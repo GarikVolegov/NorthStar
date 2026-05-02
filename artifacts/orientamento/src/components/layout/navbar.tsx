@@ -13,6 +13,8 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { LoginDialog } from "@/components/auth/LoginDialog";
 import { useAuth } from "@/contexts/AuthContext";
 
+const BASE = import.meta.env.BASE_URL || "/";
+
 const NAV_LINKS = [
   { href: "/test",     label: "Il Test",  icon: FlaskConical },
   { href: "/settori",  label: "Settori",  icon: Layers },
@@ -27,6 +29,17 @@ export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [, setLocation] = useLocation();
   const [location] = useLocation();
+  const [pendingFriends, setPendingFriends] = useState<number | null>(null);
+
+  useState(() => {
+    if (!user?.id) return;
+    fetch(`${BASE}api/friends/${user.id}`)
+      .then((res) => res.json())
+      .then((data) => setPendingFriends(Array.isArray(data.incoming) ? data.incoming.length : 0))
+      .catch(() => setPendingFriends(0));
+  });
+
+  const friendsBadge = pendingFriends && pendingFriends > 0 ? pendingFriends : null;
 
   return (
     <>
@@ -84,6 +97,7 @@ export function Navbar() {
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setLocation("/amici")} className="cursor-pointer">
                     <Users className="h-4 w-4 mr-2" /> Amici
+                    {friendsBadge ? <span className="ml-auto text-xs font-semibold text-primary">{friendsBadge}</span> : null}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive cursor-pointer">
@@ -194,6 +208,7 @@ export function Navbar() {
                         onClick={() => { setLocation("/amici"); setMenuOpen(false); }}
                       >
                         <Users className="h-4 w-4" /> Amici
+                        {friendsBadge ? <span className="ml-auto text-xs font-semibold text-primary">{friendsBadge}</span> : null}
                       </Button>
                       <Button
                         variant="ghost"
