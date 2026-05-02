@@ -12,6 +12,7 @@ import objectivesRouter from "./objectives";
 import wikiRouter from "./wiki";
 import roadmapRouter from "./roadmap";
 import grafoRouter from "./grafo";
+import sitemapRouter from "./sitemap";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(newsRouter);
 router.use(wikiRouter);
 router.use(roadmapRouter);
 router.use(grafoRouter);
+router.use(sitemapRouter);
 
 export default router;

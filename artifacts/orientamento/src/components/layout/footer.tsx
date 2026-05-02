@@ -57,6 +57,11 @@ export function Footer() {
                   Termini di servizio
                 </Link>
               </li>
+              <li>
+                <Link href="/sitemap" className="hover:text-primary transition-colors">
+                  Mappa del sito
+                </Link>
+              </li>
             </ul>
           </div>
         </div>
