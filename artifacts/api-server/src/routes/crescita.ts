@@ -1,6 +1,15 @@
 import { Router, type IRouter } from "express";
-import { db, growthArticlesTable, userFavoritesTable } from "@workspace/db";
+import { db, growthArticlesTable, userFavoritesTable, testSessionsTable } from "@workspace/db";
 import { desc, eq, and, sql, ilike } from "drizzle-orm";
+
+const RIASEC_TO_ITALIAN: Record<string, string> = {
+  R: "realistica",
+  I: "investigativa",
+  A: "artistica",
+  S: "sociale",
+  E: "imprenditoriale",
+  C: "convenzionale",
+};
 
 const router: IRouter = Router();
 
@@ -23,6 +32,45 @@ export const GROWTH_CATEGORIES = [
 function getUser(req: any) {
   return req.session?.userId ? { id: req.session.userId as number } : null;
 }
+
+router.get("/crescita/per-te", async (req, res): Promise<void> => {
+  const user = getUser(req);
+  if (!user) { res.status(401).json({ error: "Non autenticato" }); return; }
+
+  const [latestSession] = await db
+    .select({ primaryTypes: testSessionsTable.primaryTypes })
+    .from(testSessionsTable)
+    .where(eq(testSessionsTable.userId, user.id))
+    .orderBy(desc(testSessionsTable.createdAt))
+    .limit(1);
+
+  if (!latestSession?.primaryTypes) {
+    res.json({ articles: [], hasProfile: false });
+    return;
+  }
+
+  const rawTypes = latestSession.primaryTypes as string[];
+  const italianTypes = rawTypes.map(t => RIASEC_TO_ITALIAN[t]).filter(Boolean);
+
+  if (italianTypes.length === 0) {
+    res.json({ articles: [], hasProfile: false, types: rawTypes });
+    return;
+  }
+
+  const typeArray = `ARRAY[${italianTypes.map(t => `'${t}'`).join(",")}]::text[]`;
+
+  const articles = await db
+    .select()
+    .from(growthArticlesTable)
+    .where(and(
+      eq(growthArticlesTable.status, "published"),
+      sql`${growthArticlesTable.personalityMatches} && ${sql.raw(typeArray)}`
+    ))
+    .orderBy(desc(growthArticlesTable.viewCount), desc(growthArticlesTable.updatedAt))
+    .limit(4);
+
+  res.json({ articles, hasProfile: true, types: rawTypes, italianTypes });
+});
 
 router.get("/crescita/categorie", async (_req, res): Promise<void> => {
   const counts = await db

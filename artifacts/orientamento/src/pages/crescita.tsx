@@ -1,8 +1,9 @@
 import { usePageMeta } from "@/lib/seo";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowRight, BookOpen, Clock, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowRight, BookOpen, Clock, Sparkles, TrendingUp, Star, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -24,6 +25,22 @@ interface Article {
   difficulty: string;
   readTimeMinutes: number;
 }
+
+interface PerTeData {
+  articles: Article[];
+  hasProfile: boolean;
+  types?: string[];
+  italianTypes?: string[];
+}
+
+const RIASEC_LABELS: Record<string, string> = {
+  R: "Realistico",
+  I: "Investigativo",
+  A: "Artistico",
+  S: "Sociale",
+  E: "Imprenditoriale",
+  C: "Convenzionale",
+};
 
 const DIFFICULTY_LABELS: Record<string, string> = {
   base: "Base",
@@ -63,10 +80,15 @@ function CategoryCard({ cat }: { cat: Category }) {
   );
 }
 
-function ArticleCard({ article }: { article: Article }) {
+function ArticleCard({ article, recommended }: { article: Article; recommended?: boolean }) {
   return (
     <Link href={`/crescita/articolo/${article.slug}`}>
-      <div className="group rounded-2xl border bg-card p-5 hover:border-primary/40 hover:shadow-md transition-all cursor-pointer h-full flex flex-col">
+      <div className="group rounded-2xl border bg-card p-5 hover:border-primary/40 hover:shadow-md transition-all cursor-pointer h-full flex flex-col relative overflow-hidden">
+        {recommended && (
+          <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-[10px] font-semibold px-2.5 py-1 rounded-bl-xl flex items-center gap-1">
+            <Star className="w-2.5 h-2.5 fill-current" /> Per te
+          </div>
+        )}
         <div className="flex items-center gap-2 mb-3">
           <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", DIFFICULTY_COLORS[article.difficulty] ?? DIFFICULTY_COLORS["base"])}>
             {DIFFICULTY_LABELS[article.difficulty] ?? article.difficulty}
@@ -95,12 +117,136 @@ function ArticleCard({ article }: { article: Article }) {
   );
 }
 
+function PerTeSection({ userId }: { userId: number }) {
+  const { data, isLoading } = useQuery<PerTeData>({
+    queryKey: ["crescita-per-te", userId],
+    queryFn: () => fetch(`${BASE}api/crescita/per-te`).then(r => r.json()),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  if (isLoading) {
+    return (
+      <section className="py-14 border-b">
+        <div className="container mx-auto px-4 md:px-6 max-w-6xl">
+          <div className="flex items-center gap-3 mb-6">
+            <Star className="w-5 h-5 text-primary fill-primary" />
+            <div className="h-6 w-48 bg-muted animate-pulse rounded" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-44 rounded-2xl bg-muted animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (!data?.hasProfile) {
+    return (
+      <section className="py-14 border-b">
+        <div className="container mx-auto px-4 md:px-6 max-w-6xl">
+          <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/3 p-8 flex flex-col md:flex-row items-center gap-6">
+            <div className="flex-shrink-0 w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+              <Star className="w-7 h-7 text-primary" />
+            </div>
+            <div className="text-center md:text-left flex-1">
+              <h3 className="font-serif font-semibold text-lg text-foreground mb-1">
+                Sblocca i contenuti per te
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Fai il test RIASEC per ricevere articoli di crescita allineati al tuo profilo di personalità.
+              </p>
+            </div>
+            <Link href="/test">
+              <button className="flex-shrink-0 bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-sm font-medium hover:opacity-90 transition-opacity inline-flex items-center gap-2">
+                Fai il test <ArrowRight className="w-4 h-4" />
+              </button>
+            </Link>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (!data.articles.length) return null;
+
+  const typeLabels = (data.types ?? []).map(t => RIASEC_LABELS[t] ?? t);
+
+  return (
+    <section className="py-14 border-b">
+      <div className="container mx-auto px-4 md:px-6 max-w-6xl">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-8">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Star className="w-4 h-4 text-primary fill-primary" />
+              <h2 className="text-2xl font-serif font-bold text-foreground">Per te</h2>
+            </div>
+            <p className="text-muted-foreground text-sm">
+              Selezionati in base al tuo profilo{" "}
+              {typeLabels.length > 0 && (
+                <span className="font-medium text-foreground">
+                  {typeLabels.join(" · ")}
+                </span>
+              )}
+            </p>
+          </div>
+          <Link href="/profilo" className="text-sm font-medium text-primary hover:underline flex items-center gap-1 self-start sm:self-auto">
+            Il tuo profilo <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {data.articles.map(a => (
+            <ArticleCard key={a.id} article={a} recommended />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function NoProfileTeaser() {
+  return (
+    <section className="py-14 border-b">
+      <div className="container mx-auto px-4 md:px-6 max-w-6xl">
+        <div className="rounded-2xl border border-dashed border-muted-foreground/20 bg-muted/30 p-8 flex flex-col md:flex-row items-center gap-6">
+          <div className="flex-shrink-0 w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+            <Lock className="w-6 h-6 text-primary" />
+          </div>
+          <div className="text-center md:text-left flex-1">
+            <h3 className="font-serif font-semibold text-lg text-foreground mb-1">
+              Contenuti personalizzati per il tuo profilo
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Accedi o registrati per ricevere articoli selezionati in base al tuo tipo di personalità RIASEC.
+            </p>
+          </div>
+          <div className="flex gap-3 flex-shrink-0">
+            <Link href="/accedi">
+              <button className="border border-primary text-primary px-5 py-2.5 rounded-full text-sm font-medium hover:bg-primary/5 transition-colors">
+                Accedi
+              </button>
+            </Link>
+            <Link href="/registrati">
+              <button className="bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-sm font-medium hover:opacity-90 transition-opacity">
+                Registrati
+              </button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function Crescita() {
   usePageMeta({
     title: "Crescita Personale — NorthStar",
     description: "Una knowledge base di articoli, guide ed esercizi pratici su abitudini, mindset, motivazione, disciplina e sviluppo professionale.",
     canonicalPath: "/crescita",
   });
+
+  const { user, isLoggedIn } = useAuth();
 
   const { data: catData = [] } = useQuery<Category[]>({
     queryKey: ["crescita-categorie"],
@@ -150,6 +296,13 @@ export default function Crescita() {
           </div>
         </div>
       </section>
+
+      {/* Personalized section */}
+      {isLoggedIn && user ? (
+        <PerTeSection userId={user.id} />
+      ) : (
+        <NoProfileTeaser />
+      )}
 
       {/* Categories */}
       <section className="py-14">
