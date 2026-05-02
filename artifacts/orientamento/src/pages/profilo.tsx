@@ -14,7 +14,7 @@ import {
   ChevronRight, Loader2, KeyRound, BarChart3, Sparkles, ShieldCheck,
   TrendingUp, DollarSign, Activity, Settings2, ArrowRight, Layers,
   Bookmark, ExternalLink, Newspaper, X, Heart,
-  Target, Plus, Check,
+  Target, Plus, Check, ChevronDown, Flag, Award, Users, Briefcase, GraduationCap,
 } from "lucide-react";
 import { useFavorites } from "@/hooks/useFavorites";
 import { cn } from "@/lib/utils";
@@ -272,21 +272,44 @@ function ExploredSectorCard({ sector }: { sector: ExploredSector }) {
   );
 }
 
-// ── Mini objectives ───────────────────────────────────────────────────
+// ── Objectives panel ─────────────────────────────────────────────────
 const FREE_LIMIT = 5;
+
+const CATEGORIES: { value: string; label: string; Icon: React.ElementType; color: string; bg: string }[] = [
+  { value: "formazione",    label: "Formazione",    Icon: GraduationCap, color: "#6366f1", bg: "#eef2ff" },
+  { value: "certificazione",label: "Certificazione",Icon: Award,         color: "#f59e0b", bg: "#fffbeb" },
+  { value: "networking",    label: "Networking",    Icon: Users,         color: "#10b981", bg: "#ecfdf5" },
+  { value: "esperienza",    label: "Esperienza",    Icon: Briefcase,     color: "#3b82f6", bg: "#eff6ff" },
+  { value: "altro",         label: "Altro",         Icon: Flag,          color: "#8b5cf6", bg: "#f5f3ff" },
+];
 
 interface Objective {
   id: number;
   userId: number;
   text: string;
+  category: string;
+  progress: number;
+  dueDate: string | null;
   completed: boolean;
+  completedAt: string | null;
   createdAt: string;
 }
 
-function MiniObjectives({ userId }: { userId: number }) {
+function dueDateStatus(dueDate: string | null): { label: string; color: string } | null {
+  if (!dueDate) return null;
+  const diff = Math.ceil((new Date(dueDate).getTime() - Date.now()) / 86_400_000);
+  if (diff < 0) return { label: `Scaduto ${Math.abs(diff)}g fa`, color: "text-rose-600 bg-rose-50 border-rose-200" };
+  if (diff === 0) return { label: "Scade oggi", color: "text-orange-600 bg-orange-50 border-orange-200" };
+  if (diff <= 7) return { label: `${diff}g rimasti`, color: "text-amber-600 bg-amber-50 border-amber-200" };
+  return { label: new Date(dueDate).toLocaleDateString("it-IT", { day: "numeric", month: "short" }), color: "text-muted-foreground bg-muted/50 border-border" };
+}
+
+function ObjectivesPanel({ userId }: { userId: number }) {
   const queryClient = useQueryClient();
-  const [input, setInput] = useState("");
+  const [filterCat, setFilterCat] = useState<string>("all");
   const [showCompleted, setShowCompleted] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ text: "", category: "formazione", dueDate: "" });
 
   const { data: objectives = [], isLoading } = useQuery<Objective[]>({
     queryKey: ["objectives", userId],
@@ -295,30 +318,32 @@ function MiniObjectives({ userId }: { userId: number }) {
       if (!res.ok) return [];
       return res.json();
     },
-    staleTime: 60_000,
+    staleTime: 30_000,
   });
 
   const addMutation = useMutation({
-    mutationFn: async (text: string) => {
+    mutationFn: async (payload: { text: string; category: string; dueDate: string | null }) => {
       const res = await fetch(`${BASE}api/objectives`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, text }),
+        body: JSON.stringify({ userId, ...payload }),
       });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["objectives", userId] });
-      setInput("");
+      setForm({ text: "", category: "formazione", dueDate: "" });
+      setShowForm(false);
     },
   });
 
-  const toggleMutation = useMutation({
-    mutationFn: async ({ id, completed }: { id: number; completed: boolean }) => {
+  const patchMutation = useMutation({
+    mutationFn: async (payload: Partial<Objective> & { id: number }) => {
+      const { id, ...rest } = payload;
       const res = await fetch(`${BASE}api/objectives/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ completed }),
+        body: JSON.stringify(rest),
       });
       return res.json();
     },
@@ -333,134 +358,314 @@ function MiniObjectives({ userId }: { userId: number }) {
   });
 
   const active = objectives.filter((o) => !o.completed);
-  const completed = objectives.filter((o) => o.completed);
+  const completedList = objectives.filter((o) => o.completed);
   const atLimit = active.length >= FREE_LIMIT;
+
+  const visibleActive = filterCat === "all" ? active : active.filter((o) => o.category === filterCat);
+  const avgProgress = active.length > 0
+    ? Math.round(active.reduce((s, o) => s + o.progress, 0) / active.length)
+    : 0;
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    if (!input.trim() || atLimit) return;
-    addMutation.mutate(input.trim());
+    if (!form.text.trim() || atLimit) return;
+    addMutation.mutate({ text: form.text.trim(), category: form.category, dueDate: form.dueDate || null });
   }
 
   return (
     <Card className="rounded-2xl">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <Target className="w-4 h-4 text-primary" /> Il mio prossimo passo
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Annotati piccoli obiettivi concreti per restare in movimento.
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-3">
-
-        {/* Active objectives */}
-        {isLoading ? (
-          <div className="space-y-2">
-            {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full rounded-xl" />)}
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Target className="w-4 h-4 text-primary" /> I miei obiettivi
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Traguardi di carriera da raggiungere, con scadenze e progressi tracciati.
+            </p>
           </div>
-        ) : active.length === 0 && completed.length === 0 ? (
-          <div className="text-center py-6 px-3">
-            <div className="w-10 h-10 bg-muted rounded-xl flex items-center justify-center mx-auto mb-3">
-              <Target className="w-5 h-5 text-muted-foreground opacity-50" />
+          <Button size="sm" className="rounded-xl" onClick={() => setShowForm((v) => !v)} disabled={atLimit}>
+            <Plus className="w-3.5 h-3.5 mr-1.5" />
+            {atLimit ? `Limite Free (${FREE_LIMIT})` : "Nuovo obiettivo"}
+          </Button>
+        </div>
+
+        {/* Stats row */}
+        {!isLoading && objectives.length > 0 && (
+          <div className="flex flex-wrap gap-3 mt-4">
+            <div className="flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-xl px-3 py-2">
+              <Target className="w-3.5 h-3.5 text-primary" />
+              <span className="text-xs font-medium text-primary">{active.length} attivi</span>
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Nessun obiettivo ancora.<br />
-              Aggiungi il tuo primo piccolo passo.
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="text-xs font-medium text-emerald-700">{completedList.length} completati</span>
+            </div>
+            {active.length > 0 && (
+              <div className="flex items-center gap-2 bg-muted/60 border border-border rounded-xl px-3 py-2">
+                <BarChart3 className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs font-medium text-foreground">{avgProgress}% progresso medio</span>
+              </div>
+            )}
+          </div>
+        )}
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+
+        {/* Add form */}
+        {showForm && (
+          <div className="bg-muted/40 border rounded-2xl p-4 space-y-3 animate-in slide-in-from-top-2 fade-in duration-200">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Obiettivo *</label>
+              <Input
+                placeholder='es. "Ottenere la certificazione AWS entro giugno"'
+                value={form.text}
+                onChange={(e) => setForm((f) => ({ ...f, text: e.target.value }))}
+                maxLength={160}
+                className="rounded-xl text-sm"
+                autoFocus
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Categoria</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.value}
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, category: cat.value }))}
+                      className={cn(
+                        "flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors",
+                        form.category === cat.value
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                      )}
+                    >
+                      <cat.Icon className="w-3 h-3" /> {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Scadenza (opzionale)</label>
+                <Input
+                  type="date"
+                  value={form.dueDate}
+                  onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))}
+                  className="rounded-xl text-sm h-9"
+                  min={new Date().toISOString().split("T")[0]}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" className="rounded-xl" onClick={() => setShowForm(false)}>Annulla</Button>
+              <Button
+                size="sm"
+                className="rounded-xl"
+                onClick={handleAdd}
+                disabled={!form.text.trim() || addMutation.isPending}
+              >
+                {addMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Plus className="w-3.5 h-3.5 mr-1.5" />}
+                Aggiungi
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {atLimit && !showForm && (
+          <p className="text-xs text-muted-foreground bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-center">
+            Hai raggiunto il limite Free di {FREE_LIMIT} obiettivi attivi.{" "}
+            <Link href="/premium" className="text-primary hover:underline font-medium">Upgrade →</Link>
+          </p>
+        )}
+
+        {/* Category filter */}
+        {active.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => setFilterCat("all")}
+              className={cn(
+                "px-3 py-1 rounded-full text-xs font-medium border transition-colors",
+                filterCat === "all"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background border-border text-muted-foreground hover:border-primary/40"
+              )}
+            >
+              Tutti ({active.length})
+            </button>
+            {CATEGORIES.filter((cat) => active.some((o) => o.category === cat.value)).map((cat) => {
+              const count = active.filter((o) => o.category === cat.value).length;
+              return (
+                <button
+                  key={cat.value}
+                  onClick={() => setFilterCat(cat.value)}
+                  className={cn(
+                    "flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border transition-colors",
+                    filterCat === cat.value
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "bg-background border-border text-muted-foreground hover:border-primary/40"
+                  )}
+                >
+                  <cat.Icon className="w-3 h-3" /> {cat.label} ({count})
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Active objectives list */}
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
+          </div>
+        ) : visibleActive.length === 0 && completedList.length === 0 ? (
+          <div className="text-center py-10">
+            <div className="w-12 h-12 bg-muted rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <Target className="w-6 h-6 text-muted-foreground opacity-40" />
+            </div>
+            <p className="text-sm font-medium text-foreground mb-1">Nessun obiettivo ancora</p>
+            <p className="text-sm text-muted-foreground">
+              Aggiungi il tuo primo traguardo di carriera per iniziare a tracciare i progressi.
             </p>
           </div>
         ) : (
-          <ul className="space-y-2">
-            {active.map((obj) => (
-              <li key={obj.id} className="flex items-start gap-2.5 group">
-                <button
-                  onClick={() => toggleMutation.mutate({ id: obj.id, completed: true })}
-                  disabled={toggleMutation.isPending}
-                  className="mt-0.5 w-5 h-5 rounded-full border-2 border-border hover:border-primary hover:bg-primary/5 transition-colors shrink-0 flex items-center justify-center"
-                  title="Segna come completato"
-                />
-                <p className="flex-1 text-sm text-foreground leading-snug pt-0.5">{obj.text}</p>
-                <button
-                  onClick={() => deleteMutation.mutate(obj.id)}
-                  disabled={deleteMutation.isPending}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-muted-foreground hover:text-destructive transition-all"
-                  title="Elimina"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {/* Completed section */}
-        {completed.length > 0 && (
-          <div>
-            <button
-              onClick={() => setShowCompleted((v) => !v)}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 mt-1"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-              {completed.length} completat{completed.length === 1 ? "o" : "i"}
-              <span className="opacity-60">{showCompleted ? "▲" : "▼"}</span>
-            </button>
-            {showCompleted && (
-              <ul className="space-y-1.5 mt-2">
-                {completed.map((obj) => (
-                  <li key={obj.id} className="flex items-start gap-2.5 group">
-                    <button
-                      onClick={() => toggleMutation.mutate({ id: obj.id, completed: false })}
-                      disabled={toggleMutation.isPending}
-                      className="mt-0.5 w-5 h-5 rounded-full bg-emerald-100 border-2 border-emerald-400 shrink-0 flex items-center justify-center hover:bg-emerald-200 transition-colors"
-                      title="Segna come da fare"
-                    >
-                      <Check className="w-3 h-3 text-emerald-600" />
-                    </button>
-                    <p className="flex-1 text-sm text-muted-foreground line-through leading-snug pt-0.5">{obj.text}</p>
+          <div className="space-y-3">
+            {visibleActive.map((obj) => {
+              const cat = CATEGORIES.find((c) => c.value === obj.category) ?? CATEGORIES[4];
+              const due = dueDateStatus(obj.dueDate);
+              const STEPS = [0, 25, 50, 75, 100];
+              return (
+                <div key={obj.id} className="group rounded-2xl border bg-card p-4 hover:shadow-sm transition-all">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                      <button
+                        onClick={() => patchMutation.mutate({ id: obj.id, completed: true })}
+                        disabled={patchMutation.isPending}
+                        className="mt-0.5 w-5 h-5 rounded-full border-2 border-border hover:border-emerald-500 hover:bg-emerald-50 transition-colors shrink-0"
+                        title="Segna come completato"
+                      />
+                      <p className="text-sm font-medium text-foreground leading-snug">{obj.text}</p>
+                    </div>
                     <button
                       onClick={() => deleteMutation.mutate(obj.id)}
                       disabled={deleteMutation.isPending}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-muted-foreground hover:text-destructive transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-all shrink-0"
                       title="Elimina"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
-                  </li>
-                ))}
-              </ul>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs text-muted-foreground">Progresso</span>
+                      <span className="text-xs font-semibold text-foreground">{obj.progress}%</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${obj.progress}%`,
+                          backgroundColor: obj.progress >= 100 ? "#10b981" : obj.progress >= 50 ? "#6366f1" : "#94a3b8",
+                        }}
+                      />
+                    </div>
+                    {/* Quick progress buttons */}
+                    <div className="flex gap-1 mt-2">
+                      {STEPS.map((step) => (
+                        <button
+                          key={step}
+                          onClick={() => patchMutation.mutate({ id: obj.id, progress: step })}
+                          disabled={patchMutation.isPending}
+                          className={cn(
+                            "flex-1 py-1 rounded-lg text-xs font-medium border transition-colors",
+                            obj.progress === step
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                          )}
+                        >
+                          {step === 100 ? "✓" : `${step}%`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Badges row */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span
+                      className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border"
+                      style={{ color: cat.color, backgroundColor: cat.bg, borderColor: `${cat.color}30` }}
+                    >
+                      <cat.Icon className="w-3 h-3" /> {cat.label}
+                    </span>
+                    {due && (
+                      <span className={cn("inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border", due.color)}>
+                        <Calendar className="w-3 h-3" /> {due.label}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Completed section */}
+        {completedList.length > 0 && (
+          <div>
+            <button
+              onClick={() => setShowCompleted((v) => !v)}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              {completedList.length} obiettiv{completedList.length === 1 ? "o completato" : "i completati"}
+              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showCompleted && "rotate-180")} />
+            </button>
+            {showCompleted && (
+              <div className="space-y-2 mt-3">
+                {completedList.map((obj) => {
+                  const cat = CATEGORIES.find((c) => c.value === obj.category) ?? CATEGORIES[4];
+                  return (
+                    <div key={obj.id} className="group flex items-start gap-3 rounded-xl border bg-muted/30 px-4 py-3 opacity-70 hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => patchMutation.mutate({ id: obj.id, completed: false, progress: 75 })}
+                        disabled={patchMutation.isPending}
+                        className="mt-0.5 w-5 h-5 rounded-full bg-emerald-100 border-2 border-emerald-400 shrink-0 flex items-center justify-center hover:bg-emerald-200 transition-colors"
+                        title="Riapri"
+                      >
+                        <Check className="w-3 h-3 text-emerald-600" />
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-muted-foreground line-through leading-snug">{obj.text}</p>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="text-xs text-muted-foreground/70" style={{ color: cat.color }}>
+                            {cat.label}
+                          </span>
+                          {obj.completedAt && (
+                            <span className="text-xs text-muted-foreground/50">
+                              · {new Date(obj.completedAt).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => deleteMutation.mutate(obj.id)}
+                        disabled={deleteMutation.isPending}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-muted-foreground hover:text-destructive transition-all shrink-0"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}
 
-        {/* Add new objective */}
-        <form onSubmit={handleAdd} className="flex gap-2 pt-1">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={atLimit ? `Limite ${FREE_LIMIT} obiettivi (Free)` : "Aggiungi un obiettivo…"}
-            disabled={atLimit}
-            maxLength={120}
-            className="rounded-xl text-sm h-9"
-          />
-          <Button
-            type="submit"
-            size="sm"
-            disabled={!input.trim() || atLimit || addMutation.isPending}
-            className="rounded-xl h-9 w-9 p-0 shrink-0"
-            title="Aggiungi"
-          >
-            {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-          </Button>
-        </form>
-
-        {atLimit && (
-          <p className="text-xs text-muted-foreground text-center pt-1">
-            Hai raggiunto il limite Free.{" "}
-            <Link href="/premium" className="text-primary hover:underline font-medium">
-              Upgrade per obiettivi illimitati
-            </Link>
-          </p>
-        )}
       </CardContent>
     </Card>
   );
@@ -729,7 +934,6 @@ export default function Profilo() {
             </CardContent>
           </Card>
 
-          <MiniObjectives userId={user.id} />
         </div>
 
         {/* Test history */}
@@ -815,6 +1019,9 @@ export default function Profilo() {
           </CardContent>
         </Card>
       )}
+
+      {/* Objectives — full width */}
+      <ObjectivesPanel userId={user.id} />
 
       {/* Saved items — sectors + articles */}
       <SavedItems userId={user.id} />

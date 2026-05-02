@@ -35,6 +35,8 @@ scripts/
 - **sectors** — Career sectors with RIASEC types, salary ranges, growth rates, pros/cons
 - **test_sessions** — User test answers, RIASEC scores, spirit scores, recommendations, confirmed sector
 - **users** — Registered users linked to test sessions (with stripeCustomerId, stripeSubscriptionId)
+- **user_objectives** — Career goals per user: text, category (formazione/certificazione/networking/esperienza/altro), progress 0–100, dueDate, completed, completedAt
+- **user_favorites** — Saved sectors and articles per user
 
 ## Key Features (MVP)
 
