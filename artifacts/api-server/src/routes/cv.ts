@@ -334,6 +334,64 @@ Integra i dati del CV caricato con le informazioni del grafo. Se il CV è vuoto,
   res.json({ success: true, generated });
 });
 
+// ── POST /api/cv/:userId/tailor — rewrite CV for a specific job posting ─
+router.post("/cv/:userId/tailor", async (req, res): Promise<void> => {
+  const userId = parseInt(req.params.userId, 10);
+  if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+  const { generated, jobPosting } = req.body;
+  if (!generated || typeof generated !== "object") {
+    res.status(400).json({ error: "CV mancante. Genera prima il CV base." }); return;
+  }
+  if (!jobPosting || jobPosting.trim().length < 30) {
+    res.status(400).json({ error: "Incolla il testo dell'offerta di lavoro (almeno 30 caratteri)." }); return;
+  }
+
+  const cvJson = JSON.stringify(generated, null, 2);
+
+  const prompt = `Sei un esperto recruiter e career coach italiano. Il candidato ti ha fornito il suo CV strutturato e un'offerta di lavoro.
+Il tuo compito è ADATTARE il CV all'offerta: riscrivi le sezioni rilevanti per massimizzare le possibilità di superare i filtri ATS e impressionare il recruiter.
+
+─── CV ATTUALE (JSON) ───
+${cvJson}
+
+─── OFFERTA DI LAVORO ───
+${jobPosting.slice(0, 4000)}
+
+ISTRUZIONI:
+1. Aggiorna "targetRole" con il titolo esatto del ruolo nell'offerta
+2. Riscrivi "summary" di 3-4 righe: menziona esplicitamente il ruolo e integra 3-5 keyword chiave dell'offerta
+3. Per ogni esperienza, riscrivi "description" usando bullet → per evidenziare responsabilità che corrispondono ai requisiti dell'offerta
+4. Riordina "skills": metti prima le competenze che matchano l'offerta, mantieni tutte le altre
+5. Riordina "tools": stessa logica delle skills
+6. Aggiorna "personalInfo.title" con il titolo del ruolo target
+7. NON inventare esperienze o competenze che non sono nel CV originale
+8. Mantieni TUTTI i campi JSON originali (id, company, period, education, languages, certifications ecc.) invariati
+9. Usa un tono professionale in italiano
+
+Restituisci SOLO il JSON aggiornato (stesso schema del CV attuale, senza markdown, senza spiegazioni).`;
+
+  let tailored: any;
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4.1",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.25,
+      max_tokens: 4500,
+    });
+
+    const raw = (completion.choices[0]?.message?.content ?? "{}").trim()
+      .replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "");
+
+    tailored = JSON.parse(raw);
+  } catch (err) {
+    console.error("Tailor error:", err);
+    res.status(500).json({ error: "Errore nell'adattamento. Riprova." }); return;
+  }
+
+  res.json({ success: true, tailored });
+});
+
 // ── PATCH /api/cv/:userId/save — persist edited generated CV ──────────
 router.patch("/cv/:userId/save", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);

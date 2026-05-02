@@ -9,6 +9,7 @@ import {
   Pencil, Eye, Plus, Trash2, ChevronDown, ChevronUp, Check,
   User, Briefcase, GraduationCap, Wrench, Award, Globe,
   Save, CheckCircle2, Clock, History, FolderOpen, PenLine, Download,
+  Crosshair, FileSearch, Lightbulb,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -499,6 +500,13 @@ export function CvGeneratorModal({
   const [loadingVersionId, setLoadingVersionId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
 
+  // ── Tailor state ───────────────────────────────────────────────────
+  const [showTailor, setShowTailor] = useState(false);
+  const [jobPosting, setJobPosting] = useState("");
+  const [tailorStatus, setTailorStatus] = useState<"idle" | "tailoring" | "done" | "error">("idle");
+  const [tailorError, setTailorError] = useState<string | null>(null);
+  const [tailorKeywords, setTailorKeywords] = useState<string[]>([]);
+
   async function fetchVersions() {
     try {
       const res = await fetch(`${BASE}api/cv/${userId}/versions`);
@@ -547,6 +555,35 @@ export function CvGeneratorModal({
       await fetch(`${BASE}api/cv/${userId}/versions/${id}`, { method: "DELETE" });
       setVersions((prev) => prev.filter((v) => v.id !== id));
     } catch { /* silent */ }
+  }
+
+  async function tailorCv() {
+    if (!generated || !jobPosting.trim()) return;
+    setTailorStatus("tailoring");
+    setTailorError(null);
+    setTailorKeywords([]);
+    try {
+      const res = await fetch(`${BASE}api/cv/${userId}/tailor`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ generated, jobPosting }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Errore nell'adattamento");
+      setGenerated(data.tailored);
+      setHasUnsavedChanges(true);
+      setSaveStatus("idle");
+      setTailorStatus("done");
+      // Auto-detect matched keywords for the success message
+      const posting = jobPosting.toLowerCase();
+      const matched = [...(data.tailored.skills ?? []), ...(data.tailored.tools ?? [])]
+        .filter((k: string) => posting.includes(k.toLowerCase()))
+        .slice(0, 6);
+      setTailorKeywords(matched);
+    } catch (err: any) {
+      setTailorError(err.message || "Errore di rete. Riprova.");
+      setTailorStatus("error");
+    }
   }
 
   async function downloadPdf() {
@@ -793,13 +830,36 @@ export function CvGeneratorModal({
             </Button>
           )}
 
+          {/* Adatta a Offerta */}
+          {hasContent && (
+            <Button
+              size="sm"
+              variant={showTailor ? "default" : "outline"}
+              className={cn(
+                "rounded-full gap-1.5",
+                !showTailor && "border-amber-300 text-amber-700 hover:bg-amber-50",
+                showTailor && "bg-amber-600 hover:bg-amber-700",
+              )}
+              onClick={() => {
+                setShowTailor((v) => !v);
+                setShowVersions(false);
+              }}
+            >
+              <Crosshair className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Adatta a Offerta</span>
+            </Button>
+          )}
+
           {/* Versioni */}
           {hasContent && (
             <Button
               size="sm"
               variant={showVersions ? "default" : "outline"}
               className="rounded-full gap-1.5"
-              onClick={() => setShowVersions((v) => !v)}
+              onClick={() => {
+                setShowVersions((v) => !v);
+                setShowTailor(false);
+              }}
             >
               <History className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">
@@ -890,7 +950,7 @@ export function CvGeneratorModal({
             {/* Desktop: side-by-side */}
             <div className="hidden md:flex flex-1 overflow-hidden">
               {/* Edit panel */}
-              {isEditing && !showVersions && (
+              {isEditing && !showVersions && !showTailor && (
                 <div className="w-[400px] flex-shrink-0 overflow-y-auto border-r bg-background p-4">
                   <div className="flex items-center gap-2 mb-4 pb-3 border-b">
                     <Pencil className="w-4 h-4 text-primary" />
@@ -915,6 +975,112 @@ export function CvGeneratorModal({
                     )}
                     {lastSavedAt && saveStatus !== "saving" && (
                       <p className="text-center text-xs text-muted-foreground mt-1.5">Ultima modifica: {formatSavedAt(lastSavedAt)}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Tailor panel (desktop) ── */}
+              {showTailor && (
+                <div className="w-[400px] flex-shrink-0 flex flex-col border-r bg-background">
+                  {/* Header */}
+                  <div className="flex items-center gap-2 px-4 py-3 border-b bg-amber-50">
+                    <Crosshair className="w-4 h-4 text-amber-600" />
+                    <h2 className="font-semibold text-sm text-amber-900">Adatta CV all'Offerta</h2>
+                    <button onClick={() => setShowTailor(false)} className="ml-auto p-1 rounded hover:bg-amber-100">
+                      <X className="w-3.5 h-3.5 text-amber-700" />
+                    </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {/* How it works */}
+                    <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-1.5">
+                      <p className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
+                        <Lightbulb className="w-3.5 h-3.5" /> Come funziona
+                      </p>
+                      <ul className="text-xs text-amber-700 space-y-1 pl-1">
+                        <li>→ L'AI analizza il testo dell'offerta di lavoro</li>
+                        <li>→ Riscrive il profilo e le descrizioni per evidenziare le competenze richieste</li>
+                        <li>→ Riordina skills e strumenti per massimizzare il match ATS</li>
+                        <li>→ NON inventa esperienze: lavora solo su ciò che hai già nel CV</li>
+                      </ul>
+                    </div>
+
+                    {/* Job posting textarea */}
+                    <div>
+                      <Label className="text-xs font-semibold text-foreground mb-1.5 block flex items-center gap-1.5">
+                        <FileSearch className="w-3.5 h-3.5 text-muted-foreground" />
+                        Testo dell'offerta di lavoro
+                      </Label>
+                      <Textarea
+                        value={jobPosting}
+                        onChange={(e) => {
+                          setJobPosting(e.target.value);
+                          if (tailorStatus !== "idle") { setTailorStatus("idle"); setTailorError(null); }
+                        }}
+                        placeholder={"Incolla qui il testo completo dell'offerta...\n\nEs.:\nStiamo cercando un Software Engineer...\nRequisiti: React, TypeScript, Node.js...\nResponsabilità: sviluppo frontend..."}
+                        className="min-h-[220px] text-xs rounded-xl resize-none font-mono leading-relaxed"
+                      />
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        {jobPosting.length} caratteri
+                        {jobPosting.length > 0 && jobPosting.length < 30 && (
+                          <span className="text-amber-600 ml-1">— ne servono almeno 30</span>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Error */}
+                    {tailorStatus === "error" && tailorError && (
+                      <div className="flex items-start gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+                        <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                        <p className="text-xs text-destructive">{tailorError}</p>
+                      </div>
+                    )}
+
+                    {/* Success */}
+                    {tailorStatus === "done" && (
+                      <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 space-y-2">
+                        <p className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> CV adattato con successo!
+                        </p>
+                        {tailorKeywords.length > 0 && (
+                          <div>
+                            <p className="text-xs text-emerald-700 mb-1.5">Keyword evidenziate:</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {tailorKeywords.map((k) => (
+                                <span key={k} className="text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                                  {k}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <p className="text-xs text-emerald-600">
+                          Controlla il CV nell'anteprima, poi <strong>salva</strong> o <strong>aggiungi come versione</strong> per conservarlo.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action button */}
+                  <div className="p-4 border-t bg-muted/20">
+                    <Button
+                      className={cn(
+                        "w-full rounded-xl gap-2 h-10",
+                        tailorStatus === "done" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700",
+                      )}
+                      onClick={tailorStatus === "done" ? () => { setTailorStatus("idle"); setJobPosting(""); } : tailorCv}
+                      disabled={tailorStatus === "tailoring" || jobPosting.trim().length < 30}
+                    >
+                      {tailorStatus === "tailoring" && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {tailorStatus === "tailoring" ? "Adattamento in corso…"
+                        : tailorStatus === "done" ? "↩ Adatta un'altra offerta"
+                        : <><Crosshair className="w-4 h-4" /> Adatta il CV</>}
+                    </Button>
+                    {tailorStatus === "idle" && jobPosting.trim().length >= 30 && (
+                      <p className="text-center text-[11px] text-muted-foreground mt-2">
+                        L'AI riscriverà il CV mantenendo tutte le tue esperienze reali
+                      </p>
                     )}
                   </div>
                 </div>
@@ -1049,7 +1215,57 @@ export function CvGeneratorModal({
             <div className="flex md:hidden flex-1 overflow-hidden">
               {mobileTab === "edit" ? (
                 <div className="flex-1 overflow-y-auto p-4 bg-background">
-                  {showVersions ? (
+                  {showTailor ? (
+                    /* Mobile tailor panel */
+                    <div>
+                      <div className="flex items-center gap-2 mb-3 pb-3 border-b bg-amber-50 -mx-4 -mt-4 px-4 pt-4">
+                        <Crosshair className="w-4 h-4 text-amber-600" />
+                        <h2 className="font-semibold text-sm text-amber-900">Adatta CV all'Offerta</h2>
+                        <button onClick={() => setShowTailor(false)} className="ml-auto p-1 rounded hover:bg-amber-100">
+                          <X className="w-3.5 h-3.5 text-amber-700" />
+                        </button>
+                      </div>
+                      <div className="mt-4 rounded-xl bg-amber-50 border border-amber-200 p-3 mb-4 space-y-1">
+                        <p className="text-xs font-semibold text-amber-800">Come funziona</p>
+                        <p className="text-xs text-amber-700">L'AI analizza l'offerta e riscrive il CV per massimizzare il match ATS, senza inventare esperienze.</p>
+                      </div>
+                      <Label className="text-xs font-semibold mb-1.5 block">Testo dell'offerta</Label>
+                      <Textarea
+                        value={jobPosting}
+                        onChange={(e) => { setJobPosting(e.target.value); if (tailorStatus !== "idle") setTailorStatus("idle"); }}
+                        placeholder="Incolla qui il testo dell'offerta di lavoro..."
+                        className="min-h-[160px] text-xs rounded-xl resize-none mb-3"
+                      />
+                      {tailorStatus === "error" && tailorError && (
+                        <div className="flex gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20 mb-3">
+                          <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
+                          <p className="text-xs text-destructive">{tailorError}</p>
+                        </div>
+                      )}
+                      {tailorStatus === "done" && (
+                        <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 mb-3">
+                          <p className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> CV adattato! Controlla l'anteprima.
+                          </p>
+                          {tailorKeywords.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {tailorKeywords.map((k) => (
+                                <span key={k} className="text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">{k}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <Button
+                        className={cn("w-full rounded-xl gap-2", tailorStatus === "done" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700")}
+                        onClick={tailorStatus === "done" ? () => { setTailorStatus("idle"); setJobPosting(""); } : tailorCv}
+                        disabled={tailorStatus === "tailoring" || jobPosting.trim().length < 30}
+                      >
+                        {tailorStatus === "tailoring" && <Loader2 className="w-4 h-4 animate-spin" />}
+                        {tailorStatus === "tailoring" ? "Adattamento in corso…" : tailorStatus === "done" ? "↩ Adatta un'altra offerta" : <><Crosshair className="w-4 h-4" /> Adatta il CV</>}
+                      </Button>
+                    </div>
+                  ) : showVersions ? (
                     /* Mobile versions panel */
                     <div>
                       <div className="flex items-center gap-2 mb-3 pb-3 border-b">
