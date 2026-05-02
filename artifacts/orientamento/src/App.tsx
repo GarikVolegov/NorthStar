@@ -17,6 +17,9 @@ import Profilo from "@/pages/profilo";
 import Wiki from "@/pages/wiki";
 import Roadmap from "@/pages/roadmap";
 import Grafo from "@/pages/grafo";
+import ChiSiamo from "@/pages/chi-siamo";
+import PrivacyPolicy from "@/pages/privacy-policy";
+import TerminiDiServizio from "@/pages/termini-di-servizio";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 
@@ -41,6 +44,9 @@ function Router() {
           <Route path="/wiki/:id" component={Wiki} />
           <Route path="/roadmap/:id" component={Roadmap} />
           <Route path="/grafo/:id" component={Grafo} />
+          <Route path="/chi-siamo" component={ChiSiamo} />
+          <Route path="/privacy-policy" component={PrivacyPolicy} />
+          <Route path="/termini-di-servizio" component={TerminiDiServizio} />
           <Route component={NotFound} />
         </Switch>
       </main>
