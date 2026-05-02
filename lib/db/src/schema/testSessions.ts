@@ -15,6 +15,8 @@ export const testSessionsTable = pgTable("test_sessions", {
     matchScore: number;
     matchReason: string;
   }>>().notNull().default([]),
+  spiritScores: json("spirit_scores").$type<Record<string, number>>().notNull().default({}),
+  dominantSpirit: text("dominant_spirit").notNull().default(""),
   confirmedSectorId: integer("confirmed_sector_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
