@@ -1,10 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
-  X, Loader2, Printer, RefreshCw, Sparkles, Briefcase,
-  GraduationCap, Wrench, Award, Globe, Mail, Phone,
-  MapPin, Linkedin, ExternalLink, CheckCircle2, AlertCircle,
+  X, Loader2, Printer, RefreshCw, Sparkles, AlertCircle,
+  Pencil, Eye, Plus, Trash2, ChevronDown, ChevronUp, Check,
+  User, Briefcase, GraduationCap, Wrench, Award, Globe,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -18,7 +21,7 @@ interface GraphNode {
   description: string; userAdded?: boolean;
 }
 
-interface GeneratedCv {
+export interface GeneratedCv {
   personalInfo: {
     name: string; email?: string; phone?: string; location?: string;
     linkedin?: string; website?: string; title?: string;
@@ -59,7 +62,7 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
       {/* Header */}
       <div style={{ background: "#1a3a2a", padding: "32px 40px 28px", color: "#ffffff" }}>
         <h1 style={{ margin: 0, fontSize: "28px", fontWeight: "700", letterSpacing: "-0.5px", fontFamily: "Georgia, serif" }}>
-          {cv.personalInfo.name}
+          {cv.personalInfo.name || "Nome Cognome"}
         </h1>
         {cv.personalInfo.title && (
           <p style={{ margin: "6px 0 0", fontSize: "14px", color: "#86efac", fontWeight: "500" }}>
@@ -67,207 +70,395 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
           </p>
         )}
         {cv.targetRole && cv.targetRole !== cv.personalInfo.title && (
-          <p style={{ margin: "4px 0 0", fontSize: "12px", color: "rgba(255,255,255,0.6)" }}>
+          <p style={{ margin: "4px 0 0", fontSize: "12px", color: "rgba(255,255,255,0.5)" }}>
             Target: {cv.targetRole}
           </p>
         )}
-
-        {/* Contact row */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", marginTop: "16px" }}>
           {cv.personalInfo.email && (
-            <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "rgba(255,255,255,0.8)" }}>
-              ✉ {cv.personalInfo.email}
-            </span>
+            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)" }}>✉ {cv.personalInfo.email}</span>
           )}
           {cv.personalInfo.phone && (
-            <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "rgba(255,255,255,0.8)" }}>
-              ✆ {cv.personalInfo.phone}
-            </span>
+            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)" }}>✆ {cv.personalInfo.phone}</span>
           )}
           {cv.personalInfo.location && (
-            <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "rgba(255,255,255,0.8)" }}>
-              ⌖ {cv.personalInfo.location}
-            </span>
+            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)" }}>⌖ {cv.personalInfo.location}</span>
           )}
           {cv.personalInfo.linkedin && (
-            <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#86efac" }}>
+            <span style={{ fontSize: "12px", color: "#86efac" }}>
               in {cv.personalInfo.linkedin.replace(/https?:\/\/(www\.)?linkedin\.com\/in\//, "")}
             </span>
           )}
           {cv.personalInfo.website && (
-            <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#86efac" }}>
-              ⌘ {cv.personalInfo.website}
-            </span>
+            <span style={{ fontSize: "12px", color: "#86efac" }}>⌘ {cv.personalInfo.website}</span>
           )}
         </div>
       </div>
 
       {/* Two-column body */}
-      <div style={{ display: "flex", gap: 0 }}>
-
+      <div style={{ display: "flex" }}>
         {/* Left column */}
         <div style={{ width: "38%", background: "#f8faf9", borderRight: "1px solid #e5e7eb", padding: "28px 24px", flexShrink: 0 }}>
-
-          {/* Skills */}
           {cv.skills.length > 0 && (
-            <div style={{ marginBottom: "24px" }}>
-              <h3 style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1.5px", textTransform: "uppercase", color: "#1a3a2a", marginBottom: "12px", borderBottom: "2px solid #1a3a2a", paddingBottom: "6px" }}>
-                Competenze
-              </h3>
+            <CvSection title="Competenze">
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                 {cv.skills.map((s) => (
-                  <span key={s} style={{ fontSize: "11px", background: "#dcfce7", color: "#15803d", border: "1px solid #bbf7d0", borderRadius: "999px", padding: "3px 10px", fontWeight: "500" }}>
-                    {s}
-                  </span>
+                  <span key={s} style={{ fontSize: "11px", background: "#dcfce7", color: "#15803d", border: "1px solid #bbf7d0", borderRadius: "999px", padding: "3px 10px", fontWeight: "500" }}>{s}</span>
                 ))}
               </div>
-            </div>
+            </CvSection>
           )}
-
-          {/* Tools */}
           {cv.tools.length > 0 && (
-            <div style={{ marginBottom: "24px" }}>
-              <h3 style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1.5px", textTransform: "uppercase", color: "#1a3a2a", marginBottom: "12px", borderBottom: "2px solid #1a3a2a", paddingBottom: "6px" }}>
-                Strumenti
-              </h3>
+            <CvSection title="Strumenti">
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                 {cv.tools.map((t) => (
-                  <span key={t} style={{ fontSize: "11px", background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a", borderRadius: "999px", padding: "3px 10px", fontWeight: "500" }}>
-                    {t}
-                  </span>
+                  <span key={t} style={{ fontSize: "11px", background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a", borderRadius: "999px", padding: "3px 10px", fontWeight: "500" }}>{t}</span>
                 ))}
               </div>
-            </div>
+            </CvSection>
           )}
-
-          {/* Languages */}
           {cv.languages.length > 0 && (
-            <div style={{ marginBottom: "24px" }}>
-              <h3 style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1.5px", textTransform: "uppercase", color: "#1a3a2a", marginBottom: "12px", borderBottom: "2px solid #1a3a2a", paddingBottom: "6px" }}>
-                Lingue
-              </h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {cv.languages.map((l) => (
-                  <div key={l.language} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: "12px", fontWeight: "600", color: "#374151" }}>{l.language}</span>
-                    <span style={{ fontSize: "11px", color: "#6b7280", background: "#f3f4f6", borderRadius: "999px", padding: "2px 8px" }}>{l.level}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <CvSection title="Lingue">
+              {cv.languages.map((l) => (
+                <div key={l.language} style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                  <span style={{ fontSize: "12px", fontWeight: "600", color: "#374151" }}>{l.language}</span>
+                  <span style={{ fontSize: "11px", color: "#6b7280", background: "#f3f4f6", borderRadius: "999px", padding: "2px 8px" }}>{l.level}</span>
+                </div>
+              ))}
+            </CvSection>
           )}
-
-          {/* Certifications */}
           {cv.certifications.length > 0 && (
-            <div style={{ marginBottom: "24px" }}>
-              <h3 style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1.5px", textTransform: "uppercase", color: "#1a3a2a", marginBottom: "12px", borderBottom: "2px solid #1a3a2a", paddingBottom: "6px" }}>
-                Certificazioni
-              </h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                {cv.certifications.map((c) => (
-                  <div key={c} style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
-                    <span style={{ color: "#1a3a2a", fontSize: "14px", lineHeight: "18px", flexShrink: 0 }}>✦</span>
-                    <span style={{ fontSize: "12px", color: "#374151", lineHeight: "1.5" }}>{c}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <CvSection title="Certificazioni">
+              {cv.certifications.map((c) => (
+                <div key={c} style={{ display: "flex", gap: "8px", marginBottom: "6px" }}>
+                  <span style={{ color: "#1a3a2a", fontSize: "14px" }}>✦</span>
+                  <span style={{ fontSize: "12px", color: "#374151", lineHeight: "1.5" }}>{c}</span>
+                </div>
+              ))}
+            </CvSection>
           )}
-
-          {/* NorthStar credit */}
-          <div style={{ marginTop: "32px", padding: "12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px" }}>
-            <p style={{ margin: 0, fontSize: "10px", color: "#15803d", textAlign: "center", fontWeight: "500" }}>
-              ✦ Generato con NorthStar
-            </p>
+          <div style={{ marginTop: "auto", padding: "12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", marginTop: "24px" }}>
+            <p style={{ margin: 0, fontSize: "10px", color: "#15803d", textAlign: "center", fontWeight: "500" }}>✦ Generato con NorthStar</p>
           </div>
         </div>
 
         {/* Right column */}
         <div style={{ flex: 1, padding: "28px 32px" }}>
-
-          {/* Summary */}
           {cv.summary && (
-            <div style={{ marginBottom: "28px" }}>
-              <h3 style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1.5px", textTransform: "uppercase", color: "#1a3a2a", marginBottom: "10px", borderBottom: "2px solid #1a3a2a", paddingBottom: "6px" }}>
-                Profilo Professionale
-              </h3>
-              <p style={{ fontSize: "13px", color: "#4b5563", lineHeight: "1.7", margin: 0 }}>
-                {cv.summary}
-              </p>
-            </div>
+            <CvSection title="Profilo Professionale">
+              <p style={{ fontSize: "13px", color: "#4b5563", lineHeight: "1.7", margin: 0 }}>{cv.summary}</p>
+            </CvSection>
           )}
-
-          {/* Experience */}
           {cv.experience.length > 0 && (
-            <div style={{ marginBottom: "28px" }}>
-              <h3 style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1.5px", textTransform: "uppercase", color: "#1a3a2a", marginBottom: "14px", borderBottom: "2px solid #1a3a2a", paddingBottom: "6px" }}>
-                Esperienza Professionale
-              </h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-                {cv.experience.map((e) => (
-                  <div key={e.id}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" }}>
-                      <div>
-                        <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "#111827" }}>{e.title}</p>
-                        <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6b7280" }}>
-                          {e.company}{e.location ? ` · ${e.location}` : ""}
-                        </p>
-                      </div>
-                      <span style={{ fontSize: "11px", color: "#9ca3af", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "999px", padding: "2px 10px", flexShrink: 0 }}>
-                        {e.period}
-                      </span>
-                    </div>
-                    {e.description && (
-                      <div style={{ fontSize: "12px", color: "#4b5563", lineHeight: "1.7", marginTop: "6px" }}>
-                        {e.description.split("\n").map((line, i) => (
-                          <p key={i} style={{ margin: "3px 0" }}>
-                            {line.startsWith("→") ? <span style={{ color: "#1a3a2a", marginRight: "4px" }}>→</span> : null}
-                            {line.startsWith("→") ? line.slice(1).trim() : line}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                    {e.skills.length > 0 && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "8px" }}>
-                        {e.skills.map((s) => (
-                          <span key={s} style={{ fontSize: "10px", background: "#f3f4f6", color: "#6b7280", borderRadius: "999px", padding: "2px 8px" }}>
-                            {s}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Education */}
-          {cv.education.length > 0 && (
-            <div>
-              <h3 style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1.5px", textTransform: "uppercase", color: "#1a3a2a", marginBottom: "14px", borderBottom: "2px solid #1a3a2a", paddingBottom: "6px" }}>
-                Formazione
-              </h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {cv.education.map((e) => (
-                  <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <CvSection title="Esperienza Professionale">
+              {cv.experience.map((e) => (
+                <div key={e.id} style={{ marginBottom: "18px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
                     <div>
-                      <p style={{ margin: 0, fontSize: "13px", fontWeight: "700", color: "#111827" }}>{e.degree}</p>
-                      <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6b7280" }}>{e.institution}</p>
-                      {e.description && (
-                        <p style={{ margin: "3px 0 0", fontSize: "11px", color: "#9ca3af" }}>{e.description}</p>
-                      )}
+                      <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "#111827" }}>{e.title}</p>
+                      <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6b7280" }}>
+                        {e.company}{e.location ? ` · ${e.location}` : ""}
+                      </p>
                     </div>
-                    <span style={{ fontSize: "11px", color: "#9ca3af", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "999px", padding: "2px 10px", flexShrink: 0 }}>
-                      {e.year}
-                    </span>
+                    <span style={{ fontSize: "11px", color: "#9ca3af", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "999px", padding: "2px 10px", flexShrink: 0 }}>{e.period}</span>
                   </div>
-                ))}
-              </div>
-            </div>
+                  {e.description && (
+                    <div style={{ fontSize: "12px", color: "#4b5563", lineHeight: "1.7", marginTop: "6px" }}>
+                      {e.description.split("\n").map((line, i) => (
+                        <p key={i} style={{ margin: "3px 0" }}>
+                          {line.startsWith("→") ? <><span style={{ color: "#1a3a2a" }}>→</span> {line.slice(1).trim()}</> : line}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  {e.skills.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "8px" }}>
+                      {e.skills.map((s) => (
+                        <span key={s} style={{ fontSize: "10px", background: "#f3f4f6", color: "#6b7280", borderRadius: "999px", padding: "2px 8px" }}>{s}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </CvSection>
+          )}
+          {cv.education.length > 0 && (
+            <CvSection title="Formazione">
+              {cv.education.map((e) => (
+                <div key={e.id} style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <div>
+                    <p style={{ margin: 0, fontSize: "13px", fontWeight: "700", color: "#111827" }}>{e.degree}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6b7280" }}>{e.institution}</p>
+                    {e.description && <p style={{ margin: "3px 0 0", fontSize: "11px", color: "#9ca3af" }}>{e.description}</p>}
+                  </div>
+                  <span style={{ fontSize: "11px", color: "#9ca3af", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "999px", padding: "2px 10px", flexShrink: 0 }}>{e.year}</span>
+                </div>
+              ))}
+            </CvSection>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function CvSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: "24px" }}>
+      <h3 style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1.5px", textTransform: "uppercase", color: "#1a3a2a", marginBottom: "10px", borderBottom: "2px solid #1a3a2a", paddingBottom: "6px", margin: "0 0 10px 0" }}>
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
+// ── Tag input ──────────────────────────────────────────────────────────
+function TagInput({ items, onChange, placeholder }: { items: string[]; onChange: (items: string[]) => void; placeholder?: string }) {
+  const [input, setInput] = useState("");
+  function add() {
+    const val = input.trim();
+    if (val && !items.includes(val)) { onChange([...items, val]); }
+    setInput("");
+  }
+  return (
+    <div>
+      <div className="flex flex-wrap gap-1.5 mb-2 min-h-[28px]">
+        {items.map((item) => (
+          <span key={item} className="flex items-center gap-1 text-xs bg-primary/8 text-primary border border-primary/20 rounded-full px-2.5 py-0.5 font-medium">
+            {item}
+            <button type="button" onClick={() => onChange(items.filter((i) => i !== item))} className="hover:text-destructive ml-0.5">
+              <X className="w-2.5 h-2.5" />
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <Input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+          placeholder={placeholder || "Aggiungi..."}
+          className="h-8 text-xs rounded-lg"
+        />
+        <Button type="button" size="sm" variant="outline" className="h-8 rounded-lg px-2.5" onClick={add}>
+          <Plus className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Edit Section wrapper ──────────────────────────────────────────────
+function EditBlock({ icon: Icon, title, children, defaultOpen = true }: {
+  icon: React.ElementType; title: string; children: React.ReactNode; defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border rounded-xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-muted/40 hover:bg-muted/70 transition-colors text-left"
+      >
+        <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Icon className="w-4 h-4 text-primary" />{title}
+        </span>
+        {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+      </button>
+      {open && <div className="p-4 space-y-3 bg-background">{children}</div>}
+    </div>
+  );
+}
+
+// ── Full Edit Panel ───────────────────────────────────────────────────
+function EditPanel({ cv, onChange }: { cv: GeneratedCv; onChange: (cv: GeneratedCv) => void }) {
+  const set = useCallback((patch: Partial<GeneratedCv>) => onChange({ ...cv, ...patch }), [cv, onChange]);
+  const setPI = (patch: Partial<GeneratedCv["personalInfo"]>) =>
+    set({ personalInfo: { ...cv.personalInfo, ...patch } });
+
+  // Experience helpers
+  const updateExp = (id: string, patch: Partial<GeneratedCv["experience"][0]>) =>
+    set({ experience: cv.experience.map((e) => e.id === id ? { ...e, ...patch } : e) });
+  const addExp = () => set({
+    experience: [...cv.experience, {
+      id: `exp-${Date.now()}`, title: "", company: "", period: "", location: "", description: "", skills: [],
+    }],
+  });
+  const delExp = (id: string) => set({ experience: cv.experience.filter((e) => e.id !== id) });
+
+  // Education helpers
+  const updateEdu = (id: string, patch: Partial<GeneratedCv["education"][0]>) =>
+    set({ education: cv.education.map((e) => e.id === id ? { ...e, ...patch } : e) });
+  const addEdu = () => set({
+    education: [...cv.education, { id: `edu-${Date.now()}`, degree: "", institution: "", year: "" }],
+  });
+  const delEdu = (id: string) => set({ education: cv.education.filter((e) => e.id !== id) });
+
+  // Language helpers
+  const updateLang = (i: number, patch: Partial<{ language: string; level: string }>) =>
+    set({ languages: cv.languages.map((l, idx) => idx === i ? { ...l, ...patch } : l) });
+  const addLang = () => set({ languages: [...cv.languages, { language: "", level: "" }] });
+  const delLang = (i: number) => set({ languages: cv.languages.filter((_, idx) => idx !== i) });
+
+  return (
+    <div className="space-y-3">
+
+      {/* Personal info */}
+      <EditBlock icon={User} title="Informazioni personali">
+        <div className="grid grid-cols-2 gap-2">
+          {([
+            ["name", "Nome completo"],
+            ["title", "Titolo professionale"],
+            ["email", "Email"],
+            ["phone", "Telefono"],
+            ["location", "Città / Paese"],
+            ["linkedin", "LinkedIn URL"],
+            ["website", "Sito web"],
+          ] as [keyof GeneratedCv["personalInfo"], string][]).map(([field, label]) => (
+            <div key={field} className={field === "title" || field === "linkedin" ? "col-span-2" : ""}>
+              <Label className="text-[11px] text-muted-foreground mb-1 block">{label}</Label>
+              <Input
+                value={(cv.personalInfo[field] as string) ?? ""}
+                onChange={(e) => setPI({ [field]: e.target.value })}
+                className="h-8 text-xs rounded-lg"
+                placeholder={label}
+              />
+            </div>
+          ))}
+        </div>
+      </EditBlock>
+
+      {/* Summary */}
+      <EditBlock icon={Sparkles} title="Profilo professionale">
+        <Textarea
+          value={cv.summary}
+          onChange={(e) => set({ summary: e.target.value })}
+          className="text-xs rounded-lg min-h-[100px] resize-none"
+          placeholder="Scrivi un sommario professionale..."
+        />
+      </EditBlock>
+
+      {/* Experience */}
+      <EditBlock icon={Briefcase} title={`Esperienza (${cv.experience.length})`} defaultOpen={cv.experience.length > 0}>
+        <div className="space-y-4">
+          {cv.experience.map((exp, idx) => (
+            <div key={exp.id} className="border rounded-lg p-3 space-y-2 bg-muted/20">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Esperienza {idx + 1}</span>
+                <button onClick={() => delExp(exp.id)} className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="col-span-2">
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">Ruolo *</Label>
+                  <Input value={exp.title} onChange={(e) => updateExp(exp.id, { title: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="es. Software Engineer" />
+                </div>
+                <div>
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">Azienda *</Label>
+                  <Input value={exp.company} onChange={(e) => updateExp(exp.id, { company: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="Nome azienda" />
+                </div>
+                <div>
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">Periodo *</Label>
+                  <Input value={exp.period} onChange={(e) => updateExp(exp.id, { period: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="Gen 2022 – Presente" />
+                </div>
+                <div>
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">Sede</Label>
+                  <Input value={exp.location ?? ""} onChange={(e) => updateExp(exp.id, { location: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="Milano" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-[11px] text-muted-foreground mb-1 block">Descrizione</Label>
+                <Textarea
+                  value={exp.description}
+                  onChange={(e) => updateExp(exp.id, { description: e.target.value })}
+                  className="text-xs rounded-lg min-h-[72px] resize-none"
+                  placeholder="Usa → per i bullet point: → Descrizione attività..."
+                />
+              </div>
+              <div>
+                <Label className="text-[11px] text-muted-foreground mb-1 block">Competenze (premi Invio)</Label>
+                <TagInput items={exp.skills} onChange={(skills) => updateExp(exp.id, { skills })} placeholder="es. React, Python..." />
+              </div>
+            </div>
+          ))}
+          <Button type="button" size="sm" variant="outline" className="w-full rounded-lg gap-1.5 h-8" onClick={addExp}>
+            <Plus className="w-3.5 h-3.5" /> Aggiungi esperienza
+          </Button>
+        </div>
+      </EditBlock>
+
+      {/* Education */}
+      <EditBlock icon={GraduationCap} title={`Formazione (${cv.education.length})`} defaultOpen={cv.education.length > 0}>
+        <div className="space-y-3">
+          {cv.education.map((edu, idx) => (
+            <div key={edu.id} className="border rounded-lg p-3 space-y-2 bg-muted/20">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Titolo {idx + 1}</span>
+                <button onClick={() => delEdu(edu.id)} className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div>
+                <Label className="text-[11px] text-muted-foreground mb-1 block">Titolo di studio *</Label>
+                <Input value={edu.degree} onChange={(e) => updateEdu(edu.id, { degree: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="es. Laurea Magistrale in Informatica" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">Istituto *</Label>
+                  <Input value={edu.institution} onChange={(e) => updateEdu(edu.id, { institution: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="Università di..." />
+                </div>
+                <div>
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">Anno</Label>
+                  <Input value={edu.year} onChange={(e) => updateEdu(edu.id, { year: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="2022" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-[11px] text-muted-foreground mb-1 block">Note (voto, specializzazione…)</Label>
+                <Input value={edu.description ?? ""} onChange={(e) => updateEdu(edu.id, { description: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="110/110 con lode" />
+              </div>
+            </div>
+          ))}
+          <Button type="button" size="sm" variant="outline" className="w-full rounded-lg gap-1.5 h-8" onClick={addEdu}>
+            <Plus className="w-3.5 h-3.5" /> Aggiungi titolo di studio
+          </Button>
+        </div>
+      </EditBlock>
+
+      {/* Skills */}
+      <EditBlock icon={Sparkles} title="Competenze" defaultOpen={false}>
+        <TagInput items={cv.skills} onChange={(skills) => set({ skills })} placeholder="es. Machine Learning..." />
+      </EditBlock>
+
+      {/* Tools */}
+      <EditBlock icon={Wrench} title="Strumenti" defaultOpen={false}>
+        <TagInput items={cv.tools} onChange={(tools) => set({ tools })} placeholder="es. TensorFlow, Figma..." />
+      </EditBlock>
+
+      {/* Languages */}
+      <EditBlock icon={Globe} title="Lingue" defaultOpen={false}>
+        <div className="space-y-2">
+          {cv.languages.map((l, i) => (
+            <div key={i} className="flex gap-2 items-center">
+              <Input value={l.language} onChange={(e) => updateLang(i, { language: e.target.value })} className="h-8 text-xs rounded-lg flex-1" placeholder="Lingua" />
+              <Input value={l.level} onChange={(e) => updateLang(i, { level: e.target.value })} className="h-8 text-xs rounded-lg w-28" placeholder="Livello" />
+              <button onClick={() => delLang(i)} className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors shrink-0">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+          <Button type="button" size="sm" variant="outline" className="w-full rounded-lg gap-1.5 h-8" onClick={addLang}>
+            <Plus className="w-3.5 h-3.5" /> Aggiungi lingua
+          </Button>
+        </div>
+      </EditBlock>
+
+      {/* Certifications */}
+      <EditBlock icon={Award} title="Certificazioni" defaultOpen={false}>
+        <TagInput items={cv.certifications} onChange={(certifications) => set({ certifications })} placeholder="es. AWS Solutions Architect..." />
+      </EditBlock>
+
     </div>
   );
 }
@@ -286,9 +477,9 @@ export function CvGeneratorModal({
   const [generated, setGenerated] = useState<GeneratedCv | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [mobileTab, setMobileTab] = useState<"edit" | "preview">("preview");
+  const [isEditing, setIsEditing] = useState(false);
 
-  // Read graph nodes from localStorage
   function readGraphNodes(): GraphNode[] {
     try {
       const key = `grafo_user_${confirmedSectorId}_${userId}`;
@@ -304,9 +495,7 @@ export function CvGeneratorModal({
     try {
       const latestSession = profile?.testSessions?.[0];
       const confirmedSector = profile?.exploredSectors?.find((s: any) => s.confirmed);
-
       const graphNodes = readGraphNodes();
-
       const res = await fetch(`${BASE}api/cv/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -326,6 +515,7 @@ export function CvGeneratorModal({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Errore nella generazione");
       setGenerated(data.generated);
+      setIsEditing(false);
     } catch (err: any) {
       setError(err.message || "Errore di rete. Riprova.");
     } finally {
@@ -333,12 +523,8 @@ export function CvGeneratorModal({
     }
   }
 
-  // Auto-generate on open
-  useEffect(() => {
-    generate();
-  }, []);
+  useEffect(() => { generate(); }, []);
 
-  // Print styles
   useEffect(() => {
     const style = document.createElement("style");
     style.id = "cv-print-style";
@@ -346,6 +532,8 @@ export function CvGeneratorModal({
       @media print {
         body > *:not(#cv-print-portal) { display: none !important; }
         #cv-print-portal { position: fixed; top: 0; left: 0; width: 100%; z-index: 99999; }
+        #cv-print-portal > * { display: none !important; }
+        #cv-print-portal #cv-preview-scroll { display: block !important; overflow: visible !important; padding: 0 !important; }
         #cv-document { box-shadow: none !important; margin: 0 !important; width: 100% !important; }
         @page { margin: 0; size: A4; }
       }
@@ -354,9 +542,7 @@ export function CvGeneratorModal({
     return () => { document.getElementById("cv-print-style")?.remove(); };
   }, []);
 
-  function handlePrint() {
-    window.print();
-  }
+  const hasContent = !!generated && !loading;
 
   return (
     <div
@@ -364,70 +550,93 @@ export function CvGeneratorModal({
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-5 py-3 bg-background/95 border-b shadow-sm print:hidden">
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+      {/* ── Toolbar ── */}
+      <div className="flex items-center justify-between px-4 py-2.5 bg-background/97 border-b shadow-sm print:hidden gap-3 flex-wrap">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <Sparkles className="w-4 h-4 text-primary" />
           </div>
           <div>
-            <p className="font-semibold text-sm text-foreground">CV Generato con NorthStar</p>
+            <p className="font-semibold text-sm text-foreground leading-tight">CV Generato con NorthStar</p>
             {generated?.targetRole && (
               <p className="text-xs text-muted-foreground">Target: {generated.targetRole}</p>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {generated && (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-full gap-1.5"
-                onClick={generate}
-                disabled={loading}
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Mobile tab switcher */}
+          {hasContent && (
+            <div className="flex rounded-lg bg-muted p-0.5 md:hidden">
+              <button
+                onClick={() => setMobileTab("edit")}
+                className={cn("flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all", mobileTab === "edit" ? "bg-white shadow text-foreground" : "text-muted-foreground")}
               >
-                <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
-                Rigenera
-              </Button>
-              <Button
-                size="sm"
-                className="rounded-full gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
-                onClick={handlePrint}
+                <Pencil className="w-3 h-3" /> Modifica
+              </button>
+              <button
+                onClick={() => setMobileTab("preview")}
+                className={cn("flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all", mobileTab === "preview" ? "bg-white shadow text-foreground" : "text-muted-foreground")}
               >
-                <Printer className="w-3.5 h-3.5" />
-                Stampa / Scarica PDF
-              </Button>
-            </>
+                <Eye className="w-3 h-3" /> Anteprima
+              </button>
+            </div>
           )}
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-muted transition-colors ml-1"
-          >
+
+          {/* Desktop edit toggle */}
+          {hasContent && (
+            <Button
+              size="sm"
+              variant={isEditing ? "default" : "outline"}
+              className="rounded-full gap-1.5 hidden md:flex"
+              onClick={() => setIsEditing((v) => !v)}
+            >
+              {isEditing ? <><Check className="w-3.5 h-3.5" />Fine modifica</> : <><Pencil className="w-3.5 h-3.5" />Modifica</>}
+            </Button>
+          )}
+
+          {hasContent && (
+            <Button size="sm" variant="outline" className="rounded-full gap-1.5" onClick={generate} disabled={loading}>
+              <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
+              <span className="hidden sm:inline">Rigenera</span>
+            </Button>
+          )}
+
+          {hasContent && (
+            <Button size="sm" className="rounded-full gap-1.5" onClick={() => window.print()}>
+              <Printer className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Stampa / PDF</span>
+            </Button>
+          )}
+
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors ml-0.5">
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto py-8 px-4 print:p-0" ref={containerRef}>
+      {/* ── Body ── */}
+      <div className="flex flex-1 overflow-hidden">
+
+        {/* Loading */}
         {loading && (
-          <div className="flex flex-col items-center justify-center h-full gap-4">
+          <div className="flex flex-col items-center justify-center w-full gap-4">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
               <Sparkles className="w-8 h-8 text-primary animate-pulse" />
             </div>
             <div className="text-center">
               <p className="font-semibold text-foreground">Generazione CV in corso…</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Sto integrando il grafo delle conoscenze{cvData ? " e il tuo CV" : ""} con il profilo RIASEC
+                Integro il grafo delle conoscenze{cvData ? " e il tuo CV" : ""} con il profilo RIASEC
               </p>
             </div>
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
         )}
 
+        {/* Error */}
         {error && !loading && (
-          <div className="max-w-md mx-auto mt-20 text-center">
+          <div className="max-w-md mx-auto mt-20 text-center w-full">
             <div className="w-14 h-14 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
               <AlertCircle className="w-7 h-7 text-destructive" />
             </div>
@@ -437,15 +646,57 @@ export function CvGeneratorModal({
           </div>
         )}
 
+        {/* Content */}
         {generated && !loading && (
-          <CvDocument cv={generated} />
+          <>
+            {/* Desktop: side-by-side */}
+            <div className="hidden md:flex flex-1 overflow-hidden">
+              {/* Edit panel */}
+              {isEditing && (
+                <div className="w-[400px] flex-shrink-0 overflow-y-auto border-r bg-background p-4 space-y-1">
+                  <div className="flex items-center gap-2 mb-4 pb-3 border-b">
+                    <Pencil className="w-4 h-4 text-primary" />
+                    <h2 className="font-semibold text-sm text-foreground">Modifica il CV</h2>
+                    <span className="text-xs text-muted-foreground ml-auto">Le modifiche appaiono in tempo reale →</span>
+                  </div>
+                  <EditPanel cv={generated} onChange={setGenerated} />
+                </div>
+              )}
+              {/* Preview */}
+              <div id="cv-preview-scroll" className="flex-1 overflow-auto py-8 px-6 bg-gray-100">
+                <CvDocument cv={generated} />
+              </div>
+            </div>
+
+            {/* Mobile: tabbed */}
+            <div className="flex md:hidden flex-1 overflow-hidden">
+              {mobileTab === "edit" ? (
+                <div className="flex-1 overflow-y-auto p-4 space-y-1 bg-background">
+                  <div className="flex items-center gap-2 mb-4 pb-3 border-b">
+                    <Pencil className="w-4 h-4 text-primary" />
+                    <h2 className="font-semibold text-sm">Modifica CV</h2>
+                    <span className="text-xs text-muted-foreground ml-auto">Vai su Anteprima per vedere</span>
+                  </div>
+                  <EditPanel cv={generated} onChange={setGenerated} />
+                </div>
+              ) : (
+                <div id="cv-preview-scroll" className="flex-1 overflow-auto py-4 px-2 bg-gray-100">
+                  <div className="scale-[0.45] origin-top-left" style={{ width: "222%", transformOrigin: "top left" }}>
+                    <CvDocument cv={generated} />
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
-      {/* Footer hint */}
-      {generated && !loading && (
-        <div className="text-center py-2.5 text-xs text-white/70 bg-black/30 print:hidden">
-          Clicca "Stampa / Scarica PDF" per salvare il CV · Il browser aprirà la finestra di stampa
+      {/* Footer */}
+      {hasContent && (
+        <div className="text-center py-2 text-xs text-white/60 bg-black/25 print:hidden">
+          {isEditing
+            ? "Modifica i campi nel pannello a sinistra — il CV si aggiorna in tempo reale"
+            : 'Clicca "Modifica" per editare i campi · "Stampa / PDF" per esportare'}
         </div>
       )}
     </div>
