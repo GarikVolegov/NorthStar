@@ -20,6 +20,7 @@ import {
 import { useFavorites } from "@/hooks/useFavorites";
 import { cn } from "@/lib/utils";
 import { SectorIcon } from "@/lib/sector-icon";
+import { CvSection } from "@/components/cv/CvSection";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -1043,6 +1044,14 @@ export default function Profilo() {
           </CardContent>
         </Card>
       )}
+
+      {/* CV — full width */}
+      <div className="mt-6">
+        <CvSection
+          userId={user.id}
+          confirmedSectorId={profile?.exploredSectors?.find((s) => s.confirmed)?.sectorId}
+        />
+      </div>
 
       {/* Objectives — full width */}
       <ObjectivesPanel userId={user.id} />

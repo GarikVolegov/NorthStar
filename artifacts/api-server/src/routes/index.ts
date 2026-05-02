@@ -19,6 +19,7 @@ import ogRouter from "./og";
 import ogImageRouter from "./og-image";
 import affiliazioneRouter from "./affiliazione";
 import crescitaRouter from "./crescita";
+import cvRouter from "./cv";
 
 const router: IRouter = Router();
 
@@ -42,5 +43,6 @@ router.use(ogRouter);
 router.use(ogImageRouter);
 router.use(affiliazioneRouter);
 router.use(crescitaRouter);
+router.use(cvRouter);
 
 export default router;
