@@ -7,6 +7,7 @@ import { openai } from "@workspace/integrations-openai-ai-server";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { CvPdfDocument } from "../cv-pdf.js";
+import { CoverLetterPdfDocument, type CoverLetterData } from "../cover-letter-pdf.js";
 
 const router: IRouter = Router();
 
@@ -520,6 +521,132 @@ router.delete("/cv/:userId/versions/:versionId", async (req, res): Promise<void>
   await db.update(usersTable).set({ cvJson: updated as any }).where(eq(usersTable.id, userId));
 
   res.json({ success: true });
+});
+
+// ── POST /api/cv/:userId/cover-letter — AI generate cover letter ───────
+router.post("/cv/:userId/cover-letter", async (req, res): Promise<void> => {
+  const userId = parseInt(req.params.userId, 10);
+  if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+  const { generated, jobPosting, companyName, roleTitle, extraInfo } = req.body;
+  if (!generated || !jobPosting?.trim()) {
+    res.status(400).json({ error: "Dati CV e offerta di lavoro richiesti" });
+    return;
+  }
+
+  const today = new Date().toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" });
+
+  const prompt = `Sei un esperto di scrittura professionale italiana. Devi scrivere una lettera di presentazione (cover letter) ECCELLENTE in italiano formale-professionale, basandoti sul CV del candidato e sull'offerta di lavoro.
+
+CANDIDATO:
+Nome: ${generated.personalInfo?.name ?? "Candidato"}
+Titolo attuale: ${generated.personalInfo?.title ?? ""}
+Sommario: ${generated.summary ?? ""}
+Esperienze principali: ${JSON.stringify(generated.experience?.slice(0, 3) ?? [])}
+Competenze: ${[...(generated.skills ?? []), ...(generated.tools ?? [])].join(", ")}
+${extraInfo ? `Informazioni aggiuntive fornite dal candidato: ${extraInfo}` : ""}
+
+OFFERTA DI LAVORO:
+${jobPosting}
+${companyName ? `Azienda: ${companyName}` : ""}
+${roleTitle ? `Ruolo: ${roleTitle}` : ""}
+
+REQUISITI DELLA LETTERA:
+1. Scrivi in italiano formale ma non rigido, naturale e coinvolgente
+2. Saluto: "Gentile Team ${companyName ?? "HR"}" oppure "Egregio/a Responsabile Selezione" se non c'è azienda
+3. Paragrafo 1 (APERTURA): suscita interesse con una frase forte; indica il ruolo a cui si candida; mostra conoscenza dell'azienda
+4. Paragrafo 2 (VALORE): collega 2-3 esperienze/competenze concrete del CV ai requisiti specifici dell'offerta; usa dati/risultati dove possibili
+5. Paragrafo 3 (MOTIVAZIONE): mostra autenticità e motivazione genuina per questo ruolo e azienda
+6. Paragrafo 4 (CHIUSURA): invito a colloquio, disponibilità, tono fiducioso ma non arrogante
+7. Congedo: "Cordiali saluti"
+8. NON inventare esperienze, numeri o aziende non presenti nel CV
+9. Lunghezza: 220-320 parole totali nei paragrafi
+
+RISPOSTA JSON (solo JSON, nessun testo extra):
+{
+  "subject": "Candidatura per il ruolo di [ruolo]",
+  "salutation": "Gentile ...",
+  "paragraphs": ["paragrafo 1", "paragrafo 2", "paragrafo 3", "paragrafo 4"],
+  "closing": "Cordiali saluti,"
+}`;
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4.1",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.7,
+    max_tokens: 1200,
+  });
+
+  let raw = completion.choices[0].message.content ?? "{}";
+  raw = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+
+  let letter: { subject: string; salutation: string; paragraphs: string[]; closing: string };
+  try {
+    letter = JSON.parse(raw);
+  } catch {
+    res.status(500).json({ error: "Errore nel parsing della risposta AI" });
+    return;
+  }
+
+  const letterData: CoverLetterData = {
+    senderName: generated.personalInfo?.name ?? "Candidato",
+    senderTitle: generated.personalInfo?.title,
+    senderEmail: generated.personalInfo?.email,
+    senderPhone: generated.personalInfo?.phone,
+    senderLocation: generated.personalInfo?.location,
+    recipientCompany: companyName,
+    recipientRole: roleTitle,
+    date: today,
+    subject: letter.subject,
+    salutation: letter.salutation,
+    paragraphs: letter.paragraphs,
+    closing: letter.closing,
+  };
+
+  // Persist in cvJson.coverLetter
+  const row = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (row.length) {
+    const current = (row[0].cvJson as Record<string, any>) ?? {};
+    await db.update(usersTable)
+      .set({ cvJson: { ...current, coverLetter: { ...letterData, generatedAt: new Date().toISOString() } } as any })
+      .where(eq(usersTable.id, userId));
+  }
+
+  res.json({ success: true, letter: letterData });
+});
+
+// ── GET /api/cv/:userId/cover-letter/pdf — render cover letter PDF ─────
+router.get("/cv/:userId/cover-letter/pdf", async (req, res): Promise<void> => {
+  const userId = parseInt(req.params.userId, 10);
+  if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+  // Accept letter data from query param (base64 JSON) for flexibility
+  const letterParam = req.query.data as string | undefined;
+  let letter: CoverLetterData | null = null;
+
+  if (letterParam) {
+    try {
+      letter = JSON.parse(Buffer.from(decodeURIComponent(letterParam), "base64").toString("utf-8"));
+    } catch { /* fallback to DB */ }
+  }
+
+  if (!letter) {
+    const row = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    if (!row.length || !(row[0].cvJson as any)?.coverLetter) {
+      res.status(404).json({ error: "Nessuna lettera trovata" });
+      return;
+    }
+    letter = (row[0].cvJson as any).coverLetter as CoverLetterData;
+  }
+
+  const buffer = await renderToBuffer(
+    React.createElement(CoverLetterPdfDocument, { letter })
+  );
+
+  const safeFileName = `lettera-${(letter.senderName ?? "cv").replace(/\s+/g, "-").toLowerCase()}.pdf`;
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${safeFileName}"`);
+  res.send(buffer);
 });
 
 // ── DELETE /api/cv/:userId — delete stored CV ─────────────────────────
