@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Link } from "wouter";
+import { SectorIcon } from "@/lib/sector-icon";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,7 +31,7 @@ interface SitemapGroup {
   icon: React.ElementType;
   color: string;
   bg: string;
-  items: { label: string; href: string; desc?: string; badge?: string }[];
+  items: { label: string; href: string; desc?: string; badge?: string; iconName?: string }[];
 }
 
 const STATIC_GROUPS: SitemapGroup[] = [
@@ -76,7 +77,8 @@ export default function Sitemap() {
       color: "#f59e0b",
       bg: "#fffbeb",
       items: sectors.map((s) => ({
-        label: `${s.icon} ${s.name}`,
+        label: s.name,
+        iconName: s.icon,
         href: `/settore/${s.id}`,
         desc: "Panoramica, dati e match",
       })),
@@ -87,7 +89,8 @@ export default function Sitemap() {
       color: "#8b5cf6",
       bg: "#f5f3ff",
       items: sectors.map((s) => ({
-        label: `${s.icon} ${s.name}`,
+        label: s.name,
+        iconName: s.icon,
         href: `/wiki/${s.id}`,
         desc: "Contenuti AI approfonditi",
         badge: "Premium",
@@ -99,7 +102,8 @@ export default function Sitemap() {
       color: "#3b82f6",
       bg: "#eff6ff",
       items: sectors.map((s) => ({
-        label: `${s.icon} ${s.name}`,
+        label: s.name,
+        iconName: s.icon,
         href: `/roadmap/${s.id}`,
         desc: "Percorso step-by-step",
         badge: "Premium",
@@ -111,7 +115,8 @@ export default function Sitemap() {
       color: "#ec4899",
       bg: "#fdf2f8",
       items: sectors.map((s) => ({
-        label: `${s.icon} ${s.name}`,
+        label: s.name,
+        iconName: s.icon,
         href: `/grafo/${s.id}`,
         desc: "Visualizzazione AI interattiva",
         badge: "Premium",
@@ -202,10 +207,14 @@ export default function Sitemap() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {group.items.map((item) => (
                   <Link key={item.href} href={item.href}>
-                    <div className="group flex items-start gap-3 p-3.5 rounded-xl border bg-card hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer">
-                      <ChevronRight
-                        className="w-4 h-4 shrink-0 mt-0.5 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all"
-                      />
+                    <div className="group flex items-center gap-3 p-3.5 rounded-xl border bg-card hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer">
+                      {item.iconName ? (
+                        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                          <SectorIcon name={item.iconName} size={16} />
+                        </div>
+                      ) : (
+                        <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                      )}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <p className="text-sm font-medium text-foreground leading-snug truncate">{item.label}</p>

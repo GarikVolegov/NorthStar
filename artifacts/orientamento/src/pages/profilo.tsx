@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useFavorites } from "@/hooks/useFavorites";
 import { cn } from "@/lib/utils";
+import { SectorIcon } from "@/lib/sector-icon";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -142,7 +143,8 @@ function SessionCard({ session, index }: { session: SessionData; index: number }
           {session.confirmedSector ? (
             <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-3 py-1.5">
               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-              <span className="text-xs font-medium">{session.confirmedSector.icon} {session.confirmedSector.name}</span>
+              <SectorIcon name={session.confirmedSector.icon} size={13} className="text-emerald-600" />
+              <span className="text-xs font-medium">{session.confirmedSector.name}</span>
             </div>
           ) : session.topRecommendation ? (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground border rounded-xl px-3 py-1.5">
@@ -178,7 +180,9 @@ function ExploredSectorCard({ sector }: { sector: ExploredSector }) {
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-3">
-            <span className="text-3xl">{sector.icon}</span>
+            <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+              <SectorIcon name={sector.icon} size={22} />
+            </div>
             <div>
               <h3 className="font-serif font-bold text-foreground leading-tight">{sector.name}</h3>
               <div className={cn("mt-1 inline-flex items-center gap-1 text-xs font-medium border rounded-full px-2.5 py-0.5", trend?.color)}>
@@ -763,7 +767,9 @@ function SavedItems({ userId }: { userId: number }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {savedSectors.map((fav) => (
                 <div key={fav.id} className="flex items-center gap-3 bg-muted/40 rounded-xl p-3 border border-border/50 group">
-                  <span className="text-2xl shrink-0">{fav.sector?.icon ?? "💼"}</span>
+                  <div className="w-9 h-9 rounded-lg bg-primary/8 flex items-center justify-center text-primary shrink-0">
+                    <SectorIcon name={fav.sector?.icon} size={17} />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm text-foreground truncate">{fav.sector?.name ?? "Settore"}</p>
                     {fav.sector && (
