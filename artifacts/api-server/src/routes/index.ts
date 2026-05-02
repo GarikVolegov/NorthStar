@@ -8,12 +8,14 @@ import newsRouter from "./news";
 import authRouter from "./auth";
 import profileRouter from "./profile";
 import favoritesRouter from "./favorites";
+import objectivesRouter from "./objectives";
 
 const router: IRouter = Router();
 
 router.use(authRouter);
 router.use(profileRouter);
 router.use(favoritesRouter);
+router.use(objectivesRouter);
 router.use(healthRouter);
 router.use(sectorsRouter);
 router.use(testSessionsRouter);

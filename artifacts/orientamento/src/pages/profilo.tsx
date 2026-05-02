@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import {
   ChevronRight, Loader2, KeyRound, BarChart3, Sparkles, ShieldCheck,
   TrendingUp, DollarSign, Activity, Settings2, ArrowRight, Layers,
   Bookmark, ExternalLink, Newspaper, X, Heart,
+  Target, Plus, Check,
 } from "lucide-react";
 import { useFavorites } from "@/hooks/useFavorites";
 import { cn } from "@/lib/utils";
@@ -268,6 +269,200 @@ function ExploredSectorCard({ sector }: { sector: ExploredSector }) {
         </Button>
       </div>
     </div>
+  );
+}
+
+// ── Mini objectives ───────────────────────────────────────────────────
+const FREE_LIMIT = 5;
+
+interface Objective {
+  id: number;
+  userId: number;
+  text: string;
+  completed: boolean;
+  createdAt: string;
+}
+
+function MiniObjectives({ userId }: { userId: number }) {
+  const queryClient = useQueryClient();
+  const [input, setInput] = useState("");
+  const [showCompleted, setShowCompleted] = useState(false);
+
+  const { data: objectives = [], isLoading } = useQuery<Objective[]>({
+    queryKey: ["objectives", userId],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}api/objectives/${userId}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (text: string) => {
+      const res = await fetch(`${BASE}api/objectives`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, text }),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["objectives", userId] });
+      setInput("");
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async ({ id, completed }: { id: number; completed: boolean }) => {
+      const res = await fetch(`${BASE}api/objectives/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed }),
+      });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["objectives", userId] }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await fetch(`${BASE}api/objectives/${id}`, { method: "DELETE" });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["objectives", userId] }),
+  });
+
+  const active = objectives.filter((o) => !o.completed);
+  const completed = objectives.filter((o) => o.completed);
+  const atLimit = active.length >= FREE_LIMIT;
+
+  function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    if (!input.trim() || atLimit) return;
+    addMutation.mutate(input.trim());
+  }
+
+  return (
+    <Card className="rounded-2xl">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <Target className="w-4 h-4 text-primary" /> Il mio prossimo passo
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Annotati piccoli obiettivi concreti per restare in movimento.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+
+        {/* Active objectives */}
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full rounded-xl" />)}
+          </div>
+        ) : active.length === 0 && completed.length === 0 ? (
+          <div className="text-center py-6 px-3">
+            <div className="w-10 h-10 bg-muted rounded-xl flex items-center justify-center mx-auto mb-3">
+              <Target className="w-5 h-5 text-muted-foreground opacity-50" />
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Nessun obiettivo ancora.<br />
+              Aggiungi il tuo primo piccolo passo.
+            </p>
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {active.map((obj) => (
+              <li key={obj.id} className="flex items-start gap-2.5 group">
+                <button
+                  onClick={() => toggleMutation.mutate({ id: obj.id, completed: true })}
+                  disabled={toggleMutation.isPending}
+                  className="mt-0.5 w-5 h-5 rounded-full border-2 border-border hover:border-primary hover:bg-primary/5 transition-colors shrink-0 flex items-center justify-center"
+                  title="Segna come completato"
+                />
+                <p className="flex-1 text-sm text-foreground leading-snug pt-0.5">{obj.text}</p>
+                <button
+                  onClick={() => deleteMutation.mutate(obj.id)}
+                  disabled={deleteMutation.isPending}
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-muted-foreground hover:text-destructive transition-all"
+                  title="Elimina"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Completed section */}
+        {completed.length > 0 && (
+          <div>
+            <button
+              onClick={() => setShowCompleted((v) => !v)}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 mt-1"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              {completed.length} completat{completed.length === 1 ? "o" : "i"}
+              <span className="opacity-60">{showCompleted ? "▲" : "▼"}</span>
+            </button>
+            {showCompleted && (
+              <ul className="space-y-1.5 mt-2">
+                {completed.map((obj) => (
+                  <li key={obj.id} className="flex items-start gap-2.5 group">
+                    <button
+                      onClick={() => toggleMutation.mutate({ id: obj.id, completed: false })}
+                      disabled={toggleMutation.isPending}
+                      className="mt-0.5 w-5 h-5 rounded-full bg-emerald-100 border-2 border-emerald-400 shrink-0 flex items-center justify-center hover:bg-emerald-200 transition-colors"
+                      title="Segna come da fare"
+                    >
+                      <Check className="w-3 h-3 text-emerald-600" />
+                    </button>
+                    <p className="flex-1 text-sm text-muted-foreground line-through leading-snug pt-0.5">{obj.text}</p>
+                    <button
+                      onClick={() => deleteMutation.mutate(obj.id)}
+                      disabled={deleteMutation.isPending}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-muted-foreground hover:text-destructive transition-all"
+                      title="Elimina"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {/* Add new objective */}
+        <form onSubmit={handleAdd} className="flex gap-2 pt-1">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={atLimit ? `Limite ${FREE_LIMIT} obiettivi (Free)` : "Aggiungi un obiettivo…"}
+            disabled={atLimit}
+            maxLength={120}
+            className="rounded-xl text-sm h-9"
+          />
+          <Button
+            type="submit"
+            size="sm"
+            disabled={!input.trim() || atLimit || addMutation.isPending}
+            className="rounded-xl h-9 w-9 p-0 shrink-0"
+            title="Aggiungi"
+          >
+            {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+          </Button>
+        </form>
+
+        {atLimit && (
+          <p className="text-xs text-muted-foreground text-center pt-1">
+            Hai raggiunto il limite Free.{" "}
+            <Link href="/premium" className="text-primary hover:underline font-medium">
+              Upgrade per obiettivi illimitati
+            </Link>
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -533,6 +728,8 @@ export default function Profilo() {
               <ChangePasswordForm userId={user.id} />
             </CardContent>
           </Card>
+
+          <MiniObjectives userId={user.id} />
         </div>
 
         {/* Test history */}
