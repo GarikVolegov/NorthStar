@@ -117,6 +117,34 @@ Added as a second layer of personality analysis after RIASEC:
 - DB is seeded via `artifacts/api-server/src/lib/seed.ts` called at server startup
 - Spirit weights per sector are in `artifacts/api-server/src/lib/spirits.ts` — modify to tune recommendations
 
+## News Module
+
+### Endpoints
+- `GET /api/news?category=technology&limit=6` — Free news per categoria
+- `GET /api/news?multi=true&categories=general,technology,business&perCategory=2` — Feed misto
+- `GET /api/news/sector/:sector&limit=8` — News premium per settore
+
+### Categorie Free
+general, business, technology, science, health, finance, education
+
+### Settori Premium
+ai, data-science, cybersecurity, fintech, green-energy, healthcare, e-commerce, marketing, robotica, turismo, educazione, finanza
+
+### Fonte dati
+- Se `GNEWS_API_KEY` è presente: fetcha live da GNews API (italiano, `lang=it`)
+- Se assente: mostra contenuto editoriale statico (7 articoli curati in italiano)
+- Cache in-memory da 30 minuti per ridurre le chiamate API
+
+### Per attivare news live
+1. Registrarsi su https://gnews.io (piano free: 100 req/giorno)
+2. Aggiungere il secret `GNEWS_API_KEY` nelle variabili d'ambiente Replit
+
+### Frontend — `/news`
+- Tab per categoria con emoji
+- Card con titolo, descrizione, fonte, ora relativa, link esterno
+- Sezione Premium bloccata con CTA verso `/premium`
+- Skeleton loading durante il fetch
+
 ## Roadmap (Future Phases)
 
 - **Phase 2:** Fix Stripe key + seed products, activate premium checkout

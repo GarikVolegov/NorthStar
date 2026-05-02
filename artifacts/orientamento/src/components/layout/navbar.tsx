@@ -19,6 +19,9 @@ export function Navbar() {
             <Link href="/test" className="text-sm font-medium transition-colors hover:text-primary">
               Il Test
             </Link>
+            <Link href="/news" className="text-sm font-medium transition-colors hover:text-primary">
+              News
+            </Link>
             <Link href="/premium" className="text-sm font-medium transition-colors hover:text-primary">
               Premium
             </Link>

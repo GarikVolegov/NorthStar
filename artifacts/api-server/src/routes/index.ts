@@ -4,6 +4,7 @@ import sectorsRouter from "./sectors";
 import testSessionsRouter from "./testSessions";
 import usersRouter from "./users";
 import stripeRouter from "./stripe";
+import newsRouter from "./news";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use(sectorsRouter);
 router.use(testSessionsRouter);
 router.use(usersRouter);
 router.use(stripeRouter);
+router.use(newsRouter);
 
 export default router;
