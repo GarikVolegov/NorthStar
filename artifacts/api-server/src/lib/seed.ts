@@ -1,0 +1,212 @@
+import { db, sectorsTable } from "@workspace/db";
+
+const SECTORS = [
+  {
+    name: "Tecnologia & Software",
+    description:
+      "Sviluppo di software, applicazioni web e mobile, intelligenza artificiale e cybersecurity. Un settore in costante evoluzione che offre opportunità globali.",
+    riasecTypes: ["I", "R", "C"],
+    skills: ["Programmazione", "Problem solving", "Pensiero logico", "Lavoro in team", "Apprendimento continuo"],
+    avgSalaryMin: 35000,
+    avgSalaryMax: 120000,
+    growthRate: 28,
+    automationRisk: "low" as const,
+    scalability: "high" as const,
+    trend: "booming" as const,
+    timeToAutonomy: "12-24 mesi con formazione intensiva",
+    advantages: [
+      "Altissima domanda globale",
+      "Possibilità di lavorare da remoto",
+      "Stipendi competitivi",
+      "Crescita rapida di carriera",
+      "Settore dinamico e stimolante",
+    ],
+    disadvantages: [
+      "Aggiornamento continuo necessario",
+      "Alta competitività",
+      "Possibile isolamento sociale",
+    ],
+    opportunities: [
+      "AI e Machine Learning",
+      "Cybersecurity",
+      "Cloud Computing",
+      "Sviluppo mobile",
+      "Web3 e Blockchain",
+    ],
+    icon: "code",
+    color: "#6366f1",
+  },
+  {
+    name: "Salute & Benessere",
+    description:
+      "Medicina, psicologia, fisioterapia, nutrizione e tutte le professioni legate alla cura della persona. Un settore fondamentale con crescita costante.",
+    riasecTypes: ["S", "I", "R"],
+    skills: ["Empatia", "Comunicazione", "Conoscenze scientifiche", "Resistenza allo stress", "Lavoro in équipe"],
+    avgSalaryMin: 30000,
+    avgSalaryMax: 150000,
+    growthRate: 18,
+    automationRisk: "low" as const,
+    scalability: "medium" as const,
+    trend: "growing" as const,
+    timeToAutonomy: "3-6 anni (percorso formativo incluso)",
+    advantages: [
+      "Altissima richiesta di professionisti",
+      "Impatto sociale positivo",
+      "Sicurezza occupazionale",
+      "Varietà di specializzazioni",
+    ],
+    disadvantages: [
+      "Formazione lunga e costosa",
+      "Alto stress emotivo",
+      "Orari spesso irregolari",
+    ],
+    opportunities: [
+      "Telemedicina",
+      "Salute mentale digitale",
+      "Medicina preventiva",
+      "Longevità e anti-aging",
+    ],
+    icon: "heart",
+    color: "#ec4899",
+  },
+  {
+    name: "Creatività & Design",
+    description:
+      "Graphic design, UX/UI, architettura, moda, fotografia, video e contenuti digitali. Per chi vuole esprimere la propria visione creativa con impatto.",
+    riasecTypes: ["A", "E", "I"],
+    skills: ["Creatività", "Senso estetico", "Software di design", "Storytelling", "Adattabilità"],
+    avgSalaryMin: 25000,
+    avgSalaryMax: 90000,
+    growthRate: 15,
+    automationRisk: "medium" as const,
+    scalability: "high" as const,
+    trend: "growing" as const,
+    timeToAutonomy: "6-18 mesi con portfolio solido",
+    advantages: [
+      "Alta soddisfazione personale",
+      "Possibilità freelance globale",
+      "Settore in espansione digitale",
+      "Espressione della propria identità",
+    ],
+    disadvantages: [
+      "Reddito iniziale variabile",
+      "Mercato molto competitivo",
+      "Necessità di aggiornamento costante",
+    ],
+    opportunities: [
+      "UX Design per AI",
+      "Realtà Aumentata e Virtuale",
+      "Branding digitale",
+      "Contenuti video e social",
+    ],
+    icon: "palette",
+    color: "#f59e0b",
+  },
+  {
+    name: "Business & Imprenditoria",
+    description:
+      "Gestione aziendale, startup, consulenza, marketing e vendite. Per chi vuole costruire qualcosa di proprio o guidare organizzazioni verso la crescita.",
+    riasecTypes: ["E", "C", "S"],
+    skills: ["Leadership", "Negoziazione", "Pianificazione strategica", "Comunicazione", "Analisi dei dati"],
+    avgSalaryMin: 30000,
+    avgSalaryMax: 200000,
+    growthRate: 12,
+    automationRisk: "low" as const,
+    scalability: "high" as const,
+    trend: "growing" as const,
+    timeToAutonomy: "1-3 anni con esperienza pratica",
+    advantages: [
+      "Potenziale di reddito illimitato",
+      "Autonomia decisionale",
+      "Impatto diretto sui risultati",
+      "Possibilità di fare la differenza",
+    ],
+    disadvantages: [
+      "Alto rischio finanziario iniziale",
+      "Incertezza nelle fasi iniziali",
+      "Richiede resilienza elevata",
+    ],
+    opportunities: [
+      "Digital marketing",
+      "E-commerce",
+      "Startup tech",
+      "Consulenza strategica",
+      "Fintech",
+    ],
+    icon: "trending-up",
+    color: "#10b981",
+  },
+  {
+    name: "Educazione & Formazione",
+    description:
+      "Insegnamento, coaching, formazione aziendale, e-learning e sviluppo delle persone. Per chi vuole trasmettere conoscenza e aiutare gli altri a crescere.",
+    riasecTypes: ["S", "A", "E"],
+    skills: ["Comunicazione", "Pazienza", "Conoscenza disciplinare", "Empatia", "Creatività didattica"],
+    avgSalaryMin: 22000,
+    avgSalaryMax: 80000,
+    growthRate: 14,
+    automationRisk: "low" as const,
+    scalability: "medium" as const,
+    trend: "growing" as const,
+    timeToAutonomy: "1-2 anni con certificazioni",
+    advantages: [
+      "Impatto duraturo sulla vita delle persone",
+      "Alta stabilità lavorativa",
+      "Varietà di contesti (scuola, aziende, online)",
+      "Possibilità di specializzarsi",
+    ],
+    disadvantages: [
+      "Stipendi pubblici spesso bassi",
+      "Alto investimento emotivo",
+      "Percorsi burocratici per l'insegnamento pubblico",
+    ],
+    opportunities: [
+      "Corsi online e piattaforme e-learning",
+      "Corporate training",
+      "Coaching personale",
+      "Educazione STEM",
+    ],
+    icon: "book-open",
+    color: "#3b82f6",
+  },
+  {
+    name: "Finanza & Investimenti",
+    description:
+      "Banca, finanza personale, trading, private equity e gestione patrimoniale. Per chi vuole operare nel mondo dei numeri e delle strategie finanziarie.",
+    riasecTypes: ["C", "E", "I"],
+    skills: ["Analisi quantitativa", "Gestione del rischio", "Excel e strumenti finanziari", "Comunicazione", "Disciplina"],
+    avgSalaryMin: 35000,
+    avgSalaryMax: 250000,
+    growthRate: 10,
+    automationRisk: "medium" as const,
+    scalability: "high" as const,
+    trend: "stable" as const,
+    timeToAutonomy: "2-4 anni con certificazioni CFA/CFP",
+    advantages: [
+      "Stipendi molto elevati",
+      "Trasferibilità internazionale",
+      "Sviluppo di competenze analitiche",
+      "Accesso a network esclusivi",
+    ],
+    disadvantages: [
+      "Alta pressione e lunghi orari",
+      "Forte competizione per posizioni top",
+      "Cultura aziendale spesso rigida",
+    ],
+    opportunities: [
+      "Fintech e neobank",
+      "Criptovalute e DeFi",
+      "ESG e finanza sostenibile",
+      "Consulenza finanziaria indipendente",
+    ],
+    icon: "bar-chart",
+    color: "#8b5cf6",
+  },
+];
+
+export async function seedSectors() {
+  const existing = await db.select().from(sectorsTable);
+  if (existing.length > 0) return;
+
+  await db.insert(sectorsTable).values(SECTORS);
+}

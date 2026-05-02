@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "ue03JDYVa8OsFQkkvplc6"
+uri = "file://artifacts/orientamento/public/hero.png"
+type = "image"
+title = "Serene path in nature"

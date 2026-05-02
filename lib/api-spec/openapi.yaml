@@ -3,13 +3,20 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Orientamento SaaS API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: sectors
+    description: Sector and career data
+  - name: test
+    description: Personality test operations
+  - name: users
+    description: User registration
+
 paths:
   /healthz:
     get:
@@ -24,6 +31,191 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /sectors:
+    get:
+      operationId: listSectors
+      tags: [sectors]
+      summary: List all sectors
+      responses:
+        "200":
+          description: List of sectors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Sector"
+
+  /sectors/{id}:
+    get:
+      operationId: getSector
+      tags: [sectors]
+      summary: Get sector details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sector details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sector"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /test-sessions:
+    post:
+      operationId: submitTest
+      tags: [test]
+      summary: Submit personality test and get recommendations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitTestBody"
+      responses:
+        "201":
+          description: Test result with personality profile and sector recommendations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestSession"
+        "400":
+          description: Invalid answers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /test-sessions/{id}:
+    get:
+      operationId: getTestSession
+      tags: [test]
+      summary: Get a test session result
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Test session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestSession"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /test-sessions/{id}/confirm:
+    post:
+      operationId: confirmSector
+      tags: [test]
+      summary: Confirm a sector choice from the test results
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmSectorBody"
+      responses:
+        "200":
+          description: Updated test session with confirmed sector
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestSession"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users:
+    post:
+      operationId: registerUser
+      tags: [users]
+      summary: Register a user to save test results
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterUserBody"
+      responses:
+        "201":
+          description: Created user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Invalid data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stats/summary:
+    get:
+      operationId: getStatsSummary
+      tags: [sectors]
+      summary: Get platform stats summary
+      responses:
+        "200":
+          description: Platform statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsSummary"
+
+  /sectors/{id}/stats:
+    get:
+      operationId: getSectorStats
+      tags: [sectors]
+      summary: Get detailed stats for a sector
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sector statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SectorStats"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +226,249 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    Sector:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        riasecTypes:
+          type: array
+          items:
+            type: string
+        skills:
+          type: array
+          items:
+            type: string
+        avgSalaryMin:
+          type: integer
+        avgSalaryMax:
+          type: integer
+        growthRate:
+          type: number
+        automationRisk:
+          type: string
+          enum: [low, medium, high]
+        scalability:
+          type: string
+          enum: [low, medium, high]
+        trend:
+          type: string
+          enum: [declining, stable, growing, booming]
+        timeToAutonomy:
+          type: string
+        advantages:
+          type: array
+          items:
+            type: string
+        disadvantages:
+          type: array
+          items:
+            type: string
+        opportunities:
+          type: array
+          items:
+            type: string
+        icon:
+          type: string
+        color:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - description
+        - riasecTypes
+        - skills
+        - avgSalaryMin
+        - avgSalaryMax
+        - growthRate
+        - automationRisk
+        - scalability
+        - trend
+        - timeToAutonomy
+        - advantages
+        - disadvantages
+        - opportunities
+        - icon
+        - color
+        - createdAt
+
+    SectorRecommendation:
+      type: object
+      properties:
+        sectorId:
+          type: integer
+        sectorName:
+          type: string
+        matchScore:
+          type: number
+        matchReason:
+          type: string
+        sector:
+          $ref: "#/components/schemas/Sector"
+      required:
+        - sectorId
+        - sectorName
+        - matchScore
+        - matchReason
+        - sector
+
+    TestSession:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: ["integer", "null"]
+        answers:
+          type: object
+          additionalProperties: true
+        riasecScores:
+          type: object
+          additionalProperties: true
+        primaryTypes:
+          type: array
+          items:
+            type: string
+        profileSummary:
+          type: string
+        recommendations:
+          type: array
+          items:
+            $ref: "#/components/schemas/SectorRecommendation"
+        confirmedSectorId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - answers
+        - riasecScores
+        - primaryTypes
+        - profileSummary
+        - recommendations
+        - createdAt
+
+    SubmitTestBody:
+      type: object
+      properties:
+        answers:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Map of question ID to answer value (1-5)
+        name:
+          type: ["string", "null"]
+      required:
+        - answers
+
+    ConfirmSectorBody:
+      type: object
+      properties:
+        sectorId:
+          type: integer
+      required:
+        - sectorId
+
+    RegisterUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        testSessionId:
+          type: ["integer", "null"]
+      required:
+        - name
+        - email
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        testSessionId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - email
+        - createdAt
+
+    StatsSummary:
+      type: object
+      properties:
+        totalSectors:
+          type: integer
+        totalTestsTaken:
+          type: integer
+        topSectors:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              count:
+                type: integer
+            required:
+              - name
+              - count
+        avgGrowthRate:
+          type: number
+      required:
+        - totalSectors
+        - totalTestsTaken
+        - topSectors
+        - avgGrowthRate
+
+    SectorStats:
+      type: object
+      properties:
+        sectorId:
+          type: integer
+        timesPicked:
+          type: integer
+        avgMatchScore:
+          type: number
+        salaryRange:
+          type: string
+        growthProjection:
+          type: object
+          properties:
+            shortTerm:
+              type: string
+            midTerm:
+              type: string
+            longTerm:
+              type: string
+          required:
+            - shortTerm
+            - midTerm
+            - longTerm
+      required:
+        - sectorId
+        - timesPicked
+        - avgMatchScore
+        - salaryRange
+        - growthProjection
