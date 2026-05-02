@@ -21,6 +21,7 @@ import Settori from "@/pages/settori";
 import Confronta from "@/pages/confronta";
 import Contatti from "@/pages/contatti";
 import AdminMessaggi from "@/pages/admin-messaggi";
+import AdminAffiliazione from "@/pages/admin-affiliazione";
 import SitemapPage from "@/pages/sitemap";
 import ChiSiamo from "@/pages/chi-siamo";
 import ComeFunziona from "@/pages/come-funziona";
@@ -42,6 +43,7 @@ function Router() {
     <Switch>
       {/* Admin — no navbar/footer */}
       <Route path="/admin/messaggi" component={AdminMessaggi} />
+      <Route path="/admin/affiliazione" component={AdminAffiliazione} />
 
       {/* Public layout */}
       <Route>
