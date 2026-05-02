@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, CheckCircle2, TrendingUp, DollarSign, Activity, Bot, BarChart3, AlertTriangle, Sparkles, Star, UserCheck, Bookmark, BookmarkCheck, Newspaper, Brain, Map } from "lucide-react";
+import { ArrowRight, CheckCircle2, TrendingUp, DollarSign, Activity, Bot, BarChart3, AlertTriangle, Sparkles, Star, UserCheck, Bookmark, BookmarkCheck, Newspaper, Brain, Map, GitCompare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
 import { useAuth } from "@/contexts/AuthContext";
@@ -110,6 +110,215 @@ function SectorBookmarkButton({ sectorId }: { sectorId: number }) {
     >
       {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
     </button>
+  );
+}
+
+const TREND_LABEL: Record<string, { label: string; score: number }> = {
+  booming:  { label: "In forte crescita", score: 4 },
+  growing:  { label: "In crescita",       score: 3 },
+  stable:   { label: "Stabile",           score: 2 },
+  declining:{ label: "In calo",           score: 1 },
+};
+const RISK_LABEL: Record<string, { label: string; score: number; color: string }> = {
+  low:    { label: "Basso",  score: 3, color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+  medium: { label: "Medio",  score: 2, color: "text-amber-700 bg-amber-50 border-amber-200" },
+  high:   { label: "Alto",   score: 1, color: "text-rose-700 bg-rose-50 border-rose-200" },
+};
+
+type Rec = {
+  sectorId: number;
+  matchScore: number;
+  sector?: {
+    name?: string; icon?: string; avgSalaryMax?: number;
+    growthRate?: number; automationRisk?: string; trend?: string;
+  } | null;
+};
+
+function QuickCompare({ recs }: { recs: Rec[] }) {
+  if (recs.length < 2) return null;
+
+  const cols = recs.slice(0, 3);
+
+  // per-metric winner index
+  function winnerIdx(vals: number[]) {
+    const max = Math.max(...vals);
+    return vals.indexOf(max);
+  }
+
+  const salaryVals  = cols.map(r => r.sector?.avgSalaryMax ?? 0);
+  const growthVals  = cols.map(r => r.sector?.growthRate   ?? 0);
+  const riskVals    = cols.map(r => RISK_LABEL[r.sector?.automationRisk ?? ""]?.score ?? 2);
+  const trendVals   = cols.map(r => TREND_LABEL[r.sector?.trend ?? ""]?.score ?? 2);
+
+  const PAIRS = [
+    [0, 1], [0, 2], [1, 2],
+  ].filter(([a, b]) => a < cols.length && b < cols.length);
+
+  const ACCENT = ["hsl(var(--primary))", "#7c3aed", "#0891b2"];
+  const ACCENT_CLS = [
+    "bg-primary/10 text-primary border-primary/20",
+    "bg-violet-100 text-violet-700 border-violet-200",
+    "bg-cyan-100 text-cyan-700 border-cyan-200",
+  ];
+
+  function Cell({ val, isWinner, className }: { val: string; isWinner: boolean; className?: string }) {
+    return (
+      <td className={cn(
+        "px-4 py-3 text-sm text-center font-medium transition-colors",
+        isWinner ? "text-emerald-700 font-bold" : "text-foreground",
+        className,
+      )}>
+        {isWinner && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 mb-0.5 align-middle" />}
+        {val}
+      </td>
+    );
+  }
+
+  return (
+    <div className="mt-10 mb-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex items-center gap-2 mb-4">
+        <GitCompare className="w-5 h-5 text-primary" />
+        <h3 className="font-serif text-xl font-bold text-foreground">Confronto rapido tra i tuoi percorsi</h3>
+        <span className="text-sm text-muted-foreground ml-1">· Il punto verde indica il valore migliore</span>
+      </div>
+
+      <div className="rounded-2xl border bg-card overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b bg-muted/30">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-32">
+                  Metrica
+                </th>
+                {cols.map((rec, i) => (
+                  <th key={rec.sectorId} className="px-4 py-3 text-center min-w-[160px]">
+                    <div className="flex flex-col items-center gap-1.5">
+                      <div className={cn(
+                        "w-9 h-9 rounded-xl flex items-center justify-center",
+                        ACCENT_CLS[i],
+                      )}>
+                        <SectorIcon name={rec.sector?.icon} size={18} />
+                      </div>
+                      <span className="text-xs font-semibold text-foreground leading-snug line-clamp-2 text-center">
+                        {rec.sector?.name ?? `Settore ${i + 1}`}
+                      </span>
+                      <span className={cn(
+                        "text-xs font-bold px-2 py-0.5 rounded-full border",
+                        ACCENT_CLS[i],
+                      )}>
+                        {rec.matchScore}% match
+                      </span>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {/* Stipendio max */}
+              <tr className="hover:bg-muted/20 transition-colors">
+                <td className="px-4 py-3 text-sm text-muted-foreground font-medium whitespace-nowrap">
+                  <div className="flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5" />
+                    Stipendio max
+                  </div>
+                </td>
+                {cols.map((rec, i) => (
+                  <Cell
+                    key={rec.sectorId}
+                    val={`€${(rec.sector?.avgSalaryMax ?? 0) / 1000}k`}
+                    isWinner={winnerIdx(salaryVals) === i}
+                  />
+                ))}
+              </tr>
+              {/* Crescita */}
+              <tr className="hover:bg-muted/20 transition-colors">
+                <td className="px-4 py-3 text-sm text-muted-foreground font-medium whitespace-nowrap">
+                  <div className="flex items-center gap-1.5">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    Crescita annua
+                  </div>
+                </td>
+                {cols.map((rec, i) => (
+                  <Cell
+                    key={rec.sectorId}
+                    val={`+${rec.sector?.growthRate ?? 0}%`}
+                    isWinner={winnerIdx(growthVals) === i}
+                  />
+                ))}
+              </tr>
+              {/* Rischio automazione */}
+              <tr className="hover:bg-muted/20 transition-colors">
+                <td className="px-4 py-3 text-sm text-muted-foreground font-medium whitespace-nowrap">
+                  <div className="flex items-center gap-1.5">
+                    <Bot className="w-3.5 h-3.5" />
+                    Rischio AI
+                  </div>
+                </td>
+                {cols.map((rec, i) => {
+                  const meta = RISK_LABEL[rec.sector?.automationRisk ?? ""] ?? RISK_LABEL["medium"];
+                  return (
+                    <td key={rec.sectorId} className="px-4 py-3 text-center">
+                      <span className={cn(
+                        "inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border",
+                        meta.color,
+                        winnerIdx(riskVals) === i ? "ring-1 ring-emerald-400/40" : "",
+                      )}>
+                        {winnerIdx(riskVals) === i && (
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 mr-0.5" />
+                        )}
+                        {meta.label}
+                      </span>
+                    </td>
+                  );
+                })}
+              </tr>
+              {/* Trend */}
+              <tr className="hover:bg-muted/20 transition-colors">
+                <td className="px-4 py-3 text-sm text-muted-foreground font-medium whitespace-nowrap">
+                  <div className="flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5" />
+                    Trend mercato
+                  </div>
+                </td>
+                {cols.map((rec, i) => (
+                  <Cell
+                    key={rec.sectorId}
+                    val={TREND_LABEL[rec.sector?.trend ?? ""]?.label ?? rec.sector?.trend ?? "—"}
+                    isWinner={winnerIdx(trendVals) === i}
+                  />
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pair compare buttons */}
+        <div className="flex flex-wrap items-center justify-center gap-2 px-4 py-4 border-t bg-muted/20">
+          <span className="text-xs text-muted-foreground font-medium mr-1">Confronto approfondito:</span>
+          {PAIRS.map(([a, b]) => (
+            <Link
+              key={`${a}-${b}`}
+              href={`/confronta?a=${cols[a].sectorId}&b=${cols[b].sectorId}`}
+            >
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-card text-xs font-medium text-foreground hover:border-primary/40 hover:text-primary transition-colors">
+                <span
+                  className={cn("inline-block w-2 h-2 rounded-full border", ACCENT_CLS[a])}
+                  style={{ backgroundColor: ACCENT[a] }}
+                />
+                {cols[a].sector?.name?.split(" ")[0]}
+                <span className="text-muted-foreground">vs</span>
+                <span
+                  className="inline-block w-2 h-2 rounded-full border"
+                  style={{ backgroundColor: ACCENT[b] }}
+                />
+                {cols[b].sector?.name?.split(" ")[0]}
+                <ArrowRight className="w-3 h-3 ml-0.5 text-muted-foreground" />
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -362,6 +571,8 @@ export default function Results() {
             </Card>
           ))}
         </div>
+
+        <QuickCompare recs={session.recommendations as Rec[]} />
       </div>
 
       {/* Stats Footer */}
