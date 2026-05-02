@@ -1,7 +1,5 @@
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
-// Resend free tier allows sending from onboarding@resend.dev during testing.
-// For production, use a verified domain address.
 const FROM = process.env.EMAIL_FROM ?? "NorthStar <onboarding@resend.dev>";
 
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
@@ -60,7 +58,7 @@ export async function sendVerificationEmail(to: string, name: string, code: stri
 </body>
 </html>`;
 
-  await sendEmail(to, "Conferma il tuo account NorthStar ✦", html);
+  await sendEmail(to, "Conferma il tuo account NorthStar", html);
 }
 
 export async function sendResetEmail(to: string, resetUrl: string): Promise<void> {
