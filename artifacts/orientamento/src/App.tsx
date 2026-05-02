@@ -8,6 +8,8 @@ import Test from "@/pages/test";
 import Results from "@/pages/results";
 import Sector from "@/pages/sector";
 import Register from "@/pages/register";
+import Premium from "@/pages/premium";
+import PremiumSuccess from "@/pages/premium-success";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 
@@ -24,6 +26,8 @@ function Router() {
           <Route path="/risultati/:id" component={Results} />
           <Route path="/settore/:id" component={Sector} />
           <Route path="/registra" component={Register} />
+          <Route path="/premium" component={Premium} />
+          <Route path="/premium/successo" component={PremiumSuccess} />
           <Route component={NotFound} />
         </Switch>
       </main>
