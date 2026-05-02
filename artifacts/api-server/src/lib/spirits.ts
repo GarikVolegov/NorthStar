@@ -32,12 +32,34 @@ export const SPIRIT_META: Record<SpiritKey, { name: string; emoji: string; descr
 // Spirit weights per sector name (lowercase match). Values 0-1.
 // Higher = stronger alignment.
 export const SECTOR_SPIRIT_WEIGHTS: Record<string, Partial<Record<SpiritKey, number>>> = {
-  "tecnologia & software": { yi: 0.9, zhi: 0.8, hun: 0.4 },
-  "salute & benessere": { shen: 0.9, po: 0.7, yi: 0.4 },
-  "creatività & design": { hun: 0.9, shen: 0.6, po: 0.4 },
-  "business & imprenditoria": { zhi: 0.9, hun: 0.8, shen: 0.4 },
-  "educazione & formazione": { shen: 0.9, yi: 0.7, hun: 0.4 },
-  "finanza & investimenti": { yi: 0.9, zhi: 0.9, hun: 0.3 },
+  // Legacy keys (kept for backwards compatibility)
+  "tecnologia & software":         { yi: 0.9, zhi: 0.8, hun: 0.4 },
+  "salute & benessere":            { shen: 0.9, po: 0.7, yi: 0.4 },
+  "creatività & design":           { hun: 0.9, shen: 0.6, po: 0.4 },
+  "business & imprenditoria":      { zhi: 0.9, hun: 0.8, shen: 0.4 },
+
+  // New catalog — 20 sectors
+  "tecnologia & digitale":         { yi: 0.9, zhi: 0.8, hun: 0.5 },
+  "cybersecurity":                 { yi: 0.9, zhi: 0.9, po: 0.4 },
+  "data & analytics":              { yi: 1.0, zhi: 0.7, po: 0.3 },
+  "fintech":                       { yi: 0.8, zhi: 0.9, hun: 0.5 },
+  "green economy & sostenibilità": { po: 0.7, zhi: 0.8, shen: 0.6 },
+  "sanità & healthcare digitale":  { shen: 0.9, yi: 0.6, po: 0.5 },
+  "istruzione & formazione":       { shen: 0.9, hun: 0.6, yi: 0.6 },
+  "marketing & growth":            { hun: 0.9, shen: 0.5, zhi: 0.6 },
+  "e-commerce & retail digitale":  { hun: 0.6, zhi: 0.7, yi: 0.5 },
+  "logistica & supply chain":      { yi: 0.7, zhi: 0.8, po: 0.5 },
+  "ingegneria & sistemi tecnici":  { yi: 0.9, zhi: 0.8, po: 0.6 },
+  "turismo & hospitality":         { shen: 0.8, po: 0.6, hun: 0.5 },
+  "consulenza & strategia":        { yi: 0.9, zhi: 0.7, hun: 0.6 },
+  "risorse umane & people operations": { shen: 0.9, yi: 0.6, zhi: 0.5 },
+  "design & creatività digitale":  { hun: 0.9, shen: 0.6, po: 0.4 },
+  "immobiliare & property":        { zhi: 0.8, yi: 0.6, po: 0.5 },
+  "agroalimentare & food industry":{ po: 0.7, zhi: 0.6, shen: 0.5 },
+  "gaming & esports":              { hun: 0.9, po: 0.7, zhi: 0.6 },
+  "legal tech & servizi legali digitali": { yi: 0.9, zhi: 0.8, shen: 0.4 },
+  "biotech & life sciences":       { yi: 1.0, zhi: 0.9, po: 0.4 },
+  "finanza & investimenti":        { yi: 0.9, zhi: 0.9, hun: 0.3 },
 };
 
 export function extractSpiritAnswers(answers: Record<string, number>): Record<string, number> {
