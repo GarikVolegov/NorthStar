@@ -37,6 +37,11 @@ export function Footer() {
                   Piano Premium
                 </Link>
               </li>
+              <li>
+                <Link href="/contatti" className="hover:text-primary transition-colors">
+                  Contatti
+                </Link>
+              </li>
             </ul>
           </div>
           <div className="space-y-3">

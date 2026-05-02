@@ -13,6 +13,7 @@ import wikiRouter from "./wiki";
 import roadmapRouter from "./roadmap";
 import grafoRouter from "./grafo";
 import sitemapRouter from "./sitemap";
+import contactRouter from "./contact";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(wikiRouter);
 router.use(roadmapRouter);
 router.use(grafoRouter);
 router.use(sitemapRouter);
+router.use(contactRouter);
 
 export default router;
