@@ -22,6 +22,7 @@ import crescitaRouter from "./crescita";
 import cvRouter from "./cv";
 import applicationsRouter from "./applications";
 import remindersRouter from "./reminders";
+import friendsRouter from "./friends";
 
 const router: IRouter = Router();
 
@@ -48,5 +49,6 @@ router.use(crescitaRouter);
 router.use(cvRouter);
 router.use(applicationsRouter);
 router.use(remindersRouter);
+router.use(friendsRouter);
 
 export default router;

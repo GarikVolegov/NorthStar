@@ -31,6 +31,8 @@ import Crescita from "@/pages/crescita";
 import CrescitaCategoria from "@/pages/crescita-categoria";
 import CrescitaArticolo from "@/pages/crescita-articolo";
 import Candidature from "@/pages/candidature";
+import Amici from "@/pages/amici";
+import Utente from "@/pages/utente";
 import Affiliazione from "@/pages/affiliazione";
 import AffiliazioneScuole from "@/pages/affiliazione-scuole";
 import AffiliazioneUniversita from "@/pages/affiliazione-universita";
@@ -67,6 +69,8 @@ function Router() {
               <Route path="/reset-password" component={ResetPassword} />
               <Route path="/profilo" component={Profilo} />
               <Route path="/candidature" component={Candidature} />
+              <Route path="/amici" component={Amici} />
+              <Route path="/utente/:id" component={Utente} />
               <Route path="/wiki/:id" component={Wiki} />
               <Route path="/roadmap/:id" component={Roadmap} />
               <Route path="/grafo/:id" component={Grafo} />

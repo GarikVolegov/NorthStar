@@ -20,8 +20,20 @@ export const usersTable = pgTable("users", {
   resetTokenExpires: timestamp("reset_token_expires", { withTimezone: true }),
   cvText: text("cv_text"),
   cvJson: jsonb("cv_json"),
+  isPublic: boolean("is_public").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const friendshipsTable = pgTable("friendships", {
+  id: serial("id").primaryKey(),
+  requesterId: integer("requester_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  receiverId: integer("receiver_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type Friendship = typeof friendshipsTable.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({ id: true, createdAt: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
