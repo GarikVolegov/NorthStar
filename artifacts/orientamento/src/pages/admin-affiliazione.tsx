@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import {
   Handshake, Mail, CheckCheck, RefreshCw, LogOut,
   Eye, Filter, ChevronDown, ChevronUp, Circle,
-  ShieldAlert, Phone, Users, Building2, ExternalLink,
+  ShieldAlert, Phone, Users, Building2, ExternalLink, Loader2,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -121,6 +121,8 @@ export default function AdminAffiliazione() {
 
   useEffect(() => { if (key) fetchLeads(key); }, [key, fetchLeads]);
 
+  const [updatingStatus, setUpdatingStatus] = useState<number | null>(null);
+
   async function markContacted(id: number) {
     const res = await fetch(`${BASE}api/affiliazione/leads/${id}/read`, {
       method: "PATCH",
@@ -129,6 +131,23 @@ export default function AdminAffiliazione() {
     if (res.ok) {
       const updated: Lead = await res.json();
       setLeads(prev => prev.map(l => l.id === id ? { ...l, read: true, status: updated.status } : l));
+    }
+  }
+
+  async function updateStatus(id: number, status: string) {
+    setUpdatingStatus(id);
+    try {
+      const res = await fetch(`${BASE}api/affiliazione/leads/${id}/status`, {
+        method: "PATCH",
+        headers: { "x-admin-key": key, "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        const updated: Lead = await res.json();
+        setLeads(prev => prev.map(l => l.id === id ? { ...l, status: updated.status, read: updated.read } : l));
+      }
+    } finally {
+      setUpdatingStatus(null);
     }
   }
 
@@ -381,8 +400,29 @@ export default function AdminAffiliazione() {
                         <p className="text-sm font-medium">{lead.estimatedUsers ?? "Non specificato"}</p>
                       </div>
                       <div className="p-3 rounded-xl bg-background border">
-                        <p className="text-xs text-muted-foreground mb-1">Stato</p>
-                        <p className="text-sm font-medium">{STATUS_LABELS[lead.status] ?? lead.status}</p>
+                        <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                          {updatingStatus === lead.id
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : null}
+                          Stato pipeline
+                        </p>
+                        <select
+                          value={lead.status}
+                          disabled={updatingStatus === lead.id}
+                          onChange={e => updateStatus(lead.id, e.target.value)}
+                          className={cn(
+                            "w-full text-sm font-medium rounded-lg border px-2 py-1.5 bg-background",
+                            "focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all",
+                            "disabled:opacity-50 disabled:cursor-not-allowed",
+                            STATUS_COLORS[lead.status] ?? STATUS_COLORS["nuovo"],
+                          )}
+                        >
+                          {Object.entries(STATUS_LABELS).map(([val, label]) => (
+                            <option key={val} value={val} className="bg-background text-foreground">
+                              {label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
 

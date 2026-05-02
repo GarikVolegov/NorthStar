@@ -76,4 +76,30 @@ router.patch("/affiliazione/leads/:id/read", async (req, res): Promise<void> => 
   res.json(lead);
 });
 
+const VALID_STATUSES = ["nuovo", "contattato", "in_trattativa", "attivo"];
+
+router.patch("/affiliazione/leads/:id/status", async (req, res): Promise<void> => {
+  const adminKey = req.headers["x-admin-key"];
+  if (!adminKey || adminKey !== process.env.ADMIN_KEY) {
+    res.status(403).json({ error: "Non autorizzato" });
+    return;
+  }
+  const id = parseInt(req.params["id"] ?? "", 10);
+  if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
+  const { status } = req.body as { status?: string };
+  if (!status || !VALID_STATUSES.includes(status)) {
+    res.status(400).json({ error: "Stato non valido" });
+    return;
+  }
+  const updates: { status: string; read?: boolean } = { status };
+  if (status !== "nuovo") updates.read = true;
+  const [lead] = await db
+    .update(affiliationLeadsTable)
+    .set(updates)
+    .where(eq(affiliationLeadsTable.id, id))
+    .returning();
+  if (!lead) { res.status(404).json({ error: "Lead non trovato" }); return; }
+  res.json(lead);
+});
+
 export default router;
