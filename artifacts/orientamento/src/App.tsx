@@ -27,6 +27,9 @@ import ChiSiamo from "@/pages/chi-siamo";
 import ComeFunziona from "@/pages/come-funziona";
 import PrivacyPolicy from "@/pages/privacy-policy";
 import TerminiDiServizio from "@/pages/termini-di-servizio";
+import Crescita from "@/pages/crescita";
+import CrescitaCategoria from "@/pages/crescita-categoria";
+import CrescitaArticolo from "@/pages/crescita-articolo";
 import Affiliazione from "@/pages/affiliazione";
 import AffiliazioneScuole from "@/pages/affiliazione-scuole";
 import AffiliazioneUniversita from "@/pages/affiliazione-universita";
@@ -73,6 +76,9 @@ function Router() {
               <Route path="/come-funziona" component={ComeFunziona} />
               <Route path="/privacy-policy" component={PrivacyPolicy} />
               <Route path="/termini-di-servizio" component={TerminiDiServizio} />
+              <Route path="/crescita" component={Crescita} />
+              <Route path="/crescita/categoria/:cat" component={CrescitaCategoria} />
+              <Route path="/crescita/articolo/:slug" component={CrescitaArticolo} />
               <Route path="/affiliazione" component={Affiliazione} />
               <Route path="/affiliazione/scuole" component={AffiliazioneScuole} />
               <Route path="/affiliazione/universita" component={AffiliazioneUniversita} />

@@ -1,7 +1,7 @@
 import { useLocation } from "wouter";
 import { ChevronLeft } from "lucide-react";
 
-const NO_BACK_PATHS = ["/", "/test", "/news", "/settori", "/premium", "/profilo", "/contatti"];
+const NO_BACK_PATHS = ["/", "/test", "/news", "/settori", "/premium", "/profilo", "/contatti", "/crescita"];
 
 export function BackButton() {
   const [location] = useLocation();

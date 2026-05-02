@@ -17,6 +17,7 @@ import contactRouter from "./contact";
 import ogRouter from "./og";
 import ogImageRouter from "./og-image";
 import affiliazioneRouter from "./affiliazione";
+import crescitaRouter from "./crescita";
 
 const router: IRouter = Router();
 
@@ -38,5 +39,6 @@ router.use(contactRouter);
 router.use(ogRouter);
 router.use(ogImageRouter);
 router.use(affiliazioneRouter);
+router.use(crescitaRouter);
 
 export default router;

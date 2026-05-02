@@ -38,6 +38,9 @@ export function Navbar() {
               <Link href="/settori" className="text-sm font-medium transition-colors hover:text-primary hidden md:inline">
                 Settori
               </Link>
+              <Link href="/crescita" className="text-sm font-medium transition-colors hover:text-primary hidden md:inline">
+                Crescita
+              </Link>
               <Link href="/news" className="text-sm font-medium transition-colors hover:text-primary">
                 News
               </Link>

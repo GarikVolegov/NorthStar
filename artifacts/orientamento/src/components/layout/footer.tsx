@@ -40,6 +40,7 @@ export function Footer() {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><FooterLink href="/test">Il Test RIASEC</FooterLink></li>
               <li><FooterLink href="/settori">Esplora settori</FooterLink></li>
+              <li><FooterLink href="/crescita">Crescita Personale</FooterLink></li>
               <li><FooterLink href="/news">News settoriali</FooterLink></li>
               <li><FooterLink href="/premium">Piano Premium</FooterLink></li>
               <li><FooterLink href="/contatti">Contatti</FooterLink></li>

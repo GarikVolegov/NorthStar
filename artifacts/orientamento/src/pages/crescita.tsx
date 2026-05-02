@@ -1,0 +1,211 @@
+import { usePageMeta } from "@/lib/seo";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { ArrowRight, BookOpen, Clock, Sparkles, TrendingUp } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const BASE = import.meta.env.BASE_URL || "/";
+
+interface Category {
+  id: string;
+  label: string;
+  icon: string;
+  description: string;
+  count: number;
+}
+
+interface Article {
+  id: number;
+  title: string;
+  slug: string;
+  category: string;
+  description: string;
+  tags: string[];
+  difficulty: string;
+  readTimeMinutes: number;
+}
+
+const DIFFICULTY_LABELS: Record<string, string> = {
+  base: "Base",
+  intermedio: "Intermedio",
+  avanzato: "Avanzato",
+};
+
+const DIFFICULTY_COLORS: Record<string, string> = {
+  base: "bg-emerald-100 text-emerald-700",
+  intermedio: "bg-amber-100 text-amber-700",
+  avanzato: "bg-rose-100 text-rose-700",
+};
+
+function CategoryCard({ cat }: { cat: Category }) {
+  return (
+    <Link href={`/crescita/categoria/${cat.id}`}>
+      <div className="group rounded-2xl border bg-card p-5 hover:border-primary/40 hover:shadow-md transition-all cursor-pointer h-full">
+        <div className="flex items-start justify-between mb-3">
+          <span className="text-3xl">{cat.icon}</span>
+          {cat.count > 0 && (
+            <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+              {cat.count} {cat.count === 1 ? "articolo" : "articoli"}
+            </span>
+          )}
+        </div>
+        <h3 className="font-semibold text-foreground mb-1 group-hover:text-primary transition-colors">
+          {cat.label}
+        </h3>
+        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
+          {cat.description}
+        </p>
+        <div className="mt-3 flex items-center gap-1 text-xs font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+          Esplora <ArrowRight className="w-3 h-3" />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function ArticleCard({ article }: { article: Article }) {
+  return (
+    <Link href={`/crescita/articolo/${article.slug}`}>
+      <div className="group rounded-2xl border bg-card p-5 hover:border-primary/40 hover:shadow-md transition-all cursor-pointer h-full flex flex-col">
+        <div className="flex items-center gap-2 mb-3">
+          <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", DIFFICULTY_COLORS[article.difficulty] ?? DIFFICULTY_COLORS["base"])}>
+            {DIFFICULTY_LABELS[article.difficulty] ?? article.difficulty}
+          </span>
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <Clock className="w-3 h-3" /> {article.readTimeMinutes} min
+          </span>
+        </div>
+        <h3 className="font-semibold text-foreground mb-2 group-hover:text-primary transition-colors line-clamp-2 leading-snug">
+          {article.title}
+        </h3>
+        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 flex-1">
+          {article.description}
+        </p>
+        {article.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-3">
+            {article.tags.slice(0, 3).map(t => (
+              <span key={t} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+export default function Crescita() {
+  usePageMeta({
+    title: "Crescita Personale — NorthStar",
+    description: "Una knowledge base di articoli, guide ed esercizi pratici su abitudini, mindset, motivazione, disciplina e sviluppo professionale.",
+    canonicalPath: "/crescita",
+  });
+
+  const { data: catData = [] } = useQuery<Category[]>({
+    queryKey: ["crescita-categorie"],
+    queryFn: () => fetch(`${BASE}api/crescita/categorie`).then(r => r.json()),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const { data: recentData } = useQuery<{ articles: Article[] }>({
+    queryKey: ["crescita-recent"],
+    queryFn: () => fetch(`${BASE}api/crescita?limit=6`).then(r => r.json()),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const totalArticles = catData.reduce((sum, c) => sum + c.count, 0);
+  const totalCategories = catData.filter(c => c.count > 0).length;
+  const recentArticles = recentData?.articles ?? [];
+
+  return (
+    <div className="min-h-screen">
+
+      {/* Hero */}
+      <section className="py-16 md:py-24 bg-gradient-to-b from-primary/5 to-background border-b">
+        <div className="container mx-auto px-4 md:px-6 max-w-4xl text-center">
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary text-sm font-medium px-4 py-1.5 rounded-full mb-6">
+            <Sparkles className="w-4 h-4" />
+            Crescita Personale
+          </div>
+          <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground mb-4 leading-tight">
+            La biblioteca della tua <span className="text-primary">evoluzione</span>
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-8">
+            Articoli, guide ed esercizi pratici su abitudini, mindset, motivazione e crescita professionale. Contenuti curati per chi vuole migliorare con intenzione.
+          </p>
+          <div className="flex flex-wrap justify-center gap-6 text-sm">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <BookOpen className="w-4 h-4 text-primary" />
+              <span><strong className="text-foreground">{totalArticles}</strong> articoli</span>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <TrendingUp className="w-4 h-4 text-primary" />
+              <span><strong className="text-foreground">{totalCategories}</strong> aree tematiche</span>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <span>Aggiornato continuamente</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Categories */}
+      <section className="py-14">
+        <div className="container mx-auto px-4 md:px-6 max-w-6xl">
+          <div className="mb-8">
+            <h2 className="text-2xl font-serif font-bold text-foreground mb-1">Esplora per area</h2>
+            <p className="text-muted-foreground">Scegli il tema su cui vuoi lavorare adesso.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {catData.map(cat => (
+              <CategoryCard key={cat.id} cat={cat} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Recent articles */}
+      {recentArticles.length > 0 && (
+        <section className="py-14 bg-muted/30 border-t border-b">
+          <div className="container mx-auto px-4 md:px-6 max-w-6xl">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-2xl font-serif font-bold text-foreground mb-1">Ultimi articoli</h2>
+                <p className="text-muted-foreground">I contenuti aggiunti più di recente.</p>
+              </div>
+              <Link href="/crescita/categoria/autoconsapevolezza" className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
+                Vedi tutti <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {recentArticles.map(a => (
+                <ArticleCard key={a.id} article={a} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* CTA */}
+      <section className="py-16">
+        <div className="container mx-auto px-4 md:px-6 max-w-3xl text-center">
+          <div className="rounded-3xl bg-primary/5 border border-primary/20 p-10">
+            <h2 className="text-2xl font-serif font-bold text-foreground mb-3">
+              Non sai da dove iniziare?
+            </h2>
+            <p className="text-muted-foreground mb-6">
+              Fai il test RIASEC + Cinque Spiriti: capire chi sei è sempre il primo passo.
+            </p>
+            <Link href="/test">
+              <button className="bg-primary text-primary-foreground px-6 py-3 rounded-full font-medium hover:opacity-90 transition-opacity inline-flex items-center gap-2">
+                Inizia il percorso <ArrowRight className="w-4 h-4" />
+              </button>
+            </Link>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
