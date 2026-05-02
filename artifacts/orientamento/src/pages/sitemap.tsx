@@ -41,11 +41,21 @@ const STATIC_GROUPS: SitemapGroup[] = [
     color: "#6366f1",
     bg: "#eef2ff",
     items: [
-      { label: "Home",         href: "/",       desc: "La bussola per il tuo futuro" },
-      { label: "Il Test",      href: "/test",   desc: "Test RIASEC + Cinque Spiriti (17 domande)" },
-      { label: "News",         href: "/news",   desc: "Articoli aggiornati per settore" },
-      { label: "Premium",      href: "/premium",desc: "Piani e funzionalità avanzate" },
-      { label: "Il mio profilo",href: "/profilo",desc: "Account, obiettivi e storico test" },
+      { label: "Home",            href: "/",         desc: "La bussola per il tuo futuro" },
+      { label: "Il Test",         href: "/test",     desc: "Test RIASEC + Cinque Spiriti (17 domande)" },
+      { label: "News",            href: "/news",     desc: "Articoli aggiornati per settore" },
+      { label: "Premium",         href: "/premium",  desc: "Piani e funzionalità avanzate" },
+      { label: "Il mio profilo",  href: "/profilo",  desc: "Account, obiettivi e storico test" },
+    ],
+  },
+  {
+    title: "Esplora settori",
+    icon: Globe,
+    color: "#f59e0b",
+    bg: "#fffbeb",
+    items: [
+      { label: "Tutti i settori",    href: "/settori",   desc: "Griglia dei 21 settori con filtri RIASEC e AI" },
+      { label: "Confronta settori",  href: "/confronta", desc: "Comparatore fianco a fianco con URL condivisibile" },
     ],
   },
   {
@@ -54,9 +64,12 @@ const STATIC_GROUPS: SitemapGroup[] = [
     color: "#10b981",
     bg: "#ecfdf5",
     items: [
-      { label: "Chi siamo",           href: "/chi-siamo",          desc: "Missione, metodo e valori di NorthStar" },
-      { label: "Privacy Policy",       href: "/privacy-policy",     desc: "Trattamento dei dati personali (GDPR)" },
-      { label: "Termini di servizio",  href: "/termini-di-servizio",desc: "Condizioni d'uso della piattaforma" },
+      { label: "Chi siamo",            href: "/chi-siamo",           desc: "Missione, metodo e valori di NorthStar" },
+      { label: "Come funziona",        href: "/come-funziona",       desc: "RIASEC, Cinque Spiriti, FAQ e privacy" },
+      { label: "Contatti",             href: "/contatti",            desc: "Scrivi al team NorthStar" },
+      { label: "Mappa del sito",       href: "/sitemap",             desc: "Panoramica di tutte le pagine" },
+      { label: "Privacy Policy",       href: "/privacy-policy",      desc: "Trattamento dei dati personali (GDPR)" },
+      { label: "Termini di servizio",  href: "/termini-di-servizio", desc: "Condizioni d'uso della piattaforma" },
     ],
   },
 ];

@@ -9,8 +9,13 @@ const STATIC_ROUTES: { path: string; priority: string; changefreq: string }[] = 
   { path: "/",                    priority: "1.0", changefreq: "weekly"  },
   { path: "/test",                priority: "0.9", changefreq: "monthly" },
   { path: "/news",                priority: "0.8", changefreq: "daily"   },
+  { path: "/settori",             priority: "0.8", changefreq: "weekly"  },
   { path: "/premium",             priority: "0.8", changefreq: "monthly" },
+  { path: "/confronta",           priority: "0.7", changefreq: "weekly"  },
+  { path: "/come-funziona",       priority: "0.7", changefreq: "monthly" },
   { path: "/chi-siamo",           priority: "0.7", changefreq: "monthly" },
+  { path: "/contatti",            priority: "0.5", changefreq: "monthly" },
+  { path: "/sitemap",             priority: "0.3", changefreq: "monthly" },
   { path: "/privacy-policy",      priority: "0.4", changefreq: "yearly"  },
   { path: "/termini-di-servizio", priority: "0.4", changefreq: "yearly"  },
 ];
