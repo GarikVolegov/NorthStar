@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { usePageMeta } from "@/lib/seo";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -164,11 +165,11 @@ function SalaryBar({ value, max, color }: { value: number; max: number; color: s
 }
 
 export default function Confronta() {
-  useEffect(() => {
-    document.title = "Confronta Settori — NorthStar";
-    const meta = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
-    if (meta) meta.content = "Metti a confronto due settori professionali e scopri le differenze chiave in termini di stipendio, crescita, rischio automazione e competenze richieste.";
-  }, []);
+  usePageMeta({
+    title: "Confronta i settori professionali",
+    description: "Metti a confronto due settori fianco a fianco: stipendi, crescita annua, rischio AI, competenze e opportunità. Link condivisibile per confronti salvati.",
+    path: "/confronta",
+  });
 
   const { data: sectors = [], isLoading } = useAllSectors();
 

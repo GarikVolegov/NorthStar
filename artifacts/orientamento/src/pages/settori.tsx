@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { usePageMeta } from "@/lib/seo";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -54,11 +55,11 @@ const ALL_RIASEC = ["R", "I", "A", "S", "E", "C"];
 const ALL_RISK   = ["low", "medium", "high"];
 
 export default function Settori() {
-  useEffect(() => {
-    document.title = "Esplora i Settori — NorthStar";
-    const meta = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
-    if (meta) meta.content = "Esplora tutti i 21 settori professionali di NorthStar. Filtra per tipo di personalità RIASEC, rischio automazione e trend di mercato per trovare il percorso più adatto a te.";
-  }, []);
+  usePageMeta({
+    title: "Esplora i 21 settori professionali",
+    description: "Sfoglia tutti i settori professionali italiani. Filtra per tipo RIASEC, rischio automazione AI e trend di mercato. Trova dove il tuo talento incontra un'opportunità reale.",
+    path: "/settori",
+  });
 
   const { data: sectors = [], isLoading } = useAllSectors();
 

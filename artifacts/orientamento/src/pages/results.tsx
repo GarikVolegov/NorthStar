@@ -1,4 +1,5 @@
 import React from "react";
+import { usePageMeta } from "@/lib/seo";
 import { useParams, Link, useLocation } from "wouter";
 import { useGetTestSession, useConfirmSector, useGetStatsSummary } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -323,6 +324,11 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
 }
 
 export default function Results() {
+  usePageMeta({
+    title: "I tuoi risultati RIASEC",
+    description: "I tuoi risultati personalizzati del test RIASEC + Bussola Interiore. Scopri i settori professionali più adatti al tuo profilo di personalità.",
+    noIndex: true,
+  });
   const params = useParams();
   const id = parseInt(params.id || "0", 10);
   const [, setLocation] = useLocation();

@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Clock, DollarSign, Bot, Sparkles, TrendingUp, Target, Plus, Minus, Zap, Brain, MapPin, Network, ArrowRight, Newspaper, GitCompare } from "lucide-react";
 import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { usePageMeta, buildSectorMeta } from "@/lib/seo";
 
 export default function Sector() {
   const params = useParams();
@@ -21,6 +22,16 @@ export default function Sector() {
   const { data: stats, isLoading: isLoadingStats } = useGetSectorStats(id, {
     query: { enabled: !!id, queryKey: ["sectorStats", id] }
   });
+
+  usePageMeta(
+    sector
+      ? buildSectorMeta(sector as Parameters<typeof buildSectorMeta>[0])
+      : {
+          title: "Settore professionale",
+          description: "Scopri dettagli, stipendi, crescita e rischio AI di questo settore professionale su NorthStar.",
+          noIndex: true,
+        }
+  );
 
   if (isLoadingSector) {
     return (

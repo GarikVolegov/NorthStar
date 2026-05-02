@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePageMeta } from "@/lib/seo";
 import { useQuery } from "@tanstack/react-query";
 import { Newspaper, ExternalLink, Clock, Tag, Sparkles, RefreshCw, Bookmark, BookmarkCheck, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -179,6 +180,12 @@ function UpgradeCTA() {
 }
 
 export default function News() {
+  usePageMeta({
+    title: "News & Tendenze del mercato del lavoro",
+    description: "Aggiornamenti su tecnologia, business, finanza, salute e formazione per il mercato del lavoro italiano. Articoli selezionati per settore professionale.",
+    path: "/news",
+    type: "article",
+  });
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<string>("general");
 
