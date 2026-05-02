@@ -14,6 +14,7 @@ import roadmapRouter from "./roadmap";
 import grafoRouter from "./grafo";
 import sitemapRouter from "./sitemap";
 import contactRouter from "./contact";
+import ogRouter from "./og";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(roadmapRouter);
 router.use(grafoRouter);
 router.use(sitemapRouter);
 router.use(contactRouter);
+router.use(ogRouter);
 
 export default router;
