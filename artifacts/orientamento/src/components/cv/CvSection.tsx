@@ -32,6 +32,9 @@ export interface CvData {
   languages: Array<{ language: string; level: string }>;
   certifications: string[];
   extractedAt?: string;
+  generated?: any;
+  lastGenerated?: string;
+  lastSaved?: string;
 }
 
 interface GraphNode {

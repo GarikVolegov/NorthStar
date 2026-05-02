@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,6 +8,7 @@ import {
   X, Loader2, Printer, RefreshCw, Sparkles, AlertCircle,
   Pencil, Eye, Plus, Trash2, ChevronDown, ChevronUp, Check,
   User, Briefcase, GraduationCap, Wrench, Award, Globe,
+  Save, CheckCircle2, Clock,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -137,7 +138,7 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
               ))}
             </CvSection>
           )}
-          <div style={{ marginTop: "auto", padding: "12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", marginTop: "24px" }}>
+          <div style={{ padding: "12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", marginTop: "24px" }}>
             <p style={{ margin: 0, fontSize: "10px", color: "#15803d", textAlign: "center", fontWeight: "500" }}>✦ Generato con NorthStar</p>
           </div>
         </div>
@@ -473,12 +474,19 @@ export function CvGeneratorModal({
   onClose: () => void;
 }) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: profile } = useProfileForCv(userId);
   const [generated, setGenerated] = useState<GeneratedCv | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<"edit" | "preview">("preview");
   const [isEditing, setIsEditing] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(
+    (cvData as any)?.lastSaved ?? null
+  );
+  // Track if user has unsaved edits
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   function readGraphNodes(): GraphNode[] {
     try {
@@ -492,6 +500,7 @@ export function CvGeneratorModal({
   async function generate() {
     setLoading(true);
     setError(null);
+    setHasUnsavedChanges(false);
     try {
       const latestSession = profile?.testSessions?.[0];
       const confirmedSector = profile?.exploredSectors?.find((s: any) => s.confirmed);
@@ -516,6 +525,7 @@ export function CvGeneratorModal({
       if (!res.ok) throw new Error(data.error || "Errore nella generazione");
       setGenerated(data.generated);
       setIsEditing(false);
+      setSaveStatus("idle");
     } catch (err: any) {
       setError(err.message || "Errore di rete. Riprova.");
     } finally {
@@ -523,7 +533,46 @@ export function CvGeneratorModal({
     }
   }
 
-  useEffect(() => { generate(); }, []);
+  async function save() {
+    if (!generated) return;
+    setSaveStatus("saving");
+    try {
+      const res = await fetch(`${BASE}api/cv/${userId}/save`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ generated }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Errore nel salvataggio");
+      setLastSavedAt(data.savedAt);
+      setSaveStatus("saved");
+      setHasUnsavedChanges(false);
+      // Refresh the CvSection so it shows the new saved state
+      queryClient.invalidateQueries({ queryKey: ["cv", userId] });
+      // Reset "saved" badge after 3 seconds
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    } catch {
+      setSaveStatus("error");
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    }
+  }
+
+  // Handle CV changes and mark as unsaved
+  function handleCvChange(updated: GeneratedCv) {
+    setGenerated(updated);
+    setHasUnsavedChanges(true);
+    setSaveStatus("idle");
+  }
+
+  // On open: if a saved generated CV exists, load it directly — skip AI generation
+  useEffect(() => {
+    const savedGenerated = (cvData as any)?.generated;
+    if (savedGenerated && typeof savedGenerated === "object") {
+      setGenerated(savedGenerated);
+    } else {
+      generate();
+    }
+  }, []);
 
   useEffect(() => {
     const style = document.createElement("style");
@@ -543,6 +592,13 @@ export function CvGeneratorModal({
   }, []);
 
   const hasContent = !!generated && !loading;
+  const hasSavedCv = !!(cvData as any)?.generated;
+
+  function formatSavedAt(iso: string) {
+    return new Date(iso).toLocaleString("it-IT", {
+      day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+    });
+  }
 
   return (
     <div
@@ -552,38 +608,49 @@ export function CvGeneratorModal({
     >
       {/* ── Toolbar ── */}
       <div className="flex items-center justify-between px-4 py-2.5 bg-background/97 border-b shadow-sm print:hidden gap-3 flex-wrap">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <Sparkles className="w-4 h-4 text-primary" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="font-semibold text-sm text-foreground leading-tight">CV Generato con NorthStar</p>
-            {generated?.targetRole && (
-              <p className="text-xs text-muted-foreground">Target: {generated.targetRole}</p>
-            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {generated?.targetRole && (
+                <span className="text-xs text-muted-foreground">Target: {generated.targetRole}</span>
+              )}
+              {lastSavedAt && (
+                <span className="flex items-center gap-1 text-xs text-emerald-600">
+                  <Clock className="w-2.5 h-2.5" />
+                  Salvato {formatSavedAt(lastSavedAt)}
+                </span>
+              )}
+              {hasUnsavedChanges && (
+                <span className="text-xs text-amber-600 font-medium">● Modifiche non salvate</span>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {/* Mobile tab switcher */}
           {hasContent && (
             <div className="flex rounded-lg bg-muted p-0.5 md:hidden">
               <button
                 onClick={() => setMobileTab("edit")}
-                className={cn("flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all", mobileTab === "edit" ? "bg-white shadow text-foreground" : "text-muted-foreground")}
+                className={cn("flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all", mobileTab === "edit" ? "bg-white shadow text-foreground" : "text-muted-foreground")}
               >
                 <Pencil className="w-3 h-3" /> Modifica
               </button>
               <button
                 onClick={() => setMobileTab("preview")}
-                className={cn("flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all", mobileTab === "preview" ? "bg-white shadow text-foreground" : "text-muted-foreground")}
+                className={cn("flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all", mobileTab === "preview" ? "bg-white shadow text-foreground" : "text-muted-foreground")}
               >
                 <Eye className="w-3 h-3" /> Anteprima
               </button>
             </div>
           )}
 
-          {/* Desktop edit toggle */}
+          {/* Desktop: edit toggle */}
           {hasContent && (
             <Button
               size="sm"
@@ -591,14 +658,50 @@ export function CvGeneratorModal({
               className="rounded-full gap-1.5 hidden md:flex"
               onClick={() => setIsEditing((v) => !v)}
             >
-              {isEditing ? <><Check className="w-3.5 h-3.5" />Fine modifica</> : <><Pencil className="w-3.5 h-3.5" />Modifica</>}
+              {isEditing
+                ? <><Check className="w-3.5 h-3.5" />Fine modifica</>
+                : <><Pencil className="w-3.5 h-3.5" />Modifica</>}
             </Button>
           )}
 
+          {/* Save button — shown when editing or there are unsaved changes */}
+          {hasContent && (isEditing || hasUnsavedChanges) && (
+            <Button
+              size="sm"
+              variant={saveStatus === "saved" ? "outline" : "default"}
+              className={cn(
+                "rounded-full gap-1.5",
+                saveStatus === "saved" && "text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-50",
+                saveStatus === "error" && "text-destructive border-destructive/30 bg-destructive/5",
+              )}
+              onClick={save}
+              disabled={saveStatus === "saving" || saveStatus === "saved"}
+            >
+              {saveStatus === "saving" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {saveStatus === "saved" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+              {saveStatus === "error" && <AlertCircle className="w-3.5 h-3.5" />}
+              {saveStatus === "idle" && <Save className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">
+                {saveStatus === "saving" ? "Salvataggio…"
+                  : saveStatus === "saved" ? "Salvato!"
+                  : saveStatus === "error" ? "Errore"
+                  : "Salva modifiche"}
+              </span>
+            </Button>
+          )}
+
+          {/* Rigenera — shows "Aggiorna con AI" when a saved CV exists */}
           {hasContent && (
-            <Button size="sm" variant="outline" className="rounded-full gap-1.5" onClick={generate} disabled={loading}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-full gap-1.5"
+              onClick={generate}
+              disabled={loading}
+              title={hasSavedCv ? "Rigenera con AI (sostituirà il CV salvato)" : "Genera nuova versione"}
+            >
               <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
-              <span className="hidden sm:inline">Rigenera</span>
+              <span className="hidden sm:inline">{hasSavedCv ? "Rigenera" : "Rigenera"}</span>
             </Button>
           )}
 
@@ -651,18 +754,46 @@ export function CvGeneratorModal({
           <>
             {/* Desktop: side-by-side */}
             <div className="hidden md:flex flex-1 overflow-hidden">
-              {/* Edit panel */}
               {isEditing && (
-                <div className="w-[400px] flex-shrink-0 overflow-y-auto border-r bg-background p-4 space-y-1">
+                <div className="w-[400px] flex-shrink-0 overflow-y-auto border-r bg-background p-4">
                   <div className="flex items-center gap-2 mb-4 pb-3 border-b">
                     <Pencil className="w-4 h-4 text-primary" />
                     <h2 className="font-semibold text-sm text-foreground">Modifica il CV</h2>
-                    <span className="text-xs text-muted-foreground ml-auto">Le modifiche appaiono in tempo reale →</span>
+                    <span className="text-xs text-muted-foreground ml-auto">Preview live →</span>
                   </div>
-                  <EditPanel cv={generated} onChange={setGenerated} />
+                  <EditPanel cv={generated} onChange={handleCvChange} />
+                  {/* Save button inside panel too */}
+                  <div className="mt-4 pt-4 border-t sticky bottom-0 bg-background pb-2">
+                    <Button
+                      className={cn(
+                        "w-full rounded-xl gap-2",
+                        saveStatus === "saved" && "bg-emerald-600 hover:bg-emerald-700",
+                      )}
+                      onClick={save}
+                      disabled={saveStatus === "saving" || (!hasUnsavedChanges && saveStatus !== "idle")}
+                    >
+                      {saveStatus === "saving" && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {saveStatus === "saved" && <CheckCircle2 className="w-4 h-4" />}
+                      {saveStatus === "error" && <AlertCircle className="w-4 h-4" />}
+                      {saveStatus === "idle" && <Save className="w-4 h-4" />}
+                      {saveStatus === "saving" ? "Salvataggio in corso…"
+                        : saveStatus === "saved" ? "Salvato con successo!"
+                        : saveStatus === "error" ? "Errore — riprova"
+                        : "Salva modifiche"}
+                    </Button>
+                    {hasUnsavedChanges && saveStatus === "idle" && (
+                      <p className="text-center text-xs text-amber-600 mt-2">
+                        Hai modifiche non salvate
+                      </p>
+                    )}
+                    {lastSavedAt && saveStatus !== "saving" && (
+                      <p className="text-center text-xs text-muted-foreground mt-1.5">
+                        Ultima modifica: {formatSavedAt(lastSavedAt)}
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
-              {/* Preview */}
               <div id="cv-preview-scroll" className="flex-1 overflow-auto py-8 px-6 bg-gray-100">
                 <CvDocument cv={generated} />
               </div>
@@ -671,13 +802,30 @@ export function CvGeneratorModal({
             {/* Mobile: tabbed */}
             <div className="flex md:hidden flex-1 overflow-hidden">
               {mobileTab === "edit" ? (
-                <div className="flex-1 overflow-y-auto p-4 space-y-1 bg-background">
+                <div className="flex-1 overflow-y-auto p-4 bg-background">
                   <div className="flex items-center gap-2 mb-4 pb-3 border-b">
                     <Pencil className="w-4 h-4 text-primary" />
                     <h2 className="font-semibold text-sm">Modifica CV</h2>
                     <span className="text-xs text-muted-foreground ml-auto">Vai su Anteprima per vedere</span>
                   </div>
-                  <EditPanel cv={generated} onChange={setGenerated} />
+                  <EditPanel cv={generated} onChange={handleCvChange} />
+                  <div className="mt-4 pt-4 border-t">
+                    <Button
+                      className={cn("w-full rounded-xl gap-2", saveStatus === "saved" && "bg-emerald-600")}
+                      onClick={save}
+                      disabled={saveStatus === "saving"}
+                    >
+                      {saveStatus === "saving" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      {saveStatus === "saving" ? "Salvataggio…"
+                        : saveStatus === "saved" ? "Salvato!"
+                        : "Salva modifiche"}
+                    </Button>
+                    {lastSavedAt && (
+                      <p className="text-center text-xs text-muted-foreground mt-2">
+                        Ultima modifica: {formatSavedAt(lastSavedAt)}
+                      </p>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div id="cv-preview-scroll" className="flex-1 overflow-auto py-4 px-2 bg-gray-100">
@@ -695,8 +843,12 @@ export function CvGeneratorModal({
       {hasContent && (
         <div className="text-center py-2 text-xs text-white/60 bg-black/25 print:hidden">
           {isEditing
-            ? "Modifica i campi nel pannello a sinistra — il CV si aggiorna in tempo reale"
-            : 'Clicca "Modifica" per editare i campi · "Stampa / PDF" per esportare'}
+            ? hasUnsavedChanges
+              ? '● Modifiche non salvate — clicca "Salva modifiche" per conservarle'
+              : 'Modifica i campi — il CV si aggiorna in tempo reale'
+            : lastSavedAt
+            ? `CV salvato il ${formatSavedAt(lastSavedAt)} · Riaprendo il modal troverai questa versione`
+            : '"Modifica" per editare · "Stampa / PDF" per esportare · "Salva" per conservare le modifiche'}
         </div>
       )}
     </div>

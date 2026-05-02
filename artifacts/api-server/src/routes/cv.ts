@@ -296,6 +296,39 @@ Integra i dati del CV caricato con le informazioni del grafo. Se il CV è vuoto,
   res.json({ success: true, generated });
 });
 
+// ── PATCH /api/cv/:userId/save — persist edited generated CV ──────────
+router.patch("/cv/:userId/save", async (req, res): Promise<void> => {
+  const userId = parseInt(req.params.userId, 10);
+  if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+  const { generated } = req.body;
+  if (!generated || typeof generated !== "object") {
+    res.status(400).json({ error: "Dati CV mancanti" });
+    return;
+  }
+
+  const [user] = await db
+    .select({ cvJson: usersTable.cvJson })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId));
+
+  if (!user) { res.status(404).json({ error: "Utente non trovato" }); return; }
+
+  const now = new Date().toISOString();
+  const updated = {
+    ...((user.cvJson as any) ?? {}),
+    generated: { ...generated, savedAt: now },
+    lastGenerated: (user.cvJson as any)?.lastGenerated ?? now,
+    lastSaved: now,
+  };
+
+  await db.update(usersTable)
+    .set({ cvJson: updated as any })
+    .where(eq(usersTable.id, userId));
+
+  res.json({ success: true, savedAt: now });
+});
+
 // ── DELETE /api/cv/:userId — delete stored CV ─────────────────────────
 router.delete("/cv/:userId", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
