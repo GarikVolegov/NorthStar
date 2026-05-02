@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, affiliationLeadsTable } from "@workspace/db";
 import { desc, eq } from "drizzle-orm";
+import { notifyNewLead } from "../lib/notify-email.js";
 
 const router: IRouter = Router();
 
@@ -42,6 +43,8 @@ router.post("/affiliazione/lead", async (req, res): Promise<void> => {
     message: message?.trim().slice(0, 1500) ?? null,
     estimatedUsers: estimatedUsers?.trim().slice(0, 20) ?? null,
   }).returning();
+
+  notifyNewLead(entry).catch(() => {});
 
   res.status(201).json({ ok: true, id: entry.id });
 });
@@ -100,6 +103,31 @@ router.patch("/affiliazione/leads/:id/status", async (req, res): Promise<void> =
     .returning();
   if (!lead) { res.status(404).json({ error: "Lead non trovato" }); return; }
   res.json(lead);
+});
+
+router.post("/affiliazione/test-email", async (req, res): Promise<void> => {
+  const adminKey = req.headers["x-admin-key"];
+  if (!adminKey || adminKey !== process.env.ADMIN_KEY) {
+    res.status(403).json({ error: "Non autorizzato" }); return;
+  }
+  if (!process.env.RESEND_API_KEY) {
+    res.status(400).json({ error: "RESEND_API_KEY non configurata" }); return;
+  }
+  if (!process.env.ADMIN_NOTIFICATION_EMAIL) {
+    res.status(400).json({ error: "ADMIN_NOTIFICATION_EMAIL non configurata" }); return;
+  }
+  await notifyNewLead({
+    id: 0,
+    institutionName: "Istituto Demo Test",
+    partnerType: "scuola_superiore",
+    contactName: "Admin NorthStar",
+    email: process.env.ADMIN_NOTIFICATION_EMAIL,
+    phone: "+39 000 0000000",
+    message: "Questa è un'email di test per verificare la configurazione delle notifiche.",
+    estimatedUsers: "100-500",
+    createdAt: new Date().toISOString(),
+  });
+  res.json({ ok: true, sentTo: process.env.ADMIN_NOTIFICATION_EMAIL });
 });
 
 export default router;
