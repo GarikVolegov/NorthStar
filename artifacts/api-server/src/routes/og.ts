@@ -114,7 +114,7 @@ router.get("/og/settore/:id", async (req: Request, res: Response): Promise<void>
 
   const canonicalPath = `/settore/${sector.id}`;
   const canonicalUrl = `${SITE_URL}${canonicalPath}`;
-  const imageUrl = `${SITE_URL}/opengraph.jpg`;
+  const imageUrl = `${SITE_URL}/api/og-image/settore/${sector.id}`;
 
   const salaryMin = Math.round(sector.avgSalaryMin / 1000);
   const salaryMax = Math.round(sector.avgSalaryMax / 1000);

@@ -15,6 +15,7 @@ import grafoRouter from "./grafo";
 import sitemapRouter from "./sitemap";
 import contactRouter from "./contact";
 import ogRouter from "./og";
+import ogImageRouter from "./og-image";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(grafoRouter);
 router.use(sitemapRouter);
 router.use(contactRouter);
 router.use(ogRouter);
+router.use(ogImageRouter);
 
 export default router;

@@ -128,7 +128,7 @@ export function buildSectorMeta(sector: {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Occupation",
-    "@id": `https://northstar.app/settore/${sector.id}`,
+    "@id": `${SITE_URL}/settore/${sector.id}`,
     name: sector.name,
     description: sector.description,
     occupationLocation: {
@@ -151,6 +151,8 @@ export function buildSectorMeta(sector: {
     description,
     path: `/settore/${sector.id}`,
     type: "article",
+    image: `${SITE_URL}/api/og-image/settore/${sector.id}`,
+    imageAlt: `${sector.name} — dati e opportunità del settore su NorthStar`,
     jsonLd,
   };
 }
