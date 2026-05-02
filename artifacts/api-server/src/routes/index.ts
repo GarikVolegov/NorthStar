@@ -6,6 +6,7 @@ import usersRouter from "./users";
 import stripeRouter from "./stripe";
 import newsRouter from "./news";
 import authRouter from "./auth";
+import authGoogleRouter from "./auth-google";
 import profileRouter from "./profile";
 import favoritesRouter from "./favorites";
 import objectivesRouter from "./objectives";
@@ -22,6 +23,7 @@ import crescitaRouter from "./crescita";
 const router: IRouter = Router();
 
 router.use(authRouter);
+router.use(authGoogleRouter);
 router.use(profileRouter);
 router.use(favoritesRouter);
 router.use(objectivesRouter);

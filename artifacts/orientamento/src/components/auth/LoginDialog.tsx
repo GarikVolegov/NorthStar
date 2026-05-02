@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,21 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Star, ArrowLeft, Mail, CheckCircle2, KeyRound } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL || "/";
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (cfg: object) => void;
+          renderButton: (el: HTMLElement, cfg: object) => void;
+          prompt: () => void;
+          cancel: () => void;
+        };
+      };
+    };
+  }
+}
 
 type View = "login" | "register" | "verify" | "forgot" | "forgot-sent" | "reset-sent";
 
@@ -20,31 +35,31 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
   const { login } = useAuth();
   const [view, setView] = useState<View>(defaultTab);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [devHint, setDevHint] = useState<string | null>(null);
 
-  // login fields
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
-  // register fields
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regPasswordConfirm, setRegPasswordConfirm] = useState("");
 
-  // verify fields
   const [verifyEmail, setVerifyEmail] = useState("");
   const [verifyCode, setVerifyCode] = useState(["", "", "", "", "", ""]);
   const codeRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // forgot fields
   const [forgotEmail, setForgotEmail] = useState("");
+
+  const googleBtnRef = useRef<HTMLDivElement>(null);
 
   function resetAll() {
     setError(null);
     setDevHint(null);
     setLoading(false);
+    setGoogleLoading(false);
   }
 
   function goTo(v: View) {
@@ -56,6 +71,58 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
   useEffect(() => {
     if (open) setView(defaultTab);
   }, [open, defaultTab]);
+
+  // ── Google Identity Services ─────────────────────────────────────────
+  const handleGoogleCredential = useCallback(async (credential: string) => {
+    setGoogleLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${BASE}api/auth/google-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Errore con Google. Riprova.");
+      } else {
+        login(data);
+        onOpenChange(false);
+        resetAll();
+      }
+    } catch {
+      setError("Errore di rete. Riprova.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  }, [login, onOpenChange]);
+
+  useEffect(() => {
+    if (!open) return;
+    if ((view !== "login" && view !== "register")) return;
+
+    const clientId = (window as any).__GOOGLE_CLIENT_ID__;
+    const gsiReady = !!window.google?.accounts?.id;
+
+    if (!clientId || !gsiReady || !googleBtnRef.current) return;
+
+    window.google!.accounts.id.initialize({
+      client_id: clientId,
+      callback: (response: { credential: string }) => {
+        handleGoogleCredential(response.credential);
+      },
+      auto_select: false,
+    });
+
+    window.google!.accounts.id.renderButton(googleBtnRef.current, {
+      theme: "outline",
+      size: "large",
+      width: googleBtnRef.current.offsetWidth || 340,
+      text: "continue_with",
+      locale: "it",
+      shape: "pill",
+    });
+  }, [open, view, handleGoogleCredential]);
 
   // ── Code input helpers ──────────────────────────────────────────────
   function handleCodeInput(idx: number, val: string) {
@@ -229,6 +296,8 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
     "reset-sent": "La tua password è stata reimpostata. Puoi ora accedere.",
   };
 
+  const showGoogleBtn = (view === "login" || view === "register") && !!(window as any).__GOOGLE_CLIENT_ID__;
+
   return (
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetAll(); }}>
       <DialogContent className="sm:max-w-md">
@@ -243,7 +312,7 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
 
         {/* Tab switcher — only on login / register */}
         {(view === "login" || view === "register") && (
-          <div className="flex rounded-xl bg-muted p-1 mb-4">
+          <div className="flex rounded-xl bg-muted p-1 mb-2">
             <button
               onClick={() => goTo("login")}
               className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-all ${
@@ -271,6 +340,25 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Torna al login
           </button>
+        )}
+
+        {/* ── GOOGLE BUTTON ── */}
+        {showGoogleBtn && (
+          <div className="space-y-3 mb-1">
+            {googleLoading ? (
+              <div className="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Accesso con Google in corso…
+              </div>
+            ) : (
+              <div ref={googleBtnRef} className="w-full flex justify-center" />
+            )}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">oppure</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+          </div>
         )}
 
         {/* ── LOGIN ── */}
@@ -406,7 +494,6 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
               </div>
             </div>
 
-            {/* Dev mode hint */}
             {devHint && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
                 <p className="text-xs text-amber-700 font-medium mb-1">Modalità sviluppo — codice:</p>
