@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Clock, DollarSign, Bot, Sparkles, TrendingUp, Target, Plus, Minus, Zap, Brain, MapPin, Network, ArrowRight, Newspaper } from "lucide-react";
+import { ArrowLeft, Clock, DollarSign, Bot, Sparkles, TrendingUp, Target, Plus, Minus, Zap, Brain, MapPin, Network, ArrowRight, Newspaper, GitCompare } from "lucide-react";
 import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
@@ -132,6 +132,24 @@ export default function Sector() {
             {sector.automationRisk}
           </div>
         </div>
+      </div>
+
+      {/* Compare CTA */}
+      <div className="mb-8 flex items-center justify-between gap-4 p-4 rounded-2xl border border-dashed border-border bg-muted/30">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+            <GitCompare className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Non sei sicuro? Metti a confronto</p>
+            <p className="text-xs text-muted-foreground">Confronta {sector.name} con un altro settore affiancato</p>
+          </div>
+        </div>
+        <Link href={`/confronta?a=${id}`}>
+          <div className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+            Confronta <ArrowRight className="w-3.5 h-3.5" />
+          </div>
+        </Link>
       </div>
 
       {/* Premium Feature Cards */}
