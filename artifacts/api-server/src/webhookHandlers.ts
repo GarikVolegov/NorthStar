@@ -1,17 +1,23 @@
-import { getStripeSync } from './stripeClient';
+import Stripe from 'stripe';
 
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string): Promise<void> {
-    if (!Buffer.isBuffer(payload)) {
-      throw new Error(
-        'STRIPE WEBHOOK ERROR: Payload must be a Buffer. ' +
-        'Received type: ' + typeof payload + '. ' +
-        'This usually means express.json() parsed the body before reaching this handler. ' +
-        'FIX: Ensure webhook route is registered BEFORE app.use(express.json()).'
-      );
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      throw new Error('STRIPE_WEBHOOK_SECRET is not configured');
     }
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+    const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
 
-    const sync = await getStripeSync();
-    await sync.processWebhook(payload, signature);
+    // Handle subscription events to update user records
+    if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.created') {
+      const sub = event.data.object as Stripe.Subscription;
+      const { db, usersTable } = await import('@workspace/db');
+      const { eq, sql } = await import('drizzle-orm');
+      await db
+        .update(usersTable)
+        .set({ stripeSubscriptionId: sub.id })
+        .where(eq(usersTable.stripeCustomerId, sub.customer as string));
+    }
   }
 }

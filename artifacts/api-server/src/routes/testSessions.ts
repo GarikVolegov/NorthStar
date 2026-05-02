@@ -14,6 +14,13 @@ import {
   computeMatchScore,
   buildMatchReason,
 } from "../lib/riasec";
+import {
+  extractSpiritAnswers,
+  getDominantSpirit,
+  getSecondarySpiritS,
+  computeSpiritBoost,
+  buildSpiritInsight,
+} from "../lib/spirits";
 
 const router: IRouter = Router();
 
@@ -25,23 +32,26 @@ router.post("/test-sessions", async (req, res): Promise<void> => {
   }
 
   const { answers } = parsed.data;
-  const riasecScores = computeRiasecScores(answers as Record<string, number>);
+  const allAnswers = answers as Record<string, number>;
+
+  // RIASEC scoring (q1–q12)
+  const riasecScores = computeRiasecScores(allAnswers);
   const primaryTypes = getPrimaryTypes(riasecScores);
   const profileSummary = buildProfileSummary(primaryTypes);
+
+  // Spirit scoring (shen, hun, po, yi, zhi keys)
+  const spiritScores = extractSpiritAnswers(allAnswers);
+  const dominantSpirit = getDominantSpirit(spiritScores);
+  const secondarySpirit = getSecondarySpiritS(spiritScores);
 
   const sectors = await db.select().from(sectorsTable);
 
   const recommendations = sectors
     .map((sector) => {
-      const matchScore = computeMatchScore(
-        riasecScores,
-        sector.riasecTypes as string[],
-      );
-      const matchReason = buildMatchReason(
-        primaryTypes,
-        sector.name,
-        sector.riasecTypes as string[],
-      );
+      const baseScore = computeMatchScore(riasecScores, sector.riasecTypes as string[]);
+      const spiritBoost = computeSpiritBoost(spiritScores, sector.name);
+      const matchScore = Math.min(99, baseScore + spiritBoost);
+      const matchReason = buildMatchReason(primaryTypes, sector.name, sector.riasecTypes as string[]);
       return {
         sectorId: sector.id,
         sectorName: sector.name,
@@ -61,13 +71,17 @@ router.post("/test-sessions", async (req, res): Promise<void> => {
     .sort((a, b) => b.matchScore - a.matchScore)
     .slice(0, 3);
 
+  const spiritInsight = buildSpiritInsight(dominantSpirit, secondarySpirit);
+
   const [session] = await db
     .insert(testSessionsTable)
     .values({
-      answers: answers as Record<string, number>,
+      answers: allAnswers,
       riasecScores,
       primaryTypes,
       profileSummary,
+      spiritScores,
+      dominantSpirit,
       recommendations: recommendations.map(({ sector: _s, ...r }) => r),
     })
     .returning();
@@ -79,6 +93,9 @@ router.post("/test-sessions", async (req, res): Promise<void> => {
     riasecScores: session.riasecScores,
     primaryTypes: session.primaryTypes,
     profileSummary: session.profileSummary,
+    spiritScores: session.spiritScores,
+    dominantSpirit: session.dominantSpirit,
+    spiritInsight,
     recommendations,
     confirmedSectorId: session.confirmedSectorId,
     createdAt: session.createdAt.toISOString(),
@@ -110,9 +127,7 @@ router.get("/test-sessions/:id", async (req, res): Promise<void> => {
   }>;
 
   const sectorIds = storedRecs.map((r) => r.sectorId);
-  const sectors = sectorIds.length > 0
-    ? await db.select().from(sectorsTable)
-    : [];
+  const sectors = sectorIds.length > 0 ? await db.select().from(sectorsTable) : [];
 
   const recommendations = storedRecs.map((rec) => {
     const sector = sectors.find((s) => s.id === rec.sectorId);
@@ -132,6 +147,11 @@ router.get("/test-sessions/:id", async (req, res): Promise<void> => {
     };
   });
 
+  const spiritScores = (session.spiritScores ?? {}) as Record<string, number>;
+  const dominantSpirit = session.dominantSpirit ?? "";
+  const secondarySpirit = getSecondarySpiritS(spiritScores);
+  const spiritInsight = buildSpiritInsight(dominantSpirit, secondarySpirit);
+
   res.json({
     id: session.id,
     userId: session.userId,
@@ -139,6 +159,9 @@ router.get("/test-sessions/:id", async (req, res): Promise<void> => {
     riasecScores: session.riasecScores,
     primaryTypes: session.primaryTypes,
     profileSummary: session.profileSummary,
+    spiritScores,
+    dominantSpirit,
+    spiritInsight,
     recommendations,
     confirmedSectorId: session.confirmedSectorId,
     createdAt: session.createdAt.toISOString(),
@@ -182,9 +205,7 @@ router.post("/test-sessions/:id/confirm", async (req, res): Promise<void> => {
   }>;
 
   const sectorIds = storedRecs.map((r) => r.sectorId);
-  const sectors = sectorIds.length > 0
-    ? await db.select().from(sectorsTable)
-    : [];
+  const sectors = sectorIds.length > 0 ? await db.select().from(sectorsTable) : [];
 
   const recommendations = storedRecs.map((rec) => {
     const sector = sectors.find((s) => s.id === rec.sectorId);
@@ -204,6 +225,11 @@ router.post("/test-sessions/:id/confirm", async (req, res): Promise<void> => {
     };
   });
 
+  const spiritScores = (updated.spiritScores ?? {}) as Record<string, number>;
+  const dominantSpirit = updated.dominantSpirit ?? "";
+  const secondarySpirit = getSecondarySpiritS(spiritScores);
+  const spiritInsight = buildSpiritInsight(dominantSpirit, secondarySpirit);
+
   res.json({
     id: updated.id,
     userId: updated.userId,
@@ -211,6 +237,9 @@ router.post("/test-sessions/:id/confirm", async (req, res): Promise<void> => {
     riasecScores: updated.riasecScores,
     primaryTypes: updated.primaryTypes,
     profileSummary: updated.profileSummary,
+    spiritScores,
+    dominantSpirit,
+    spiritInsight,
     recommendations,
     confirmedSectorId: updated.confirmedSectorId,
     createdAt: updated.createdAt.toISOString(),
