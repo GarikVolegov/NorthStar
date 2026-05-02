@@ -15,6 +15,7 @@ import {
   TrendingUp, DollarSign, Activity, Settings2, ArrowRight, Layers,
   Bookmark, ExternalLink, Newspaper, X, Heart,
   Target, Plus, Check, ChevronDown, Flag, Award, Users, Briefcase, GraduationCap,
+  GitCompare,
 } from "lucide-react";
 import { useFavorites } from "@/hooks/useFavorites";
 import { cn } from "@/lib/utils";
@@ -266,11 +267,18 @@ function ExploredSectorCard({ sector }: { sector: ExploredSector }) {
           ))}
         </div>
 
-        <Button asChild variant="outline" className="w-full rounded-full" size="sm">
-          <Link href={`/settore/${sector.sectorId}`}>
-            Approfondisci il settore <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline" className="flex-1 rounded-full" size="sm">
+            <Link href={`/settore/${sector.sectorId}`}>
+              Approfondisci <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </Link>
+          </Button>
+          <Button asChild variant="ghost" className="rounded-full px-3" size="sm" title="Confronta con un altro settore">
+            <Link href={`/confronta?a=${sector.sectorId}`}>
+              <GitCompare className="w-3.5 h-3.5" />
+            </Link>
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -993,15 +1001,25 @@ export default function Profilo() {
       {(isLoading || (profile && profile.exploredSectors.length > 0)) && (
         <Card className="rounded-2xl">
           <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <Layers className="w-4 h-4 text-primary" /> Settori esplorati
               </CardTitle>
-              {profile && (
-                <span className="text-sm text-muted-foreground">
-                  {profile.exploredSectors.length} settori unici
-                </span>
-              )}
+              <div className="flex items-center gap-3">
+                {profile && (
+                  <span className="text-sm text-muted-foreground">
+                    {profile.exploredSectors.length} settori unici
+                  </span>
+                )}
+                {profile && profile.exploredSectors.length >= 2 && (
+                  <Link href={`/confronta?a=${profile.exploredSectors[0].sectorId}&b=${profile.exploredSectors[1].sectorId}`}>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/8 border border-primary/20 text-primary text-xs font-medium hover:bg-primary/15 transition-colors">
+                      <GitCompare className="w-3.5 h-3.5" />
+                      Confronta i tuoi top 2
+                    </div>
+                  </Link>
+                )}
+              </div>
             </div>
             <p className="text-sm text-muted-foreground mt-1">
               Tutti i settori emersi dai tuoi test, con dati di carriera aggiornati.
