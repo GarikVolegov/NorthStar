@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft, Sparkles, Loader2, RefreshCw, Plus, X,
-  Send, Bot, User, Network, MessageSquare,
+  Send, Bot, User, Network, MessageSquare, Download,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -138,8 +138,10 @@ export default function Grafo() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   const { data: sector, isLoading: sectorLoading } = useGetSector(id, {
     query: { enabled: !!id, queryKey: ["sector", id] },
@@ -233,6 +235,107 @@ export default function Grafo() {
     setUserEdges(nextEdges);
     persistUser(nextNodes, nextEdges);
   };
+
+  const handleExportPNG = useCallback(async () => {
+    if (!svgRef.current || positioned.length === 0) return;
+    setIsExporting(true);
+
+    try {
+      const svgEl = svgRef.current;
+      const cloned = svgEl.cloneNode(true) as SVGSVGElement;
+
+      // Remove hover-state classes that don't export well
+      cloned.querySelectorAll("[class]").forEach((el) => el.removeAttribute("class"));
+
+      // Add white background rect at the start
+      const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      bgRect.setAttribute("width", "1000");
+      bgRect.setAttribute("height", "800");
+      bgRect.setAttribute("fill", "#ffffff");
+      cloned.insertBefore(bgRect, cloned.firstChild);
+
+      // Build legend rows inside SVG at the bottom
+      const legendY = 760;
+      const legendItems = [
+        { color: "#6366f1", label: "Ruolo" },
+        { color: "#10b981", label: "Competenza" },
+        { color: "#f59e0b", label: "Strumento" },
+        { color: "#8b5cf6", label: "Certificazione" },
+      ];
+      const legendG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      let lx = 30;
+      legendItems.forEach(({ color, label }) => {
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", String(lx));
+        circle.setAttribute("cy", String(legendY));
+        circle.setAttribute("r", "5");
+        circle.setAttribute("fill", color);
+        legendG.appendChild(circle);
+
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", String(lx + 10));
+        text.setAttribute("y", String(legendY + 4));
+        text.setAttribute("font-size", "10");
+        text.setAttribute("fill", "#64748b");
+        text.setAttribute("font-family", "system-ui, sans-serif");
+        text.textContent = label;
+        legendG.appendChild(text);
+
+        lx += label.length * 7 + 28;
+      });
+
+      // Watermark / branding bottom-right
+      const brand = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      brand.setAttribute("x", "970");
+      brand.setAttribute("y", String(legendY + 4));
+      brand.setAttribute("text-anchor", "end");
+      brand.setAttribute("font-size", "9");
+      brand.setAttribute("fill", "#cbd5e1");
+      brand.setAttribute("font-family", "system-ui, sans-serif");
+      brand.textContent = "NorthStar · Grafo della Conoscenza";
+      legendG.appendChild(brand);
+      cloned.appendChild(legendG);
+
+      const svgStr = new XMLSerializer().serializeToString(cloned);
+      const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+      const svgUrl = URL.createObjectURL(svgBlob);
+
+      const scale = 2;
+      const W = 1000 * scale;
+      const H = 800 * scale;
+
+      await new Promise<void>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = W;
+          canvas.height = H;
+          const ctx = canvas.getContext("2d")!;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, W, H);
+          ctx.drawImage(img, 0, 0, W, H);
+          URL.revokeObjectURL(svgUrl);
+
+          canvas.toBlob((blob) => {
+            if (!blob) { reject(new Error("blob null")); return; }
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            const name = (sector?.name ?? "settore").toLowerCase().replace(/[\s&]+/g, "-");
+            a.download = `grafo-${name}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+            resolve();
+          }, "image/png");
+        };
+        img.onerror = () => { URL.revokeObjectURL(svgUrl); reject(new Error("img load failed")); };
+        img.src = svgUrl;
+      });
+    } catch { /* silent */ }
+
+    setIsExporting(false);
+  }, [positioned, sector]);
 
   const handleSendChat = async () => {
     const text = chatInput.trim();
@@ -336,6 +439,21 @@ export default function Grafo() {
           {sector && <p className="text-sm text-muted-foreground">{sector.name}</p>}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {aiGraph && positioned.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              onClick={handleExportPNG}
+              disabled={isExporting}
+              title="Scarica come PNG"
+            >
+              {isExporting
+                ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                : <Download className="w-3.5 h-3.5 mr-1.5" />}
+              {isExporting ? "Export…" : "PNG"}
+            </Button>
+          )}
           {aiGraph && (
             <Button variant="outline" size="sm" className="rounded-xl" onClick={() => fetchGraph(true)} disabled={isLoading}>
               <RefreshCw className={cn("w-3.5 h-3.5 mr-1.5", isLoading && "animate-spin")} />
@@ -516,6 +634,7 @@ export default function Grafo() {
           <div className="relative">
             <div className="bg-card border rounded-3xl overflow-hidden shadow-sm">
               <svg
+                ref={svgRef}
                 viewBox="0 0 1000 800"
                 className="w-full"
                 style={{ maxHeight: "70vh" }}
