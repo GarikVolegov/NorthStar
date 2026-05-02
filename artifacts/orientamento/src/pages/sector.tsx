@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Clock, DollarSign, ShieldAlert, Sparkles, TrendingUp, Target, Plus, Minus, Zap } from "lucide-react";
+import { ArrowLeft, Clock, DollarSign, ShieldAlert, Sparkles, TrendingUp, Target, Plus, Minus, Zap, Brain, MapPin, Network, ArrowRight, Newspaper } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 export default function Sector() {
@@ -122,6 +122,62 @@ export default function Sector() {
           <div className="text-xl md:text-2xl font-semibold capitalize">
             {sector.automationRisk}
           </div>
+        </div>
+      </div>
+
+      {/* Premium Feature Cards */}
+      <div className="mb-12">
+        <div className="flex items-center gap-2 mb-5">
+          <Badge variant="outline" className="border-primary/20 text-primary bg-primary/5 text-xs">
+            <Sparkles className="w-3 h-3 mr-1" /> Strumenti Premium
+          </Badge>
+          <span className="text-sm text-muted-foreground">Approfondisci con l'AI</span>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-4">
+          <Link href={`/wiki/${id}`} className="block">
+            <div className="h-full p-5 bg-card border rounded-2xl hover:border-primary/30 hover:shadow-md transition-all cursor-pointer group">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-4 group-hover:bg-indigo-100 transition-colors">
+                <Brain className="w-5 h-5 text-indigo-600" />
+              </div>
+              <h4 className="font-semibold mb-1.5 text-sm">Wiki AI</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+                Fai domande specifiche sul settore e ricevi risposte personalizzate dall'AI.
+              </p>
+              <div className="flex items-center text-indigo-600 text-xs font-medium">
+                Apri la chat <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+          </Link>
+
+          <Link href={`/roadmap/${id}`} className="block">
+            <div className="h-full p-5 bg-card border rounded-2xl hover:border-primary/30 hover:shadow-md transition-all cursor-pointer group">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mb-4 group-hover:bg-emerald-100 transition-colors">
+                <MapPin className="w-5 h-5 text-emerald-600" />
+              </div>
+              <h4 className="font-semibold mb-1.5 text-sm">Roadmap Dettagliata</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+                Piano step-by-step generato dall'AI per entrare nel settore con risorse concrete.
+              </p>
+              <div className="flex items-center text-emerald-600 text-xs font-medium">
+                Genera il piano <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+          </Link>
+
+          <Link href={`/grafo/${id}`} className="block">
+            <div className="h-full p-5 bg-card border rounded-2xl hover:border-primary/30 hover:shadow-md transition-all cursor-pointer group">
+              <div className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center mb-4 group-hover:bg-violet-100 transition-colors">
+                <Network className="w-5 h-5 text-violet-600" />
+              </div>
+              <h4 className="font-semibold mb-1.5 text-sm">Grafo della Conoscenza</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+                Visualizza ruoli, competenze e strumenti del settore in un grafo interattivo.
+              </p>
+              <div className="flex items-center text-violet-600 text-xs font-medium">
+                Esplora il grafo <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+          </Link>
         </div>
       </div>
 

@@ -145,10 +145,60 @@ ai, data-science, cybersecurity, fintech, green-energy, healthcare, e-commerce, 
 - Sezione Premium bloccata con CTA verso `/premium`
 - Skeleton loading durante il fetch
 
+## Premium Features (AI-powered)
+
+Built using Replit AI Integrations (OpenAI, no API key needed). Accessible to all registered users.
+
+### Wiki AI (`/wiki/:sectorId`)
+- Full-screen chat interface with streaming AI responses
+- System prompt: expert on the chosen sector in Italy
+- Message history maintained client-side (last 10 messages sent as context)
+- Suggested questions on empty state
+- Auto-scrolling, inline markdown rendering (bold, lists, numbered lists)
+- Model: `gpt-5.1`, max 1024 tokens
+
+### Roadmap Dettagliata (`/roadmap/:sectorId`)
+- AI-generated step-by-step career plan via streaming
+- JSON output parsed: phases (emoji, title, duration, actions, resources, milestone)
+- Progress bar during generation (~20-30 seconds)
+- Accordion-style phase cards (expandable)
+- Salary progression table, top roles, key tip
+- Model: `gpt-5.1`, max 2048 tokens
+
+### Grafo della Conoscenza (`/grafo/:sectorId`)
+- AI-generated knowledge graph: 5 roles, 7 skills, 5 tools, 4 certifications (21 nodes)
+- In-memory server-side cache per sectorId (persists until server restart)
+- SVG radial layout: roles (r=140), skills (r=255), tools+certs (r=360)
+- Hover tooltip: node description + connection count
+- Connected nodes highlighted on hover, inactive nodes dimmed
+- Color-coded by type: indigo (role), emerald (skill), amber (tool), violet (cert)
+- Model: `gpt-5.1`, max 2048 tokens
+
+### Aggiornamenti
+- Existing news page (`/news`) with sector-specific content
+
+### Backend Routes
+- `POST /api/wiki/:sectorId/ask` — streaming SSE chat
+- `POST /api/roadmap/:sectorId/generate` — streaming SSE roadmap generation
+- `GET /api/grafo/:sectorId` — graph data (cached)
+
+### AI Integration Setup
+- `AI_INTEGRATIONS_OPENAI_BASE_URL` + `AI_INTEGRATIONS_OPENAI_API_KEY` — auto-set via Replit
+- Lib: `lib/integrations-openai-ai-server/` (copied from template)
+- Package: `@workspace/integrations-openai-ai-server` added to api-server
+
+## Sector Page Premium Panel
+
+Added 3 card links directly on `/settore/:id` above the tabs:
+- Wiki AI → `/wiki/:id` (indigo)
+- Roadmap Dettagliata → `/roadmap/:id` (emerald)
+- Grafo della Conoscenza → `/grafo/:id` (violet)
+
+## Bug Fixes
+
+- `GET /api/sectors` and `GET /api/sectors/:id` now serialize `createdAt` as ISO string before Zod parsing (fixes ZodError "Expected string, received date")
+
 ## Roadmap (Future Phases)
 
 - **Phase 2:** Fix Stripe key + seed products, activate premium checkout
-- **Phase 3:** LLM Wiki with spirit pages (one page per spirit with exercises, sector advice)
-- **Phase 4:** Knowledge graph (Neo4j) — spirit/sector/role relationships
-- **Phase 5:** AI chat coach, personalized growth plans
-- **Phase 6:** B2B (schools, enterprises)
+- **Phase 5:** B2B (schools, enterprises)

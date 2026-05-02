@@ -9,6 +9,9 @@ import authRouter from "./auth";
 import profileRouter from "./profile";
 import favoritesRouter from "./favorites";
 import objectivesRouter from "./objectives";
+import wikiRouter from "./wiki";
+import roadmapRouter from "./roadmap";
+import grafoRouter from "./grafo";
 
 const router: IRouter = Router();
 
@@ -22,5 +25,8 @@ router.use(testSessionsRouter);
 router.use(usersRouter);
 router.use(stripeRouter);
 router.use(newsRouter);
+router.use(wikiRouter);
+router.use(roadmapRouter);
+router.use(grafoRouter);
 
 export default router;

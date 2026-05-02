@@ -14,7 +14,7 @@ const router: IRouter = Router();
 
 router.get("/sectors", async (_req, res): Promise<void> => {
   const sectors = await db.select().from(sectorsTable).orderBy(sectorsTable.id);
-  res.json(ListSectorsResponse.parse(sectors));
+  res.json(ListSectorsResponse.parse(sectors.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() }))));
 });
 
 router.get("/sectors/:id", async (req, res): Promise<void> => {
@@ -34,7 +34,7 @@ router.get("/sectors/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(GetSectorResponse.parse(sector));
+  res.json(GetSectorResponse.parse({ ...sector, createdAt: sector.createdAt.toISOString() }));
 });
 
 router.get("/stats/summary", async (_req, res): Promise<void> => {

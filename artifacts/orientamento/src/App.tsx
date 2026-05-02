@@ -14,6 +14,9 @@ import PremiumSuccess from "@/pages/premium-success";
 import News from "@/pages/news";
 import ResetPassword from "@/pages/reset-password";
 import Profilo from "@/pages/profilo";
+import Wiki from "@/pages/wiki";
+import Roadmap from "@/pages/roadmap";
+import Grafo from "@/pages/grafo";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 
@@ -35,6 +38,9 @@ function Router() {
           <Route path="/news" component={News} />
           <Route path="/reset-password" component={ResetPassword} />
           <Route path="/profilo" component={Profilo} />
+          <Route path="/wiki/:id" component={Wiki} />
+          <Route path="/roadmap/:id" component={Roadmap} />
+          <Route path="/grafo/:id" component={Grafo} />
           <Route component={NotFound} />
         </Switch>
       </main>
