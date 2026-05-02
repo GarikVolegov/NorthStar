@@ -11,7 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import {
   User, Star, Mail, Calendar, CheckCircle2, Clock,
-  ChevronRight, Loader2, KeyRound, BarChart3, Sparkles, ShieldCheck
+  ChevronRight, Loader2, KeyRound, BarChart3, Sparkles, ShieldCheck,
+  TrendingUp, DollarSign, Activity, Settings2, ArrowRight, Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,19 @@ const SPIRIT_META: Record<string, { emoji: string; label: string }> = {
   po: { emoji: "⚡", label: "Po" },
   yi: { emoji: "🔮", label: "Yi" },
   zhi: { emoji: "🔥", label: "Zhi" },
+};
+
+const TREND_LABEL: Record<string, { label: string; color: string }> = {
+  booming:  { label: "In forte crescita", color: "text-emerald-600 bg-emerald-50 border-emerald-200" },
+  growing:  { label: "In crescita",       color: "text-blue-600 bg-blue-50 border-blue-200" },
+  stable:   { label: "Stabile",           color: "text-amber-600 bg-amber-50 border-amber-200" },
+  declining:{ label: "In calo",           color: "text-rose-600 bg-rose-50 border-rose-200" },
+};
+
+const RISK_LABEL: Record<string, { label: string; color: string }> = {
+  low:    { label: "Basso",  color: "text-emerald-700 bg-emerald-50" },
+  medium: { label: "Medio",  color: "text-amber-700 bg-amber-50" },
+  high:   { label: "Alto",   color: "text-rose-700 bg-rose-50" },
 };
 
 interface SessionData {
@@ -37,6 +51,25 @@ interface SessionData {
   topRecommendation: { sectorId: number; sectorName: string; matchScore: number } | null;
 }
 
+interface ExploredSector {
+  sectorId: number;
+  bestMatchScore: number;
+  confirmed: boolean;
+  name: string;
+  icon: string;
+  description: string;
+  avgSalaryMin: number;
+  avgSalaryMax: number;
+  growthRate: number;
+  automationRisk: "low" | "medium" | "high";
+  scalability: "low" | "medium" | "high";
+  trend: "declining" | "stable" | "growing" | "booming";
+  timeToAutonomy: string;
+  riasecTypes: string[];
+  skills: string[];
+  advantages: string[];
+}
+
 interface ProfileData {
   id: number;
   name: string;
@@ -44,6 +77,7 @@ interface ProfileData {
   emailVerified: boolean;
   createdAt: string;
   testSessions: SessionData[];
+  exploredSectors: ExploredSector[];
 }
 
 function useProfile(userId: number) {
@@ -64,18 +98,17 @@ function formatDate(iso: string) {
   });
 }
 
+// ── Session card ─────────────────────────────────────────────────────
 function SessionCard({ session, index }: { session: SessionData; index: number }) {
   const spirit = session.dominantSpirit ? SPIRIT_META[session.dominantSpirit] : null;
   const profile = (session.primaryTypes ?? []).join(" + ");
 
   return (
     <Link href={`/risultati/${session.id}`}>
-      <div
-        className={cn(
-          "group flex flex-col sm:flex-row sm:items-center gap-4 p-5 rounded-2xl border bg-card hover:border-primary/30 hover:shadow-md transition-all duration-200 cursor-pointer",
-          index === 0 && "border-primary/20 bg-primary/5"
-        )}
-      >
+      <div className={cn(
+        "group flex flex-col sm:flex-row sm:items-center gap-4 p-5 rounded-2xl border bg-card hover:border-primary/30 hover:shadow-md transition-all duration-200 cursor-pointer",
+        index === 0 && "border-primary/20 bg-primary/5"
+      )}>
         <div className="flex items-center gap-4 flex-1">
           <div className={cn(
             "w-11 h-11 rounded-xl flex items-center justify-center shrink-0 text-lg font-bold font-serif",
@@ -121,6 +154,122 @@ function SessionCard({ session, index }: { session: SessionData; index: number }
   );
 }
 
+// ── Explored sector card ─────────────────────────────────────────────
+function ExploredSectorCard({ sector }: { sector: ExploredSector }) {
+  const trend = TREND_LABEL[sector.trend];
+  const risk = RISK_LABEL[sector.automationRisk];
+
+  return (
+    <div className={cn(
+      "flex flex-col rounded-2xl border bg-card overflow-hidden hover:shadow-lg transition-all duration-300",
+      sector.confirmed && "border-primary/30 ring-1 ring-primary/10"
+    )}>
+      {sector.confirmed && (
+        <div className="flex items-center gap-1.5 bg-primary/10 text-primary text-xs font-semibold px-4 py-2">
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          Direzione confermata
+        </div>
+      )}
+
+      <div className="p-5 flex-1 flex flex-col">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">{sector.icon}</span>
+            <div>
+              <h3 className="font-serif font-bold text-foreground leading-tight">{sector.name}</h3>
+              <div className={cn("mt-1 inline-flex items-center gap-1 text-xs font-medium border rounded-full px-2.5 py-0.5", trend?.color)}>
+                <TrendingUp className="w-3 h-3" />
+                {trend?.label}
+              </div>
+            </div>
+          </div>
+          <div className="shrink-0 text-right">
+            <span className="text-2xl font-bold text-primary">{sector.bestMatchScore}%</span>
+            <p className="text-xs text-muted-foreground">match</p>
+          </div>
+        </div>
+
+        <p className="text-sm text-muted-foreground leading-relaxed mb-4 line-clamp-2">
+          {sector.description}
+        </p>
+
+        {/* Career metrics */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-muted/50 rounded-xl p-3">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+              <DollarSign className="w-3 h-3" /> RAL media
+            </div>
+            <p className="text-sm font-semibold">
+              €{Math.round(sector.avgSalaryMin / 1000)}k – €{Math.round(sector.avgSalaryMax / 1000)}k
+            </p>
+          </div>
+          <div className="bg-muted/50 rounded-xl p-3">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+              <TrendingUp className="w-3 h-3" /> Crescita
+            </div>
+            <p className="text-sm font-semibold text-emerald-600">+{sector.growthRate}% / anno</p>
+          </div>
+          <div className="bg-muted/50 rounded-xl p-3">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+              <Settings2 className="w-3 h-3" /> Rischio auto.
+            </div>
+            <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full", risk?.color)}>
+              {risk?.label}
+            </span>
+          </div>
+          <div className="bg-muted/50 rounded-xl p-3">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+              <Activity className="w-3 h-3" /> Autonomia
+            </div>
+            <p className="text-sm font-semibold">{sector.timeToAutonomy}</p>
+          </div>
+        </div>
+
+        {/* Skills */}
+        {sector.skills.length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Competenze chiave</p>
+            <div className="flex flex-wrap gap-1.5">
+              {sector.skills.map((skill) => (
+                <span key={skill} className="text-xs bg-primary/8 text-primary border border-primary/15 rounded-full px-2.5 py-0.5 font-medium">
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Advantages */}
+        {sector.advantages.length > 0 && (
+          <div className="mb-4 space-y-1.5">
+            {sector.advantages.map((adv) => (
+              <div key={adv} className="flex items-start gap-2 text-sm">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <span className="text-muted-foreground">{adv}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* RIASEC types */}
+        <div className="flex flex-wrap gap-1 mb-5 mt-auto">
+          {sector.riasecTypes.map((t) => (
+            <Badge key={t} variant="outline" className="text-xs rounded-full font-mono">{t}</Badge>
+          ))}
+        </div>
+
+        <Button asChild variant="outline" className="w-full rounded-full" size="sm">
+          <Link href={`/settore/${sector.sectorId}`}>
+            Approfondisci il settore <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+          </Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Change password form ─────────────────────────────────────────────
 function ChangePasswordForm({ userId }: { userId: number }) {
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -131,13 +280,8 @@ function ChangePasswordForm({ userId }: { userId: number }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (newPassword !== confirm) {
-      setError("Le nuove password non coincidono");
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
+    if (newPassword !== confirm) { setError("Le nuove password non coincidono"); return; }
+    setLoading(true); setError(null); setSuccess(false);
     try {
       const res = await fetch(`${BASE}api/profile/change-password`, {
         method: "POST",
@@ -149,74 +293,38 @@ function ChangePasswordForm({ userId }: { userId: number }) {
         setError(data.error || "Errore durante l'aggiornamento");
       } else {
         setSuccess(true);
-        setOldPassword("");
-        setNewPassword("");
-        setConfirm("");
+        setOldPassword(""); setNewPassword(""); setConfirm("");
       }
-    } catch {
-      setError("Errore di rete. Riprova.");
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError("Errore di rete. Riprova."); }
+    finally { setLoading(false); }
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="old-password">Password attuale</Label>
-        <Input
-          id="old-password"
-          type="password"
-          placeholder="••••••••"
-          value={oldPassword}
-          onChange={(e) => setOldPassword(e.target.value)}
-          required
-          autoComplete="current-password"
-        />
+        <Input id="old-password" type="password" placeholder="••••••••"
+          value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} required autoComplete="current-password" />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="new-password">Nuova password</Label>
-        <Input
-          id="new-password"
-          type="password"
-          placeholder="Min. 6 caratteri"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          required
-          minLength={6}
-          autoComplete="new-password"
-        />
+        <Input id="new-password" type="password" placeholder="Min. 6 caratteri"
+          value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={6} autoComplete="new-password" />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="confirm-password">Conferma nuova password</Label>
-        <Input
-          id="confirm-password"
-          type="password"
-          placeholder="Ripeti la nuova password"
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-          required
-          autoComplete="new-password"
-          className={confirm && newPassword !== confirm ? "border-destructive" : ""}
-        />
-        {confirm && newPassword !== confirm && (
-          <p className="text-xs text-destructive">Le password non coincidono</p>
-        )}
+        <Input id="confirm-password" type="password" placeholder="Ripeti la nuova password"
+          value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password"
+          className={confirm && newPassword !== confirm ? "border-destructive" : ""} />
+        {confirm && newPassword !== confirm && <p className="text-xs text-destructive">Le password non coincidono</p>}
       </div>
-
       {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>}
       {success && (
         <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          Password aggiornata con successo.
+          <CheckCircle2 className="w-4 h-4 shrink-0" /> Password aggiornata con successo.
         </div>
       )}
-
-      <Button
-        type="submit"
-        className="rounded-full"
-        disabled={loading || (!!confirm && newPassword !== confirm)}
-      >
+      <Button type="submit" className="rounded-full" disabled={loading || (!!confirm && newPassword !== confirm)}>
         {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
         Aggiorna password
       </Button>
@@ -224,6 +332,7 @@ function ChangePasswordForm({ userId }: { userId: number }) {
   );
 }
 
+// ── Main page ────────────────────────────────────────────────────────
 export default function Profilo() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
@@ -242,9 +351,9 @@ export default function Profilo() {
   const { data: profile, isLoading } = useProfile(user.id);
 
   return (
-    <div className="container mx-auto px-4 py-10 max-w-4xl">
+    <div className="container mx-auto px-4 py-10 max-w-5xl">
 
-      {/* Header */}
+      {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
         <div>
           <h1 className="text-3xl font-serif font-bold text-foreground">Il mio profilo</h1>
@@ -255,12 +364,11 @@ export default function Profilo() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Top row: account info + test history */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
 
-        {/* Left column: account info + change password */}
+        {/* Account + change password */}
         <div className="md:col-span-1 space-y-5">
-
-          {/* Account card */}
           <Card className="rounded-2xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -300,7 +408,6 @@ export default function Profilo() {
             </CardContent>
           </Card>
 
-          {/* Change password card */}
           <Card className="rounded-2xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -313,9 +420,9 @@ export default function Profilo() {
           </Card>
         </div>
 
-        {/* Right column: test history */}
+        {/* Test history */}
         <div className="md:col-span-2">
-          <Card className="rounded-2xl">
+          <Card className="rounded-2xl h-full">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary" /> Cronologia test
@@ -359,6 +466,44 @@ export default function Profilo() {
           </Card>
         </div>
       </div>
+
+      {/* Explored sectors — full width */}
+      {(isLoading || (profile && profile.exploredSectors.length > 0)) && (
+        <Card className="rounded-2xl">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Layers className="w-4 h-4 text-primary" /> Settori esplorati
+              </CardTitle>
+              {profile && (
+                <span className="text-sm text-muted-foreground">
+                  {profile.exploredSectors.length} settori unici
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              Tutti i settori emersi dai tuoi test, con dati di carriera aggiornati.
+              {profile?.exploredSectors.some((s) => s.confirmed) && (
+                <> La tua <span className="text-primary font-medium">direzione confermata</span> è in evidenza.</>
+              )}
+            </p>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {[1, 2, 3].map((i) => <Skeleton key={i} className="h-80 w-full rounded-2xl" />)}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {profile!.exploredSectors.map((sector) => (
+                  <ExploredSectorCard key={sector.sectorId} sector={sector} />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
     </div>
   );
 }
