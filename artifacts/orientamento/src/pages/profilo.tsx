@@ -22,11 +22,11 @@ import { cn } from "@/lib/utils";
 const BASE = import.meta.env.BASE_URL || "/";
 
 const SPIRIT_META: Record<string, { emoji: string; label: string }> = {
-  shen: { emoji: "✨", label: "Shen" },
-  hun: { emoji: "🌙", label: "Hun" },
-  po: { emoji: "⚡", label: "Po" },
-  yi: { emoji: "🔮", label: "Yi" },
-  zhi: { emoji: "🔥", label: "Zhi" },
+  shen: { emoji: "✨", label: "Presenza" },
+  hun:  { emoji: "🌙", label: "Visione" },
+  po:   { emoji: "⚡", label: "Istinto" },
+  yi:   { emoji: "🔮", label: "Focus" },
+  zhi:  { emoji: "🔥", label: "Tenacia" },
 };
 
 const TREND_LABEL: Record<string, { label: string; color: string }> = {

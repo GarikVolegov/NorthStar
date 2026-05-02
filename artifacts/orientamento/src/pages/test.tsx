@@ -28,83 +28,83 @@ const RIASEC_QUESTIONS = [
 // ── Bussola Interiore — 15 domande, 3 per spirito ────────────────────────────
 // Ordinate per spirito: shen × 3, hun × 3, po × 3, yi × 3, zhi × 3
 const SPIRIT_QUESTIONS = [
-  // ✨ SHEN — Coscienza & Presenza
+  // ✨ PRESENZA — Coscienza & Presenza
   {
-    id: "shen_1", spirit: "Shen", spiritKey: "shen", emoji: "✨",
+    id: "shen_1", spirit: "Presenza", spiritKey: "shen", emoji: "✨",
     description: "Coscienza & Presenza", phase: "spirits",
     text: "Mi sento spesso chiaro e centrato nelle mie emozioni, anche nei momenti difficili.",
   },
   {
-    id: "shen_2", spirit: "Shen", spiritKey: "shen", emoji: "✨",
+    id: "shen_2", spirit: "Presenza", spiritKey: "shen", emoji: "✨",
     description: "Coscienza & Presenza", phase: "spirits",
     text: "Riconosco facilmente quando il mio stato d'animo cambia e so come ritrovare l'equilibrio.",
   },
   {
-    id: "shen_3", spirit: "Shen", spiritKey: "shen", emoji: "✨",
+    id: "shen_3", spirit: "Presenza", spiritKey: "shen", emoji: "✨",
     description: "Coscienza & Presenza", phase: "spirits",
     text: "Le persone mi percepiscono come qualcuno presente, attento e capace di capire le emozioni altrui.",
   },
-  // 🌙 HUN — Visione & Direzione
+  // 🌙 VISIONE — Visione & Direzione
   {
-    id: "hun_1", spirit: "Hun", spiritKey: "hun", emoji: "🌙",
+    id: "hun_1", spirit: "Visione", spiritKey: "hun", emoji: "🌙",
     description: "Visione & Direzione", phase: "spirits",
     text: "Riesco a immaginare con facilità il mio futuro ideale e a sentirlo davvero possibile.",
   },
   {
-    id: "hun_2", spirit: "Hun", spiritKey: "hun", emoji: "🌙",
+    id: "hun_2", spirit: "Visione", spiritKey: "hun", emoji: "🌙",
     description: "Visione & Direzione", phase: "spirits",
     text: "Ho spesso idee originali che mi entusiasmano e mi spingono a esplorare strade nuove.",
   },
   {
-    id: "hun_3", spirit: "Hun", spiritKey: "hun", emoji: "🌙",
+    id: "hun_3", spirit: "Visione", spiritKey: "hun", emoji: "🌙",
     description: "Visione & Direzione", phase: "spirits",
     text: "Sento un senso chiaro di direzione nella mia vita: so dove voglio arrivare, anche senza conoscere ancora tutto il percorso.",
   },
-  // ⚡ PO — Istinto & Energia
+  // ⚡ ISTINTO — Istinto & Energia
   {
-    id: "po_1", spirit: "Po", spiritKey: "po", emoji: "⚡",
+    id: "po_1", spirit: "Istinto", spiritKey: "po", emoji: "⚡",
     description: "Istinto & Energia", phase: "spirits",
     text: "Sento forte l'energia nel corpo quando faccio qualcosa che mi appassiona davvero.",
   },
   {
-    id: "po_2", spirit: "Po", spiritKey: "po", emoji: "⚡",
+    id: "po_2", spirit: "Istinto", spiritKey: "po", emoji: "⚡",
     description: "Istinto & Energia", phase: "spirits",
     text: "Mi fido spesso delle mie sensazioni fisiche e istintive per capire se una situazione è giusta per me.",
   },
   {
-    id: "po_3", spirit: "Po", spiritKey: "po", emoji: "⚡",
+    id: "po_3", spirit: "Istinto", spiritKey: "po", emoji: "⚡",
     description: "Istinto & Energia", phase: "spirits",
     text: "Quando sono in un ambiente che mi piace, lo sento subito nel corpo — ancora prima che la mente lo elabori.",
   },
-  // 🔮 YI — Concentrazione & Analisi
+  // 🔮 FOCUS — Concentrazione & Analisi
   {
-    id: "yi_1", spirit: "Yi", spiritKey: "yi", emoji: "🔮",
+    id: "yi_1", spirit: "Focus", spiritKey: "yi", emoji: "🔮",
     description: "Concentrazione & Analisi", phase: "spirits",
     text: "Mi riesce facile concentrare l'attenzione a lungo su studio, analisi o problem solving.",
   },
   {
-    id: "yi_2", spirit: "Yi", spiritKey: "yi", emoji: "🔮",
+    id: "yi_2", spirit: "Focus", spiritKey: "yi", emoji: "🔮",
     description: "Concentrazione & Analisi", phase: "spirits",
     text: "Trovo soddisfazione nello scomporre un problema complesso in parti più semplici e risolverlo passo dopo passo.",
   },
   {
-    id: "yi_3", spirit: "Yi", spiritKey: "yi", emoji: "🔮",
+    id: "yi_3", spirit: "Focus", spiritKey: "yi", emoji: "🔮",
     description: "Concentrazione & Analisi", phase: "spirits",
     text: "Ricordo facilmente dettagli importanti e riesco a tenere in mente molte informazioni nello stesso momento.",
   },
-  // 🔥 ZHI — Volontà & Resilienza
+  // 🔥 TENACIA — Volontà & Resilienza
   {
-    id: "zhi_1", spirit: "Zhi", spiritKey: "zhi", emoji: "🔥",
+    id: "zhi_1", spirit: "Tenacia", spiritKey: "zhi", emoji: "🔥",
     description: "Volontà & Resilienza", phase: "spirits",
     text: "Porto avanti le mie decisioni anche quando diventano difficili o richiedono sacrifici.",
   },
   {
-    id: "zhi_2", spirit: "Zhi", spiritKey: "zhi", emoji: "🔥",
+    id: "zhi_2", spirit: "Tenacia", spiritKey: "zhi", emoji: "🔥",
     description: "Volontà & Resilienza", phase: "spirits",
     text: "Di fronte agli ostacoli, cerco sempre un modo per continuare invece di fermarmi.",
   },
   {
-    id: "zhi_3", spirit: "Zhi", spiritKey: "zhi", emoji: "🔥",
+    id: "zhi_3", spirit: "Tenacia", spiritKey: "zhi", emoji: "🔥",
     description: "Volontà & Resilienza", phase: "spirits",
     text: "Una volta che mi impegno su un obiettivo, ci lavoro con costanza anche nei momenti di stanchezza.",
   },
@@ -215,11 +215,11 @@ export default function Test() {
 
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 w-full mb-10">
           {[
-            { emoji: "✨", name: "Shen",  desc: "Coscienza" },
-            { emoji: "🌙", name: "Hun",   desc: "Visione" },
-            { emoji: "⚡", name: "Po",    desc: "Istinto" },
-            { emoji: "🔮", name: "Yi",    desc: "Analisi" },
-            { emoji: "🔥", name: "Zhi",   desc: "Volontà" },
+            { emoji: "✨", name: "Presenza", desc: "Coscienza" },
+            { emoji: "🌙", name: "Visione",  desc: "Direzione" },
+            { emoji: "⚡", name: "Istinto",  desc: "Energia" },
+            { emoji: "🔮", name: "Focus",    desc: "Analisi" },
+            { emoji: "🔥", name: "Tenacia",  desc: "Volontà" },
           ].map((s) => (
             <div key={s.name} className="flex flex-col items-center gap-1.5 bg-card border rounded-2xl px-3 py-4 text-center">
               <span className="text-2xl">{s.emoji}</span>

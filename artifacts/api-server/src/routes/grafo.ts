@@ -5,7 +5,6 @@ import { eq } from "drizzle-orm";
 
 const router = Router();
 
-// In-memory cache: sectorId → graph data
 const graphCache = new Map<number, { nodes: GraphNode[]; edges: GraphEdge[] }>();
 
 interface GraphNode {
@@ -13,12 +12,19 @@ interface GraphNode {
   label: string;
   type: "role" | "skill" | "tool" | "certification";
   description: string;
+  userAdded?: boolean;
 }
 
 interface GraphEdge {
   from: string;
   to: string;
   label?: string;
+  userAdded?: boolean;
+}
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
 }
 
 router.get("/grafo/:sectorId", async (req, res): Promise<void> => {
@@ -28,7 +34,7 @@ router.get("/grafo/:sectorId", async (req, res): Promise<void> => {
     return;
   }
 
-  if (graphCache.has(sectorId)) {
+  if (!req.query.refresh && graphCache.has(sectorId)) {
     res.json(graphCache.get(sectorId));
     return;
   }
@@ -91,6 +97,87 @@ Regole tassative:
     res.json(graph);
   } catch {
     res.status(500).json({ error: "Errore nella generazione del grafo" });
+  }
+});
+
+router.post("/grafo/:sectorId/chat", async (req, res): Promise<void> => {
+  const sectorId = parseInt(req.params.sectorId, 10);
+  if (isNaN(sectorId)) {
+    res.status(400).json({ error: "ID non valido" });
+    return;
+  }
+
+  const { messages, nodes, edges, sectorName } = req.body as {
+    messages: ChatMessage[];
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+    sectorName: string;
+  };
+
+  if (!messages || !Array.isArray(messages)) {
+    res.status(400).json({ error: "messages obbligatori" });
+    return;
+  }
+
+  const allNodes: GraphNode[] = Array.isArray(nodes) ? nodes : [];
+  const allEdges: GraphEdge[] = Array.isArray(edges) ? edges : [];
+
+  const nodeLines = allNodes.map((n) => {
+    const tag = n.userAdded ? " [aggiunto da te]" : "";
+    return `[${n.type.toUpperCase()}] ${n.label}${tag}: ${n.description}`;
+  });
+
+  const findLabel = (id: string) => allNodes.find((n) => n.id === id)?.label ?? id;
+  const edgeLines = allEdges.map((e) => {
+    const rel = e.label ? ` —${e.label}→ ` : " → ";
+    return `${findLabel(e.from)}${rel}${findLabel(e.to)}`;
+  });
+
+  const systemPrompt = `Sei un esperto del settore professionale "${sectorName || "specificato"}" in Italia. 
+L'utente ha costruito un grafo della conoscenza su questo settore. Rispondi SEMPRE basandoti principalmente sui dati presenti nel grafo. 
+Se l'utente ha aggiunto nodi personalizzati, trattali con la stessa importanza dei nodi generati dall'AI.
+Puoi ampliare con conoscenze generali se utile, ma segnalalo chiaramente.
+Rispondi in italiano, in modo chiaro, pratico e specifico.
+
+═══ GRAFO DELLA CONOSCENZA ═══
+
+NODI (${allNodes.length} totali):
+${nodeLines.join("\n")}
+
+CONNESSIONI (${allEdges.length} totali):
+${edgeLines.join("\n")}
+
+═════════════════════════════`;
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  try {
+    const stream = await openai.chat.completions.create({
+      model: "gpt-5.1",
+      max_completion_tokens: 1024,
+      stream: true,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...messages.slice(-10),
+      ],
+    });
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) {
+        res.write(`data: ${JSON.stringify({ text: delta })}\n\n`);
+      }
+    }
+
+    res.write("data: [DONE]\n\n");
+    res.end();
+  } catch {
+    res.write(`data: ${JSON.stringify({ text: "\n\n[Errore nella generazione della risposta]" })}\n\n`);
+    res.write("data: [DONE]\n\n");
+    res.end();
   }
 });
 

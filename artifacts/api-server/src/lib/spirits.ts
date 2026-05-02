@@ -2,11 +2,11 @@ export const SPIRIT_KEYS = ["shen", "hun", "po", "yi", "zhi"] as const;
 export type SpiritKey = typeof SPIRIT_KEYS[number];
 
 export const SPIRIT_META: Record<SpiritKey, { name: string; emoji: string; description: string }> = {
-  shen: { name: "Shen", emoji: "✨", description: "Coscienza, presenza e chiarezza emotiva" },
-  hun:  { name: "Hun",  emoji: "🌙", description: "Visione, immaginazione e direzione futura" },
-  po:   { name: "Po",   emoji: "⚡", description: "Istinto, energia corporea e percezione immediata" },
-  yi:   { name: "Yi",   emoji: "🔮", description: "Concentrazione, logica, memoria e analisi" },
-  zhi:  { name: "Zhi",  emoji: "🔥", description: "Volontà, resilienza e capacità di portare a termine" },
+  shen: { name: "Presenza", emoji: "✨", description: "Coscienza, presenza e chiarezza emotiva" },
+  hun:  { name: "Visione",  emoji: "🌙", description: "Visione, immaginazione e direzione futura" },
+  po:   { name: "Istinto",  emoji: "⚡", description: "Istinto, energia corporea e percezione immediata" },
+  yi:   { name: "Focus",    emoji: "🔮", description: "Concentrazione, logica, memoria e analisi" },
+  zhi:  { name: "Tenacia",  emoji: "🔥", description: "Volontà, resilienza e capacità di portare a termine" },
 };
 
 export const SECTOR_SPIRIT_WEIGHTS: Record<string, Partial<Record<SpiritKey, number>>> = {

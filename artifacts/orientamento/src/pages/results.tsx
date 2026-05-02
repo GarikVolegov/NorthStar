@@ -19,11 +19,11 @@ import {
 } from "recharts";
 
 const SPIRIT_META: Record<string, { emoji: string; label: string; color: string }> = {
-  shen: { emoji: "✨", label: "Shen", color: "bg-violet-100 text-violet-700 border-violet-200" },
-  hun: { emoji: "🌙", label: "Hun",  color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
-  po:  { emoji: "⚡", label: "Po",   color: "bg-amber-100 text-amber-700 border-amber-200" },
-  yi:  { emoji: "🔮", label: "Yi",   color: "bg-cyan-100 text-cyan-700 border-cyan-200" },
-  zhi: { emoji: "🔥", label: "Zhi",  color: "bg-rose-100 text-rose-700 border-rose-200" },
+  shen: { emoji: "✨", label: "Presenza", color: "bg-violet-100 text-violet-700 border-violet-200" },
+  hun:  { emoji: "🌙", label: "Visione",  color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
+  po:   { emoji: "⚡", label: "Istinto",  color: "bg-amber-100 text-amber-700 border-amber-200" },
+  yi:   { emoji: "🔮", label: "Focus",    color: "bg-cyan-100 text-cyan-700 border-cyan-200" },
+  zhi:  { emoji: "🔥", label: "Tenacia",  color: "bg-rose-100 text-rose-700 border-rose-200" },
 };
 
 const SPIRIT_DESCRIPTIONS: Record<string, string> = {
