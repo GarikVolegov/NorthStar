@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Compass, LogIn, MapPin, Sparkles, Star, TrendingUp, Users, Bot, DollarSign, GitCompare, Flame } from "lucide-react";
+import { ArrowRight, Compass, ExternalLink, LogIn, MapPin, Newspaper, Clock, Sparkles, Star, TrendingUp, Users, Bot, DollarSign, GitCompare, Flame } from "lucide-react";
 import { useGetStatsSummary } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,6 +30,86 @@ type TrendingSector = {
   avgSalaryMin: number; avgSalaryMax: number;
   riasecTypes: string[]; weeklyPicks: number; totalPicks: number;
 };
+
+type HomeNewsItem = {
+  id: string; title: string; description: string;
+  source: string; url: string; publishedAt: string;
+  image: string | null; category: string; tags: string[];
+};
+
+const CAT_META: Record<string, { label: string; emoji: string; color: string }> = {
+  technology: { label: "Tecnologia",  emoji: "💻", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  business:   { label: "Business",    emoji: "📈", color: "bg-amber-50 text-amber-700 border-amber-200" },
+  education:  { label: "Formazione",  emoji: "🎓", color: "bg-violet-50 text-violet-700 border-violet-200" },
+  science:    { label: "Scienza",     emoji: "🔬", color: "bg-teal-50 text-teal-700 border-teal-200" },
+  health:     { label: "Salute",      emoji: "❤️", color: "bg-rose-50 text-rose-700 border-rose-200" },
+  finance:    { label: "Finanza",     emoji: "💰", color: "bg-green-50 text-green-700 border-green-200" },
+  general:    { label: "Panoramica",  emoji: "🌍", color: "bg-slate-50 text-slate-700 border-slate-200" },
+};
+
+function timeAgo(dateStr: string): string {
+  const h = Math.floor((Date.now() - new Date(dateStr).getTime()) / 3_600_000);
+  if (h < 1) return "meno di 1h fa";
+  if (h < 24) return `${h}h fa`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? "ieri" : `${d} giorni fa`;
+}
+
+function useHomeNews() {
+  return useQuery<{ news: HomeNewsItem[] }>({
+    queryKey: ["home-news"],
+    queryFn: async () => {
+      const res = await fetch(
+        `${BASE}api/news?multi=true&categories=technology,business,education&perCategory=1`
+      );
+      if (!res.ok) throw new Error("Errore news");
+      return res.json();
+    },
+    staleTime: 600_000,
+  });
+}
+
+function HomeNewsCard({ item }: { item: HomeNewsItem }) {
+  const cat = CAT_META[item.category] ?? CAT_META["general"];
+  return (
+    <a
+      href={item.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex flex-col rounded-2xl border bg-card hover:shadow-lg hover:border-primary/30 transition-all duration-300 overflow-hidden h-full"
+    >
+      <div className="p-6 flex-1 flex flex-col">
+        {/* Category badge + time */}
+        <div className="flex items-center justify-between mb-3">
+          <span className={cn("inline-flex items-center gap-1 text-xs font-medium border rounded-full px-2.5 py-0.5", cat.color)}>
+            {cat.emoji} {cat.label}
+          </span>
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Clock className="w-3 h-3" /> {timeAgo(item.publishedAt)}
+          </span>
+        </div>
+
+        {/* Title */}
+        <h3 className="font-serif font-bold text-foreground leading-snug mb-2 line-clamp-3 group-hover:text-primary transition-colors">
+          {item.title}
+        </h3>
+
+        {/* Description */}
+        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 flex-1 mb-4">
+          {item.description}
+        </p>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between mt-auto pt-3 border-t border-border/60">
+          <span className="text-xs font-medium text-muted-foreground truncate max-w-[60%]">{item.source}</span>
+          <span className="flex items-center gap-1 text-xs font-medium text-primary group-hover:gap-1.5 transition-all">
+            Leggi <ExternalLink className="w-3 h-3" />
+          </span>
+        </div>
+      </div>
+    </a>
+  );
+}
 
 function useTrendingSectors() {
   return useQuery<TrendingSector[]>({
@@ -147,6 +227,7 @@ function AnimatedNumber({ value, suffix = "" }: { value: number, suffix?: string
 export default function Home() {
   const { data: stats, isLoading: isStatsLoading } = useGetStatsSummary();
   const { data: trendingData } = useTrendingSectors();
+  const { data: newsData, isLoading: isNewsLoading } = useHomeNews();
   const { isLoggedIn, user } = useAuth();
   const [loginOpen, setLoginOpen] = useState(false);
 
@@ -264,6 +345,44 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {trendingData.map((sector, i) => (
                 <TrendingSectorCard key={sector.id} sector={sector} rank={i + 1} />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* News Section */}
+      <section className="py-20 bg-card border-y">
+        <div className="container mx-auto px-4 md:px-6 max-w-6xl">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
+            <div>
+              <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-sm font-medium mb-3">
+                <Newspaper className="w-3.5 h-3.5" /> News dal mondo del lavoro
+              </div>
+              <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
+                Aggiornamenti in evidenza
+              </h2>
+              <p className="text-muted-foreground mt-2 max-w-xl">
+                Le ultime notizie su tecnologia, business e formazione professionale, selezionate per te.
+              </p>
+            </div>
+            <Link href="/news">
+              <div className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-border text-sm font-medium text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors bg-background">
+                Tutte le notizie <ArrowRight className="w-3.5 h-3.5" />
+              </div>
+            </Link>
+          </div>
+
+          {isNewsLoading || !newsData ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-56 w-full rounded-2xl" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {newsData.news.slice(0, 3).map((item) => (
+                <HomeNewsCard key={item.id} item={item} />
               ))}
             </div>
           )}
