@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import {
   TrendingUp, DollarSign, Bot, Clock, ArrowRight,
   GitCompare, ChevronDown, X, Check, Minus, Plus,
-  Sparkles, BarChart2,
+  Sparkles, BarChart2, Link2, Copy, CheckCheck,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -68,10 +68,13 @@ function SectorPicker({
 
   return (
     <div className="relative">
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => e.key === "Enter" && setOpen((o) => !o)}
         className={cn(
-          "w-full flex items-center gap-3 p-4 rounded-2xl border bg-card text-left transition-colors",
+          "w-full flex items-center gap-3 p-4 rounded-2xl border bg-card text-left transition-colors cursor-pointer select-none",
           open ? "border-primary/50 shadow-sm" : "hover:border-primary/30"
         )}
       >
@@ -103,7 +106,7 @@ function SectorPicker({
             <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", open && "rotate-180")} />
           </>
         )}
-      </button>
+      </div>
 
       {open && (
         <div className="absolute top-full mt-2 left-0 right-0 z-50 bg-card border rounded-2xl shadow-lg overflow-hidden">
@@ -168,8 +171,31 @@ export default function Confronta() {
   }, []);
 
   const { data: sectors = [], isLoading } = useAllSectors();
-  const [leftId, setLeftId]   = useState<number | null>(null);
-  const [rightId, setRightId] = useState<number | null>(null);
+
+  const [leftId, setLeftId] = useState<number | null>(() => {
+    const a = new URLSearchParams(window.location.search).get("a");
+    return a ? parseInt(a, 10) : null;
+  });
+  const [rightId, setRightId] = useState<number | null>(() => {
+    const b = new URLSearchParams(window.location.search).get("b");
+    return b ? parseInt(b, 10) : null;
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (leftId)  params.set("a", String(leftId));
+    if (rightId) params.set("b", String(rightId));
+    const qs = params.toString();
+    window.history.replaceState({}, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
+  }, [leftId, rightId]);
+
+  const [copied, setCopied] = useState(false);
+  const copyLink = useCallback(() => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, []);
 
   const left  = useMemo(() => sectors.find((s) => s.id === leftId)  ?? null, [sectors, leftId]);
   const right = useMemo(() => sectors.find((s) => s.id === rightId) ?? null, [sectors, rightId]);
@@ -264,6 +290,24 @@ export default function Confronta() {
         {/* Comparison */}
         {bothSelected && left && right && (
           <div className="space-y-6">
+
+            {/* Share bar */}
+            <div className="flex justify-end">
+              <button
+                onClick={copyLink}
+                className={cn(
+                  "inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all",
+                  copied
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                    : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/30"
+                )}
+              >
+                {copied
+                  ? <><CheckCheck className="w-4 h-4" /> Link copiato!</>
+                  : <><Link2 className="w-4 h-4" /> Copia link confronto</>
+                }
+              </button>
+            </div>
 
             {/* Header columns */}
             <div className="grid grid-cols-[1fr_40px_1fr] gap-2 items-center">
