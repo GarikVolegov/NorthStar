@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,8 @@ import {
   Plus, ExternalLink, Trash2, Loader2, ChevronDown,
   Building2, Briefcase, MapPin, DollarSign, FileText,
   Link2, Star, Calendar, AlertCircle, Bell, X,
-  BarChart3, TrendingUp, ArrowRight,
+  BarChart3, TrendingUp, ArrowRight, StickyNote, Send,
+  ChevronUp, Clock,
 } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,11 @@ import { cn } from "@/lib/utils";
 const BASE = import.meta.env.BASE_URL || "/";
 
 type AppStatus = "saved" | "applied" | "interview" | "offer" | "rejected";
+
+interface NoteEntry {
+  text: string;
+  createdAt: string;
+}
 
 interface Application {
   id: number;
@@ -37,6 +43,7 @@ interface Application {
   location: string | null;
   appliedAt: string;
   updatedAt: string;
+  notesLog: NoteEntry[] | null;
 }
 
 const STATUS_META: Record<AppStatus, { label: string; emoji: string; color: string; border: string; bg: string; badge: string }> = {
@@ -48,13 +55,30 @@ const STATUS_META: Record<AppStatus, { label: string; emoji: string; color: stri
 };
 
 const COLUMNS: AppStatus[] = ["saved", "applied", "interview", "offer", "rejected"];
-
 const EMPTY_FORM = { company: "", role: "", url: "", status: "saved" as AppStatus, notes: "", salary: "", location: "" };
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("it-IT", { day: "numeric", month: "short" });
 }
 
+function formatNoteDate(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMins < 1) return "Adesso";
+  if (diffMins < 60) return `${diffMins}m fa`;
+  if (diffHours < 24) return `${diffHours}h fa`;
+  if (diffDays === 1) return "Ieri";
+  if (diffDays < 7) return `${diffDays}g fa`;
+  return date.toLocaleDateString("it-IT", { day: "numeric", month: "short" });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Main page component
+═══════════════════════════════════════════════════════════════════════ */
 export default function Candidature() {
   const { user, isLoggedIn } = useAuth();
   const queryClient = useQueryClient();
@@ -124,7 +148,7 @@ export default function Candidature() {
     }
     if (editApp) {
       updateMutation.mutate({ id: editApp.id, updates: form }, {
-        onSuccess: () => { setEditApp(null); setForm(EMPTY_FORM); setFormError(null); },
+        onSuccess: () => { setEditApp(null); setForm(EMPTY_FORM); setFormError(null); setAddOpen(false); },
       });
     } else {
       createMutation.mutate(form);
@@ -141,9 +165,9 @@ export default function Candidature() {
     setAddOpen(true);
   }
 
-  function openAdd() {
+  function openAdd(defaultStatus?: AppStatus) {
     setEditApp(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, status: defaultStatus ?? "saved" });
     setFormError(null);
     setAddOpen(true);
   }
@@ -179,7 +203,7 @@ export default function Candidature() {
                 {total === 0 ? "Nessuna candidatura ancora" : `${total} candidatur${total === 1 ? "a" : "e"} totali`}
               </p>
             </div>
-            <Button onClick={openAdd} className="rounded-full gap-2 shrink-0">
+            <Button onClick={() => openAdd()} className="rounded-full gap-2 shrink-0">
               <Plus className="w-4 h-4" /> Aggiungi
             </Button>
           </div>
@@ -203,28 +227,18 @@ export default function Candidature() {
           {/* View toggle tabs */}
           {total > 0 && (
             <div className="flex gap-1 mt-4">
-              <button
-                onClick={() => setView("kanban")}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
-                  view === "kanban"
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted",
-                )}
-              >
-                <Briefcase className="w-3.5 h-3.5" /> Kanban
-              </button>
-              <button
-                onClick={() => setView("stats")}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
-                  view === "stats"
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted",
-                )}
-              >
-                <BarChart3 className="w-3.5 h-3.5" /> Statistiche
-              </button>
+              {(["kanban", "stats"] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
+                    view === v ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                  )}
+                >
+                  {v === "kanban" ? <><Briefcase className="w-3.5 h-3.5" /> Kanban</> : <><BarChart3 className="w-3.5 h-3.5" /> Statistiche</>}
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -246,11 +260,8 @@ export default function Candidature() {
                 </p>
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
                   {staleInterviews.map((a) => (
-                    <button
-                      key={a.id}
-                      onClick={() => openEdit(a)}
-                      className="text-xs text-amber-700 underline underline-offset-2 hover:text-amber-900 transition-colors"
-                    >
+                    <button key={a.id} onClick={() => openEdit(a)}
+                      className="text-xs text-amber-700 underline underline-offset-2 hover:text-amber-900 transition-colors">
                       {a.company} — {a.role}
                     </button>
                   ))}
@@ -259,11 +270,8 @@ export default function Candidature() {
                   Riceverai un promemoria via email. Clicca su un colloquio per aggiornarne lo stato.
                 </p>
               </div>
-              <button
-                onClick={() => setBannerDismissed(true)}
-                className="p-1 rounded-lg hover:bg-amber-100 text-amber-500 hover:text-amber-700 transition-colors shrink-0"
-                aria-label="Chiudi"
-              >
+              <button onClick={() => setBannerDismissed(true)}
+                className="p-1 rounded-lg hover:bg-amber-100 text-amber-500 hover:text-amber-700 transition-colors shrink-0">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -271,14 +279,13 @@ export default function Candidature() {
         </div>
       )}
 
-      {/* ── Content: Kanban or Stats ── */}
+      {/* ── Content ── */}
       <div className="max-w-screen-2xl mx-auto px-4 md:px-8 py-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-24">
             <Loader2 className="w-7 h-7 animate-spin text-primary" />
           </div>
         ) : total === 0 ? (
-          /* Empty state */
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
               <Briefcase className="w-8 h-8 text-primary/60" />
@@ -287,7 +294,7 @@ export default function Candidature() {
             <p className="text-sm text-muted-foreground max-w-sm mb-6">
               Aggiungi le offerte di lavoro che ti interessano e monitora ogni passaggio del processo selettivo.
             </p>
-            <Button onClick={openAdd} className="rounded-full gap-2">
+            <Button onClick={() => openAdd()} className="rounded-full gap-2">
               <Plus className="w-4 h-4" /> Aggiungi la prima candidatura
             </Button>
           </div>
@@ -300,8 +307,7 @@ export default function Candidature() {
               const meta = STATUS_META[status];
               const cards = byStatus[status];
               return (
-                <div key={status} className="flex-shrink-0 w-[300px] md:w-[280px] xl:w-[300px] flex flex-col">
-                  {/* Column header */}
+                <div key={status} className="flex-shrink-0 w-[300px] md:w-[285px] xl:w-[300px] flex flex-col">
                   <div className={cn("flex items-center gap-2 px-3 py-2.5 rounded-xl mb-3", meta.bg)}>
                     <span className="text-base">{meta.emoji}</span>
                     <span className={cn("text-sm font-semibold flex-1", meta.color)}>{meta.label}</span>
@@ -310,7 +316,6 @@ export default function Candidature() {
                     </Badge>
                   </div>
 
-                  {/* Cards */}
                   <div className="space-y-2.5 flex-1">
                     {cards.length === 0 ? (
                       <div className="border-2 border-dashed border-border rounded-xl p-5 text-center">
@@ -321,6 +326,7 @@ export default function Candidature() {
                         <AppCard
                           key={app.id}
                           app={app}
+                          userId={user!.id}
                           onEdit={() => openEdit(app)}
                           onDelete={() => deleteMutation.mutate(app.id)}
                           onStatusChange={(s) => updateMutation.mutate({ id: app.id, updates: { status: s } })}
@@ -329,9 +335,8 @@ export default function Candidature() {
                       ))
                     )}
 
-                    {/* Add to this column */}
                     <button
-                      onClick={() => { setForm({ ...EMPTY_FORM, status }); setEditApp(null); setFormError(null); setAddOpen(true); }}
+                      onClick={() => openAdd(status)}
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 border border-dashed border-border transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" /> Aggiungi a {meta.label.toLowerCase()}
@@ -345,7 +350,7 @@ export default function Candidature() {
       </div>
 
       {/* ── Add / Edit dialog ── */}
-      <Dialog open={addOpen} onOpenChange={(open) => { if (!open) { setAddOpen(false); setEditApp(null); setFormError(null); } else setAddOpen(true); }}>
+      <Dialog open={addOpen} onOpenChange={(open) => { if (!open) { setAddOpen(false); setEditApp(null); setFormError(null); } }}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-base font-semibold">
@@ -354,97 +359,62 @@ export default function Candidature() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {/* Company + Role */}
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 sm:col-span-1">
                 <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
                   <Building2 className="w-3.5 h-3.5 text-muted-foreground" /> Azienda *
                 </Label>
-                <Input
-                  value={form.company}
-                  onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
-                  placeholder="es. Google Italia"
-                  className="h-9 rounded-xl text-sm"
-                />
+                <Input value={form.company} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
+                  placeholder="es. Google Italia" className="h-9 rounded-xl text-sm" />
               </div>
               <div className="col-span-2 sm:col-span-1">
                 <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
                   <Briefcase className="w-3.5 h-3.5 text-muted-foreground" /> Ruolo *
                 </Label>
-                <Input
-                  value={form.role}
-                  onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-                  placeholder="es. UX Designer"
-                  className="h-9 rounded-xl text-sm"
-                />
+                <Input value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                  placeholder="es. UX Designer" className="h-9 rounded-xl text-sm" />
               </div>
             </div>
 
-            {/* URL */}
             <div>
               <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
                 <Link2 className="w-3.5 h-3.5 text-muted-foreground" /> Link offerta <span className="font-normal text-muted-foreground">(opzionale)</span>
               </Label>
-              <Input
-                value={form.url}
-                onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
-                placeholder="https://..."
-                className="h-9 rounded-xl text-sm"
-                type="url"
-              />
+              <Input value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
+                placeholder="https://..." className="h-9 rounded-xl text-sm" type="url" />
             </div>
 
-            {/* Status + Location */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs font-semibold mb-1.5 block">Stato</Label>
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as AppStatus }))}
-                  className="w-full h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  {COLUMNS.map((s) => (
-                    <option key={s} value={s}>{STATUS_META[s].emoji} {STATUS_META[s].label}</option>
-                  ))}
+                <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as AppStatus }))}
+                  className="w-full h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                  {COLUMNS.map((s) => <option key={s} value={s}>{STATUS_META[s].emoji} {STATUS_META[s].label}</option>)}
                 </select>
               </div>
               <div>
                 <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-muted-foreground" /> Sede
                 </Label>
-                <Input
-                  value={form.location}
-                  onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-                  placeholder="es. Milano / Remote"
-                  className="h-9 rounded-xl text-sm"
-                />
+                <Input value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                  placeholder="es. Milano / Remote" className="h-9 rounded-xl text-sm" />
               </div>
             </div>
 
-            {/* Salary */}
             <div>
               <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
                 <DollarSign className="w-3.5 h-3.5 text-muted-foreground" /> RAL / Stipendio <span className="font-normal text-muted-foreground">(opzionale)</span>
               </Label>
-              <Input
-                value={form.salary}
-                onChange={(e) => setForm((f) => ({ ...f, salary: e.target.value }))}
-                placeholder="es. 45.000 € / 3.500 € mese"
-                className="h-9 rounded-xl text-sm"
-              />
+              <Input value={form.salary} onChange={(e) => setForm((f) => ({ ...f, salary: e.target.value }))}
+                placeholder="es. 45.000 € / 3.500 € mese" className="h-9 rounded-xl text-sm" />
             </div>
 
-            {/* Notes */}
             <div>
               <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5 text-muted-foreground" /> Note <span className="font-normal text-muted-foreground">(opzionale)</span>
               </Label>
-              <Textarea
-                value={form.notes}
-                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                placeholder="Contatti, colloqui passati, impressioni, dettagli importanti..."
-                className="min-h-[80px] rounded-xl text-sm resize-none"
-              />
+              <Textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                placeholder="Contatti, impressioni, dettagli importanti..." className="min-h-[70px] rounded-xl text-sm resize-none" />
             </div>
 
             {formError && (
@@ -459,11 +429,8 @@ export default function Candidature() {
             <Button variant="outline" className="rounded-xl" onClick={() => { setAddOpen(false); setEditApp(null); }}>
               Annulla
             </Button>
-            <Button
-              className="rounded-xl gap-2"
-              onClick={handleSubmit}
-              disabled={createMutation.isPending || updateMutation.isPending}
-            >
+            <Button className="rounded-xl gap-2" onClick={handleSubmit}
+              disabled={createMutation.isPending || updateMutation.isPending}>
               {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
               {editApp ? "Salva modifiche" : "Aggiungi"}
             </Button>
@@ -474,7 +441,233 @@ export default function Candidature() {
   );
 }
 
-/* ── Statistics view ──────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════
+   Application card with inline notes diary
+═══════════════════════════════════════════════════════════════════════ */
+function AppCard({
+  app, userId, onEdit, onDelete, onStatusChange, deleting,
+}: {
+  app: Application;
+  userId: number;
+  onEdit: () => void;
+  onDelete: () => void;
+  onStatusChange: (s: AppStatus) => void;
+  deleting: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const meta = STATUS_META[app.status];
+  const otherStatuses = COLUMNS.filter((s) => s !== app.status);
+  const notesLog: NoteEntry[] = Array.isArray(app.notesLog) ? app.notesLog : [];
+
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [noteInput, setNoteInput] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (notesOpen) inputRef.current?.focus();
+  }, [notesOpen]);
+
+  const addNoteMutation = useMutation({
+    mutationFn: async (text: string) => {
+      const res = await fetch(`${BASE}api/applications/${app.id}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error("Errore");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["applications", userId] });
+      setNoteInput("");
+    },
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (index: number) => {
+      const res = await fetch(`${BASE}api/applications/${app.id}/notes/${index}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Errore");
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["applications", userId] }),
+  });
+
+  function submitNote() {
+    const text = noteInput.trim();
+    if (!text || addNoteMutation.isPending) return;
+    addNoteMutation.mutate(text);
+  }
+
+  return (
+    <div className={cn(
+      "bg-background rounded-xl border border-l-4 shadow-sm hover:shadow-md transition-all",
+      meta.border,
+    )}>
+      {/* ── Clickable card body ── */}
+      <div className="p-3 cursor-pointer" onClick={onEdit}>
+        {/* Company + Delete */}
+        <div className="flex items-start gap-1.5 mb-1">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-foreground leading-tight truncate">{app.company}</p>
+            <p className="text-xs text-muted-foreground truncate">{app.role}</p>
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all shrink-0 -mt-0.5 -mr-0.5 group"
+            disabled={deleting}
+          >
+            {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3 opacity-0 group-hover:opacity-100" />}
+          </button>
+        </div>
+
+        {/* Location / Salary */}
+        {(app.location || app.salary) && (
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
+            {app.location && (
+              <span className="text-[11px] flex items-center gap-1 text-muted-foreground">
+                <MapPin className="w-2.5 h-2.5" />{app.location}
+              </span>
+            )}
+            {app.salary && (
+              <span className="text-[11px] flex items-center gap-1 text-muted-foreground">
+                <DollarSign className="w-2.5 h-2.5" />{app.salary}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Notes preview */}
+        {app.notes && (
+          <p className="text-[11px] text-muted-foreground italic mt-1.5 line-clamp-2">{app.notes}</p>
+        )}
+
+        {/* Latest diary note teaser (when panel is closed) */}
+        {!notesOpen && notesLog.length > 0 && (
+          <div className="mt-2 flex items-start gap-1.5">
+            <Clock className="w-2.5 h-2.5 text-muted-foreground/60 mt-0.5 shrink-0" />
+            <p className="text-[10px] text-muted-foreground/70 line-clamp-1 italic">
+              {formatNoteDate(notesLog[0].createdAt)} · {notesLog[0].text}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Footer: date, url, notes toggle, status ── */}
+      <div className="flex items-center gap-1.5 px-3 pb-2.5 pt-0">
+        <span className="text-[11px] text-muted-foreground flex items-center gap-1 mr-auto">
+          <Calendar className="w-2.5 h-2.5" />{formatDate(app.appliedAt)}
+        </span>
+
+        {app.url && (
+          <a href={app.url} target="_blank" rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-colors" title="Apri offerta">
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        )}
+
+        {/* Notes toggle */}
+        <button
+          onClick={(e) => { e.stopPropagation(); setNotesOpen((o) => !o); }}
+          className={cn(
+            "flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-md transition-colors",
+            notesOpen
+              ? "bg-primary/10 text-primary"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted",
+          )}
+          title={notesOpen ? "Chiudi diario" : "Apri diario note"}
+        >
+          <StickyNote className="w-3 h-3" />
+          {notesLog.length > 0 ? notesLog.length : ""}
+          {notesOpen ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
+        </button>
+
+        {/* Status dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button onClick={(e) => e.stopPropagation()}
+              className={cn("text-[11px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 hover:opacity-80 transition-opacity", meta.badge)}>
+              {meta.emoji} {meta.label} <ChevronDown className="w-2.5 h-2.5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            {otherStatuses.map((s) => {
+              const m = STATUS_META[s];
+              return (
+                <DropdownMenuItem key={s} onClick={(e) => { e.stopPropagation(); onStatusChange(s); }}
+                  className="text-xs gap-2 cursor-pointer">
+                  <span>{m.emoji}</span> Sposta in {m.label}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* ── Inline notes diary ── */}
+      {notesOpen && (
+        <div
+          className="border-t border-border/60 mx-3 pb-3 pt-2.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Existing notes */}
+          {notesLog.length > 0 && (
+            <div className="space-y-1.5 mb-2.5 max-h-40 overflow-y-auto pr-1">
+              {notesLog.map((entry, i) => (
+                <div key={i} className="flex items-start gap-2 group/note">
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap pt-0.5 shrink-0 tabular-nums">
+                    {formatNoteDate(entry.createdAt)}
+                  </span>
+                  <p className="text-[11px] text-foreground leading-relaxed flex-1 min-w-0">{entry.text}</p>
+                  <button
+                    onClick={() => deleteNoteMutation.mutate(i)}
+                    disabled={deleteNoteMutation.isPending}
+                    className="opacity-0 group-hover/note:opacity-100 p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all shrink-0"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {notesLog.length === 0 && (
+            <p className="text-[11px] text-muted-foreground italic mb-2.5">
+              Nessuna nota ancora. Scrivi il primo aggiornamento!
+            </p>
+          )}
+
+          {/* Add note input */}
+          <div className="flex items-center gap-1.5">
+            <input
+              ref={inputRef}
+              value={noteInput}
+              onChange={(e) => setNoteInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitNote(); }
+              }}
+              placeholder="Es. Chiamato HR, colloquio tecnico superato…"
+              className="flex-1 min-w-0 text-xs bg-muted/60 border border-input rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/50 transition-shadow"
+            />
+            <button
+              onClick={submitNote}
+              disabled={!noteInput.trim() || addNoteMutation.isPending}
+              className="p-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+              title="Aggiungi nota (Invio)"
+            >
+              {addNoteMutation.isPending
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Send className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Statistics view
+═══════════════════════════════════════════════════════════════════════ */
 function StatsView({ applications }: { applications: Application[] }) {
   const total = applications.length;
 
@@ -489,22 +682,22 @@ function StatsView({ applications }: { applications: Application[] }) {
   const active = counts.applied + counts.interview;
   const sentApplications = counts.applied + counts.interview + counts.offer + counts.rejected;
   const responseRate = sentApplications > 0
-    ? Math.round(((counts.interview + counts.offer) / sentApplications) * 100)
-    : 0;
+    ? Math.round(((counts.interview + counts.offer) / sentApplications) * 100) : 0;
   const offerRate = (counts.interview + counts.offer) > 0
-    ? Math.round((counts.offer / (counts.interview + counts.offer)) * 100)
-    : 0;
+    ? Math.round((counts.offer / (counts.interview + counts.offer)) * 100) : 0;
 
   const funnelStages: { status: AppStatus; count: number }[] = [
-    { status: "saved",     count: counts.saved },
-    { status: "applied",   count: counts.applied },
+    { status: "saved", count: counts.saved },
+    { status: "applied", count: counts.applied },
     { status: "interview", count: counts.interview },
-    { status: "offer",     count: counts.offer },
+    { status: "offer", count: counts.offer },
   ];
   const maxFunnelCount = Math.max(...funnelStages.map((s) => s.count), 1);
 
   const monthlyData = groupByMonth(applications);
   const maxMonthly = Math.max(...monthlyData.map((d) => d.count), 1);
+
+  const totalNotes = applications.reduce((sum, a) => sum + (Array.isArray(a.notesLog) ? a.notesLog.length : 0), 0);
 
   if (total === 0) {
     return (
@@ -517,69 +710,53 @@ function StatsView({ applications }: { applications: Application[] }) {
 
   return (
     <div className="space-y-5 max-w-3xl">
-
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard emoji="📊" label="Totale" value={total} sub="candidature tracciate" valueColor="text-foreground" />
         <KpiCard emoji="💌" label="Tasso risposta" value={`${responseRate}%`} sub="inviati → colloquio" valueColor="text-blue-600" />
         <KpiCard emoji="⏳" label="In corso" value={active} sub="in attesa di risposta" valueColor="text-violet-600" />
-        <KpiCard
-          emoji="🎉"
-          label="Offerte"
-          value={counts.offer}
-          sub={offerRate > 0 ? `${offerRate}% dai colloqui` : "nessuna ancora"}
-          valueColor="text-emerald-600"
-        />
+        <KpiCard emoji="📝" label="Note totali" value={totalNotes} sub={`${(totalNotes / total).toFixed(1)} per candidatura`} valueColor="text-amber-600" />
       </div>
 
       {/* Funnel */}
       <div className="bg-background rounded-2xl border p-5">
-        <h3 className="text-sm font-semibold mb-5 flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-primary" /> Funnel di avanzamento
-        </h3>
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-primary" /> Funnel di avanzamento
+          </h3>
+          {offerRate > 0 && (
+            <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full border", STATUS_META.offer.badge)}>
+              🎉 {offerRate}% successo dai colloqui
+            </span>
+          )}
+        </div>
         <div className="space-y-2">
           {funnelStages.map((stage, i) => {
             const m = STATUS_META[stage.status];
             const pct = maxFunnelCount > 0 ? (stage.count / maxFunnelCount) * 100 : 0;
             const prevCount = i > 0 ? funnelStages[i - 1].count : null;
             const convPct = prevCount !== null && prevCount > 0
-              ? Math.round((stage.count / prevCount) * 100)
-              : null;
-
+              ? Math.round((stage.count / prevCount) * 100) : null;
             return (
               <div key={stage.status}>
-                {/* Conversion arrow */}
                 {convPct !== null && (
-                  <div className="flex items-center gap-2 py-1.5 pl-[108px]">
+                  <div className="flex items-center gap-2 py-1 pl-[108px]">
                     <ArrowRight className="w-3 h-3 text-muted-foreground/40 shrink-0" />
-                    <span className="text-[11px] text-muted-foreground font-medium">
-                      {convPct}% di conversione
-                    </span>
+                    <span className="text-[11px] text-muted-foreground font-medium">{convPct}% di conversione</span>
                   </div>
                 )}
-
-                {/* Bar row */}
                 <div className="flex items-center gap-3">
-                  {/* Label */}
                   <div className="w-24 shrink-0 text-right">
-                    <span className={cn("text-xs font-semibold", m.color)}>
-                      {m.emoji} {m.label}
-                    </span>
+                    <span className={cn("text-xs font-semibold", m.color)}>{m.emoji} {m.label}</span>
                   </div>
-
-                  {/* Progress bar */}
-                  <div className="flex-1 bg-muted rounded-full h-8 relative overflow-hidden">
-                    <div
-                      className={cn("h-full rounded-full transition-all duration-700 ease-out flex items-center", m.bg)}
-                      style={{ width: `${Math.max(pct, stage.count > 0 ? 6 : 0)}%` }}
-                    />
+                  <div className="flex-1 bg-muted rounded-full h-8 overflow-hidden">
+                    <div className={cn("h-full rounded-full transition-all duration-700 ease-out", m.bg)}
+                      style={{ width: `${Math.max(pct, stage.count > 0 ? 6 : 0)}%` }} />
                   </div>
-
-                  {/* Count + % */}
                   <div className="w-20 shrink-0 text-right">
                     <span className="text-base font-bold tabular-nums">{stage.count}</span>
                     <span className="text-[11px] text-muted-foreground ml-1">
-                      {total > 0 ? `(${Math.round((stage.count / total) * 100)}%)` : "(0%)"}
+                      ({total > 0 ? Math.round((stage.count / total) * 100) : 0}%)
                     </span>
                   </div>
                 </div>
@@ -587,8 +764,6 @@ function StatsView({ applications }: { applications: Application[] }) {
             );
           })}
         </div>
-
-        {/* Rejected footer */}
         {counts.rejected > 0 && (
           <div className="mt-5 pt-4 border-t flex items-center gap-3 text-sm">
             <span className="text-base">❌</span>
@@ -602,36 +777,29 @@ function StatsView({ applications }: { applications: Application[] }) {
         )}
       </div>
 
-      {/* Monthly bar chart */}
+      {/* Monthly chart */}
       {monthlyData.length > 0 && (
         <div className="bg-background rounded-2xl border p-5">
           <h3 className="text-sm font-semibold mb-5 flex items-center gap-2">
             <Calendar className="w-4 h-4 text-primary" /> Candidature nel tempo
           </h3>
-
           <div className="flex items-end gap-2" style={{ height: 120 }}>
             {monthlyData.map(({ month, count }) => {
               const barH = Math.max(Math.round((count / maxMonthly) * 100), 4);
               return (
                 <div key={month} className="flex-1 flex flex-col items-center gap-1 min-w-0 group">
-                  <span className="text-xs font-bold text-foreground tabular-nums opacity-0 group-hover:opacity-100 transition-opacity">
-                    {count}
-                  </span>
+                  <span className="text-xs font-bold text-foreground tabular-nums opacity-0 group-hover:opacity-100 transition-opacity">{count}</span>
                   <div className="w-full relative" style={{ height: `${barH}%` }}>
-                    <div className="w-full h-full bg-primary/20 hover:bg-primary/40 rounded-t-md transition-colors cursor-default" title={`${count} candidature`} />
-                    {/* Count label always on top for single bar */}
+                    <div className="w-full h-full bg-primary/20 hover:bg-primary/40 rounded-t-md transition-colors cursor-default" />
                     {monthlyData.length <= 6 && (
                       <span className="absolute -top-5 left-0 right-0 text-center text-xs font-semibold tabular-nums">{count}</span>
                     )}
                   </div>
-                  <span className="text-[10px] text-muted-foreground truncate w-full text-center leading-tight">
-                    {formatMonth(month)}
-                  </span>
+                  <span className="text-[10px] text-muted-foreground truncate w-full text-center leading-tight">{formatMonth(month)}</span>
                 </div>
               );
             })}
           </div>
-
           <p className="text-xs text-muted-foreground mt-3 text-right">
             Media: {(total / Math.max(monthlyData.length, 1)).toFixed(1)} candidature/mese
           </p>
@@ -641,13 +809,9 @@ function StatsView({ applications }: { applications: Application[] }) {
   );
 }
 
-/* ── KPI card ──────────────────────────────────────────────────────────── */
+/* ── KPI card ─────────────────────────────────────────────────────────── */
 function KpiCard({ emoji, label, value, sub, valueColor }: {
-  emoji: string;
-  label: string;
-  value: string | number;
-  sub: string;
-  valueColor: string;
+  emoji: string; label: string; value: string | number; sub: string; valueColor: string;
 }) {
   return (
     <div className="bg-background rounded-2xl border p-4">
@@ -661,7 +825,7 @@ function KpiCard({ emoji, label, value, sub, valueColor }: {
   );
 }
 
-/* ── Helpers ───────────────────────────────────────────────────────────── */
+/* ── Helpers ──────────────────────────────────────────────────────────── */
 function groupByMonth(apps: Application[]): { month: string; count: number }[] {
   const map = new Map<string, number>();
   apps.forEach((app) => {
@@ -669,116 +833,10 @@ function groupByMonth(apps: Application[]): { month: string; count: number }[] {
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     map.set(key, (map.get(key) ?? 0) + 1);
   });
-  return Array.from(map.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, count]) => ({ month, count }));
+  return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([month, count]) => ({ month, count }));
 }
 
 function formatMonth(ym: string): string {
   const [y, m] = ym.split("-");
   return new Date(parseInt(y), parseInt(m) - 1).toLocaleDateString("it-IT", { month: "short", year: "2-digit" });
-}
-
-/* ── Application card ─────────────────────────────────────────────────── */
-function AppCard({
-  app, onEdit, onDelete, onStatusChange, deleting,
-}: {
-  app: Application;
-  onEdit: () => void;
-  onDelete: () => void;
-  onStatusChange: (s: AppStatus) => void;
-  deleting: boolean;
-}) {
-  const meta = STATUS_META[app.status];
-  const otherStatuses = COLUMNS.filter((s) => s !== app.status);
-
-  return (
-    <div
-      className={cn(
-        "bg-background rounded-xl border border-l-4 p-3 shadow-sm hover:shadow-md transition-all cursor-pointer group",
-        meta.border,
-      )}
-      onClick={onEdit}
-    >
-      {/* Company + Delete */}
-      <div className="flex items-start gap-1.5 mb-1">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-foreground leading-tight truncate">{app.company}</p>
-          <p className="text-xs text-muted-foreground truncate">{app.role}</p>
-        </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all shrink-0 -mt-0.5 -mr-0.5"
-          disabled={deleting}
-        >
-          {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-        </button>
-      </div>
-
-      {/* Badges row */}
-      <div className="flex flex-wrap gap-1.5 mt-2">
-        {app.location && (
-          <span className="text-[11px] flex items-center gap-1 text-muted-foreground">
-            <MapPin className="w-2.5 h-2.5" />{app.location}
-          </span>
-        )}
-        {app.salary && (
-          <span className="text-[11px] flex items-center gap-1 text-muted-foreground">
-            <DollarSign className="w-2.5 h-2.5" />{app.salary}
-          </span>
-        )}
-      </div>
-
-      {/* Notes preview */}
-      {app.notes && (
-        <p className="text-[11px] text-muted-foreground italic mt-1.5 line-clamp-2">{app.notes}</p>
-      )}
-
-      {/* Footer: date + url + status pill */}
-      <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-border/50">
-        <span className="text-[11px] text-muted-foreground flex items-center gap-1 mr-auto">
-          <Calendar className="w-2.5 h-2.5" />{formatDate(app.appliedAt)}
-        </span>
-
-        {app.url && (
-          <a
-            href={app.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-colors"
-            title="Apri offerta"
-          >
-            <ExternalLink className="w-3 h-3" />
-          </a>
-        )}
-
-        {/* Status dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              onClick={(e) => e.stopPropagation()}
-              className={cn("text-[11px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 hover:opacity-80 transition-opacity", meta.badge)}
-            >
-              {meta.emoji} {meta.label} <ChevronDown className="w-2.5 h-2.5" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            {otherStatuses.map((s) => {
-              const m = STATUS_META[s];
-              return (
-                <DropdownMenuItem
-                  key={s}
-                  onClick={(e) => { e.stopPropagation(); onStatusChange(s); }}
-                  className="text-xs gap-2 cursor-pointer"
-                >
-                  <span>{m.emoji}</span> Sposta in {m.label}
-                </DropdownMenuItem>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </div>
-  );
 }

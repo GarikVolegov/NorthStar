@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, jobApplicationsTable } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
 
 const router: IRouter = Router();
@@ -46,6 +46,7 @@ router.post("/applications", async (req, res): Promise<void> => {
     notes: notes || null,
     salary: salary || null,
     location: location || null,
+    notesLog: [],
   }).returning();
 
   res.status(201).json({ application: app });
@@ -70,7 +71,6 @@ router.patch("/applications/:id", async (req, res): Promise<void> => {
   if (!parsed.success) { res.status(400).json({ error: "Dati non validi" }); return; }
 
   const updates: Record<string, any> = { ...parsed.data, updatedAt: new Date() };
-  // Remove undefined values
   Object.keys(updates).forEach((k) => updates[k] === undefined && delete updates[k]);
 
   const [updated] = await db
@@ -80,6 +80,63 @@ router.patch("/applications/:id", async (req, res): Promise<void> => {
     .returning();
 
   if (!updated) { res.status(404).json({ error: "Candidatura non trovata" }); return; }
+  res.json({ application: updated });
+});
+
+// ── POST /api/applications/:id/notes ───────────────────────────────────
+const noteSchema = z.object({
+  text: z.string().min(1).max(1000).trim(),
+});
+
+router.post("/applications/:id/notes", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+  const parsed = noteSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "Testo richiesto" }); return; }
+
+  const [app] = await db
+    .select({ notesLog: jobApplicationsTable.notesLog })
+    .from(jobApplicationsTable)
+    .where(eq(jobApplicationsTable.id, id));
+
+  if (!app) { res.status(404).json({ error: "Candidatura non trovata" }); return; }
+
+  const currentLog: Array<{ text: string; createdAt: string }> = Array.isArray(app.notesLog) ? (app.notesLog as any) : [];
+  const newEntry = { text: parsed.data.text, createdAt: new Date().toISOString() };
+  const updatedLog = [newEntry, ...currentLog]; // newest first
+
+  const [updated] = await db
+    .update(jobApplicationsTable)
+    .set({ notesLog: updatedLog, updatedAt: new Date() })
+    .where(eq(jobApplicationsTable.id, id))
+    .returning();
+
+  res.status(201).json({ entry: newEntry, application: updated });
+});
+
+// ── DELETE /api/applications/:id/notes/:index ──────────────────────────
+router.delete("/applications/:id/notes/:index", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  const index = parseInt(req.params.index, 10);
+  if (isNaN(id) || isNaN(index)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+  const [app] = await db
+    .select({ notesLog: jobApplicationsTable.notesLog })
+    .from(jobApplicationsTable)
+    .where(eq(jobApplicationsTable.id, id));
+
+  if (!app) { res.status(404).json({ error: "Candidatura non trovata" }); return; }
+
+  const currentLog: any[] = Array.isArray(app.notesLog) ? (app.notesLog as any) : [];
+  const updatedLog = currentLog.filter((_, i) => i !== index);
+
+  const [updated] = await db
+    .update(jobApplicationsTable)
+    .set({ notesLog: updatedLog })
+    .where(eq(jobApplicationsTable.id, id))
+    .returning();
+
   res.json({ application: updated });
 });
 

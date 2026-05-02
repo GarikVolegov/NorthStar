@@ -40,6 +40,7 @@ export const jobApplicationsTable = pgTable("job_applications", {
   appliedAt: timestamp("applied_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
+  notesLog: jsonb("notes_log"),
 });
 
 export type JobApplication = typeof jobApplicationsTable.$inferSelect;
