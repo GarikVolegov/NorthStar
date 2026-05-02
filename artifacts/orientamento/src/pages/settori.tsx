@@ -7,7 +7,7 @@ import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
 import { cn } from "@/lib/utils";
 import {
   Search, TrendingUp, DollarSign, Bot, ArrowRight,
-  Zap, SlidersHorizontal, X,
+  Zap, SlidersHorizontal, X, GitCompare,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -305,9 +305,21 @@ export default function Settori() {
           </div>
         )}
 
+        {/* Compare CTA */}
+        {!isLoading && sectors.length > 0 && (
+          <div className="mt-8 flex justify-center">
+            <Link href="/confronta">
+              <div className="inline-flex items-center gap-2 border border-primary/20 bg-primary/5 text-primary px-5 py-3 rounded-full text-sm font-medium hover:bg-primary/10 transition-colors">
+                <GitCompare className="w-4 h-4" />
+                Confronta due settori affiancati
+              </div>
+            </Link>
+          </div>
+        )}
+
         {/* CTA bottom */}
         {!isLoading && sectors.length > 0 && (
-          <div className="mt-16 text-center rounded-3xl border border-primary/20 bg-primary/5 p-10">
+          <div className="mt-8 text-center rounded-3xl border border-primary/20 bg-primary/5 p-10">
             <h2 className="text-2xl font-serif font-bold text-foreground mb-3">
               Non sai da dove iniziare?
             </h2>
