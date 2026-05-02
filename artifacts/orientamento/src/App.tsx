@@ -12,6 +12,7 @@ import Register from "@/pages/register";
 import Premium from "@/pages/premium";
 import PremiumSuccess from "@/pages/premium-success";
 import News from "@/pages/news";
+import ResetPassword from "@/pages/reset-password";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 
@@ -31,6 +32,7 @@ function Router() {
           <Route path="/premium" component={Premium} />
           <Route path="/premium/successo" component={PremiumSuccess} />
           <Route path="/news" component={News} />
+          <Route path="/reset-password" component={ResetPassword} />
           <Route component={NotFound} />
         </Switch>
       </main>
