@@ -1,11 +1,123 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Compass, LogIn, MapPin, Sparkles, Star, TrendingUp, Users } from "lucide-react";
+import { ArrowRight, Compass, LogIn, MapPin, Sparkles, Star, TrendingUp, Users, Bot, DollarSign, GitCompare, Flame } from "lucide-react";
 import { useGetStatsSummary } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LoginDialog } from "@/components/auth/LoginDialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { SectorIcon } from "@/lib/sector-icon";
+import { cn } from "@/lib/utils";
+
+const BASE = import.meta.env.BASE_URL || "/";
+
+const TREND_META: Record<string, { label: string; color: string }> = {
+  booming:  { label: "In forte crescita", color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+  growing:  { label: "In crescita",       color: "text-blue-700 bg-blue-50 border-blue-200" },
+  stable:   { label: "Stabile",           color: "text-slate-600 bg-slate-50 border-slate-200" },
+  declining:{ label: "In calo",           color: "text-rose-700 bg-rose-50 border-rose-200" },
+};
+const RISK_META: Record<string, { label: string; color: string }> = {
+  low:    { label: "Basso",  color: "text-emerald-700" },
+  medium: { label: "Medio",  color: "text-amber-700" },
+  high:   { label: "Alto",   color: "text-rose-700" },
+};
+
+type TrendingSector = {
+  id: number; name: string; icon: string; description: string;
+  trend: string; growthRate: number; automationRisk: string;
+  avgSalaryMin: number; avgSalaryMax: number;
+  riasecTypes: string[]; weeklyPicks: number; totalPicks: number;
+};
+
+function useTrendingSectors() {
+  return useQuery<TrendingSector[]>({
+    queryKey: ["trending-sectors"],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}api/trending-sectors`);
+      if (!res.ok) throw new Error("Errore");
+      return res.json();
+    },
+    staleTime: 300_000,
+  });
+}
+
+function TrendingSectorCard({ sector, rank }: { sector: TrendingSector; rank: number }) {
+  const trend = TREND_META[sector.trend] ?? TREND_META["stable"];
+  const risk  = RISK_META[sector.automationRisk] ?? RISK_META["medium"];
+
+  return (
+    <div className="group relative flex flex-col rounded-2xl border bg-card hover:shadow-lg hover:border-primary/30 transition-all duration-300 overflow-hidden">
+      {rank === 1 && (
+        <div className="flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-bold px-4 py-1.5">
+          <Flame className="w-3 h-3" /> Più richiesto questa settimana
+        </div>
+      )}
+      <div className="p-6 flex-1 flex flex-col">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+              <SectorIcon name={sector.icon} size={24} />
+            </div>
+            <div>
+              <h3 className="font-serif font-bold text-foreground leading-tight">{sector.name}</h3>
+              <span className={cn("mt-1 inline-flex items-center gap-1 text-xs font-medium border rounded-full px-2.5 py-0.5", trend.color)}>
+                <TrendingUp className="w-3 h-3" /> {trend.label}
+              </span>
+            </div>
+          </div>
+          <span className="shrink-0 text-3xl font-serif font-bold text-primary/20 leading-none">
+            #{rank}
+          </span>
+        </div>
+
+        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 mb-5">
+          {sector.description}
+        </p>
+
+        {/* Metrics */}
+        <div className="grid grid-cols-3 gap-2 mb-5">
+          <div className="bg-muted/40 rounded-xl p-2.5 text-center">
+            <div className="flex items-center justify-center gap-0.5 text-xs text-muted-foreground mb-1">
+              <DollarSign className="w-3 h-3" /> Stipendio
+            </div>
+            <p className="text-xs font-bold text-foreground">
+              €{Math.round(sector.avgSalaryMin / 1000)}k–{Math.round(sector.avgSalaryMax / 1000)}k
+            </p>
+          </div>
+          <div className="bg-muted/40 rounded-xl p-2.5 text-center">
+            <div className="flex items-center justify-center gap-0.5 text-xs text-muted-foreground mb-1">
+              <TrendingUp className="w-3 h-3" /> Crescita
+            </div>
+            <p className="text-xs font-bold text-emerald-600">+{sector.growthRate}%</p>
+          </div>
+          <div className="bg-muted/40 rounded-xl p-2.5 text-center">
+            <div className="flex items-center justify-center gap-0.5 text-xs text-muted-foreground mb-1">
+              <Bot className="w-3 h-3" /> Rischio AI
+            </div>
+            <p className={cn("text-xs font-bold", risk.color)}>{risk.label}</p>
+          </div>
+        </div>
+
+        {/* CTA row */}
+        <div className="flex gap-2 mt-auto">
+          <Link href={`/settore/${sector.id}`} className="flex-1">
+            <div className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-primary/8 border border-primary/15 text-primary text-sm font-medium hover:bg-primary/15 transition-colors group-hover:border-primary/30">
+              Approfondisci <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+          </Link>
+          <Link href={`/confronta?a=${sector.id}`}>
+            <div className="px-3 py-2 rounded-xl bg-muted/60 border border-border text-muted-foreground text-sm hover:text-primary hover:border-primary/30 transition-colors" title="Confronta con un altro settore">
+              <GitCompare className="w-4 h-4" />
+            </div>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function AnimatedNumber({ value, suffix = "" }: { value: number, suffix?: string }) {
   const [current, setCurrent] = useState(0);
@@ -34,6 +146,7 @@ function AnimatedNumber({ value, suffix = "" }: { value: number, suffix?: string
 
 export default function Home() {
   const { data: stats, isLoading: isStatsLoading } = useGetStatsSummary();
+  const { data: trendingData } = useTrendingSectors();
   const { isLoggedIn, user } = useAuth();
   const [loginOpen, setLoginOpen] = useState(false);
 
@@ -116,6 +229,44 @@ export default function Home() {
               <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Crescita media settori</p>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Trending sectors */}
+      <section className="py-20 bg-background">
+        <div className="container mx-auto px-4 md:px-6 max-w-6xl">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
+            <div>
+              <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-sm font-medium mb-3">
+                <Flame className="w-3.5 h-3.5" /> Settori in evidenza questa settimana
+              </div>
+              <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
+                I più richiesti in questo momento
+              </h2>
+              <p className="text-muted-foreground mt-2 max-w-xl">
+                I settori con maggiore interesse tra gli utenti, basati su scelte reali e dati di mercato.
+              </p>
+            </div>
+            <Link href="/settori">
+              <div className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-border text-sm font-medium text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors">
+                Esplora tutti i 21 settori <ArrowRight className="w-3.5 h-3.5" />
+              </div>
+            </Link>
+          </div>
+
+          {isStatsLoading || !trendingData ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-72 w-full rounded-2xl" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {trendingData.map((sector, i) => (
+                <TrendingSectorCard key={sector.id} sector={sector} rank={i + 1} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

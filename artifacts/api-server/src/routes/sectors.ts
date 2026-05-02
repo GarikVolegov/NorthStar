@@ -72,6 +72,60 @@ router.get("/stats/summary", async (_req, res): Promise<void> => {
   );
 });
 
+router.get("/trending-sectors", async (_req, res): Promise<void> => {
+  const sectors = await db.select().from(sectorsTable);
+  const sessions = await db.select().from(testSessionsTable);
+
+  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const weeklyCounts: Record<number, number> = {};
+  const allTimeCounts: Record<number, number> = {};
+  const recCounts: Record<number, number> = {};
+
+  for (const s of sessions) {
+    if (s.confirmedSectorId != null) {
+      allTimeCounts[s.confirmedSectorId] = (allTimeCounts[s.confirmedSectorId] ?? 0) + 1;
+      if (s.createdAt >= oneWeekAgo) {
+        weeklyCounts[s.confirmedSectorId] = (weeklyCounts[s.confirmedSectorId] ?? 0) + 1;
+      }
+    }
+    const recs = (s.recommendations ?? []) as Array<{ sectorId: number }>;
+    for (const r of recs) {
+      recCounts[r.sectorId] = (recCounts[r.sectorId] ?? 0) + 1;
+    }
+  }
+
+  const TREND_SCORE: Record<string, number> = { booming: 4, growing: 3, stable: 2, declining: 1 };
+
+  const scored = sectors
+    .map((s) => {
+      const weekly = weeklyCounts[s.id] ?? 0;
+      const alltime = allTimeCounts[s.id] ?? 0;
+      const recs = recCounts[s.id] ?? 0;
+      const trendScore = TREND_SCORE[s.trend] ?? 2;
+      const score = weekly * 10 + alltime * 3 + recs * 2 + s.growthRate * 0.5 + trendScore;
+      return { s, score, weeklyPicks: weekly, totalPicks: alltime };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+
+  res.json(
+    scored.map(({ s, weeklyPicks, totalPicks }) => ({
+      id: s.id,
+      name: s.name,
+      icon: s.icon,
+      description: s.description,
+      trend: s.trend,
+      growthRate: s.growthRate,
+      automationRisk: s.automationRisk,
+      avgSalaryMin: s.avgSalaryMin,
+      avgSalaryMax: s.avgSalaryMax,
+      riasecTypes: s.riasecTypes as string[],
+      weeklyPicks,
+      totalPicks,
+    }))
+  );
+});
+
 router.get("/sectors/:id/stats", async (req, res): Promise<void> => {
   const params = GetSectorStatsParams.safeParse(req.params);
   if (!params.success) {
