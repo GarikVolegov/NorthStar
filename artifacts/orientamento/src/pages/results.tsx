@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, CheckCircle2, TrendingUp, DollarSign, Activity, Settings2, BarChart3, AlertTriangle, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCircle2, TrendingUp, DollarSign, Activity, Settings2, BarChart3, AlertTriangle, Sparkles, Star, UserCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 const SPIRIT_META: Record<string, { emoji: string; label: string; color: string }> = {
   shen: { emoji: "✨", label: "Shen", color: "bg-violet-100 text-violet-700 border-violet-200" },
@@ -53,6 +54,7 @@ export default function Results() {
   const params = useParams();
   const id = parseInt(params.id || "0", 10);
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
 
   const { data: session, isLoading, error } = useGetTestSession(id, {
     query: { enabled: !!id, queryKey: ["testSession", id] }
@@ -63,7 +65,13 @@ export default function Results() {
 
   const handleConfirm = (sectorId: number) => {
     confirmSector.mutate({ id, data: { sectorId } }, {
-      onSuccess: () => setLocation(`/registra?session=${id}`),
+      onSuccess: () => {
+        if (user) {
+          setLocation("/");
+        } else {
+          setLocation(`/registra?session=${id}`);
+        }
+      },
     });
   };
 
@@ -111,6 +119,16 @@ export default function Results() {
 
   return (
     <div className="container mx-auto px-4 py-12 md:py-20 max-w-6xl">
+
+      {/* Saved banner — shown when logged in */}
+      {user && (
+        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-5 py-3 mb-8 animate-in slide-in-from-top-2 fade-in duration-500">
+          <UserCheck className="w-5 h-5 shrink-0 text-emerald-600" />
+          <p className="text-sm font-medium">
+            Risultati salvati sul tuo account — li ritrovi sempre nel tuo profilo, {user.name}.
+          </p>
+        </div>
+      )}
 
       {/* Profile Header */}
       <div className="text-center mb-12 max-w-3xl mx-auto animate-in slide-in-from-bottom-4 fade-in duration-700">
@@ -251,7 +269,7 @@ export default function Results() {
                   onClick={() => handleConfirm(rec.sectorId)}
                   disabled={confirmSector.isPending}
                 >
-                  Conferma questa direzione
+                  {user ? "Salva questa direzione" : "Conferma questa direzione"}
                 </Button>
               </CardFooter>
             </Card>

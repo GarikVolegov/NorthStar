@@ -168,6 +168,37 @@ router.get("/test-sessions/:id", async (req, res): Promise<void> => {
   });
 });
 
+router.post("/test-sessions/:id/assign-user", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "ID non valido" });
+    return;
+  }
+
+  const userId = req.body?.userId;
+  if (typeof userId !== "number") {
+    res.status(400).json({ error: "userId richiesto" });
+    return;
+  }
+
+  const [session] = await db
+    .select()
+    .from(testSessionsTable)
+    .where(eq(testSessionsTable.id, id));
+
+  if (!session) {
+    res.status(404).json({ error: "Sessione non trovata" });
+    return;
+  }
+
+  await db
+    .update(testSessionsTable)
+    .set({ userId })
+    .where(eq(testSessionsTable.id, id));
+
+  res.json({ ok: true, sessionId: id, userId });
+});
+
 router.post("/test-sessions/:id/confirm", async (req, res): Promise<void> => {
   const params = ConfirmSectorParams.safeParse(req.params);
   if (!params.success) {

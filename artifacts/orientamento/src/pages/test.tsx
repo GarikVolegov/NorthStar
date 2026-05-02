@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Loader2, ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+
+const BASE = import.meta.env.BASE_URL || "/";
 
 const RIASEC_QUESTIONS = [
   { id: "q1",  text: "Mi piace costruire, riparare o lavorare con le mani.", type: "R", phase: "riasec" },
@@ -74,9 +77,22 @@ const OPTIONS = [
   { value: 5, label: "Moltissimo" },
 ];
 
+async function assignUserToSession(sessionId: number, userId: number): Promise<void> {
+  try {
+    await fetch(`${BASE}api/test-sessions/${sessionId}/assign-user`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+  } catch {
+    // non-critical — silently fail
+  }
+}
+
 export default function Test() {
   const [, setLocation] = useLocation();
   const submitTest = useSubmitTest();
+  const { user } = useAuth();
 
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -98,7 +114,12 @@ export default function Test() {
 
   const handleSubmit = () => {
     submitTest.mutate({ data: { answers } }, {
-      onSuccess: (session) => setLocation(`/risultati/${session.id}`),
+      onSuccess: async (session) => {
+        if (user) {
+          await assignUserToSession(session.id, user.id);
+        }
+        setLocation(`/risultati/${session.id}`);
+      },
     });
   };
 
@@ -145,103 +166,91 @@ export default function Test() {
           <Check className="w-12 h-12" />
         </div>
         <h1 className="text-3xl md:text-4xl font-serif font-bold mb-4">Analisi completata!</h1>
-        <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
+        <p className="text-lg text-muted-foreground mb-2 leading-relaxed">
           Abbiamo analizzato il tuo profilo RIASEC e la tua Bussola Interiore. Siamo pronti a svelarti i settori più adatti a te.
         </p>
+        {user && (
+          <p className="text-sm text-primary font-medium mb-6">
+            I risultati verranno salvati automaticamente sul tuo account.
+          </p>
+        )}
         <Button
           size="lg"
           onClick={handleSubmit}
           disabled={submitTest.isPending}
           className="rounded-full px-8 h-14 text-lg w-full sm:w-auto"
         >
-          {submitTest.isPending ? (
-            <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Elaborazione in corso...</>
-          ) : (
-            <>Scopri il tuo profilo <ArrowRight className="ml-2 h-5 w-5" /></>
-          )}
+          {submitTest.isPending
+            ? <><Loader2 className="mr-2 w-5 h-5 animate-spin" /> Elaborazione…</>
+            : <><Sparkles className="mr-2 w-5 h-5" /> Scopri i tuoi risultati</>
+          }
         </Button>
+        {submitTest.isError && (
+          <p className="mt-4 text-sm text-destructive">Errore nell'invio. Riprova.</p>
+        )}
       </div>
     );
   }
 
-  const isSpiritQuestion = !isRiasecPhase;
-  const spiritQ = isSpiritQuestion ? SPIRIT_QUESTIONS.find(s => s.id === currentQuestion.id) : null;
+  // Spirit question screen (with spirit label above)
+  const isSpiritQ = currentQuestion?.phase === "spirits";
+  const spiritQ = isSpiritQ ? SPIRIT_QUESTIONS.find(s => s.id === currentQuestion.id) : null;
+  const totalDisplay = ALL_QUESTIONS.length;
+  const stepDisplay = currentStep + 1;
 
   return (
-    <div className="container max-w-3xl mx-auto px-4 py-12 md:py-24">
-      {/* Header & Progress */}
-      <div className="mb-12">
-        <div className="flex justify-between items-center mb-4 text-sm font-medium text-muted-foreground">
-          <button
-            onClick={handleBack}
-            disabled={currentStep === 0}
-            className="flex items-center hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <ArrowLeft className="w-4 h-4 mr-1" /> Indietro
-          </button>
-          <span>
-            {isSpiritQuestion
-              ? `Spirito ${currentStep - RIASEC_QUESTIONS.length + 1} di 5`
-              : `Domanda ${currentStep + 1} di ${RIASEC_QUESTIONS.length}`}
-          </span>
-        </div>
-        <Progress value={progress} className="h-2" />
-        {isSpiritQuestion && (
-          <div className="flex justify-center mt-4">
-            <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-full px-4 py-1.5 text-xs font-medium text-primary">
-              <Sparkles className="w-3 h-3" /> Bussola Interiore
-            </div>
-          </div>
-        )}
+    <div className="container max-w-2xl mx-auto px-4 py-12 min-h-[70vh]">
+      {/* Progress */}
+      <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={handleBack}
+          disabled={currentStep === 0}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Indietro
+        </button>
+        <span className="text-sm text-muted-foreground">
+          Domanda {stepDisplay} di {totalDisplay}
+        </span>
       </div>
+      <Progress value={progress} className="mb-10 h-1.5" />
 
-      {/* Question */}
-      <div className="animate-in slide-in-from-right-4 fade-in duration-300" key={currentStep}>
-        {spiritQ && (
-          <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-3xl mb-3 shadow-inner">
-              {spiritQ.emoji}
-            </div>
-            <div className="text-sm font-semibold text-primary tracking-wider uppercase">
-              {spiritQ.spirit} · {spiritQ.description}
-            </div>
-          </div>
-        )}
-
-        <h2 className="text-2xl md:text-3xl font-serif font-medium leading-tight mb-12 text-center text-foreground">
-          {currentQuestion.text}
-        </h2>
-
-        <div className="grid gap-3 sm:gap-4 max-w-md mx-auto">
-          {OPTIONS.map((option) => {
-            const isSelected = answers[currentQuestion.id] === option.value;
-            return (
-              <button
-                key={option.value}
-                onClick={() => handleAnswer(option.value)}
-                className={cn(
-                  "w-full text-left px-6 py-4 rounded-xl border-2 transition-all duration-200 flex items-center justify-between group outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                  isSelected
-                    ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-border bg-card hover:border-primary/50 hover:bg-muted/50"
-                )}
-              >
-                <span className={cn(
-                  "text-lg font-medium",
-                  isSelected ? "text-primary" : "text-foreground group-hover:text-primary/80"
-                )}>
-                  {option.label}
-                </span>
-                <div className={cn(
-                  "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors",
-                  isSelected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/30"
-                )}>
-                  {isSelected && <div className="w-2.5 h-2.5 bg-current rounded-full" />}
-                </div>
-              </button>
-            );
-          })}
+      {/* Spirit label */}
+      {spiritQ && (
+        <div className="flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-full px-4 py-1.5 mb-6 w-fit">
+          <span>{spiritQ.emoji}</span>
+          <span className="text-sm font-medium text-primary">{spiritQ.spirit} · {spiritQ.description}</span>
         </div>
+      )}
+
+      <h2 className="text-2xl md:text-3xl font-serif font-semibold text-foreground mb-10 leading-snug">
+        {currentQuestion?.text}
+      </h2>
+
+      <div className="space-y-3">
+        {OPTIONS.map(opt => {
+          const selected = answers[currentQuestion?.id] === opt.value;
+          return (
+            <button
+              key={opt.value}
+              onClick={() => handleAnswer(opt.value)}
+              className={cn(
+                "w-full flex items-center justify-between px-5 py-4 rounded-xl border text-left text-base font-medium transition-all duration-150",
+                selected
+                  ? "bg-primary text-primary-foreground border-primary shadow-md"
+                  : "bg-card border-border hover:border-primary/40 hover:bg-primary/5 text-foreground"
+              )}
+            >
+              {opt.label}
+              <div className={cn(
+                "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
+                selected ? "border-primary-foreground bg-primary-foreground/20" : "border-muted-foreground"
+              )}>
+                {selected && <div className="w-2.5 h-2.5 rounded-full bg-primary-foreground" />}
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
