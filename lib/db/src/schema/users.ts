@@ -39,6 +39,7 @@ export const jobApplicationsTable = pgTable("job_applications", {
   location: text("location"),
   appliedAt: timestamp("applied_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
 });
 
 export type JobApplication = typeof jobApplicationsTable.$inferSelect;

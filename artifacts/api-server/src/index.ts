@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedSectors } from "./lib/seed";
+import { startInterviewReminderScheduler } from "./lib/interview-reminder.js";
 
 const rawPort = process.env["PORT"];
 
@@ -28,4 +29,6 @@ app.listen(port, async (err) => {
   } catch (seedErr) {
     logger.error({ err: seedErr }, "Failed to seed sectors");
   }
+
+  startInterviewReminderScheduler();
 });

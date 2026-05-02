@@ -15,7 +15,7 @@ import {
 import {
   Plus, ExternalLink, Trash2, Loader2, ChevronDown,
   Building2, Briefcase, MapPin, DollarSign, FileText,
-  Link2, Star, Calendar, AlertCircle,
+  Link2, Star, Calendar, AlertCircle, Bell, X,
 } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
@@ -58,6 +58,7 @@ export default function Candidature() {
   const { user, isLoggedIn } = useAuth();
   const queryClient = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const [editApp, setEditApp] = useState<Application | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
@@ -159,6 +160,11 @@ export default function Candidature() {
   const total = applications.length;
   const byStatus = COLUMNS.reduce((acc, s) => ({ ...acc, [s]: applications.filter((a) => a.status === s) }), {} as Record<AppStatus, Application[]>);
 
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const staleInterviews = applications.filter(
+    (a) => a.status === "interview" && Date.now() - new Date(a.updatedAt).getTime() > SEVEN_DAYS_MS,
+  );
+
   return (
     <div className="min-h-screen bg-muted/30">
       {/* ── Page header ── */}
@@ -193,6 +199,47 @@ export default function Candidature() {
           )}
         </div>
       </div>
+
+      {/* ── Stale interview banner ── */}
+      {!bannerDismissed && staleInterviews.length > 0 && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <div className="max-w-screen-2xl mx-auto px-4 md:px-8 py-3">
+            <div className="flex items-start gap-3">
+              <div className="w-7 h-7 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center shrink-0 mt-0.5">
+                <Bell className="w-3.5 h-3.5 text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-900">
+                  {staleInterviews.length === 1
+                    ? "Hai 1 colloquio senza aggiornamenti da più di 7 giorni"
+                    : `Hai ${staleInterviews.length} colloqui senza aggiornamenti da più di 7 giorni`}
+                </p>
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                  {staleInterviews.map((a) => (
+                    <button
+                      key={a.id}
+                      onClick={() => openEdit(a)}
+                      className="text-xs text-amber-700 underline underline-offset-2 hover:text-amber-900 transition-colors"
+                    >
+                      {a.company} — {a.role}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-amber-600 mt-1">
+                  Riceverai un promemoria via email. Clicca su un colloquio per aggiornarne lo stato.
+                </p>
+              </div>
+              <button
+                onClick={() => setBannerDismissed(true)}
+                className="p-1 rounded-lg hover:bg-amber-100 text-amber-500 hover:text-amber-700 transition-colors shrink-0"
+                aria-label="Chiudi"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Kanban board ── */}
       <div className="max-w-screen-2xl mx-auto px-4 md:px-8 py-6">

@@ -21,6 +21,7 @@ import affiliazioneRouter from "./affiliazione";
 import crescitaRouter from "./crescita";
 import cvRouter from "./cv";
 import applicationsRouter from "./applications";
+import remindersRouter from "./reminders";
 
 const router: IRouter = Router();
 
@@ -46,5 +47,6 @@ router.use(affiliazioneRouter);
 router.use(crescitaRouter);
 router.use(cvRouter);
 router.use(applicationsRouter);
+router.use(remindersRouter);
 
 export default router;
