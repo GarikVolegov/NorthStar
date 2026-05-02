@@ -71,7 +71,7 @@ router.post("/test-sessions", async (req, res): Promise<void> => {
     .sort((a, b) => b.matchScore - a.matchScore)
     .slice(0, 3);
 
-  const spiritInsight = buildSpiritInsight(dominantSpirit, secondarySpirit);
+  const spiritInsight = buildSpiritInsight(dominantSpirit, secondarySpirit, spiritScores);
 
   const [session] = await db
     .insert(testSessionsTable)
@@ -150,7 +150,7 @@ router.get("/test-sessions/:id", async (req, res): Promise<void> => {
   const spiritScores = (session.spiritScores ?? {}) as Record<string, number>;
   const dominantSpirit = session.dominantSpirit ?? "";
   const secondarySpirit = getSecondarySpiritS(spiritScores);
-  const spiritInsight = buildSpiritInsight(dominantSpirit, secondarySpirit);
+  const spiritInsight = buildSpiritInsight(dominantSpirit, secondarySpirit, spiritScores);
 
   res.json({
     id: session.id,
@@ -259,7 +259,7 @@ router.post("/test-sessions/:id/confirm", async (req, res): Promise<void> => {
   const spiritScores = (updated.spiritScores ?? {}) as Record<string, number>;
   const dominantSpirit = updated.dominantSpirit ?? "";
   const secondarySpirit = getSecondarySpiritS(spiritScores);
-  const spiritInsight = buildSpiritInsight(dominantSpirit, secondarySpirit);
+  const spiritInsight = buildSpiritInsight(dominantSpirit, secondarySpirit, spiritScores);
 
   res.json({
     id: updated.id,

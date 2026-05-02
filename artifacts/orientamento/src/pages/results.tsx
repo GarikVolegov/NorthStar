@@ -10,6 +10,13 @@ import { ArrowRight, CheckCircle2, TrendingUp, DollarSign, Activity, Settings2, 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
+import {
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
+  ResponsiveContainer,
+} from "recharts";
 
 const SPIRIT_META: Record<string, { emoji: string; label: string; color: string }> = {
   shen: { emoji: "✨", label: "Shen", color: "bg-violet-100 text-violet-700 border-violet-200" },
@@ -27,10 +34,14 @@ const SPIRIT_DESCRIPTIONS: Record<string, string> = {
   zhi:  "Volontà & Resilienza",
 };
 
+// Fixed display order for the radar pentagon
+const SPIRIT_RADAR_ORDER = ["shen", "hun", "po", "yi", "zhi"] as const;
+
 function SpiritBar({ spirit, score }: { spirit: string; score: number }) {
   const meta = SPIRIT_META[spirit];
   if (!meta) return null;
   const pct = ((score - 1) / 4) * 100;
+  const displayScore = Number.isInteger(score) ? score : score.toFixed(1);
   return (
     <div className="flex items-center gap-3">
       <span className="text-xl w-7 text-center">{meta.emoji}</span>
@@ -46,8 +57,37 @@ function SpiritBar({ spirit, score }: { spirit: string; score: number }) {
           />
         </div>
       </div>
-      <span className="text-sm font-bold text-foreground w-6 text-right">{score}</span>
+      <span className="text-sm font-bold text-foreground w-8 text-right">{displayScore}</span>
     </div>
+  );
+}
+
+function SpiritRadarChart({ spiritScores }: { spiritScores: Record<string, number> }) {
+  const data = SPIRIT_RADAR_ORDER.map((key) => ({
+    spirit: `${SPIRIT_META[key]?.emoji} ${SPIRIT_META[key]?.label}`,
+    value: spiritScores[key] ?? 0,
+    fullMark: 5,
+  }));
+
+  return (
+    <ResponsiveContainer width="100%" height={260}>
+      <RadarChart data={data} margin={{ top: 16, right: 24, bottom: 16, left: 24 }}>
+        <PolarGrid stroke="hsl(var(--border))" strokeOpacity={0.6} />
+        <PolarAngleAxis
+          dataKey="spirit"
+          tick={{ fontSize: 13, fontWeight: 600, fill: "hsl(var(--foreground))" }}
+          tickLine={false}
+        />
+        <Radar
+          dataKey="value"
+          stroke="hsl(var(--primary))"
+          fill="hsl(var(--primary))"
+          fillOpacity={0.22}
+          strokeWidth={2.5}
+          dot={{ r: 4, fill: "hsl(var(--primary))", strokeWidth: 0 }}
+        />
+      </RadarChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -169,13 +209,15 @@ export default function Results() {
       {hasSpiritData && (
         <div className="mb-14 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
           <div className="bg-gradient-to-br from-primary/5 via-background to-primary/5 border border-primary/15 rounded-3xl p-6 md:p-8">
-            <div className="flex items-center gap-3 mb-6">
+
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-8">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Sparkles className="w-5 h-5 text-primary" />
               </div>
               <div>
                 <h2 className="font-serif text-xl font-bold text-foreground">Bussola Interiore</h2>
-                <p className="text-sm text-muted-foreground">I tuoi Cinque Spiriti</p>
+                <p className="text-sm text-muted-foreground">I tuoi Cinque Spiriti · 15 domande, 3 per spirito</p>
               </div>
               {dominantMeta && (
                 <div className={cn("ml-auto flex items-center gap-2 border rounded-full px-4 py-1.5 text-sm font-semibold", dominantMeta.color)}>
@@ -185,18 +227,35 @@ export default function Results() {
               )}
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                {Object.entries(spiritScores!).map(([spirit, score]) => (
-                  <SpiritBar key={spirit} spirit={spirit} score={score} />
-                ))}
+            {/* Radar pentagon + insight */}
+            <div className="grid md:grid-cols-2 gap-8 mb-8">
+              <div className="flex flex-col items-center justify-center bg-background/40 rounded-2xl border border-primary/10 py-4">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">
+                  Mappa interiore
+                </p>
+                <SpiritRadarChart spiritScores={spiritScores!} />
               </div>
               {spiritInsight && (
                 <div className="flex flex-col justify-center bg-background/60 rounded-2xl p-6 border border-primary/10">
                   <div className="text-2xl mb-3">{dominantMeta?.emoji ?? "✨"}</div>
-                  <p className="text-foreground leading-relaxed font-medium">{spiritInsight}</p>
+                  <h3 className="font-semibold text-foreground mb-2 text-sm uppercase tracking-wide">
+                    Il tuo profilo interiore
+                  </h3>
+                  <p className="text-foreground leading-relaxed">{spiritInsight}</p>
                 </div>
               )}
+            </div>
+
+            {/* Spirit bars — ordered for consistency */}
+            <div className="bg-background/40 rounded-2xl border border-primary/10 p-5 space-y-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+                Dettaglio spiriti (media su 3 domande ciascuno)
+              </p>
+              {(["shen", "hun", "po", "yi", "zhi"] as const).map((key) => {
+                const score = spiritScores![key];
+                if (score == null) return null;
+                return <SpiritBar key={key} spirit={key} score={score} />;
+              })}
             </div>
           </div>
         </div>
