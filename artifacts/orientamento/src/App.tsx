@@ -23,10 +23,12 @@ import Contatti from "@/pages/contatti";
 import AdminMessaggi from "@/pages/admin-messaggi";
 import SitemapPage from "@/pages/sitemap";
 import ChiSiamo from "@/pages/chi-siamo";
+import ComeFunziona from "@/pages/come-funziona";
 import PrivacyPolicy from "@/pages/privacy-policy";
 import TerminiDiServizio from "@/pages/termini-di-servizio";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
+import { BackButton } from "@/components/layout/back-button";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +43,7 @@ function Router() {
         <div className="flex flex-col min-h-[100dvh]">
           <Navbar />
           <main className="flex-1">
+            <BackButton />
             <Switch>
               <Route path="/" component={Home} />
               <Route path="/test" component={Test} />
@@ -60,6 +63,7 @@ function Router() {
               <Route path="/contatti" component={Contatti} />
               <Route path="/sitemap" component={SitemapPage} />
               <Route path="/chi-siamo" component={ChiSiamo} />
+              <Route path="/come-funziona" component={ComeFunziona} />
               <Route path="/privacy-policy" component={PrivacyPolicy} />
               <Route path="/termini-di-servizio" component={TerminiDiServizio} />
               <Route component={NotFound} />
