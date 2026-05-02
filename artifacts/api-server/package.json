@@ -10,7 +10,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.5.1",
     "@resvg/resvg-js": "^2.6.2",
+    "@swc/helpers": "^0.5.21",
     "@types/nodemailer": "^8.0.0",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
@@ -26,6 +28,7 @@
     "pdf-parse": "^2.4.5",
     "pino": "^9",
     "pino-http": "^10",
+    "react": "catalog:",
     "satori": "^0.26.0",
     "zod": "catalog:"
   },

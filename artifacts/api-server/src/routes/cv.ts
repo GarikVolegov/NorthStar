@@ -4,6 +4,9 @@ import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
+import React from "react";
+import { renderToBuffer } from "@react-pdf/renderer";
+import { CvPdfDocument } from "../cv-pdf.js";
 
 const router: IRouter = Router();
 
@@ -65,6 +68,41 @@ router.get("/cv/:userId", async (req, res): Promise<void> => {
   if (!user) { res.status(404).json({ error: "Utente non trovato" }); return; }
 
   res.json({ cvData: user.cvJson ?? null, hasCv: !!user.cvJson });
+});
+
+// ── GET /api/cv/:userId/pdf — generate and stream a PDF ───────────────
+router.get("/cv/:userId/pdf", async (req, res): Promise<void> => {
+  const userId = parseInt(req.params.userId, 10);
+  if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+  const [user] = await db
+    .select({ cvJson: usersTable.cvJson })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId));
+
+  if (!user) { res.status(404).json({ error: "Utente non trovato" }); return; }
+
+  const generated = (user.cvJson as any)?.generated;
+  if (!generated) { res.status(404).json({ error: "Nessun CV generato. Genera il CV prima di scaricarlo." }); return; }
+
+  try {
+    const buffer = await renderToBuffer(
+      React.createElement(CvPdfDocument, { cv: generated })
+    );
+
+    const safeName = (generated.personalInfo?.name ?? "CV")
+      .replace(/[^a-zA-Z0-9\s]/g, "")
+      .trim()
+      .replace(/\s+/g, "_");
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="CV_${safeName}_NorthStar.pdf"`);
+    res.setHeader("Content-Length", buffer.length);
+    res.end(buffer);
+  } catch (err: any) {
+    console.error("PDF generation error:", err);
+    res.status(500).json({ error: "Errore nella generazione del PDF. Riprova." });
+  }
 });
 
 // ── POST /api/cv/upload — parse PDF/TXT and structure with AI ─────────

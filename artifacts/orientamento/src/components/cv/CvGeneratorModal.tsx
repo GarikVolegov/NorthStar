@@ -8,7 +8,7 @@ import {
   X, Loader2, Printer, RefreshCw, Sparkles, AlertCircle,
   Pencil, Eye, Plus, Trash2, ChevronDown, ChevronUp, Check,
   User, Briefcase, GraduationCap, Wrench, Award, Globe,
-  Save, CheckCircle2, Clock, History, FolderOpen, PenLine,
+  Save, CheckCircle2, Clock, History, FolderOpen, PenLine, Download,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -497,6 +497,7 @@ export function CvGeneratorModal({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [loadingVersionId, setLoadingVersionId] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   async function fetchVersions() {
     try {
@@ -546,6 +547,28 @@ export function CvGeneratorModal({
       await fetch(`${BASE}api/cv/${userId}/versions/${id}`, { method: "DELETE" });
       setVersions((prev) => prev.filter((v) => v.id !== id));
     } catch { /* silent */ }
+  }
+
+  async function downloadPdf() {
+    if (!generated) return;
+    setDownloading(true);
+    try {
+      // First save the current state so the server has the latest version
+      await fetch(`${BASE}api/cv/${userId}/save`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ generated }),
+      });
+      // Then trigger download
+      const a = document.createElement("a");
+      a.href = `${BASE}api/cv/${userId}/pdf`;
+      a.download = `CV_NorthStar.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch { /* silent */ } finally {
+      setDownloading(false);
+    }
   }
 
   async function loadVersion(id: string) {
@@ -799,10 +822,28 @@ export function CvGeneratorModal({
             </Button>
           )}
 
+          {/* Scarica PDF */}
+          {hasContent && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-full gap-1.5"
+              onClick={downloadPdf}
+              disabled={downloading}
+              title="Scarica PDF vero (via server)"
+            >
+              {downloading
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Download className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{downloading ? "PDF…" : "Scarica PDF"}</span>
+            </Button>
+          )}
+
+          {/* Stampa */}
           {hasContent && (
             <Button size="sm" className="rounded-full gap-1.5" onClick={() => window.print()}>
               <Printer className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Stampa / PDF</span>
+              <span className="hidden lg:inline">Stampa</span>
             </Button>
           )}
 
