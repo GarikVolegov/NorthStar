@@ -5,9 +5,11 @@ import testSessionsRouter from "./testSessions";
 import usersRouter from "./users";
 import stripeRouter from "./stripe";
 import newsRouter from "./news";
+import authRouter from "./auth";
 
 const router: IRouter = Router();
 
+router.use(authRouter);
 router.use(healthRouter);
 router.use(sectorsRouter);
 router.use(testSessionsRouter);

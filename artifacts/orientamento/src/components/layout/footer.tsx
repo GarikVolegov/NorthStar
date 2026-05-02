@@ -8,7 +8,7 @@ export function Footer() {
           <div className="flex items-center space-x-2">
             <Compass className="h-6 w-6 text-primary" />
             <span className="font-serif font-bold text-xl tracking-tight text-primary">
-              Orientamento
+              NorthStar
             </span>
           </div>
           <p className="text-sm text-muted-foreground leading-relaxed">
@@ -35,7 +35,7 @@ export function Footer() {
         </div>
       </div>
       <div className="container mx-auto px-4 md:px-6 mt-10 pt-6 border-t text-sm text-muted-foreground flex justify-between">
-        <p>© {new Date().getFullYear()} Orientamento. Tutti i diritti riservati.</p>
+        <p>© {new Date().getFullYear()} NorthStar. Tutti i diritti riservati.</p>
         <p>Progettato con cura.</p>
       </div>
     </footer>

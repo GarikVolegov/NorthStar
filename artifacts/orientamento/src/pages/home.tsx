@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Compass, MapPin, Sparkles, TrendingUp, Users } from "lucide-react";
+import { ArrowRight, Compass, LogIn, MapPin, Sparkles, Star, TrendingUp, Users } from "lucide-react";
 import { useGetStatsSummary } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LoginDialog } from "@/components/auth/LoginDialog";
+import { useAuth } from "@/contexts/AuthContext";
 
 function AnimatedNumber({ value, suffix = "" }: { value: number, suffix?: string }) {
   const [current, setCurrent] = useState(0);
@@ -32,6 +34,8 @@ function AnimatedNumber({ value, suffix = "" }: { value: number, suffix?: string
 
 export default function Home() {
   const { data: stats, isLoading: isStatsLoading } = useGetStatsSummary();
+  const { isLoggedIn, user } = useAuth();
+  const [loginOpen, setLoginOpen] = useState(false);
 
   return (
     <div className="flex flex-col w-full">
@@ -49,7 +53,7 @@ export default function Home() {
         
         <div className="container mx-auto px-4 md:px-6 relative z-10 flex flex-col items-center text-center max-w-4xl">
           <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-sm text-primary mb-8 animate-in slide-in-from-bottom-4 fade-in duration-700">
-            <Sparkles className="mr-2 h-4 w-4" />
+            <Star className="mr-2 h-4 w-4 fill-primary" />
             <span>Scopri il tuo potenziale</span>
           </div>
           <h1 className="text-5xl md:text-7xl font-serif font-bold tracking-tight text-foreground mb-6 animate-in slide-in-from-bottom-6 fade-in duration-700 delay-150 fill-mode-both leading-[1.1]">
@@ -57,7 +61,7 @@ export default function Home() {
             <span className="text-primary italic">con consapevolezza.</span>
           </h1>
           <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl animate-in slide-in-from-bottom-8 fade-in duration-700 delay-300 fill-mode-both leading-relaxed font-light">
-            Orientamento non ti dice cosa fare. Ti offre una bussola per esplorare i settori che risuonano con la tua natura, guidandoti verso una scelta autentica.
+            NorthStar non ti dice cosa fare. Ti offre una bussola per esplorare i settori che risuonano con la tua natura, guidandoti verso una scelta autentica.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto animate-in slide-in-from-bottom-10 fade-in duration-700 delay-500 fill-mode-both">
             <Button asChild size="lg" className="rounded-full text-base h-14 px-8 shadow-xl">
@@ -65,10 +69,27 @@ export default function Home() {
                 Inizia il Test Gratuito <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="rounded-full text-base h-14 px-8 border-primary/20 bg-background/50 backdrop-blur">
-              <a href="#come-funziona">Scopri come funziona</a>
-            </Button>
+            {isLoggedIn ? (
+              <Button asChild size="lg" variant="outline" className="rounded-full text-base h-14 px-8 border-primary/20 bg-background/50 backdrop-blur">
+                <Link href="/risultati/latest">Rivedi i tuoi risultati</Link>
+              </Button>
+            ) : (
+              <Button
+                size="lg"
+                variant="outline"
+                className="rounded-full text-base h-14 px-8 border-primary/20 bg-background/50 backdrop-blur"
+                onClick={() => setLoginOpen(true)}
+              >
+                <LogIn className="mr-2 h-5 w-5" />
+                Hai già un account? Accedi
+              </Button>
+            )}
           </div>
+          {isLoggedIn && user && (
+            <p className="mt-4 text-sm text-muted-foreground animate-in fade-in duration-500">
+              Bentornato, <span className="font-medium text-primary">{user.name}</span> ✦
+            </p>
+          )}
         </div>
       </section>
 
@@ -151,7 +172,7 @@ export default function Home() {
               "Il futuro non si indovina, si costruisce. La migliore carriera non è quella che paga di più in assoluto, ma quella in cui il tuo talento naturale incontra una reale opportunità di mercato."
             </blockquote>
             <p className="text-primary-foreground/80 font-medium tracking-wider uppercase text-sm">
-              La Filosofia di Orientamento
+              La Filosofia di NorthStar
             </p>
           </div>
         </div>
@@ -178,6 +199,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
     </div>
   );
 }
