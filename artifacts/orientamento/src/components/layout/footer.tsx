@@ -1,12 +1,28 @@
 import { Link } from "wouter";
 import { Star } from "lucide-react";
 
+function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      onClick={() => window.scrollTo({ top: 0, behavior: "instant" })}
+      className="hover:text-primary transition-colors"
+    >
+      {children}
+    </Link>
+  );
+}
+
 export function Footer() {
   return (
     <footer className="border-t bg-card py-10 md:py-16">
       <div className="container mx-auto px-4 md:px-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
         <div className="flex flex-col items-start gap-4 max-w-sm">
-          <Link href="/" className="flex items-center space-x-2">
+          <Link
+            href="/"
+            onClick={() => window.scrollTo({ top: 0, behavior: "instant" })}
+            className="flex items-center space-x-2"
+          >
             <Star className="h-5 w-5 text-primary fill-primary" />
             <span className="font-serif font-bold text-xl tracking-tight text-primary">
               NorthStar
@@ -22,51 +38,19 @@ export function Footer() {
           <div className="space-y-3">
             <h4 className="text-sm font-semibold text-foreground">Risorse</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>
-                <Link href="/test" className="hover:text-primary transition-colors">
-                  Il Test RIASEC
-                </Link>
-              </li>
-              <li>
-                <Link href="/news" className="hover:text-primary transition-colors">
-                  News settoriali
-                </Link>
-              </li>
-              <li>
-                <Link href="/premium" className="hover:text-primary transition-colors">
-                  Piano Premium
-                </Link>
-              </li>
-              <li>
-                <Link href="/contatti" className="hover:text-primary transition-colors">
-                  Contatti
-                </Link>
-              </li>
+              <li><FooterLink href="/test">Il Test RIASEC</FooterLink></li>
+              <li><FooterLink href="/news">News settoriali</FooterLink></li>
+              <li><FooterLink href="/premium">Piano Premium</FooterLink></li>
+              <li><FooterLink href="/contatti">Contatti</FooterLink></li>
             </ul>
           </div>
           <div className="space-y-3">
             <h4 className="text-sm font-semibold text-foreground">Prodotto</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>
-                <Link href="/chi-siamo" className="hover:text-primary transition-colors">
-                  Chi siamo
-                </Link>
-              </li>
-              <li>
-                <Link href="/privacy-policy" className="hover:text-primary transition-colors">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link href="/termini-di-servizio" className="hover:text-primary transition-colors">
-                  Termini di servizio
-                </Link>
-              </li>
-              <li>
-                <Link href="/sitemap" className="hover:text-primary transition-colors">
-                  Mappa del sito
-                </Link>
-              </li>
+              <li><FooterLink href="/chi-siamo">Chi siamo</FooterLink></li>
+              <li><FooterLink href="/privacy-policy">Privacy Policy</FooterLink></li>
+              <li><FooterLink href="/termini-di-servizio">Termini di servizio</FooterLink></li>
+              <li><FooterLink href="/sitemap">Mappa del sito</FooterLink></li>
             </ul>
           </div>
         </div>
@@ -75,9 +59,9 @@ export function Footer() {
       <div className="container mx-auto px-4 md:px-6 mt-10 pt-6 border-t text-sm text-muted-foreground flex flex-wrap justify-between gap-3">
         <p>© {new Date().getFullYear()} NorthStar. Tutti i diritti riservati.</p>
         <div className="flex items-center gap-4">
-          <Link href="/privacy-policy" className="hover:text-primary transition-colors">Privacy</Link>
-          <Link href="/termini-di-servizio" className="hover:text-primary transition-colors">Termini</Link>
-          <Link href="/chi-siamo" className="hover:text-primary transition-colors">Chi siamo</Link>
+          <FooterLink href="/privacy-policy">Privacy</FooterLink>
+          <FooterLink href="/termini-di-servizio">Termini</FooterLink>
+          <FooterLink href="/chi-siamo">Chi siamo</FooterLink>
         </div>
       </div>
     </footer>
