@@ -52,6 +52,12 @@ function generateCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+function getAppBaseUrl(): string {
+  const raw = process.env.APP_BASE_URL ?? process.env.PUBLIC_APP_URL ?? process.env.APP_URL ?? "";
+  if (!raw) return "";
+  return raw.startsWith("http://") || raw.startsWith("https://") ? raw.replace(/\/$/, "") : `https://${raw.replace(/^\/+/, "").replace(/\/$/, "")}`;
+}
+
 const isDevMode = !process.env.SMTP_HOST;
 
 router.post("/auth/register", async (req, res): Promise<void> => {
@@ -234,7 +240,7 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
       .set({ resetToken, resetTokenExpires })
       .where(eq(usersTable.id, user.id));
 
-    const appBase = process.env.APP_BASE_URL?.replace(/\/$/, "") ?? "";
+    const appBase = getAppBaseUrl();
     const resetUrl = `${appBase}/reset-password?token=${resetToken}`;
     await sendResetEmail(email, resetUrl);
 
