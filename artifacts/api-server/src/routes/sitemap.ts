@@ -32,6 +32,47 @@ function urlEntry(loc: string, lastmod: string, changefreq: string, priority: st
   return `  <url>\n    <loc>${xmlEscape(loc)}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
 }
 
+router.get("/robots.txt", (_req, res): void => {
+  const sitemapUrl = `${BASE_URL}/api/sitemap.xml`;
+  const content = [
+    "User-agent: *",
+    "Allow: /",
+    "",
+    "# Pagine pubbliche e indicizzabili",
+    "Allow: /test",
+    "Allow: /news",
+    "Allow: /settori",
+    "Allow: /confronta",
+    "Allow: /premium",
+    "Allow: /come-funziona",
+    "Allow: /chi-siamo",
+    "Allow: /contatti",
+    "Allow: /sitemap",
+    "Allow: /privacy-policy",
+    "Allow: /termini-di-servizio",
+    "Allow: /settore/",
+    "",
+    "# Pagine private — non indicizzare",
+    "Disallow: /api/",
+    "Disallow: /admin/",
+    "Disallow: /risultati/",
+    "Disallow: /profilo",
+    "Disallow: /registra",
+    "Disallow: /reset-password",
+    "Disallow: /wiki/",
+    "Disallow: /roadmap/",
+    "Disallow: /grafo/",
+    "Disallow: /premium/successo",
+    "",
+    `# Sitemap`,
+    `Sitemap: ${sitemapUrl}`,
+  ].join("\n");
+
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=86400");
+  res.send(content);
+});
+
 router.get("/sitemap.xml", async (_req, res): Promise<void> => {
   const today = new Date().toISOString().split("T")[0];
 
