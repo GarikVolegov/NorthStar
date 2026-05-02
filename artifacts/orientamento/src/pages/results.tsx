@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, CheckCircle2, TrendingUp, DollarSign, Activity, Settings2, BarChart3, AlertTriangle, Sparkles, Star, UserCheck, Bookmark, BookmarkCheck, Newspaper, Brain, Map } from "lucide-react";
+import { ArrowRight, CheckCircle2, TrendingUp, DollarSign, Activity, Bot, BarChart3, AlertTriangle, Sparkles, Star, UserCheck, Bookmark, BookmarkCheck, Newspaper, Brain, Map } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import {
@@ -269,7 +270,7 @@ export default function Results() {
           I tuoi percorsi ideali
         </h2>
         <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
-          Basandoci sul tuo profilo RIASEC e sulla tua Bussola Interiore, ecco i 3 settori dove potresti eccellere.
+          Basandoci sulla tua tipologia di personalità (il modello RIASEC classifica 6 tendenze: Realistico, Investigativo, Artistico, Sociale, Imprenditivo, Convenzionale) e sulla tua Bussola Interiore, ecco i 3 settori dove potresti eccellere.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -290,7 +291,9 @@ export default function Results() {
 
               <CardHeader className="pb-4">
                 <div className="flex justify-between items-start mb-4">
-                  <div className="text-4xl">{rec.sector?.icon || "💼"}</div>
+                  <div className="w-14 h-14 rounded-2xl bg-primary/8 flex items-center justify-center text-primary">
+                    <SectorIcon name={rec.sector?.icon} size={26} />
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <Badge variant="secondary" className="font-mono font-medium text-sm">
                       {rec.matchScore}% Match
@@ -314,7 +317,7 @@ export default function Results() {
                   <div className="grid grid-cols-2 gap-3 pt-2">
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                        <DollarSign className="w-3.5 h-3.5 mr-1" /> RAL Media
+                        <DollarSign className="w-3.5 h-3.5 mr-1" /> Stipendio medio annuo
                       </div>
                       <span className="font-semibold text-sm">
                         €{(rec.sector?.avgSalaryMin ?? 0) / 1000}k - €{(rec.sector?.avgSalaryMax ?? 0) / 1000}k
@@ -336,7 +339,7 @@ export default function Results() {
                     </div>
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                        <Settings2 className="w-3.5 h-3.5 mr-1" /> Rischio Auto.
+                        <Bot className="w-3.5 h-3.5 mr-1" /> Rischio automazione
                       </div>
                       <span className="font-semibold text-sm capitalize">{rec.sector?.automationRisk}</span>
                     </div>

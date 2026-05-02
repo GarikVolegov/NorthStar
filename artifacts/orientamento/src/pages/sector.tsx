@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Clock, DollarSign, ShieldAlert, Sparkles, TrendingUp, Target, Plus, Minus, Zap, Brain, MapPin, Network, ArrowRight, Newspaper } from "lucide-react";
+import { ArrowLeft, Clock, DollarSign, Bot, Sparkles, TrendingUp, Target, Plus, Minus, Zap, Brain, MapPin, Network, ArrowRight, Newspaper } from "lucide-react";
+import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 export default function Sector() {
@@ -66,16 +67,24 @@ export default function Sector() {
 
       {/* Header */}
       <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start mb-12">
-        <div className="w-24 h-24 md:w-32 md:h-32 bg-primary/10 rounded-3xl flex items-center justify-center text-5xl md:text-6xl shrink-0 shadow-inner">
-          {sector.icon}
+        <div className="w-24 h-24 md:w-32 md:h-32 bg-primary/10 rounded-3xl flex items-center justify-center shrink-0 shadow-inner text-primary">
+          <SectorIcon name={sector.icon} size={52} />
         </div>
         <div className="flex-1">
           <div className="flex flex-wrap gap-2 mb-4">
-            {sector.riasecTypes.map(type => (
-              <Badge key={type} variant="secondary" className="font-mono bg-secondary/50 hover:bg-secondary/70">
-                {type}
-              </Badge>
-            ))}
+            {sector.riasecTypes.map(type => {
+              const meta = RIASEC_LABELS[type];
+              return (
+                <span
+                  key={type}
+                  title={meta?.desc}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary/60 text-secondary-foreground text-sm font-medium"
+                >
+                  <span className="font-mono font-bold">{type}</span>
+                  {meta && <span className="text-muted-foreground">— {meta.label}</span>}
+                </span>
+              );
+            })}
             <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50">
               <TrendingUp className="w-3 h-3 mr-1" /> {sector.trend}
             </Badge>
@@ -93,7 +102,7 @@ export default function Sector() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-16">
         <div className="bg-card border rounded-2xl p-5 flex flex-col justify-center">
           <div className="flex items-center text-muted-foreground text-sm font-medium mb-2 uppercase tracking-wider">
-            <DollarSign className="w-4 h-4 mr-1.5" /> RAL Media
+            <DollarSign className="w-4 h-4 mr-1.5" /> Stipendio medio annuo
           </div>
           <div className="text-xl md:text-2xl font-semibold">
             €{sector.avgSalaryMin / 1000}k - {sector.avgSalaryMax / 1000}k
@@ -117,7 +126,7 @@ export default function Sector() {
         </div>
         <div className="bg-card border rounded-2xl p-5 flex flex-col justify-center">
           <div className="flex items-center text-muted-foreground text-sm font-medium mb-2 uppercase tracking-wider">
-            <ShieldAlert className="w-4 h-4 mr-1.5" /> Rischio Autom.
+            <Bot className="w-4 h-4 mr-1.5" /> Rischio automazione
           </div>
           <div className="text-xl md:text-2xl font-semibold capitalize">
             {sector.automationRisk}
