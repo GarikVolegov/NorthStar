@@ -13,7 +13,9 @@ import {
   User, Star, Mail, Calendar, CheckCircle2, Clock,
   ChevronRight, Loader2, KeyRound, BarChart3, Sparkles, ShieldCheck,
   TrendingUp, DollarSign, Activity, Settings2, ArrowRight, Layers,
+  Bookmark, ExternalLink, Newspaper, X, Heart,
 } from "lucide-react";
+import { useFavorites } from "@/hooks/useFavorites";
 import { cn } from "@/lib/utils";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -332,6 +334,119 @@ function ChangePasswordForm({ userId }: { userId: number }) {
   );
 }
 
+// ── Saved items section ───────────────────────────────────────────────
+function SavedItems({ userId }: { userId: number }) {
+  const { favorites, removeFavorite, isLoading } = useFavorites();
+  const savedSectors = favorites.filter((f) => f.type === "sector");
+  const savedArticles = favorites.filter((f) => f.type === "news");
+
+  if (favorites.length === 0) return null;
+
+  return (
+    <Card className="rounded-2xl mt-6">
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <Bookmark className="w-4 h-4 text-primary" /> Elementi salvati
+          </CardTitle>
+          <span className="text-sm text-muted-foreground">{favorites.length} salvati</span>
+        </div>
+        <p className="text-sm text-muted-foreground mt-1">Settori e articoli che hai messo da parte.</p>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Saved sectors */}
+        {savedSectors.length > 0 && (
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-3 flex items-center gap-1.5">
+              <Heart className="w-3 h-3" /> Settori preferiti
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {savedSectors.map((fav) => (
+                <div key={fav.id} className="flex items-center gap-3 bg-muted/40 rounded-xl p-3 border border-border/50 group">
+                  <span className="text-2xl shrink-0">{fav.sector?.icon ?? "💼"}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm text-foreground truncate">{fav.sector?.name ?? "Settore"}</p>
+                    {fav.sector && (
+                      <p className="text-xs text-muted-foreground">
+                        €{Math.round(fav.sector.avgSalaryMin / 1000)}k–€{Math.round(fav.sector.avgSalaryMax / 1000)}k · +{fav.sector.growthRate}%
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Link href={`/settore/${fav.sectorId}`}>
+                      <button className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors" title="Vedi settore">
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </Link>
+                    <button
+                      onClick={() => removeFavorite(fav.id)}
+                      disabled={isLoading}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors"
+                      title="Rimuovi"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Saved articles */}
+        {savedArticles.length > 0 && (
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-3 flex items-center gap-1.5">
+              <Newspaper className="w-3 h-3" /> Articoli salvati
+            </p>
+            <div className="space-y-2">
+              {savedArticles.map((fav) => (
+                <div key={fav.id} className="flex items-start gap-3 bg-muted/40 rounded-xl p-3 border border-border/50 group">
+                  {fav.articleImage && (
+                    <img
+                      src={fav.articleImage}
+                      alt=""
+                      className="w-14 h-14 rounded-lg object-cover shrink-0 hidden sm:block"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm text-foreground line-clamp-2 leading-snug">{fav.articleTitle}</p>
+                    {fav.articleSource && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{fav.articleSource}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                    {fav.articleUrl && (
+                      <a
+                        href={fav.articleUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                        title="Apri articolo"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                    <button
+                      onClick={() => removeFavorite(fav.id)}
+                      disabled={isLoading}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors"
+                      title="Rimuovi"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Main page ────────────────────────────────────────────────────────
 export default function Profilo() {
   const { user, logout } = useAuth();
@@ -503,6 +618,9 @@ export default function Profilo() {
           </CardContent>
         </Card>
       )}
+
+      {/* Saved items — sectors + articles */}
+      <SavedItems userId={user.id} />
 
     </div>
   );

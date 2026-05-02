@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, CheckCircle2, TrendingUp, DollarSign, Activity, Settings2, BarChart3, AlertTriangle, Sparkles, Star, UserCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, TrendingUp, DollarSign, Activity, Settings2, BarChart3, AlertTriangle, Sparkles, Star, UserCheck, Bookmark, BookmarkCheck, Newspaper, Brain, Map } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useFavorites } from "@/hooks/useFavorites";
 
 const SPIRIT_META: Record<string, { emoji: string; label: string; color: string }> = {
   shen: { emoji: "✨", label: "Shen", color: "bg-violet-100 text-violet-700 border-violet-200" },
@@ -47,6 +48,27 @@ function SpiritBar({ spirit, score }: { spirit: string; score: number }) {
       </div>
       <span className="text-sm font-bold text-foreground w-6 text-right">{score}</span>
     </div>
+  );
+}
+
+function SectorBookmarkButton({ sectorId }: { sectorId: number }) {
+  const { user } = useAuth();
+  const { isSectorFavorite, getSectorFavoriteId, addFavorite, removeFavorite, isLoading } = useFavorites();
+  if (!user) return null;
+  const saved = isSectorFavorite(sectorId);
+  const favId = getSectorFavoriteId(sectorId);
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); saved && favId !== undefined ? removeFavorite(favId) : addFavorite({ type: "sector", sectorId }); }}
+      disabled={isLoading}
+      title={saved ? "Rimuovi dai salvati" : "Salva settore"}
+      className={cn(
+        "p-2 rounded-xl transition-colors",
+        saved ? "text-primary bg-primary/10" : "text-slate-400 hover:text-primary hover:bg-primary/5"
+      )}
+    >
+      {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+    </button>
   );
 }
 
@@ -210,9 +232,12 @@ export default function Results() {
               <CardHeader className="pb-4">
                 <div className="flex justify-between items-start mb-4">
                   <div className="text-4xl">{rec.sector?.icon || "💼"}</div>
-                  <Badge variant="secondary" className="font-mono font-medium text-sm">
-                    {rec.matchScore}% Match
-                  </Badge>
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant="secondary" className="font-mono font-medium text-sm">
+                      {rec.matchScore}% Match
+                    </Badge>
+                    <SectorBookmarkButton sectorId={rec.sectorId} />
+                  </div>
                 </div>
                 <CardTitle className="text-2xl font-serif">{rec.sector?.name}</CardTitle>
                 <CardDescription className="text-sm line-clamp-2 mt-2">
@@ -288,6 +313,45 @@ export default function Results() {
           </p>
         </div>
       )}
+
+      {/* Premium upgrade CTA */}
+      <div className="mt-10 rounded-3xl overflow-hidden border border-primary/15 bg-gradient-to-br from-primary/5 via-background to-primary/5 animate-in fade-in duration-1000 delay-700">
+        <div className="grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-primary/10">
+          <div className="flex flex-col items-center text-center p-8 gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <Newspaper className="w-5 h-5 text-primary" />
+            </div>
+            <h4 className="font-semibold text-foreground text-sm">News settoriali</h4>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Aggiornamenti mirati sul tuo settore: trend, opportunità, aziende e certificazioni.
+            </p>
+          </div>
+          <div className="flex flex-col items-center text-center p-8 gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <Brain className="w-5 h-5 text-primary" />
+            </div>
+            <h4 className="font-semibold text-foreground text-sm">Wiki personalizzata</h4>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Una knowledge base intelligente che risponde alle tue domande specifiche sul settore.
+            </p>
+          </div>
+          <div className="flex flex-col items-center text-center p-8 gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <Map className="w-5 h-5 text-primary" />
+            </div>
+            <h4 className="font-semibold text-foreground text-sm">Roadmap dettagliata</h4>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Un piano step-by-step personalizzato per entrare nel tuo settore ideale.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 px-8 py-6 border-t border-primary/10 bg-primary/3">
+          <p className="text-sm text-muted-foreground">Vuoi andare più in profondità?</p>
+          <Button asChild className="rounded-full" size="sm">
+            <Link href="/premium"><Sparkles className="h-3.5 w-3.5 mr-1.5" />Scopri NorthStar Premium</Link>
+          </Button>
+        </div>
+      </div>
 
     </div>
   );

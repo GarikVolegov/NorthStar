@@ -7,11 +7,13 @@ import stripeRouter from "./stripe";
 import newsRouter from "./news";
 import authRouter from "./auth";
 import profileRouter from "./profile";
+import favoritesRouter from "./favorites";
 
 const router: IRouter = Router();
 
 router.use(authRouter);
 router.use(profileRouter);
+router.use(favoritesRouter);
 router.use(healthRouter);
 router.use(sectorsRouter);
 router.use(testSessionsRouter);

@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Newspaper, ExternalLink, Clock, Tag, Lock, Sparkles, RefreshCw } from "lucide-react";
+import { Newspaper, ExternalLink, Clock, Tag, Sparkles, RefreshCw, Bookmark, BookmarkCheck, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
+import { useFavorites } from "@/hooks/useFavorites";
+import { cn } from "@/lib/utils";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -22,24 +25,23 @@ interface NewsItem {
   plan: "free" | "premium";
 }
 
-const CATEGORIES = [
-  { id: "general", label: "Panoramica", emoji: "🌍" },
-  { id: "technology", label: "Tecnologia", emoji: "💻" },
-  { id: "business", label: "Business", emoji: "📈" },
-  { id: "science", label: "Scienza", emoji: "🔬" },
-  { id: "health", label: "Salute", emoji: "❤️" },
-  { id: "finance", label: "Finanza", emoji: "💰" },
-  { id: "education", label: "Formazione", emoji: "🎓" },
+interface ProfileData {
+  exploredSectors: Array<{ sectorId: number; name: string; icon: string; confirmed: boolean }>;
+}
+
+const FREE_CATEGORIES = [
+  { id: "general",    label: "Panoramica",  emoji: "🌍" },
+  { id: "technology", label: "Tecnologia",  emoji: "💻" },
+  { id: "business",   label: "Business",    emoji: "📈" },
+  { id: "science",    label: "Scienza",     emoji: "🔬" },
+  { id: "health",     label: "Salute",      emoji: "❤️" },
+  { id: "finance",    label: "Finanza",     emoji: "💰" },
+  { id: "education",  label: "Formazione",  emoji: "🎓" },
 ] as const;
 
 const CATEGORY_LABELS: Record<string, string> = {
-  general: "Panoramica",
-  technology: "Tecnologia",
-  business: "Business",
-  science: "Scienza",
-  health: "Salute",
-  finance: "Finanza",
-  education: "Formazione",
+  general: "Panoramica", technology: "Tecnologia", business: "Business",
+  science: "Scienza", health: "Salute", finance: "Finanza", education: "Formazione",
 };
 
 function timeAgo(dateStr: string): string {
@@ -49,42 +51,79 @@ function timeAgo(dateStr: string): string {
   if (h === 1) return "1 ora fa";
   if (h < 24) return `${h} ore fa`;
   const d = Math.floor(h / 24);
-  if (d === 1) return "ieri";
-  return `${d} giorni fa`;
+  return d === 1 ? "ieri" : `${d} giorni fa`;
 }
 
-function NewsCard({ item }: { item: NewsItem }) {
+function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boolean }) {
+  const { user } = useAuth();
+  const { isNewsFavorite, getNewsFavoriteId, addFavorite, removeFavorite, isLoading } = useFavorites();
+  const saved = isNewsFavorite(item.url);
+  const favId = getNewsFavoriteId(item.url);
+
+  function toggleSave(e: React.MouseEvent) {
+    e.preventDefault();
+    if (!user) return;
+    if (saved && favId !== undefined) {
+      removeFavorite(favId);
+    } else {
+      addFavorite({
+        type: "news",
+        articleUrl: item.url,
+        articleTitle: item.title,
+        articleDescription: item.description,
+        articleSource: item.source,
+        articleImage: item.image ?? undefined,
+        articleCategory: item.category,
+      });
+    }
+  }
+
   return (
-    <article className="bg-white border border-slate-100 rounded-2xl overflow-hidden hover:shadow-md transition-shadow group">
+    <article className="bg-white border border-slate-100 rounded-2xl overflow-hidden hover:shadow-md transition-shadow group flex flex-col">
       {item.image && (
-        <div className="aspect-video overflow-hidden">
+        <div className="aspect-video overflow-hidden shrink-0">
           <img
             src={item.image}
             alt={item.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
           />
         </div>
       )}
-      <div className="p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <Badge variant="secondary" className="text-xs font-medium">
-            {CATEGORY_LABELS[item.category] ?? item.category}
-          </Badge>
-          <span className="text-xs text-slate-400 flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            {timeAgo(item.publishedAt)}
-          </span>
+      <div className="p-5 flex flex-col flex-1">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="secondary" className="text-xs font-medium">
+              {CATEGORY_LABELS[item.category] ?? item.category}
+            </Badge>
+            <span className="text-xs text-slate-400 flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {timeAgo(item.publishedAt)}
+            </span>
+          </div>
+          {showSave && user && (
+            <button
+              onClick={toggleSave}
+              disabled={isLoading}
+              title={saved ? "Rimuovi dai salvati" : "Salva articolo"}
+              className={cn(
+                "shrink-0 p-1.5 rounded-lg transition-colors",
+                saved
+                  ? "text-primary bg-primary/10"
+                  : "text-slate-400 hover:text-primary hover:bg-primary/5"
+              )}
+            >
+              {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+            </button>
+          )}
         </div>
         <h3 className="font-serif font-semibold text-slate-800 leading-snug mb-2 line-clamp-3 text-[1.05rem]">
           {item.title}
         </h3>
-        <p className="text-sm text-slate-500 leading-relaxed line-clamp-2 mb-4">
+        <p className="text-sm text-slate-500 leading-relaxed line-clamp-2 mb-4 flex-1">
           {item.description}
         </p>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mt-auto">
           <span className="text-xs text-slate-400 font-medium">{item.source}</span>
           <a
             href={item.url}
@@ -92,7 +131,7 @@ function NewsCard({ item }: { item: NewsItem }) {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
           >
-            Leggi di più <ExternalLink className="h-3 w-3" />
+            Leggi <ExternalLink className="h-3 w-3" />
           </a>
         </div>
       </div>
@@ -117,50 +156,69 @@ function NewsCardSkeleton() {
   );
 }
 
-function PremiumNewsTeaser() {
+function UpgradeCTA() {
   return (
-    <div className="relative bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-8 text-center overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-amber-100/40 to-orange-100/40 backdrop-blur-sm" />
-      <div className="relative z-10">
-        <div className="inline-flex items-center justify-center w-12 h-12 bg-amber-100 rounded-2xl mb-4">
-          <Lock className="h-5 w-5 text-amber-600" />
-        </div>
-        <h3 className="font-serif font-bold text-xl text-slate-800 mb-2">
-          News per il tuo settore
-        </h3>
-        <p className="text-sm text-slate-600 mb-6 max-w-sm mx-auto leading-relaxed">
-          Accedi a notizie specifiche per il settore che hai scelto: trend, opportunità, aziende
-          che assumono, certificazioni e molto altro.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Button asChild className="rounded-full font-medium">
-            <Link href="/premium">
-              <Sparkles className="h-4 w-4 mr-1.5" />
-              Sblocca Premium
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="rounded-full font-medium">
-            <Link href="/test">Fai il test prima</Link>
-          </Button>
-        </div>
+    <div className="bg-gradient-to-r from-primary/5 via-background to-primary/5 border border-primary/15 rounded-2xl p-8 text-center">
+      <div className="inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-2xl mb-4">
+        <Sparkles className="h-5 w-5 text-primary" />
+      </div>
+      <h3 className="font-serif font-bold text-xl text-foreground mb-2">Sblocca le News del tuo Settore</h3>
+      <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto leading-relaxed">
+        Completa il test e conferma il tuo settore per ricevere notizie mirate: trend, opportunità di lavoro, aziende e certificazioni.
+      </p>
+      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <Button asChild className="rounded-full font-medium">
+          <Link href="/premium"><Sparkles className="h-4 w-4 mr-1.5" />Scopri Premium</Link>
+        </Button>
+        <Button asChild variant="outline" className="rounded-full font-medium">
+          <Link href="/test">Fai il test</Link>
+        </Button>
       </div>
     </div>
   );
 }
 
 export default function News() {
-  const [activeCategory, setActiveCategory] = useState<string>("general");
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<string>("general");
+
+  const { data: profile } = useQuery<ProfileData>({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}api/profile/${user!.id}`);
+      return res.json();
+    },
+    enabled: !!user,
+    staleTime: 5 * 60_000,
+  });
+
+  const confirmedSector = profile?.exploredSectors?.find((s) => s.confirmed) ?? null;
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["news", activeCategory],
+    queryKey: ["news", activeTab],
     queryFn: async () => {
-      const url = `${BASE}api/news?category=${activeCategory}&limit=6`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Errore nel caricamento delle news");
+      const res = await fetch(`${BASE}api/news?category=${activeTab}&limit=6`);
+      if (!res.ok) throw new Error("Errore nel caricamento");
       return res.json() as Promise<{ news: NewsItem[]; source: "live" | "static" }>;
     },
-    staleTime: 15 * 60 * 1000,
+    enabled: activeTab !== "__sector__",
+    staleTime: 15 * 60_000,
   });
+
+  const { data: sectorNewsData, isLoading: sectorLoading } = useQuery({
+    queryKey: ["news", "sector", confirmedSector?.name],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}api/news/sector/${encodeURIComponent(confirmedSector!.name)}?limit=6`);
+      if (!res.ok) throw new Error();
+      return res.json() as Promise<{ news: NewsItem[]; source: "live" | "static" }>;
+    },
+    enabled: !!confirmedSector,
+    staleTime: 15 * 60_000,
+  });
+
+  const displayNews = activeTab === "__sector__" ? (sectorNewsData?.news ?? []) : (data?.news ?? []);
+  const displaySource = activeTab === "__sector__" ? sectorNewsData?.source : data?.source;
+  const displayLoading = activeTab === "__sector__" ? (sectorLoading && !!confirmedSector) : isLoading;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -171,25 +229,38 @@ export default function News() {
               <Newspaper className="h-4 w-4" />
               Aggiornamenti dal mondo del lavoro
             </div>
-            <h1 className="font-serif font-bold text-4xl text-slate-900 mb-3">
-              News & Tendenze
-            </h1>
+            <h1 className="font-serif font-bold text-4xl text-slate-900 mb-3">News & Tendenze</h1>
             <p className="text-lg text-slate-500 leading-relaxed">
-              Resta aggiornato sul mercato del lavoro, i settori emergenti e le opportunità di
-              crescita professionale.
+              Resta aggiornato sul mercato del lavoro, i settori emergenti e le opportunità di crescita professionale.
             </p>
           </div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 md:px-6 py-8">
+
+        {/* Tab bar */}
         <div className="flex gap-2 overflow-x-auto pb-2 mb-8 scrollbar-hide">
-          {CATEGORIES.map((cat) => (
+          {confirmedSector && (
+            <button
+              onClick={() => setActiveTab("__sector__")}
+              className={`flex-none flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap border ${
+                activeTab === "__sector__"
+                  ? "bg-primary text-white shadow-sm border-primary"
+                  : "bg-primary/8 border-primary/20 text-primary hover:bg-primary/15"
+              }`}
+            >
+              <Star className="h-3.5 w-3.5 fill-current" />
+              {confirmedSector.icon} {confirmedSector.name}
+            </button>
+          )}
+
+          {FREE_CATEGORIES.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
+              onClick={() => setActiveTab(cat.id)}
               className={`flex-none flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
-                activeCategory === cat.id
+                activeTab === cat.id
                   ? "bg-primary text-white shadow-sm"
                   : "bg-white border border-slate-200 text-slate-600 hover:border-primary/40 hover:text-primary"
               }`}
@@ -200,45 +271,59 @@ export default function News() {
           ))}
         </div>
 
-        {isError && (
+        {/* Sector tab context banner */}
+        {activeTab === "__sector__" && confirmedSector && (
+          <div className="flex items-center gap-3 mb-6 bg-primary/5 border border-primary/15 rounded-xl px-5 py-3">
+            <span className="text-2xl">{confirmedSector.icon}</span>
+            <div>
+              <p className="font-semibold text-foreground text-sm">News per il tuo settore</p>
+              <p className="text-xs text-muted-foreground">
+                Aggiornamenti su {confirmedSector.name} — trend, opportunità e innovazioni
+              </p>
+            </div>
+            <Badge className="ml-auto bg-primary/10 text-primary border-0 text-xs font-medium">
+              Il tuo settore
+            </Badge>
+          </div>
+        )}
+
+        {isError && activeTab !== "__sector__" && (
           <div className="text-center py-12">
             <p className="text-slate-500 mb-4">Impossibile caricare le news al momento.</p>
             <Button variant="outline" onClick={() => refetch()} className="gap-2 rounded-full">
-              <RefreshCw className="h-4 w-4" />
-              Riprova
+              <RefreshCw className="h-4 w-4" /> Riprova
             </Button>
           </div>
         )}
 
-        {!isError && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {isLoading
-              ? Array.from({ length: 6 }).map((_, i) => <NewsCardSkeleton key={i} />)
-              : data?.news.map((item) => <NewsCard key={item.id} item={item} />)}
-          </div>
-        )}
-
-        {!isLoading && data && (
-          <div className="flex items-center justify-between mb-8">
-            <p className="text-xs text-slate-400 flex items-center gap-1.5">
-              <Tag className="h-3 w-3" />
-              {data.source === "live"
-                ? "Notizie aggiornate in tempo reale"
-                : "Contenuto editoriale selezionato"}
-            </p>
-          </div>
-        )}
-
-        <div className="mb-4">
-          <div className="flex items-center gap-2 mb-6">
-            <Sparkles className="h-5 w-5 text-amber-500" />
-            <h2 className="font-serif font-bold text-xl text-slate-800">
-              News Premium — per il tuo settore
-            </h2>
-            <Badge className="bg-amber-100 text-amber-700 border-0 text-xs">Premium</Badge>
-          </div>
-          <PremiumNewsTeaser />
+        {/* News grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {displayLoading
+            ? Array.from({ length: 6 }).map((_, i) => <NewsCardSkeleton key={i} />)
+            : displayNews.map((item) => (
+                <NewsCard key={item.id} item={item} showSave={!!user} />
+              ))}
         </div>
+
+        {!displayLoading && displayNews.length > 0 && (
+          <p className="text-xs text-slate-400 flex items-center gap-1.5 mb-10">
+            <Tag className="h-3 w-3" />
+            {displaySource === "live" ? "Notizie aggiornate in tempo reale" : "Contenuto editoriale selezionato"}
+            {user && <span className="ml-2">· Usa il segnalibro 🔖 per salvare gli articoli nel profilo</span>}
+          </p>
+        )}
+
+        {/* Upgrade CTA — only if no confirmed sector */}
+        {!confirmedSector && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-6">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <h2 className="font-serif font-bold text-xl text-slate-800">News per il tuo settore</h2>
+              <Badge className="bg-primary/10 text-primary border-0 text-xs">Premium</Badge>
+            </div>
+            <UpgradeCTA />
+          </div>
+        )}
       </div>
     </div>
   );
