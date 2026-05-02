@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link } from "wouter";
-import { Star, LogOut, User } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { Star, LogOut, User, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export function Navbar() {
   const { user, logout, isLoggedIn } = useAuth();
   const [loginOpen, setLoginOpen] = useState(false);
+  const [, setLocation] = useLocation();
 
   return (
     <>
@@ -57,6 +58,11 @@ export function Navbar() {
                       <span className="text-xs text-muted-foreground truncate">{user.email}</span>
                     </div>
                   </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setLocation("/profilo")} className="cursor-pointer">
+                    <LayoutDashboard className="h-4 w-4 mr-2" />
+                    Il mio profilo
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive cursor-pointer">
                     <LogOut className="h-4 w-4 mr-2" />
