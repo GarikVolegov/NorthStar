@@ -1,6 +1,7 @@
 import { pgTable, text, serial, timestamp, integer, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { relations } from "drizzle-orm";
 
 export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -25,3 +26,19 @@ export const usersTable = pgTable("users", {
 export const insertUserSchema = createInsertSchema(usersTable).omit({ id: true, createdAt: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof usersTable.$inferSelect;
+
+export const jobApplicationsTable = pgTable("job_applications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  company: text("company").notNull(),
+  role: text("role").notNull(),
+  url: text("url"),
+  status: text("status").notNull().default("saved"),
+  notes: text("notes"),
+  salary: text("salary"),
+  location: text("location"),
+  appliedAt: timestamp("applied_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type JobApplication = typeof jobApplicationsTable.$inferSelect;

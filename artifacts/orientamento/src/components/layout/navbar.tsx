@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Star, LogOut, User, LayoutDashboard, Menu, X,
-  FlaskConical, Layers, BookOpenText, Newspaper, Crown,
+  FlaskConical, Layers, BookOpenText, Newspaper, Crown, Briefcase,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -78,6 +78,9 @@ export function Navbar() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setLocation("/profilo")} className="cursor-pointer">
                     <LayoutDashboard className="h-4 w-4 mr-2" /> Il mio profilo
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setLocation("/candidature")} className="cursor-pointer">
+                    <Briefcase className="h-4 w-4 mr-2" /> Candidature
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive cursor-pointer">
@@ -174,6 +177,13 @@ export function Navbar() {
                         onClick={() => { setLocation("/profilo"); setMenuOpen(false); }}
                       >
                         <LayoutDashboard className="h-4 w-4" /> Il mio profilo
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full rounded-full justify-start gap-2"
+                        onClick={() => { setLocation("/candidature"); setMenuOpen(false); }}
+                      >
+                        <Briefcase className="h-4 w-4" /> Candidature
                       </Button>
                       <Button
                         variant="ghost"

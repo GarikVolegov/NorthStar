@@ -30,6 +30,7 @@ import TerminiDiServizio from "@/pages/termini-di-servizio";
 import Crescita from "@/pages/crescita";
 import CrescitaCategoria from "@/pages/crescita-categoria";
 import CrescitaArticolo from "@/pages/crescita-articolo";
+import Candidature from "@/pages/candidature";
 import Affiliazione from "@/pages/affiliazione";
 import AffiliazioneScuole from "@/pages/affiliazione-scuole";
 import AffiliazioneUniversita from "@/pages/affiliazione-universita";
@@ -65,6 +66,7 @@ function Router() {
               <Route path="/news" component={News} />
               <Route path="/reset-password" component={ResetPassword} />
               <Route path="/profilo" component={Profilo} />
+              <Route path="/candidature" component={Candidature} />
               <Route path="/wiki/:id" component={Wiki} />
               <Route path="/roadmap/:id" component={Roadmap} />
               <Route path="/grafo/:id" component={Grafo} />
