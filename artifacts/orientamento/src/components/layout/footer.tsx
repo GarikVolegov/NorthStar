@@ -50,6 +50,7 @@ export function Footer() {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><FooterLink href="/chi-siamo">Chi siamo</FooterLink></li>
               <li><FooterLink href="/come-funziona">Come funziona</FooterLink></li>
+              <li><FooterLink href="/affiliazione">Affiliazione</FooterLink></li>
               <li><FooterLink href="/privacy-policy">Privacy Policy</FooterLink></li>
               <li><FooterLink href="/termini-di-servizio">Termini di servizio</FooterLink></li>
               <li><FooterLink href="/sitemap">Mappa del sito</FooterLink></li>

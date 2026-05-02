@@ -26,6 +26,11 @@ import ChiSiamo from "@/pages/chi-siamo";
 import ComeFunziona from "@/pages/come-funziona";
 import PrivacyPolicy from "@/pages/privacy-policy";
 import TerminiDiServizio from "@/pages/termini-di-servizio";
+import Affiliazione from "@/pages/affiliazione";
+import AffiliazioneScuole from "@/pages/affiliazione-scuole";
+import AffiliazioneUniversita from "@/pages/affiliazione-universita";
+import AffiliazioneAgenzie from "@/pages/affiliazione-agenzie";
+import AffiliazioneFormazione from "@/pages/affiliazione-formazione";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { BackButton } from "@/components/layout/back-button";
@@ -66,6 +71,11 @@ function Router() {
               <Route path="/come-funziona" component={ComeFunziona} />
               <Route path="/privacy-policy" component={PrivacyPolicy} />
               <Route path="/termini-di-servizio" component={TerminiDiServizio} />
+              <Route path="/affiliazione" component={Affiliazione} />
+              <Route path="/affiliazione/scuole" component={AffiliazioneScuole} />
+              <Route path="/affiliazione/universita" component={AffiliazioneUniversita} />
+              <Route path="/affiliazione/agenzie-lavoro" component={AffiliazioneAgenzie} />
+              <Route path="/affiliazione/centri-formazione" component={AffiliazioneFormazione} />
               <Route component={NotFound} />
             </Switch>
           </main>

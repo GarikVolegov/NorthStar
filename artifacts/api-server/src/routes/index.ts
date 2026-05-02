@@ -16,6 +16,7 @@ import sitemapRouter from "./sitemap";
 import contactRouter from "./contact";
 import ogRouter from "./og";
 import ogImageRouter from "./og-image";
+import affiliazioneRouter from "./affiliazione";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use(sitemapRouter);
 router.use(contactRouter);
 router.use(ogRouter);
 router.use(ogImageRouter);
+router.use(affiliazioneRouter);
 
 export default router;

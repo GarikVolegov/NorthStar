@@ -4,3 +4,4 @@ export * from "./testSessions";
 export * from "./userFavorites";
 export * from "./userObjectives";
 export * from "./contactMessages";
+export * from "./affiliationLeads";
