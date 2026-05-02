@@ -1,58 +1,103 @@
-import nodemailer from "nodemailer";
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
-function getTransport() {
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-    return nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: Number(process.env.SMTP_PORT) === 465,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+// Resend free tier allows sending from onboarding@resend.dev during testing.
+// For production, use a verified domain address.
+const FROM = process.env.EMAIL_FROM ?? "NorthStar <onboarding@resend.dev>";
+
+async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+  if (!RESEND_API_KEY) {
+    console.warn("[email] RESEND_API_KEY non configurato — email non inviata a:", to);
+    return;
   }
-  return null;
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from: FROM, to: [to], subject, html }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    console.error("[email] Resend error:", res.status, body);
+    throw new Error(`Resend API error ${res.status}: ${body}`);
+  }
+
+  console.log("[email] Inviata a:", to, "—", subject);
 }
 
-const FROM = process.env.SMTP_FROM || "NorthStar <noreply@northstar.app>";
-
 export async function sendVerificationEmail(to: string, name: string, code: string): Promise<void> {
-  const transport = getTransport();
-  if (!transport) return;
-  await transport.sendMail({
-    from: FROM,
-    to,
-    subject: "Conferma il tuo account NorthStar ✦",
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
-        <h2 style="font-size:24px;font-weight:700;margin-bottom:8px;">Benvenuto su NorthStar, ${name}!</h2>
-        <p style="color:#555;margin-bottom:24px;">Usa il codice qui sotto per confermare il tuo account. Il codice è valido per 15 minuti.</p>
-        <div style="background:#f5f5f5;border-radius:12px;padding:24px;text-align:center;letter-spacing:8px;font-size:32px;font-weight:700;margin-bottom:24px;">
-          ${code}
-        </div>
-        <p style="color:#888;font-size:13px;">Se non hai creato un account NorthStar, ignora questa email.</p>
+  const html = `
+<!DOCTYPE html>
+<html lang="it">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:system-ui,-apple-system,sans-serif;">
+  <div style="max-width:480px;margin:40px auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+    <div style="background:#1a3a2a;padding:24px 28px;">
+      <p style="margin:0;color:#86efac;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;">NorthStar</p>
+      <h1 style="margin:8px 0 0;color:#ffffff;font-size:22px;font-weight:700;">Conferma il tuo account</h1>
+    </div>
+    <div style="padding:28px;">
+      <p style="margin:0 0 8px;color:#374151;font-size:16px;">Ciao <strong>${name}</strong>,</p>
+      <p style="margin:0 0 24px;color:#6b7280;font-size:14px;line-height:1.6;">
+        Usa il codice qui sotto per confermare il tuo account NorthStar.<br>
+        Il codice è valido per <strong>15 minuti</strong>.
+      </p>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:24px;text-align:center;margin-bottom:24px;">
+        <p style="margin:0 0 8px;color:#15803d;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;">Codice di verifica</p>
+        <p style="margin:0;letter-spacing:10px;font-size:36px;font-weight:700;color:#1a3a2a;font-family:monospace;">${code}</p>
       </div>
-    `,
-  });
+      <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
+        Se non hai creato un account NorthStar, puoi ignorare questa email in sicurezza.
+      </p>
+    </div>
+    <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px 28px;">
+      <p style="margin:0;color:#9ca3af;font-size:11px;">© NorthStar · La tua bussola professionale</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  await sendEmail(to, "Conferma il tuo account NorthStar ✦", html);
 }
 
 export async function sendResetEmail(to: string, resetUrl: string): Promise<void> {
-  const transport = getTransport();
-  if (!transport) return;
-  await transport.sendMail({
-    from: FROM,
-    to,
-    subject: "Reimposta la tua password NorthStar",
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
-        <h2 style="font-size:24px;font-weight:700;margin-bottom:8px;">Reimposta la password</h2>
-        <p style="color:#555;margin-bottom:24px;">Clicca sul pulsante qui sotto per scegliere una nuova password. Il link è valido per 1 ora.</p>
-        <a href="${resetUrl}" style="display:inline-block;background:#2d6a4f;color:#fff;padding:14px 28px;border-radius:999px;text-decoration:none;font-weight:600;margin-bottom:24px;">
-          Reimposta Password
+  const html = `
+<!DOCTYPE html>
+<html lang="it">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:system-ui,-apple-system,sans-serif;">
+  <div style="max-width:480px;margin:40px auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+    <div style="background:#1a3a2a;padding:24px 28px;">
+      <p style="margin:0;color:#86efac;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;">NorthStar</p>
+      <h1 style="margin:8px 0 0;color:#ffffff;font-size:22px;font-weight:700;">Reimposta la password</h1>
+    </div>
+    <div style="padding:28px;">
+      <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.6;">
+        Abbiamo ricevuto una richiesta di reset della password per il tuo account NorthStar.<br>
+        Clicca sul pulsante qui sotto per sceglierne una nuova.
+      </p>
+      <p style="margin:0 0 24px;color:#6b7280;font-size:13px;">Il link è valido per <strong>1 ora</strong>.</p>
+      <div style="text-align:center;margin-bottom:28px;">
+        <a href="${resetUrl}"
+           style="display:inline-block;background:#1a3a2a;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:999px;font-size:15px;font-weight:600;">
+          Reimposta Password →
         </a>
-        <p style="color:#888;font-size:13px;">Se non hai richiesto un reset, ignora questa email. La tua password rimane invariata.</p>
       </div>
-    `,
-  });
+      <p style="margin:0 0 8px;color:#9ca3af;font-size:12px;">Oppure copia e incolla questo link nel browser:</p>
+      <p style="margin:0;color:#15803d;font-size:11px;word-break:break-all;font-family:monospace;">${resetUrl}</p>
+    </div>
+    <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px 28px;">
+      <p style="margin:0;color:#9ca3af;font-size:11px;">
+        Se non hai richiesto il reset, ignora questa email. La tua password rimane invariata.<br>
+        © NorthStar · La tua bussola professionale
+      </p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  await sendEmail(to, "Reimposta la tua password NorthStar", html);
 }
