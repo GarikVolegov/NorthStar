@@ -17,6 +17,7 @@ import Profilo from "@/pages/profilo";
 import Wiki from "@/pages/wiki";
 import Roadmap from "@/pages/roadmap";
 import Grafo from "@/pages/grafo";
+import Settori from "@/pages/settori";
 import Contatti from "@/pages/contatti";
 import AdminMessaggi from "@/pages/admin-messaggi";
 import SitemapPage from "@/pages/sitemap";
@@ -53,6 +54,7 @@ function Router() {
               <Route path="/wiki/:id" component={Wiki} />
               <Route path="/roadmap/:id" component={Roadmap} />
               <Route path="/grafo/:id" component={Grafo} />
+              <Route path="/settori" component={Settori} />
               <Route path="/contatti" component={Contatti} />
               <Route path="/sitemap" component={SitemapPage} />
               <Route path="/chi-siamo" component={ChiSiamo} />

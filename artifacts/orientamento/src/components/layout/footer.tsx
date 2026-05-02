@@ -39,6 +39,7 @@ export function Footer() {
             <h4 className="text-sm font-semibold text-foreground">Risorse</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><FooterLink href="/test">Il Test RIASEC</FooterLink></li>
+              <li><FooterLink href="/settori">Esplora settori</FooterLink></li>
               <li><FooterLink href="/news">News settoriali</FooterLink></li>
               <li><FooterLink href="/premium">Piano Premium</FooterLink></li>
               <li><FooterLink href="/contatti">Contatti</FooterLink></li>

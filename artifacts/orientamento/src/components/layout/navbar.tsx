@@ -35,6 +35,9 @@ export function Navbar() {
               <Link href="/test" className="text-sm font-medium transition-colors hover:text-primary">
                 Il Test
               </Link>
+              <Link href="/settori" className="text-sm font-medium transition-colors hover:text-primary hidden md:inline">
+                Settori
+              </Link>
               <Link href="/news" className="text-sm font-medium transition-colors hover:text-primary">
                 News
               </Link>
