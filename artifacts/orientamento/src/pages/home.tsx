@@ -234,7 +234,7 @@ export default function Home() {
   return (
     <div className="flex flex-col w-full">
       {/* Hero Section */}
-      <section className="relative w-full py-20 md:py-32 overflow-hidden flex items-center justify-center min-h-[90vh]">
+      <section className="relative w-full py-16 md:py-32 overflow-hidden flex items-center justify-center min-h-[80vh] md:min-h-[90vh]">
         <div className="absolute inset-0 z-0">
           <img 
             src="/hero.png" 
@@ -245,33 +245,33 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background"></div>
         </div>
         
-        <div className="container mx-auto px-4 md:px-6 relative z-10 flex flex-col items-center text-center max-w-4xl">
-          <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-sm text-primary mb-8 animate-in slide-in-from-bottom-4 fade-in duration-700">
+        <div className="container mx-auto px-5 md:px-6 relative z-10 flex flex-col items-center text-center max-w-4xl">
+          <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-sm text-primary mb-6 md:mb-8 animate-in slide-in-from-bottom-4 fade-in duration-700">
             <Star className="mr-2 h-4 w-4 fill-primary" />
             <span>Scopri il tuo potenziale</span>
           </div>
-          <h1 className="text-5xl md:text-7xl font-serif font-bold tracking-tight text-foreground mb-6 animate-in slide-in-from-bottom-6 fade-in duration-700 delay-150 fill-mode-both leading-[1.1]">
+          <h1 className="text-[2.4rem] leading-[1.15] sm:text-5xl md:text-7xl font-serif font-bold tracking-tight text-foreground mb-5 md:mb-6 animate-in slide-in-from-bottom-6 fade-in duration-700 delay-150 fill-mode-both">
             Trova la tua strada,<br />
             <span className="text-primary italic">con consapevolezza.</span>
           </h1>
-          <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl animate-in slide-in-from-bottom-8 fade-in duration-700 delay-300 fill-mode-both leading-relaxed font-light">
+          <p className="text-base md:text-2xl text-muted-foreground mb-8 md:mb-10 max-w-2xl animate-in slide-in-from-bottom-8 fade-in duration-700 delay-300 fill-mode-both leading-relaxed font-light">
             NorthStar non ti dice cosa fare. Ti offre una bussola per esplorare i settori che risuonano con la tua natura, guidandoti verso una scelta autentica.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto animate-in slide-in-from-bottom-10 fade-in duration-700 delay-500 fill-mode-both">
-            <Button asChild size="lg" className="rounded-full text-base h-14 px-8 shadow-xl">
+          <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full sm:w-auto animate-in slide-in-from-bottom-10 fade-in duration-700 delay-500 fill-mode-both">
+            <Button asChild size="lg" className="rounded-full text-base h-12 md:h-14 px-8 shadow-xl">
               <Link href="/test">
                 Inizia il Test Gratuito <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
             {isLoggedIn ? (
-              <Button asChild size="lg" variant="outline" className="rounded-full text-base h-14 px-8 border-primary/20 bg-background/50 backdrop-blur">
+              <Button asChild size="lg" variant="outline" className="rounded-full text-base h-12 md:h-14 px-8 border-primary/20 bg-background/50 backdrop-blur">
                 <Link href="/risultati/latest">Rivedi i tuoi risultati</Link>
               </Button>
             ) : (
               <Button
                 size="lg"
                 variant="outline"
-                className="rounded-full text-base h-14 px-8 border-primary/20 bg-background/50 backdrop-blur"
+                className="rounded-full text-base h-12 md:h-14 px-8 border-primary/20 bg-background/50 backdrop-blur"
                 onClick={() => setLoginOpen(true)}
               >
                 <LogIn className="mr-2 h-5 w-5" />
@@ -288,35 +288,35 @@ export default function Home() {
       </section>
 
       {/* Stats Section */}
-      <section className="py-16 bg-card border-y">
+      <section className="py-10 md:py-16 bg-card border-y">
         <div className="container mx-auto px-4 md:px-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 divide-y md:divide-y-0 md:divide-x divide-border">
-            <div className="flex flex-col items-center text-center pt-8 md:pt-0">
-              <div className="text-4xl md:text-5xl font-serif font-bold text-primary mb-2">
-                {isStatsLoading ? <Skeleton className="h-12 w-24 rounded-md" /> : <AnimatedNumber value={stats?.totalTestsTaken || 12450} />}
+          <div className="grid grid-cols-3 gap-4 md:gap-12 divide-x md:divide-x divide-border">
+            <div className="flex flex-col items-center text-center px-2">
+              <div className="text-3xl md:text-5xl font-serif font-bold text-primary mb-1 md:mb-2">
+                {isStatsLoading ? <Skeleton className="h-9 w-16 rounded-md mx-auto" /> : <AnimatedNumber value={stats?.totalTestsTaken || 12450} />}
               </div>
-              <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Persone guidate</p>
+              <p className="text-[10px] md:text-sm font-medium uppercase tracking-wider text-muted-foreground leading-tight">Persone guidate</p>
             </div>
-            <div className="flex flex-col items-center text-center pt-8 md:pt-0">
-              <div className="text-4xl md:text-5xl font-serif font-bold text-primary mb-2">
-                {isStatsLoading ? <Skeleton className="h-12 w-24 rounded-md" /> : <AnimatedNumber value={stats?.totalSectors || 42} />}
+            <div className="flex flex-col items-center text-center px-2">
+              <div className="text-3xl md:text-5xl font-serif font-bold text-primary mb-1 md:mb-2">
+                {isStatsLoading ? <Skeleton className="h-9 w-16 rounded-md mx-auto" /> : <AnimatedNumber value={stats?.totalSectors || 42} />}
               </div>
-              <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Settori analizzati</p>
+              <p className="text-[10px] md:text-sm font-medium uppercase tracking-wider text-muted-foreground leading-tight">Settori analizzati</p>
             </div>
-            <div className="flex flex-col items-center text-center pt-8 md:pt-0">
-              <div className="text-4xl md:text-5xl font-serif font-bold text-primary mb-2">
-                {isStatsLoading ? <Skeleton className="h-12 w-24 rounded-md" /> : <AnimatedNumber value={stats?.avgGrowthRate || 15} suffix="%" />}
+            <div className="flex flex-col items-center text-center px-2">
+              <div className="text-3xl md:text-5xl font-serif font-bold text-primary mb-1 md:mb-2">
+                {isStatsLoading ? <Skeleton className="h-9 w-16 rounded-md mx-auto" /> : <AnimatedNumber value={stats?.avgGrowthRate || 15} suffix="%" />}
               </div>
-              <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Crescita media settori</p>
+              <p className="text-[10px] md:text-sm font-medium uppercase tracking-wider text-muted-foreground leading-tight">Crescita media</p>
             </div>
           </div>
         </div>
       </section>
 
       {/* Trending sectors */}
-      <section className="py-20 bg-background">
+      <section className="py-12 md:py-20 bg-background">
         <div className="container mx-auto px-4 md:px-6 max-w-6xl">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 md:mb-10">
             <div>
               <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-sm font-medium mb-3">
                 <Flame className="w-3.5 h-3.5" /> Settori in evidenza questa settimana
@@ -352,9 +352,9 @@ export default function Home() {
       </section>
 
       {/* News Section */}
-      <section className="py-20 bg-card border-y">
+      <section className="py-12 md:py-20 bg-card border-y">
         <div className="container mx-auto px-4 md:px-6 max-w-6xl">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 md:mb-10">
             <div>
               <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-sm font-medium mb-3">
                 <Newspaper className="w-3.5 h-3.5" /> News dal mondo del lavoro
@@ -390,14 +390,14 @@ export default function Home() {
       </section>
 
       {/* How it works */}
-      <section id="come-funziona" className="py-24 bg-background">
+      <section id="come-funziona" className="py-14 md:py-24 bg-background">
         <div className="container mx-auto px-4 md:px-6">
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground mb-4">Un percorso in tre passi</h2>
-            <p className="text-lg text-muted-foreground">Il nostro approccio è basato sul modello RIASEC, validato scientificamente, unito a dati di mercato in tempo reale.</p>
+          <div className="text-center max-w-3xl mx-auto mb-10 md:mb-16">
+            <h2 className="text-2xl md:text-4xl font-serif font-bold text-foreground mb-3 md:mb-4">Un percorso in tre passi</h2>
+            <p className="text-base md:text-lg text-muted-foreground">Il nostro approccio è basato sul modello RIASEC, validato scientificamente, unito a dati di mercato in tempo reale.</p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 relative">
             <div className="hidden md:block absolute top-12 left-[15%] right-[15%] h-px bg-border -z-10" />
             
             <div className="flex flex-col items-center text-center group">
@@ -434,11 +434,11 @@ export default function Home() {
       </section>
 
       {/* Testimonial / Philosophy */}
-      <section className="py-24 bg-primary text-primary-foreground">
-        <div className="container mx-auto px-4 md:px-6">
+      <section className="py-14 md:py-24 bg-primary text-primary-foreground">
+        <div className="container mx-auto px-5 md:px-6">
           <div className="max-w-4xl mx-auto text-center">
-            <Compass className="h-12 w-12 mx-auto mb-8 opacity-80" />
-            <blockquote className="text-2xl md:text-4xl font-serif font-medium leading-relaxed mb-8">
+            <Compass className="h-10 w-10 md:h-12 md:w-12 mx-auto mb-6 md:mb-8 opacity-80" />
+            <blockquote className="text-xl md:text-4xl font-serif font-medium leading-relaxed mb-6 md:mb-8">
               "Il futuro non si indovina, si costruisce. La migliore carriera non è quella che paga di più in assoluto, ma quella in cui il tuo talento naturale incontra una reale opportunità di mercato."
             </blockquote>
             <p className="text-primary-foreground/80 font-medium tracking-wider uppercase text-sm">
@@ -449,20 +449,20 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 bg-background">
+      <section className="py-14 md:py-24 bg-background">
         <div className="container mx-auto px-4 md:px-6">
-          <div className="bg-card rounded-3xl p-8 md:p-16 text-center border shadow-xl max-w-5xl mx-auto relative overflow-hidden">
+          <div className="bg-card rounded-3xl p-7 md:p-16 text-center border shadow-xl max-w-5xl mx-auto relative overflow-hidden">
             <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
               <TrendingUp className="w-64 h-64" />
             </div>
             <div className="relative z-10">
-              <h2 className="text-3xl md:text-5xl font-serif font-bold text-foreground mb-6">
+              <h2 className="text-2xl md:text-5xl font-serif font-bold text-foreground mb-4 md:mb-6">
                 Pronto a scoprire la tua direzione?
               </h2>
-              <p className="text-xl text-muted-foreground mb-10 max-w-2xl mx-auto font-light">
+              <p className="text-base md:text-xl text-muted-foreground mb-7 md:mb-10 max-w-2xl mx-auto font-light">
                 Il test richiede meno di 3 minuti. Senza registrazione obbligatoria.
               </p>
-              <Button asChild size="lg" className="rounded-full text-lg h-14 px-10 shadow-lg hover:shadow-xl transition-all">
+              <Button asChild size="lg" className="rounded-full text-base md:text-lg h-12 md:h-14 px-8 md:px-10 shadow-lg hover:shadow-xl transition-all">
                 <Link href="/test">Inizia Ora</Link>
               </Button>
             </div>

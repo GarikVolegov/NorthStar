@@ -268,19 +268,19 @@ export default function Crescita() {
     <div className="min-h-screen">
 
       {/* Hero */}
-      <section className="py-16 md:py-24 bg-gradient-to-b from-primary/5 to-background border-b">
-        <div className="container mx-auto px-4 md:px-6 max-w-4xl text-center">
-          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary text-sm font-medium px-4 py-1.5 rounded-full mb-6">
+      <section className="py-12 md:py-24 bg-gradient-to-b from-primary/5 to-background border-b">
+        <div className="container mx-auto px-5 md:px-6 max-w-4xl text-center">
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary text-sm font-medium px-4 py-1.5 rounded-full mb-5 md:mb-6">
             <Sparkles className="w-4 h-4" />
             Crescita Personale
           </div>
-          <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground mb-4 leading-tight">
+          <h1 className="text-3xl md:text-5xl font-serif font-bold text-foreground mb-3 md:mb-4 leading-tight">
             La biblioteca della tua <span className="text-primary">evoluzione</span>
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-8">
+          <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-6 md:mb-8">
             Articoli, guide ed esercizi pratici su abitudini, mindset, motivazione e crescita professionale. Contenuti curati per chi vuole migliorare con intenzione.
           </p>
-          <div className="flex flex-wrap justify-center gap-6 text-sm">
+          <div className="flex flex-wrap justify-center gap-4 md:gap-6 text-sm">
             <div className="flex items-center gap-2 text-muted-foreground">
               <BookOpen className="w-4 h-4 text-primary" />
               <span><strong className="text-foreground">{totalArticles}</strong> articoli</span>
@@ -305,13 +305,13 @@ export default function Crescita() {
       )}
 
       {/* Categories */}
-      <section className="py-14">
+      <section className="py-10 md:py-14">
         <div className="container mx-auto px-4 md:px-6 max-w-6xl">
-          <div className="mb-8">
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-1">Esplora per area</h2>
-            <p className="text-muted-foreground">Scegli il tema su cui vuoi lavorare adesso.</p>
+          <div className="mb-6 md:mb-8">
+            <h2 className="text-xl md:text-2xl font-serif font-bold text-foreground mb-1">Esplora per area</h2>
+            <p className="text-sm md:text-base text-muted-foreground">Scegli il tema su cui vuoi lavorare adesso.</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
             {catData.map(cat => (
               <CategoryCard key={cat.id} cat={cat} />
             ))}
