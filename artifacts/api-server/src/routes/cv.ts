@@ -649,6 +649,80 @@ router.get("/cv/:userId/cover-letter/pdf", async (req, res): Promise<void> => {
   res.send(buffer);
 });
 
+// ── POST /api/cv/:userId/ats-score — AI ATS compatibility analysis ────
+router.post("/cv/:userId/ats-score", async (req, res): Promise<void> => {
+  const userId = parseInt(req.params.userId, 10);
+  if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+  const { generated, jobPosting } = req.body;
+  if (!generated || !jobPosting?.trim()) {
+    res.status(400).json({ error: "Dati CV e offerta richiesti" });
+    return;
+  }
+
+  const cvText = [
+    generated.personalInfo?.title ?? "",
+    generated.summary ?? "",
+    (generated.experience ?? []).map((e: any) => `${e.title} ${e.company} ${e.description} ${(e.skills ?? []).join(" ")}`).join(" "),
+    (generated.skills ?? []).join(" "),
+    (generated.tools ?? []).join(" "),
+    (generated.education ?? []).map((e: any) => `${e.degree} ${e.institution}`).join(" "),
+    (generated.certifications ?? []).join(" "),
+  ].join("\n");
+
+  const prompt = `Sei un esperto ATS (Applicant Tracking System) e recruiter HR senior. Analizza la compatibilità tra il CV e l'offerta di lavoro e fornisci un punteggio dettagliato.
+
+CV DEL CANDIDATO:
+${cvText}
+
+OFFERTA DI LAVORO:
+${jobPosting}
+
+ISTRUZIONI:
+1. Calcola un punteggio globale ATS da 0 a 100 (basato su keyword match, rilevanza dell'esperienza, competenze, istruzione, formato)
+2. Valuta 5 sezioni specifiche con punteggio 0-100 e feedback breve (max 80 caratteri)
+3. Elenca le keyword importanti presenti nell'offerta ma ASSENTI nel CV (max 8)
+4. Elenca 2 punti di forza del CV rispetto all'offerta
+5. Fornisci 3 consigli pratici e specifici per migliorare il punteggio (max 100 caratteri ciascuno)
+6. Assegna un label: "Eccellente" (85+), "Buono" (70-84), "Sufficiente" (55-69), "Da migliorare" (<55)
+
+RISPOSTA JSON puro (nessun testo extra):
+{
+  "score": 78,
+  "label": "Buono",
+  "sections": [
+    {"name": "Riepilogo", "score": 80, "feedback": "Breve feedback specifico"},
+    {"name": "Esperienza", "score": 72, "feedback": "Breve feedback specifico"},
+    {"name": "Competenze", "score": 85, "feedback": "Breve feedback specifico"},
+    {"name": "Parole chiave", "score": 65, "feedback": "Breve feedback specifico"},
+    {"name": "Istruzione", "score": 90, "feedback": "Breve feedback specifico"}
+  ],
+  "missingKeywords": ["keyword1", "keyword2"],
+  "strengths": ["Punto di forza 1", "Punto di forza 2"],
+  "tips": ["Consiglio pratico 1", "Consiglio pratico 2", "Consiglio pratico 3"]
+}`;
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4.1",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.3,
+    max_tokens: 800,
+  });
+
+  let raw = completion.choices[0].message.content ?? "{}";
+  raw = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+
+  let result: any;
+  try {
+    result = JSON.parse(raw);
+  } catch {
+    res.status(500).json({ error: "Errore nel parsing della risposta AI" });
+    return;
+  }
+
+  res.json({ success: true, result });
+});
+
 // ── DELETE /api/cv/:userId — delete stored CV ─────────────────────────
 router.delete("/cv/:userId", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
