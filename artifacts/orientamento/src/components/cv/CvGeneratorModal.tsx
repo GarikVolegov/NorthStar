@@ -8,7 +8,7 @@ import {
   X, Loader2, Printer, RefreshCw, Sparkles, AlertCircle,
   Pencil, Eye, Plus, Trash2, ChevronDown, ChevronUp, Check,
   User, Briefcase, GraduationCap, Wrench, Award, Globe,
-  Save, CheckCircle2, Clock,
+  Save, CheckCircle2, Clock, History, FolderOpen, PenLine,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -485,8 +485,83 @@ export function CvGeneratorModal({
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(
     (cvData as any)?.lastSaved ?? null
   );
-  // Track if user has unsaved edits
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // ── Version history state ──────────────────────────────────────────
+  const [showVersions, setShowVersions] = useState(false);
+  const [versions, setVersions] = useState<Array<{
+    id: string; name: string; targetRole: string; savedAt: string;
+  }>>([]);
+  const [versionSaveStatus, setVersionSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [newVersionName, setNewVersionName] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [loadingVersionId, setLoadingVersionId] = useState<string | null>(null);
+
+  async function fetchVersions() {
+    try {
+      const res = await fetch(`${BASE}api/cv/${userId}/versions`);
+      const data = await res.json();
+      setVersions(data.versions ?? []);
+    } catch { /* silent */ }
+  }
+
+  async function saveAsVersion() {
+    if (!generated) return;
+    setVersionSaveStatus("saving");
+    try {
+      const res = await fetch(`${BASE}api/cv/${userId}/versions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ generated, name: newVersionName || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setVersions((prev) => [data.version, ...prev]);
+      setNewVersionName("");
+      setVersionSaveStatus("saved");
+      setTimeout(() => setVersionSaveStatus("idle"), 2500);
+    } catch {
+      setVersionSaveStatus("error");
+      setTimeout(() => setVersionSaveStatus("idle"), 2500);
+    }
+  }
+
+  async function renameVersion(id: string) {
+    if (!renameValue.trim()) { setRenamingId(null); return; }
+    try {
+      await fetch(`${BASE}api/cv/${userId}/versions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: renameValue.trim() }),
+      });
+      setVersions((prev) => prev.map((v) => v.id === id ? { ...v, name: renameValue.trim() } : v));
+    } catch { /* silent */ } finally {
+      setRenamingId(null);
+    }
+  }
+
+  async function deleteVersion(id: string) {
+    try {
+      await fetch(`${BASE}api/cv/${userId}/versions/${id}`, { method: "DELETE" });
+      setVersions((prev) => prev.filter((v) => v.id !== id));
+    } catch { /* silent */ }
+  }
+
+  async function loadVersion(id: string) {
+    setLoadingVersionId(id);
+    try {
+      const res = await fetch(`${BASE}api/cv/${userId}/versions/${id}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setGenerated(data.version.data);
+      setHasUnsavedChanges(false);
+      setSaveStatus("idle");
+      setShowVersions(false);
+    } catch { /* silent */ } finally {
+      setLoadingVersionId(null);
+    }
+  }
 
   function readGraphNodes(): GraphNode[] {
     try {
@@ -573,6 +648,11 @@ export function CvGeneratorModal({
       generate();
     }
   }, []);
+
+  // Load version list whenever the panel opens
+  useEffect(() => {
+    if (showVersions) fetchVersions();
+  }, [showVersions]);
 
   useEffect(() => {
     const style = document.createElement("style");
@@ -690,7 +770,22 @@ export function CvGeneratorModal({
             </Button>
           )}
 
-          {/* Rigenera — shows "Aggiorna con AI" when a saved CV exists */}
+          {/* Versioni */}
+          {hasContent && (
+            <Button
+              size="sm"
+              variant={showVersions ? "default" : "outline"}
+              className="rounded-full gap-1.5"
+              onClick={() => setShowVersions((v) => !v)}
+            >
+              <History className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">
+                Versioni{versions.length > 0 ? ` (${versions.length})` : ""}
+              </span>
+            </Button>
+          )}
+
+          {/* Rigenera */}
           {hasContent && (
             <Button
               size="sm"
@@ -698,10 +793,9 @@ export function CvGeneratorModal({
               className="rounded-full gap-1.5"
               onClick={generate}
               disabled={loading}
-              title={hasSavedCv ? "Rigenera con AI (sostituirà il CV salvato)" : "Genera nuova versione"}
             >
               <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
-              <span className="hidden sm:inline">{hasSavedCv ? "Rigenera" : "Rigenera"}</span>
+              <span className="hidden sm:inline">Rigenera</span>
             </Button>
           )}
 
@@ -754,7 +848,8 @@ export function CvGeneratorModal({
           <>
             {/* Desktop: side-by-side */}
             <div className="hidden md:flex flex-1 overflow-hidden">
-              {isEditing && (
+              {/* Edit panel */}
+              {isEditing && !showVersions && (
                 <div className="w-[400px] flex-shrink-0 overflow-y-auto border-r bg-background p-4">
                   <div className="flex items-center gap-2 mb-4 pb-3 border-b">
                     <Pencil className="w-4 h-4 text-primary" />
@@ -762,13 +857,9 @@ export function CvGeneratorModal({
                     <span className="text-xs text-muted-foreground ml-auto">Preview live →</span>
                   </div>
                   <EditPanel cv={generated} onChange={handleCvChange} />
-                  {/* Save button inside panel too */}
                   <div className="mt-4 pt-4 border-t sticky bottom-0 bg-background pb-2">
                     <Button
-                      className={cn(
-                        "w-full rounded-xl gap-2",
-                        saveStatus === "saved" && "bg-emerald-600 hover:bg-emerald-700",
-                      )}
+                      className={cn("w-full rounded-xl gap-2", saveStatus === "saved" && "bg-emerald-600 hover:bg-emerald-700")}
                       onClick={save}
                       disabled={saveStatus === "saving" || (!hasUnsavedChanges && saveStatus !== "idle")}
                     >
@@ -776,24 +867,138 @@ export function CvGeneratorModal({
                       {saveStatus === "saved" && <CheckCircle2 className="w-4 h-4" />}
                       {saveStatus === "error" && <AlertCircle className="w-4 h-4" />}
                       {saveStatus === "idle" && <Save className="w-4 h-4" />}
-                      {saveStatus === "saving" ? "Salvataggio in corso…"
-                        : saveStatus === "saved" ? "Salvato con successo!"
-                        : saveStatus === "error" ? "Errore — riprova"
-                        : "Salva modifiche"}
+                      {saveStatus === "saving" ? "Salvataggio in corso…" : saveStatus === "saved" ? "Salvato con successo!" : saveStatus === "error" ? "Errore — riprova" : "Salva modifiche"}
                     </Button>
                     {hasUnsavedChanges && saveStatus === "idle" && (
-                      <p className="text-center text-xs text-amber-600 mt-2">
-                        Hai modifiche non salvate
-                      </p>
+                      <p className="text-center text-xs text-amber-600 mt-2">Hai modifiche non salvate</p>
                     )}
                     {lastSavedAt && saveStatus !== "saving" && (
-                      <p className="text-center text-xs text-muted-foreground mt-1.5">
-                        Ultima modifica: {formatSavedAt(lastSavedAt)}
-                      </p>
+                      <p className="text-center text-xs text-muted-foreground mt-1.5">Ultima modifica: {formatSavedAt(lastSavedAt)}</p>
                     )}
                   </div>
                 </div>
               )}
+
+              {/* Versions panel */}
+              {showVersions && (
+                <div className="w-[360px] flex-shrink-0 flex flex-col border-r bg-background">
+                  <div className="flex items-center gap-2 px-4 py-3 border-b">
+                    <History className="w-4 h-4 text-primary" />
+                    <h2 className="font-semibold text-sm text-foreground">Versioni salvate</h2>
+                    <span className="ml-auto text-xs text-muted-foreground">{versions.length}/20</span>
+                    <button onClick={() => setShowVersions(false)} className="p-1 rounded hover:bg-muted ml-1">
+                      <X className="w-3.5 h-3.5 text-muted-foreground" />
+                    </button>
+                  </div>
+
+                  {/* Save current as new version */}
+                  <div className="px-4 py-3 border-b bg-muted/30">
+                    <p className="text-xs font-medium text-foreground mb-2">Salva versione corrente</p>
+                    <div className="flex gap-2">
+                      <Input
+                        value={newVersionName}
+                        onChange={(e) => setNewVersionName(e.target.value)}
+                        placeholder={`CV ${new Date().toLocaleDateString("it-IT")}`}
+                        className="h-8 text-xs rounded-lg flex-1"
+                        onKeyDown={(e) => { if (e.key === "Enter") saveAsVersion(); }}
+                      />
+                      <Button
+                        size="sm"
+                        className={cn("h-8 rounded-lg gap-1.5 shrink-0", versionSaveStatus === "saved" && "bg-emerald-600")}
+                        onClick={saveAsVersion}
+                        disabled={versionSaveStatus === "saving" || !generated}
+                      >
+                        {versionSaveStatus === "saving" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                        {versionSaveStatus === "saved" && <CheckCircle2 className="w-3.5 h-3.5" />}
+                        {versionSaveStatus === "idle" && <Save className="w-3.5 h-3.5" />}
+                        {versionSaveStatus === "error" && <AlertCircle className="w-3.5 h-3.5" />}
+                        {versionSaveStatus === "saved" ? "Salvato!" : "Salva"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Version list */}
+                  <div className="flex-1 overflow-y-auto">
+                    {versions.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                        <FolderOpen className="w-10 h-10 text-muted-foreground/40 mb-3" />
+                        <p className="text-sm font-medium text-muted-foreground">Nessuna versione salvata</p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">Usa il form qui sopra per salvare una versione del CV corrente</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y">
+                        {versions.map((v) => (
+                          <div key={v.id} className="px-4 py-3 hover:bg-muted/30 transition-colors group">
+                            {renamingId === v.id ? (
+                              <div className="flex gap-2 items-center mb-1">
+                                <Input
+                                  autoFocus
+                                  value={renameValue}
+                                  onChange={(e) => setRenameValue(e.target.value)}
+                                  className="h-7 text-xs rounded-md flex-1"
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") renameVersion(v.id);
+                                    if (e.key === "Escape") setRenamingId(null);
+                                  }}
+                                />
+                                <button onClick={() => renameVersion(v.id)} className="p-1 rounded hover:bg-primary/10 text-primary">
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                                <button onClick={() => setRenamingId(null)} className="p-1 rounded hover:bg-muted text-muted-foreground">
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-start gap-1.5 mb-1">
+                                <p className="text-sm font-medium text-foreground leading-tight flex-1 truncate">{v.name}</p>
+                                <button
+                                  onClick={() => { setRenamingId(v.id); setRenameValue(v.name); }}
+                                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-muted transition-all shrink-0 mt-0.5"
+                                  title="Rinomina"
+                                >
+                                  <PenLine className="w-3 h-3 text-muted-foreground" />
+                                </button>
+                              </div>
+                            )}
+                            {v.targetRole && (
+                              <p className="text-xs text-muted-foreground mb-2">🎯 {v.targetRole}</p>
+                            )}
+                            <div className="flex items-center gap-1.5 justify-between">
+                              <span className="text-[11px] text-muted-foreground/70 flex items-center gap-1">
+                                <Clock className="w-2.5 h-2.5" />
+                                {formatSavedAt(v.savedAt)}
+                              </span>
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-6 px-2 text-[11px] rounded-md gap-1"
+                                  onClick={() => loadVersion(v.id)}
+                                  disabled={loadingVersionId === v.id}
+                                >
+                                  {loadingVersionId === v.id
+                                    ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                    : <FolderOpen className="w-2.5 h-2.5" />}
+                                  Carica
+                                </Button>
+                                <button
+                                  onClick={() => deleteVersion(v.id)}
+                                  className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                                  title="Elimina versione"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Preview */}
               <div id="cv-preview-scroll" className="flex-1 overflow-auto py-8 px-6 bg-gray-100">
                 <CvDocument cv={generated} />
               </div>
@@ -803,29 +1008,73 @@ export function CvGeneratorModal({
             <div className="flex md:hidden flex-1 overflow-hidden">
               {mobileTab === "edit" ? (
                 <div className="flex-1 overflow-y-auto p-4 bg-background">
-                  <div className="flex items-center gap-2 mb-4 pb-3 border-b">
-                    <Pencil className="w-4 h-4 text-primary" />
-                    <h2 className="font-semibold text-sm">Modifica CV</h2>
-                    <span className="text-xs text-muted-foreground ml-auto">Vai su Anteprima per vedere</span>
-                  </div>
-                  <EditPanel cv={generated} onChange={handleCvChange} />
-                  <div className="mt-4 pt-4 border-t">
-                    <Button
-                      className={cn("w-full rounded-xl gap-2", saveStatus === "saved" && "bg-emerald-600")}
-                      onClick={save}
-                      disabled={saveStatus === "saving"}
-                    >
-                      {saveStatus === "saving" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      {saveStatus === "saving" ? "Salvataggio…"
-                        : saveStatus === "saved" ? "Salvato!"
-                        : "Salva modifiche"}
-                    </Button>
-                    {lastSavedAt && (
-                      <p className="text-center text-xs text-muted-foreground mt-2">
-                        Ultima modifica: {formatSavedAt(lastSavedAt)}
-                      </p>
-                    )}
-                  </div>
+                  {showVersions ? (
+                    /* Mobile versions panel */
+                    <div>
+                      <div className="flex items-center gap-2 mb-3 pb-3 border-b">
+                        <History className="w-4 h-4 text-primary" />
+                        <h2 className="font-semibold text-sm">Versioni salvate</h2>
+                        <button onClick={() => setShowVersions(false)} className="ml-auto p-1 rounded hover:bg-muted">
+                          <X className="w-3.5 h-3.5 text-muted-foreground" />
+                        </button>
+                      </div>
+                      <div className="flex gap-2 mb-3">
+                        <Input
+                          value={newVersionName}
+                          onChange={(e) => setNewVersionName(e.target.value)}
+                          placeholder={`CV ${new Date().toLocaleDateString("it-IT")}`}
+                          className="h-8 text-xs rounded-lg flex-1"
+                        />
+                        <Button size="sm" className="h-8 rounded-lg gap-1 shrink-0" onClick={saveAsVersion} disabled={versionSaveStatus === "saving"}>
+                          {versionSaveStatus === "saving" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                          {versionSaveStatus === "saved" ? "Salvato!" : "Salva"}
+                        </Button>
+                      </div>
+                      {versions.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-8">Nessuna versione salvata</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {versions.map((v) => (
+                            <div key={v.id} className="border rounded-lg p-3">
+                              <p className="text-sm font-medium mb-0.5 truncate">{v.name}</p>
+                              {v.targetRole && <p className="text-xs text-muted-foreground mb-2">🎯 {v.targetRole}</p>}
+                              <div className="flex gap-2 justify-end">
+                                <Button size="sm" variant="outline" className="h-7 text-xs rounded-md gap-1" onClick={() => loadVersion(v.id)} disabled={loadingVersionId === v.id}>
+                                  {loadingVersionId === v.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FolderOpen className="w-3 h-3" />}
+                                  Carica
+                                </Button>
+                                <button onClick={() => deleteVersion(v.id)} className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 mb-4 pb-3 border-b">
+                        <Pencil className="w-4 h-4 text-primary" />
+                        <h2 className="font-semibold text-sm">Modifica CV</h2>
+                        <span className="text-xs text-muted-foreground ml-auto">Vai su Anteprima per vedere</span>
+                      </div>
+                      <EditPanel cv={generated} onChange={handleCvChange} />
+                      <div className="mt-4 pt-4 border-t">
+                        <Button
+                          className={cn("w-full rounded-xl gap-2", saveStatus === "saved" && "bg-emerald-600")}
+                          onClick={save}
+                          disabled={saveStatus === "saving"}
+                        >
+                          {saveStatus === "saving" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                          {saveStatus === "saving" ? "Salvataggio…" : saveStatus === "saved" ? "Salvato!" : "Salva modifiche"}
+                        </Button>
+                        {lastSavedAt && (
+                          <p className="text-center text-xs text-muted-foreground mt-2">Ultima modifica: {formatSavedAt(lastSavedAt)}</p>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div id="cv-preview-scroll" className="flex-1 overflow-auto py-4 px-2 bg-gray-100">

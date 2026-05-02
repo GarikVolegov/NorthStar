@@ -329,6 +329,103 @@ router.patch("/cv/:userId/save", async (req, res): Promise<void> => {
   res.json({ success: true, savedAt: now });
 });
 
+// ── GET /api/cv/:userId/versions — list saved versions (metadata only) ─
+router.get("/cv/:userId/versions", async (req, res): Promise<void> => {
+  const userId = parseInt(req.params.userId, 10);
+  if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+  const [user] = await db.select({ cvJson: usersTable.cvJson }).from(usersTable).where(eq(usersTable.id, userId));
+  if (!user) { res.status(404).json({ error: "Utente non trovato" }); return; }
+
+  const versions: any[] = ((user.cvJson as any)?.versions ?? []).map((v: any) => ({
+    id: v.id,
+    name: v.name,
+    targetRole: v.targetRole,
+    savedAt: v.savedAt,
+  }));
+
+  res.json({ versions });
+});
+
+// ── POST /api/cv/:userId/versions — save current generated as new version ─
+router.post("/cv/:userId/versions", async (req, res): Promise<void> => {
+  const userId = parseInt(req.params.userId, 10);
+  if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+  const { generated, name } = req.body;
+  if (!generated || typeof generated !== "object") { res.status(400).json({ error: "Dati CV mancanti" }); return; }
+
+  const [user] = await db.select({ cvJson: usersTable.cvJson }).from(usersTable).where(eq(usersTable.id, userId));
+  if (!user) { res.status(404).json({ error: "Utente non trovato" }); return; }
+
+  const now = new Date().toISOString();
+  const newVersion = {
+    id: crypto.randomUUID(),
+    name: (name as string)?.trim() || `CV ${new Date().toLocaleDateString("it-IT")}`,
+    targetRole: generated.targetRole ?? "",
+    savedAt: now,
+    data: generated,
+  };
+
+  const existing: any[] = (user.cvJson as any)?.versions ?? [];
+  const versions = [newVersion, ...existing].slice(0, 20); // max 20 versions
+
+  const updated = { ...((user.cvJson as any) ?? {}), versions };
+  await db.update(usersTable).set({ cvJson: updated as any }).where(eq(usersTable.id, userId));
+
+  res.json({ success: true, version: { id: newVersion.id, name: newVersion.name, targetRole: newVersion.targetRole, savedAt: newVersion.savedAt } });
+});
+
+// ── GET /api/cv/:userId/versions/:versionId — load a specific version ──
+router.get("/cv/:userId/versions/:versionId", async (req, res): Promise<void> => {
+  const userId = parseInt(req.params.userId, 10);
+  if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+  const [user] = await db.select({ cvJson: usersTable.cvJson }).from(usersTable).where(eq(usersTable.id, userId));
+  if (!user) { res.status(404).json({ error: "Utente non trovato" }); return; }
+
+  const version = ((user.cvJson as any)?.versions ?? []).find((v: any) => v.id === req.params.versionId);
+  if (!version) { res.status(404).json({ error: "Versione non trovata" }); return; }
+
+  res.json({ version });
+});
+
+// ── PATCH /api/cv/:userId/versions/:versionId — rename a version ───────
+router.patch("/cv/:userId/versions/:versionId", async (req, res): Promise<void> => {
+  const userId = parseInt(req.params.userId, 10);
+  if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+  const { name } = req.body;
+  if (!name?.trim()) { res.status(400).json({ error: "Nome mancante" }); return; }
+
+  const [user] = await db.select({ cvJson: usersTable.cvJson }).from(usersTable).where(eq(usersTable.id, userId));
+  if (!user) { res.status(404).json({ error: "Utente non trovato" }); return; }
+
+  const versions = ((user.cvJson as any)?.versions ?? []).map((v: any) =>
+    v.id === req.params.versionId ? { ...v, name: name.trim() } : v
+  );
+
+  const updated = { ...((user.cvJson as any) ?? {}), versions };
+  await db.update(usersTable).set({ cvJson: updated as any }).where(eq(usersTable.id, userId));
+
+  res.json({ success: true });
+});
+
+// ── DELETE /api/cv/:userId/versions/:versionId — delete a version ───────
+router.delete("/cv/:userId/versions/:versionId", async (req, res): Promise<void> => {
+  const userId = parseInt(req.params.userId, 10);
+  if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+  const [user] = await db.select({ cvJson: usersTable.cvJson }).from(usersTable).where(eq(usersTable.id, userId));
+  if (!user) { res.status(404).json({ error: "Utente non trovato" }); return; }
+
+  const versions = ((user.cvJson as any)?.versions ?? []).filter((v: any) => v.id !== req.params.versionId);
+  const updated = { ...((user.cvJson as any) ?? {}), versions };
+  await db.update(usersTable).set({ cvJson: updated as any }).where(eq(usersTable.id, userId));
+
+  res.json({ success: true });
+});
+
 // ── DELETE /api/cv/:userId — delete stored CV ─────────────────────────
 router.delete("/cv/:userId", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
