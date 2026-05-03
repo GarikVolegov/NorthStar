@@ -252,7 +252,39 @@
       "low": "Bajo",
       "medium": "Medio",
       "high": "Alto"
-    }
+    },
+    "bookmarkSave": "Guardar sector",
+    "bookmarkRemove": "Eliminar de guardados",
+    "sectorFallback": "Sector {{n}}",
+    "alignment": {
+      "aligned": "✓ Alineado",
+      "partial": "~ Compatible",
+      "misaligned": "⚠ No alineado"
+    },
+    "aiSection": {
+      "title": "Análisis AI Profundo",
+      "loginDesc": "Inicia sesión para desbloquear el análisis AI personalizado",
+      "loadingDesc": "El orquestador AI está procesando tu perfil…",
+      "planFree": "Plan gratuito · {{count}} profesiones analizadas",
+      "planPremium": "Plan Premium · {{count}} profesiones analizadas",
+      "genericDesc": "Análisis personalizado de tu perfil RIASEC",
+      "loginTitle": "Análisis AI Personalizado",
+      "loginBody": "Inicia sesión para desbloquear el análisis AI: profesiones, rutas formativas y modalidades de trabajo recomendadas para tu perfil.",
+      "loginBtn": "Iniciar sesión o Registrarse",
+      "loadingMsg": "Análisis AI en curso — puede tardar 20–30 segundos…",
+      "errorMsg": "El análisis AI no está disponible en este momento. Inténtalo de nuevo en unos segundos.",
+      "professionsTitle": "Profesiones recomendadas",
+      "freeLabel": "Plan gratuito · 3 profesiones",
+      "workModeTitle": "Modalidad de trabajo óptima",
+      "premiumBadge": "Análisis Premium",
+      "upsellTitle": "Desbloquear el análisis completo",
+      "upsellDesc": "Con Premium: 6 profesiones, modalidad de trabajo óptima, rutas formativas personalizadas y calendario de acciones.",
+      "upsellBtn": "Desbloquear",
+      "educationTitle": "Rutas formativas",
+      "dashboardLink": "Ir al Dashboard AI completo"
+    },
+    "statsFooterTitle": "¿Sabías que?",
+    "statsFooterDesc": "{{count}} personas han completado el test en NorthStar. Los sectores más elegidos:"
   },
   "sectors": {
     "title": "Explora los sectores",
@@ -330,7 +362,20 @@
     "midTerm": "Medio plazo",
     "longTerm": "Largo plazo",
     "notFound": "Sector no encontrado",
-    "goHome": "Volver al inicio"
+    "goHome": "Volver al inicio",
+    "platformStatsUsers": "Veces elegido por usuarios",
+    "platformStatsMatch": "Puntuación de afinidad media",
+    "readyTitle": "¿Listo para empezar?",
+    "readyDesc": "Si este sector resuena contigo, confírmalo en tus resultados para recibir una hoja de ruta detallada.",
+    "backAndConfirm": "Volver y confirmar",
+    "noStats": "Datos estadísticos no disponibles en este momento.",
+    "alignment": {
+      "aligned": "✓ Alineado",
+      "partial": "~ Compatible",
+      "misaligned": "⚠ No alineado"
+    },
+    "loadingTitle": "Sector profesional",
+    "loadingDesc": "Descubre detalles, salarios, crecimiento y riesgo AI de este sector profesional en NorthStar."
   },
   "premium": {
     "badge": "NorthStar Premium",

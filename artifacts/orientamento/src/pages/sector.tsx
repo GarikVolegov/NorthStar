@@ -43,8 +43,8 @@ export default function Sector() {
     sector
       ? buildSectorMeta(sector as Parameters<typeof buildSectorMeta>[0])
       : {
-          title: "Settore professionale",
-          description: "Scopri dettagli, stipendi, crescita e rischio AI di questo settore professionale su NorthStar.",
+          title: t("sector.loadingTitle"),
+          description: t("sector.loadingDesc"),
           noIndex: true,
         }
   );
@@ -79,9 +79,9 @@ export default function Sector() {
 
   // Prepare chart data if stats exist
   const chartData = stats ? [
-    { name: "Breve Termine", value: parseInt(stats.growthProjection.shortTerm), color: "hsl(var(--chart-1))" },
-    { name: "Medio Termine", value: parseInt(stats.growthProjection.midTerm), color: "hsl(var(--chart-2))" },
-    { name: "Lungo Termine", value: parseInt(stats.growthProjection.longTerm), color: "hsl(var(--chart-3))" }
+    { name: t("sector.shortTerm"), value: parseInt(stats.growthProjection.shortTerm), color: "hsl(var(--chart-1))" },
+    { name: t("sector.midTerm"), value: parseInt(stats.growthProjection.midTerm), color: "hsl(var(--chart-2))" },
+    { name: t("sector.longTerm"), value: parseInt(stats.growthProjection.longTerm), color: "hsl(var(--chart-3))" }
   ] : [];
 
   return (
@@ -138,9 +138,9 @@ export default function Sector() {
                         alignment.type === "partial" ? "rgb(217 119 6)" :
                         "rgb(220 38 38)"
                     }} />
-                    {alignment.type === "aligned" ? "✓ Allineato" :
-                     alignment.type === "partial" ? "~ Compatibile" :
-                     "⚠ Non allineato"}
+                    {alignment.type === "aligned" ? t("sector.alignment.aligned") :
+                     alignment.type === "partial" ? t("sector.alignment.partial") :
+                     t("sector.alignment.misaligned")}
                   </div>
                 );
               })()

@@ -252,7 +252,39 @@
       "low": "Faible",
       "medium": "Moyen",
       "high": "Élevé"
-    }
+    },
+    "bookmarkSave": "Enregistrer le secteur",
+    "bookmarkRemove": "Retirer des enregistrés",
+    "sectorFallback": "Secteur {{n}}",
+    "alignment": {
+      "aligned": "✓ Aligné",
+      "partial": "~ Compatible",
+      "misaligned": "⚠ Non aligné"
+    },
+    "aiSection": {
+      "title": "Analyse IA Approfondie",
+      "loginDesc": "Connectez-vous pour débloquer l'analyse IA personnalisée",
+      "loadingDesc": "L'orchestrateur IA traite votre profil…",
+      "planFree": "Plan gratuit · {{count}} professions analysées",
+      "planPremium": "Plan Premium · {{count}} professions analysées",
+      "genericDesc": "Analyse personnalisée de votre profil RIASEC",
+      "loginTitle": "Analyse IA Personnalisée",
+      "loginBody": "Connectez-vous pour débloquer l'analyse IA : professions, parcours de formation et modes de travail recommandés pour votre profil.",
+      "loginBtn": "Se connecter ou S'inscrire",
+      "loadingMsg": "Analyse IA en cours — peut prendre 20–30 secondes…",
+      "errorMsg": "L'analyse IA n'est pas disponible pour le moment. Réessayez dans quelques secondes.",
+      "professionsTitle": "Professions recommandées",
+      "freeLabel": "Plan gratuit · 3 professions",
+      "workModeTitle": "Mode de travail optimal",
+      "premiumBadge": "Analyse Premium",
+      "upsellTitle": "Débloquer l'analyse complète",
+      "upsellDesc": "Avec Premium : 6 professions, mode de travail optimal, parcours de formation personnalisés et calendrier d'actions.",
+      "upsellBtn": "Débloquer",
+      "educationTitle": "Parcours de formation",
+      "dashboardLink": "Aller au tableau de bord IA complet"
+    },
+    "statsFooterTitle": "Le saviez-vous ?",
+    "statsFooterDesc": "{{count}} personnes ont déjà complété le test sur NorthStar. Les secteurs les plus choisis :"
   },
   "sectors": {
     "title": "Explorer les secteurs",
@@ -330,7 +362,20 @@
     "midTerm": "Moyen terme",
     "longTerm": "Long terme",
     "notFound": "Secteur introuvable",
-    "goHome": "Retour à l'accueil"
+    "goHome": "Retour à l'accueil",
+    "platformStatsUsers": "Fois choisi par les utilisateurs",
+    "platformStatsMatch": "Score d'affinité moyen",
+    "readyTitle": "Prêt à commencer ?",
+    "readyDesc": "Si ce secteur vous correspond, confirmez-le dans vos résultats pour recevoir une feuille de route détaillée.",
+    "backAndConfirm": "Retour et confirmer",
+    "noStats": "Données statistiques non disponibles pour le moment.",
+    "alignment": {
+      "aligned": "✓ Aligné",
+      "partial": "~ Compatible",
+      "misaligned": "⚠ Non aligné"
+    },
+    "loadingTitle": "Secteur professionnel",
+    "loadingDesc": "Découvrez les détails, salaires, croissance et risque IA de ce secteur professionnel sur NorthStar."
   },
   "premium": {
     "badge": "NorthStar Premium",

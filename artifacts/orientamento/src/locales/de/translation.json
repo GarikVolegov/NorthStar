@@ -252,7 +252,39 @@
       "low": "Niedrig",
       "medium": "Mittel",
       "high": "Hoch"
-    }
+    },
+    "bookmarkSave": "Sektor speichern",
+    "bookmarkRemove": "Aus Gespeicherten entfernen",
+    "sectorFallback": "Sektor {{n}}",
+    "alignment": {
+      "aligned": "✓ Ausgerichtet",
+      "partial": "~ Kompatibel",
+      "misaligned": "⚠ Nicht ausgerichtet"
+    },
+    "aiSection": {
+      "title": "Vertiefte KI-Analyse",
+      "loginDesc": "Anmelden um die personalisierte KI-Analyse freizuschalten",
+      "loadingDesc": "Der KI-Orchestrator verarbeitet dein Profil…",
+      "planFree": "Kostenloser Plan · {{count}} analysierte Berufe",
+      "planPremium": "Premium-Plan · {{count}} analysierte Berufe",
+      "genericDesc": "Personalisierte Analyse deines RIASEC-Profils",
+      "loginTitle": "Personalisierte KI-Analyse",
+      "loginBody": "Melde dich an um die KI-Analyse freizuschalten: Berufe, Bildungswege und empfohlene Arbeitsmodi für dein Profil.",
+      "loginBtn": "Anmelden oder Registrieren",
+      "loadingMsg": "KI-Analyse läuft — kann 20–30 Sekunden dauern…",
+      "errorMsg": "Die KI-Analyse ist derzeit nicht verfügbar. Bitte versuche es in einigen Sekunden erneut.",
+      "professionsTitle": "Empfohlene Berufe",
+      "freeLabel": "Kostenloser Plan · 3 Berufe",
+      "workModeTitle": "Optimaler Arbeitsmodus",
+      "premiumBadge": "Premium-Analyse",
+      "upsellTitle": "Vollständige Analyse freischalten",
+      "upsellDesc": "Mit Premium: 6 Berufe, optimaler Arbeitsmodus, personalisierte Bildungswege und Aktionskalender.",
+      "upsellBtn": "Freischalten",
+      "educationTitle": "Bildungswege",
+      "dashboardLink": "Zum vollständigen KI-Dashboard"
+    },
+    "statsFooterTitle": "Wusstest du?",
+    "statsFooterDesc": "{{count}} Personen haben den Test auf NorthStar abgeschlossen. Die beliebtesten Sektoren:"
   },
   "sectors": {
     "title": "Branchen erkunden",
@@ -330,7 +362,20 @@
     "midTerm": "Mittelfristig",
     "longTerm": "Langfristig",
     "notFound": "Branche nicht gefunden",
-    "goHome": "Zurück zur Startseite"
+    "goHome": "Zurück zur Startseite",
+    "platformStatsUsers": "Von Nutzern gewählt",
+    "platformStatsMatch": "Durchschnittliche Übereinstimmung",
+    "readyTitle": "Bereit anzufangen?",
+    "readyDesc": "Wenn dieser Sektor zu dir passt, bestätige ihn in deinen Ergebnissen für eine detaillierte Roadmap.",
+    "backAndConfirm": "Zurück und bestätigen",
+    "noStats": "Statistische Daten momentan nicht verfügbar.",
+    "alignment": {
+      "aligned": "✓ Ausgerichtet",
+      "partial": "~ Kompatibel",
+      "misaligned": "⚠ Nicht ausgerichtet"
+    },
+    "loadingTitle": "Berufsfeld",
+    "loadingDesc": "Entdecke Details, Gehälter, Wachstum und KI-Risiko dieses Berufsfelds auf NorthStar."
   },
   "premium": {
     "badge": "NorthStar Premium",

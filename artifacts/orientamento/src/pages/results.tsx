@@ -67,6 +67,7 @@ const WORK_MODE_LABELS: Record<WorkPreference, string> = {
 };
 
 function SpiritBar({ spirit, score }: { spirit: string; score: number }) {
+  const { t } = useTranslation();
   const meta = SPIRIT_META[spirit];
   if (!meta) return null;
   const pct = ((score - 1) / 4) * 100;
@@ -76,8 +77,8 @@ function SpiritBar({ spirit, score }: { spirit: string; score: number }) {
       <span className="text-xl w-7 text-center">{meta.emoji}</span>
       <div className="flex-1">
         <div className="flex justify-between items-center mb-1">
-          <span className="text-sm font-semibold text-foreground">{meta.label}</span>
-          <span className="text-xs text-muted-foreground">{SPIRIT_DESCRIPTIONS[spirit]}</span>
+          <span className="text-sm font-semibold text-foreground">{t(`results.spirits.${spirit}`)}</span>
+          <span className="text-xs text-muted-foreground">{t(`results.spirits.${spirit}_desc`)}</span>
         </div>
         <div className="h-2 bg-muted rounded-full overflow-hidden">
           <div
@@ -92,9 +93,10 @@ function SpiritBar({ spirit, score }: { spirit: string; score: number }) {
 }
 
 function SpiritRadarChart({ spiritScores }: { spiritScores: Record<string, number> }) {
+  const { t } = useTranslation();
   const prefersReduced = useReducedMotion();
   const data = SPIRIT_RADAR_ORDER.map((key) => ({
-    spirit: `${SPIRIT_META[key]?.emoji} ${SPIRIT_META[key]?.label}`,
+    spirit: `${SPIRIT_META[key]?.emoji} ${t(`results.spirits.${key}`)}`,
     value: spiritScores[key] ?? 0,
     fullMark: 5,
   }));
@@ -128,6 +130,7 @@ function SpiritRadarChart({ spiritScores }: { spiritScores: Record<string, numbe
 }
 
 function SectorBookmarkButton({ sectorId }: { sectorId: number }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { isSectorFavorite, getSectorFavoriteId, addFavorite, removeFavorite, isLoading } = useFavorites();
   if (!user) return null;
@@ -137,7 +140,7 @@ function SectorBookmarkButton({ sectorId }: { sectorId: number }) {
     <button
       onClick={(e) => { e.stopPropagation(); saved && favId !== undefined ? removeFavorite(favId) : addFavorite({ type: "sector", sectorId }); }}
       disabled={isLoading}
-      title={saved ? "Rimuovi dai salvati" : "Salva settore"}
+      title={saved ? t("results.bookmarkRemove") : t("results.bookmarkSave")}
       className={cn(
         "p-2 rounded-xl transition-colors",
         saved ? "text-primary bg-primary/10" : "text-slate-400 hover:text-primary hover:bg-primary/5"
@@ -238,7 +241,7 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
                         <SectorIcon name={rec.sector?.icon} size={18} />
                       </div>
                       <span className="text-xs font-semibold text-foreground leading-snug line-clamp-2 text-center">
-                        {rec.sector?.name ?? `Settore ${i + 1}`}
+                        {rec.sector?.name ?? t("results.sectorFallback", { n: i + 1 })}
                       </span>
                       <span className={cn(
                         "text-xs font-bold px-2 py-0.5 rounded-full border",
@@ -471,7 +474,7 @@ export default function Results() {
 
   const suggestedWorkMode: WorkPreference =
     s.suggestedWorkMode ?? (RIASEC_SUGGESTED_WORK_MODE[primaryTypes[0]] ?? "ibrido");
-  const suggestedLabel = WORK_MODE_LABELS[suggestedWorkMode];
+  const suggestedLabel = t(`results.workModes.${suggestedWorkMode}`);
 
   const riasecScoresAI = session.riasecScores as Record<string, number> | undefined;
   const topSectorsForAgent = (session.recommendations as Rec[])
@@ -651,9 +654,9 @@ export default function Results() {
                             alignment.type === "partial" ? "rgb(217 119 6)" :
                             "rgb(220 38 38)"
                         }} />
-                        {alignment.type === "aligned" ? "✓ Allineato" :
-                         alignment.type === "partial" ? "~ Compatibile" :
-                         "⚠ Non allineato"}
+                        {alignment.type === "aligned" ? t("results.alignment.aligned") :
+                         alignment.type === "partial" ? t("results.alignment.partial") :
+                         t("results.alignment.misaligned")}
                       </div>
                     )}
                   </div>
@@ -732,15 +735,17 @@ export default function Results() {
             <Bot className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="font-serif text-2xl font-bold text-foreground">Analisi AI Approfondita</h2>
+            <h2 className="font-serif text-2xl font-bold text-foreground">{t("results.aiSection.title")}</h2>
             <p className="text-sm text-muted-foreground">
               {!user
-                ? "Accedi per sbloccare l'analisi AI personalizzata"
+                ? t("results.aiSection.loginDesc")
                 : agentLoading
-                  ? "L'orchestratore AI sta elaborando il tuo profilo…"
+                  ? t("results.aiSection.loadingDesc")
                   : agentData
-                    ? `Piano ${isPremiumAgent ? "Premium" : "gratuito"} · ${agentProfessions.length} professioni analizzate`
-                    : "Analisi personalizzata del tuo profilo RIASEC"}
+                    ? isPremiumAgent
+                      ? t("results.aiSection.planPremium", { count: agentProfessions.length })
+                      : t("results.aiSection.planFree", { count: agentProfessions.length })
+                    : t("results.aiSection.genericDesc")}
             </p>
           </div>
           {isPremiumAgent && (
@@ -753,12 +758,12 @@ export default function Results() {
         {!user && (
           <div className="rounded-3xl border border-dashed p-8 text-center">
             <Bot className="w-10 h-10 text-muted-foreground mx-auto mb-4 opacity-50" />
-            <h3 className="font-serif text-xl font-bold mb-2">Analisi AI Personalizzata</h3>
+            <h3 className="font-serif text-xl font-bold mb-2">{t("results.aiSection.loginTitle")}</h3>
             <p className="text-sm text-muted-foreground mb-5 max-w-lg mx-auto">
-              Accedi per sbloccare l'analisi AI: professioni, percorsi formativi e modalità di lavoro consigliati per il tuo profilo.
+              {t("results.aiSection.loginBody")}
             </p>
             <Button asChild size="sm" className="rounded-full">
-              <Link href="/registra"><Sparkles className="w-3.5 h-3.5 mr-1.5" />Accedi o Registrati</Link>
+              <Link href="/registra"><Sparkles className="w-3.5 h-3.5 mr-1.5" />{t("results.aiSection.loginBtn")}</Link>
             </Button>
           </div>
         )}
@@ -767,7 +772,7 @@ export default function Results() {
           <div className="space-y-4">
             <div className="flex items-center gap-3 text-primary animate-pulse">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm font-medium">Analisi AI in corso — potrebbe richiedere 20–30 secondi…</span>
+              <span className="text-sm font-medium">{t("results.aiSection.loadingMsg")}</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[1, 2, 3].map((i) => (
@@ -788,7 +793,7 @@ export default function Results() {
         {user && agentError && !agentLoading && (
           <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-5 flex items-start gap-3">
             <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-            <p className="text-sm text-muted-foreground">L'analisi AI non è disponibile al momento. Riprova tra qualche istante.</p>
+            <p className="text-sm text-muted-foreground">{t("results.aiSection.errorMsg")}</p>
           </div>
         )}
 
@@ -800,9 +805,9 @@ export default function Results() {
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <Zap className="w-4 h-4 text-primary" />
-                  <h3 className="font-semibold text-foreground">Professioni consigliate</h3>
+                  <h3 className="font-semibold text-foreground">{t("results.aiSection.professionsTitle")}</h3>
                   {!isPremiumAgent && (
-                    <span className="text-xs text-muted-foreground bg-muted rounded-full px-2.5 py-0.5 ml-1">Piano gratuito · 3 professioni</span>
+                    <span className="text-xs text-muted-foreground bg-muted rounded-full px-2.5 py-0.5 ml-1">{t("results.aiSection.freeLabel")}</span>
                   )}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -850,8 +855,8 @@ export default function Results() {
                     <Star className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-foreground">Modalità lavorativa ottimale</h3>
-                    {isPremiumAgent && <span className="text-xs text-amber-700">Analisi Premium</span>}
+                    <h3 className="font-semibold text-foreground">{t("results.aiSection.workModeTitle")}</h3>
+                    {isPremiumAgent && <span className="text-xs text-amber-700">{t("results.aiSection.premiumBadge")}</span>}
                   </div>
                   <span className="ml-auto text-sm font-semibold text-primary border border-primary/20 bg-primary/5 rounded-full px-3 py-1">
                     {agentWorkMode.recommendedLabel ?? agentWorkMode.recommended}
@@ -873,13 +878,13 @@ export default function Results() {
                   <Lock className="w-4 h-4" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-foreground text-sm">Sblocca l'analisi completa</p>
+                  <p className="font-semibold text-foreground text-sm">{t("results.aiSection.upsellTitle")}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Con Premium: 6 professioni, modalità lavorativa ottimale, percorsi formativi personalizzati e calendario azioni.
+                    {t("results.aiSection.upsellDesc")}
                   </p>
                 </div>
                 <Button asChild size="sm" variant="outline" className="shrink-0 rounded-full border-amber-300 text-amber-700 hover:bg-amber-50">
-                  <Link href="/premium"><Crown className="w-3.5 h-3.5 mr-1.5" />Sblocca</Link>
+                  <Link href="/premium"><Crown className="w-3.5 h-3.5 mr-1.5" />{t("results.aiSection.upsellBtn")}</Link>
                 </Button>
               </div>
             )}
@@ -889,7 +894,7 @@ export default function Results() {
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <GraduationCap className="w-4 h-4 text-emerald-600" />
-                  <h3 className="font-semibold text-foreground">Percorsi formativi</h3>
+                  <h3 className="font-semibold text-foreground">{t("results.aiSection.educationTitle")}</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {agentEducation.map((e, i) => (
@@ -925,7 +930,7 @@ export default function Results() {
             <div className="flex justify-end">
               <Link href="/dashboard">
                 <div className="inline-flex items-center gap-1.5 text-sm text-primary font-medium hover:underline">
-                  Vai alla Dashboard AI completa <ArrowRight className="w-3.5 h-3.5" />
+                  {t("results.aiSection.dashboardLink")} <ArrowRight className="w-3.5 h-3.5" />
                 </div>
               </Link>
             </div>
@@ -937,10 +942,9 @@ export default function Results() {
       {stats && (
         <div className="mt-20 bg-card border rounded-2xl p-8 text-center animate-in fade-in duration-1000 delay-500">
           <BarChart3 className="w-10 h-10 mx-auto text-muted-foreground mb-4 opacity-50" />
-          <h3 className="font-serif text-xl font-medium mb-2">{t("home.stats.guided", { defaultValue: "Lo sapevi?" })}</h3>
+          <h3 className="font-serif text-xl font-medium mb-2">{t("results.statsFooterTitle")}</h3>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            {t("results.sectorCount", { count: stats.totalTestsTaken })} {t("results.quickCompare", { defaultValue: "" })}
-            {stats.topSectors.slice(0, 3).map(s => s.name).join(", ")}.
+            {t("results.statsFooterDesc", { count: stats.totalTestsTaken })} {stats.topSectors.slice(0, 3).map(s => s.name).join(", ")}.
           </p>
         </div>
       )}

@@ -252,7 +252,39 @@
       "low": "Low",
       "medium": "Medium",
       "high": "High"
-    }
+    },
+    "bookmarkSave": "Save sector",
+    "bookmarkRemove": "Remove from saved",
+    "sectorFallback": "Sector {{n}}",
+    "alignment": {
+      "aligned": "✓ Aligned",
+      "partial": "~ Compatible",
+      "misaligned": "⚠ Not aligned"
+    },
+    "aiSection": {
+      "title": "In-Depth AI Analysis",
+      "loginDesc": "Sign in to unlock personalized AI analysis",
+      "loadingDesc": "The AI orchestrator is processing your profile…",
+      "planFree": "Free plan · {{count}} professions analyzed",
+      "planPremium": "Premium plan · {{count}} professions analyzed",
+      "genericDesc": "Personalized analysis of your RIASEC profile",
+      "loginTitle": "Personalized AI Analysis",
+      "loginBody": "Sign in to unlock AI analysis: professions, training paths and work modes recommended for your profile.",
+      "loginBtn": "Sign in or Register",
+      "loadingMsg": "AI analysis in progress — may take 20–30 seconds…",
+      "errorMsg": "AI analysis is not available at the moment. Please try again in a few seconds.",
+      "professionsTitle": "Recommended professions",
+      "freeLabel": "Free plan · 3 professions",
+      "workModeTitle": "Optimal work mode",
+      "premiumBadge": "Premium Analysis",
+      "upsellTitle": "Unlock the full analysis",
+      "upsellDesc": "With Premium: 6 professions, optimal work mode, personalized training paths and action calendar.",
+      "upsellBtn": "Unlock",
+      "educationTitle": "Training paths",
+      "dashboardLink": "Go to the full AI Dashboard"
+    },
+    "statsFooterTitle": "Did you know?",
+    "statsFooterDesc": "{{count}} people have already completed the test on NorthStar. Top sectors:"
   },
   "sectors": {
     "title": "Explore sectors",
@@ -330,7 +362,20 @@
     "midTerm": "Mid Term",
     "longTerm": "Long Term",
     "notFound": "Sector not found",
-    "goHome": "Back to home"
+    "goHome": "Back to home",
+    "platformStatsUsers": "Times chosen by users",
+    "platformStatsMatch": "Average match score",
+    "readyTitle": "Ready to start?",
+    "readyDesc": "If this sector resonates with you, confirm it in your results to receive a detailed roadmap.",
+    "backAndConfirm": "Go back and confirm",
+    "noStats": "Statistical data not available at the moment.",
+    "alignment": {
+      "aligned": "✓ Aligned",
+      "partial": "~ Compatible",
+      "misaligned": "⚠ Not aligned"
+    },
+    "loadingTitle": "Professional sector",
+    "loadingDesc": "Discover details, salaries, growth and AI risk of this professional sector on NorthStar."
   },
   "premium": {
     "badge": "NorthStar Premium",
