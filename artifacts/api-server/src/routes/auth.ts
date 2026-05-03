@@ -4,7 +4,7 @@ import crypto from "crypto";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { sendVerificationEmail, sendResetEmail } from "../lib/email";
+import { sendVerificationEmail, sendResetEmail, sendPasswordChangedEmail } from "../lib/email";
 import { signToken } from "../lib/auth-jwt.js";
 
 const router: IRouter = Router();
@@ -303,6 +303,12 @@ router.post("/auth/reset-password", async (req, res): Promise<void> => {
     .update(usersTable)
     .set({ passwordHash, resetToken: null, resetTokenExpires: null })
     .where(eq(usersTable.id, user.id));
+
+  try {
+    await sendPasswordChangedEmail(user.email, user.name);
+  } catch (err) {
+    console.error("[auth] password changed confirmation email failed", err);
+  }
 
   res.json({ message: "Password reimpostata con successo." });
 });

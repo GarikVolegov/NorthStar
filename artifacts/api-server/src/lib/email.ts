@@ -111,6 +111,42 @@ function daysSince(date: Date): number {
   return Math.floor((Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24));
 }
 
+export async function sendPasswordChangedEmail(to: string, name: string): Promise<void> {
+  const html = `
+<!DOCTYPE html>
+<html lang="it">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:system-ui,-apple-system,sans-serif;">
+  <div style="max-width:480px;margin:40px auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+    <div style="background:#1a3a2a;padding:24px 28px;">
+      <p style="margin:0;color:#86efac;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;">NorthStar</p>
+      <h1 style="margin:8px 0 0;color:#ffffff;font-size:22px;font-weight:700;">Password reimpostata</h1>
+    </div>
+    <div style="padding:28px;">
+      <p style="margin:0 0 8px;color:#374151;font-size:16px;">Ciao <strong>${name}</strong>,</p>
+      <p style="margin:0 0 24px;color:#6b7280;font-size:14px;line-height:1.6;">
+        La tua password NorthStar è stata cambiata con successo.
+      </p>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin-bottom:24px;">
+        <p style="margin:0;color:#15803d;font-size:14px;line-height:1.6;">
+          ✓ Se hai effettuato tu questa modifica, puoi ignorare questa email in sicurezza.<br>
+          ⚠️ Se <strong>non</strong> hai cambiato la password, <strong>contatta subito il nostro supporto</strong>.
+        </p>
+      </div>
+      <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
+        Per motivi di sicurezza, non condivideremo mai la tua password via email. Se hai domande, rispondi a questa email.
+      </p>
+    </div>
+    <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px 28px;">
+      <p style="margin:0;color:#9ca3af;font-size:11px;">© NorthStar · La tua bussola professionale</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  await sendEmail(to, "La tua password NorthStar è stata reimpostata", html);
+}
+
 export async function sendInterviewReminderEmail(
   to: string,
   name: string,
