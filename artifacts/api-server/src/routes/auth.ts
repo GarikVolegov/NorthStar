@@ -59,6 +59,14 @@ function getAppBaseUrl(): string {
 
 const isDevMode = !process.env.SMTP_HOST;
 
+async function trySendVerificationEmail(email: string, name: string, code: string): Promise<void> {
+  try {
+    await sendVerificationEmail(email, name, code);
+  } catch (err) {
+    console.error("[auth] verification email failed", err);
+  }
+}
+
 router.post("/auth/register", async (req, res): Promise<void> => {
   const parsed = RegisterBody.safeParse(req.body);
   if (!parsed.success) {
@@ -88,7 +96,7 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     verificationCodeExpires,
   });
 
-  await sendVerificationEmail(email, name, verificationCode);
+  await trySendVerificationEmail(email, name, verificationCode);
 
   const body: Record<string, unknown> = {
     message: "Registrazione completata. Controlla la tua email per il codice di verifica.",
@@ -160,7 +168,7 @@ router.post("/auth/resend-verification", async (req, res): Promise<void> => {
     .set({ verificationCode, verificationCodeExpires })
     .where(eq(usersTable.id, user.id));
 
-  await sendVerificationEmail(email, user.name, verificationCode);
+  await trySendVerificationEmail(email, user.name, verificationCode);
 
   const body: Record<string, unknown> = { message: "Nuovo codice inviato." };
   if (isDevMode) body.devCode = verificationCode;
@@ -201,7 +209,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
       .update(usersTable)
       .set({ verificationCode: newCode, verificationCodeExpires: newExpires })
       .where(eq(usersTable.id, user.id));
-    await sendVerificationEmail(email, user.name, newCode);
+    await trySendVerificationEmail(email, user.name, newCode);
 
     const body: Record<string, unknown> = {
       error: "Email non verificata. Ti abbiamo inviato un nuovo codice.",
