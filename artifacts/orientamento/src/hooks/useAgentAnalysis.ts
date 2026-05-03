@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-fetch";
+import { useAuth } from "@/contexts/AuthContext";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -88,6 +89,9 @@ export function useAgentAnalysis({
   topSectors,
   enabled = true,
 }: UseAgentAnalysisOptions) {
+  const { user } = useAuth();
+  const planHint = user?.stripeSubscriptionId ? "premium" : "free";
+
   const hasData =
     !!riasecScores &&
     Object.keys(riasecScores).length > 0 &&
@@ -95,7 +99,7 @@ export function useAgentAnalysis({
     primaryTypes.length > 0;
 
   return useQuery<AgentAnalysisResponse>({
-    queryKey: ["agent-full-profile", sessionId],
+    queryKey: ["agent-full-profile", sessionId, planHint],
     enabled: enabled && !!sessionId && hasData,
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
