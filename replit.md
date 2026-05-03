@@ -159,13 +159,14 @@ Built using Replit AI Integrations (OpenAI, no API key needed). Accessible to al
 - Auto-scrolling, inline markdown rendering (bold, lists, numbered lists)
 - Model: `gpt-5.1`, max 1024 tokens
 
-### Roadmap Dettagliata (`/roadmap/:sectorId`)
-- AI-generated step-by-step career plan via streaming
-- JSON output parsed: phases (emoji, title, duration, actions, resources, milestone)
-- Progress bar during generation (~20-30 seconds)
-- Accordion-style phase cards (expandable)
-- Salary progression table, top roles, key tip
-- Model: `gpt-5.1`, max 2048 tokens
+### Roadmap personalizzata multi-percorso (`/roadmap/:sectorId`)
+- AI esplora 3-5 percorsi alternativi per entrare nel settore (Università, ITS, Bootcamp, Apprendistato, Autodidatta + certificazioni, Master, Formazione professionale)
+- Ogni percorso include: tipo, durata, costo stimato, fitScore 0-100 personalizzato, fitReason che cita i dati dell'utente, "bestFor" (profilo ideale), pros[], cons[], 4-6 fasi con azioni/risorse/milestone
+- Top-level: `userProfileSummary`, `recommendedPathId` + `recommendationReason`, `comparison`, `alternativeFormativePaths[]` (percorsi formativi laterali tipo lingua/soft skills/cert tecnica), `salaryProgression`, `topRoles`, `keyTip`
+- Personalizzazione: route usa `optionalAuthMiddleware`, fetch user (workPreference, autonomyPreference, stabilityPreference, cvJson per età/istruzione) + testSession (RIASEC, primaryTypes, dominantSpirit, spiritScores, profileSummary, recommendations.matchScore per il settore)
+- Streaming SSE, model `gpt-5.1`, `max_completion_tokens: 8192`
+- Frontend: card selettore con fitScore colorato e badge "Consigliato per te", dettaglio percorso selezionato con pros/cons, fasi accordion, sezione "Confronto onesto" + "Percorsi formativi laterali"
+- File: `artifacts/api-server/src/routes/roadmap.ts`, `artifacts/orientamento/src/pages/roadmap.tsx`
 
 ### Grafo della Conoscenza personale (`/grafo`) — Obsidian-like
 - Personal, persistent knowledge graph per user (notes, skills, documents, roles, tools, certifications, concepts, links)

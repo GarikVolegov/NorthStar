@@ -94,6 +94,16 @@ export function verifyToken(token: string): { userId: number } | null {
   }
 }
 
+/** Extracts userId from Bearer token if present and valid. Never rejects. */
+export function optionalAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const auth = req.headers.authorization;
+  if (auth?.startsWith("Bearer ")) {
+    const result = verifyToken(auth.slice(7));
+    if (result) res.locals.userId = result.userId;
+  }
+  next();
+}
+
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) {
