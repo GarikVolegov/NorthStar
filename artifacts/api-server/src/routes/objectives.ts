@@ -1,8 +1,18 @@
 import { Router, type IRouter } from "express";
 import { db, userObjectivesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { authMiddleware } from "../lib/auth-jwt";
 
 const router: IRouter = Router();
+
+router.get("/objectives/me", authMiddleware, async (req, res): Promise<void> => {
+  const userId = res.locals.userId as number;
+  const objectives = await db
+    .select()
+    .from(userObjectivesTable)
+    .where(eq(userObjectivesTable.userId, userId));
+  res.json(objectives);
+});
 
 router.get("/objectives/:userId", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);

@@ -16,6 +16,392 @@ tags:
     description: Personality test operations
   - name: users
     description: User registration
+  - name: calendar
+    description: Calendar events and reminders
+  - name: notifications
+    description: In-app notifications
+  - name: push
+    description: Browser push notification subscriptions
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+
+    Sector:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        riasecTypes:
+          type: array
+          items:
+            type: string
+        skills:
+          type: array
+          items:
+            type: string
+        avgSalaryMin:
+          type: integer
+        avgSalaryMax:
+          type: integer
+        growthRate:
+          type: number
+        automationRisk:
+          type: string
+          enum: [low, medium, high]
+        scalability:
+          type: string
+          enum: [low, medium, high]
+        trend:
+          type: string
+          enum: [declining, stable, growing, booming]
+        timeToAutonomy:
+          type: string
+        advantages:
+          type: array
+          items:
+            type: string
+        disadvantages:
+          type: array
+          items:
+            type: string
+        opportunities:
+          type: array
+          items:
+            type: string
+        icon:
+          type: string
+        color:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - description
+        - riasecTypes
+        - skills
+        - avgSalaryMin
+        - avgSalaryMax
+        - growthRate
+        - automationRisk
+        - scalability
+        - trend
+        - timeToAutonomy
+        - advantages
+        - disadvantages
+        - opportunities
+        - icon
+        - color
+        - createdAt
+
+    SectorRecommendation:
+      type: object
+      properties:
+        sectorId:
+          type: integer
+        sectorName:
+          type: string
+        matchScore:
+          type: number
+        matchReason:
+          type: string
+        sector:
+          $ref: "#/components/schemas/Sector"
+      required:
+        - sectorId
+        - sectorName
+        - matchScore
+        - matchReason
+        - sector
+
+    TestSession:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: ["integer", "null"]
+        answers:
+          type: object
+          additionalProperties: true
+        riasecScores:
+          type: object
+          additionalProperties: true
+        primaryTypes:
+          type: array
+          items:
+            type: string
+        profileSummary:
+          type: string
+        recommendations:
+          type: array
+          items:
+            $ref: "#/components/schemas/SectorRecommendation"
+        confirmedSectorId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - answers
+        - riasecScores
+        - primaryTypes
+        - profileSummary
+        - recommendations
+        - createdAt
+
+    SubmitTestBody:
+      type: object
+      properties:
+        answers:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Map of question ID to answer value (1-5)
+        name:
+          type: ["string", "null"]
+      required:
+        - answers
+
+    ConfirmSectorBody:
+      type: object
+      properties:
+        sectorId:
+          type: integer
+      required:
+        - sectorId
+
+    RegisterUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        testSessionId:
+          type: ["integer", "null"]
+      required:
+        - name
+        - email
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        testSessionId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - email
+        - createdAt
+
+    CalendarEvent:
+      type: object
+      properties:
+        id: { type: integer }
+        userId: { type: integer }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        allDay: { type: boolean }
+        category: { type: string, enum: [study, training, interview, deadline, task, follow-up] }
+        priority: { type: string, enum: [low, medium, high] }
+        status: { type: string, enum: [todo, in-progress, done, postponed] }
+        color: { type: ["string", "null"] }
+        tags: { type: array, items: { type: string } }
+        linkedSectorId: { type: ["integer", "null"] }
+        linkedGoal: { type: ["string", "null"] }
+        linkedContentIds: { type: array, items: { type: integer } }
+        isRecurring: { type: boolean }
+        recurrenceRule: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        reminders: { type: array, items: { $ref: "#/components/schemas/EventReminder" } }
+      required: [id, userId, title, startAt, endAt, allDay, category, priority, status, createdAt, updatedAt]
+
+    EventReminder:
+      type: object
+      properties:
+        id: { type: integer }
+        eventId: { type: integer }
+        minutesBefore: { type: integer }
+        enabled: { type: boolean }
+        sentAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+      required: [id, eventId, minutesBefore, enabled, createdAt]
+
+    NotificationLog:
+      type: object
+      properties:
+        id: { type: integer }
+        userId: { type: integer }
+        eventId: { type: ["integer", "null"] }
+        channel: { type: string }
+        title: { type: string }
+        body: { type: ["string", "null"] }
+        isRead: { type: boolean }
+        sentAt: { type: string, format: date-time }
+        openedAt: { type: ["string", "null"], format: date-time }
+      required: [id, userId, channel, title, isRead, sentAt]
+
+    CreateCalendarEventBody:
+      type: object
+      properties:
+        title: { type: string, maxLength: 200 }
+        description: { type: ["string", "null"] }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        allDay: { type: boolean, default: false }
+        category: { type: string, enum: [study, training, interview, deadline, task, follow-up], default: task }
+        priority: { type: string, enum: [low, medium, high], default: medium }
+        status: { type: string, enum: [todo, in-progress, done, postponed], default: todo }
+        color: { type: ["string", "null"] }
+        tags: { type: array, items: { type: string } }
+        linkedSectorId: { type: ["integer", "null"] }
+        linkedGoal: { type: ["string", "null"] }
+        linkedContentIds: { type: array, items: { type: integer } }
+        isRecurring: { type: boolean, default: false }
+        recurrenceRule: { type: ["string", "null"] }
+        reminders:
+          type: array
+          maxItems: 4
+          items:
+            type: object
+            properties:
+              minutesBefore: { type: integer }
+              enabled: { type: boolean }
+            required: [minutesBefore]
+      required: [title, startAt, endAt]
+
+    UpdateCalendarEventBody:
+      type: object
+      properties:
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        allDay: { type: boolean }
+        category: { type: string, enum: [study, training, interview, deadline, task, follow-up] }
+        priority: { type: string, enum: [low, medium, high] }
+        status: { type: string, enum: [todo, in-progress, done, postponed] }
+        color: { type: ["string", "null"] }
+        tags: { type: array, items: { type: string } }
+        linkedSectorId: { type: ["integer", "null"] }
+        linkedGoal: { type: ["string", "null"] }
+        linkedContentIds: { type: array, items: { type: integer } }
+        reminders:
+          type: array
+          maxItems: 4
+          items:
+            type: object
+            properties:
+              minutesBefore: { type: integer }
+              enabled: { type: boolean }
+            required: [minutesBefore]
+
+    CalendarQuota:
+      type: object
+      properties:
+        isPremium: { type: boolean }
+        eventCount: { type: integer }
+        eventLimit: { type: ["integer", "null"] }
+      required: [isPremium, eventCount, eventLimit]
+
+    StatsSummary:
+      type: object
+      properties:
+        totalSectors:
+          type: integer
+        totalTestsTaken:
+          type: integer
+        topSectors:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              count:
+                type: integer
+            required:
+              - name
+              - count
+        avgGrowthRate:
+          type: number
+      required:
+        - totalSectors
+        - totalTestsTaken
+        - topSectors
+        - avgGrowthRate
+
+    SectorStats:
+      type: object
+      properties:
+        sectorId:
+          type: integer
+        timesPicked:
+          type: integer
+        avgMatchScore:
+          type: number
+        salaryRange:
+          type: string
+        growthProjection:
+          type: object
+          properties:
+            shortTerm:
+              type: string
+            midTerm:
+              type: string
+            longTerm:
+              type: string
+          required:
+            - shortTerm
+            - midTerm
+            - longTerm
+      required:
+        - sectorId
+        - timesPicked
+        - avgMatchScore
+        - salaryRange
+        - growthProjection
 
 paths:
   /healthz:
@@ -23,7 +409,6 @@ paths:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -216,259 +601,324 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-components:
-  schemas:
-    HealthStatus:
-      type: object
-      properties:
-        status:
-          type: string
-      required:
-        - status
+  /calendar/quota:
+    get:
+      operationId: getCalendarQuota
+      tags: [calendar]
+      summary: Get the authenticated user's plan quota and event count
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Quota information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarQuota"
 
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: string
-      required:
-        - error
+  /calendar/events:
+    get:
+      operationId: listCalendarEvents
+      tags: [calendar]
+      summary: List events for the authenticated user within a date range
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: from, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date-time } }
+      responses:
+        "200":
+          description: List of events with reminders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events: { type: array, items: { $ref: "#/components/schemas/CalendarEvent" } }
+                required: [events]
+    post:
+      operationId: createCalendarEvent
+      tags: [calendar]
+      summary: Create a new calendar event
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCalendarEventBody" }
+      responses:
+        "201":
+          description: Created event
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event: { $ref: "#/components/schemas/CalendarEvent" }
+                required: [event]
+        "403":
+          description: Free tier limit reached or premium reminder required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
-    Sector:
-      type: object
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-        description:
-          type: string
-        riasecTypes:
-          type: array
-          items:
-            type: string
-        skills:
-          type: array
-          items:
-            type: string
-        avgSalaryMin:
-          type: integer
-        avgSalaryMax:
-          type: integer
-        growthRate:
-          type: number
-        automationRisk:
-          type: string
-          enum: [low, medium, high]
-        scalability:
-          type: string
-          enum: [low, medium, high]
-        trend:
-          type: string
-          enum: [declining, stable, growing, booming]
-        timeToAutonomy:
-          type: string
-        advantages:
-          type: array
-          items:
-            type: string
-        disadvantages:
-          type: array
-          items:
-            type: string
-        opportunities:
-          type: array
-          items:
-            type: string
-        icon:
-          type: string
-        color:
-          type: string
-        createdAt:
-          type: string
-      required:
-        - id
-        - name
-        - description
-        - riasecTypes
-        - skills
-        - avgSalaryMin
-        - avgSalaryMax
-        - growthRate
-        - automationRisk
-        - scalability
-        - trend
-        - timeToAutonomy
-        - advantages
-        - disadvantages
-        - opportunities
-        - icon
-        - color
-        - createdAt
+  /calendar/events/{id}:
+    get:
+      operationId: getCalendarEvent
+      tags: [calendar]
+      summary: Get a single event (must own it)
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Event with reminders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event: { $ref: "#/components/schemas/CalendarEvent" }
+                required: [event]
+        "404": { description: Not found }
+    put:
+      operationId: updateCalendarEvent
+      tags: [calendar]
+      summary: Update an event (must own it)
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateCalendarEventBody" }
+      responses:
+        "200":
+          description: Updated event
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event: { $ref: "#/components/schemas/CalendarEvent" }
+                required: [event]
+        "403":
+          description: Premium reminder required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404": { description: Not found }
+    delete:
+      operationId: deleteCalendarEvent
+      tags: [calendar]
+      summary: Delete an event (must own it)
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                required: [success]
 
-    SectorRecommendation:
-      type: object
-      properties:
-        sectorId:
-          type: integer
-        sectorName:
-          type: string
-        matchScore:
-          type: number
-        matchReason:
-          type: string
-        sector:
-          $ref: "#/components/schemas/Sector"
-      required:
-        - sectorId
-        - sectorName
-        - matchScore
-        - matchReason
-        - sector
+  /calendar/events/{id}/reminders:
+    post:
+      operationId: addEventReminder
+      tags: [calendar]
+      summary: Add a reminder to an event
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                minutesBefore: { type: integer }
+                enabled: { type: boolean }
+              required: [minutesBefore]
+      responses:
+        "201":
+          description: Created reminder
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reminder: { $ref: "#/components/schemas/EventReminder" }
+                required: [reminder]
+        "403":
+          description: Premium reminder required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
-    TestSession:
-      type: object
-      properties:
-        id:
-          type: integer
-        userId:
-          type: ["integer", "null"]
-        answers:
-          type: object
-          additionalProperties: true
-        riasecScores:
-          type: object
-          additionalProperties: true
-        primaryTypes:
-          type: array
-          items:
-            type: string
-        profileSummary:
-          type: string
-        recommendations:
-          type: array
-          items:
-            $ref: "#/components/schemas/SectorRecommendation"
-        confirmedSectorId:
-          type: ["integer", "null"]
-        createdAt:
-          type: string
-      required:
-        - id
-        - answers
-        - riasecScores
-        - primaryTypes
-        - profileSummary
-        - recommendations
-        - createdAt
+  /calendar/reminders/{id}:
+    put:
+      operationId: updateEventReminder
+      tags: [calendar]
+      summary: Update a reminder
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                minutesBefore: { type: integer }
+                enabled: { type: boolean }
+      responses:
+        "200":
+          description: Updated reminder
+        "403":
+          description: Premium reminder required
+    delete:
+      operationId: deleteEventReminder
+      tags: [calendar]
+      summary: Delete a reminder
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Deleted
 
-    SubmitTestBody:
-      type: object
-      properties:
-        answers:
-          type: object
-          additionalProperties:
-            type: integer
-          description: Map of question ID to answer value (1-5)
-        name:
-          type: ["string", "null"]
-      required:
-        - answers
+  /calendar/upcoming:
+    get:
+      operationId: getUpcomingEvents
+      tags: [calendar]
+      summary: Get upcoming events for the authenticated user
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 5, maximum: 20 } }
+      responses:
+        "200":
+          description: Upcoming events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events: { type: array, items: { $ref: "#/components/schemas/CalendarEvent" } }
+                required: [events]
 
-    ConfirmSectorBody:
-      type: object
-      properties:
-        sectorId:
-          type: integer
-      required:
-        - sectorId
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List in-app notifications for the authenticated user
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: unread, in: query, required: false, schema: { type: boolean } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 20 } }
+      responses:
+        "200":
+          description: Notifications list with unread count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications: { type: array, items: { $ref: "#/components/schemas/NotificationLog" } }
+                  unreadCount: { type: integer }
+                required: [notifications, unreadCount]
 
-    RegisterUserBody:
-      type: object
-      properties:
-        name:
-          type: string
-        email:
-          type: string
-        testSessionId:
-          type: ["integer", "null"]
-      required:
-        - name
-        - email
+  /notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Marked as read
 
-    User:
-      type: object
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-        email:
-          type: string
-        testSessionId:
-          type: ["integer", "null"]
-        createdAt:
-          type: string
-      required:
-        - id
-        - name
-        - email
-        - createdAt
+  /notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read for the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: All marked as read
 
-    StatsSummary:
-      type: object
-      properties:
-        totalSectors:
-          type: integer
-        totalTestsTaken:
-          type: integer
-        topSectors:
-          type: array
-          items:
-            type: object
-            properties:
-              name:
-                type: string
-              count:
-                type: integer
-            required:
-              - name
-              - count
-        avgGrowthRate:
-          type: number
-      required:
-        - totalSectors
-        - totalTestsTaken
-        - topSectors
-        - avgGrowthRate
+  /push/subscribe:
+    post:
+      operationId: subscribePush
+      tags: [push]
+      summary: Register a browser push subscription for the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                endpoint: { type: string, format: uri }
+                p256dh: { type: string }
+                auth: { type: string }
+              required: [endpoint, p256dh, auth]
+      responses:
+        "201":
+          description: Subscription registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                required: [success]
 
-    SectorStats:
-      type: object
-      properties:
-        sectorId:
-          type: integer
-        timesPicked:
-          type: integer
-        avgMatchScore:
-          type: number
-        salaryRange:
-          type: string
-        growthProjection:
-          type: object
-          properties:
-            shortTerm:
-              type: string
-            midTerm:
-              type: string
-            longTerm:
-              type: string
-          required:
-            - shortTerm
-            - midTerm
-            - longTerm
-      required:
-        - sectorId
-        - timesPicked
-        - avgMatchScore
-        - salaryRange
-        - growthProjection
+  /push/unsubscribe:
+    delete:
+      operationId: unsubscribePush
+      tags: [push]
+      summary: Remove a browser push subscription for the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                endpoint: { type: string }
+              required: [endpoint]
+      responses:
+        "200":
+          description: Subscription removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                required: [success]

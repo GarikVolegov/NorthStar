@@ -11,6 +11,8 @@ export interface HealthStatus {
 
 export interface ErrorResponse {
   error: string;
+  code?: string;
+  message?: string;
 }
 
 export type SectorAutomationRisk =
@@ -119,6 +121,217 @@ export interface User {
   createdAt: string;
 }
 
+export type CalendarEventCategory =
+  (typeof CalendarEventCategory)[keyof typeof CalendarEventCategory];
+
+export const CalendarEventCategory = {
+  study: "study",
+  training: "training",
+  interview: "interview",
+  deadline: "deadline",
+  task: "task",
+  "follow-up": "follow-up",
+} as const;
+
+export type CalendarEventPriority =
+  (typeof CalendarEventPriority)[keyof typeof CalendarEventPriority];
+
+export const CalendarEventPriority = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+} as const;
+
+export type CalendarEventStatus =
+  (typeof CalendarEventStatus)[keyof typeof CalendarEventStatus];
+
+export const CalendarEventStatus = {
+  todo: "todo",
+  "in-progress": "in-progress",
+  done: "done",
+  postponed: "postponed",
+} as const;
+
+export interface EventReminder {
+  id: number;
+  eventId: number;
+  minutesBefore: number;
+  enabled: boolean;
+  /** @nullable */
+  sentAt?: string | null;
+  createdAt: string;
+}
+
+export interface CalendarEvent {
+  id: number;
+  userId: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  startAt: string;
+  endAt: string;
+  allDay: boolean;
+  category: CalendarEventCategory;
+  priority: CalendarEventPriority;
+  status: CalendarEventStatus;
+  /** @nullable */
+  color?: string | null;
+  tags?: string[];
+  /** @nullable */
+  linkedSectorId?: number | null;
+  /** @nullable */
+  linkedGoal?: string | null;
+  linkedContentIds?: number[];
+  isRecurring?: boolean;
+  /** @nullable */
+  recurrenceRule?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  reminders?: EventReminder[];
+}
+
+export interface NotificationLog {
+  id: number;
+  userId: number;
+  /** @nullable */
+  eventId?: number | null;
+  channel: string;
+  title: string;
+  /** @nullable */
+  body?: string | null;
+  isRead: boolean;
+  sentAt: string;
+  /** @nullable */
+  openedAt?: string | null;
+}
+
+export type CreateCalendarEventBodyCategory =
+  (typeof CreateCalendarEventBodyCategory)[keyof typeof CreateCalendarEventBodyCategory];
+
+export const CreateCalendarEventBodyCategory = {
+  study: "study",
+  training: "training",
+  interview: "interview",
+  deadline: "deadline",
+  task: "task",
+  "follow-up": "follow-up",
+} as const;
+
+export type CreateCalendarEventBodyPriority =
+  (typeof CreateCalendarEventBodyPriority)[keyof typeof CreateCalendarEventBodyPriority];
+
+export const CreateCalendarEventBodyPriority = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+} as const;
+
+export type CreateCalendarEventBodyStatus =
+  (typeof CreateCalendarEventBodyStatus)[keyof typeof CreateCalendarEventBodyStatus];
+
+export const CreateCalendarEventBodyStatus = {
+  todo: "todo",
+  "in-progress": "in-progress",
+  done: "done",
+  postponed: "postponed",
+} as const;
+
+export type CreateCalendarEventBodyRemindersItem = {
+  minutesBefore: number;
+  enabled?: boolean;
+};
+
+export interface CreateCalendarEventBody {
+  /** @maxLength 200 */
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  startAt: string;
+  endAt: string;
+  allDay?: boolean;
+  category?: CreateCalendarEventBodyCategory;
+  priority?: CreateCalendarEventBodyPriority;
+  status?: CreateCalendarEventBodyStatus;
+  /** @nullable */
+  color?: string | null;
+  tags?: string[];
+  /** @nullable */
+  linkedSectorId?: number | null;
+  /** @nullable */
+  linkedGoal?: string | null;
+  linkedContentIds?: number[];
+  isRecurring?: boolean;
+  /** @nullable */
+  recurrenceRule?: string | null;
+  /** @maxItems 4 */
+  reminders?: CreateCalendarEventBodyRemindersItem[];
+}
+
+export type UpdateCalendarEventBodyCategory =
+  (typeof UpdateCalendarEventBodyCategory)[keyof typeof UpdateCalendarEventBodyCategory];
+
+export const UpdateCalendarEventBodyCategory = {
+  study: "study",
+  training: "training",
+  interview: "interview",
+  deadline: "deadline",
+  task: "task",
+  "follow-up": "follow-up",
+} as const;
+
+export type UpdateCalendarEventBodyPriority =
+  (typeof UpdateCalendarEventBodyPriority)[keyof typeof UpdateCalendarEventBodyPriority];
+
+export const UpdateCalendarEventBodyPriority = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+} as const;
+
+export type UpdateCalendarEventBodyStatus =
+  (typeof UpdateCalendarEventBodyStatus)[keyof typeof UpdateCalendarEventBodyStatus];
+
+export const UpdateCalendarEventBodyStatus = {
+  todo: "todo",
+  "in-progress": "in-progress",
+  done: "done",
+  postponed: "postponed",
+} as const;
+
+export type UpdateCalendarEventBodyRemindersItem = {
+  minutesBefore: number;
+  enabled?: boolean;
+};
+
+export interface UpdateCalendarEventBody {
+  title?: string;
+  /** @nullable */
+  description?: string | null;
+  startAt?: string;
+  endAt?: string;
+  allDay?: boolean;
+  category?: UpdateCalendarEventBodyCategory;
+  priority?: UpdateCalendarEventBodyPriority;
+  status?: UpdateCalendarEventBodyStatus;
+  /** @nullable */
+  color?: string | null;
+  tags?: string[];
+  /** @nullable */
+  linkedSectorId?: number | null;
+  /** @nullable */
+  linkedGoal?: string | null;
+  linkedContentIds?: number[];
+  /** @maxItems 4 */
+  reminders?: UpdateCalendarEventBodyRemindersItem[];
+}
+
+export interface CalendarQuota {
+  isPremium: boolean;
+  eventCount: number;
+  /** @nullable */
+  eventLimit: number | null;
+}
+
 export type StatsSummaryTopSectorsItem = {
   name: string;
   count: number;
@@ -144,3 +357,81 @@ export interface SectorStats {
   salaryRange: string;
   growthProjection: SectorStatsGrowthProjection;
 }
+
+export type ListCalendarEventsParams = {
+  from?: string;
+  to?: string;
+};
+
+export type ListCalendarEvents200 = {
+  events: CalendarEvent[];
+};
+
+export type CreateCalendarEvent201 = {
+  event: CalendarEvent;
+};
+
+export type GetCalendarEvent200 = {
+  event: CalendarEvent;
+};
+
+export type UpdateCalendarEvent200 = {
+  event: CalendarEvent;
+};
+
+export type DeleteCalendarEvent200 = {
+  success: boolean;
+};
+
+export type AddEventReminderBody = {
+  minutesBefore: number;
+  enabled?: boolean;
+};
+
+export type AddEventReminder201 = {
+  reminder: EventReminder;
+};
+
+export type UpdateEventReminderBody = {
+  minutesBefore?: number;
+  enabled?: boolean;
+};
+
+export type GetUpcomingEventsParams = {
+  /**
+   * @maximum 20
+   */
+  limit?: number;
+};
+
+export type GetUpcomingEvents200 = {
+  events: CalendarEvent[];
+};
+
+export type ListNotificationsParams = {
+  unread?: boolean;
+  limit?: number;
+};
+
+export type ListNotifications200 = {
+  notifications: NotificationLog[];
+  unreadCount: number;
+};
+
+export type SubscribePushBody = {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+};
+
+export type SubscribePush201 = {
+  success: boolean;
+};
+
+export type UnsubscribePushBody = {
+  endpoint: string;
+};
+
+export type UnsubscribePush200 = {
+  success: boolean;
+};

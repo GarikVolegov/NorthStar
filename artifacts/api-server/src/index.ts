@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { seedSectors } from "./lib/seed";
 import { startInterviewReminderScheduler } from "./lib/interview-reminder.js";
+import { startCalendarReminderScheduler } from "./lib/calendar-scheduler.js";
 
 const rawPort = process.env["PORT"];
 
@@ -31,4 +32,5 @@ app.listen(port, async (err) => {
   }
 
   startInterviewReminderScheduler();
+  startCalendarReminderScheduler();
 });

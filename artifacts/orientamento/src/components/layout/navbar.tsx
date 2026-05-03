@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Star, LogOut, User, LayoutDashboard, Menu, X,
-  FlaskConical, Layers, BookOpenText, Newspaper, Crown, Briefcase, Users,
+  FlaskConical, Layers, BookOpenText, Newspaper, Crown, Briefcase, Users, Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,7 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { LoginDialog } from "@/components/auth/LoginDialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -74,37 +75,43 @@ export function Navbar() {
           {/* Desktop right actions */}
           <div className="hidden md:flex items-center gap-2">
             {isLoggedIn && user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
-                    <User className="h-4 w-4 text-primary" />
-                    <span className="max-w-[100px] truncate">{user.name}</span>
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-sm">{user.name}</span>
-                      <span className="text-xs text-muted-foreground truncate">{user.email}</span>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setLocation("/profilo")} className="cursor-pointer">
-                    <LayoutDashboard className="h-4 w-4 mr-2" /> Il mio profilo
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setLocation("/candidature")} className="cursor-pointer">
-                    <Briefcase className="h-4 w-4 mr-2" /> Candidature
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setLocation("/amici")} className="cursor-pointer">
-                    <Users className="h-4 w-4 mr-2" /> Amici
-                    {friendsBadge ? <span className="ml-auto text-xs font-semibold text-primary">{friendsBadge}</span> : null}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive cursor-pointer">
-                    <LogOut className="h-4 w-4 mr-2" /> Esci
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <>
+                <NotificationBell userId={user.id} />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
+                      <User className="h-4 w-4 text-primary" />
+                      <span className="max-w-[100px] truncate">{user.name}</span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-sm">{user.name}</span>
+                        <span className="text-xs text-muted-foreground truncate">{user.email}</span>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setLocation("/profilo")} className="cursor-pointer">
+                      <LayoutDashboard className="h-4 w-4 mr-2" /> Il mio profilo
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setLocation("/candidature")} className="cursor-pointer">
+                      <Briefcase className="h-4 w-4 mr-2" /> Candidature
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setLocation("/calendario")} className="cursor-pointer">
+                      <Calendar className="h-4 w-4 mr-2" /> Calendario
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setLocation("/amici")} className="cursor-pointer">
+                      <Users className="h-4 w-4 mr-2" /> Amici
+                      {friendsBadge ? <span className="ml-auto text-xs font-semibold text-primary">{friendsBadge}</span> : null}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive cursor-pointer">
+                      <LogOut className="h-4 w-4 mr-2" /> Esci
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
             ) : (
               <>
                 <Button variant="ghost" size="sm" className="rounded-full font-medium" onClick={() => setLoginOpen(true)}>
@@ -117,15 +124,18 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Mobile right: user avatar or login + hamburger */}
+          {/* Mobile right: notification + user avatar or login + hamburger */}
           <div className="flex md:hidden items-center gap-2">
             {isLoggedIn && user ? (
-              <button
-                onClick={() => setLocation("/profilo")}
-                className="flex items-center justify-center w-8 h-8 rounded-full border border-border bg-card hover:bg-accent transition-colors"
-              >
-                <User className="h-4 w-4 text-primary" />
-              </button>
+              <>
+                <NotificationBell userId={user.id} />
+                <button
+                  onClick={() => setLocation("/profilo")}
+                  className="flex items-center justify-center w-8 h-8 rounded-full border border-border bg-card hover:bg-accent transition-colors"
+                >
+                  <User className="h-4 w-4 text-primary" />
+                </button>
+              </>
             ) : (
               <Button
                 variant="ghost"
@@ -201,6 +211,13 @@ export function Navbar() {
                         onClick={() => { setLocation("/candidature"); setMenuOpen(false); }}
                       >
                         <Briefcase className="h-4 w-4" /> Candidature
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full rounded-full justify-start gap-2"
+                        onClick={() => { setLocation("/calendario"); setMenuOpen(false); }}
+                      >
+                        <Calendar className="h-4 w-4" /> Calendario
                       </Button>
                       <Button
                         variant="outline"

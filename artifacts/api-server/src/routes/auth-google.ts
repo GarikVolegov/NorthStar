@@ -3,6 +3,7 @@ import { OAuth2Client } from "google-auth-library";
 import { db, usersTable } from "@workspace/db";
 import { eq, or } from "drizzle-orm";
 import { z } from "zod";
+import { signToken } from "../lib/auth-jwt.js";
 
 const router: IRouter = Router();
 
@@ -70,12 +71,10 @@ router.post("/auth/google-token", async (req, res): Promise<void> => {
       ? await db.update(usersTable).set(updates).where(eq(usersTable.id, existing.id)).returning()
       : [existing];
 
-    if (req.session) (req.session as any).userId = updated.id;
-    res.json(safeUser(updated));
+    res.json({ ...safeUser(updated), token: signToken(updated.id) });
     return;
   }
 
-  // Create new user
   const [newUser] = await db
     .insert(usersTable)
     .values({
@@ -88,8 +87,7 @@ router.post("/auth/google-token", async (req, res): Promise<void> => {
     })
     .returning();
 
-  if (req.session) (req.session as any).userId = newUser.id;
-  res.status(201).json(safeUser(newUser));
+  res.status(201).json({ ...safeUser(newUser), token: signToken(newUser.id) });
 });
 
 export default router;

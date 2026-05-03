@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, User, Mail, Calendar, CheckCircle2, KeyRound, Sparkles, ShieldCheck, Globe, Lock, Bookmark, X, Users } from "lucide-react";
 import { useFavorites } from "@/hooks/useFavorites";
 import { cn } from "@/lib/utils";
+import { ProssimiEventi } from "@/components/calendario/ProssimiEventi";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -289,8 +290,9 @@ export default function Profilo() {
           <PrivacyCard userId={user.id} />
         </div>
 
-        <div className="md:col-span-2">
-          <Card className="rounded-2xl h-full">
+        <div className="md:col-span-2 space-y-5">
+          <ProssimiEventi userId={user.id} limit={5} />
+          <Card className="rounded-2xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary" /> Cronologia test

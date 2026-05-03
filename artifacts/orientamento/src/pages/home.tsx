@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { ProssimiEventi } from "@/components/calendario/ProssimiEventi";
 import { ArrowRight, Compass, ExternalLink, LogIn, MapPin, Newspaper, Clock, Sparkles, Star, TrendingUp, Users, Bot, DollarSign, GitCompare, Flame } from "lucide-react";
 import { useGetStatsSummary } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
@@ -312,6 +313,15 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Upcoming events widget — visible only when logged in */}
+      {isLoggedIn && user && (
+        <section className="py-8 bg-background border-b">
+          <div className="container mx-auto px-4 md:px-6 max-w-6xl">
+            <ProssimiEventi userId={user.id} limit={4} />
+          </div>
+        </section>
+      )}
 
       {/* Trending sectors */}
       <section className="py-12 md:py-20 bg-background">

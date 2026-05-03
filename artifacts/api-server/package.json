@@ -14,6 +14,7 @@
     "@resvg/resvg-js": "^2.6.2",
     "@swc/helpers": "^0.5.21",
     "@types/nodemailer": "^8.0.0",
+    "@types/web-push": "^3.6.4",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
     "@workspace/integrations-openai-ai-server": "workspace:*",
@@ -30,6 +31,7 @@
     "pino-http": "^10",
     "react": "catalog:",
     "satori": "^0.26.0",
+    "web-push": "^3.6.7",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -85,7 +85,7 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
       if (!res.ok) {
         setError(data.error || "Errore con Google. Riprova.");
       } else {
-        login(data);
+        login(data, data.token ?? "");
         onOpenChange(false);
         resetAll();
       }
@@ -166,7 +166,7 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
           setError(data.error || "Errore durante il login");
         }
       } else {
-        login(data);
+        login(data, data.token ?? "");
         onOpenChange(false);
         resetAll();
       }
@@ -225,7 +225,7 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
       if (!res.ok) {
         setError(data.error || "Codice non valido");
       } else {
-        login(data);
+        login(data, data.token ?? "");
         onOpenChange(false);
         resetAll();
       }

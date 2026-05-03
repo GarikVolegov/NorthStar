@@ -23,6 +23,10 @@ import cvRouter from "./cv";
 import applicationsRouter from "./applications";
 import remindersRouter from "./reminders";
 import friendsRouter from "./friends";
+import calendarRouter from "./calendar";
+import notificationsRouter from "./notifications";
+import pushRouter from "./push";
+import meRouter from "./me";
 
 const router: IRouter = Router();
 
@@ -50,5 +54,9 @@ router.use(cvRouter);
 router.use(applicationsRouter);
 router.use(remindersRouter);
 router.use(friendsRouter);
+router.use(calendarRouter);
+router.use(notificationsRouter);
+router.use(pushRouter);
+router.use(meRouter);
 
 export default router;

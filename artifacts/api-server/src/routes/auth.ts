@@ -5,6 +5,7 @@ import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { sendVerificationEmail, sendResetEmail } from "../lib/email";
+import { signToken } from "../lib/auth-jwt.js";
 
 const router: IRouter = Router();
 
@@ -142,7 +143,7 @@ router.post("/auth/verify-email", async (req, res): Promise<void> => {
     .where(eq(usersTable.id, user.id))
     .returning();
 
-  res.json(safeUser(updated));
+  res.json({ ...safeUser(updated), token: signToken(updated.id) });
 });
 
 router.post("/auth/resend-verification", async (req, res): Promise<void> => {
@@ -225,7 +226,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(safeUser(user));
+  res.json({ ...safeUser(user), token: signToken(user.id) });
 });
 
 router.post("/auth/forgot-password", async (req, res): Promise<void> => {

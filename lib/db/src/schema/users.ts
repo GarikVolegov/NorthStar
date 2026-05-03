@@ -21,6 +21,7 @@ export const usersTable = pgTable("users", {
   cvText: text("cv_text"),
   cvJson: jsonb("cv_json"),
   isPublic: boolean("is_public").notNull().default(false),
+  timezone: text("timezone").default("Europe/Rome"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
