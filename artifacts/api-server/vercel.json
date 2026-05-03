@@ -1,5 +1,14 @@
 {
   "version": 2,
+  "builds": [
+    {
+      "src": "api/index.mjs",
+      "use": "@vercel/node",
+      "config": {
+        "buildCommand": "node ./build.mjs"
+      }
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",
