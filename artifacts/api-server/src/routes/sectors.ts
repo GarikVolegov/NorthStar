@@ -17,9 +17,18 @@ import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
-router.get("/sectors", async (_req, res): Promise<void> => {
+router.get("/sectors", async (req, res): Promise<void> => {
   const sectors = await db.select().from(sectorsTable).orderBy(sectorsTable.id);
-  res.json(ListSectorsResponse.parse(sectors.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() }))));
+  const workModeFilter = req.query.work_mode as string | undefined;
+
+  const filtered = workModeFilter
+    ? sectors.filter((s) => {
+        const modes = (s.workMode as string[] | null) ?? [];
+        return modes.includes(workModeFilter);
+      })
+    : sectors;
+
+  res.json(ListSectorsResponse.parse(filtered.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() }))));
 });
 
 router.get("/sectors/personalized", async (req, res): Promise<void> => {

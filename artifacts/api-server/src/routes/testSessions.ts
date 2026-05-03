@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db, testSessionsTable, sectorsTable } from "@workspace/db";
 import {
   SubmitTestBody,
@@ -13,6 +13,9 @@ import {
   buildProfileSummary,
   computeMatchScore,
   buildMatchReason,
+  applyWorkModeBoost,
+  RIASEC_SUGGESTED_WORK_MODE,
+  type WorkMode,
 } from "../lib/riasec";
 import {
   extractSpiritAnswers,
@@ -25,6 +28,7 @@ import { orchestratorAgent } from "../agents/orchestrator";
 import { logAgentCall } from "../agents/logger";
 import { parseOrchestratorData, getSubAgentOutput, parseSectorAgentData } from "../lib/agent-helpers";
 import { getAuthenticatedUserId, getUserPlan } from "../lib/plan-utils";
+import { usersTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -54,15 +58,20 @@ router.post("/test-sessions", async (req, res): Promise<void> => {
   const authenticatedUserId = getAuthenticatedUserId(req);
   const plan = authenticatedUserId ? await getUserPlan(authenticatedUserId) : "free";
 
-  // Delegate sector matching to SectorAgent via orchestrator
-  let agentRecommendations: Array<{
-    sectorId: number;
-    sectorName: string;
-    matchScore: number;
-    matchReason: string;
-    sector: Record<string, unknown>;
-  }> = [];
+  // Fetch user work preference for boosting sector scores
+  let userWorkMode: WorkMode = "unknown";
+  if (authenticatedUserId) {
+    const [userRow] = await db
+      .select({ workPreference: usersTable.workPreference })
+      .from(usersTable)
+      .where(eq(usersTable.id, authenticatedUserId));
+    if (userRow?.workPreference) {
+      userWorkMode = userRow.workPreference as WorkMode;
+    }
+  }
 
+  // Run SectorAgent to collect curated match reasons (best-effort; does not limit sector selection)
+  const agentReasonMap: Record<number, string> = {};
   try {
     const _agentStart = Date.now();
     const agentResult = await orchestratorAgent.run({
@@ -80,71 +89,47 @@ router.post("/test-sessions", async (req, res): Promise<void> => {
       error: agentResult.error,
       retryCount: 0,
     });
-
     if (agentResult.success) {
       const orcData = parseOrchestratorData(agentResult);
       const sectorData = orcData
         ? parseSectorAgentData(getSubAgentOutput(orcData, "SectorAgent"))
         : null;
-
-      if (sectorData && sectorData.sectors.length > 0) {
-        const allSectors = await db.select().from(sectorsTable);
-        agentRecommendations = sectorData.sectors.map((s) => {
-          const dbSector = allSectors.find((sec) => sec.id === s.sectorId);
-          return {
-            sectorId: s.sectorId,
-            sectorName: s.sectorName,
-            matchScore: s.matchScore,
-            matchReason: s.motivation,
-            sector: dbSector
-              ? {
-                  ...dbSector,
-                  riasecTypes: dbSector.riasecTypes as string[],
-                  skills: dbSector.skills as string[],
-                  advantages: dbSector.advantages as string[],
-                  disadvantages: dbSector.disadvantages as string[],
-                  opportunities: dbSector.opportunities as string[],
-                  createdAt: dbSector.createdAt.toISOString(),
-                }
-              : {},
-          };
-        });
+      if (sectorData) {
+        for (const s of sectorData.sectors) {
+          agentReasonMap[s.sectorId] = s.motivation;
+        }
       }
     }
   } catch (err) {
-    logger.warn({ err }, "SectorAgent delegation failed, falling back to direct computation");
+    logger.warn({ err }, "SectorAgent failed, using computed match reasons");
   }
 
-  // Fallback: deterministic sector computation if agent failed
-  if (agentRecommendations.length === 0) {
-    const sectors = await db.select().from(sectorsTable);
-    agentRecommendations = sectors
-      .map((sector) => {
-        const baseScore = computeMatchScore(riasecScores, sector.riasecTypes as string[]);
-        const spiritBoost = computeSpiritBoost(spiritScores, sector.name);
-        const matchScore = Math.min(99, baseScore + spiritBoost);
-        const matchReason = buildMatchReason(primaryTypes, sector.name, sector.riasecTypes as string[]);
-        return {
-          sectorId: sector.id,
-          sectorName: sector.name,
-          matchScore,
-          matchReason,
-          sector: {
-            ...sector,
-            riasecTypes: sector.riasecTypes as string[],
-            skills: sector.skills as string[],
-            advantages: sector.advantages as string[],
-            disadvantages: sector.disadvantages as string[],
-            opportunities: sector.opportunities as string[],
-            createdAt: sector.createdAt.toISOString(),
-          },
-        };
-      })
-      .sort((a, b) => b.matchScore - a.matchScore)
-      .slice(0, 3);
-  }
-
-  const recommendations = agentRecommendations;
+  // Score every sector in the catalog (RIASEC + spirit); enrich with agent match reasons where available.
+  // Storing the full ranked slate lets work-mode preference re-rank across the entire catalog on GET.
+  const allSectors = await db.select().from(sectorsTable);
+  const allScored = allSectors
+    .map((sector) => {
+      const baseScore = computeMatchScore(riasecScores, sector.riasecTypes as string[]);
+      const spiritBoost = computeSpiritBoost(spiritScores, sector.name);
+      const matchScore = Math.min(99, baseScore + spiritBoost);
+      const matchReason = agentReasonMap[sector.id] ?? buildMatchReason(primaryTypes, sector.name, sector.riasecTypes as string[]);
+      return {
+        sectorId: sector.id,
+        sectorName: sector.name,
+        matchScore,
+        matchReason,
+        sector: {
+          ...sector,
+          riasecTypes: sector.riasecTypes as string[],
+          skills: sector.skills as string[],
+          advantages: sector.advantages as string[],
+          disadvantages: sector.disadvantages as string[],
+          opportunities: sector.opportunities as string[],
+          createdAt: sector.createdAt.toISOString(),
+        },
+      };
+    })
+    .sort((a, b) => b.matchScore - a.matchScore);
 
   const [session] = await db
     .insert(testSessionsTable)
@@ -156,9 +141,22 @@ router.post("/test-sessions", async (req, res): Promise<void> => {
       profileSummary,
       spiritScores,
       dominantSpirit,
-      recommendations: recommendations.map(({ sector: _s, ...r }) => r),
+      recommendations: allScored.map(({ sector: _s, ...r }) => r),
     })
     .returning();
+
+  const boostedRecommendations = allScored
+    .map((rec) => {
+      const sectorWorkMode = (rec.sector as { workMode?: Array<"dipendente" | "autonomo" | "ibrido"> | null })?.workMode ?? null;
+      const boostedScore = applyWorkModeBoost(rec.matchScore, userWorkMode, sectorWorkMode);
+      return { ...rec, matchScore: boostedScore };
+    })
+    .sort((a, b) => b.matchScore - a.matchScore)
+    .slice(0, 3);
+
+  const suggestedWorkModeForSession = primaryTypes.length > 0
+    ? (RIASEC_SUGGESTED_WORK_MODE[primaryTypes[0] as keyof typeof RIASEC_SUGGESTED_WORK_MODE] ?? "ibrido")
+    : "ibrido";
 
   res.status(201).json({
     id: session.id,
@@ -170,9 +168,79 @@ router.post("/test-sessions", async (req, res): Promise<void> => {
     spiritScores: session.spiritScores,
     dominantSpirit: session.dominantSpirit,
     spiritInsight,
-    recommendations,
+    suggestedWorkMode: suggestedWorkModeForSession,
+    recommendations: boostedRecommendations,
     confirmedSectorId: session.confirmedSectorId,
     createdAt: session.createdAt.toISOString(),
+  });
+});
+
+router.get("/test-sessions/latest", async (req, res): Promise<void> => {
+  const userId = getAuthenticatedUserId(req);
+  if (!userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const [userRow] = await db
+    .select({ testSessionId: usersTable.testSessionId, workPreference: usersTable.workPreference })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId));
+
+  if (!userRow) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  // Prefer the latest session by user_id, fall back to the linked testSessionId
+  const sessionsByUser = await db
+    .select()
+    .from(testSessionsTable)
+    .where(eq(testSessionsTable.userId, userId))
+    .orderBy(desc(testSessionsTable.createdAt))
+    .limit(1);
+
+  const [session] = sessionsByUser.length > 0
+    ? sessionsByUser
+    : userRow.testSessionId
+      ? await db.select().from(testSessionsTable).where(eq(testSessionsTable.id, userRow.testSessionId))
+      : [];
+
+  if (!session) {
+    res.status(404).json({ error: "Test session not found" });
+    return;
+  }
+
+  const validWorkModes: WorkMode[] = ["dipendente", "autonomo", "ibrido", "unknown"];
+  const sessionUserWorkMode: WorkMode =
+    userRow.workPreference && validWorkModes.includes(userRow.workPreference as WorkMode)
+      ? (userRow.workPreference as WorkMode)
+      : "unknown";
+
+  const storedRecs = (session.recommendations ?? []) as Array<{
+    sectorId: number; sectorName: string; matchScore: number; matchReason: string;
+  }>;
+
+  const sectors = storedRecs.length > 0 ? await db.select().from(sectorsTable) : [];
+
+  const recommendations = storedRecs
+    .map((rec) => {
+      const sector = sectors.find((s) => s.id === rec.sectorId);
+      const boostedScore = applyWorkModeBoost(
+        rec.matchScore,
+        sessionUserWorkMode,
+        sector?.workMode as Array<"dipendente" | "autonomo" | "ibrido"> | null,
+      );
+      return { sectorId: rec.sectorId, sectorName: rec.sectorName, matchScore: boostedScore, matchReason: rec.matchReason };
+    })
+    .sort((a, b) => b.matchScore - a.matchScore)
+    .slice(0, 3);
+
+  res.json({
+    sessionId: session.id,
+    workPreference: sessionUserWorkMode,
+    recommendations,
+    confirmedSectorId: session.confirmedSectorId,
   });
 });
 
@@ -200,31 +268,62 @@ router.get("/test-sessions/:id", async (req, res): Promise<void> => {
     matchReason: string;
   }>;
 
+  const sessionUserId = session.userId ?? getAuthenticatedUserId(req);
+  const workModeParam = req.query.work_mode as string | undefined;
+  const validWorkModes: WorkMode[] = ["dipendente", "autonomo", "ibrido", "unknown"];
+  let sessionUserWorkMode: WorkMode = "unknown";
+  if (workModeParam && validWorkModes.includes(workModeParam as WorkMode)) {
+    sessionUserWorkMode = workModeParam as WorkMode;
+  } else if (sessionUserId) {
+    const [userRow] = await db
+      .select({ workPreference: usersTable.workPreference })
+      .from(usersTable)
+      .where(eq(usersTable.id, sessionUserId));
+    if (userRow?.workPreference) {
+      sessionUserWorkMode = userRow.workPreference as WorkMode;
+    }
+  }
+
   const sectorIds = storedRecs.map((r) => r.sectorId);
   const sectors = sectorIds.length > 0 ? await db.select().from(sectorsTable) : [];
 
-  const recommendations = storedRecs.map((rec) => {
-    const sector = sectors.find((s) => s.id === rec.sectorId);
-    return {
-      ...rec,
-      sector: sector
-        ? {
-            ...sector,
-            riasecTypes: sector.riasecTypes as string[],
-            skills: sector.skills as string[],
-            advantages: sector.advantages as string[],
-            disadvantages: sector.disadvantages as string[],
-            opportunities: sector.opportunities as string[],
-            createdAt: sector.createdAt.toISOString(),
-          }
-        : null,
-    };
-  });
+  const recommendations = storedRecs
+    .map((rec) => {
+      const sector = sectors.find((s) => s.id === rec.sectorId);
+      const boostedScore = applyWorkModeBoost(
+        rec.matchScore,
+        sessionUserWorkMode,
+        sector?.workMode as Array<"dipendente" | "autonomo" | "ibrido"> | null,
+      );
+      return {
+        ...rec,
+        matchScore: boostedScore,
+        sector: sector
+          ? {
+              ...sector,
+              riasecTypes: sector.riasecTypes as string[],
+              skills: sector.skills as string[],
+              advantages: sector.advantages as string[],
+              disadvantages: sector.disadvantages as string[],
+              opportunities: sector.opportunities as string[],
+              createdAt: sector.createdAt.toISOString(),
+            }
+          : null,
+      };
+    })
+    .sort((a, b) => b.matchScore - a.matchScore)
+    .slice(0, 3);
 
   const spiritScores = (session.spiritScores ?? {}) as Record<string, number>;
   const dominantSpirit = session.dominantSpirit ?? "";
   const secondarySpirit = getSecondarySpiritS(spiritScores);
   const spiritInsight = buildSpiritInsight(dominantSpirit, secondarySpirit, spiritScores);
+
+  // Compute suggested work mode from RIASEC primary types
+  const primaryTypesForWorkMode = (session.primaryTypes ?? []) as string[];
+  const suggestedWorkMode = primaryTypesForWorkMode.length > 0
+    ? (RIASEC_SUGGESTED_WORK_MODE[primaryTypesForWorkMode[0] as keyof typeof RIASEC_SUGGESTED_WORK_MODE] ?? "ibrido")
+    : "ibrido";
 
   res.json({
     id: session.id,
@@ -236,6 +335,7 @@ router.get("/test-sessions/:id", async (req, res): Promise<void> => {
     spiritScores,
     dominantSpirit,
     spiritInsight,
+    suggestedWorkMode,
     recommendations,
     confirmedSectorId: session.confirmedSectorId,
     createdAt: session.createdAt.toISOString(),

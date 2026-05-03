@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { usePageMeta } from "@/lib/seo";
 import { useParams, Link, useLocation } from "wouter";
-import { useGetTestSession, useConfirmSector, useGetStatsSummary } from "@workspace/api-client-react";
+import { useGetTestSession, useConfirmSector, useGetStatsSummary, getGetTestSessionQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,10 @@ import {
   PolarAngleAxis,
   ResponsiveContainer,
 } from "recharts";
+import { WorkModeSelector, WorkModeBadge, useWorkPreference } from "@/components/WorkModeSelector";
+import type { WorkPreference } from "@/components/WorkModeSelector";
+
+const BASE = import.meta.env.BASE_URL || "/";
 
 const SPIRIT_META: Record<string, { emoji: string; label: string; color: string }> = {
   shen: { emoji: "✨", label: "Presenza", color: "bg-violet-100 text-violet-700 border-violet-200" },
@@ -36,8 +41,23 @@ const SPIRIT_DESCRIPTIONS: Record<string, string> = {
   zhi:  "Volontà & Resilienza",
 };
 
-// Fixed display order for the radar pentagon
 const SPIRIT_RADAR_ORDER = ["shen", "hun", "po", "yi", "zhi"] as const;
+
+const RIASEC_SUGGESTED_WORK_MODE: Record<string, WorkPreference> = {
+  E: "autonomo",
+  A: "ibrido",
+  I: "ibrido",
+  R: "dipendente",
+  S: "dipendente",
+  C: "dipendente",
+};
+
+const WORK_MODE_LABELS: Record<WorkPreference, string> = {
+  dipendente: "Dipendente",
+  autonomo: "Autonomo / Freelance",
+  ibrido: "Ibrido",
+  unknown: "Non definita",
+};
 
 function SpiritBar({ spirit, score }: { spirit: string; score: number }) {
   const meta = SPIRIT_META[spirit];
@@ -132,6 +152,7 @@ type Rec = {
   sector?: {
     name?: string; icon?: string; avgSalaryMax?: number;
     growthRate?: number; automationRisk?: string; trend?: string;
+    workMode?: Array<"dipendente" | "autonomo" | "ibrido"> | null;
   } | null;
 };
 
@@ -140,7 +161,6 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
 
   const cols = recs.slice(0, 3);
 
-  // per-metric winner index
   function winnerIdx(vals: number[]) {
     const max = Math.max(...vals);
     return vals.indexOf(max);
@@ -215,7 +235,6 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {/* Stipendio max */}
               <tr className="hover:bg-muted/20 transition-colors">
                 <td className="px-4 py-3 text-sm text-muted-foreground font-medium whitespace-nowrap">
                   <div className="flex items-center gap-1.5">
@@ -231,7 +250,6 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
                   />
                 ))}
               </tr>
-              {/* Crescita */}
               <tr className="hover:bg-muted/20 transition-colors">
                 <td className="px-4 py-3 text-sm text-muted-foreground font-medium whitespace-nowrap">
                   <div className="flex items-center gap-1.5">
@@ -247,7 +265,6 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
                   />
                 ))}
               </tr>
-              {/* Rischio automazione */}
               <tr className="hover:bg-muted/20 transition-colors">
                 <td className="px-4 py-3 text-sm text-muted-foreground font-medium whitespace-nowrap">
                   <div className="flex items-center gap-1.5">
@@ -273,7 +290,6 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
                   );
                 })}
               </tr>
-              {/* Trend */}
               <tr className="hover:bg-muted/20 transition-colors">
                 <td className="px-4 py-3 text-sm text-muted-foreground font-medium whitespace-nowrap">
                   <div className="flex items-center gap-1.5">
@@ -293,7 +309,6 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
           </table>
         </div>
 
-        {/* Pair compare buttons */}
         <div className="flex flex-wrap items-center justify-center gap-2 px-4 py-4 border-t bg-muted/20">
           <span className="text-xs text-muted-foreground font-medium mr-1">Confronto approfondito:</span>
           {PAIRS.map(([a, b]) => (
@@ -335,11 +350,20 @@ export default function Results() {
   const { user } = useAuth();
 
   const { data: session, isLoading, error } = useGetTestSession(id, {
-    query: { enabled: !!id, queryKey: ["testSession", id] }
+    query: { queryKey: getGetTestSessionQueryKey(id), enabled: !!id }
   });
 
   const { data: stats } = useGetStatsSummary();
   const confirmSector = useConfirmSector();
+  const queryClient = useQueryClient();
+
+  const { workPreference, save: saveWorkPreference, isLoading: isSavingWorkPref } = useWorkPreference(user?.id);
+  const [workModeConfirmed, setWorkModeConfirmed] = useState(false);
+  const [anonymousWorkMode, setAnonymousWorkMode] = useState<WorkPreference | null>(null);
+  const [overriddenRecs, setOverriddenRecs] = useState<typeof session | null>(null);
+
+  // Effective session merges server data with any anonymous work-mode re-rank
+  const effectiveSession = overriddenRecs ?? session;
 
   const handleConfirm = (sectorId: number) => {
     confirmSector.mutate({ id, data: { sectorId } }, {
@@ -347,10 +371,32 @@ export default function Results() {
         if (user) {
           setLocation("/");
         } else {
-          setLocation(`/registra?session=${id}`);
+          const wm = anonymousWorkMode ?? "unknown";
+          setLocation(`/registra?session=${id}&sector=${sectorId}&work_mode=${wm}`);
         }
       },
     });
+  };
+
+  const handleInlineWorkModeSelect = async (mode: WorkPreference) => {
+    if (user) {
+      await saveWorkPreference(mode);
+      await queryClient.refetchQueries({ queryKey: getGetTestSessionQueryKey(id) });
+    } else {
+      // For anonymous users: re-fetch session with work_mode override to re-rank recommendations
+      setAnonymousWorkMode(mode);
+      try {
+        const BASE = import.meta.env.BASE_URL || "/";
+        const res = await fetch(`${BASE}api/test-sessions/${id}?work_mode=${mode}`);
+        if (res.ok) {
+          const data = await res.json();
+          setOverriddenRecs(data);
+        }
+      } catch {
+        // non-critical — keep current rankings if fetch fails
+      }
+    }
+    setWorkModeConfirmed(true);
   };
 
   if (isLoading) {
@@ -388,12 +434,17 @@ export default function Results() {
     );
   }
 
-  const primaryProfile = session.primaryTypes.join(" + ");
-  const spiritScores = (session as any).spiritScores as Record<string, number> | undefined;
-  const dominantSpirit = (session as any).dominantSpirit as string | undefined;
-  const spiritInsight = (session as any).spiritInsight as string | undefined;
+  const primaryTypes = session.primaryTypes as string[];
+  const primaryProfile = primaryTypes.join(" + ");
+  const spiritScores = session.spiritScores as Record<string, number> | null | undefined;
+  const dominantSpirit = session.dominantSpirit;
+  const spiritInsight = session.spiritInsight;
   const hasSpiritData = spiritScores && Object.keys(spiritScores).length > 0;
   const dominantMeta = dominantSpirit ? SPIRIT_META[dominantSpirit] : null;
+
+  const suggestedWorkMode: WorkPreference = (session.suggestedWorkMode as WorkPreference | null | undefined)
+    ?? (RIASEC_SUGGESTED_WORK_MODE[primaryTypes[0]] ?? "ibrido");
+  const suggestedLabel = WORK_MODE_LABELS[suggestedWorkMode];
 
   return (
     <div className="container mx-auto px-4 py-12 md:py-20 max-w-6xl">
@@ -426,7 +477,6 @@ export default function Results() {
         <div className="mb-14 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
           <div className="bg-gradient-to-br from-primary/5 via-background to-primary/5 border border-primary/15 rounded-3xl p-6 md:p-8">
 
-            {/* Header */}
             <div className="flex items-center gap-3 mb-8">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Sparkles className="w-5 h-5 text-primary" />
@@ -443,7 +493,6 @@ export default function Results() {
               )}
             </div>
 
-            {/* Radar pentagon + insight */}
             <div className="grid md:grid-cols-2 gap-8 mb-8">
               <div className="flex flex-col items-center justify-center bg-background/40 rounded-2xl border border-primary/10 py-4">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">
@@ -462,7 +511,6 @@ export default function Results() {
               )}
             </div>
 
-            {/* Spirit bars — ordered for consistency */}
             <div className="bg-background/40 rounded-2xl border border-primary/10 p-5 space-y-4">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
                 Dettaglio spiriti (media su 3 domande ciascuno)
@@ -479,6 +527,18 @@ export default function Results() {
 
       <Separator className="mb-12" />
 
+      {/* Work Mode Step — shown inline BEFORE sector confirmation for all users */}
+      {(!workModeConfirmed && (!user || workPreference === "unknown")) && (
+        <div className="mb-12 bg-gradient-to-br from-primary/3 via-background to-primary/3 border border-primary/15 rounded-3xl p-6 md:p-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <WorkModeSelector
+            suggestedMode={suggestedWorkMode}
+            suggestedLabel={suggestedLabel}
+            onSelect={handleInlineWorkModeSelect}
+            isPending={isSavingWorkPref}
+          />
+        </div>
+      )}
+
       {/* Recommendations */}
       <div className="mb-12">
         <h2 className="text-2xl md:text-3xl font-serif font-bold text-center mb-4">
@@ -489,93 +549,102 @@ export default function Results() {
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {session.recommendations.map((rec, index) => (
-            <Card
-              key={rec.sectorId}
-              className={cn(
-                "flex flex-col border-2 overflow-hidden hover:shadow-xl transition-all duration-300 animate-in slide-in-from-bottom-8 fade-in fill-mode-both",
-                rec.matchScore >= 90 ? "border-primary shadow-lg" : "border-border",
-              )}
-              style={{ animationDelay: `${index * 150}ms` }}
-            >
-              {rec.matchScore >= 90 && (
-                <div className="bg-primary text-primary-foreground text-xs font-bold uppercase tracking-wider text-center py-1.5">
-                  Miglior Affinità
-                </div>
-              )}
+          {(effectiveSession?.recommendations ?? session?.recommendations ?? []).map((rec, index) => {
+            const workModes = rec.sector?.workMode ?? null;
 
-              <CardHeader className="pb-4">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="w-14 h-14 rounded-2xl bg-primary/8 flex items-center justify-center text-primary">
-                    <SectorIcon name={rec.sector?.icon} size={26} />
+            return (
+              <Card
+                key={rec.sectorId}
+                className={cn(
+                  "flex flex-col border-2 overflow-hidden hover:shadow-xl transition-all duration-300 animate-in slide-in-from-bottom-8 fade-in fill-mode-both",
+                  rec.matchScore >= 90 ? "border-primary shadow-lg" : "border-border",
+                )}
+                style={{ animationDelay: `${index * 150}ms` }}
+              >
+                {rec.matchScore >= 90 && (
+                  <div className="bg-primary text-primary-foreground text-xs font-bold uppercase tracking-wider text-center py-1.5">
+                    Miglior Affinità
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Badge variant="secondary" className="font-mono font-medium text-sm">
-                      {rec.matchScore}% Match
-                    </Badge>
-                    <SectorBookmarkButton sectorId={rec.sectorId} />
-                  </div>
-                </div>
-                <CardTitle className="text-2xl font-serif">{rec.sector?.name}</CardTitle>
-                <CardDescription className="text-sm line-clamp-2 mt-2">
-                  {rec.sector?.description}
-                </CardDescription>
-              </CardHeader>
+                )}
 
-              <CardContent className="flex-1">
-                <div className="space-y-4">
-                  <div className="bg-muted rounded-lg p-3 text-sm flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                    <p className="text-foreground">{rec.matchReason}</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 pt-2">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                        <DollarSign className="w-3.5 h-3.5 mr-1" /> Stipendio medio annuo
-                      </div>
-                      <span className="font-semibold text-sm">
-                        €{(rec.sector?.avgSalaryMin ?? 0) / 1000}k - €{(rec.sector?.avgSalaryMax ?? 0) / 1000}k
-                      </span>
+                <CardHeader className="pb-4">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="w-14 h-14 rounded-2xl bg-primary/8 flex items-center justify-center text-primary">
+                      <SectorIcon name={rec.sector?.icon} size={26} />
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                        <TrendingUp className="w-3.5 h-3.5 mr-1" /> Crescita
-                      </div>
-                      <span className="font-semibold text-sm text-emerald-600">
-                        +{rec.sector?.growthRate}% annuo
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                        <Activity className="w-3.5 h-3.5 mr-1" /> Trend
-                      </div>
-                      <span className="font-semibold text-sm capitalize">{rec.sector?.trend}</span>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                        <Bot className="w-3.5 h-3.5 mr-1" /> Rischio automazione
-                      </div>
-                      <span className="font-semibold text-sm capitalize">{rec.sector?.automationRisk}</span>
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant="secondary" className="font-mono font-medium text-sm">
+                        {rec.matchScore}% Match
+                      </Badge>
+                      <SectorBookmarkButton sectorId={rec.sectorId} />
                     </div>
                   </div>
-                </div>
-              </CardContent>
+                  <CardTitle className="text-2xl font-serif">{rec.sector?.name}</CardTitle>
+                  <CardDescription className="text-sm line-clamp-2 mt-2">
+                    {rec.sector?.description}
+                  </CardDescription>
+                  {workModes && workModes.length > 0 && (
+                    <div className="mt-2">
+                      <WorkModeBadge modes={workModes} size="xs" />
+                    </div>
+                  )}
+                </CardHeader>
 
-              <CardFooter className="p-6 pt-0 flex flex-col gap-3">
-                <Button asChild variant="outline" className="w-full">
-                  <Link href={`/settore/${rec.sectorId}`}>Vedi dettagli completi</Link>
-                </Button>
-                <Button
-                  className="w-full"
-                  onClick={() => handleConfirm(rec.sectorId)}
-                  disabled={confirmSector.isPending}
-                >
-                  {user ? "Salva questa direzione" : "Conferma questa direzione"}
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+                <CardContent className="flex-1">
+                  <div className="space-y-4">
+                    <div className="bg-muted rounded-lg p-3 text-sm flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                      <p className="text-foreground">{rec.matchReason}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center text-muted-foreground text-xs font-medium uppercase tracking-wider">
+                          <DollarSign className="w-3.5 h-3.5 mr-1" /> Stipendio medio annuo
+                        </div>
+                        <span className="font-semibold text-sm">
+                          €{(rec.sector?.avgSalaryMin ?? 0) / 1000}k - €{(rec.sector?.avgSalaryMax ?? 0) / 1000}k
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center text-muted-foreground text-xs font-medium uppercase tracking-wider">
+                          <TrendingUp className="w-3.5 h-3.5 mr-1" /> Crescita
+                        </div>
+                        <span className="font-semibold text-sm text-emerald-600">
+                          +{rec.sector?.growthRate}% annuo
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center text-muted-foreground text-xs font-medium uppercase tracking-wider">
+                          <Activity className="w-3.5 h-3.5 mr-1" /> Trend
+                        </div>
+                        <span className="font-semibold text-sm capitalize">{rec.sector?.trend}</span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center text-muted-foreground text-xs font-medium uppercase tracking-wider">
+                          <Bot className="w-3.5 h-3.5 mr-1" /> Rischio automazione
+                        </div>
+                        <span className="font-semibold text-sm capitalize">{rec.sector?.automationRisk}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+
+                <CardFooter className="p-6 pt-0 flex flex-col gap-3">
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href={`/settore/${rec.sectorId}`}>Vedi dettagli completi</Link>
+                  </Button>
+                  <Button
+                    className="w-full"
+                    onClick={() => handleConfirm(rec.sectorId)}
+                    disabled={confirmSector.isPending}
+                  >
+                    {user ? "Salva questa direzione" : "Conferma questa direzione"}
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
         </div>
 
         <QuickCompare recs={session.recommendations as Rec[]} />

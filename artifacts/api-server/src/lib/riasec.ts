@@ -18,6 +18,17 @@ export const RIASEC_DESCRIPTIONS: Record<RiasecType, string> = {
   C: "Organizzato, preciso, metodico. Ama ordine, dati e procedure.",
 };
 
+export type WorkMode = "dipendente" | "autonomo" | "ibrido" | "unknown";
+
+export const RIASEC_SUGGESTED_WORK_MODE: Record<RiasecType, WorkMode> = {
+  E: "autonomo",
+  A: "ibrido",
+  I: "ibrido",
+  R: "dipendente",
+  S: "dipendente",
+  C: "dipendente",
+};
+
 export interface QuestionMapping {
   id: string;
   type: RiasecType;
@@ -75,6 +86,37 @@ export function buildProfileSummary(primaryTypes: RiasecType[]): string {
   const descriptions = primaryTypes.map((t) => RIASEC_DESCRIPTIONS[t]);
 
   return `Profilo ${labels.join(" + ")}: ${descriptions[0]} Al tempo stesso, ${descriptions[1]?.toLowerCase() ?? ""}`;
+}
+
+export function getSuggestedWorkMode(primaryTypes: RiasecType[]): WorkMode {
+  if (primaryTypes.length === 0) return "ibrido";
+  const dominant = primaryTypes[0];
+  return RIASEC_SUGGESTED_WORK_MODE[dominant] ?? "ibrido";
+}
+
+export function applyWorkModeBoost(
+  baseScore: number,
+  userWorkPreference: WorkMode | null | undefined,
+  sectorWorkModes: Array<"dipendente" | "autonomo" | "ibrido"> | null | undefined,
+): number {
+  if (!userWorkPreference || userWorkPreference === "unknown") return baseScore;
+  if (!sectorWorkModes || sectorWorkModes.length === 0) return baseScore;
+
+  if (userWorkPreference === "ibrido") {
+    // ibrido users get full boost only for sectors explicitly tagged ibrido;
+    // partial boost for dipendente/autonomo sectors (they are compatible but not ideal)
+    if (sectorWorkModes.includes("ibrido")) {
+      return Math.min(99, baseScore + 5);
+    }
+    return Math.min(99, baseScore + 2);
+  }
+
+  const hasMatch = sectorWorkModes.some((mode) => mode === userWorkPreference);
+
+  if (hasMatch) {
+    return Math.min(99, baseScore + 5);
+  }
+  return Math.max(55, baseScore - 5);
 }
 
 export function computeMatchScore(

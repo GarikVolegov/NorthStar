@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ProssimiEventi } from "@/components/calendario/ProssimiEventi";
-import { ArrowRight, Compass, ExternalLink, LogIn, MapPin, Newspaper, Clock, Sparkles, Star, TrendingUp, Users, Bot, DollarSign, GitCompare, Flame } from "lucide-react";
+import { ArrowRight, Compass, ExternalLink, LogIn, MapPin, Newspaper, Clock, Sparkles, Star, TrendingUp, Users, Bot, DollarSign, GitCompare, Flame, Briefcase, Laptop, GitMerge } from "lucide-react";
 import { useGetStatsSummary } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,6 +10,7 @@ import { LoginDialog } from "@/components/auth/LoginDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { SectorIcon } from "@/lib/sector-icon";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -109,6 +110,110 @@ function HomeNewsCard({ item }: { item: HomeNewsItem }) {
         </div>
       </div>
     </a>
+  );
+}
+
+type LatestRec = { sectorId: number; sectorName: string; matchScore: number; matchReason: string };
+type LatestResult = { sessionId: number; workPreference: string; recommendations: LatestRec[]; confirmedSectorId: number | null };
+
+const WORK_MODE_LABEL: Record<string, string> = {
+  dipendente: "Dipendente", autonomo: "Autonomo/Freelance", ibrido: "Ibrido",
+};
+const WORK_MODE_ICON: Record<string, React.ReactNode> = {
+  dipendente: <Briefcase className="w-3.5 h-3.5" />,
+  autonomo: <Laptop className="w-3.5 h-3.5" />,
+  ibrido: <GitMerge className="w-3.5 h-3.5" />,
+};
+const WORK_MODE_COLOR: Record<string, string> = {
+  dipendente: "text-blue-700 bg-blue-50 border-blue-200",
+  autonomo: "text-violet-700 bg-violet-50 border-violet-200",
+  ibrido: "text-emerald-700 bg-emerald-50 border-emerald-200",
+};
+
+function useLatestRecommendations(enabled: boolean) {
+  return useQuery<LatestResult>({
+    queryKey: ["latest-recommendations"],
+    enabled,
+    queryFn: async () => {
+      const res = await apiFetch(`${BASE}api/test-sessions/latest`);
+      if (!res.ok) throw new Error("No session");
+      return res.json();
+    },
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
+function PersonalizedRecommendationsSection({ userId }: { userId: number }) {
+  const { data, isLoading } = useLatestRecommendations(!!userId);
+  if (isLoading) return (
+    <section className="py-10 bg-primary/5 border-b">
+      <div className="container mx-auto px-4 md:px-6 max-w-6xl">
+        <Skeleton className="h-6 w-64 mb-4 rounded-xl" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1,2,3].map(i => <Skeleton key={i} className="h-28 rounded-2xl" />)}
+        </div>
+      </div>
+    </section>
+  );
+  if (!data?.recommendations?.length) return null;
+
+  const wm = data.workPreference;
+  const wmLabel = WORK_MODE_LABEL[wm];
+  const wmIcon = WORK_MODE_ICON[wm];
+  const wmColor = WORK_MODE_COLOR[wm];
+
+  return (
+    <section className="py-10 bg-primary/5 border-b">
+      <div className="container mx-auto px-4 md:px-6 max-w-6xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+          <div>
+            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-sm font-medium mb-2">
+              <Sparkles className="w-3.5 h-3.5" /> Raccomandazioni personalizzate
+            </div>
+            <h2 className="text-xl md:text-2xl font-serif font-bold text-foreground">
+              I settori più adatti al tuo profilo
+            </h2>
+            {wmLabel && (
+              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+                Ordinate per la tua preferenza:
+                <span className={cn("inline-flex items-center gap-1 text-xs font-semibold border rounded-full px-2 py-0.5", wmColor)}>
+                  {wmIcon} {wmLabel}
+                </span>
+              </p>
+            )}
+          </div>
+          <Link href={`/risultati/${data.sessionId}`}>
+            <div className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-primary/20 bg-background text-sm font-medium text-primary hover:bg-primary/5 transition-colors">
+              Dettaglio completo <ArrowRight className="w-3.5 h-3.5" />
+            </div>
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {data.recommendations.map((rec, i) => (
+            <Link key={rec.sectorId} href={`/settore/${rec.sectorId}`}>
+              <div className={cn(
+                "group flex items-start gap-3 p-4 rounded-2xl border bg-card hover:shadow-md hover:border-primary/30 transition-all duration-200 cursor-pointer h-full",
+                rec.sectorId === data.confirmedSectorId && "border-primary/40 bg-primary/5",
+              )}>
+                <div className="shrink-0 w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary text-lg font-serif font-bold">
+                  {i + 1}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-foreground leading-tight mb-1 group-hover:text-primary transition-colors">
+                    {rec.sectorName}
+                    {rec.sectorId === data.confirmedSectorId && (
+                      <span className="ml-2 text-xs font-medium text-primary bg-primary/10 rounded-full px-2 py-0.5">✓ Scelto</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{rec.matchReason}</p>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -322,6 +427,9 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      {/* Personalized work-mode-aware recommendations — logged-in users only */}
+      {isLoggedIn && user && <PersonalizedRecommendationsSection userId={user.id} />}
 
       {/* Trending sectors */}
       <section className="py-12 md:py-20 bg-background">

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, real, json } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, real, json, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -20,6 +20,13 @@ export const sectorsTable = pgTable("sectors", {
   opportunities: json("opportunities").$type<string[]>().notNull().default([]),
   icon: text("icon").notNull().default("briefcase"),
   color: text("color").notNull().default("#6366f1"),
+  workMode: json("work_mode").$type<Array<"dipendente" | "autonomo" | "ibrido">>().default(["dipendente", "ibrido"]),
+  autonomyScore: integer("autonomy_score").default(5),
+  stabilityScore: integer("stability_score").default(5),
+  clientAcquisitionRequired: boolean("client_acquisition_required").default(false),
+  freelanceSteps: json("freelance_steps").$type<Array<{ step: number; title: string; description: string }>>().default([]),
+  dipendentiSteps: json("dipendenti_steps").$type<Array<{ step: number; title: string; description: string }>>().default([]),
+  remoteFriendly: boolean("remote_friendly").default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

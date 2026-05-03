@@ -10,21 +10,12 @@ import {
   Search, TrendingUp, DollarSign, Bot, ArrowRight,
   Zap, SlidersHorizontal, X, GitCompare,
 } from "lucide-react";
+import { WorkModeBadge } from "@/components/WorkModeSelector";
+import type { Sector as ApiSector } from "@workspace/api-client-react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
-type Sector = {
-  id: number;
-  name: string;
-  icon: string;
-  description: string;
-  riasecTypes: string[];
-  automationRisk: string;
-  trend: string;
-  avgSalaryMin: number;
-  avgSalaryMax: number;
-  growthRate: number;
-};
+type Sector = ApiSector;
 
 const TREND_META: Record<string, { label: string; color: string }> = {
   booming:  { label: "In forte crescita", color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
@@ -281,8 +272,8 @@ export default function Settori() {
                       </div>
                     </div>
 
-                    {/* RIASEC + CTA */}
-                    <div className="px-5 pb-4 flex items-center justify-between">
+                    {/* RIASEC + work mode + CTA */}
+                    <div className="px-5 pb-4 flex items-center justify-between gap-2">
                       <div className="flex gap-1 flex-wrap">
                         {sector.riasecTypes.map((r) => (
                           <span
@@ -293,8 +284,11 @@ export default function Settori() {
                             {r}
                           </span>
                         ))}
+                        {sector.workMode && sector.workMode.length > 0 && (
+                          <WorkModeBadge modes={sector.workMode} size="xs" />
+                        )}
                       </div>
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-primary group-hover:gap-1.5 transition-all">
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-primary group-hover:gap-1.5 transition-all shrink-0">
                         Scopri <ArrowRight className="w-3 h-3" />
                       </span>
                     </div>

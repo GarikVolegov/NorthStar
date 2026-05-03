@@ -42,6 +42,21 @@ export const SectorTrend = {
   booming: "booming",
 } as const;
 
+export type SectorWorkModeItem =
+  (typeof SectorWorkModeItem)[keyof typeof SectorWorkModeItem];
+
+export const SectorWorkModeItem = {
+  dipendente: "dipendente",
+  autonomo: "autonomo",
+  ibrido: "ibrido",
+} as const;
+
+export interface FreelanceStep {
+  step: number;
+  title: string;
+  description: string;
+}
+
 export interface Sector {
   id: number;
   name: string;
@@ -60,6 +75,13 @@ export interface Sector {
   opportunities: string[];
   icon: string;
   color: string;
+  workMode?: SectorWorkModeItem[] | null;
+  autonomyScore?: number | null;
+  stabilityScore?: number | null;
+  clientAcquisitionRequired?: boolean | null;
+  remoteFriendly?: boolean | null;
+  freelanceSteps?: FreelanceStep[] | null;
+  dipendentiSteps?: FreelanceStep[] | null;
   createdAt: string;
 }
 
@@ -83,6 +105,10 @@ export interface TestSession {
   riasecScores: TestSessionRiasecScores;
   primaryTypes: string[];
   profileSummary: string;
+  suggestedWorkMode?: string | null;
+  spiritScores?: { [key: string]: number } | null;
+  dominantSpirit?: string | null;
+  spiritInsight?: string | null;
   recommendations: SectorRecommendation[];
   /** @nullable */
   confirmedSectorId?: number | null;
@@ -110,6 +136,7 @@ export interface RegisterUserBody {
   email: string;
   /** @nullable */
   testSessionId?: number | null;
+  workPreference?: string;
 }
 
 export interface User {

@@ -35,6 +35,13 @@ export const ListSectorsResponseItem = zod.object({
   opportunities: zod.array(zod.string()),
   icon: zod.string(),
   color: zod.string(),
+  workMode: zod.array(zod.enum(["dipendente", "autonomo", "ibrido"])).nullish(),
+  autonomyScore: zod.number().nullish(),
+  stabilityScore: zod.number().nullish(),
+  clientAcquisitionRequired: zod.boolean().nullish(),
+  remoteFriendly: zod.boolean().nullish(),
+  freelanceSteps: zod.array(zod.object({ step: zod.number(), title: zod.string(), description: zod.string() })).nullish(),
+  dipendentiSteps: zod.array(zod.object({ step: zod.number(), title: zod.string(), description: zod.string() })).nullish(),
   createdAt: zod.string(),
 });
 export const ListSectorsResponse = zod.array(ListSectorsResponseItem);
@@ -64,6 +71,17 @@ export const GetSectorResponse = zod.object({
   opportunities: zod.array(zod.string()),
   icon: zod.string(),
   color: zod.string(),
+  workMode: zod.array(zod.enum(["dipendente", "autonomo", "ibrido"])).nullish(),
+  autonomyScore: zod.number().nullish(),
+  stabilityScore: zod.number().nullish(),
+  clientAcquisitionRequired: zod.boolean().nullish(),
+  remoteFriendly: zod.boolean().nullish(),
+  freelanceSteps: zod.array(zod.object({
+    step: zod.number(),
+    title: zod.string(),
+    description: zod.string(),
+  })).nullish(),
+  dipendentiSteps: zod.array(zod.object({ step: zod.number(), title: zod.string(), description: zod.string() })).nullish(),
   createdAt: zod.string(),
 });
 
@@ -91,6 +109,10 @@ export const GetTestSessionResponse = zod.object({
   riasecScores: zod.record(zod.string(), zod.unknown()),
   primaryTypes: zod.array(zod.string()),
   profileSummary: zod.string(),
+  suggestedWorkMode: zod.string().nullish(),
+  spiritScores: zod.record(zod.string(), zod.number()).nullish(),
+  dominantSpirit: zod.string().nullish(),
+  spiritInsight: zod.string().nullish(),
   recommendations: zod.array(
     zod.object({
       sectorId: zod.number(),
@@ -115,6 +137,13 @@ export const GetTestSessionResponse = zod.object({
         opportunities: zod.array(zod.string()),
         icon: zod.string(),
         color: zod.string(),
+        workMode: zod.array(zod.enum(["dipendente", "autonomo", "ibrido"])).nullish(),
+        autonomyScore: zod.number().nullish(),
+        stabilityScore: zod.number().nullish(),
+        clientAcquisitionRequired: zod.boolean().nullish(),
+        remoteFriendly: zod.boolean().nullish(),
+        freelanceSteps: zod.array(zod.object({ step: zod.number(), title: zod.string(), description: zod.string() })).nullish(),
+        dipendentiSteps: zod.array(zod.object({ step: zod.number(), title: zod.string(), description: zod.string() })).nullish(),
         createdAt: zod.string(),
       }),
     }),
@@ -141,6 +170,10 @@ export const ConfirmSectorResponse = zod.object({
   riasecScores: zod.record(zod.string(), zod.unknown()),
   primaryTypes: zod.array(zod.string()),
   profileSummary: zod.string(),
+  suggestedWorkMode: zod.string().nullish(),
+  spiritScores: zod.record(zod.string(), zod.number()).nullish(),
+  dominantSpirit: zod.string().nullish(),
+  spiritInsight: zod.string().nullish(),
   recommendations: zod.array(
     zod.object({
       sectorId: zod.number(),
@@ -165,6 +198,13 @@ export const ConfirmSectorResponse = zod.object({
         opportunities: zod.array(zod.string()),
         icon: zod.string(),
         color: zod.string(),
+        workMode: zod.array(zod.enum(["dipendente", "autonomo", "ibrido"])).nullish(),
+        autonomyScore: zod.number().nullish(),
+        stabilityScore: zod.number().nullish(),
+        clientAcquisitionRequired: zod.boolean().nullish(),
+        remoteFriendly: zod.boolean().nullish(),
+        freelanceSteps: zod.array(zod.object({ step: zod.number(), title: zod.string(), description: zod.string() })).nullish(),
+        dipendentiSteps: zod.array(zod.object({ step: zod.number(), title: zod.string(), description: zod.string() })).nullish(),
         createdAt: zod.string(),
       }),
     }),
@@ -180,6 +220,7 @@ export const RegisterUserBody = zod.object({
   name: zod.string(),
   email: zod.string(),
   testSessionId: zod.number().nullish(),
+  workPreference: zod.string().optional(),
 });
 
 /**

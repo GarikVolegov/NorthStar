@@ -13,9 +13,10 @@ export default function Register() {
   const { toast } = useToast();
   const registerUser = useRegisterUser();
   
-  // Extract session ID from URL search params
+  // Extract params from URL
   const searchParams = new URLSearchParams(window.location.search);
   const sessionId = searchParams.get("session") ? parseInt(searchParams.get("session") as string, 10) : null;
+  const pendingWorkMode = searchParams.get("work_mode");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -40,7 +41,8 @@ export default function Register() {
       data: { 
         name: formData.name, 
         email: formData.email,
-        testSessionId: sessionId
+        testSessionId: sessionId,
+        workPreference: pendingWorkMode ?? undefined,
       } 
     }, {
       onSuccess: () => {

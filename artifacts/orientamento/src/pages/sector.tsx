@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useParams, Link } from "wouter";
 import { useGetSector, useGetSectorStats } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -6,14 +6,27 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Clock, DollarSign, Bot, Sparkles, TrendingUp, Target, Plus, Minus, Zap, Brain, MapPin, Network, ArrowRight, Newspaper, GitCompare } from "lucide-react";
+import { ArrowLeft, Clock, DollarSign, Bot, Sparkles, TrendingUp, Target, Plus, Minus, Zap, Brain, MapPin, Network, ArrowRight, Newspaper, GitCompare, Briefcase, Laptop, ToggleLeft, ToggleRight } from "lucide-react";
 import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { usePageMeta, buildSectorMeta } from "@/lib/seo";
+import { WorkModeBadge, useWorkPreference } from "@/components/WorkModeSelector";
+import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
 
 export default function Sector() {
   const params = useParams();
   const id = parseInt(params.id || "0", 10);
+  const { user } = useAuth();
+  const { workPreference } = useWorkPreference(user?.id);
+  const [stepsView, setStepsView] = useState<"dipendente" | "autonomo">(
+    workPreference === "autonomo" ? "autonomo" : "dipendente"
+  );
+
+  React.useEffect(() => {
+    if (workPreference === "autonomo") setStepsView("autonomo");
+    else if (workPreference === "dipendente") setStepsView("dipendente");
+  }, [workPreference]);
 
   const { data: sector, isLoading: isLoadingSector, error: sectorError } = useGetSector(id, {
     query: { enabled: !!id, queryKey: ["sector", id] }
@@ -99,6 +112,9 @@ export default function Sector() {
             <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50">
               <TrendingUp className="w-3 h-3 mr-1" /> {sector.trend}
             </Badge>
+            {sector.workMode && sector.workMode.length > 0 && (
+              <WorkModeBadge modes={sector.workMode} size="sm" />
+            )}
           </div>
           <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground mb-4 leading-tight">
             {sector.name}
@@ -229,6 +245,12 @@ export default function Sector() {
             Panoramica
           </TabsTrigger>
           <TabsTrigger 
+            value="percorso" 
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 py-3 text-base"
+          >
+            Percorso di Carriera
+          </TabsTrigger>
+          <TabsTrigger 
             value="skills" 
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 py-3 text-base"
           >
@@ -241,6 +263,108 @@ export default function Sector() {
             Dati & Trend
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="percorso" className="animate-in fade-in duration-500">
+          <div className="max-w-3xl">
+            <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+              <h3 className="text-2xl font-serif font-bold flex items-center gap-2">
+                Percorso di Carriera
+              </h3>
+              <div className="flex items-center gap-2 bg-muted rounded-xl p-1">
+                <button
+                  onClick={() => setStepsView("dipendente")}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                    stepsView === "dipendente"
+                      ? "bg-background shadow-sm text-blue-700 border border-blue-200"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Briefcase className="w-4 h-4" /> Dipendente
+                </button>
+                <button
+                  onClick={() => setStepsView("autonomo")}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                    stepsView === "autonomo"
+                      ? "bg-background shadow-sm text-violet-700 border border-violet-200"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Laptop className="w-4 h-4" /> Autonomo / Freelance
+                </button>
+              </div>
+            </div>
+
+            {stepsView === "dipendente" ? (
+              <div>
+                <p className="text-muted-foreground mb-8 text-base">
+                  Percorso tipico per chi vuole lavorare come <strong>dipendente</strong> nel settore {sector.name}.
+                  Stabile, strutturato, con progressione chiara.
+                </p>
+                {(() => {
+                  const dipendentiSteps = sector.dipendentiSteps ?? null;
+                  if (!dipendentiSteps || dipendentiSteps.length === 0) {
+                    return (
+                      <p className="text-muted-foreground italic">Percorso dipendente non ancora disponibile per questo settore.</p>
+                    );
+                  }
+                  return (
+                    <div className="space-y-0">
+                      {dipendentiSteps.map((s, i) => (
+                        <div key={s.step} className="flex gap-4">
+                          <div className="flex flex-col items-center">
+                            <div className="w-9 h-9 rounded-full bg-blue-100 border-2 border-blue-300 flex items-center justify-center shrink-0 font-bold text-blue-700 text-sm">
+                              {s.step}
+                            </div>
+                            {i < dipendentiSteps.length - 1 && <div className="w-0.5 h-full bg-blue-100 mt-1" />}
+                          </div>
+                          <div className="pb-8">
+                            <h4 className="font-semibold text-foreground mb-1">{s.title}</h4>
+                            <p className="text-sm text-muted-foreground leading-relaxed">{s.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div>
+                <p className="text-muted-foreground mb-8 text-base">
+                  Percorso per chi vuole lavorare in modo <strong>autonomo o freelance</strong> nel settore {sector.name}.
+                  Più libertà, ma anche più responsabilità nella gestione del business.
+                </p>
+                {(() => {
+                  const freelanceSteps = sector.freelanceSteps ?? null;
+                  if (!freelanceSteps || freelanceSteps.length === 0) {
+                    return (
+                      <p className="text-muted-foreground italic">Percorso freelance non ancora disponibile per questo settore.</p>
+                    );
+                  }
+                  return (
+                    <div className="space-y-0">
+                      {freelanceSteps.map((s, i) => (
+                        <div key={s.step} className="flex gap-4">
+                          <div className="flex flex-col items-center">
+                            <div className="w-9 h-9 rounded-full bg-violet-100 border-2 border-violet-300 flex items-center justify-center shrink-0 font-bold text-violet-700 text-sm">
+                              {s.step}
+                            </div>
+                            {i < freelanceSteps.length - 1 && <div className="w-0.5 h-full bg-violet-100 mt-1" />}
+                          </div>
+                          <div className="pb-8">
+                            <h4 className="font-semibold text-foreground mb-1">{s.title}</h4>
+                            <p className="text-sm text-muted-foreground leading-relaxed">{s.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        </TabsContent>
 
         <TabsContent value="overview" className="space-y-10 animate-in fade-in duration-500">
           <div className="grid md:grid-cols-2 gap-8">

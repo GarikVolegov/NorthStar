@@ -12,7 +12,7 @@ router.post("/users", async (req, res): Promise<void> => {
     return;
   }
 
-  const { name, email, testSessionId } = parsed.data;
+  const { name, email, testSessionId, workPreference } = parsed.data;
 
   const existing = await db
     .select()
@@ -24,9 +24,15 @@ router.post("/users", async (req, res): Promise<void> => {
     return;
   }
 
+  const validWorkModes = ["dipendente", "autonomo", "ibrido", "unknown"];
   const [user] = await db
     .insert(usersTable)
-    .values({ name, email, testSessionId: testSessionId ?? null })
+    .values({
+      name,
+      email,
+      testSessionId: testSessionId ?? null,
+      workPreference: workPreference && validWorkModes.includes(workPreference) ? workPreference : "unknown",
+    })
     .returning();
 
   if (testSessionId) {
