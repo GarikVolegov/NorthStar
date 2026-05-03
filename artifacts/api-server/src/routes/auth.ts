@@ -53,8 +53,7 @@ function generateCode(): string {
 }
 
 function getAppBaseUrl(): string {
-  const raw = process.env.APP_BASE_URL ?? process.env.PUBLIC_APP_URL ?? process.env.APP_URL ?? "";
-  if (!raw) return "";
+  const raw = process.env.APP_BASE_URL ?? process.env.PUBLIC_APP_URL ?? process.env.APP_URL ?? "https://northstar.app";
   return raw.startsWith("http://") || raw.startsWith("https://") ? raw.replace(/\/$/, "") : `https://${raw.replace(/^\/+/, "").replace(/\/$/, "")}`;
 }
 
@@ -240,8 +239,7 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
       .set({ resetToken, resetTokenExpires })
       .where(eq(usersTable.id, user.id));
 
-    const appBase = getAppBaseUrl();
-    const resetUrl = `${appBase}/reset-password?token=${resetToken}`;
+    const resetUrl = `${getAppBaseUrl()}/reset-password?token=${resetToken}`;
     await sendResetEmail(email, resetUrl);
 
     if (isDevMode) body.devToken = resetToken;
