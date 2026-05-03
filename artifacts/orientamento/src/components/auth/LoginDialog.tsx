@@ -411,8 +411,8 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
 
             {devHint && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
-                <p className="text-xs text-amber-700 font-medium mb-1">Modalità sviluppo — codice:</p>
-                <p className="text-2xl font-mono font-bold tracking-widest text-amber-800">{devHint}</p>
+        <p className="text-xs text-amber-700 font-medium mb-1">Modalità sviluppo — codice:</p>
+        <p className="text-2xl font-mono font-bold tracking-widest text-amber-800">{devHint}</p>
               </div>
             )}
 
@@ -438,6 +438,11 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
                 Invia di nuovo
               </button>
             </p>
+            {devHint && (
+              <p className="text-center text-xs text-muted-foreground break-all">
+                Codice sviluppo: <span className="font-mono font-semibold text-foreground">{devHint}</span>
+              </p>
+            )}
           </form>
         )}
 
