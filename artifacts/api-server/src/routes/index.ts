@@ -30,6 +30,7 @@ import pushRouter from "./push";
 import meRouter from "./me";
 import agentRouter from "./agent";
 import catalogRouter from "./catalog";
+import researchRouter from "./research";
 
 const router: IRouter = Router();
 
@@ -64,5 +65,6 @@ router.use(notificationsRouter);
 router.use(pushRouter);
 router.use(meRouter);
 router.use(catalogRouter);
+router.use(researchRouter);
 
 export default router;

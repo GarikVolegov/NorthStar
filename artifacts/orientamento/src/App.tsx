@@ -38,6 +38,7 @@ import Amici from "@/pages/amici";
 import Utente from "@/pages/utente";
 import Calendario from "@/pages/Calendario";
 import Affiliazione from "@/pages/affiliazione";
+import Dashboard from "@/pages/dashboard";
 import AffiliazioneScuole from "@/pages/affiliazione-scuole";
 import AffiliazioneUniversita from "@/pages/affiliazione-universita";
 import AffiliazioneAgenzie from "@/pages/affiliazione-agenzie";
@@ -83,6 +84,7 @@ function AnimatedRoutes() {
       <Route path="/crescita" component={Crescita} />
       <Route path="/crescita/categoria/:cat" component={CrescitaCategoria} />
       <Route path="/crescita/articolo/:slug" component={CrescitaArticolo} />
+      <Route path="/dashboard" component={Dashboard} />
       <Route path="/affiliazione" component={Affiliazione} />
       <Route path="/affiliazione/scuole" component={AffiliazioneScuole} />
       <Route path="/affiliazione/universita" component={AffiliazioneUniversita} />

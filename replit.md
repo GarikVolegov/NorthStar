@@ -223,6 +223,53 @@ Added 3 card links directly on `/settore/:id` above the tabs:
 - **`safeUser` esteso**: include `emailVerified`, `stripeSubscriptionId`, `workPreference`, `autonomyPreference`, `stabilityPreference`, `timezone`. Allineato anche `auth-google.ts`.
 - **Deliverability**: l'email `FROM` di default è `onboarding@resend.dev`. Resend free tier consente l'invio solo all'email del proprietario dell'account a meno che il dominio non sia verificato. Per produzione: impostare `EMAIL_FROM` con un dominio verificato su Resend.
 
+## AI Orchestrator — Agent System
+
+### Architecture
+Multi-agent orchestration pipeline (`artifacts/api-server/src/agents/`):
+- **OrchestratorAgent** (`orchestrator.ts`) — routes tasks, manages shared state, runs parallel agents
+- **PersonalityAgent** — derives RIASEC primaryTypes from raw scores
+- **SectorAgent** — matches sectors to RIASEC profile
+- **ProfessionAgent** — free: 3 professions, premium: 6 (with skills, salary, growth outlook, RIASEC alignment)
+- **NewsAgent** — relevant news from DB or curated sources
+- **GrowthAgent** — personalized growth article suggestions
+- **WorkModeAgent** — premium-only: recommended work mode (dipendente/autonomo/ibrido) with reasoning
+- **EducationAgent** — premium-only: education paths (type, duration, cost, steps, career outcomes)
+- **CalendarAgent** — premium-only: career calendar events
+- **ValidatorAgent** — validates orchestrator output
+
+### API
+- `POST /api/agent` — authenticated, taskType: "full_profile" (main use case)
+- `GET /api/agent/health` — agent status
+
+### Frontend integration (Task #12)
+- **`/risultati/:id`** — AI Analysis section auto-triggers when user is logged in; shows professions (with salary, skills, growth), work mode (premium), education paths (premium), premium upsell, "vai alla Dashboard AI" link
+- **`/dashboard`** — dedicated AI dashboard page; fetches latest session, runs full_profile pipeline, shows all agent outputs with loading state; linked from results page and user dashboard
+- **`UserDashboard` (home page)** — "Professioni consigliate per te" section appears after sector recommendations, with agent loading skeletons and premium upsell pill
+- **`useAgentAnalysis` hook** (`artifacts/orientamento/src/hooks/useAgentAnalysis.ts`) — shared hook with 10-min staleTime and session-keyed cache
+
+## Research Scheduler (Tavily AI Web Search)
+
+Requires `TAVILY_API_KEY` env secret (now configured).
+
+### Agents
+- **`news-research.ts`** (`artifacts/api-server/src/agents/research/`) — searches Tavily for Italian career news every 6h; deduplicates by URL hash; stores in `news_articles` table
+- **`growth-research.ts`** — searches Tavily for career growth topics every 24h; generates full articles via LLM from web context; stores in `growth_articles` table; deduplicates by slug
+
+### Scheduler
+- `artifacts/api-server/src/lib/research-scheduler.ts` — starts 90s after server boot, then ticks every 30 min; checks if news (6h) or growth (24h) interval elapsed; disabled automatically if TAVILY_API_KEY is missing
+
+### Database
+- `news_articles` table — title, url, url_hash (unique), source, summary, publishedAt, sectorNames[], category, relevanceScore, searchQuery, createdAt
+
+### Admin API
+- `POST /admin/research/news/run` — manually trigger news research (with optional sectorNames[])
+- `POST /admin/research/growth/run` — manually trigger growth article generation
+- `GET /research/news` — list persisted news articles (supports ?sector= and ?limit= params)
+
+### Tavily client
+- `artifacts/api-server/src/lib/tavily.ts` — search wrapper with URL normalization and lightweight URL hashing for deduplication
+
 ## Roadmap (Future Phases)
 
 - **Phase 2:** Fix Stripe key + seed products, activate premium checkout

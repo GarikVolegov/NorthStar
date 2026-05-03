@@ -11,3 +11,4 @@ export * from "./agentLogs";
 export * from "./professions";
 export * from "./educationPaths";
 export * from "./knowledge";
+export * from "./newsArticles";

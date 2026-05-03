@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { seedSectors, patchDipendentiSteps, patchWorkModeFields, seedProfessions, seedEducationPaths } from "./lib/seed";
 import { startInterviewReminderScheduler } from "./lib/interview-reminder.js";
 import { startCalendarReminderScheduler } from "./lib/calendar-scheduler.js";
+import { startResearchScheduler } from "./lib/research-scheduler.js";
 
 const rawPort = process.env["PORT"];
 
@@ -37,4 +38,5 @@ app.listen(port, async (err) => {
 
   startInterviewReminderScheduler();
   startCalendarReminderScheduler();
+  startResearchScheduler();
 });

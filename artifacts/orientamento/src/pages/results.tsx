@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, CheckCircle2, TrendingUp, DollarSign, Activity, Bot, BarChart3, AlertTriangle, Sparkles, Star, UserCheck, Bookmark, BookmarkCheck, Newspaper, Brain, Map, GitCompare } from "lucide-react";
+import { ArrowRight, CheckCircle2, TrendingUp, DollarSign, Activity, Bot, BarChart3, AlertTriangle, Sparkles, Star, UserCheck, Bookmark, BookmarkCheck, Newspaper, Brain, Map, GitCompare, GraduationCap, Loader2, Zap, Crown, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,6 +26,8 @@ import type { WorkPreference } from "@/components/WorkModeSelector";
 import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
 import { useReducedMotion } from "@/lib/motion";
 import { getWorkModeAlignment } from "@/lib/work-mode-utils";
+import { useAgentAnalysis } from "@/hooks/useAgentAnalysis";
+import type { ProfessionResult, EducationResult, WorkModeResult } from "@/hooks/useAgentAnalysis";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -458,6 +460,23 @@ export default function Results() {
     ?? (RIASEC_SUGGESTED_WORK_MODE[primaryTypes[0]] ?? "ibrido");
   const suggestedLabel = WORK_MODE_LABELS[suggestedWorkMode];
 
+  const riasecScoresAI = (session as Record<string, unknown>).riasecScores as Record<string, number> | undefined;
+  const topSectorsForAgent = (session.recommendations as Rec[])
+    .map((r) => ({ sectorName: r.sector?.name ?? "" }))
+    .filter((r) => r.sectorName);
+  const { data: agentData, isLoading: agentLoading, isError: agentError } = useAgentAnalysis({
+    sessionId: Number(id),
+    riasecScores: riasecScoresAI,
+    primaryTypes: session.primaryTypes as string[],
+    spiritScores: spiritScores as Record<string, number> | undefined,
+    topSectors: topSectorsForAgent,
+    enabled: !!user,
+  });
+  const agentProfessions = agentData?.data?.summary?.professions ?? [];
+  const agentEducation = agentData?.data?.summary?.educationPaths ?? [];
+  const agentWorkMode = agentData?.data?.summary?.workMode;
+  const isPremiumAgent = agentData?.plan === "premium";
+
   return (
     <div className="container mx-auto px-4 py-12 md:py-20 max-w-6xl">
 
@@ -687,6 +706,214 @@ export default function Results() {
         </AnimateOnScroll>
 
         <QuickCompare recs={session.recommendations as Rec[]} />
+      </div>
+
+      {/* AI Analysis Section */}
+      <div className="mt-16">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+            <Bot className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="font-serif text-2xl font-bold text-foreground">Analisi AI Approfondita</h2>
+            <p className="text-sm text-muted-foreground">
+              {!user
+                ? "Accedi per sbloccare l'analisi AI personalizzata"
+                : agentLoading
+                  ? "L'orchestratore AI sta elaborando il tuo profilo…"
+                  : agentData
+                    ? `Piano ${isPremiumAgent ? "Premium" : "gratuito"} · ${agentProfessions.length} professioni analizzate`
+                    : "Analisi personalizzata del tuo profilo RIASEC"}
+            </p>
+          </div>
+          {isPremiumAgent && (
+            <div className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">
+              <Crown className="w-3 h-3" /> Premium
+            </div>
+          )}
+        </div>
+
+        {!user && (
+          <div className="rounded-3xl border border-dashed p-8 text-center">
+            <Bot className="w-10 h-10 text-muted-foreground mx-auto mb-4 opacity-50" />
+            <h3 className="font-serif text-xl font-bold mb-2">Analisi AI Personalizzata</h3>
+            <p className="text-sm text-muted-foreground mb-5 max-w-lg mx-auto">
+              Accedi per sbloccare l'analisi AI: professioni, percorsi formativi e modalità di lavoro consigliati per il tuo profilo.
+            </p>
+            <Button asChild size="sm" className="rounded-full">
+              <Link href="/registra"><Sparkles className="w-3.5 h-3.5 mr-1.5" />Accedi o Registrati</Link>
+            </Button>
+          </div>
+        )}
+
+        {user && agentLoading && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 text-primary animate-pulse">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm font-medium">Analisi AI in corso — potrebbe richiedere 20–30 secondi…</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="rounded-2xl border p-5 space-y-3">
+                  <Skeleton className="h-4 w-20 rounded-full" />
+                  <Skeleton className="h-5 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <div className="flex gap-2">
+                    <Skeleton className="h-6 w-16 rounded-full" />
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {user && agentError && !agentLoading && (
+          <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-5 flex items-start gap-3">
+            <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+            <p className="text-sm text-muted-foreground">L'analisi AI non è disponibile al momento. Riprova tra qualche istante.</p>
+          </div>
+        )}
+
+        {user && agentData && !agentLoading && (
+          <div className="space-y-8">
+
+            {/* Professions */}
+            {agentProfessions.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Zap className="w-4 h-4 text-primary" />
+                  <h3 className="font-semibold text-foreground">Professioni consigliate</h3>
+                  {!isPremiumAgent && (
+                    <span className="text-xs text-muted-foreground bg-muted rounded-full px-2.5 py-0.5 ml-1">Piano gratuito · 3 professioni</span>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {agentProfessions.map((p, i) => (
+                    <div key={`${p.title}-${i}`} className="rounded-2xl border bg-card p-5 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full mb-1.5 inline-block">#{i + 1}</span>
+                          <h4 className="font-semibold text-foreground leading-snug">{p.title}</h4>
+                          <p className="text-xs text-muted-foreground">{p.sector}</p>
+                        </div>
+                        {p.growthOutlook && (
+                          <span className="shrink-0 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 flex items-center gap-1">
+                            <TrendingUp className="w-3 h-3" /> {p.growthOutlook}
+                          </span>
+                        )}
+                      </div>
+                      {p.salaryRange && (
+                        <div className="flex items-center gap-1.5 text-sm">
+                          <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span className="font-medium text-foreground">{p.salaryRange}</span>
+                        </div>
+                      )}
+                      {p.skills && p.skills.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {p.skills.slice(0, 4).map((sk) => (
+                            <span key={sk} className="text-xs bg-primary/8 text-primary rounded-full px-2.5 py-0.5 font-medium">{sk}</span>
+                          ))}
+                        </div>
+                      )}
+                      {p.riasecAlignment && (
+                        <p className="text-xs text-muted-foreground leading-relaxed">{p.riasecAlignment}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Work Mode — premium */}
+            {agentWorkMode && (
+              <div className="rounded-2xl border bg-card p-5 md:p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center text-violet-700">
+                    <Star className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Modalità lavorativa ottimale</h3>
+                    {isPremiumAgent && <span className="text-xs text-amber-700">Analisi Premium</span>}
+                  </div>
+                  <span className="ml-auto text-sm font-semibold text-primary border border-primary/20 bg-primary/5 rounded-full px-3 py-1">
+                    {agentWorkMode.recommendedLabel ?? agentWorkMode.recommended}
+                  </span>
+                </div>
+                {agentWorkMode.riasecFit && <p className="text-sm text-muted-foreground mb-3">{agentWorkMode.riasecFit}</p>}
+                {agentWorkMode.contextualAdvice && (
+                  <div className="bg-muted rounded-xl p-4">
+                    <p className="text-sm text-foreground">{agentWorkMode.contextualAdvice}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Premium upsell */}
+            {!isPremiumAgent && (
+              <div className="rounded-2xl border border-dashed p-5 flex items-center gap-4">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-foreground text-sm">Sblocca l'analisi completa</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Con Premium: 6 professioni, modalità lavorativa ottimale, percorsi formativi personalizzati e calendario azioni.
+                  </p>
+                </div>
+                <Button asChild size="sm" variant="outline" className="shrink-0 rounded-full border-amber-300 text-amber-700 hover:bg-amber-50">
+                  <Link href="/premium"><Crown className="w-3.5 h-3.5 mr-1.5" />Sblocca</Link>
+                </Button>
+              </div>
+            )}
+
+            {/* Education paths — premium only */}
+            {isPremiumAgent && agentEducation.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <GraduationCap className="w-4 h-4 text-emerald-600" />
+                  <h3 className="font-semibold text-foreground">Percorsi formativi</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {agentEducation.map((e, i) => (
+                    <div key={`${e.path}-${i}`} className="rounded-2xl border bg-card p-5">
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div>
+                          <h4 className="font-semibold text-foreground">{e.path}</h4>
+                          <p className="text-xs text-muted-foreground">{e.type}</p>
+                        </div>
+                        <div className="shrink-0 text-right space-y-0.5">
+                          {e.duration && <p className="text-xs text-muted-foreground">{e.duration}</p>}
+                          {e.cost && <p className="text-xs font-medium text-primary">{e.cost}</p>}
+                        </div>
+                      </div>
+                      {e.steps?.slice(0, 3).map((step, si) => (
+                        <div key={si} className="flex items-start gap-2 text-xs text-muted-foreground mb-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" /> {step}
+                        </div>
+                      ))}
+                      {e.careerOutcomes && e.careerOutcomes.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-3">
+                          {e.careerOutcomes.slice(0, 3).map((o) => (
+                            <span key={o} className="text-xs bg-muted text-muted-foreground rounded-full px-2.5 py-0.5">{o}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Link href="/dashboard">
+                <div className="inline-flex items-center gap-1.5 text-sm text-primary font-medium hover:underline">
+                  Vai alla Dashboard AI completa <ArrowRight className="w-3.5 h-3.5" />
+                </div>
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats Footer */}
