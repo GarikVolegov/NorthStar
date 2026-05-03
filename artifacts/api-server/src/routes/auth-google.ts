@@ -4,7 +4,7 @@ import { db, usersTable } from "@workspace/db";
 import { eq, or } from "drizzle-orm";
 import { z } from "zod";
 import { signToken } from "../lib/auth-jwt.js";
-import rateLimit from "express-rate-limit";
+import { rateLimit } from "express-rate-limit";
 
 const googleLimiter = rateLimit({
   windowMs: 60_000,
@@ -69,14 +69,12 @@ router.post("/auth/google-token", googleLimiter, async (req, res): Promise<void>
 
   const { sub: googleId, email, name = email.split("@")[0], picture: avatarUrl } = payload;
 
-  // Find existing user by googleId or email
   const [existing] = await db
     .select()
     .from(usersTable)
     .where(or(eq(usersTable.googleId, googleId), eq(usersTable.email, email)));
 
   if (existing) {
-    // Update google info if not already linked
     const updates: Partial<typeof usersTable.$inferInsert> = {};
     if (!existing.googleId) updates.googleId = googleId;
     if (!existing.avatarUrl && avatarUrl) updates.avatarUrl = avatarUrl;
