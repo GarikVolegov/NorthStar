@@ -34,7 +34,7 @@ async function generateSectorPng(sector: {
   avgSalaryMax: number;
   riasecTypes: string[];
 }): Promise<Buffer> {
-  const satori = (await import("satori")).default;
+  const { default: satori } = await import("satori");
   const { Resvg } = await import("@resvg/resvg-js");
   const font = await getInterFont();
 
@@ -58,7 +58,6 @@ async function generateSectorPng(sector: {
         position: "relative" as const,
       },
       children: [
-        // Top bar: logo + domain
         {
           type: "div",
           props: {
@@ -106,7 +105,6 @@ async function generateSectorPng(sector: {
           },
         },
 
-        // Sector name
         {
           type: "div",
           props: {
@@ -123,7 +121,6 @@ async function generateSectorPng(sector: {
           },
         },
 
-        // Description
         {
           type: "div",
           props: {
@@ -138,7 +135,6 @@ async function generateSectorPng(sector: {
           },
         },
 
-        // Bottom stats row
         {
           type: "div",
           props: {
@@ -149,7 +145,6 @@ async function generateSectorPng(sector: {
               alignItems: "center",
             },
             children: [
-              // Salary badge
               {
                 type: "div",
                 props: {
@@ -181,7 +176,6 @@ async function generateSectorPng(sector: {
                 },
               },
 
-              // Growth badge
               {
                 type: "div",
                 props: {
@@ -213,7 +207,6 @@ async function generateSectorPng(sector: {
                 },
               },
 
-              // Trend badge
               {
                 type: "div",
                 props: {
@@ -245,7 +238,6 @@ async function generateSectorPng(sector: {
                 },
               },
 
-              // AI Risk badge
               {
                 type: "div",
                 props: {
@@ -302,9 +294,8 @@ async function generateSectorPng(sector: {
   return Buffer.from(resvg.render().asPng());
 }
 
-// In-memory PNG cache: sectorId -> { png, ts }
 const cache = new Map<number, { png: Buffer; ts: number }>();
-const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 
 router.get("/og-image/settore/:id", async (req: Request, res: Response): Promise<void> => {
   const id = parseInt(String(req.params["id"] ?? ""), 10);
@@ -313,7 +304,6 @@ router.get("/og-image/settore/:id", async (req: Request, res: Response): Promise
     return;
   }
 
-  // Check cache
   const cached = cache.get(id);
   if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
     res
@@ -348,7 +338,6 @@ router.get("/og-image/settore/:id", async (req: Request, res: Response): Promise
       })
       .send(png);
   } catch (err) {
-    // Fallback: redirect to static OG image
     console.error("OG image generation failed:", err);
     res.redirect(`${SITE_URL}/opengraph.jpg`);
   }
