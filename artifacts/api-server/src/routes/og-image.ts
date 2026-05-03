@@ -2,7 +2,12 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { eq } from "drizzle-orm";
 import { db, sectorsTable } from "@workspace/db";
 import { getInterFont } from "../lib/og-font";
-import satori from "satori";
+import * as satoriModule from "satori";
+
+// satori@0.26 ships a namespace export; cast to callable for TS 5.9 compatibility
+const satori = (satoriModule.default ?? satoriModule) as unknown as (
+  ...args: Parameters<typeof satoriModule.default>
+) => ReturnType<typeof satoriModule.default>;
 
 const router: IRouter = Router();
 
