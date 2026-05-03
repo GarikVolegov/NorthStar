@@ -1,6 +1,8 @@
 import type { Agent, AgentInput, AgentOutput } from "./types";
 import { ProfessionInputSchema, ProfessionOutputSchema } from "./types";
 import { RIASEC_LABELS, type RiasecType } from "../lib/riasec";
+import { db, professionsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 interface ProfessionTemplate {
   title: string;
@@ -12,7 +14,7 @@ interface ProfessionTemplate {
   growthOutlook: string;
 }
 
-const PROFESSION_TEMPLATES: ProfessionTemplate[] = [
+const PROFESSION_FALLBACK: ProfessionTemplate[] = [
   { title: "Sviluppatore Software", sector: "tecnologia & software", riasecFit: ["I", "R"], skills: ["Programmazione", "Problem solving", "Debugging", "Git"], workModes: ["dipendente", "freelance", "autonomo"], salaryRange: "€30.000 – €65.000", growthOutlook: "Molto alto" },
   { title: "Data Analyst", sector: "data & analytics", riasecFit: ["I", "C"], skills: ["SQL", "Python", "Statistica", "Visualizzazione dati"], workModes: ["dipendente", "freelance"], salaryRange: "€28.000 – €55.000", growthOutlook: "Alto" },
   { title: "UX/UI Designer", sector: "design & creatività digitale", riasecFit: ["A", "I"], skills: ["Figma", "Ricerca utente", "Prototipazione", "CSS"], workModes: ["dipendente", "freelance"], salaryRange: "€25.000 – €50.000", growthOutlook: "Alto" },
@@ -29,6 +31,24 @@ const PROFESSION_TEMPLATES: ProfessionTemplate[] = [
   { title: "Financial Analyst", sector: "finanza & investimenti", riasecFit: ["I", "C"], skills: ["Modellazione finanziaria", "Excel avanzato", "Bloomberg", "Valutazione"], workModes: ["dipendente"], salaryRange: "€30.000 – €70.000", growthOutlook: "Stabile" },
   { title: "Agronomo", sector: "agroalimentare & food industry", riasecFit: ["R", "I"], skills: ["Agronomia", "Sostenibilità", "Gestione terreni", "Normative"], workModes: ["dipendente", "autonomo"], salaryRange: "€22.000 – €45.000", growthOutlook: "Crescente" },
 ];
+
+async function loadProfessions(): Promise<ProfessionTemplate[]> {
+  try {
+    const rows = await db.select().from(professionsTable).where(eq(professionsTable.isActive, true));
+    if (rows.length === 0) return PROFESSION_FALLBACK;
+    return rows.map((r) => ({
+      title: r.title,
+      sector: r.sector,
+      riasecFit: (r.riasecFit ?? []) as RiasecType[],
+      skills: r.skills ?? [],
+      workModes: r.workModes ?? [],
+      salaryRange: r.salaryRange,
+      growthOutlook: r.growthOutlook,
+    }));
+  } catch {
+    return PROFESSION_FALLBACK;
+  }
+}
 
 export const professionAgent: Agent = {
   name: "ProfessionAgent",
@@ -50,7 +70,9 @@ export const professionAgent: Agent = {
       const limit = isPremium ? 6 : 3;
       const sectorNames = (topSectors ?? []).map((s) => s.sectorName.toLowerCase());
 
-      let candidates = PROFESSION_TEMPLATES.filter((p) => {
+      const templates = await loadProfessions();
+
+      let candidates = templates.filter((p) => {
         const riasecMatch = p.riasecFit.some((r) => primaryTypes.includes(r));
         const sectorMatch =
           sectorNames.length === 0 ||

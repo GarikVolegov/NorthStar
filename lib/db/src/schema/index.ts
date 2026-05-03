@@ -8,3 +8,5 @@ export * from "./affiliationLeads";
 export * from "./growthArticles";
 export * from "./calendar";
 export * from "./agentLogs";
+export * from "./professions";
+export * from "./educationPaths";

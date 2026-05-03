@@ -28,6 +28,7 @@ import notificationsRouter from "./notifications";
 import pushRouter from "./push";
 import meRouter from "./me";
 import agentRouter from "./agent";
+import catalogRouter from "./catalog";
 
 const router: IRouter = Router();
 
@@ -60,5 +61,6 @@ router.use(calendarRouter);
 router.use(notificationsRouter);
 router.use(pushRouter);
 router.use(meRouter);
+router.use(catalogRouter);
 
 export default router;

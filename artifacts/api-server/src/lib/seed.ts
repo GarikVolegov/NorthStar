@@ -1,4 +1,4 @@
-import { db, sectorsTable } from "@workspace/db";
+import { db, sectorsTable, professionsTable, educationPathsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 
 const SECTORS = [
@@ -843,4 +843,91 @@ export async function patchWorkModeFields() {
     { step: 5, title: "Scala e differenzia", description: "Aumenta le tariffe, seleziona clienti migliori e aggiungi servizi complementari alla tua offerta." },
   ]);
   await db.execute(sql`UPDATE sectors SET freelance_steps = ${defaultSteps}::json WHERE freelance_steps::text = '[]' OR freelance_steps IS NULL`);
+}
+
+export async function seedProfessions(): Promise<void> {
+  const existing = await db.select().from(professionsTable);
+  if (existing.length > 0) return;
+
+  await db.insert(professionsTable).values([
+    { title: "Sviluppatore Software", sector: "tecnologia & software", riasecFit: ["I", "R"], skills: ["Programmazione", "Problem solving", "Debugging", "Git"], workModes: ["dipendente", "freelance", "autonomo"], salaryRange: "€30.000 – €65.000", growthOutlook: "Molto alto" },
+    { title: "Data Analyst", sector: "data & analytics", riasecFit: ["I", "C"], skills: ["SQL", "Python", "Statistica", "Visualizzazione dati"], workModes: ["dipendente", "freelance"], salaryRange: "€28.000 – €55.000", growthOutlook: "Alto" },
+    { title: "UX/UI Designer", sector: "design & creatività digitale", riasecFit: ["A", "I"], skills: ["Figma", "Ricerca utente", "Prototipazione", "CSS"], workModes: ["dipendente", "freelance"], salaryRange: "€25.000 – €50.000", growthOutlook: "Alto" },
+    { title: "Marketing Manager", sector: "marketing & growth", riasecFit: ["E", "A"], skills: ["SEO/SEM", "Copywriting", "Analytics", "Social media"], workModes: ["dipendente"], salaryRange: "€28.000 – €55.000", growthOutlook: "Stabile" },
+    { title: "Consulente Aziendale", sector: "consulenza & strategia", riasecFit: ["E", "I"], skills: ["Analisi strategica", "Project management", "Presentazione", "Excel"], workModes: ["dipendente", "autonomo"], salaryRange: "€35.000 – €80.000", growthOutlook: "Stabile" },
+    { title: "Infermiere/a", sector: "salute & benessere", riasecFit: ["S", "R"], skills: ["Cura del paziente", "Procedure cliniche", "Lavoro di squadra"], workModes: ["dipendente"], salaryRange: "€25.000 – €42.000", growthOutlook: "Molto alto" },
+    { title: "Insegnante", sector: "istruzione & formazione", riasecFit: ["S", "A"], skills: ["Comunicazione", "Progettazione didattica", "Gestione classe"], workModes: ["dipendente"], salaryRange: "€22.000 – €38.000", growthOutlook: "Stabile" },
+    { title: "Imprenditore Digitale", sector: "business & imprenditoria", riasecFit: ["E", "A"], skills: ["Visione strategica", "Marketing", "Gestione risorse", "Vendita"], workModes: ["autonomo", "imprenditore"], salaryRange: "€20.000 – €100.000+", growthOutlook: "Variabile" },
+    { title: "Ingegnere Gestionale", sector: "ingegneria & sistemi tecnici", riasecFit: ["R", "C"], skills: ["Lean manufacturing", "Project management", "Analisi processi"], workModes: ["dipendente"], salaryRange: "€30.000 – €58.000", growthOutlook: "Stabile" },
+    { title: "Avvocato", sector: "legal tech & servizi legali digitali", riasecFit: ["E", "C"], skills: ["Diritto civile/penale", "Contrattualistica", "Negoziazione"], workModes: ["dipendente", "autonomo"], salaryRange: "€25.000 – €80.000+", growthOutlook: "Stabile" },
+    { title: "Creativo/Content Creator", sector: "creatività & design", riasecFit: ["A", "E"], skills: ["Storytelling", "Video editing", "Social media", "Fotografia"], workModes: ["freelance", "autonomo"], salaryRange: "€15.000 – €60.000", growthOutlook: "Alto" },
+    { title: "Ricercatore/Scienziato", sector: "biotech & life sciences", riasecFit: ["I", "R"], skills: ["Metodo scientifico", "Laboratorio", "Pubblicazioni", "Statistiche"], workModes: ["dipendente"], salaryRange: "€25.000 – €60.000", growthOutlook: "Alto" },
+    { title: "HR Manager", sector: "risorse umane & people operations", riasecFit: ["S", "E"], skills: ["Selezione personale", "Formazione", "Relazioni sindacali"], workModes: ["dipendente"], salaryRange: "€28.000 – €55.000", growthOutlook: "Stabile" },
+    { title: "Financial Analyst", sector: "finanza & investimenti", riasecFit: ["I", "C"], skills: ["Modellazione finanziaria", "Excel avanzato", "Bloomberg", "Valutazione"], workModes: ["dipendente"], salaryRange: "€30.000 – €70.000", growthOutlook: "Stabile" },
+    { title: "Agronomo", sector: "agroalimentare & food industry", riasecFit: ["R", "I"], skills: ["Agronomia", "Sostenibilità", "Gestione terreni", "Normative"], workModes: ["dipendente", "autonomo"], salaryRange: "€22.000 – €45.000", growthOutlook: "Crescente" },
+  ]);
+}
+
+export async function seedEducationPaths(): Promise<void> {
+  const existing = await db.select().from(educationPathsTable);
+  if (existing.length > 0) return;
+
+  await db.insert(educationPathsTable).values([
+    {
+      path: "Laurea in Informatica / Ingegneria Informatica",
+      type: "universitario", duration: "3–5 anni", cost: "€1.000 – €3.000/anno",
+      steps: ["Basi di programmazione", "Algoritmi e strutture dati", "Reti e sistemi", "Progetto di tesi"],
+      careerOutcomes: ["Sviluppatore software", "DevOps engineer", "Data engineer"],
+      sectorFit: ["tecnologia", "software", "data"],
+    },
+    {
+      path: "Bootcamp di Sviluppo Web Full-Stack",
+      type: "bootcamp", duration: "3–6 mesi", cost: "€3.000 – €8.000",
+      steps: ["HTML/CSS/JS", "React & Node.js", "Database", "Progetto portfolio"],
+      careerOutcomes: ["Frontend developer", "Backend developer", "Freelance dev"],
+      sectorFit: ["tecnologia", "digitale", "software"],
+    },
+    {
+      path: "Laurea in Economia / Management",
+      type: "universitario", duration: "3–5 anni", cost: "€1.000 – €3.000/anno",
+      steps: ["Microeconomia e macro", "Marketing", "Finanza aziendale", "Stage"],
+      careerOutcomes: ["Consulente", "Manager", "Imprenditore"],
+      sectorFit: ["business", "finanza", "consulenza", "marketing"],
+    },
+    {
+      path: "Laurea in Psicologia / Scienze dell'educazione",
+      type: "universitario", duration: "3–5 anni", cost: "€1.000 – €2.500/anno",
+      steps: ["Psicologia generale", "Metodologia della ricerca", "Stage clinico", "Tesi"],
+      careerOutcomes: ["Psicologo", "HR specialist", "Formatore"],
+      sectorFit: ["salute", "istruzione", "risorse umane"],
+    },
+    {
+      path: "Corso Professionale in Design Grafico / UX",
+      type: "professionale", duration: "1–2 anni", cost: "€2.000 – €6.000",
+      steps: ["Principi del design", "Figma & Adobe Suite", "Portfolio", "Stage"],
+      careerOutcomes: ["UX designer", "Graphic designer", "Art director"],
+      sectorFit: ["design", "creatività", "marketing"],
+    },
+    {
+      path: "Laurea in Medicina / Infermieristica",
+      type: "universitario", duration: "3–6 anni", cost: "€1.000 – €2.500/anno",
+      steps: ["Anatomia e fisiologia", "Clinica medica", "Tirocini ospedalieri", "Esame di stato"],
+      careerOutcomes: ["Medico", "Infermiere", "Operatore sanitario"],
+      sectorFit: ["salute", "healthcare", "benessere"],
+    },
+    {
+      path: "Master / MBA in Business Administration",
+      type: "universitario", duration: "1–2 anni", cost: "€5.000 – €20.000",
+      steps: ["Strategia aziendale", "Leadership", "Finance", "Project finale"],
+      careerOutcomes: ["Senior manager", "Imprenditore", "Consulente senior"],
+      sectorFit: ["business", "consulenza", "finanza"],
+    },
+    {
+      path: "Certificazioni Online (Coursera, edX, Google, AWS)",
+      type: "online", duration: "1–6 mesi", cost: "€0 – €1.000",
+      steps: ["Scelta certificazione", "Moduli online", "Progetto pratico", "Esame finale"],
+      careerOutcomes: ["Specialista tecnico", "Freelance", "Transizione di carriera"],
+      sectorFit: ["tecnologia", "data", "marketing", "digitale"],
+    },
+  ]);
 }

@@ -1,5 +1,7 @@
 import type { Agent, AgentInput, AgentOutput } from "./types";
 import { EducationInputSchema, EducationOutputSchema } from "./types";
+import { db, educationPathsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 interface EducationPath {
   path: string;
@@ -11,7 +13,7 @@ interface EducationPath {
   sectorFit: string[];
 }
 
-const EDUCATION_PATHS: EducationPath[] = [
+const EDUCATION_FALLBACK: EducationPath[] = [
   {
     path: "Laurea in Informatica / Ingegneria Informatica",
     type: "universitario", duration: "3–5 anni", cost: "€1.000 – €3.000/anno",
@@ -70,6 +72,24 @@ const EDUCATION_PATHS: EducationPath[] = [
   },
 ];
 
+async function loadEducationPaths(): Promise<EducationPath[]> {
+  try {
+    const rows = await db.select().from(educationPathsTable).where(eq(educationPathsTable.isActive, true));
+    if (rows.length === 0) return EDUCATION_FALLBACK;
+    return rows.map((r) => ({
+      path: r.path,
+      type: r.type as EducationPath["type"],
+      duration: r.duration,
+      cost: r.cost,
+      steps: r.steps ?? [],
+      careerOutcomes: r.careerOutcomes ?? [],
+      sectorFit: r.sectorFit ?? [],
+    }));
+  } catch {
+    return EDUCATION_FALLBACK;
+  }
+}
+
 export const educationAgent: Agent = {
   name: "EducationAgent",
 
@@ -94,13 +114,15 @@ export const educationAgent: Agent = {
         ...(professions ?? []).map((p) => p.sector.toLowerCase()),
       ];
 
-      let matched = EDUCATION_PATHS.filter((ep) =>
+      const allPaths = await loadEducationPaths();
+
+      let matched = allPaths.filter((ep) =>
         ep.sectorFit.some((sf) =>
           sectorKeywords.some((kw) => kw.includes(sf) || sf.includes(kw.split(" ")[0]!)),
         ),
       );
 
-      if (matched.length === 0) matched = EDUCATION_PATHS.slice(0, limit);
+      if (matched.length === 0) matched = allPaths.slice(0, limit);
 
       const educationPaths = matched.slice(0, limit).map((ep) => ({
         path: ep.path,

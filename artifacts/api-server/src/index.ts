@@ -1,6 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { seedSectors, patchDipendentiSteps, patchWorkModeFields } from "./lib/seed";
+import { seedSectors, patchDipendentiSteps, patchWorkModeFields, seedProfessions, seedEducationPaths } from "./lib/seed";
 import { startInterviewReminderScheduler } from "./lib/interview-reminder.js";
 import { startCalendarReminderScheduler } from "./lib/calendar-scheduler.js";
 
@@ -28,7 +28,9 @@ app.listen(port, async (err) => {
     await seedSectors();
     await patchWorkModeFields();
     await patchDipendentiSteps();
-    logger.info("Sectors seeded and patched successfully");
+    await seedProfessions();
+    await seedEducationPaths();
+    logger.info("Sectors, professions and education paths seeded successfully");
   } catch (seedErr) {
     logger.error({ err: seedErr }, "Failed to seed sectors");
   }
