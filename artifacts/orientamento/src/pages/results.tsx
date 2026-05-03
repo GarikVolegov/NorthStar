@@ -25,6 +25,7 @@ import { WorkModeSelector, WorkModeBadge, useWorkPreference } from "@/components
 import type { WorkPreference } from "@/components/WorkModeSelector";
 import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
 import { useReducedMotion } from "@/lib/motion";
+import { getWorkModeAlignment } from "@/lib/work-mode-utils";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -155,25 +156,6 @@ const RISK_LABEL: Record<string, { label: string; score: number; color: string }
   medium: { label: "Medio",  score: 2, color: "text-amber-700 bg-amber-50 border-amber-200" },
   high:   { label: "Alto",   score: 1, color: "text-rose-700 bg-rose-50 border-rose-200" },
 };
-
-function getWorkModeAlignment(userWorkMode: WorkPreference | null | undefined, sectorModes: Array<string> | null | undefined): { type: "aligned" | "partial" | "misaligned"; tooltip: string } {
-  if (!userWorkMode || userWorkMode === "unknown" || !sectorModes || sectorModes.length === 0) {
-    return { type: "aligned", tooltip: "" };
-  }
-  
-  if (userWorkMode === "ibrido") {
-    if (sectorModes.includes("ibrido")) {
-      return { type: "aligned", tooltip: "Allineato alla tua modalità di lavoro preferita" };
-    }
-    return { type: "partial", tooltip: "Compatibile con la tua modalità ibrida, ma non ottimale" };
-  }
-  
-  if (sectorModes.includes(userWorkMode)) {
-    return { type: "aligned", tooltip: "Allineato alla tua modalità di lavoro preferita" };
-  }
-  
-  return { type: "misaligned", tooltip: `Questo settore è principalmente per ${sectorModes.join("/")}` };
-}
 
 type Rec = {
   sectorId: number;
