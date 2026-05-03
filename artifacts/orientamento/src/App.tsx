@@ -19,6 +19,7 @@ import Profilo from "@/pages/profilo";
 import Wiki from "@/pages/wiki";
 import Roadmap from "@/pages/roadmap";
 import Grafo from "@/pages/grafo";
+import GrafoConoscenza from "@/pages/grafo-conoscenza";
 import Settori from "@/pages/settori";
 import Confronta from "@/pages/confronta";
 import Contatti from "@/pages/contatti";
@@ -69,6 +70,7 @@ function AnimatedRoutes() {
       <Route path="/utente/:id" component={Utente} />
       <Route path="/wiki/:id" component={Wiki} />
       <Route path="/roadmap/:id" component={Roadmap} />
+      <Route path="/grafo" component={GrafoConoscenza} />
       <Route path="/grafo/:id" component={Grafo} />
       <Route path="/settori" component={Settori} />
       <Route path="/confronta" component={Confronta} />

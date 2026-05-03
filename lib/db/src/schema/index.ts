@@ -10,3 +10,4 @@ export * from "./calendar";
 export * from "./agentLogs";
 export * from "./professions";
 export * from "./educationPaths";
+export * from "./knowledge";

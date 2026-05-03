@@ -247,12 +247,10 @@ export function UserDashboard({ userName, latestResult, isPremium = false }: Use
       accent: "emerald",
     },
     {
-      href: hasConfirmedSector ? `/grafo/${confirmedSectorId}` : "/settori",
+      href: "/grafo",
       icon: <GitBranch className="w-5 h-5" />,
-      title: "Grafo competenze",
-      description: hasConfirmedSector
-        ? "Visualizza le skill chiave del tuo settore."
-        : "Mappa visiva delle competenze per settore.",
+      title: "Grafo della Conoscenza",
+      description: "Note, competenze e documenti collegati come una mappa personale.",
       accent: "violet",
     },
     {
@@ -371,9 +369,9 @@ export function UserDashboard({ userName, latestResult, isPremium = false }: Use
                       <Map className="w-4 h-4" /> Roadmap del settore
                     </Button>
                   </Link>
-                  <Link href={`/grafo/${confirmedSectorId}`}>
+                  <Link href="/grafo">
                     <Button variant="outline" className="w-full rounded-xl gap-2">
-                      <GitBranch className="w-4 h-4" /> Grafo delle competenze
+                      <GitBranch className="w-4 h-4" /> Grafo della Conoscenza
                     </Button>
                   </Link>
                 </div>
