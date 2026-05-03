@@ -1,15 +1,9 @@
 {
   "version": 2,
-  "outputDirectory": "dist",
-  "functions": {
-    "index.mjs": {
-      "runtime": "nodejs22.x"
-    }
-  },
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/index.mjs"
+      "destination": "/api/index"
     }
   ]
 }
