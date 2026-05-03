@@ -117,8 +117,7 @@ router.post("/cv/upload", upload.single("file"), async (req, res): Promise<void>
   if (req.file) {
     if (req.file.mimetype === "application/pdf") {
       try {
-        // Dynamically import pdf-parse to avoid ESM/CJS issues
-        const pdfParse = (await import("pdf-parse")).default;
+        const { default: pdfParse } = await import("pdf-parse");
         const parsed = await pdfParse(req.file.buffer);
         text = parsed.text;
       } catch {
@@ -140,7 +139,6 @@ router.post("/cv/upload", upload.single("file"), async (req, res): Promise<void>
     return;
   }
 
-  // Use OpenAI to structure the CV text
   const prompt = `Analizza il seguente curriculum vitae e restituisci un JSON strutturato.
 
 CURRICULUM:
@@ -207,7 +205,6 @@ Estrai tutte le informazioni presenti. Per i campi non trovati usa array vuoti o
     return;
   }
 
-  // Store in DB
   await db.update(usersTable)
     .set({ cvJson: cvData as any, cvText: text.slice(0, 50000) })
     .where(eq(usersTable.id, uid));
@@ -241,7 +238,6 @@ router.post("/cv/generate", async (req, res): Promise<void> => {
 
   const { userId, profileData, graphNodes = [], cvData } = parsed.data;
 
-  // Organize graph nodes by type
   const graphRoles = graphNodes.filter((n) => n.type === "role").map((n) => n.label);
   const graphSkills = graphNodes.filter((n) => n.type === "skill").map((n) => n.label);
   const graphTools = graphNodes.filter((n) => n.type === "tool").map((n) => n.label);
@@ -327,7 +323,6 @@ Integra i dati del CV caricato con le informazioni del grafo. Se il CV è vuoto,
     return;
   }
 
-  // Optionally store the generated cv back
   await db.update(usersTable)
     .set({ cvJson: { ...(cvData ?? {}), generated, lastGenerated: new Date().toISOString() } as any })
     .where(eq(usersTable.id, userId));
@@ -465,7 +460,7 @@ router.post("/cv/:userId/versions", async (req, res): Promise<void> => {
   };
 
   const existing: any[] = (user.cvJson as any)?.versions ?? [];
-  const versions = [newVersion, ...existing].slice(0, 20); // max 20 versions
+  const versions = [newVersion, ...existing].slice(0, 20);
 
   const updated = { ...((user.cvJson as any) ?? {}), versions };
   await db.update(usersTable).set({ cvJson: updated as any }).where(eq(usersTable.id, userId));
@@ -603,7 +598,6 @@ RISPOSTA JSON (solo JSON, nessun testo extra):
     closing: letter.closing,
   };
 
-  // Persist in cvJson.coverLetter
   const row = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
   if (row.length) {
     const current = (row[0].cvJson as Record<string, any>) ?? {};
@@ -620,7 +614,6 @@ router.get("/cv/:userId/cover-letter/pdf", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
 
-  // Accept letter data from query param (base64 JSON) for flexibility
   const letterParam = req.query.data as string | undefined;
   let letter: CoverLetterData | null = null;
 
