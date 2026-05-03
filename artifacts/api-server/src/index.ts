@@ -5,10 +5,11 @@ import { startInterviewReminderScheduler } from "./lib/interview-reminder.js";
 import { startCalendarReminderScheduler } from "./lib/calendar-scheduler.js";
 import { startResearchScheduler } from "./lib/research-scheduler.js";
 
-// On Vercel (serverless), export the app as default — no .listen() needed
-if (process.env.VERCEL) {
-  export default app;
-} else {
+// Export at top-level for Vercel serverless (export default cannot be inside an if block)
+export default app;
+
+// Local server startup — skipped on Vercel
+if (!process.env.VERCEL) {
   const rawPort = process.env["PORT"];
 
   if (!rawPort) {
