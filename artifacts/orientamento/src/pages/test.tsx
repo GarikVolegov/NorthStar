@@ -9,119 +9,46 @@ import { Loader2, ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useReducedMotion, easings } from "@/lib/motion";
+import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
-// ── RIASEC questions (12) ─────────────────────────────────────────────────────
-const RIASEC_QUESTIONS = [
-  { id: "q1",  text: "Mi piace costruire, riparare o lavorare con le mani.", type: "R", phase: "riasec" },
-  { id: "q2",  text: "Mi piace analizzare dati, risolvere problemi logici o fare ricerca.", type: "I", phase: "riasec" },
-  { id: "q3",  text: "Mi piace esprimermi attraverso l'arte, la musica, la scrittura o il design.", type: "A", phase: "riasec" },
-  { id: "q4",  text: "Mi piace aiutare, insegnare o prendermi cura degli altri.", type: "S", phase: "riasec" },
-  { id: "q5",  text: "Mi piace guidare progetti, prendere decisioni o avviare nuove iniziative.", type: "E", phase: "riasec" },
-  { id: "q6",  text: "Mi piace organizzare, pianificare e lavorare con procedure chiare.", type: "C", phase: "riasec" },
-  { id: "q7",  text: "Preferisco lavorare all'aperto o con strumenti concreti piuttosto che in ufficio.", type: "R", phase: "riasec" },
-  { id: "q8",  text: "Sono incuriosito dal capire come funzionano le cose a livello profondo.", type: "I", phase: "riasec" },
-  { id: "q9",  text: "Preferisco un ambiente di lavoro flessibile e non strutturato.", type: "A", phase: "riasec" },
-  { id: "q10", text: "Per me è importante che il mio lavoro abbia un impatto sociale positivo.", type: "S", phase: "riasec" },
-  { id: "q11", text: "Mi trovo a mio agio nel persuadere gli altri o negoziare accordi.", type: "E", phase: "riasec" },
-  { id: "q12", text: "Sono una persona molto attenta ai dettagli e all'accuratezza.", type: "C", phase: "riasec" },
-];
+const RIASEC_QUESTION_IDS = ["q1","q2","q3","q4","q5","q6","q7","q8","q9","q10","q11","q12"] as const;
+const SPIRIT_QUESTION_IDS = [
+  "shen_1","shen_2","shen_3",
+  "hun_1","hun_2","hun_3",
+  "po_1","po_2","po_3",
+  "yi_1","yi_2","yi_3",
+  "zhi_1","zhi_2","zhi_3",
+] as const;
 
-// ── Bussola Interiore — 15 domande, 3 per spirito ────────────────────────────
-// Ordinate per spirito: shen × 3, hun × 3, po × 3, yi × 3, zhi × 3
-const SPIRIT_QUESTIONS = [
-  // ✨ PRESENZA — Coscienza & Presenza
-  {
-    id: "shen_1", spirit: "Presenza", spiritKey: "shen", emoji: "✨",
-    description: "Coscienza & Presenza", phase: "spirits",
-    text: "Mi sento spesso chiaro e centrato nelle mie emozioni, anche nei momenti difficili.",
-  },
-  {
-    id: "shen_2", spirit: "Presenza", spiritKey: "shen", emoji: "✨",
-    description: "Coscienza & Presenza", phase: "spirits",
-    text: "Riconosco facilmente quando il mio stato d'animo cambia e so come ritrovare l'equilibrio.",
-  },
-  {
-    id: "shen_3", spirit: "Presenza", spiritKey: "shen", emoji: "✨",
-    description: "Coscienza & Presenza", phase: "spirits",
-    text: "Le persone mi percepiscono come qualcuno presente, attento e capace di capire le emozioni altrui.",
-  },
-  // 🌙 VISIONE — Visione & Direzione
-  {
-    id: "hun_1", spirit: "Visione", spiritKey: "hun", emoji: "🌙",
-    description: "Visione & Direzione", phase: "spirits",
-    text: "Riesco a immaginare con facilità il mio futuro ideale e a sentirlo davvero possibile.",
-  },
-  {
-    id: "hun_2", spirit: "Visione", spiritKey: "hun", emoji: "🌙",
-    description: "Visione & Direzione", phase: "spirits",
-    text: "Ho spesso idee originali che mi entusiasmano e mi spingono a esplorare strade nuove.",
-  },
-  {
-    id: "hun_3", spirit: "Visione", spiritKey: "hun", emoji: "🌙",
-    description: "Visione & Direzione", phase: "spirits",
-    text: "Sento un senso chiaro di direzione nella mia vita: so dove voglio arrivare, anche senza conoscere ancora tutto il percorso.",
-  },
-  // ⚡ ISTINTO — Istinto & Energia
-  {
-    id: "po_1", spirit: "Istinto", spiritKey: "po", emoji: "⚡",
-    description: "Istinto & Energia", phase: "spirits",
-    text: "Sento forte l'energia nel corpo quando faccio qualcosa che mi appassiona davvero.",
-  },
-  {
-    id: "po_2", spirit: "Istinto", spiritKey: "po", emoji: "⚡",
-    description: "Istinto & Energia", phase: "spirits",
-    text: "Mi fido spesso delle mie sensazioni fisiche e istintive per capire se una situazione è giusta per me.",
-  },
-  {
-    id: "po_3", spirit: "Istinto", spiritKey: "po", emoji: "⚡",
-    description: "Istinto & Energia", phase: "spirits",
-    text: "Quando sono in un ambiente che mi piace, lo sento subito nel corpo — ancora prima che la mente lo elabori.",
-  },
-  // 🔮 FOCUS — Concentrazione & Analisi
-  {
-    id: "yi_1", spirit: "Focus", spiritKey: "yi", emoji: "🔮",
-    description: "Concentrazione & Analisi", phase: "spirits",
-    text: "Mi riesce facile concentrare l'attenzione a lungo su studio, analisi o problem solving.",
-  },
-  {
-    id: "yi_2", spirit: "Focus", spiritKey: "yi", emoji: "🔮",
-    description: "Concentrazione & Analisi", phase: "spirits",
-    text: "Trovo soddisfazione nello scomporre un problema complesso in parti più semplici e risolverlo passo dopo passo.",
-  },
-  {
-    id: "yi_3", spirit: "Focus", spiritKey: "yi", emoji: "🔮",
-    description: "Concentrazione & Analisi", phase: "spirits",
-    text: "Ricordo facilmente dettagli importanti e riesco a tenere in mente molte informazioni nello stesso momento.",
-  },
-  // 🔥 TENACIA — Volontà & Resilienza
-  {
-    id: "zhi_1", spirit: "Tenacia", spiritKey: "zhi", emoji: "🔥",
-    description: "Volontà & Resilienza", phase: "spirits",
-    text: "Porto avanti le mie decisioni anche quando diventano difficili o richiedono sacrifici.",
-  },
-  {
-    id: "zhi_2", spirit: "Tenacia", spiritKey: "zhi", emoji: "🔥",
-    description: "Volontà & Resilienza", phase: "spirits",
-    text: "Di fronte agli ostacoli, cerco sempre un modo per continuare invece di fermarmi.",
-  },
-  {
-    id: "zhi_3", spirit: "Tenacia", spiritKey: "zhi", emoji: "🔥",
-    description: "Volontà & Resilienza", phase: "spirits",
-    text: "Una volta che mi impegno su un obiettivo, ci lavoro con costanza anche nei momenti di stanchezza.",
-  },
-];
+const RIASEC_TYPES: Record<string, string> = {
+  q1:"R",q2:"I",q3:"A",q4:"S",q5:"E",q6:"C",
+  q7:"R",q8:"I",q9:"A",q10:"S",q11:"E",q12:"C",
+};
 
-const ALL_QUESTIONS = [...RIASEC_QUESTIONS, ...SPIRIT_QUESTIONS];
+type SpiritKey = "shen"|"hun"|"po"|"yi"|"zhi";
+const SPIRIT_META: Record<string, { key: SpiritKey; emoji: string; transKey: string }> = {
+  shen_1:{ key:"shen", emoji:"✨", transKey:"presence" },
+  shen_2:{ key:"shen", emoji:"✨", transKey:"presence" },
+  shen_3:{ key:"shen", emoji:"✨", transKey:"presence" },
+  hun_1:{ key:"hun", emoji:"🌙", transKey:"vision" },
+  hun_2:{ key:"hun", emoji:"🌙", transKey:"vision" },
+  hun_3:{ key:"hun", emoji:"🌙", transKey:"vision" },
+  po_1:{ key:"po", emoji:"⚡", transKey:"instinct" },
+  po_2:{ key:"po", emoji:"⚡", transKey:"instinct" },
+  po_3:{ key:"po", emoji:"⚡", transKey:"instinct" },
+  yi_1:{ key:"yi", emoji:"🔮", transKey:"focus" },
+  yi_2:{ key:"yi", emoji:"🔮", transKey:"focus" },
+  yi_3:{ key:"yi", emoji:"🔮", transKey:"focus" },
+  zhi_1:{ key:"zhi", emoji:"🔥", transKey:"tenacity" },
+  zhi_2:{ key:"zhi", emoji:"🔥", transKey:"tenacity" },
+  zhi_3:{ key:"zhi", emoji:"🔥", transKey:"tenacity" },
+};
 
-const OPTIONS = [
-  { value: 1, label: "Per niente" },
-  { value: 2, label: "Poco" },
-  { value: 3, label: "Neutro" },
-  { value: 4, label: "Abbastanza" },
-  { value: 5, label: "Moltissimo" },
-];
+const ALL_RIASEC_IDS = [...RIASEC_QUESTION_IDS];
+const ALL_SPIRIT_IDS = [...SPIRIT_QUESTION_IDS];
+const ALL_IDS = [...ALL_RIASEC_IDS, ...ALL_SPIRIT_IDS];
 
 async function assignUserToSession(sessionId: number, userId: number): Promise<void> {
   try {
@@ -130,12 +57,11 @@ async function assignUserToSession(sessionId: number, userId: number): Promise<v
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId }),
     });
-  } catch {
-    // non-critical
-  }
+  } catch { /* non-critical */ }
 }
 
 export default function Test() {
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const submitTest = useSubmitTest();
   const { user } = useAuth();
@@ -144,11 +70,10 @@ export default function Test() {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [direction, setDirection] = useState<1 | -1>(1);
-  // Separate state for the transition screen — avoids conflicting with question index 12
   const [transitionPassed, setTransitionPassed] = useState(false);
 
-  const showTransition = currentStep === RIASEC_QUESTIONS.length && !transitionPassed;
-  const isComplete = currentStep >= ALL_QUESTIONS.length;
+  const showTransition = currentStep === ALL_RIASEC_IDS.length && !transitionPassed;
+  const isComplete = currentStep >= ALL_IDS.length;
 
   const questionVariants: Variants = prefersReduced
     ? {
@@ -162,22 +87,32 @@ export default function Test() {
         exit: (dir: number) => ({ opacity: 0, x: dir > 0 ? -40 : 40, transition: { duration: 0.2, ease: easings.easeIn } }),
       };
 
-  // Spirit sub-progress (which spirit group and which question within it)
-  const spiritOffset = currentStep - RIASEC_QUESTIONS.length;
-  const spiritGroupIndex = Math.floor(spiritOffset / 3); // 0-4
-  const questionInGroup  = (spiritOffset % 3) + 1;       // 1-3
+  const spiritOffset = currentStep - ALL_RIASEC_IDS.length;
+  const questionInGroup = (spiritOffset % 3) + 1;
 
-  const currentQuestion = ALL_QUESTIONS[currentStep];
-  const isSpiritQ = currentQuestion?.phase === "spirits";
-  const spiritQ = isSpiritQ ? SPIRIT_QUESTIONS.find((s) => s.id === currentQuestion.id) : null;
+  const currentId = ALL_IDS[currentStep];
+  const isSpiritQ = currentStep >= ALL_RIASEC_IDS.length;
+  const spiritInfo = isSpiritQ ? SPIRIT_META[currentId] : null;
 
-  const totalDisplay = ALL_QUESTIONS.length;
-  const stepDisplay  = currentStep + 1;
-  const progress     = (currentStep / ALL_QUESTIONS.length) * 100;
+  const totalDisplay = ALL_IDS.length;
+  const stepDisplay = currentStep + 1;
+  const progress = (currentStep / ALL_IDS.length) * 100;
+
+  const questionText = isSpiritQ
+    ? t(`test.questions.spirits.${currentId}`)
+    : t(`test.questions.riasec.${currentId}`);
+
+  const OPTIONS = [
+    { value: 1, label: t("test.options.1") },
+    { value: 2, label: t("test.options.2") },
+    { value: 3, label: t("test.options.3") },
+    { value: 4, label: t("test.options.4") },
+    { value: 5, label: t("test.options.5") },
+  ];
 
   const handleAnswer = (value: number) => {
     setDirection(1);
-    setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }));
+    setAnswers((prev) => ({ ...prev, [currentId]: value }));
     setTimeout(() => setCurrentStep((prev) => prev + 1), 250);
   };
 
@@ -185,10 +120,10 @@ export default function Test() {
     setDirection(-1);
     if (showTransition) {
       setTransitionPassed(false);
-      setCurrentStep(RIASEC_QUESTIONS.length - 1);
+      setCurrentStep(ALL_RIASEC_IDS.length - 1);
       return;
     }
-    if (currentStep === RIASEC_QUESTIONS.length && transitionPassed) {
+    if (currentStep === ALL_RIASEC_IDS.length && transitionPassed) {
       setTransitionPassed(false);
       return;
     }
@@ -209,43 +144,40 @@ export default function Test() {
 
   // ── Transition screen ──────────────────────────────────────────────────────
   if (showTransition) {
+    const spiritsTransition = [
+      { emoji: "✨", transKey: "presence" },
+      { emoji: "🌙", transKey: "vision" },
+      { emoji: "⚡", transKey: "instinct" },
+      { emoji: "🔮", transKey: "focus" },
+      { emoji: "🔥", transKey: "tenacity" },
+    ];
     return (
       <div className="container max-w-2xl mx-auto px-4 py-20 flex flex-col items-center justify-center min-h-[70vh] text-center">
         <div className="w-20 h-20 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-8 animate-in zoom-in duration-500">
           <Sparkles className="w-10 h-10" />
         </div>
         <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-full px-4 py-1.5 mb-6 text-sm font-medium text-primary">
-          <Sparkles className="w-3.5 h-3.5" /> Bussola Interiore
+          <Sparkles className="w-3.5 h-3.5" /> {t("test.transition.badge")}
         </div>
-        <h1 className="text-3xl md:text-4xl font-serif font-bold mb-4">
-          Seconda parte: i Cinque Spiriti
-        </h1>
+        <h1 className="text-3xl md:text-4xl font-serif font-bold mb-4">{t("test.transition.title")}</h1>
         <p className="text-lg text-muted-foreground mb-4 leading-relaxed max-w-xl">
-          Ottima analisi delle tue inclinazioni esterne. Ora esploriamo la tua energia interiore attraverso i{" "}
-          <strong>Cinque Spiriti</strong> della tradizione cinese.
+          {t("test.transition.intro")}{" "}
+          <strong>{t("test.transition.fiveSpirits")}</strong>{" "}
+          {t("test.transition.tradition")}
         </p>
-        <p className="text-base text-muted-foreground mb-10 leading-relaxed max-w-xl">
-          Risponderai a <strong>15 domande</strong> — 3 per ciascuno spirito — per mappare con precisione
-          il tuo equilibrio tra presenza, visione, istinto, analisi e volontà.
-          Non ci sono risposte giuste o sbagliate: segui sempre il primo istinto.
-        </p>
+        <p
+          className="text-base text-muted-foreground mb-10 leading-relaxed max-w-xl"
+          dangerouslySetInnerHTML={{ __html: t("test.transition.details") }}
+        />
 
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 w-full mb-10">
-          {[
-            { emoji: "✨", name: "Presenza", desc: "Coscienza" },
-            { emoji: "🌙", name: "Visione",  desc: "Direzione" },
-            { emoji: "⚡", name: "Istinto",  desc: "Energia" },
-            { emoji: "🔮", name: "Focus",    desc: "Analisi" },
-            { emoji: "🔥", name: "Tenacia",  desc: "Volontà" },
-          ].map((s) => (
-            <div key={s.name} className="flex flex-col items-center gap-1.5 bg-card border rounded-2xl px-3 py-4 text-center">
+          {spiritsTransition.map((s) => (
+            <div key={s.transKey} className="flex flex-col items-center gap-1.5 bg-card border rounded-2xl px-3 py-4 text-center">
               <span className="text-2xl">{s.emoji}</span>
-              <div className="font-semibold text-sm text-foreground">{s.name}</div>
-              <div className="text-xs text-muted-foreground">{s.desc}</div>
+              <div className="font-semibold text-sm text-foreground">{t(`test.transition.spirits.${s.transKey}.name`)}</div>
+              <div className="text-xs text-muted-foreground">{t(`test.transition.spirits.${s.transKey}.desc`)}</div>
               <div className="flex gap-1 mt-1">
-                {[1, 2, 3].map((i) => (
-                  <span key={i} className="w-1.5 h-1.5 rounded-full bg-primary/30" />
-                ))}
+                {[1, 2, 3].map((i) => <span key={i} className="w-1.5 h-1.5 rounded-full bg-primary/30" />)}
               </div>
             </div>
           ))}
@@ -253,10 +185,10 @@ export default function Test() {
 
         <div className="flex gap-3">
           <Button variant="ghost" onClick={handleBack} className="rounded-full px-6">
-            <ArrowLeft className="mr-2 w-4 h-4" /> Indietro
+            <ArrowLeft className="mr-2 w-4 h-4" /> {t("test.back")}
           </Button>
           <Button size="lg" onClick={() => setTransitionPassed(true)} className="rounded-full px-10 h-13">
-            Inizia la Bussola Interiore <ArrowRight className="ml-2 w-5 h-5" />
+            {t("test.transition.startCompass")} <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
         </div>
       </div>
@@ -270,15 +202,10 @@ export default function Test() {
         <div className="w-24 h-24 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-8 animate-in zoom-in duration-500">
           <Check className="w-12 h-12" />
         </div>
-        <h1 className="text-3xl md:text-4xl font-serif font-bold mb-4">Analisi completata!</h1>
-        <p className="text-lg text-muted-foreground mb-2 leading-relaxed">
-          Abbiamo analizzato il tuo profilo RIASEC e la tua Bussola Interiore.
-          Siamo pronti a svelarti i settori più adatti a te.
-        </p>
+        <h1 className="text-3xl md:text-4xl font-serif font-bold mb-4">{t("test.complete.title")}</h1>
+        <p className="text-lg text-muted-foreground mb-2 leading-relaxed">{t("test.complete.subtitle")}</p>
         {user && (
-          <p className="text-sm text-primary font-medium mb-6">
-            I risultati verranno salvati automaticamente sul tuo account.
-          </p>
+          <p className="text-sm text-primary font-medium mb-6">{t("test.complete.savedAccount")}</p>
         )}
         <Button
           size="lg"
@@ -287,13 +214,13 @@ export default function Test() {
           className="rounded-full px-8 h-14 text-lg w-full sm:w-auto"
         >
           {submitTest.isPending ? (
-            <><Loader2 className="mr-2 w-5 h-5 animate-spin" /> Elaborazione…</>
+            <><Loader2 className="mr-2 w-5 h-5 animate-spin" /> {t("test.complete.processing")}</>
           ) : (
-            <><Sparkles className="mr-2 w-5 h-5" /> Scopri i tuoi risultati</>
+            <><Sparkles className="mr-2 w-5 h-5" /> {t("test.complete.discoverResults")}</>
           )}
         </Button>
         {submitTest.isError && (
-          <p className="mt-4 text-sm text-destructive">Errore nell'invio. Riprova.</p>
+          <p className="mt-4 text-sm text-destructive">{t("test.complete.submitError")}</p>
         )}
       </div>
     );
@@ -302,7 +229,6 @@ export default function Test() {
   // ── Question screen ────────────────────────────────────────────────────────
   return (
     <div className="container max-w-2xl mx-auto px-4 py-12 min-h-[70vh]">
-      {/* Progress bar + counter */}
       <div className="flex items-center justify-between mb-4">
         <motion.button
           onClick={handleBack}
@@ -311,12 +237,12 @@ export default function Test() {
           whileHover={prefersReduced ? {} : { x: -2 }}
           whileTap={prefersReduced ? {} : { scale: 0.97 }}
         >
-          <ArrowLeft className="w-4 h-4" /> Indietro
+          <ArrowLeft className="w-4 h-4" /> {t("test.back")}
         </motion.button>
         <span className="text-sm text-muted-foreground">
           {isSpiritQ
-            ? `Bussola Interiore · ${stepDisplay - RIASEC_QUESTIONS.length} di ${SPIRIT_QUESTIONS.length}`
-            : `Domanda ${stepDisplay} di ${totalDisplay}`}
+            ? t("test.innerCompassCount", { current: stepDisplay - ALL_RIASEC_IDS.length, total: ALL_SPIRIT_IDS.length })
+            : t("test.questionOf", { current: stepDisplay, total: totalDisplay })}
         </span>
       </div>
       <motion.div
@@ -336,24 +262,19 @@ export default function Test() {
           animate="center"
           exit="exit"
         >
-          {/* Spirit header */}
-          {spiritQ && (
+          {spiritInfo && (
             <div className="flex items-center gap-3 mb-6">
               <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-full px-4 py-1.5">
-                <span>{spiritQ.emoji}</span>
+                <span>{spiritInfo.emoji}</span>
                 <span className="text-sm font-medium text-primary">
-                  {spiritQ.spirit} · {spiritQ.description}
+                  {t(`test.transition.spirits.${spiritInfo.transKey}.name`)} · {t(`test.transition.spirits.${spiritInfo.transKey}.desc`)}
                 </span>
               </div>
-              {/* 3-dot sub-progress */}
               <div className="flex gap-1.5 ml-auto">
                 {[1, 2, 3].map((n) => (
                   <span
                     key={n}
-                    className={cn(
-                      "w-2 h-2 rounded-full",
-                      n <= questionInGroup ? "bg-primary" : "bg-muted"
-                    )}
+                    className={cn("w-2 h-2 rounded-full", n <= questionInGroup ? "bg-primary" : "bg-muted")}
                   />
                 ))}
               </div>
@@ -361,12 +282,12 @@ export default function Test() {
           )}
 
           <h2 className="text-2xl md:text-3xl font-serif font-semibold text-foreground mb-10 leading-snug">
-            {currentQuestion?.text}
+            {questionText}
           </h2>
 
           <div className="space-y-3">
             {OPTIONS.map((opt, optIdx) => {
-              const selected = answers[currentQuestion?.id] === opt.value;
+              const selected = answers[currentId] === opt.value;
               return (
                 <motion.button
                   key={opt.value}
@@ -387,9 +308,7 @@ export default function Test() {
                   <motion.div
                     className={cn(
                       "w-5 h-5 rounded-full border-2 flex items-center justify-center",
-                      selected
-                        ? "border-primary-foreground bg-primary-foreground/20"
-                        : "border-muted-foreground"
+                      selected ? "border-primary-foreground bg-primary-foreground/20" : "border-muted-foreground"
                     )}
                     animate={prefersReduced ? {} : { scale: selected ? [1, 1.2, 1] : 1 }}
                     transition={{ duration: 0.25 }}

@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Star, CheckCircle2, AlertTriangle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
 export default function ResetPassword() {
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
 
   const params = new URLSearchParams(window.location.search);
@@ -23,9 +25,9 @@ export default function ResetPassword() {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 text-center">
         <AlertTriangle className="w-12 h-12 text-destructive mb-4 opacity-80" />
-        <h1 className="text-2xl font-serif font-bold mb-2">Link non valido</h1>
-        <p className="text-muted-foreground mb-6">Il link per il reset della password non è valido o è già stato utilizzato.</p>
-        <Button onClick={() => setLocation("/")}>Torna alla home</Button>
+        <h1 className="text-2xl font-serif font-bold mb-2">{t("resetPassword.invalidLinkTitle")}</h1>
+        <p className="text-muted-foreground mb-6">{t("resetPassword.invalidLinkDesc")}</p>
+        <Button onClick={() => setLocation("/")}>{t("resetPassword.goHome")}</Button>
       </div>
     );
   }
@@ -36,10 +38,10 @@ export default function ResetPassword() {
         <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mb-6">
           <CheckCircle2 className="w-8 h-8 text-emerald-600" />
         </div>
-        <h1 className="text-2xl font-serif font-bold mb-2">Password reimpostata!</h1>
-        <p className="text-muted-foreground mb-6">Ora puoi accedere con la tua nuova password.</p>
+        <h1 className="text-2xl font-serif font-bold mb-2">{t("resetPassword.successTitle")}</h1>
+        <p className="text-muted-foreground mb-6">{t("resetPassword.successDesc")}</p>
         <Button onClick={() => setLocation("/")} className="rounded-full px-8">
-          Vai al login
+          {t("resetPassword.goLogin")}
         </Button>
       </div>
     );
@@ -48,7 +50,7 @@ export default function ResetPassword() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      setError("Le password non coincidono");
+      setError(t("resetPassword.passwordMismatch"));
       return;
     }
     setLoading(true);
@@ -61,12 +63,12 @@ export default function ResetPassword() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Errore durante il reset");
+        setError(data.error || t("resetPassword.resetError"));
       } else {
         setDone(true);
       }
     } catch {
-      setError("Errore di rete. Riprova.");
+      setError(t("resetPassword.networkError"));
     } finally {
       setLoading(false);
     }
@@ -80,16 +82,16 @@ export default function ResetPassword() {
           <span className="font-serif font-bold text-lg text-primary">NorthStar</span>
         </div>
 
-        <h1 className="text-2xl font-serif font-bold mb-1">Nuova password</h1>
-        <p className="text-muted-foreground text-sm mb-6">Scegli una nuova password per il tuo account.</p>
+        <h1 className="text-2xl font-serif font-bold mb-1">{t("resetPassword.newPasswordLabel")}</h1>
+        <p className="text-muted-foreground text-sm mb-6">{t("resetPassword.chooseNew")}</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="new-password">Nuova password</Label>
+            <Label htmlFor="new-password">{t("resetPassword.newPasswordLabel")}</Label>
             <Input
               id="new-password"
               type="password"
-              placeholder="Min. 6 caratteri"
+              placeholder={t("resetPassword.passwordPlaceholder")}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               required
@@ -98,11 +100,11 @@ export default function ResetPassword() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="confirm-password">Conferma password</Label>
+            <Label htmlFor="confirm-password">{t("resetPassword.confirmPasswordLabel")}</Label>
             <Input
               id="confirm-password"
               type="password"
-              placeholder="Ripeti la nuova password"
+              placeholder={t("resetPassword.confirmPasswordPlaceholder")}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
@@ -111,7 +113,7 @@ export default function ResetPassword() {
               className={confirmPassword && newPassword !== confirmPassword ? "border-destructive" : ""}
             />
             {confirmPassword && newPassword !== confirmPassword && (
-              <p className="text-xs text-destructive">Le password non coincidono</p>
+              <p className="text-xs text-destructive">{t("resetPassword.passwordMismatch")}</p>
             )}
           </div>
 
@@ -123,7 +125,7 @@ export default function ResetPassword() {
             disabled={loading || (!!confirmPassword && newPassword !== confirmPassword)}
           >
             {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            Reimposta password
+            {loading ? t("resetPassword.resetting") : t("resetPassword.reset")}
           </Button>
         </form>
       </div>

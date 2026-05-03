@@ -5,6 +5,7 @@ import { Link, useParams } from "wouter";
 import { ArrowRight, BookOpen, Clock, Filter, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -81,6 +82,7 @@ function ArticleCard({ article }: { article: Article }) {
 }
 
 export default function CrescitaCategoria() {
+  const { t } = useTranslation();
   const { cat } = useParams<{ cat: string }>();
   const [search, setSearch] = useState("");
   const [diffFilter, setDiffFilter] = useState("all");
@@ -127,7 +129,7 @@ export default function CrescitaCategoria() {
       <section className="py-12 md:py-16 bg-gradient-to-b from-primary/5 to-background border-b">
         <div className="container mx-auto px-4 md:px-6 max-w-4xl">
           <Link href="/crescita" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors mb-6 group">
-            ← Torna alla Crescita Personale
+            ← {t("growth.backToGrowth", { defaultValue: "Torna alla Crescita Personale" })}
           </Link>
           <div className="flex items-center gap-4 mb-4">
             {currentCat && <span className="text-4xl">{currentCat.icon}</span>}
@@ -140,7 +142,7 @@ export default function CrescitaCategoria() {
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <BookOpen className="w-4 h-4" />
-            {data?.total ?? 0} articoli in questa area
+            {data?.total ?? 0} {t("growth.articlesInArea", { defaultValue: "articoli in questa area" })}
           </div>
         </div>
       </section>
@@ -152,7 +154,7 @@ export default function CrescitaCategoria() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <Input
-                placeholder="Cerca articoli…"
+                placeholder={t("growth.searchPlaceholder", { defaultValue: "Cerca articoli…" })}
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="pl-8 h-8 text-sm rounded-xl w-48"
@@ -169,7 +171,7 @@ export default function CrescitaCategoria() {
                 <button key={v} onClick={() => setDiffFilter(v)}
                   className={cn("px-3 py-1 rounded-xl border text-xs font-medium transition-colors",
                     diffFilter === v ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/30")}>
-                  {v === "all" ? "Tutti" : DIFFICULTY_LABELS[v]}
+                  {v === "all" ? t("settori.all", { defaultValue: "Tutti" }) : DIFFICULTY_LABELS[v]}
                 </button>
               ))}
             </div>
@@ -194,8 +196,8 @@ export default function CrescitaCategoria() {
             ) : filtered.length === 0 ? (
               <div className="text-center py-16 text-muted-foreground">
                 <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                <p className="font-medium">Nessun articolo trovato</p>
-                <p className="text-sm mt-1">Prova a cambiare i filtri</p>
+                <p className="font-medium">{t("growth.noArticlesFound", { defaultValue: "Nessun articolo trovato" })}</p>
+                <p className="text-sm mt-1">{t("growth.tryFilters", { defaultValue: "Prova a cambiare i filtri" })}</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -234,7 +236,7 @@ export default function CrescitaCategoria() {
                 ))}
                 <Link href="/crescita">
                   <div className="flex items-center gap-1 px-2 py-1.5 text-xs text-primary hover:underline cursor-pointer">
-                    Vedi tutte <ArrowRight className="w-3 h-3" />
+                    {t("growth.seeAll", { defaultValue: "Vedi tutti" })} <ArrowRight className="w-3 h-3" />
                   </div>
                 </Link>
               </div>

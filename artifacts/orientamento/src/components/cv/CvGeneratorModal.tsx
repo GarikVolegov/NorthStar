@@ -15,6 +15,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import type { CvData } from "./CvSection";
+import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -218,6 +219,7 @@ function CvSection({ title, children }: { title: string; children: React.ReactNo
 
 // ── Tag input ──────────────────────────────────────────────────────────
 function TagInput({ items, onChange, placeholder }: { items: string[]; onChange: (items: string[]) => void; placeholder?: string }) {
+  const { t } = useTranslation();
   const [input, setInput] = useState("");
   function add() {
     const val = input.trim();
@@ -241,7 +243,7 @@ function TagInput({ items, onChange, placeholder }: { items: string[]; onChange:
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
-          placeholder={placeholder || "Aggiungi..."}
+          placeholder={placeholder || t("cv.addPlaceholder")}
           className="h-8 text-xs rounded-lg"
         />
         <Button type="button" size="sm" variant="outline" className="h-8 rounded-lg px-2.5" onClick={add}>
@@ -276,6 +278,7 @@ function EditBlock({ icon: Icon, title, children, defaultOpen = true }: {
 
 // ── Full Edit Panel ───────────────────────────────────────────────────
 function EditPanel({ cv, onChange }: { cv: GeneratedCv; onChange: (cv: GeneratedCv) => void }) {
+  const { t } = useTranslation();
   const set = useCallback((patch: Partial<GeneratedCv>) => onChange({ ...cv, ...patch }), [cv, onChange]);
   const setPI = (patch: Partial<GeneratedCv["personalInfo"]>) =>
     set({ personalInfo: { ...cv.personalInfo, ...patch } });
@@ -308,16 +311,16 @@ function EditPanel({ cv, onChange }: { cv: GeneratedCv; onChange: (cv: Generated
     <div className="space-y-3">
 
       {/* Personal info */}
-      <EditBlock icon={User} title="Informazioni personali">
+      <EditBlock icon={User} title={t("cv.personalInfo")}>
         <div className="grid grid-cols-2 gap-2">
           {([
-            ["name", "Nome completo"],
-            ["title", "Titolo professionale"],
-            ["email", "Email"],
-            ["phone", "Telefono"],
-            ["location", "Città / Paese"],
-            ["linkedin", "LinkedIn URL"],
-            ["website", "Sito web"],
+            ["name", t("cv.fullName")],
+            ["title", t("cv.professionalTitle")],
+            ["email", t("cv.email")],
+            ["phone", t("cv.phone")],
+            ["location", t("cv.cityCountry")],
+            ["linkedin", t("cv.linkedinUrl")],
+            ["website", t("cv.website")],
           ] as [keyof GeneratedCv["personalInfo"], string][]).map(([field, label]) => (
             <div key={field} className={field === "title" || field === "linkedin" ? "col-span-2" : ""}>
               <Label className="text-[11px] text-muted-foreground mb-1 block">{label}</Label>
@@ -333,132 +336,132 @@ function EditPanel({ cv, onChange }: { cv: GeneratedCv; onChange: (cv: Generated
       </EditBlock>
 
       {/* Summary */}
-      <EditBlock icon={Sparkles} title="Profilo professionale">
+      <EditBlock icon={Sparkles} title={t("cv.professionalProfile")}>
         <Textarea
           value={cv.summary}
           onChange={(e) => set({ summary: e.target.value })}
           className="text-xs rounded-lg min-h-[100px] resize-none"
-          placeholder="Scrivi un sommario professionale..."
+          placeholder={t("cv.profilePlaceholder")}
         />
       </EditBlock>
 
       {/* Experience */}
-      <EditBlock icon={Briefcase} title={`Esperienza (${cv.experience.length})`} defaultOpen={cv.experience.length > 0}>
+      <EditBlock icon={Briefcase} title={t("cv.experienceN", { count: cv.experience.length })} defaultOpen={cv.experience.length > 0}>
         <div className="space-y-4">
           {cv.experience.map((exp, idx) => (
             <div key={exp.id} className="border rounded-lg p-3 space-y-2 bg-muted/20">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Esperienza {idx + 1}</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("cv.experienceRow", { n: idx + 1 })}</span>
                 <button onClick={() => delExp(exp.id)} className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="col-span-2">
-                  <Label className="text-[11px] text-muted-foreground mb-1 block">Ruolo *</Label>
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.roleLabel")}</Label>
                   <Input value={exp.title} onChange={(e) => updateExp(exp.id, { title: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="es. Software Engineer" />
                 </div>
                 <div>
-                  <Label className="text-[11px] text-muted-foreground mb-1 block">Azienda *</Label>
-                  <Input value={exp.company} onChange={(e) => updateExp(exp.id, { company: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="Nome azienda" />
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.companyLabel")}</Label>
+                  <Input value={exp.company} onChange={(e) => updateExp(exp.id, { company: e.target.value })} className="h-8 text-xs rounded-lg" placeholder={t("cv.companyPlaceholder")} />
                 </div>
                 <div>
-                  <Label className="text-[11px] text-muted-foreground mb-1 block">Periodo *</Label>
-                  <Input value={exp.period} onChange={(e) => updateExp(exp.id, { period: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="Gen 2022 – Presente" />
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.periodLabel")}</Label>
+                  <Input value={exp.period} onChange={(e) => updateExp(exp.id, { period: e.target.value })} className="h-8 text-xs rounded-lg" placeholder={t("cv.periodPlaceholder")} />
                 </div>
                 <div>
-                  <Label className="text-[11px] text-muted-foreground mb-1 block">Sede</Label>
-                  <Input value={exp.location ?? ""} onChange={(e) => updateExp(exp.id, { location: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="Milano" />
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.locationLabel")}</Label>
+                  <Input value={exp.location ?? ""} onChange={(e) => updateExp(exp.id, { location: e.target.value })} className="h-8 text-xs rounded-lg" placeholder={t("cv.locationPlaceholder")} />
                 </div>
               </div>
               <div>
-                <Label className="text-[11px] text-muted-foreground mb-1 block">Descrizione</Label>
+                <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.descriptionLabel")}</Label>
                 <Textarea
                   value={exp.description}
                   onChange={(e) => updateExp(exp.id, { description: e.target.value })}
                   className="text-xs rounded-lg min-h-[72px] resize-none"
-                  placeholder="Usa → per i bullet point: → Descrizione attività..."
+                  placeholder={t("cv.bulletHint")}
                 />
               </div>
               <div>
-                <Label className="text-[11px] text-muted-foreground mb-1 block">Competenze (premi Invio)</Label>
+                <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.skillsLabel")}</Label>
                 <TagInput items={exp.skills} onChange={(skills) => updateExp(exp.id, { skills })} placeholder="es. React, Python..." />
               </div>
             </div>
           ))}
           <Button type="button" size="sm" variant="outline" className="w-full rounded-lg gap-1.5 h-8" onClick={addExp}>
-            <Plus className="w-3.5 h-3.5" /> Aggiungi esperienza
+            <Plus className="w-3.5 h-3.5" /> {t("cv.addExperience")}
           </Button>
         </div>
       </EditBlock>
 
       {/* Education */}
-      <EditBlock icon={GraduationCap} title={`Formazione (${cv.education.length})`} defaultOpen={cv.education.length > 0}>
+      <EditBlock icon={GraduationCap} title={t("cv.educationN", { count: cv.education.length })} defaultOpen={cv.education.length > 0}>
         <div className="space-y-3">
           {cv.education.map((edu, idx) => (
             <div key={edu.id} className="border rounded-lg p-3 space-y-2 bg-muted/20">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Titolo {idx + 1}</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("cv.educationRow", { n: idx + 1 })}</span>
                 <button onClick={() => delEdu(edu.id)} className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
               <div>
-                <Label className="text-[11px] text-muted-foreground mb-1 block">Titolo di studio *</Label>
+                <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.degreeLabel")}</Label>
                 <Input value={edu.degree} onChange={(e) => updateEdu(edu.id, { degree: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="es. Laurea Magistrale in Informatica" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label className="text-[11px] text-muted-foreground mb-1 block">Istituto *</Label>
-                  <Input value={edu.institution} onChange={(e) => updateEdu(edu.id, { institution: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="Università di..." />
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.institutionLabel")}</Label>
+                  <Input value={edu.institution} onChange={(e) => updateEdu(edu.id, { institution: e.target.value })} className="h-8 text-xs rounded-lg" placeholder={t("cv.institutionPlaceholder")} />
                 </div>
                 <div>
-                  <Label className="text-[11px] text-muted-foreground mb-1 block">Anno</Label>
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.yearLabel")}</Label>
                   <Input value={edu.year} onChange={(e) => updateEdu(edu.id, { year: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="2022" />
                 </div>
               </div>
               <div>
-                <Label className="text-[11px] text-muted-foreground mb-1 block">Note (voto, specializzazione…)</Label>
+                <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.eduNotes")}</Label>
                 <Input value={edu.description ?? ""} onChange={(e) => updateEdu(edu.id, { description: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="110/110 con lode" />
               </div>
             </div>
           ))}
           <Button type="button" size="sm" variant="outline" className="w-full rounded-lg gap-1.5 h-8" onClick={addEdu}>
-            <Plus className="w-3.5 h-3.5" /> Aggiungi titolo di studio
+            <Plus className="w-3.5 h-3.5" /> {t("cv.addEducation")}
           </Button>
         </div>
       </EditBlock>
 
       {/* Skills */}
-      <EditBlock icon={Sparkles} title="Competenze" defaultOpen={false}>
+      <EditBlock icon={Sparkles} title={t("cv.skillsSection")} defaultOpen={false}>
         <TagInput items={cv.skills} onChange={(skills) => set({ skills })} placeholder="es. Machine Learning..." />
       </EditBlock>
 
       {/* Tools */}
-      <EditBlock icon={Wrench} title="Strumenti" defaultOpen={false}>
+      <EditBlock icon={Wrench} title={t("cv.toolsSection")} defaultOpen={false}>
         <TagInput items={cv.tools} onChange={(tools) => set({ tools })} placeholder="es. TensorFlow, Figma..." />
       </EditBlock>
 
       {/* Languages */}
-      <EditBlock icon={Globe} title="Lingue" defaultOpen={false}>
+      <EditBlock icon={Globe} title={t("cv.languagesSection")} defaultOpen={false}>
         <div className="space-y-2">
           {cv.languages.map((l, i) => (
             <div key={i} className="flex gap-2 items-center">
-              <Input value={l.language} onChange={(e) => updateLang(i, { language: e.target.value })} className="h-8 text-xs rounded-lg flex-1" placeholder="Lingua" />
-              <Input value={l.level} onChange={(e) => updateLang(i, { level: e.target.value })} className="h-8 text-xs rounded-lg w-28" placeholder="Livello" />
+              <Input value={l.language} onChange={(e) => updateLang(i, { language: e.target.value })} className="h-8 text-xs rounded-lg flex-1" placeholder={t("cv.langName")} />
+              <Input value={l.level} onChange={(e) => updateLang(i, { level: e.target.value })} className="h-8 text-xs rounded-lg w-28" placeholder={t("cv.langLevel")} />
               <button onClick={() => delLang(i)} className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors shrink-0">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}
           <Button type="button" size="sm" variant="outline" className="w-full rounded-lg gap-1.5 h-8" onClick={addLang}>
-            <Plus className="w-3.5 h-3.5" /> Aggiungi lingua
+            <Plus className="w-3.5 h-3.5" /> {t("cv.addLanguage")}
           </Button>
         </div>
       </EditBlock>
 
       {/* Certifications */}
-      <EditBlock icon={Award} title="Certificazioni" defaultOpen={false}>
+      <EditBlock icon={Award} title={t("cv.certsSection")} defaultOpen={false}>
         <TagInput items={cv.certifications} onChange={(certifications) => set({ certifications })} placeholder="es. AWS Solutions Architect..." />
       </EditBlock>
 
@@ -475,6 +478,7 @@ export function CvGeneratorModal({
   confirmedSectorId?: number;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: profile } = useProfileForCv(userId);
@@ -869,19 +873,19 @@ export function CvGeneratorModal({
             <Sparkles className="w-4 h-4 text-primary" />
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-sm text-foreground leading-tight">CV Generato con NorthStar</p>
+            <p className="font-semibold text-sm text-foreground leading-tight">{t("cv.generatedTitle")}</p>
             <div className="flex items-center gap-2 flex-wrap">
               {generated?.targetRole && (
-                <span className="text-xs text-muted-foreground">Target: {generated.targetRole}</span>
+                <span className="text-xs text-muted-foreground">{t("cv.targetRole", { role: generated.targetRole })}</span>
               )}
               {lastSavedAt && (
                 <span className="flex items-center gap-1 text-xs text-emerald-600">
                   <Clock className="w-2.5 h-2.5" />
-                  Salvato {formatSavedAt(lastSavedAt)}
+                  {t("cv.savedAt", { when: formatSavedAt(lastSavedAt) })}
                 </span>
               )}
               {hasUnsavedChanges && (
-                <span className="text-xs text-amber-600 font-medium">● Modifiche non salvate</span>
+                <span className="text-xs text-amber-600 font-medium">● {t("cv.unsavedChanges")}</span>
               )}
             </div>
           </div>
@@ -895,13 +899,13 @@ export function CvGeneratorModal({
                 onClick={() => setMobileTab("edit")}
                 className={cn("flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all", mobileTab === "edit" ? "bg-white shadow text-foreground" : "text-muted-foreground")}
               >
-                <Pencil className="w-3 h-3" /> Modifica
+                <Pencil className="w-3 h-3" /> {t("cv.noTabMobile")}
               </button>
               <button
                 onClick={() => setMobileTab("preview")}
                 className={cn("flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all", mobileTab === "preview" ? "bg-white shadow text-foreground" : "text-muted-foreground")}
               >
-                <Eye className="w-3 h-3" /> Anteprima
+                <Eye className="w-3 h-3" /> {t("cv.previewTabMobile")}
               </button>
             </div>
           )}
@@ -915,8 +919,8 @@ export function CvGeneratorModal({
               onClick={() => setIsEditing((v) => !v)}
             >
               {isEditing
-                ? <><Check className="w-3.5 h-3.5" />Fine modifica</>
-                : <><Pencil className="w-3.5 h-3.5" />Modifica</>}
+                ? <><Check className="w-3.5 h-3.5" />{t("cv.doneEdit")}</>
+                : <><Pencil className="w-3.5 h-3.5" />{t("cv.edit")}</>}
             </Button>
           )}
 
@@ -938,10 +942,10 @@ export function CvGeneratorModal({
               {saveStatus === "error" && <AlertCircle className="w-3.5 h-3.5" />}
               {saveStatus === "idle" && <Save className="w-3.5 h-3.5" />}
               <span className="hidden sm:inline">
-                {saveStatus === "saving" ? "Salvataggio…"
-                  : saveStatus === "saved" ? "Salvato!"
-                  : saveStatus === "error" ? "Errore"
-                  : "Salva modifiche"}
+                {saveStatus === "saving" ? t("cv.saving")
+                  : saveStatus === "saved" ? t("cv.saved")
+                  : saveStatus === "error" ? t("cv.saveError")
+                  : t("cv.saveChanges")}
               </span>
             </Button>
           )}
@@ -964,7 +968,7 @@ export function CvGeneratorModal({
               }}
             >
               <BarChart2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">ATS Score</span>
+              <span className="hidden sm:inline">{t("cv.atsButton")}</span>
             </Button>
           )}
 
@@ -986,7 +990,7 @@ export function CvGeneratorModal({
               }}
             >
               <Mail className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Lettera</span>
+              <span className="hidden sm:inline">{t("cv.letterButton")}</span>
             </Button>
           )}
 
@@ -1008,7 +1012,7 @@ export function CvGeneratorModal({
               }}
             >
               <Crosshair className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Adatta a Offerta</span>
+              <span className="hidden sm:inline">{t("cv.tailorButton")}</span>
             </Button>
           )}
 
@@ -1025,7 +1029,7 @@ export function CvGeneratorModal({
             >
               <History className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">
-                Versioni{versions.length > 0 ? ` (${versions.length})` : ""}
+                {t("cv.versionsButton")}{versions.length > 0 ? ` (${versions.length})` : ""}
               </span>
             </Button>
           )}
@@ -1040,7 +1044,7 @@ export function CvGeneratorModal({
               disabled={loading}
             >
               <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
-              <span className="hidden sm:inline">Rigenera</span>
+              <span className="hidden sm:inline">{t("cv.regenerate")}</span>
             </Button>
           )}
 
@@ -1052,12 +1056,12 @@ export function CvGeneratorModal({
               className="rounded-full gap-1.5"
               onClick={downloadPdf}
               disabled={downloading}
-              title="Scarica PDF vero (via server)"
+              title={t("cv.realPdfTitle")}
             >
               {downloading
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 : <Download className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">{downloading ? "PDF…" : "Scarica PDF"}</span>
+              <span className="hidden sm:inline">{downloading ? t("cv.downloadingPdf") : t("cv.downloadPdf")}</span>
             </Button>
           )}
 
@@ -1065,7 +1069,7 @@ export function CvGeneratorModal({
           {hasContent && (
             <Button size="sm" className="rounded-full gap-1.5" onClick={() => window.print()}>
               <Printer className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">Stampa</span>
+              <span className="hidden lg:inline">{t("cv.print")}</span>
             </Button>
           )}
 
@@ -1085,9 +1089,9 @@ export function CvGeneratorModal({
               <Sparkles className="w-8 h-8 text-primary animate-pulse" />
             </div>
             <div className="text-center">
-              <p className="font-semibold text-foreground">Generazione CV in corso…</p>
+              <p className="font-semibold text-foreground">{t("cv.generating")}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Integro il grafo delle conoscenze{cvData ? " e il tuo CV" : ""} con il profilo RIASEC
+                {t("cv.generatingDesc", { cvSuffix: cvData ? t("cv.generatingDescWithCv") : "" })}
               </p>
             </div>
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -1100,9 +1104,9 @@ export function CvGeneratorModal({
             <div className="w-14 h-14 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
               <AlertCircle className="w-7 h-7 text-destructive" />
             </div>
-            <p className="font-semibold text-foreground mb-2">Errore nella generazione</p>
+            <p className="font-semibold text-foreground mb-2">{t("cv.errorGenerating")}</p>
             <p className="text-sm text-muted-foreground mb-5">{error}</p>
-            <Button onClick={generate} className="rounded-full">Riprova</Button>
+            <Button onClick={generate} className="rounded-full">{t("cv.retry")}</Button>
           </div>
         )}
 
@@ -1116,8 +1120,8 @@ export function CvGeneratorModal({
                 <div className="w-[400px] flex-shrink-0 overflow-y-auto border-r bg-background p-4">
                   <div className="flex items-center gap-2 mb-4 pb-3 border-b">
                     <Pencil className="w-4 h-4 text-primary" />
-                    <h2 className="font-semibold text-sm text-foreground">Modifica il CV</h2>
-                    <span className="text-xs text-muted-foreground ml-auto">Preview live →</span>
+                    <h2 className="font-semibold text-sm text-foreground">{t("cv.editCv")}</h2>
+                    <span className="text-xs text-muted-foreground ml-auto">{t("cv.livePreview")}</span>
                   </div>
                   <EditPanel cv={generated} onChange={handleCvChange} />
                   <div className="mt-4 pt-4 border-t sticky bottom-0 bg-background pb-2">
@@ -1130,13 +1134,13 @@ export function CvGeneratorModal({
                       {saveStatus === "saved" && <CheckCircle2 className="w-4 h-4" />}
                       {saveStatus === "error" && <AlertCircle className="w-4 h-4" />}
                       {saveStatus === "idle" && <Save className="w-4 h-4" />}
-                      {saveStatus === "saving" ? "Salvataggio in corso…" : saveStatus === "saved" ? "Salvato con successo!" : saveStatus === "error" ? "Errore — riprova" : "Salva modifiche"}
+                      {saveStatus === "saving" ? t("cv.savingFull") : saveStatus === "saved" ? t("cv.savedFull") : saveStatus === "error" ? t("cv.saveErrorFull") : t("cv.saveChanges")}
                     </Button>
                     {hasUnsavedChanges && saveStatus === "idle" && (
-                      <p className="text-center text-xs text-amber-600 mt-2">Hai modifiche non salvate</p>
+                      <p className="text-center text-xs text-amber-600 mt-2">{t("cv.unsavedNote")}</p>
                     )}
                     {lastSavedAt && saveStatus !== "saving" && (
-                      <p className="text-center text-xs text-muted-foreground mt-1.5">Ultima modifica: {formatSavedAt(lastSavedAt)}</p>
+                      <p className="text-center text-xs text-muted-foreground mt-1.5">{t("cv.lastSaved", { when: formatSavedAt(lastSavedAt) })}</p>
                     )}
                   </div>
                 </div>
@@ -1148,7 +1152,7 @@ export function CvGeneratorModal({
                   {/* Header */}
                   <div className="flex items-center gap-2 px-4 py-3 border-b bg-amber-50">
                     <Crosshair className="w-4 h-4 text-amber-600" />
-                    <h2 className="font-semibold text-sm text-amber-900">Adatta CV all'Offerta</h2>
+                    <h2 className="font-semibold text-sm text-amber-900">{t("cv.adaptCvTitle")}</h2>
                     <button onClick={() => setShowTailor(false)} className="ml-auto p-1 rounded hover:bg-amber-100">
                       <X className="w-3.5 h-3.5 text-amber-700" />
                     </button>
@@ -1158,13 +1162,12 @@ export function CvGeneratorModal({
                     {/* How it works */}
                     <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-1.5">
                       <p className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
-                        <Lightbulb className="w-3.5 h-3.5" /> Come funziona
+                        <Lightbulb className="w-3.5 h-3.5" /> {t("cv.howItWorks")}
                       </p>
                       <ul className="text-xs text-amber-700 space-y-1 pl-1">
-                        <li>→ L'AI analizza il testo dell'offerta di lavoro</li>
-                        <li>→ Riscrive il profilo e le descrizioni per evidenziare le competenze richieste</li>
-                        <li>→ Riordina skills e strumenti per massimizzare il match ATS</li>
-                        <li>→ NON inventa esperienze: lavora solo su ciò che hai già nel CV</li>
+                        {(t("cv.tailorSteps", { returnObjects: true }) as string[]).map((step, i) => (
+                          <li key={i}>→ {step}</li>
+                        ))}
                       </ul>
                     </div>
 
@@ -1172,7 +1175,7 @@ export function CvGeneratorModal({
                     <div>
                       <Label className="text-xs font-semibold text-foreground mb-1.5 block flex items-center gap-1.5">
                         <FileSearch className="w-3.5 h-3.5 text-muted-foreground" />
-                        Testo dell'offerta di lavoro
+                        {t("cv.jobPostingLabel")}
                       </Label>
                       <Textarea
                         value={jobPosting}
@@ -1180,13 +1183,13 @@ export function CvGeneratorModal({
                           setJobPosting(e.target.value);
                           if (tailorStatus !== "idle") { setTailorStatus("idle"); setTailorError(null); }
                         }}
-                        placeholder={"Incolla qui il testo completo dell'offerta...\n\nEs.:\nStiamo cercando un Software Engineer...\nRequisiti: React, TypeScript, Node.js...\nResponsabilità: sviluppo frontend..."}
+                        placeholder={t("cv.jobPostingPlaceholder")}
                         className="min-h-[220px] text-xs rounded-xl resize-none font-mono leading-relaxed"
                       />
                       <p className="text-[11px] text-muted-foreground mt-1">
-                        {jobPosting.length} caratteri
+                        {jobPosting.length} {t("cv.chars")}
                         {jobPosting.length > 0 && jobPosting.length < 30 && (
-                          <span className="text-amber-600 ml-1">— ne servono almeno 30</span>
+                          <span className="text-amber-600 ml-1">{t("cv.charsMin")}</span>
                         )}
                       </p>
                     </div>
@@ -1203,11 +1206,11 @@ export function CvGeneratorModal({
                     {tailorStatus === "done" && (
                       <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 space-y-2">
                         <p className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> CV adattato con successo!
+                          <CheckCircle2 className="w-3.5 h-3.5" /> {t("cv.adaptedSuccess")}
                         </p>
                         {tailorKeywords.length > 0 && (
                           <div>
-                            <p className="text-xs text-emerald-700 mb-1.5">Keyword evidenziate:</p>
+                            <p className="text-xs text-emerald-700 mb-1.5">{t("cv.highlightedKeywords")}</p>
                             <div className="flex flex-wrap gap-1.5">
                               {tailorKeywords.map((k) => (
                                 <span key={k} className="text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
@@ -1218,7 +1221,7 @@ export function CvGeneratorModal({
                           </div>
                         )}
                         <p className="text-xs text-emerald-600">
-                          Controlla il CV nell'anteprima, poi <strong>salva</strong> o <strong>aggiungi come versione</strong> per conservarlo.
+                          {t("cv.adaptedNote")}
                         </p>
                       </div>
                     )}
@@ -1235,13 +1238,13 @@ export function CvGeneratorModal({
                       disabled={tailorStatus === "tailoring" || jobPosting.trim().length < 30}
                     >
                       {tailorStatus === "tailoring" && <Loader2 className="w-4 h-4 animate-spin" />}
-                      {tailorStatus === "tailoring" ? "Adattamento in corso…"
-                        : tailorStatus === "done" ? "↩ Adatta un'altra offerta"
-                        : <><Crosshair className="w-4 h-4" /> Adatta il CV</>}
+                      {tailorStatus === "tailoring" ? t("cv.adapting")
+                        : tailorStatus === "done" ? t("cv.adaptAnother")
+                        : <><Crosshair className="w-4 h-4" /> {t("cv.adapt")}</>}
                     </Button>
                     {tailorStatus === "idle" && jobPosting.trim().length >= 30 && (
                       <p className="text-center text-[11px] text-muted-foreground mt-2">
-                        L'AI riscriverà il CV mantenendo tutte le tue esperienze reali
+                        {t("cv.aiRewriteNote")}
                       </p>
                     )}
                   </div>
@@ -1253,7 +1256,7 @@ export function CvGeneratorModal({
                 <div className="w-[360px] flex-shrink-0 flex flex-col border-r bg-background">
                   <div className="flex items-center gap-2 px-4 py-3 border-b">
                     <History className="w-4 h-4 text-primary" />
-                    <h2 className="font-semibold text-sm text-foreground">Versioni salvate</h2>
+                    <h2 className="font-semibold text-sm text-foreground">{t("cv.savedVersions")}</h2>
                     <span className="ml-auto text-xs text-muted-foreground">{versions.length}/20</span>
                     <button onClick={() => setShowVersions(false)} className="p-1 rounded hover:bg-muted ml-1">
                       <X className="w-3.5 h-3.5 text-muted-foreground" />
@@ -1262,12 +1265,12 @@ export function CvGeneratorModal({
 
                   {/* Save current as new version */}
                   <div className="px-4 py-3 border-b bg-muted/30">
-                    <p className="text-xs font-medium text-foreground mb-2">Salva versione corrente</p>
+                    <p className="text-xs font-medium text-foreground mb-2">{t("cv.saveCurrentVersion")}</p>
                     <div className="flex gap-2">
                       <Input
                         value={newVersionName}
                         onChange={(e) => setNewVersionName(e.target.value)}
-                        placeholder={`CV ${new Date().toLocaleDateString("it-IT")}`}
+                        placeholder={`CV ${new Date().toLocaleDateString()}`}
                         className="h-8 text-xs rounded-lg flex-1"
                         onKeyDown={(e) => { if (e.key === "Enter") saveAsVersion(); }}
                       />
@@ -1281,7 +1284,7 @@ export function CvGeneratorModal({
                         {versionSaveStatus === "saved" && <CheckCircle2 className="w-3.5 h-3.5" />}
                         {versionSaveStatus === "idle" && <Save className="w-3.5 h-3.5" />}
                         {versionSaveStatus === "error" && <AlertCircle className="w-3.5 h-3.5" />}
-                        {versionSaveStatus === "saved" ? "Salvato!" : "Salva"}
+                        {versionSaveStatus === "saved" ? t("cv.versionSaved") : t("cv.save")}
                       </Button>
                     </div>
                   </div>
@@ -1323,7 +1326,7 @@ export function CvGeneratorModal({
                                 <button
                                   onClick={() => { setRenamingId(v.id); setRenameValue(v.name); }}
                                   className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-muted transition-all shrink-0 mt-0.5"
-                                  title="Rinomina"
+                                  title={t("cv.rename")}
                                 >
                                   <PenLine className="w-3 h-3 text-muted-foreground" />
                                 </button>
@@ -1348,12 +1351,12 @@ export function CvGeneratorModal({
                                   {loadingVersionId === v.id
                                     ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
                                     : <FolderOpen className="w-2.5 h-2.5" />}
-                                  Carica
+                                  {t("cv.loadVersion")}
                                 </Button>
                                 <button
                                   onClick={() => deleteVersion(v.id)}
                                   className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                                  title="Elimina versione"
+                                  title={t("cv.deleteVersion")}
                                 >
                                   <Trash2 className="w-3 h-3" />
                                 </button>
@@ -1373,7 +1376,7 @@ export function CvGeneratorModal({
                   {/* Header */}
                   <div className="flex items-center gap-2 px-4 py-3 border-b bg-indigo-50">
                     <Mail className="w-4 h-4 text-indigo-600" />
-                    <h2 className="font-semibold text-sm text-indigo-900">Lettera di Presentazione</h2>
+                    <h2 className="font-semibold text-sm text-indigo-900">{t("cv.letterTitle")}</h2>
                     <button onClick={() => setShowLetter(false)} className="ml-auto p-1 rounded hover:bg-indigo-100">
                       <X className="w-3.5 h-3.5 text-indigo-700" />
                     </button>
@@ -1385,11 +1388,11 @@ export function CvGeneratorModal({
                         {/* Inputs */}
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <Label className="text-xs font-semibold mb-1 block">Azienda</Label>
+                            <Label className="text-xs font-semibold mb-1 block">{t("cv.letterCompany")}</Label>
                             <Input value={letterCompany} onChange={(e) => setLetterCompany(e.target.value)} placeholder="es. Google Italia" className="h-8 text-xs rounded-lg" />
                           </div>
                           <div>
-                            <Label className="text-xs font-semibold mb-1 block">Ruolo cercato</Label>
+                            <Label className="text-xs font-semibold mb-1 block">{t("cv.letterRole")}</Label>
                             <Input value={letterRole} onChange={(e) => setLetterRole(e.target.value)} placeholder="es. UX Designer" className="h-8 text-xs rounded-lg" />
                           </div>
                         </div>
@@ -1397,26 +1400,26 @@ export function CvGeneratorModal({
                         <div>
                           <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
                             <FileSearch className="w-3.5 h-3.5 text-muted-foreground" />
-                            Testo dell'offerta di lavoro *
+                            {t("cv.jobPostingRequired")}
                           </Label>
                           <Textarea
                             value={letterJobPosting}
                             onChange={(e) => { setLetterJobPosting(e.target.value); if (letterStatus !== "idle") setLetterStatus("idle"); }}
-                            placeholder={"Incolla il testo completo dell'offerta...\n\nL'AI analizzerà i requisiti richiesti e scriverà una lettera personalizzata che evidenzia le tue competenze più rilevanti."}
+                            placeholder={t("cv.letterJobPlaceholder")}
                             className="min-h-[180px] text-xs rounded-xl resize-none font-mono leading-relaxed"
                           />
                           <p className="text-[11px] text-muted-foreground mt-1">
-                            {letterJobPosting.length} caratteri
-                            {letterJobPosting.length > 0 && letterJobPosting.length < 30 && <span className="text-amber-600 ml-1">— ne servono almeno 30</span>}
+                            {letterJobPosting.length} {t("cv.chars")}
+                            {letterJobPosting.length > 0 && letterJobPosting.length < 30 && <span className="text-amber-600 ml-1">{t("cv.charsMin")}</span>}
                           </p>
                         </div>
 
                         <div>
-                          <Label className="text-xs font-semibold mb-1 block">Note aggiuntive <span className="font-normal text-muted-foreground">(opzionale)</span></Label>
+                          <Label className="text-xs font-semibold mb-1 block">{t("cv.extraNotes")} <span className="font-normal text-muted-foreground">{t("cv.optional")}</span></Label>
                           <Textarea
                             value={letterExtra}
                             onChange={(e) => setLetterExtra(e.target.value)}
-                            placeholder="Es. motivazioni personali, disponibilità, risultati da evidenziare..."
+                            placeholder={t("cv.extraNotesPlaceholder")}
                             className="min-h-[60px] text-xs rounded-xl resize-none"
                           />
                         </div>
@@ -1429,11 +1432,11 @@ export function CvGeneratorModal({
                         )}
 
                         <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-3 space-y-1">
-                          <p className="text-xs font-semibold text-indigo-800 flex items-center gap-1.5"><Lightbulb className="w-3.5 h-3.5" /> Come funziona</p>
+                          <p className="text-xs font-semibold text-indigo-800 flex items-center gap-1.5"><Lightbulb className="w-3.5 h-3.5" /> {t("cv.howItWorks")}</p>
                           <ul className="text-xs text-indigo-700 space-y-0.5 pl-1">
-                            <li>→ L'AI legge il tuo CV e i requisiti dell'offerta</li>
-                            <li>→ Scrive 4 paragrafi personalizzati in italiano formale</li>
-                            <li>→ Scaricabile come PDF A4 con header professionale</li>
+                            {(t("cv.letterSteps", { returnObjects: true }) as string[]).map((step, i) => (
+                              <li key={i}>→ {step}</li>
+                            ))}
                           </ul>
                         </div>
                       </>
@@ -1442,12 +1445,12 @@ export function CvGeneratorModal({
                       <div className="space-y-4">
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                          <p className="text-xs font-semibold text-emerald-700">Lettera generata! Puoi modificare ogni paragrafo.</p>
+                          <p className="text-xs font-semibold text-emerald-700">{t("cv.letterGenerated")}</p>
                         </div>
 
                         {letter?.subject && (
                           <div className="rounded-lg bg-muted/50 border px-3 py-2">
-                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Oggetto</p>
+                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t("cv.subject")}</p>
                             <input
                               className="w-full text-xs font-semibold bg-transparent outline-none text-foreground"
                               value={letter.subject}
@@ -1457,7 +1460,7 @@ export function CvGeneratorModal({
                         )}
 
                         <div>
-                          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Saluto</p>
+                          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t("cv.salutation")}</p>
                           <input
                             className="w-full text-xs border rounded-lg px-2 py-1.5 bg-background outline-none focus:ring-1 focus:ring-indigo-300"
                             value={letter?.salutation ?? ""}
@@ -1467,7 +1470,7 @@ export function CvGeneratorModal({
 
                         {letter?.paragraphs.map((p, i) => (
                           <div key={i}>
-                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Paragrafo {i + 1}</p>
+                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t("cv.paragraphN", { n: i + 1 })}</p>
                             <Textarea
                               value={p}
                               onChange={(e) => setLetter((l) => {
@@ -1482,7 +1485,7 @@ export function CvGeneratorModal({
                         ))}
 
                         <div>
-                          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Congedo</p>
+                          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t("cv.closing")}</p>
                           <input
                             className="w-full text-xs border rounded-lg px-2 py-1.5 bg-background outline-none focus:ring-1 focus:ring-indigo-300"
                             value={letter?.closing ?? ""}
@@ -1507,7 +1510,7 @@ export function CvGeneratorModal({
                         disabled={letterStatus === "generating" || letterJobPosting.trim().length < 30}
                       >
                         {letterStatus === "generating" && <Loader2 className="w-4 h-4 animate-spin" />}
-                        {letterStatus === "generating" ? "Scrittura in corso…" : <><Mail className="w-4 h-4" /> Genera Lettera</>}
+                        {letterStatus === "generating" ? t("cv.letterWriting") : <><Mail className="w-4 h-4" /> {t("cv.generateLetter")}</>}
                       </Button>
                     ) : (
                       <div className="flex gap-2">
@@ -1517,7 +1520,7 @@ export function CvGeneratorModal({
                           disabled={downloadingLetter}
                         >
                           {downloadingLetter ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                          {downloadingLetter ? "PDF…" : "Scarica PDF"}
+                          {downloadingLetter ? t("cv.downloadingPdf") : t("cv.downloadPdf")}
                         </Button>
                         <Button
                           variant="outline"
@@ -1525,7 +1528,7 @@ export function CvGeneratorModal({
                           onClick={copyLetter}
                         >
                           {copyStatus === "copied" ? <ClipboardCheck className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                          {copyStatus === "copied" ? "Copiato!" : "Copia testo"}
+                          {copyStatus === "copied" ? t("cv.copied") : t("cv.copyText")}
                         </Button>
                       </div>
                     )}
@@ -1535,7 +1538,7 @@ export function CvGeneratorModal({
                         className="w-full rounded-xl h-8 text-xs text-muted-foreground hover:text-foreground"
                         onClick={() => { setLetterStatus("idle"); }}
                       >
-                        ↩ Genera un'altra lettera
+                        ↩ {t("cv.generateAnotherLetter")}
                       </Button>
                     )}
                   </div>
@@ -1553,7 +1556,7 @@ export function CvGeneratorModal({
                     {/* Header */}
                     <div className="flex items-center gap-2 px-4 py-3 border-b bg-teal-50">
                       <BarChart2 className="w-4 h-4 text-teal-600" />
-                      <h2 className="font-semibold text-sm text-teal-900">ATS Compatibility Score</h2>
+                      <h2 className="font-semibold text-sm text-teal-900">{t("cv.atsTitle")}</h2>
                       <button onClick={() => setShowAts(false)} className="ml-auto p-1 rounded hover:bg-teal-100">
                         <X className="w-3.5 h-3.5 text-teal-700" />
                       </button>
@@ -1563,28 +1566,28 @@ export function CvGeneratorModal({
                       {atsStatus !== "done" ? (
                         <>
                           <div className="rounded-xl bg-teal-50 border border-teal-100 p-3 space-y-1.5">
-                            <p className="text-xs font-semibold text-teal-800 flex items-center gap-1.5"><Lightbulb className="w-3.5 h-3.5" /> Come funziona</p>
+                            <p className="text-xs font-semibold text-teal-800 flex items-center gap-1.5"><Lightbulb className="w-3.5 h-3.5" /> {t("cv.howItWorks")}</p>
                             <ul className="text-xs text-teal-700 space-y-0.5 pl-1">
-                              <li>→ L'AI simula un sistema ATS reale</li>
-                              <li>→ Valuta keyword match, esperienze, competenze, istruzione</li>
-                              <li>→ Mostra cosa manca e come migliorare il punteggio</li>
+                              {(t("cv.atsSteps", { returnObjects: true }) as string[]).map((step, i) => (
+                                <li key={i}>→ {step}</li>
+                              ))}
                             </ul>
                           </div>
 
                           <div>
                             <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
                               <FileSearch className="w-3.5 h-3.5 text-muted-foreground" />
-                              Testo dell'offerta di lavoro
+                              {t("cv.jobPostingLabel")}
                             </Label>
                             <Textarea
                               value={atsJobPosting}
                               onChange={(e) => { setAtsJobPosting(e.target.value); if (atsStatus !== "idle") setAtsStatus("idle"); }}
-                              placeholder={"Incolla il testo dell'offerta di lavoro...\n\nL'AI analizzerà ogni sezione del CV per calcolare la compatibilità ATS."}
+                              placeholder={t("cv.atsJobPlaceholder")}
                               className="min-h-[220px] text-xs rounded-xl resize-none font-mono leading-relaxed"
                             />
                             <p className="text-[11px] text-muted-foreground mt-1">
-                              {atsJobPosting.length} caratteri
-                              {atsJobPosting.length > 0 && atsJobPosting.length < 30 && <span className="text-amber-600 ml-1">— ne servono almeno 30</span>}
+                              {atsJobPosting.length} {t("cv.chars")}
+                              {atsJobPosting.length > 0 && atsJobPosting.length < 30 && <span className="text-amber-600 ml-1">{t("cv.charsMin")}</span>}
                             </p>
                           </div>
 
@@ -1621,7 +1624,7 @@ export function CvGeneratorModal({
 
                           {/* Sections */}
                           <div className="space-y-2.5">
-                            <p className="text-xs font-semibold text-foreground">Dettaglio per sezione</p>
+                            <p className="text-xs font-semibold text-foreground">{t("cv.sectionBreakdown")}</p>
                             {atsResult.sections.map((sec) => (
                               <div key={sec.name}>
                                 <div className="flex items-center justify-between mb-1">
@@ -1642,7 +1645,7 @@ export function CvGeneratorModal({
                           {/* Strengths */}
                           {atsResult.strengths.length > 0 && (
                             <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 space-y-1.5">
-                              <p className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5" /> Punti di forza</p>
+                              <p className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5" /> {t("cv.strengths")}</p>
                               {atsResult.strengths.map((s, i) => (
                                 <p key={i} className="text-xs text-emerald-700 flex gap-1.5"><span className="shrink-0">✓</span>{s}</p>
                               ))}
@@ -1653,7 +1656,7 @@ export function CvGeneratorModal({
                           {atsResult.missingKeywords.length > 0 && (
                             <div>
                               <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
-                                <Zap className="w-3.5 h-3.5 text-amber-500" /> Keyword mancanti
+                                <Zap className="w-3.5 h-3.5 text-amber-500" /> {t("cv.missingKeywords")}
                               </p>
                               <div className="flex flex-wrap gap-1.5">
                                 {atsResult.missingKeywords.map((k) => (
@@ -1665,7 +1668,7 @@ export function CvGeneratorModal({
 
                           {/* Tips */}
                           <div className="rounded-xl bg-muted/40 border p-3 space-y-2">
-                            <p className="text-xs font-semibold text-foreground">Come migliorare</p>
+                            <p className="text-xs font-semibold text-foreground">{t("cv.howToImprove")}</p>
                             {atsResult.tips.map((t, i) => (
                               <p key={i} className="text-xs text-foreground flex gap-2">
                                 <span className="shrink-0 w-4 h-4 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-[10px] font-bold">{i + 1}</span>
@@ -1686,19 +1689,19 @@ export function CvGeneratorModal({
                           disabled={atsStatus === "analyzing" || atsJobPosting.trim().length < 30}
                         >
                           {atsStatus === "analyzing" && <Loader2 className="w-4 h-4 animate-spin" />}
-                          {atsStatus === "analyzing" ? "Analisi in corso…" : <><BarChart2 className="w-4 h-4" /> Analizza compatibilità</>}
+                          {atsStatus === "analyzing" ? t("cv.analyzing") : <><BarChart2 className="w-4 h-4" /> {t("cv.analyzeCompat")}</>}
                         </Button>
                       ) : (
                         <div className="space-y-2">
                           <p className="text-center text-xs text-muted-foreground">
-                            Usa <strong>Adatta a Offerta</strong> per migliorare automaticamente il tuo punteggio
+                            {t("cv.atsTipUseTailor")}
                           </p>
                           <Button
                             variant="ghost"
                             className="w-full rounded-xl h-8 text-xs text-muted-foreground hover:text-foreground"
                             onClick={() => { setAtsStatus("idle"); setAtsResult(null); }}
                           >
-                            ↩ Analizza un'altra offerta
+                            ↩ {t("cv.analyzeAnother")}
                           </Button>
                         </div>
                       )}
@@ -1722,18 +1725,18 @@ export function CvGeneratorModal({
                     <div>
                       <div className="flex items-center gap-2 mb-3 pb-3 border-b bg-teal-50 -mx-4 -mt-4 px-4 pt-4">
                         <BarChart2 className="w-4 h-4 text-teal-600" />
-                        <h2 className="font-semibold text-sm text-teal-900">ATS Compatibility Score</h2>
+                        <h2 className="font-semibold text-sm text-teal-900">{t("cv.atsTitle")}</h2>
                         <button onClick={() => setShowAts(false)} className="ml-auto p-1 rounded hover:bg-teal-100">
                           <X className="w-3.5 h-3.5 text-teal-700" />
                         </button>
                       </div>
                       {atsStatus !== "done" ? (
                         <div className="mt-4 space-y-3">
-                          <Label className="text-xs font-semibold mb-1.5 block">Testo dell'offerta</Label>
+                          <Label className="text-xs font-semibold mb-1.5 block">{t("cv.jobPostingShort")}</Label>
                           <Textarea
                             value={atsJobPosting}
                             onChange={(e) => { setAtsJobPosting(e.target.value); if (atsStatus !== "idle") setAtsStatus("idle"); }}
-                            placeholder="Incolla il testo dell'offerta di lavoro..."
+                            placeholder={t("cv.atsJobShortPlaceholder")}
                             className="min-h-[150px] text-xs rounded-xl resize-none"
                           />
                           {atsStatus === "error" && atsError && (
@@ -1748,7 +1751,7 @@ export function CvGeneratorModal({
                             disabled={atsStatus === "analyzing" || atsJobPosting.trim().length < 30}
                           >
                             {atsStatus === "analyzing" && <Loader2 className="w-4 h-4 animate-spin" />}
-                            {atsStatus === "analyzing" ? "Analisi in corso…" : <><BarChart2 className="w-4 h-4" /> Analizza</>}
+                            {atsStatus === "analyzing" ? t("cv.analyzing") : <><BarChart2 className="w-4 h-4" /> {t("cv.analyze")}</>}
                           </Button>
                         </div>
                       ) : atsResult ? (
@@ -1793,7 +1796,7 @@ export function CvGeneratorModal({
                           {/* Missing keywords */}
                           {atsResult.missingKeywords.length > 0 && (
                             <div>
-                              <p className="text-xs font-semibold mb-2 flex items-center gap-1"><Zap className="w-3 h-3 text-amber-500" /> Keyword mancanti</p>
+                              <p className="text-xs font-semibold mb-2 flex items-center gap-1"><Zap className="w-3 h-3 text-amber-500" /> {t("cv.missingKeywords")}</p>
                               <div className="flex flex-wrap gap-1">
                                 {atsResult.missingKeywords.map((k) => (
                                   <span key={k} className="text-[11px] bg-amber-50 border border-amber-200 text-amber-800 px-2 py-0.5 rounded-full">{k}</span>
@@ -1803,7 +1806,7 @@ export function CvGeneratorModal({
                           )}
                           {/* Tips */}
                           <div className="rounded-xl bg-muted/40 border p-3 space-y-1.5">
-                            <p className="text-xs font-semibold">Come migliorare</p>
+                            <p className="text-xs font-semibold">{t("cv.howToImprove")}</p>
                             {atsResult.tips.map((t, i) => (
                               <p key={i} className="text-xs flex gap-2">
                                 <span className="shrink-0 w-4 h-4 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-[10px] font-bold">{i + 1}</span>
@@ -1812,7 +1815,7 @@ export function CvGeneratorModal({
                             ))}
                           </div>
                           <Button variant="ghost" className="w-full rounded-xl h-8 text-xs text-muted-foreground" onClick={() => { setAtsStatus("idle"); setAtsResult(null); }}>
-                            ↩ Analizza un'altra offerta
+                            ↩ {t("cv.analyzeAnother")}
                           </Button>
                         </div>
                       ) : null}
@@ -1822,7 +1825,7 @@ export function CvGeneratorModal({
                     <div>
                       <div className="flex items-center gap-2 mb-3 pb-3 border-b bg-indigo-50 -mx-4 -mt-4 px-4 pt-4">
                         <Mail className="w-4 h-4 text-indigo-600" />
-                        <h2 className="font-semibold text-sm text-indigo-900">Lettera di Presentazione</h2>
+                        <h2 className="font-semibold text-sm text-indigo-900">{t("cv.letterTitle")}</h2>
                         <button onClick={() => setShowLetter(false)} className="ml-auto p-1 rounded hover:bg-indigo-100">
                           <X className="w-3.5 h-3.5 text-indigo-700" />
                         </button>
@@ -1832,23 +1835,23 @@ export function CvGeneratorModal({
                         <div className="mt-4 space-y-3">
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <Label className="text-xs font-semibold mb-1 block">Azienda</Label>
+                              <Label className="text-xs font-semibold mb-1 block">{t("cv.letterCompany")}</Label>
                               <Input value={letterCompany} onChange={(e) => setLetterCompany(e.target.value)} placeholder="es. Google" className="h-8 text-xs rounded-lg" />
                             </div>
                             <div>
-                              <Label className="text-xs font-semibold mb-1 block">Ruolo</Label>
+                              <Label className="text-xs font-semibold mb-1 block">{t("cv.letterRoleShort")}</Label>
                               <Input value={letterRole} onChange={(e) => setLetterRole(e.target.value)} placeholder="es. Designer" className="h-8 text-xs rounded-lg" />
                             </div>
                           </div>
                           <div>
-                            <Label className="text-xs font-semibold mb-1.5 block">Testo dell'offerta *</Label>
+                            <Label className="text-xs font-semibold mb-1.5 block">{t("cv.jobPostingShortReq")}</Label>
                             <Textarea
                               value={letterJobPosting}
                               onChange={(e) => { setLetterJobPosting(e.target.value); if (letterStatus !== "idle") setLetterStatus("idle"); }}
-                              placeholder="Incolla qui il testo dell'offerta di lavoro..."
+                              placeholder={t("cv.jobShortPlaceholder")}
                               className="min-h-[140px] text-xs rounded-xl resize-none mb-1"
                             />
-                            <p className="text-[11px] text-muted-foreground">{letterJobPosting.length} caratteri</p>
+                            <p className="text-[11px] text-muted-foreground">{letterJobPosting.length} {t("cv.chars")}</p>
                           </div>
                           {letterStatus === "error" && letterError && (
                             <div className="flex gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
@@ -1862,18 +1865,18 @@ export function CvGeneratorModal({
                             disabled={letterStatus === "generating" || letterJobPosting.trim().length < 30}
                           >
                             {letterStatus === "generating" && <Loader2 className="w-4 h-4 animate-spin" />}
-                            {letterStatus === "generating" ? "Generazione…" : <><Mail className="w-4 h-4" /> Genera Lettera</>}
+                            {letterStatus === "generating" ? t("cv.generatingShort") : <><Mail className="w-4 h-4" /> {t("cv.generateLetter")}</>}
                           </Button>
                         </div>
                       ) : (
                         <div className="mt-4 space-y-3">
                           <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50 border border-emerald-200">
                             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            <p className="text-xs font-semibold text-emerald-700">Lettera pronta! Controlla e modifica.</p>
+                            <p className="text-xs font-semibold text-emerald-700">{t("cv.letterReady")}</p>
                           </div>
                           {letter?.paragraphs.map((p, i) => (
                             <div key={i}>
-                              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Paragrafo {i + 1}</p>
+                              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t("cv.paragraphN", { n: i + 1 })}</p>
                               <Textarea
                                 value={p}
                                 onChange={(e) => setLetter((l) => {
@@ -1893,11 +1896,11 @@ export function CvGeneratorModal({
                             </Button>
                             <Button variant="outline" className={cn("flex-1 rounded-xl gap-1.5 h-9", copyStatus === "copied" && "border-emerald-300 text-emerald-700")} onClick={copyLetter}>
                               {copyStatus === "copied" ? <ClipboardCheck className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                              {copyStatus === "copied" ? "Copiato!" : "Copia"}
+                              {copyStatus === "copied" ? t("cv.copied") : t("cv.copyShort")}
                             </Button>
                           </div>
                           <Button variant="ghost" className="w-full rounded-xl h-8 text-xs text-muted-foreground" onClick={() => setLetterStatus("idle")}>
-                            ↩ Genera un'altra lettera
+                            ↩ {t("cv.generateAnotherLetter")}
                           </Button>
                         </div>
                       )}
@@ -1907,20 +1910,20 @@ export function CvGeneratorModal({
                     <div>
                       <div className="flex items-center gap-2 mb-3 pb-3 border-b bg-amber-50 -mx-4 -mt-4 px-4 pt-4">
                         <Crosshair className="w-4 h-4 text-amber-600" />
-                        <h2 className="font-semibold text-sm text-amber-900">Adatta CV all'Offerta</h2>
+                        <h2 className="font-semibold text-sm text-amber-900">{t("cv.adaptCvTitle")}</h2>
                         <button onClick={() => setShowTailor(false)} className="ml-auto p-1 rounded hover:bg-amber-100">
                           <X className="w-3.5 h-3.5 text-amber-700" />
                         </button>
                       </div>
                       <div className="mt-4 rounded-xl bg-amber-50 border border-amber-200 p-3 mb-4 space-y-1">
-                        <p className="text-xs font-semibold text-amber-800">Come funziona</p>
-                        <p className="text-xs text-amber-700">L'AI analizza l'offerta e riscrive il CV per massimizzare il match ATS, senza inventare esperienze.</p>
+                        <p className="text-xs font-semibold text-amber-800">{t("cv.howItWorks")}</p>
+                        <p className="text-xs text-amber-700">{t("cv.tailorMobileDesc")}</p>
                       </div>
-                      <Label className="text-xs font-semibold mb-1.5 block">Testo dell'offerta</Label>
+                      <Label className="text-xs font-semibold mb-1.5 block">{t("cv.jobPostingShort")}</Label>
                       <Textarea
                         value={jobPosting}
                         onChange={(e) => { setJobPosting(e.target.value); if (tailorStatus !== "idle") setTailorStatus("idle"); }}
-                        placeholder="Incolla qui il testo dell'offerta di lavoro..."
+                        placeholder={t("cv.jobShortPlaceholder")}
                         className="min-h-[160px] text-xs rounded-xl resize-none mb-3"
                       />
                       {tailorStatus === "error" && tailorError && (
@@ -1932,7 +1935,7 @@ export function CvGeneratorModal({
                       {tailorStatus === "done" && (
                         <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 mb-3">
                           <p className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> CV adattato! Controlla l'anteprima.
+                            <CheckCircle2 className="w-3.5 h-3.5" /> {t("cv.cvAdaptedMobile")}
                           </p>
                           {tailorKeywords.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-2">
@@ -1949,7 +1952,7 @@ export function CvGeneratorModal({
                         disabled={tailorStatus === "tailoring" || jobPosting.trim().length < 30}
                       >
                         {tailorStatus === "tailoring" && <Loader2 className="w-4 h-4 animate-spin" />}
-                        {tailorStatus === "tailoring" ? "Adattamento in corso…" : tailorStatus === "done" ? "↩ Adatta un'altra offerta" : <><Crosshair className="w-4 h-4" /> Adatta il CV</>}
+                        {tailorStatus === "tailoring" ? t("cv.adapting") : tailorStatus === "done" ? `↩ ${t("cv.adaptAnother")}` : <><Crosshair className="w-4 h-4" /> {t("cv.adapt")}</>}
                       </Button>
                     </div>
                   ) : showVersions ? (
@@ -1957,7 +1960,7 @@ export function CvGeneratorModal({
                     <div>
                       <div className="flex items-center gap-2 mb-3 pb-3 border-b">
                         <History className="w-4 h-4 text-primary" />
-                        <h2 className="font-semibold text-sm">Versioni salvate</h2>
+                        <h2 className="font-semibold text-sm">{t("cv.savedVersions")}</h2>
                         <button onClick={() => setShowVersions(false)} className="ml-auto p-1 rounded hover:bg-muted">
                           <X className="w-3.5 h-3.5 text-muted-foreground" />
                         </button>
@@ -1966,16 +1969,16 @@ export function CvGeneratorModal({
                         <Input
                           value={newVersionName}
                           onChange={(e) => setNewVersionName(e.target.value)}
-                          placeholder={`CV ${new Date().toLocaleDateString("it-IT")}`}
+                          placeholder={`CV ${new Date().toLocaleDateString()}`}
                           className="h-8 text-xs rounded-lg flex-1"
                         />
                         <Button size="sm" className="h-8 rounded-lg gap-1 shrink-0" onClick={saveAsVersion} disabled={versionSaveStatus === "saving"}>
                           {versionSaveStatus === "saving" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                          {versionSaveStatus === "saved" ? "Salvato!" : "Salva"}
+                          {versionSaveStatus === "saved" ? t("cv.versionSaved") : t("cv.save")}
                         </Button>
                       </div>
                       {versions.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-8">Nessuna versione salvata</p>
+                        <p className="text-sm text-muted-foreground text-center py-8">{t("cv.noVersions")}</p>
                       ) : (
                         <div className="space-y-2">
                           {versions.map((v) => (
@@ -1985,7 +1988,7 @@ export function CvGeneratorModal({
                               <div className="flex gap-2 justify-end">
                                 <Button size="sm" variant="outline" className="h-7 text-xs rounded-md gap-1" onClick={() => loadVersion(v.id)} disabled={loadingVersionId === v.id}>
                                   {loadingVersionId === v.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FolderOpen className="w-3 h-3" />}
-                                  Carica
+                                  {t("cv.loadVersion")}
                                 </Button>
                                 <button onClick={() => deleteVersion(v.id)} className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -2000,8 +2003,8 @@ export function CvGeneratorModal({
                     <>
                       <div className="flex items-center gap-2 mb-4 pb-3 border-b">
                         <Pencil className="w-4 h-4 text-primary" />
-                        <h2 className="font-semibold text-sm">Modifica CV</h2>
-                        <span className="text-xs text-muted-foreground ml-auto">Vai su Anteprima per vedere</span>
+                        <h2 className="font-semibold text-sm">{t("cv.editCvShort")}</h2>
+                        <span className="text-xs text-muted-foreground ml-auto">{t("cv.goToPreview")}</span>
                       </div>
                       <EditPanel cv={generated} onChange={handleCvChange} />
                       <div className="mt-4 pt-4 border-t">
@@ -2011,10 +2014,10 @@ export function CvGeneratorModal({
                           disabled={saveStatus === "saving"}
                         >
                           {saveStatus === "saving" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                          {saveStatus === "saving" ? "Salvataggio…" : saveStatus === "saved" ? "Salvato!" : "Salva modifiche"}
+                          {saveStatus === "saving" ? t("cv.saving") : saveStatus === "saved" ? t("cv.saved") : t("cv.saveChanges")}
                         </Button>
                         {lastSavedAt && (
-                          <p className="text-center text-xs text-muted-foreground mt-2">Ultima modifica: {formatSavedAt(lastSavedAt)}</p>
+                          <p className="text-center text-xs text-muted-foreground mt-2">{t("cv.lastSaved", { when: formatSavedAt(lastSavedAt) })}</p>
                         )}
                       </div>
                     </>
@@ -2037,11 +2040,11 @@ export function CvGeneratorModal({
         <div className="text-center py-2 text-xs text-white/60 bg-black/25 print:hidden">
           {isEditing
             ? hasUnsavedChanges
-              ? '● Modifiche non salvate — clicca "Salva modifiche" per conservarle'
-              : 'Modifica i campi — il CV si aggiorna in tempo reale'
+              ? `● ${t("cv.footerUnsaved")}`
+              : t("cv.footerEditing")
             : lastSavedAt
-            ? `CV salvato il ${formatSavedAt(lastSavedAt)} · Riaprendo il modal troverai questa versione`
-            : '"Modifica" per editare · "Stampa / PDF" per esportare · "Salva" per conservare le modifiche'}
+            ? t("cv.footerSavedAt", { when: formatSavedAt(lastSavedAt) })
+            : t("cv.footerHelp")}
         </div>
       )}
     </div>

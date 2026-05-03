@@ -21,18 +21,12 @@ import { useQuery } from "@tanstack/react-query";
 import type { CalendarEvent, EventCategory, EventPriority, EventStatus } from "@/pages/Calendario";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-fetch";
+import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
 const PREMIUM_REMINDER_MINUTES = [10, 30, 120, 1440];
 const FREE_REMINDER_MINUTES = [30, 120];
-
-const REMINDER_LABELS: Record<number, string> = {
-  10: "10 min prima",
-  30: "30 min prima",
-  120: "2 ore prima",
-  1440: "24 ore prima",
-};
 
 const eventFormSchema = z.object({
   title: z.string().min(1, "Titolo obbligatorio").max(200),
@@ -75,6 +69,7 @@ interface Objective {
 }
 
 export function CalendarioEventoModal({ open, onOpenChange, userId, defaultDate, editingEvent, onSaved, onDeleted }: Props) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [reminderToggles, setReminderToggles] = useState<Record<number, boolean>>({});
@@ -232,20 +227,20 @@ export function CalendarioEventoModal({ open, onOpenChange, userId, defaultDate,
 
       if (!res.ok) {
         if (data.code === "FREE_LIMIT_REACHED") {
-          toast({ title: "Limite raggiunto", description: data.message, variant: "destructive" });
+          toast({ title: t("calendar.freeLimitTitle"), description: data.message, variant: "destructive" });
         } else if (data.code === "PREMIUM_REQUIRED") {
-          toast({ title: "Funzione Premium", description: "Passa a Premium per usare questi promemoria.", variant: "destructive" });
+          toast({ title: t("calendar.premiumFeatureTitle"), description: t("calendar.premiumFeatureDesc"), variant: "destructive" });
         } else {
-          toast({ title: "Errore", description: data.error || "Errore nel salvataggio", variant: "destructive" });
+          toast({ title: t("calendar.errorTitle"), description: data.error || t("calendar.errorSaving"), variant: "destructive" });
         }
         return;
       }
 
-      toast({ title: editingEvent ? "Evento aggiornato" : "Evento creato", description: values.title });
+      toast({ title: editingEvent ? t("calendar.eventUpdated") : t("calendar.eventCreated"), description: values.title });
       onSaved();
       onOpenChange(false);
     } catch {
-      toast({ title: "Errore di rete", variant: "destructive" });
+      toast({ title: t("calendar.networkError"), variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -255,18 +250,25 @@ export function CalendarioEventoModal({ open, onOpenChange, userId, defaultDate,
   const selectedSectorId = form.watch("linkedSectorId");
   const selectedSector = sectors.find((s) => s.id.toString() === selectedSectorId);
 
+  const reminderLabels: Record<number, string> = {
+    10: t("calendar.remindersLabels.10"),
+    30: t("calendar.remindersLabels.30"),
+    120: t("calendar.remindersLabels.120"),
+    1440: t("calendar.remindersLabels.1440"),
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editingEvent ? "Modifica evento" : "Nuovo evento"}</DialogTitle>
+          <DialogTitle>{editingEvent ? t("calendar.editEvent") : t("calendar.newEvent")}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           {/* Title */}
           <div>
-            <Label htmlFor="title">Titolo *</Label>
-            <Input id="title" {...form.register("title")} placeholder="Es. Sessione di studio..." className="mt-1" />
+            <Label htmlFor="title">{t("calendar.title")}</Label>
+            <Input id="title" {...form.register("title")} placeholder={t("calendar.titlePlaceholder")} className="mt-1" />
             {form.formState.errors.title && (
               <p className="text-xs text-destructive mt-1">{form.formState.errors.title.message}</p>
             )}
@@ -274,8 +276,8 @@ export function CalendarioEventoModal({ open, onOpenChange, userId, defaultDate,
 
           {/* Description */}
           <div>
-            <Label htmlFor="description">Descrizione</Label>
-            <Textarea id="description" {...form.register("description")} rows={2} placeholder="Note aggiuntive..." className="mt-1 resize-none" />
+            <Label htmlFor="description">{t("calendar.description")}</Label>
+            <Textarea id="description" {...form.register("description")} rows={2} placeholder={t("calendar.descPlaceholder")} className="mt-1 resize-none" />
           </div>
 
           {/* All day toggle */}
@@ -285,28 +287,28 @@ export function CalendarioEventoModal({ open, onOpenChange, userId, defaultDate,
               checked={form.watch("allDay")}
               onCheckedChange={(v) => form.setValue("allDay", v)}
             />
-            <Label htmlFor="allDay" className="cursor-pointer">Tutto il giorno</Label>
+            <Label htmlFor="allDay" className="cursor-pointer">{t("calendar.allDay")}</Label>
           </div>
 
           {/* Dates */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Data inizio *</Label>
+              <Label>{t("calendar.startDate")}</Label>
               <Input type="date" {...form.register("startDate")} className="mt-1" />
             </div>
             {!allDay && (
               <div>
-                <Label>Ora inizio</Label>
+                <Label>{t("calendar.startTime")}</Label>
                 <Input type="time" {...form.register("startTime")} className="mt-1" />
               </div>
             )}
             <div>
-              <Label>Data fine *</Label>
+              <Label>{t("calendar.endDate")}</Label>
               <Input type="date" {...form.register("endDate")} className="mt-1" />
             </div>
             {!allDay && (
               <div>
-                <Label>Ora fine</Label>
+                <Label>{t("calendar.endTime")}</Label>
                 <Input type="time" {...form.register("endTime")} className="mt-1" />
               </div>
             )}
@@ -315,62 +317,62 @@ export function CalendarioEventoModal({ open, onOpenChange, userId, defaultDate,
           {/* Category, Priority, Status */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <Label>Categoria</Label>
+              <Label>{t("calendar.category")}</Label>
               <Select value={form.watch("category")} onValueChange={(v) => form.setValue("category", v as EventCategory)}>
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="study">Studio</SelectItem>
-                  <SelectItem value="training">Formazione</SelectItem>
-                  <SelectItem value="interview">Colloquio</SelectItem>
-                  <SelectItem value="deadline">Scadenza</SelectItem>
-                  <SelectItem value="task">Attività</SelectItem>
-                  <SelectItem value="follow-up">Follow-up</SelectItem>
+                  <SelectItem value="study">{t("calendar.categories.study")}</SelectItem>
+                  <SelectItem value="training">{t("calendar.categories.training")}</SelectItem>
+                  <SelectItem value="interview">{t("calendar.categories.interview")}</SelectItem>
+                  <SelectItem value="deadline">{t("calendar.categories.deadline")}</SelectItem>
+                  <SelectItem value="task">{t("calendar.categories.task")}</SelectItem>
+                  <SelectItem value="follow-up">{t("calendar.categories.follow-up")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Priorità</Label>
+              <Label>{t("calendar.priority")}</Label>
               <Select value={form.watch("priority")} onValueChange={(v) => form.setValue("priority", v as EventPriority)}>
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low">Bassa</SelectItem>
-                  <SelectItem value="medium">Media</SelectItem>
-                  <SelectItem value="high">Alta</SelectItem>
+                  <SelectItem value="low">{t("calendar.priorities.low")}</SelectItem>
+                  <SelectItem value="medium">{t("calendar.priorities.medium")}</SelectItem>
+                  <SelectItem value="high">{t("calendar.priorities.high")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Stato</Label>
+              <Label>{t("calendar.status")}</Label>
               <Select value={form.watch("status")} onValueChange={(v) => form.setValue("status", v as EventStatus)}>
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todo">Da fare</SelectItem>
-                  <SelectItem value="in-progress">In corso</SelectItem>
-                  <SelectItem value="done">Fatto</SelectItem>
-                  <SelectItem value="postponed">Posticipato</SelectItem>
+                  <SelectItem value="todo">{t("calendar.statuses.todo")}</SelectItem>
+                  <SelectItem value="in-progress">{t("calendar.statuses.in-progress")}</SelectItem>
+                  <SelectItem value="done">{t("calendar.statuses.done")}</SelectItem>
+                  <SelectItem value="postponed">{t("calendar.statuses.postponed")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* Linked sector — populated from /api/sectors */}
+          {/* Linked sector */}
           <div>
-            <Label>Settore di riferimento</Label>
+            <Label>{t("calendar.linkedSector")}</Label>
             <Select
               value={form.watch("linkedSectorId") || "none"}
               onValueChange={(v) => form.setValue("linkedSectorId", v === "none" ? "" : v)}
             >
               <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Nessun settore" />
+                <SelectValue placeholder={t("calendar.noSector")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Nessun settore</SelectItem>
+                <SelectItem value="none">{t("calendar.noSector")}</SelectItem>
                 {sectors.map((s) => (
                   <SelectItem key={s.id} value={s.id.toString()}>
                     {s.name}
@@ -389,7 +391,7 @@ export function CalendarioEventoModal({ open, onOpenChange, userId, defaultDate,
               {isPremium ? (
                 <>
                   <p className="text-xs font-semibold text-primary flex items-center gap-1">
-                    <Crown className="h-3 w-3" /> Contenuti suggeriti per {selectedSector.name}
+                    <Crown className="h-3 w-3" /> {t("calendar.suggestedContent", { name: selectedSector.name })}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <a
@@ -398,7 +400,7 @@ export function CalendarioEventoModal({ open, onOpenChange, userId, defaultDate,
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                     >
-                      <BookOpen className="h-3 w-3" /> Articoli Wiki
+                      <BookOpen className="h-3 w-3" /> {t("calendar.wikiLabel")}
                       <ExternalLink className="h-2.5 w-2.5" />
                     </a>
                     <a
@@ -407,7 +409,7 @@ export function CalendarioEventoModal({ open, onOpenChange, userId, defaultDate,
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                     >
-                      <Map className="h-3 w-3" /> Roadmap di settore
+                      <Map className="h-3 w-3" /> {t("calendar.roadmapLabel")}
                       <ExternalLink className="h-2.5 w-2.5" />
                     </a>
                     <a
@@ -416,7 +418,7 @@ export function CalendarioEventoModal({ open, onOpenChange, userId, defaultDate,
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                     >
-                      <ExternalLink className="h-3 w-3" /> Percorsi di crescita
+                      <ExternalLink className="h-3 w-3" /> {t("calendar.growthLabel")}
                     </a>
                   </div>
                 </>
@@ -424,30 +426,30 @@ export function CalendarioEventoModal({ open, onOpenChange, userId, defaultDate,
                 <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                   <Crown className="h-3 w-3 text-amber-500" />
                   <span>
-                    Passa a{" "}
+                    {t("calendar.premiumNote", { name: selectedSector.name }).split(selectedSector.name)[0]}
                     <a href={`${BASE}premium`} className="font-semibold text-amber-600 hover:underline">
                       Premium
-                    </a>{" "}
-                    per vedere wiki, roadmap e percorsi collegati a {selectedSector.name}.
+                    </a>
+                    {t("calendar.premiumNote", { name: selectedSector.name }).split("Premium")[1]}
                   </span>
                 </p>
               )}
             </div>
           )}
 
-          {/* Linked goal — dropdown from user objectives */}
+          {/* Linked goal */}
           <div>
-            <Label>Obiettivo collegato</Label>
+            <Label>{t("calendar.linkedGoal")}</Label>
             {activeObjectives.length > 0 ? (
               <Select
                 value={form.watch("linkedGoal") || "none"}
                 onValueChange={(v) => form.setValue("linkedGoal", v === "none" ? "" : v)}
               >
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Collega a un obiettivo..." />
+                  <SelectValue placeholder={t("calendar.linkedGoalPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Nessun obiettivo</SelectItem>
+                  <SelectItem value="none">{t("calendar.noGoal")}</SelectItem>
                   {activeObjectives.map((o) => (
                     <SelectItem key={o.id} value={o.text}>
                       {o.text.length > 60 ? `${o.text.slice(0, 57)}…` : o.text}
@@ -459,13 +461,13 @@ export function CalendarioEventoModal({ open, onOpenChange, userId, defaultDate,
               <Input
                 id="linkedGoal"
                 {...form.register("linkedGoal")}
-                placeholder="Es. Trovare lavoro nel settore tech..."
+                placeholder={t("calendar.linkedGoalInput")}
                 className="mt-1"
               />
             )}
             {activeObjectives.length === 0 && (
               <p className="text-xs text-muted-foreground mt-1">
-                Aggiungi obiettivi nella tua dashboard per collegarli agli eventi.
+                {t("calendar.addGoalsHint")}
               </p>
             )}
           </div>
@@ -474,7 +476,7 @@ export function CalendarioEventoModal({ open, onOpenChange, userId, defaultDate,
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Bell className="h-4 w-4 text-primary" />
-              <Label>Promemoria</Label>
+              <Label>{t("calendar.reminders")}</Label>
             </div>
             <div className="space-y-2">
               {PREMIUM_REMINDER_MINUTES.map((minutes) => {
@@ -489,7 +491,7 @@ export function CalendarioEventoModal({ open, onOpenChange, userId, defaultDate,
                     )}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="text-sm">{REMINDER_LABELS[minutes]}</span>
+                      <span className="text-sm">{reminderLabels[minutes]}</span>
                       {!isAllowed && (
                         <Badge variant="outline" className="text-xs gap-1 text-amber-600 border-amber-300">
                           <Crown className="h-3 w-3" /> Premium
@@ -509,8 +511,8 @@ export function CalendarioEventoModal({ open, onOpenChange, userId, defaultDate,
               <div className="flex items-start gap-2 mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200">
                 <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                 <p className="text-xs text-amber-700">
-                  I promemoria a 10 min e 24h sono disponibili per gli utenti Premium.{" "}
-                  <a href={`${BASE}premium`} className="font-semibold underline">Passa a Premium →</a>
+                  {t("calendar.premiumReminders")}{" "}
+                  <a href={`${BASE}premium`} className="font-semibold underline">{t("calendar.upgradePremium")}</a>
                 </p>
               </div>
             )}
@@ -524,16 +526,16 @@ export function CalendarioEventoModal({ open, onOpenChange, userId, defaultDate,
                 className="text-destructive border-destructive/30 hover:bg-destructive/10 gap-1"
                 onClick={() => onDeleted(editingEvent.id)}
               >
-                <Trash2 className="h-4 w-4" /> Elimina
+                <Trash2 className="h-4 w-4" /> {t("calendar.delete")}
               </Button>
             )}
             <div className="flex gap-2 ml-auto">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                Annulla
+                {t("calendar.cancel")}
               </Button>
               <Button type="submit" disabled={saving} className="rounded-full">
                 {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {editingEvent ? "Salva modifiche" : "Crea evento"}
+                {editingEvent ? t("calendar.saveChanges") : t("calendar.createEvent")}
               </Button>
             </div>
           </DialogFooter>

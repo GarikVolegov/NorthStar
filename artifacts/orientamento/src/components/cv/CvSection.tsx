@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { CvGeneratorModal } from "./CvGeneratorModal";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -54,6 +55,7 @@ function useCv(userId: number) {
 
 // ── Extracted chips ───────────────────────────────────────────────────
 function ChipList({ items, color = "primary" }: { items: string[]; color?: string }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? items : items.slice(0, 8);
   return (
@@ -80,7 +82,9 @@ function ChipList({ items, color = "primary" }: { items: string[]; color?: strin
           onClick={() => setExpanded((v) => !v)}
           className="text-xs text-primary hover:underline flex items-center gap-0.5"
         >
-          {expanded ? <><ChevronUp className="w-3 h-3" />meno</> : <><ChevronDown className="w-3 h-3" />+{items.length - 8} altri</>}
+          {expanded
+            ? <><ChevronUp className="w-3 h-3" />{t("cv.lessExp")}</>
+            : <><ChevronDown className="w-3 h-3" />+{items.length - 8} {t("common.others", { defaultValue: "altri" })}</>}
         </button>
       )}
     </div>
@@ -94,6 +98,7 @@ function GraphSuggestions({
 }: {
   cvData: CvData; sectorId?: number; userId: number; onAdded?: () => void;
 }) {
+  const { t } = useTranslation();
   const storageKey = `grafo_user_${sectorId}_${userId}`;
   const existing = (() => {
     try {
@@ -148,8 +153,8 @@ function GraphSuggestions({
     <div className="mt-5 p-4 rounded-2xl border border-dashed border-primary/30 bg-primary/3">
       <div className="flex items-center gap-2 mb-3">
         <Network className="w-4 h-4 text-primary" />
-        <span className="text-sm font-semibold text-foreground">Aggiungi al Grafo delle Conoscenze</span>
-        <span className="text-xs text-muted-foreground">({suggestions.length} nodi suggeriti dal tuo CV)</span>
+        <span className="text-sm font-semibold text-foreground">{t("cv.addToGraph")}</span>
+        <span className="text-xs text-muted-foreground">({t("cv.suggestedNodes", { count: suggestions.length })})</span>
       </div>
       <div className="flex flex-wrap gap-2">
         {suggestions.map((node) => (
@@ -173,10 +178,10 @@ function GraphSuggestions({
         ))}
       </div>
       <p className="text-xs text-muted-foreground mt-2.5">
-        Clicca per aggiungere i nodi al grafo del settore.{" "}
+        {t("cv.clickToAdd")}{" "}
         {sectorId && (
           <a href={`${BASE}grafo/${sectorId}`} className="text-primary hover:underline">
-            Apri il grafo →
+            {t("cv.openGraph")}
           </a>
         )}
       </p>
@@ -191,6 +196,7 @@ export function CvSection({
   userId: number;
   confirmedSectorId?: number;
 }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data, isLoading } = useCv(userId);
@@ -215,7 +221,7 @@ export function CvSection({
       }
       const res = await fetch(`${BASE}api/cv/upload`, { method: "POST", body: formData });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Errore durante il caricamento");
+      if (!res.ok) throw new Error(json.error || t("cv.uploadError"));
       return json;
     },
     onSuccess: () => {
@@ -235,12 +241,12 @@ export function CvSection({
 
   const handleFile = useCallback((file: File) => {
     if (!["application/pdf", "text/plain"].includes(file.type)) {
-      setUploadError("Formato non supportato. Usa PDF o TXT.");
+      setUploadError(t("cv.invalidFormat"));
       return;
     }
     setUploadError(null);
     uploadMutation.mutate({ file });
-  }, [uploadMutation]);
+  }, [uploadMutation, t]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -261,13 +267,12 @@ export function CvSection({
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-primary" /> Il mio Curriculum
+                  <FileText className="w-4 h-4 text-primary" /> {t("cv.myResume")}
                 </CardTitle>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Caricato {cvData.extractedAt
-                    ? new Date(cvData.extractedAt).toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" })
-                    : "recentemente"}.
-                  Usalo per generare il tuo CV ottimizzato con il grafo.
+                  {cvData.extractedAt
+                    ? t("cv.uploadedAt", { date: new Date(cvData.extractedAt).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" }) })
+                    : t("cv.uploadedRecently")}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -276,7 +281,7 @@ export function CvSection({
                   className="rounded-full gap-1.5"
                   onClick={() => setShowGenerator(true)}
                 >
-                  <Sparkles className="w-3.5 h-3.5" /> Genera CV
+                  <Sparkles className="w-3.5 h-3.5" /> {t("cv.generateCv")}
                 </Button>
                 <Button
                   size="sm"
@@ -325,7 +330,7 @@ export function CvSection({
             {cvData.skills.length > 0 && (
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-2 flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3" /> Competenze rilevate ({cvData.skills.length})
+                  <Sparkles className="w-3 h-3" /> {t("cv.skillsDetected", { count: cvData.skills.length })}
                 </p>
                 <ChipList items={cvData.skills} color="primary" />
               </div>
@@ -335,7 +340,7 @@ export function CvSection({
             {cvData.tools.length > 0 && (
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-2 flex items-center gap-1.5">
-                  <Wrench className="w-3 h-3" /> Strumenti ({cvData.tools.length})
+                  <Wrench className="w-3 h-3" /> {t("cv.toolsCount", { count: cvData.tools.length })}
                 </p>
                 <ChipList items={cvData.tools} color="amber" />
               </div>
@@ -345,7 +350,7 @@ export function CvSection({
             {cvData.experience.length > 0 && (
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-3 flex items-center gap-1.5">
-                  <Briefcase className="w-3 h-3" /> Esperienza ({cvData.experience.length})
+                  <Briefcase className="w-3 h-3" /> {t("cv.expCount", { count: cvData.experience.length })}
                 </p>
                 <div className="space-y-3">
                   {exp.map((e) => (
@@ -375,8 +380,8 @@ export function CvSection({
                       className="text-xs text-primary hover:underline flex items-center gap-1"
                     >
                       {showFullExp
-                        ? <><ChevronUp className="w-3 h-3" />Meno esperienze</>
-                        : <><ChevronDown className="w-3 h-3" />+{cvData.experience.length - 2} esperienze</>}
+                        ? <><ChevronUp className="w-3 h-3" />{t("cv.lessExp")}</>
+                        : <><ChevronDown className="w-3 h-3" />{t("cv.moreExp", { count: cvData.experience.length - 2 })}</>}
                     </button>
                   )}
                 </div>
@@ -387,7 +392,7 @@ export function CvSection({
             {cvData.education.length > 0 && (
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-3 flex items-center gap-1.5">
-                  <GraduationCap className="w-3 h-3" /> Formazione
+                  <GraduationCap className="w-3 h-3" /> {t("cv.education")}
                 </p>
                 <div className="space-y-2">
                   {cvData.education.map((e) => (
@@ -410,7 +415,7 @@ export function CvSection({
               {cvData.certifications.length > 0 && (
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-2 flex items-center gap-1.5">
-                    <Award className="w-3 h-3" /> Certificazioni
+                    <Award className="w-3 h-3" /> {t("cv.certifications")}
                   </p>
                   <ChipList items={cvData.certifications} color="violet" />
                 </div>
@@ -418,7 +423,7 @@ export function CvSection({
               {cvData.languages.length > 0 && (
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-2 flex items-center gap-1.5">
-                    <Globe className="w-3 h-3" /> Lingue
+                    <Globe className="w-3 h-3" /> {t("cv.languages")}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {cvData.languages.map((l) => (
@@ -460,10 +465,10 @@ export function CvSection({
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <FileText className="w-4 h-4 text-primary" /> Il mio Curriculum
+                <FileText className="w-4 h-4 text-primary" /> {t("cv.myResume")}
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-0.5">
-                Carica il tuo CV per integrarlo con il Grafo delle Conoscenze e generare una versione ottimizzata.
+                {t("cv.uploadDesc")}
               </p>
             </div>
             <Button
@@ -472,7 +477,7 @@ export function CvSection({
               className="rounded-full gap-1.5"
               onClick={() => setShowGenerator(true)}
             >
-              <Sparkles className="w-3.5 h-3.5" /> Genera senza CV
+              <Sparkles className="w-3.5 h-3.5" /> {t("cv.generateWithout")}
             </Button>
           </div>
         </CardHeader>
@@ -484,13 +489,13 @@ export function CvSection({
               onClick={() => setMode("upload")}
               className={cn("px-4 py-1.5 rounded-lg text-sm font-medium transition-all", mode === "upload" ? "bg-white shadow text-foreground" : "text-muted-foreground")}
             >
-              Carica file
+              {t("cv.uploadFile")}
             </button>
             <button
               onClick={() => setMode("paste")}
               className={cn("px-4 py-1.5 rounded-lg text-sm font-medium transition-all", mode === "paste" ? "bg-white shadow text-foreground" : "text-muted-foreground")}
             >
-              Incolla testo
+              {t("cv.pasteText")}
             </button>
           </div>
 
@@ -516,8 +521,8 @@ export function CvSection({
               {uploading ? (
                 <div className="flex flex-col items-center gap-3">
                   <Loader2 className="w-10 h-10 text-primary animate-spin" />
-                  <p className="text-sm font-medium text-foreground">Analisi in corso con AI…</p>
-                  <p className="text-xs text-muted-foreground">Sto estraendo competenze, esperienze e formazione</p>
+                  <p className="text-sm font-medium text-foreground">{t("cv.analyzingAI")}</p>
+                  <p className="text-xs text-muted-foreground">{t("cv.extractingSkills")}</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-3">
@@ -525,8 +530,8 @@ export function CvSection({
                     <Upload className="w-7 h-7 text-primary" />
                   </div>
                   <div>
-                    <p className="font-semibold text-foreground">Trascina il CV qui o clicca per selezionarlo</p>
-                    <p className="text-sm text-muted-foreground mt-1">PDF o TXT · Max 10 MB</p>
+                    <p className="font-semibold text-foreground">{t("cv.dragHere")}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{t("cv.fileLimit")}</p>
                   </div>
                 </div>
               )}
@@ -536,7 +541,7 @@ export function CvSection({
               <Textarea
                 value={pasteText}
                 onChange={(e) => setPasteText(e.target.value)}
-                placeholder="Incolla qui il testo del tuo CV…"
+                placeholder={t("cv.pasteHere")}
                 className="min-h-[180px] rounded-xl text-sm resize-none"
               />
               <Button
@@ -545,7 +550,7 @@ export function CvSection({
                 onClick={() => uploadMutation.mutate({ text: pasteText })}
               >
                 {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                Analizza con AI
+                {t("cv.analyzeWithAI")}
               </Button>
             </div>
           )}
@@ -554,27 +559,30 @@ export function CvSection({
           {uploadError && (
             <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              {uploadError}
+              <span>{uploadError}</span>
             </div>
           )}
 
-          {/* Features teaser */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-            {[
-              { icon: <Network className="w-4 h-4 text-primary" />, title: "Integrazione Grafo", desc: "Suggerisce nodi skill/tool da aggiungere al grafo del tuo settore" },
-              { icon: <Sparkles className="w-4 h-4 text-primary" />, title: "CV Ottimizzato", desc: "Genera un CV professionale basato sul grafo e il profilo RIASEC" },
-              { icon: <FileText className="w-4 h-4 text-primary" />, title: "Stampa & Scarica", desc: "Esporta il CV generato in PDF con un click dal browser" },
-            ].map((f) => (
-              <div key={f.title} className="p-3.5 rounded-xl bg-muted/40 border border-border/50">
-                <div className="flex items-center gap-2 mb-1">
-                  {f.icon}
-                  <span className="text-xs font-semibold text-foreground">{f.title}</span>
+          {/* Feature highlights */}
+          {!isLoading && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+              {[
+                { icon: Network, key: "featureGraph", descKey: "featureGraphDesc" },
+                { icon: FileText, key: "featureCv", descKey: "featureCvDesc" },
+                { icon: Award, key: "featurePrint", descKey: "featurePrintDesc" },
+              ].map(({ icon: Icon, key, descKey }) => (
+                <div key={key} className="flex items-start gap-2.5 p-3 rounded-xl bg-muted/50 border">
+                  <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Icon className="w-3.5 h-3.5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">{t(`cv.${key}`)}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{t(`cv.${descKey}`)}</p>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

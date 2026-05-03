@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, Link } from "wouter";
 import { useGetSector } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -113,6 +114,7 @@ function storageKey(sectorId: number, userId: number | undefined) {
 }
 
 export default function Grafo() {
+  const { t } = useTranslation();
   const params = useParams();
   const id = parseInt(params.id || "0", 10);
   const { user } = useAuth();
@@ -395,7 +397,7 @@ export default function Grafo() {
     } catch {
       setChatMessages((prev) => {
         const updated = [...prev];
-        updated[assistantIndex] = { role: "assistant", content: "Errore nella generazione della risposta. Riprova." };
+        updated[assistantIndex] = { role: "assistant", content: t("grafo.errorResponse") };
         return updated;
       });
     }
@@ -415,9 +417,9 @@ export default function Grafo() {
     return (
       <div className="container mx-auto px-4 py-24 max-w-lg text-center">
         <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6 text-3xl">🕸️</div>
-        <h2 className="text-2xl font-serif font-bold mb-3">Accesso richiesto</h2>
-        <p className="text-muted-foreground mb-8">Registrati gratuitamente per esplorare il grafo della conoscenza.</p>
-        <Button asChild><Link href="/registra">Registrati gratis</Link></Button>
+        <h2 className="text-2xl font-serif font-bold mb-3">{t("grafo.accessRequired")}</h2>
+        <p className="text-muted-foreground mb-8">{t("grafo.accessRequiredDesc")}</p>
+        <Button asChild><Link href="/registra">{t("grafo.registerFree")}</Link></Button>
       </div>
     );
   }
@@ -431,7 +433,7 @@ export default function Grafo() {
         </Button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="font-serif font-bold text-2xl truncate">Grafo della Conoscenza</h1>
+            <h1 className="font-serif font-bold text-2xl truncate">{t("grafo.title")}</h1>
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/20 text-primary bg-primary/5 shrink-0">
               <Sparkles className="w-2 h-2 mr-1" />Premium
             </Badge>
@@ -446,24 +448,24 @@ export default function Grafo() {
               className="rounded-xl"
               onClick={handleExportPNG}
               disabled={isExporting}
-              title="Scarica come PNG"
+              title={t("grafo.downloadPng")}
             >
               {isExporting
                 ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                 : <Download className="w-3.5 h-3.5 mr-1.5" />}
-              {isExporting ? "Export…" : "PNG"}
+              {isExporting ? t("grafo.exporting") : "PNG"}
             </Button>
           )}
           {aiGraph && (
             <Button variant="outline" size="sm" className="rounded-xl" onClick={() => fetchGraph(true)} disabled={isLoading}>
               <RefreshCw className={cn("w-3.5 h-3.5 mr-1.5", isLoading && "animate-spin")} />
-              Rigenera
+              {t("grafo.regenerate")}
             </Button>
           )}
           {aiGraph && (
             <Button size="sm" className="rounded-xl" onClick={() => setShowAddPanel((v) => !v)}>
               <Plus className="w-3.5 h-3.5 mr-1.5" />
-              Aggiungi nodo
+              {t("grafo.addNode")}
             </Button>
           )}
         </div>
@@ -473,14 +475,14 @@ export default function Grafo() {
       {showAddPanel && (
         <div className="mb-5 bg-card border rounded-2xl p-5 animate-in slide-in-from-top-2 fade-in duration-200">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-sm">Aggiungi un nodo al grafo</h3>
+            <h3 className="font-semibold text-sm">{t("grafo.addNodeTitle")}</h3>
             <button onClick={() => setShowAddPanel(false)} className="text-muted-foreground hover:text-foreground">
               <X className="w-4 h-4" />
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-muted-foreground mb-1.5 block font-medium">Tipo</label>
+              <label className="text-xs text-muted-foreground mb-1.5 block font-medium">{t("grafo.nodeTypeLabel")}</label>
               <div className="flex flex-wrap gap-2">
                 {TYPE_OPTIONS.map((opt) => (
                   <button
@@ -493,19 +495,19 @@ export default function Grafo() {
                         : "border-border bg-background text-muted-foreground hover:border-primary/40"
                     )}
                   >
-                    {opt.emoji} {opt.label}
+                    {opt.emoji} {t(`grafo.nodeTypes.${opt.value}`)}
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1.5 block font-medium">Collega a (opzionale)</label>
+              <label className="text-xs text-muted-foreground mb-1.5 block font-medium">{t("grafo.connectTo")}</label>
               <select
                 className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                 value={addForm.connectTo}
                 onChange={(e) => setAddForm((f) => ({ ...f, connectTo: e.target.value }))}
               >
-                <option value="">Nessuna connessione</option>
+                <option value="">{t("grafo.noConnection")}</option>
                 {allNodes.map((n) => (
                   <option key={n.id} value={n.id}>
                     {NODE_CONFIG[n.type]?.emoji} {n.label}
@@ -514,7 +516,7 @@ export default function Grafo() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1.5 block font-medium">Nome *</label>
+              <label className="text-xs text-muted-foreground mb-1.5 block font-medium">{t("grafo.nodeName")}</label>
               <input
                 type="text"
                 placeholder={`es. "${addForm.type === "role" ? "Product Manager" : addForm.type === "skill" ? "Agile Scrum" : addForm.type === "tool" ? "Jira" : "PMP"}"`}
@@ -525,10 +527,10 @@ export default function Grafo() {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1.5 block font-medium">Descrizione (opzionale)</label>
+              <label className="text-xs text-muted-foreground mb-1.5 block font-medium">{t("grafo.nodeDescription")}</label>
               <input
                 type="text"
-                placeholder="Breve descrizione..."
+                placeholder={t("grafo.nodeDescPlaceholder")}
                 className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                 value={addForm.description}
                 onChange={(e) => setAddForm((f) => ({ ...f, description: e.target.value }))}
@@ -537,9 +539,9 @@ export default function Grafo() {
             </div>
           </div>
           <div className="flex justify-end mt-4 gap-2">
-            <Button variant="ghost" size="sm" className="rounded-xl" onClick={() => setShowAddPanel(false)}>Annulla</Button>
+            <Button variant="ghost" size="sm" className="rounded-xl" onClick={() => setShowAddPanel(false)}>{t("grafo.cancel")}</Button>
             <Button size="sm" className="rounded-xl" onClick={handleAddNode} disabled={!addForm.label.trim()}>
-              <Plus className="w-3.5 h-3.5 mr-1.5" />Aggiungi
+              <Plus className="w-3.5 h-3.5 mr-1.5" />{t("grafo.addNode")}
             </Button>
           </div>
         </div>
@@ -567,7 +569,7 @@ export default function Grafo() {
               </div>
             );
           })}
-          <span className="text-xs text-muted-foreground self-center ml-1">nodi tuoi</span>
+          <span className="text-xs text-muted-foreground self-center ml-1">{t("grafo.yourNodes")}</span>
         </div>
       )}
 
@@ -581,7 +583,7 @@ export default function Grafo() {
               activeTab === "graph" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <Network className="w-3.5 h-3.5" />Grafo
+            <Network className="w-3.5 h-3.5" />{t("grafo.tabGraph")}
           </button>
           <button
             onClick={() => setActiveTab("chat")}
@@ -590,7 +592,7 @@ export default function Grafo() {
               activeTab === "chat" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <MessageSquare className="w-3.5 h-3.5" />Chiedi al Grafo
+            <MessageSquare className="w-3.5 h-3.5" />{t("grafo.tabChat")}
             {chatMessages.length > 0 && (
               <span className="ml-1 text-[10px] bg-primary text-primary-foreground rounded-full px-1.5 py-0.5">
                 {chatMessages.filter((m) => m.role === "user").length}
@@ -606,17 +608,17 @@ export default function Grafo() {
           {Object.entries(NODE_CONFIG).map(([type, cfg]) => (
             <div key={type} className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cfg.color }} />
-              <span>{cfg.label}</span>
+              <span>{t(`grafo.nodeTypes.${type}`)}</span>
             </div>
           ))}
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <div className="w-6 h-px border-t border-dashed border-muted-foreground/40" />
-            <span>Connessione</span>
+            <span>{t("grafo.connection")}</span>
           </div>
           {userNodes.length > 0 && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <div className="w-2.5 h-2.5 rounded-full border-2 border-dashed border-muted-foreground/60" />
-              <span>Nodo tuo</span>
+              <span>{t("grafo.yourNode")}</span>
             </div>
           )}
         </div>
@@ -627,8 +629,8 @@ export default function Grafo() {
         isLoading ? (
           <div className="flex flex-col items-center justify-center py-24 bg-card border rounded-3xl">
             <Loader2 className="w-10 h-10 animate-spin text-primary/30 mb-4" />
-            <p className="text-muted-foreground text-sm">L'AI sta costruendo il grafo…</p>
-            <p className="text-xs text-muted-foreground/50 mt-1">Potrebbe richiedere 20-30 secondi</p>
+            <p className="text-muted-foreground text-sm">{t("grafo.building")}</p>
+            <p className="text-xs text-muted-foreground/50 mt-1">{t("grafo.buildingHint")}</p>
           </div>
         ) : positioned.length > 0 ? (
           <div className="relative">
@@ -724,17 +726,17 @@ export default function Grafo() {
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className="text-base">{NODE_CONFIG[hoveredNode.type]?.emoji}</span>
                   <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: NODE_CONFIG[hoveredNode.type]?.color }}>
-                    {NODE_CONFIG[hoveredNode.type]?.label}
+                    {t(`grafo.nodeTypes.${hoveredNode.type}`)}
                   </span>
                   {hoveredNode.userAdded && (
-                    <span className="ml-auto text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">tuo</span>
+                    <span className="ml-auto text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">{t("grafo.yourNode")}</span>
                   )}
                 </div>
                 <p className="font-semibold text-sm mb-1">{hoveredNode.label}</p>
                 <p className="text-xs text-muted-foreground leading-relaxed">{hoveredNode.description}</p>
                 {allEdges.filter((e) => e.from === hoveredNode.id || e.to === hoveredNode.id).length > 0 && (
                   <p className="text-[10px] text-muted-foreground/50 mt-2">
-                    {allEdges.filter((e) => e.from === hoveredNode.id || e.to === hoveredNode.id).length} connessioni
+                    {t("grafo.connections", { count: allEdges.filter((e) => e.from === hoveredNode.id || e.to === hoveredNode.id).length })}
                   </p>
                 )}
               </div>
@@ -743,9 +745,9 @@ export default function Grafo() {
         ) : (
           <div className="flex flex-col items-center justify-center py-24 bg-card border rounded-3xl">
             <div className="text-4xl mb-4">🕸️</div>
-            <p className="text-muted-foreground text-sm mb-4">Il grafo non è ancora disponibile</p>
+            <p className="text-muted-foreground text-sm mb-4">{t("grafo.notAvailable")}</p>
             <Button onClick={() => fetchGraph()} variant="outline" className="rounded-xl">
-              <RefreshCw className="w-4 h-4 mr-2" />Genera grafo
+              <RefreshCw className="w-4 h-4 mr-2" />{t("grafo.generateGraph")}
             </Button>
           </div>
         )
@@ -759,16 +761,12 @@ export default function Grafo() {
             {chatMessages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center py-8">
                 <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 text-2xl">🕸️</div>
-                <h3 className="font-semibold text-foreground mb-2">Chiedi al Grafo</h3>
+                <h3 className="font-semibold text-foreground mb-2">{t("grafo.tabChat")}</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mb-6">
-                  L'AI risponde usando i nodi del grafo come base di conoscenza. Puoi chiedere di ruoli, competenze, connessioni o percorsi.
+                  {t("grafo.chatDesc")}
                 </p>
                 <div className="flex flex-col gap-2 w-full max-w-sm">
-                  {[
-                    "Quali competenze devo sviluppare per diventare un ruolo chiave?",
-                    "Quali strumenti devo imparare come priorità?",
-                    "Quali certificazioni sono più utili per entrare nel settore?",
-                  ].map((q) => (
+                  {([t("grafo.chatQuestion1"), t("grafo.chatQuestion2"), t("grafo.chatQuestion3")]).map((q: string) => (
                     <button
                       key={q}
                       onClick={() => { setChatInput(q); chatInputRef.current?.focus(); }}
@@ -825,7 +823,7 @@ export default function Grafo() {
           <div className="border-t p-4">
             {allNodes.length === 0 && (
               <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">
-                Genera prima il grafo per poter fare domande basate sui nodi.
+                {t("grafo.generateFirst")}
               </p>
             )}
             <div className="flex gap-2 items-end">
@@ -833,7 +831,7 @@ export default function Grafo() {
                 ref={chatInputRef}
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Chiedi qualcosa sul grafo…"
+                placeholder={t("grafo.chatPlaceholder")}
                 className="resize-none rounded-xl text-sm min-h-[44px] max-h-[120px]"
                 rows={1}
                 disabled={chatLoading || allNodes.length === 0}
@@ -873,7 +871,7 @@ export default function Grafo() {
                     <span className="text-xs text-primary ml-1">+{userCount}</span>
                   )}
                 </div>
-                <div className="text-[10px] text-muted-foreground">{cfg.label}i</div>
+                <div className="text-[10px] text-muted-foreground">{t(`grafo.nodeTypes.${type}`)}</div>
               </div>
             );
           })}

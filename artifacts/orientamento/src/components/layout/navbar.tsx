@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Star, LogOut, User, LayoutDashboard, Menu, X,
-  FlaskConical, Layers, BookOpenText, Newspaper, Crown, Briefcase, Users, Calendar,
+  FlaskConical, Layers, BookOpenText, Newspaper, Crown, Briefcase, Users, Calendar, Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,18 +15,21 @@ import { LoginDialog } from "@/components/auth/LoginDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useReducedMotion } from "@/lib/motion";
+import { useTranslation } from "react-i18next";
+import { SUPPORTED_LANGUAGES, STORAGE_KEY } from "@/i18n";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
-const NAV_LINKS = [
-  { href: "/test",     label: "Il Test",  icon: FlaskConical },
-  { href: "/settori",  label: "Settori",  icon: Layers },
-  { href: "/crescita", label: "Crescita", icon: BookOpenText },
-  { href: "/news",     label: "News",     icon: Newspaper },
-  { href: "/premium",  label: "Premium",  icon: Crown },
-];
+const LANG_LABELS: Record<string, string> = {
+  it: "Italiano",
+  en: "English",
+  es: "Español",
+  fr: "Français",
+  de: "Deutsch",
+};
 
 export function Navbar() {
+  const { t, i18n } = useTranslation();
   const { user, logout, isLoggedIn } = useAuth();
   const [loginOpen, setLoginOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -34,6 +37,14 @@ export function Navbar() {
   const [location] = useLocation();
   const [pendingFriends, setPendingFriends] = useState<number | null>(null);
   const prefersReduced = useReducedMotion();
+
+  const NAV_LINKS = [
+    { href: "/test",     label: t("nav.test"),     icon: FlaskConical },
+    { href: "/settori",  label: t("nav.sectors"),  icon: Layers },
+    { href: "/crescita", label: t("nav.growth"),   icon: BookOpenText },
+    { href: "/news",     label: t("nav.news"),     icon: Newspaper },
+    { href: "/premium",  label: t("nav.premium"),  icon: Crown },
+  ];
 
   useState(() => {
     if (!user?.id) return;
@@ -44,6 +55,11 @@ export function Navbar() {
   });
 
   const friendsBadge = pendingFriends && pendingFriends > 0 ? pendingFriends : null;
+
+  function changeLanguage(lang: string) {
+    i18n.changeLanguage(lang);
+    localStorage.setItem(STORAGE_KEY, lang);
+  }
 
   return (
     <>
@@ -97,6 +113,29 @@ export function Navbar() {
 
           {/* Desktop right actions */}
           <div className="hidden md:flex items-center gap-2">
+            {/* Language switcher */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="rounded-full px-2 gap-1.5 text-muted-foreground hover:text-foreground">
+                  <Globe className="h-4 w-4" />
+                  <span className="text-xs font-medium uppercase">{i18n.language?.slice(0, 2)}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-36">
+                <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">{t("nav.language")}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {SUPPORTED_LANGUAGES.map((lang) => (
+                  <DropdownMenuItem
+                    key={lang}
+                    onClick={() => changeLanguage(lang)}
+                    className={`cursor-pointer text-sm ${i18n.language?.startsWith(lang) ? "font-semibold text-primary" : ""}`}
+                  >
+                    {LANG_LABELS[lang]}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {isLoggedIn && user ? (
               <>
                 <NotificationBell userId={user.id} />
@@ -120,21 +159,21 @@ export function Navbar() {
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => setLocation("/profilo")} className="cursor-pointer">
-                      <LayoutDashboard className="h-4 w-4 mr-2" /> Il mio profilo
+                      <LayoutDashboard className="h-4 w-4 mr-2" /> {t("nav.myProfile")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setLocation("/candidature")} className="cursor-pointer">
-                      <Briefcase className="h-4 w-4 mr-2" /> Candidature
+                      <Briefcase className="h-4 w-4 mr-2" /> {t("nav.applications")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setLocation("/calendario")} className="cursor-pointer">
-                      <Calendar className="h-4 w-4 mr-2" /> Calendario
+                      <Calendar className="h-4 w-4 mr-2" /> {t("nav.calendar")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setLocation("/amici")} className="cursor-pointer">
-                      <Users className="h-4 w-4 mr-2" /> Amici
+                      <Users className="h-4 w-4 mr-2" /> {t("nav.friends")}
                       {friendsBadge ? <span className="ml-auto text-xs font-semibold text-primary">{friendsBadge}</span> : null}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive cursor-pointer">
-                      <LogOut className="h-4 w-4 mr-2" /> Esci
+                      <LogOut className="h-4 w-4 mr-2" /> {t("nav.logout")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -142,10 +181,10 @@ export function Navbar() {
             ) : (
               <>
                 <Button variant="ghost" size="sm" className="rounded-full font-medium" onClick={() => setLoginOpen(true)}>
-                  Accedi
+                  {t("nav.login")}
                 </Button>
                 <Button asChild size="sm" className="rounded-full font-medium">
-                  <Link href="/test">Inizia il percorso</Link>
+                  <Link href="/test">{t("nav.startJourney")}</Link>
                 </Button>
               </>
             )}
@@ -172,7 +211,7 @@ export function Navbar() {
                 className="rounded-full font-medium text-sm h-8 px-3"
                 onClick={() => setLoginOpen(true)}
               >
-                Accedi
+                {t("nav.login")}
               </Button>
             )}
 
@@ -246,6 +285,26 @@ export function Navbar() {
                       </motion.div>
                     );
                   })}
+
+                  {/* Language picker in mobile menu */}
+                  <div className="pt-2 px-4">
+                    <p className="text-xs text-muted-foreground mb-2 font-medium">{t("nav.language")}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {SUPPORTED_LANGUAGES.map((lang) => (
+                        <button
+                          key={lang}
+                          onClick={() => changeLanguage(lang)}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                            i18n.language?.startsWith(lang)
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "border-border text-muted-foreground hover:border-primary hover:text-primary"
+                          }`}
+                        >
+                          {lang.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </nav>
 
                 {/* Bottom actions */}
@@ -266,28 +325,28 @@ export function Navbar() {
                         className="w-full rounded-full justify-start gap-2"
                         onClick={() => { setLocation("/profilo"); setMenuOpen(false); }}
                       >
-                        <LayoutDashboard className="h-4 w-4" /> Il mio profilo
+                        <LayoutDashboard className="h-4 w-4" /> {t("nav.myProfile")}
                       </Button>
                       <Button
                         variant="outline"
                         className="w-full rounded-full justify-start gap-2"
                         onClick={() => { setLocation("/candidature"); setMenuOpen(false); }}
                       >
-                        <Briefcase className="h-4 w-4" /> Candidature
+                        <Briefcase className="h-4 w-4" /> {t("nav.applications")}
                       </Button>
                       <Button
                         variant="outline"
                         className="w-full rounded-full justify-start gap-2"
                         onClick={() => { setLocation("/calendario"); setMenuOpen(false); }}
                       >
-                        <Calendar className="h-4 w-4" /> Calendario
+                        <Calendar className="h-4 w-4" /> {t("nav.calendar")}
                       </Button>
                       <Button
                         variant="outline"
                         className="w-full rounded-full justify-start gap-2"
                         onClick={() => { setLocation("/amici"); setMenuOpen(false); }}
                       >
-                        <Users className="h-4 w-4" /> Amici
+                        <Users className="h-4 w-4" /> {t("nav.friends")}
                         {friendsBadge ? <span className="ml-auto text-xs font-semibold text-primary">{friendsBadge}</span> : null}
                       </Button>
                       <Button
@@ -295,7 +354,7 @@ export function Navbar() {
                         className="w-full rounded-full justify-start gap-2 text-destructive hover:text-destructive"
                         onClick={() => { logout(); setMenuOpen(false); }}
                       >
-                        <LogOut className="h-4 w-4" /> Esci
+                        <LogOut className="h-4 w-4" /> {t("nav.logout")}
                       </Button>
                     </>
                   ) : (
@@ -304,14 +363,14 @@ export function Navbar() {
                         className="w-full rounded-full"
                         onClick={() => { setMenuOpen(false); setTimeout(() => setLoginOpen(true), 150); }}
                       >
-                        Inizia il Test Gratuito
+                        {t("nav.startFreeTest")}
                       </Button>
                       <Button
                         variant="outline"
                         className="w-full rounded-full"
                         onClick={() => { setMenuOpen(false); setTimeout(() => setLoginOpen(true), 150); }}
                       >
-                        Accedi
+                        {t("nav.login")}
                       </Button>
                     </>
                   )}

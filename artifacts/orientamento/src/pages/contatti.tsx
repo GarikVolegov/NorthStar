@@ -8,43 +8,21 @@ import {
   Mail, MessageCircle, CheckCircle2, Loader2,
   ArrowRight, Shield, Clock, Users,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
-const SUBJECTS = [
-  { value: "info",       label: "Informazioni generali" },
-  { value: "supporto",   label: "Supporto tecnico" },
-  { value: "premium",    label: "Piani e pagamenti" },
-  { value: "privacy",    label: "Privacy e dati personali" },
-  { value: "feedback",   label: "Feedback e suggerimenti" },
-  { value: "altro",      label: "Altro" },
-];
-
-const FAQ = [
-  {
-    q: "Il test è davvero gratuito?",
-    a: "Sì, il test RIASEC + Cinque Spiriti è completamente gratuito. Puoi completarlo senza registrarti e vedere i risultati base subito.",
-  },
-  {
-    q: "Cosa include il Piano Premium?",
-    a: "Il Premium sblocca Wiki AI per settore, Roadmap di carriera personalizzata, Grafo della conoscenza interattivo con chat AI, e obiettivi di carriera illimitati.",
-  },
-  {
-    q: "Posso cancellare il mio account?",
-    a: "Sì. Puoi richiedere la cancellazione del tuo account e di tutti i dati associati scrivendo a privacy@northstar.app.",
-  },
-  {
-    q: "I miei dati sono al sicuro?",
-    a: "Assolutamente sì. I dati sono cifrati, non vengono venduti a terzi e il trattamento avviene nel rispetto del GDPR. Leggi la nostra Privacy Policy per tutti i dettagli.",
-  },
-];
 
 export default function Contatti() {
+  const { t } = useTranslation();
   useEffect(() => {
-    document.title = "Contatti — NorthStar";
+    document.title = t("contatti.pageTitle", { defaultValue: "Contatti — NorthStar" });
     const meta = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
-    if (meta) meta.content = "Contatta il team di NorthStar per supporto, informazioni sui piani Premium, feedback o domande sulla privacy. Rispondiamo entro 24 ore.";
-  }, []);
+    if (meta) meta.content = t("contatti.pageDesc", { defaultValue: "Contatta il team di NorthStar per supporto, informazioni sui piani Premium, feedback o domande sulla privacy. Rispondiamo entro 24 ore." });
+  }, [t]);
+
+  const SUBJECTS = t("contatti.subjects", { returnObjects: true }) as Array<{ value: string; label: string }>;
+  const FAQ = t("contatti.faq", { returnObjects: true }) as Array<{ q: string; a: string }>;
 
   const [form, setForm] = useState({ name: "", email: "", subject: "info", message: "" });
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -86,13 +64,13 @@ export default function Contatti() {
         <div className="container mx-auto px-4 max-w-4xl text-center">
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium mb-5">
             <MessageCircle className="w-4 h-4" />
-            Siamo qui per te
+            {t("contatti.badge")}
           </div>
           <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground mb-4">
-            Contattaci
+            {t("contatti.title")}
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">
-            Hai domande, feedback o hai bisogno di supporto? Scrivici e ti risponderemo entro 24 ore lavorative.
+            {t("contatti.subtitle")}
           </p>
         </div>
       </section>
@@ -102,23 +80,23 @@ export default function Contatti() {
 
           {/* Form — left/main */}
           <div className="lg:col-span-3">
-            <h2 className="text-xl font-serif font-bold text-foreground mb-6">Inviaci un messaggio</h2>
+            <h2 className="text-xl font-serif font-bold text-foreground mb-6">{t("contatti.sendMessage")}</h2>
 
             {status === "sent" ? (
               <div className="rounded-3xl border bg-emerald-50 border-emerald-200 p-10 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-5">
                   <CheckCircle2 className="w-8 h-8 text-emerald-600" />
                 </div>
-                <h3 className="text-xl font-serif font-bold text-foreground mb-2">Messaggio inviato!</h3>
+                <h3 className="text-xl font-serif font-bold text-foreground mb-2">{t("contatti.sent")}</h3>
                 <p className="text-muted-foreground mb-6 leading-relaxed">
-                  Grazie per averci scritto. Ti risponderemo all'indirizzo email fornito entro 24 ore lavorative.
+                  {t("contatti.sentDesc")}
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <Button className="rounded-full" onClick={() => setStatus("idle")}>
-                    Invia un altro messaggio
+                    {t("contatti.sendAnother")}
                   </Button>
                   <Button asChild variant="outline" className="rounded-full">
-                    <Link href="/">Torna alla home</Link>
+                    <Link href="/">{t("notFound.goHome")}</Link>
                   </Button>
                 </div>
               </div>
@@ -128,7 +106,7 @@ export default function Contatti() {
                 {/* Name + Email */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="name">Nome *</Label>
+                    <Label htmlFor="name">{t("profilo.name")} *</Label>
                     <Input
                       id="name"
                       placeholder="Mario Rossi"
@@ -140,7 +118,7 @@ export default function Contatti() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="email">Email *</Label>
+                    <Label htmlFor="email">{t("profilo.email")} *</Label>
                     <Input
                       id="email"
                       type="email"
@@ -156,7 +134,7 @@ export default function Contatti() {
 
                 {/* Subject */}
                 <div className="space-y-2">
-                  <Label>Oggetto *</Label>
+                  <Label>{t("contatti.subjectLabel")} *</Label>
                   <div className="flex flex-wrap gap-2">
                     {SUBJECTS.map((s) => (
                       <button
@@ -179,14 +157,14 @@ export default function Contatti() {
                 {/* Message */}
                 <div className="space-y-1.5">
                   <Label htmlFor="message">
-                    Messaggio *
+                    {t("contatti.message")} *
                     <span className="ml-2 text-xs text-muted-foreground font-normal">
                       {form.message.length}/1000
                     </span>
                   </Label>
                   <textarea
                     id="message"
-                    placeholder="Descrivici la tua richiesta nel dettaglio…"
+                    placeholder={t("contatti.messagePlaceholder")}
                     value={form.message}
                     onChange={(e) => setField("message", e.target.value)}
                     required
@@ -198,7 +176,7 @@ export default function Contatti() {
 
                 {/* Privacy notice */}
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Inviando questo modulo accetti il trattamento dei tuoi dati personali per rispondere alla tua richiesta, come descritto nella nostra{" "}
+                  {t("contatti.privacyNotice", { defaultValue: "Inviando questo modulo accetti il trattamento dei tuoi dati personali per rispondere alla tua richiesta, come descritto nella nostra" })}{" "}
                   <Link href="/privacy-policy" className="text-primary hover:underline">Privacy Policy</Link>.
                 </p>
 
@@ -214,9 +192,9 @@ export default function Contatti() {
                   disabled={status === "sending" || !form.name.trim() || !form.email.trim() || !form.message.trim()}
                 >
                   {status === "sending" ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Invio in corso…</>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t("contatti.sending")}</>
                   ) : (
-                    <>Invia messaggio <ArrowRight className="w-4 h-4 ml-2" /></>
+                    <>{t("contatti.submit")} <ArrowRight className="w-4 h-4 ml-2" /></>
                   )}
                 </Button>
               </form>
@@ -228,14 +206,14 @@ export default function Contatti() {
 
             {/* Contact info */}
             <div className="rounded-2xl border bg-card p-6 space-y-5">
-              <h2 className="font-serif font-bold text-foreground">Informazioni di contatto</h2>
+              <h2 className="font-serif font-bold text-foreground">{t("contatti.contactInfo")}</h2>
               <div className="space-y-4">
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                     <Mail className="w-4 h-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-foreground">Email generale</p>
+                    <p className="text-sm font-medium text-foreground">{t("contatti.generalEmail")}</p>
                     <a href="mailto:info@northstar.app" className="text-sm text-primary hover:underline">
                       info@northstar.app
                     </a>
@@ -246,7 +224,7 @@ export default function Contatti() {
                     <Shield className="w-4 h-4 text-emerald-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-foreground">Privacy e dati</p>
+                    <p className="text-sm font-medium text-foreground">{t("contatti.privacyEmail")}</p>
                     <a href="mailto:privacy@northstar.app" className="text-sm text-primary hover:underline">
                       privacy@northstar.app
                     </a>
@@ -257,8 +235,8 @@ export default function Contatti() {
                     <Clock className="w-4 h-4 text-amber-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-foreground">Tempi di risposta</p>
-                    <p className="text-sm text-muted-foreground">Entro 24 ore lavorative</p>
+                    <p className="text-sm font-medium text-foreground">{t("contatti.responseTime", { defaultValue: "Tempi di risposta" })}</p>
+                    <p className="text-sm text-muted-foreground">{t("contatti.responseTimeDesc", { defaultValue: "Entro 24 ore lavorative" })}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -266,8 +244,8 @@ export default function Contatti() {
                     <Users className="w-4 h-4 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-foreground">Team</p>
-                    <p className="text-sm text-muted-foreground">Piccolo team, risposte umane</p>
+                    <p className="text-sm font-medium text-foreground">{t("contatti.team", { defaultValue: "Team" })}</p>
+                    <p className="text-sm text-muted-foreground">{t("contatti.teamDesc", { defaultValue: "Piccolo team, risposte umane" })}</p>
                   </div>
                 </div>
               </div>
@@ -275,14 +253,14 @@ export default function Contatti() {
 
             {/* Quick links */}
             <div className="rounded-2xl border bg-card p-6">
-              <h2 className="font-serif font-bold text-foreground mb-4">Link utili</h2>
+              <h2 className="font-serif font-bold text-foreground mb-4">{t("contatti.usefulLinks", { defaultValue: "Link utili" })}</h2>
               <div className="space-y-2">
                 {[
-                  { label: "Inizia il test gratuito", href: "/test" },
-                  { label: "Esplora il Premium",      href: "/premium" },
-                  { label: "Privacy Policy",           href: "/privacy-policy" },
-                  { label: "Termini di servizio",      href: "/termini-di-servizio" },
-                  { label: "Chi siamo",                href: "/chi-siamo" },
+                  { label: t("nav.startFreeTest", { defaultValue: "Inizia il test gratuito" }), href: "/test" },
+                  { label: t("contatti.explorePremium", { defaultValue: "Esplora il Premium" }),  href: "/premium" },
+                  { label: "Privacy Policy",                                                       href: "/privacy-policy" },
+                  { label: t("footer.links.terms", { defaultValue: "Termini di servizio" }),       href: "/termini-di-servizio" },
+                  { label: t("footer.about", { defaultValue: "Chi siamo" }),                       href: "/chi-siamo" },
                 ].map((link) => (
                   <Link key={link.href} href={link.href}>
                     <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground hover:text-primary transition-colors group cursor-pointer">
@@ -300,7 +278,7 @@ export default function Contatti() {
         {/* FAQ section */}
         <div className="mt-16">
           <h2 className="text-2xl font-serif font-bold text-foreground mb-8 text-center">
-            Domande frequenti
+            {t("comeFunziona.faqTitle", { defaultValue: "Domande frequenti" })}
           </h2>
           <div className="max-w-3xl mx-auto space-y-3">
             {FAQ.map((item, i) => (
@@ -324,7 +302,7 @@ export default function Contatti() {
                     {item.a}
                     {item.q.includes("Privacy") && (
                       <Link href="/privacy-policy" className="ml-1 text-primary hover:underline">
-                        Leggi la Privacy Policy →
+                        {t("contatti.readPrivacy", { defaultValue: "Leggi la Privacy Policy →" })}
                       </Link>
                     )}
                   </div>

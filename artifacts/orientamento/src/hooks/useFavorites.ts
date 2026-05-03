@@ -14,6 +14,7 @@ export interface Favorite {
   articleSource: string | null;
   articleImage: string | null;
   articleCategory: string | null;
+  label?: string;
   createdAt: string;
   sector: {
     id: number; name: string; icon: string; description: string;

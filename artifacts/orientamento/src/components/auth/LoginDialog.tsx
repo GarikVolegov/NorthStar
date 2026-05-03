@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Star, ArrowLeft, Mail, CheckCircle2, KeyRound } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -32,6 +33,7 @@ interface LoginDialogProps {
 }
 
 export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginDialogProps) {
+  const { t, i18n } = useTranslation();
   const { login } = useAuth();
   const [view, setView] = useState<View>(defaultTab);
   const [loading, setLoading] = useState(false);
@@ -83,18 +85,18 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Errore con Google. Riprova.");
+        setError(data.error || t("auth.errors.googleError"));
       } else {
         login(data, data.token ?? "");
         onOpenChange(false);
         resetAll();
       }
     } catch {
-      setError("Errore di rete. Riprova.");
+      setError(t("auth.errors.networkError"));
     } finally {
       setGoogleLoading(false);
     }
-  }, [login, onOpenChange]);
+  }, [login, onOpenChange, t]);
 
   useEffect(() => {
     if (!open) return;
@@ -118,10 +120,10 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
       size: "large",
       width: googleBtnRef.current.offsetWidth || 340,
       text: "continue_with",
-      locale: "it",
+      locale: i18n.language?.slice(0, 2) || "it",
       shape: "pill",
     });
-  }, [open, view, handleGoogleCredential]);
+  }, [open, view, handleGoogleCredential, i18n.language]);
 
   function handleCodeInput(idx: number, val: string) {
     const digit = val.replace(/\D/g, "").slice(-1);
@@ -163,7 +165,7 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
           if (data.devCode) setDevHint(data.devCode);
           goTo("verify");
         } else {
-          setError(data.error || "Errore durante il login");
+          setError(data.error || t("auth.errors.loginError"));
         }
       } else {
         login(data, data.token ?? "");
@@ -171,7 +173,7 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
         resetAll();
       }
     } catch {
-      setError("Errore di rete. Riprova.");
+      setError(t("auth.errors.networkError"));
     } finally {
       setLoading(false);
     }
@@ -180,7 +182,7 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     if (regPassword !== regPasswordConfirm) {
-      setError("Le password non coincidono");
+      setError(t("auth.errors.passwordsNoMatch"));
       return;
     }
     setLoading(true);
@@ -193,14 +195,14 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Errore durante la registrazione");
+        setError(data.error || t("auth.errors.registerError"));
       } else {
         setVerifyEmail(regEmail);
         if (data.devCode) setDevHint(data.devCode);
         goTo("verify");
       }
     } catch {
-      setError("Errore di rete. Riprova.");
+      setError(t("auth.errors.networkError"));
     } finally {
       setLoading(false);
     }
@@ -210,7 +212,7 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
     e.preventDefault();
     const code = verifyCode.join("");
     if (code.length < 6) {
-      setError("Inserisci il codice a 6 cifre");
+      setError(t("auth.errors.enterCode"));
       return;
     }
     setLoading(true);
@@ -223,14 +225,14 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Codice non valido");
+        setError(data.error || t("auth.errors.invalidCode"));
       } else {
         login(data, data.token ?? "");
         onOpenChange(false);
         resetAll();
       }
     } catch {
-      setError("Errore di rete. Riprova.");
+      setError(t("auth.errors.networkError"));
     } finally {
       setLoading(false);
     }
@@ -249,7 +251,7 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
       if (data.devCode) setDevHint(data.devCode);
       setError(null);
     } catch {
-      setError("Errore di rete. Riprova.");
+      setError(t("auth.errors.networkError"));
     } finally {
       setLoading(false);
     }
@@ -269,27 +271,27 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
       if (data.devToken) setDevHint(data.devToken);
       goTo("forgot-sent");
     } catch {
-      setError("Errore di rete. Riprova.");
+      setError(t("auth.errors.networkError"));
     } finally {
       setLoading(false);
     }
   }
 
   const dialogTitles: Record<View, string> = {
-    login: "Bentornato",
-    register: "Crea il tuo account",
-    verify: "Conferma la tua email",
-    forgot: "Password dimenticata",
-    "forgot-sent": "Controlla la tua email",
-    "reset-sent": "Password reimpostata",
+    login: t("auth.titles.login"),
+    register: t("auth.titles.register"),
+    verify: t("auth.titles.verify"),
+    forgot: t("auth.titles.forgot"),
+    "forgot-sent": t("auth.titles.forgotSent"),
+    "reset-sent": t("auth.titles.resetSent"),
   };
   const dialogDescriptions: Record<View, string> = {
-    login: "Accedi per ritrovare il tuo percorso e i tuoi risultati.",
-    register: "Registrati per salvare il tuo percorso e accedere ai contenuti premium.",
-    verify: `Inserisci il codice a 6 cifre inviato a ${verifyEmail}.`,
-    forgot: "Inserisci la tua email e ti invieremo un link per reimpostare la password.",
-    "forgot-sent": `Abbiamo inviato un link a ${forgotEmail}. Controlla la posta in arrivo (e lo spam).`,
-    "reset-sent": "La tua password è stata reimpostata. Puoi ora accedere.",
+    login: t("auth.descriptions.login"),
+    register: t("auth.descriptions.register"),
+    verify: t("auth.descriptions.verify", { email: verifyEmail }),
+    forgot: t("auth.descriptions.forgot"),
+    "forgot-sent": t("auth.descriptions.forgotSent", { email: forgotEmail }),
+    "reset-sent": t("auth.descriptions.resetSent"),
   };
 
   const showGoogleBtn = (view === "login" || view === "register") && !!(window as any).__GOOGLE_CLIENT_ID__;
@@ -308,14 +310,14 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
 
         {(view === "login" || view === "register") && (
           <div className="flex rounded-xl bg-muted p-1 mb-2">
-            <button onClick={() => goTo("login")} className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-all ${view === "login" ? "bg-white shadow text-foreground" : "text-muted-foreground"}`}>Accedi</button>
-            <button onClick={() => goTo("register")} className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-all ${view === "register" ? "bg-white shadow text-foreground" : "text-muted-foreground"}`}>Registrati</button>
+            <button onClick={() => goTo("login")} className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-all ${view === "login" ? "bg-white shadow text-foreground" : "text-muted-foreground"}`}>{t("auth.login")}</button>
+            <button onClick={() => goTo("register")} className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-all ${view === "register" ? "bg-white shadow text-foreground" : "text-muted-foreground"}`}>{t("auth.register")}</button>
           </div>
         )}
 
         {(view === "verify" || view === "forgot") && (
           <button onClick={() => goTo("login")} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2 transition-colors w-fit">
-            <ArrowLeft className="w-3.5 h-3.5" /> Torna al login
+            <ArrowLeft className="w-3.5 h-3.5" /> {t("auth.backToLogin")}
           </button>
         )}
 
@@ -324,14 +326,14 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
             {googleLoading ? (
               <div className="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Accesso con Google in corso…
+                {t("auth.googleLoading")}
               </div>
             ) : (
               <div ref={googleBtnRef} className="w-full flex justify-center" />
             )}
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">oppure</span>
+              <span className="text-xs text-muted-foreground">{t("auth.or")}</span>
               <div className="flex-1 h-px bg-border" />
             </div>
           </div>
@@ -340,27 +342,27 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
         {view === "login" && (
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="login-email">Email</Label>
-              <Input id="login-email" type="email" placeholder="la-tua@email.com" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required autoComplete="email" />
+              <Label htmlFor="login-email">{t("auth.email")}</Label>
+              <Input id="login-email" type="email" placeholder={t("auth.emailPlaceholder")} value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required autoComplete="email" />
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label htmlFor="login-password">Password</Label>
+                <Label htmlFor="login-password">{t("auth.password")}</Label>
                 <button type="button" onClick={() => { setForgotEmail(loginEmail); goTo("forgot"); }} className="text-xs text-primary hover:underline">
-                  Hai dimenticato la password?
+                  {t("auth.forgotPassword")}
                 </button>
               </div>
-              <Input id="login-password" type="password" placeholder="••••••••" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required autoComplete="current-password" />
+              <Input id="login-password" type="password" placeholder={t("auth.passwordPlaceholder")} value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required autoComplete="current-password" />
             </div>
             {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>}
             <Button type="submit" className="w-full rounded-full font-medium" disabled={loading}>
               {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Accedi
+              {t("auth.loginBtn")}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
-              Non hai un account?{" "}
+              {t("auth.noAccount")}{" "}
               <button type="button" onClick={() => goTo("register")} className="text-primary hover:underline font-medium">
-                Registrati
+                {t("auth.register")}
               </button>
             </p>
           </form>
@@ -369,33 +371,33 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
         {view === "register" && (
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="reg-name">Nome</Label>
-              <Input id="reg-name" placeholder="Il tuo nome" value={regName} onChange={(e) => setRegName(e.target.value)} required autoComplete="name" />
+              <Label htmlFor="reg-name">{t("auth.name")}</Label>
+              <Input id="reg-name" placeholder={t("auth.namePlaceholder")} value={regName} onChange={(e) => setRegName(e.target.value)} required autoComplete="name" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="reg-email">Email</Label>
-              <Input id="reg-email" type="email" placeholder="la-tua@email.com" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} required autoComplete="email" />
+              <Label htmlFor="reg-email">{t("auth.email")}</Label>
+              <Input id="reg-email" type="email" placeholder={t("auth.emailPlaceholder")} value={regEmail} onChange={(e) => setRegEmail(e.target.value)} required autoComplete="email" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="reg-password">Password</Label>
-              <Input id="reg-password" type="password" placeholder="Min. 6 caratteri" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} required minLength={6} autoComplete="new-password" />
+              <Label htmlFor="reg-password">{t("auth.password")}</Label>
+              <Input id="reg-password" type="password" placeholder={t("auth.passwordMin")} value={regPassword} onChange={(e) => setRegPassword(e.target.value)} required minLength={6} autoComplete="new-password" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="reg-password-confirm">Conferma password</Label>
-              <Input id="reg-password-confirm" type="password" placeholder="Ripeti la password" value={regPasswordConfirm} onChange={(e) => setRegPasswordConfirm(e.target.value)} required minLength={6} autoComplete="new-password" className={regPasswordConfirm && regPassword !== regPasswordConfirm ? "border-destructive" : ""} />
+              <Label htmlFor="reg-password-confirm">{t("auth.confirmPassword")}</Label>
+              <Input id="reg-password-confirm" type="password" placeholder={t("auth.confirmPasswordPlaceholder")} value={regPasswordConfirm} onChange={(e) => setRegPasswordConfirm(e.target.value)} required minLength={6} autoComplete="new-password" className={regPasswordConfirm && regPassword !== regPasswordConfirm ? "border-destructive" : ""} />
               {regPasswordConfirm && regPassword !== regPasswordConfirm && (
-                <p className="text-xs text-destructive">Le password non coincidono</p>
+                <p className="text-xs text-destructive">{t("auth.passwordMismatch")}</p>
               )}
             </div>
             {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>}
             <Button type="submit" className="w-full rounded-full font-medium" disabled={loading || (!!regPasswordConfirm && regPassword !== regPasswordConfirm)}>
               {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Crea account
+              {t("auth.createAccount")}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
-              Hai già un account?{" "}
+              {t("auth.hasAccount")}{" "}
               <button type="button" onClick={() => goTo("login")} className="text-primary hover:underline font-medium">
-                Accedi
+                {t("auth.login")}
               </button>
             </p>
           </form>
@@ -411,13 +413,13 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
 
             {devHint && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
-        <p className="text-xs text-amber-700 font-medium mb-1">Modalità sviluppo — codice:</p>
-        <p className="text-2xl font-mono font-bold tracking-widest text-amber-800">{devHint}</p>
+                <p className="text-xs text-amber-700 font-medium mb-1">{t("auth.devMode")}</p>
+                <p className="text-2xl font-mono font-bold tracking-widest text-amber-800">{devHint}</p>
               </div>
             )}
 
             <div className="space-y-2">
-              <Label className="text-center block">Codice di verifica</Label>
+              <Label className="text-center block">{t("auth.verifyCode")}</Label>
               <div className="flex gap-2 justify-center" onPaste={handleCodePaste}>
                 {verifyCode.map((digit, idx) => (
                   <input key={idx} ref={(el) => { codeRefs.current[idx] = el; }} type="text" inputMode="numeric" maxLength={1} value={digit} onChange={(e) => handleCodeInput(idx, e.target.value)} onKeyDown={(e) => handleCodeKeyDown(idx, e)} className="w-11 h-13 text-center text-xl font-bold border-2 rounded-xl outline-none focus:border-primary transition-colors bg-background" />
@@ -429,18 +431,18 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
 
             <Button type="submit" className="w-full rounded-full font-medium" disabled={loading || verifyCode.join("").length < 6}>
               {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Verifica account
+              {t("auth.verifyBtn")}
             </Button>
 
             <p className="text-center text-sm text-muted-foreground">
-              Non hai ricevuto il codice?{" "}
+              {t("auth.noCodeReceived")}{" "}
               <button type="button" onClick={handleResend} disabled={loading} className="text-primary hover:underline font-medium">
-                Invia di nuovo
+                {t("auth.resend")}
               </button>
             </p>
             {devHint && (
               <p className="text-center text-xs text-muted-foreground break-all">
-                Codice sviluppo: <span className="font-mono font-semibold text-foreground">{devHint}</span>
+                {t("auth.devCodeLabel")} <span className="font-mono font-semibold text-foreground">{devHint}</span>
               </p>
             )}
           </form>
@@ -454,13 +456,13 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="forgot-email">Email del tuo account</Label>
-              <Input id="forgot-email" type="email" placeholder="la-tua@email.com" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} required autoComplete="email" />
+              <Label htmlFor="forgot-email">{t("auth.forgotEmailLabel")}</Label>
+              <Input id="forgot-email" type="email" placeholder={t("auth.emailPlaceholder")} value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} required autoComplete="email" />
             </div>
             {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>}
             <Button type="submit" className="w-full rounded-full font-medium" disabled={loading}>
               {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Invia link di reset
+              {t("auth.sendResetLink")}
             </Button>
           </form>
         )}
@@ -474,14 +476,14 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
             </div>
             {devHint && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-                <p className="text-xs text-amber-700 font-medium mb-1">Modalità sviluppo — token reset:</p>
+                <p className="text-xs text-amber-700 font-medium mb-1">{t("auth.devToken")}</p>
                 <p className="text-xs font-mono text-amber-800 break-all">{devHint}</p>
                 <a href={`${BASE}reset-password?token=${devHint}`} className="mt-2 inline-block text-xs text-primary underline" onClick={() => onOpenChange(false)}>
-                  Apri pagina reset →
+                  {t("auth.openReset")}
                 </a>
               </div>
             )}
-            <Button variant="outline" className="w-full rounded-full" onClick={() => goTo("login")}>Torna al login</Button>
+            <Button variant="outline" className="w-full rounded-full" onClick={() => goTo("login")}>{t("auth.backToLoginBtn")}</Button>
           </div>
         )}
       </DialogContent>

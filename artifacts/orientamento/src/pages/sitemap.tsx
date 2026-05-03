@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Link } from "wouter";
+import { useTranslation } from "react-i18next";
 import { SectorIcon } from "@/lib/sector-icon";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -34,58 +35,59 @@ interface SitemapGroup {
   items: { label: string; href: string; desc?: string; badge?: string; iconName?: string }[];
 }
 
-const STATIC_GROUPS: SitemapGroup[] = [
-  {
-    title: "Principale",
-    icon: Home,
-    color: "#6366f1",
-    bg: "#eef2ff",
-    items: [
-      { label: "Home",            href: "/",         desc: "La bussola per il tuo futuro" },
-      { label: "Il Test",         href: "/test",     desc: "Test RIASEC + Cinque Spiriti (17 domande)" },
-      { label: "News",            href: "/news",     desc: "Articoli aggiornati per settore" },
-      { label: "Premium",         href: "/premium",  desc: "Piani e funzionalità avanzate" },
-      { label: "Il mio profilo",  href: "/profilo",  desc: "Account, obiettivi e storico test" },
-    ],
-  },
-  {
-    title: "Esplora settori",
-    icon: Globe,
-    color: "#f59e0b",
-    bg: "#fffbeb",
-    items: [
-      { label: "Tutti i settori",    href: "/settori",   desc: "Griglia dei 21 settori con filtri RIASEC e AI" },
-      { label: "Confronta settori",  href: "/confronta", desc: "Comparatore fianco a fianco con URL condivisibile" },
-    ],
-  },
-  {
-    title: "Prodotto e brand",
-    icon: Info,
-    color: "#10b981",
-    bg: "#ecfdf5",
-    items: [
-      { label: "Chi siamo",            href: "/chi-siamo",           desc: "Missione, metodo e valori di NorthStar" },
-      { label: "Come funziona",        href: "/come-funziona",       desc: "RIASEC, Cinque Spiriti, FAQ e privacy" },
-      { label: "Contatti",             href: "/contatti",            desc: "Scrivi al team NorthStar" },
-      { label: "Mappa del sito",       href: "/sitemap",             desc: "Panoramica di tutte le pagine" },
-      { label: "Privacy Policy",       href: "/privacy-policy",      desc: "Trattamento dei dati personali (GDPR)" },
-      { label: "Termini di servizio",  href: "/termini-di-servizio", desc: "Condizioni d'uso della piattaforma" },
-    ],
-  },
-];
-
 export default function Sitemap() {
+  const { t } = useTranslation();
   const { data: sectors = [], isLoading } = useSectors();
 
   useEffect(() => {
-    document.title = "Mappa del sito — NorthStar";
+    document.title = `${t("sitemap.title")} — NorthStar`;
     const meta = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
-    if (meta) meta.content = "Mappa completa del sito NorthStar: tutte le pagine, i settori professionali e le risorse disponibili.";
-  }, []);
+    if (meta) meta.content = t("sitemap.desc");
+  }, [t]);
 
-  const sectorGroups: SitemapGroup[] = sectors.length > 0 ? [
+  const STATIC_GROUPS: SitemapGroup[] = useMemo(() => [
     {
-      title: "Settori professionali",
+      title: t("sitemap.groups.main"),
+      icon: Home,
+      color: "#6366f1",
+      bg: "#eef2ff",
+      items: [
+        { label: t("sitemap.items.home.label"),      href: "/",         desc: t("sitemap.items.home.desc") },
+        { label: t("sitemap.items.test.label"),      href: "/test",     desc: t("sitemap.items.test.desc") },
+        { label: t("sitemap.items.news.label"),      href: "/news",     desc: t("sitemap.items.news.desc") },
+        { label: t("sitemap.items.premium.label"),   href: "/premium",  desc: t("sitemap.items.premium.desc") },
+        { label: t("sitemap.items.profilo.label"),   href: "/profilo",  desc: t("sitemap.items.profilo.desc") },
+      ],
+    },
+    {
+      title: t("sitemap.groups.sectors"),
+      icon: Globe,
+      color: "#f59e0b",
+      bg: "#fffbeb",
+      items: [
+        { label: t("sitemap.items.settori.label"),   href: "/settori",   desc: t("sitemap.items.settori.desc") },
+        { label: t("sitemap.items.confronta.label"), href: "/confronta", desc: t("sitemap.items.confronta.desc") },
+      ],
+    },
+    {
+      title: t("sitemap.groups.brand"),
+      icon: Info,
+      color: "#10b981",
+      bg: "#ecfdf5",
+      items: [
+        { label: t("sitemap.items.chiSiamo.label"),    href: "/chi-siamo",           desc: t("sitemap.items.chiSiamo.desc") },
+        { label: t("sitemap.items.comeFunziona.label"),href: "/come-funziona",       desc: t("sitemap.items.comeFunziona.desc") },
+        { label: t("sitemap.items.contatti.label"),    href: "/contatti",            desc: t("sitemap.items.contatti.desc") },
+        { label: t("sitemap.items.sitemapPage.label"), href: "/sitemap",             desc: t("sitemap.items.sitemapPage.desc") },
+        { label: t("sitemap.items.privacy.label"),     href: "/privacy-policy",      desc: t("sitemap.items.privacy.desc") },
+        { label: t("sitemap.items.termini.label"),     href: "/termini-di-servizio", desc: t("sitemap.items.termini.desc") },
+      ],
+    },
+  ], [t]);
+
+  const sectorGroups: SitemapGroup[] = useMemo(() => sectors.length > 0 ? [
+    {
+      title: t("sitemap.groups.sectorPages"),
       icon: Globe,
       color: "#f59e0b",
       bg: "#fffbeb",
@@ -93,11 +95,11 @@ export default function Sitemap() {
         label: s.name,
         iconName: s.icon,
         href: `/settore/${s.id}`,
-        desc: "Panoramica, dati e match",
+        desc: t("sitemap.sectorDesc"),
       })),
     },
     {
-      title: "Wiki per settore",
+      title: t("sitemap.groups.wiki"),
       icon: BookOpen,
       color: "#8b5cf6",
       bg: "#f5f3ff",
@@ -105,12 +107,12 @@ export default function Sitemap() {
         label: s.name,
         iconName: s.icon,
         href: `/wiki/${s.id}`,
-        desc: "Contenuti AI approfonditi",
+        desc: t("sitemap.wikiDesc"),
         badge: "Premium",
       })),
     },
     {
-      title: "Roadmap di carriera",
+      title: t("sitemap.groups.roadmap"),
       icon: GitBranch,
       color: "#3b82f6",
       bg: "#eff6ff",
@@ -118,12 +120,12 @@ export default function Sitemap() {
         label: s.name,
         iconName: s.icon,
         href: `/roadmap/${s.id}`,
-        desc: "Percorso step-by-step",
+        desc: t("sitemap.roadmapDesc"),
         badge: "Premium",
       })),
     },
     {
-      title: "Grafo della conoscenza",
+      title: t("sitemap.groups.grafo"),
       icon: Network,
       color: "#ec4899",
       bg: "#fdf2f8",
@@ -131,11 +133,11 @@ export default function Sitemap() {
         label: s.name,
         iconName: s.icon,
         href: `/grafo/${s.id}`,
-        desc: "Visualizzazione AI interattiva",
+        desc: t("sitemap.grafoDesc"),
         badge: "Premium",
       })),
     },
-  ] : [];
+  ] : [], [sectors, t]);
 
   const allGroups = [...STATIC_GROUPS, ...sectorGroups];
 
@@ -150,18 +152,18 @@ export default function Sitemap() {
         <div className="container mx-auto px-4 max-w-4xl">
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium mb-5">
             <Map className="w-4 h-4" />
-            Navigazione completa
+            {t("sitemap.nav")}
           </div>
           <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground mb-4">
-            Mappa del sito
+            {t("sitemap.title")}
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-            Tutte le pagine di NorthStar in un unico posto. Trovi sezioni, settori professionali, risorse premium e pagine istituzionali.
+            {t("sitemap.desc")}
           </p>
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground bg-card border rounded-xl px-3 py-2">
               <Globe className="w-4 h-4 text-primary" />
-              {isLoading ? "…" : `${totalPages} pagine totali`}
+              {isLoading ? "…" : t("sitemap.pagesTotal", { count: totalPages })}
             </div>
             <a
               href={`${BASE}api/sitemap.xml`}
@@ -170,7 +172,7 @@ export default function Sitemap() {
               className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              Scarica sitemap.xml
+              {t("sitemap.downloadXml")}
             </a>
           </div>
         </div>
@@ -208,11 +210,11 @@ export default function Sitemap() {
               </div>
               <div>
                 <h2 className="text-lg font-serif font-bold text-foreground">{group.title}</h2>
-                <p className="text-xs text-muted-foreground">{group.items.length} pagine</p>
+                <p className="text-xs text-muted-foreground">{group.items.length} {t("sitemap.pages")}</p>
               </div>
             </div>
 
-            {isLoading && group.title !== "Principale" && group.title !== "Prodotto e brand" ? (
+            {isLoading && group.title !== t("sitemap.groups.main") && group.title !== t("sitemap.groups.brand") ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {[1,2,3,4].map((i) => <Skeleton key={i} className="h-16 rounded-xl" />)}
               </div>
@@ -253,13 +255,13 @@ export default function Sitemap() {
         <div className="bg-primary/5 border border-primary/20 rounded-3xl p-10 text-center">
           <Star className="w-10 h-10 text-primary mx-auto mb-3 opacity-80 fill-primary/20" />
           <h2 className="text-xl font-serif font-bold text-foreground mb-2">
-            Non sai da dove iniziare?
+            {t("sitemap.ctaTitle")}
           </h2>
           <p className="text-muted-foreground text-sm mb-5 max-w-sm mx-auto">
-            Il test ti guida in 10 minuti verso i settori professionali più coerenti con la tua personalità.
+            {t("sitemap.ctaDesc")}
           </p>
           <Button asChild className="rounded-full px-8">
-            <Link href="/test">Inizia il test gratuito <ArrowRight className="w-4 h-4 ml-1.5" /></Link>
+            <Link href="/test">{t("sitemap.startTest")} <ArrowRight className="w-4 h-4 ml-1.5" /></Link>
           </Button>
         </div>
 

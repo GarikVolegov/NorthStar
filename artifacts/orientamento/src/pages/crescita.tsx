@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { ArrowRight, BookOpen, Clock, Sparkles, TrendingUp, Star, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -86,7 +87,7 @@ function ArticleCard({ article, recommended }: { article: Article; recommended?:
       <div className="group rounded-2xl border bg-card p-5 hover:border-primary/40 hover:shadow-md transition-all cursor-pointer h-full flex flex-col relative overflow-hidden">
         {recommended && (
           <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-[10px] font-semibold px-2.5 py-1 rounded-bl-xl flex items-center gap-1">
-            <Star className="w-2.5 h-2.5 fill-current" /> Per te
+            <Star className="w-2.5 h-2.5 fill-current" /> {/* translates via parent */}
           </div>
         )}
         <div className="flex items-center gap-2 mb-3">
@@ -240,9 +241,10 @@ function NoProfileTeaser() {
 }
 
 export default function Crescita() {
+  const { t } = useTranslation();
   usePageMeta({
-    title: "Crescita Personale — NorthStar",
-    description: "Una knowledge base di articoli, guide ed esercizi pratici su abitudini, mindset, motivazione, disciplina e sviluppo professionale.",
+    title: t("growth.pageTitle", { defaultValue: "Crescita Personale — NorthStar" }),
+    description: t("growth.pageDesc", { defaultValue: "Una knowledge base di articoli, guide ed esercizi pratici su abitudini, mindset, motivazione, disciplina e sviluppo professionale." }),
     canonicalPath: "/crescita",
   });
 
@@ -272,26 +274,26 @@ export default function Crescita() {
         <div className="container mx-auto px-5 md:px-6 max-w-4xl text-center">
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary text-sm font-medium px-4 py-1.5 rounded-full mb-5 md:mb-6">
             <Sparkles className="w-4 h-4" />
-            Crescita Personale
+            {t("growth.badge", { defaultValue: "Crescita Personale" })}
           </div>
           <h1 className="text-3xl md:text-5xl font-serif font-bold text-foreground mb-3 md:mb-4 leading-tight">
-            La biblioteca della tua <span className="text-primary">evoluzione</span>
+            {t("growth.title")} <span className="text-primary">{t("growth.titleHighlight")}</span>
           </h1>
           <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-6 md:mb-8">
-            Articoli, guide ed esercizi pratici su abitudini, mindset, motivazione e crescita professionale. Contenuti curati per chi vuole migliorare con intenzione.
+            {t("growth.subtitle")}
           </p>
           <div className="flex flex-wrap justify-center gap-4 md:gap-6 text-sm">
             <div className="flex items-center gap-2 text-muted-foreground">
               <BookOpen className="w-4 h-4 text-primary" />
-              <span><strong className="text-foreground">{totalArticles}</strong> articoli</span>
+              <span><strong className="text-foreground">{totalArticles}</strong> {t("growth.articles")}</span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <TrendingUp className="w-4 h-4 text-primary" />
-              <span><strong className="text-foreground">{totalCategories}</strong> aree tematiche</span>
+              <span><strong className="text-foreground">{totalCategories}</strong> {t("growth.stats.areas")}</span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <Sparkles className="w-4 h-4 text-primary" />
-              <span>Aggiornato continuamente</span>
+              <span>{t("growth.stats.updated")}</span>
             </div>
           </div>
         </div>
@@ -308,8 +310,8 @@ export default function Crescita() {
       <section className="py-10 md:py-14">
         <div className="container mx-auto px-4 md:px-6 max-w-6xl">
           <div className="mb-6 md:mb-8">
-            <h2 className="text-xl md:text-2xl font-serif font-bold text-foreground mb-1">Esplora per area</h2>
-            <p className="text-sm md:text-base text-muted-foreground">Scegli il tema su cui vuoi lavorare adesso.</p>
+            <h2 className="text-xl md:text-2xl font-serif font-bold text-foreground mb-1">{t("growth.exploreByArea", { defaultValue: "Esplora per area" })}</h2>
+            <p className="text-sm md:text-base text-muted-foreground">{t("growth.exploreByAreaDesc", { defaultValue: "Scegli il tema su cui vuoi lavorare adesso." })}</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
             {catData.map(cat => (
@@ -325,11 +327,11 @@ export default function Crescita() {
           <div className="container mx-auto px-4 md:px-6 max-w-6xl">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h2 className="text-2xl font-serif font-bold text-foreground mb-1">Ultimi articoli</h2>
-                <p className="text-muted-foreground">I contenuti aggiunti più di recente.</p>
+                <h2 className="text-2xl font-serif font-bold text-foreground mb-1">{t("growth.latestArticles", { defaultValue: "Ultimi articoli" })}</h2>
+                <p className="text-muted-foreground">{t("growth.latestArticlesDesc", { defaultValue: "I contenuti aggiunti più di recente." })}</p>
               </div>
               <Link href="/crescita/categoria/autoconsapevolezza" className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
-                Vedi tutti <ArrowRight className="w-3.5 h-3.5" />
+                {t("growth.seeAll", { defaultValue: "Vedi tutti" })} <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -346,14 +348,14 @@ export default function Crescita() {
         <div className="container mx-auto px-4 md:px-6 max-w-3xl text-center">
           <div className="rounded-3xl bg-primary/5 border border-primary/20 p-10">
             <h2 className="text-2xl font-serif font-bold text-foreground mb-3">
-              Non sai da dove iniziare?
+              {t("growth.ctaTitle", { defaultValue: "Non sai da dove iniziare?" })}
             </h2>
             <p className="text-muted-foreground mb-6">
-              Fai il test RIASEC + Cinque Spiriti: capire chi sei è sempre il primo passo.
+              {t("growth.ctaDesc", { defaultValue: "Fai il test RIASEC + Cinque Spiriti: capire chi sei è sempre il primo passo." })}
             </p>
             <Link href="/test">
               <button className="bg-primary text-primary-foreground px-6 py-3 rounded-full font-medium hover:opacity-90 transition-opacity inline-flex items-center gap-2">
-                Inizia il percorso <ArrowRight className="w-4 h-4" />
+                {t("growth.startJourney", { defaultValue: "Inizia il percorso" })} <ArrowRight className="w-4 h-4" />
               </button>
             </Link>
           </div>

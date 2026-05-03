@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -57,29 +58,34 @@ const STATUS_META: Record<AppStatus, { label: string; emoji: string; color: stri
 const COLUMNS: AppStatus[] = ["saved", "applied", "interview", "offer", "rejected"];
 const EMPTY_FORM = { company: "", role: "", url: "", status: "saved" as AppStatus, notes: "", salary: "", location: "" };
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("it-IT", { day: "numeric", month: "short" });
+function useFormatDate() {
+  const { i18n } = useTranslation();
+  return (iso: string) => new Date(iso).toLocaleDateString(i18n.language, { day: "numeric", month: "short" });
 }
 
-function formatNoteDate(iso: string): string {
-  const date = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-  if (diffMins < 1) return "Adesso";
-  if (diffMins < 60) return `${diffMins}m fa`;
-  if (diffHours < 24) return `${diffHours}h fa`;
-  if (diffDays === 1) return "Ieri";
-  if (diffDays < 7) return `${diffDays}g fa`;
-  return date.toLocaleDateString("it-IT", { day: "numeric", month: "short" });
+function useFormatNoteDate() {
+  const { t, i18n } = useTranslation();
+  return (iso: string): string => {
+    const date = new Date(iso);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffMins < 1) return t("candidature.now");
+    if (diffMins < 60) return `${diffMins}m`;
+    if (diffHours < 24) return `${diffHours}h`;
+    if (diffDays === 1) return t("amici.yesterday");
+    if (diffDays < 7) return `${diffDays}d`;
+    return date.toLocaleDateString(i18n.language, { day: "numeric", month: "short" });
+  };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
    Main page component
 ═══════════════════════════════════════════════════════════════════════ */
 export default function Candidature() {
+  const { t } = useTranslation();
   const { user, isLoggedIn } = useAuth();
   const queryClient = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
@@ -143,7 +149,7 @@ export default function Candidature() {
 
   function handleSubmit() {
     if (!form.company.trim() || !form.role.trim()) {
-      setFormError("Azienda e ruolo sono obbligatori");
+      setFormError(t("candidature.requiredFields"));
       return;
     }
     if (editApp) {
@@ -176,9 +182,9 @@ export default function Candidature() {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
         <Star className="w-12 h-12 text-primary/30 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Accedi per vedere le tue candidature</h2>
-        <p className="text-muted-foreground mb-6 max-w-sm">Tieni traccia di tutte le tue candidature in un unico posto.</p>
-        <Button asChild><Link href="/">Vai alla home</Link></Button>
+        <h2 className="text-xl font-semibold mb-2">{t("candidature.loginRequired")}</h2>
+        <p className="text-muted-foreground mb-6 max-w-sm">{t("candidature.loginRequiredDesc")}</p>
+        <Button asChild><Link href="/">{t("candidature.goHome")}</Link></Button>
       </div>
     );
   }
@@ -198,13 +204,13 @@ export default function Candidature() {
         <div className="max-w-screen-2xl mx-auto px-4 md:px-8 py-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-serif font-bold text-foreground">Le mie Candidature</h1>
+              <h1 className="text-2xl font-serif font-bold text-foreground">{t("candidature.myCandidatures")}</h1>
               <p className="text-sm text-muted-foreground mt-0.5">
-                {total === 0 ? "Nessuna candidatura ancora" : `${total} candidatur${total === 1 ? "a" : "e"} totali`}
+                {total === 0 ? t("candidature.noCandidatures") : t("candidature.totalCount", { count: total })}
               </p>
             </div>
             <Button onClick={() => openAdd()} className="rounded-full gap-2 shrink-0">
-              <Plus className="w-4 h-4" /> Aggiungi
+              <Plus className="w-4 h-4" /> {t("candidature.add")}
             </Button>
           </div>
 
@@ -217,7 +223,7 @@ export default function Candidature() {
                 const m = STATUS_META[s];
                 return (
                   <span key={s} className={cn("text-xs font-medium px-2.5 py-1 rounded-full border", m.badge)}>
-                    {m.emoji} {m.label}: {count}
+                    {m.emoji} {t(`candidature.status.${s}`)}: {count}
                   </span>
                 );
               })}
@@ -236,7 +242,7 @@ export default function Candidature() {
                     view === v ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
                 >
-                  {v === "kanban" ? <><Briefcase className="w-3.5 h-3.5" /> Kanban</> : <><BarChart3 className="w-3.5 h-3.5" /> Statistiche</>}
+                  {v === "kanban" ? <><Briefcase className="w-3.5 h-3.5" /> {t("candidature.kanban")}</> : <><BarChart3 className="w-3.5 h-3.5" /> {t("candidature.statistics")}</>}
                 </button>
               ))}
             </div>
@@ -254,9 +260,7 @@ export default function Candidature() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-amber-900">
-                  {staleInterviews.length === 1
-                    ? "Hai 1 colloquio senza aggiornamenti da più di 7 giorni"
-                    : `Hai ${staleInterviews.length} colloqui senza aggiornamenti da più di 7 giorni`}
+                  {t("candidature.staleInterview", { count: staleInterviews.length })}
                 </p>
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
                   {staleInterviews.map((a) => (
@@ -267,7 +271,7 @@ export default function Candidature() {
                   ))}
                 </div>
                 <p className="text-xs text-amber-600 mt-1">
-                  Riceverai un promemoria via email. Clicca su un colloquio per aggiornarne lo stato.
+                  {t("candidature.staleInterviewReminder")}
                 </p>
               </div>
               <button onClick={() => setBannerDismissed(true)}
@@ -290,12 +294,12 @@ export default function Candidature() {
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
               <Briefcase className="w-8 h-8 text-primary/60" />
             </div>
-            <h2 className="text-lg font-semibold mb-2">Inizia a tracciare le tue candidature</h2>
+            <h2 className="text-lg font-semibold mb-2">{t("candidature.startTracking")}</h2>
             <p className="text-sm text-muted-foreground max-w-sm mb-6">
-              Aggiungi le offerte di lavoro che ti interessano e monitora ogni passaggio del processo selettivo.
+              {t("candidature.startTrackingDesc")}
             </p>
             <Button onClick={() => openAdd()} className="rounded-full gap-2">
-              <Plus className="w-4 h-4" /> Aggiungi la prima candidatura
+              <Plus className="w-4 h-4" /> {t("candidature.addFirst")}
             </Button>
           </div>
         ) : view === "stats" ? (
@@ -310,7 +314,7 @@ export default function Candidature() {
                 <div key={status} className="flex-shrink-0 w-[300px] md:w-[285px] xl:w-[300px] flex flex-col">
                   <div className={cn("flex items-center gap-2 px-3 py-2.5 rounded-xl mb-3", meta.bg)}>
                     <span className="text-base">{meta.emoji}</span>
-                    <span className={cn("text-sm font-semibold flex-1", meta.color)}>{meta.label}</span>
+                    <span className={cn("text-sm font-semibold flex-1", meta.color)}>{t(`candidature.status.${status}`)}</span>
                     <Badge variant="outline" className={cn("text-xs h-5 px-1.5 font-semibold", meta.badge)}>
                       {cards.length}
                     </Badge>
@@ -319,7 +323,7 @@ export default function Candidature() {
                   <div className="space-y-2.5 flex-1">
                     {cards.length === 0 ? (
                       <div className="border-2 border-dashed border-border rounded-xl p-5 text-center">
-                        <p className="text-xs text-muted-foreground">Nessuna candidatura</p>
+                        <p className="text-xs text-muted-foreground">{t("candidature.noApps")}</p>
                       </div>
                     ) : (
                       cards.map((app) => (
@@ -339,7 +343,7 @@ export default function Candidature() {
                       onClick={() => openAdd(status)}
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 border border-dashed border-border transition-colors"
                     >
-                      <Plus className="w-3.5 h-3.5" /> Aggiungi a {meta.label.toLowerCase()}
+                      <Plus className="w-3.5 h-3.5" /> {t("candidature.addTo", { status: t(`candidature.status.${status}`).toLowerCase() })}
                     </button>
                   </div>
                 </div>
@@ -354,7 +358,7 @@ export default function Candidature() {
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-base font-semibold">
-              {editApp ? "Modifica candidatura" : "Nuova candidatura"}
+              {editApp ? t("candidature.editApp") : t("candidature.newApp")}
             </DialogTitle>
           </DialogHeader>
 
@@ -362,14 +366,14 @@ export default function Candidature() {
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 sm:col-span-1">
                 <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-muted-foreground" /> Azienda *
+                  <Building2 className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.company")}
                 </Label>
                 <Input value={form.company} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
                   placeholder="es. Google Italia" className="h-9 rounded-xl text-sm" />
               </div>
               <div className="col-span-2 sm:col-span-1">
                 <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
-                  <Briefcase className="w-3.5 h-3.5 text-muted-foreground" /> Ruolo *
+                  <Briefcase className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.role")}
                 </Label>
                 <Input value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
                   placeholder="es. UX Designer" className="h-9 rounded-xl text-sm" />
@@ -378,7 +382,7 @@ export default function Candidature() {
 
             <div>
               <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
-                <Link2 className="w-3.5 h-3.5 text-muted-foreground" /> Link offerta <span className="font-normal text-muted-foreground">(opzionale)</span>
+                <Link2 className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.link")} <span className="font-normal text-muted-foreground">({t("candidature.optional")})</span>
               </Label>
               <Input value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
                 placeholder="https://..." className="h-9 rounded-xl text-sm" type="url" />
@@ -386,15 +390,15 @@ export default function Candidature() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold mb-1.5 block">Stato</Label>
+                <Label className="text-xs font-semibold mb-1.5 block">{t("candidature.statusLbl")}</Label>
                 <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as AppStatus }))}
                   className="w-full h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-                  {COLUMNS.map((s) => <option key={s} value={s}>{STATUS_META[s].emoji} {STATUS_META[s].label}</option>)}
+                  {COLUMNS.map((s) => <option key={s} value={s}>{STATUS_META[s].emoji} {t(`candidature.status.${s}`)}</option>)}
                 </select>
               </div>
               <div>
                 <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-muted-foreground" /> Sede
+                  <MapPin className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.location")}
                 </Label>
                 <Input value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
                   placeholder="es. Milano / Remote" className="h-9 rounded-xl text-sm" />
@@ -403,7 +407,7 @@ export default function Candidature() {
 
             <div>
               <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
-                <DollarSign className="w-3.5 h-3.5 text-muted-foreground" /> RAL / Stipendio <span className="font-normal text-muted-foreground">(opzionale)</span>
+                <DollarSign className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.salary")} <span className="font-normal text-muted-foreground">({t("candidature.optional")})</span>
               </Label>
               <Input value={form.salary} onChange={(e) => setForm((f) => ({ ...f, salary: e.target.value }))}
                 placeholder="es. 45.000 € / 3.500 € mese" className="h-9 rounded-xl text-sm" />
@@ -411,7 +415,7 @@ export default function Candidature() {
 
             <div>
               <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-muted-foreground" /> Note <span className="font-normal text-muted-foreground">(opzionale)</span>
+                <FileText className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.notes")} <span className="font-normal text-muted-foreground">({t("candidature.optional")})</span>
               </Label>
               <Textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                 placeholder="Contatti, impressioni, dettagli importanti..." className="min-h-[70px] rounded-xl text-sm resize-none" />
@@ -427,12 +431,12 @@ export default function Candidature() {
 
           <DialogFooter className="gap-2">
             <Button variant="outline" className="rounded-xl" onClick={() => { setAddOpen(false); setEditApp(null); }}>
-              Annulla
+              {t("candidature.cancel")}
             </Button>
             <Button className="rounded-xl gap-2" onClick={handleSubmit}
               disabled={createMutation.isPending || updateMutation.isPending}>
               {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
-              {editApp ? "Salva modifiche" : "Aggiungi"}
+              {editApp ? t("candidature.saveChanges") : t("candidature.add")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -454,6 +458,9 @@ function AppCard({
   onStatusChange: (s: AppStatus) => void;
   deleting: boolean;
 }) {
+  const { t } = useTranslation();
+  const formatDate = useFormatDate();
+  const formatNoteDate = useFormatNoteDate();
   const queryClient = useQueryClient();
   const meta = STATUS_META[app.status];
   const otherStatuses = COLUMNS.filter((s) => s !== app.status);
@@ -595,7 +602,7 @@ function AppCard({
               return (
                 <DropdownMenuItem key={s} onClick={(e) => { e.stopPropagation(); onStatusChange(s); }}
                   className="text-xs gap-2 cursor-pointer">
-                  <span>{m.emoji}</span> Sposta in {m.label}
+                  <span>{m.emoji}</span> {t("candidature.moveTo", { status: t(`candidature.status.${s}`) })}
                 </DropdownMenuItem>
               );
             })}
@@ -632,7 +639,7 @@ function AppCard({
 
           {notesLog.length === 0 && (
             <p className="text-[11px] text-muted-foreground italic mb-2.5">
-              Nessuna nota ancora. Scrivi il primo aggiornamento!
+              {t("candidature.noNotesYet")}
             </p>
           )}
 
@@ -645,7 +652,7 @@ function AppCard({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitNote(); }
               }}
-              placeholder="Es. Chiamato HR, colloquio tecnico superato…"
+              placeholder={t("candidature.addNotePlaceholder")}
               className="flex-1 min-w-0 text-xs bg-muted/60 border border-input rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/50 transition-shadow"
             />
             <button
@@ -669,6 +676,7 @@ function AppCard({
    Statistics view
 ═══════════════════════════════════════════════════════════════════════ */
 function StatsView({ applications }: { applications: Application[] }) {
+  const { t } = useTranslation();
   const total = applications.length;
 
   const counts = {
@@ -703,7 +711,7 @@ function StatsView({ applications }: { applications: Application[] }) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <BarChart3 className="w-12 h-12 text-muted-foreground/30 mb-4" />
-        <p className="text-muted-foreground">Aggiungi candidature per vedere le statistiche</p>
+        <p className="text-muted-foreground">{t("candidature.addStatNote")}</p>
       </div>
     );
   }
@@ -712,21 +720,21 @@ function StatsView({ applications }: { applications: Application[] }) {
     <div className="space-y-5 max-w-3xl">
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard emoji="📊" label="Totale" value={total} sub="candidature tracciate" valueColor="text-foreground" />
-        <KpiCard emoji="💌" label="Tasso risposta" value={`${responseRate}%`} sub="inviati → colloquio" valueColor="text-blue-600" />
-        <KpiCard emoji="⏳" label="In corso" value={active} sub="in attesa di risposta" valueColor="text-violet-600" />
-        <KpiCard emoji="📝" label="Note totali" value={totalNotes} sub={`${(totalNotes / total).toFixed(1)} per candidatura`} valueColor="text-amber-600" />
+        <KpiCard emoji="📊" label={t("candidature.totalLabel")} value={total} sub={t("candidature.tracked")} valueColor="text-foreground" />
+        <KpiCard emoji="💌" label={t("candidature.responseRate")} value={`${responseRate}%`} sub={t("candidature.responseRateDesc")} valueColor="text-blue-600" />
+        <KpiCard emoji="⏳" label={t("candidature.inProgress")} value={active} sub={t("candidature.inProgressDesc")} valueColor="text-violet-600" />
+        <KpiCard emoji="📝" label={t("candidature.totalNotes")} value={totalNotes} sub={`${(totalNotes / total).toFixed(1)} ${t("candidature.perApp")}`} valueColor="text-amber-600" />
       </div>
 
       {/* Funnel */}
       <div className="bg-background rounded-2xl border p-5">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-sm font-semibold flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-primary" /> Funnel di avanzamento
+            <TrendingUp className="w-4 h-4 text-primary" /> {t("candidature.funnelTitle")}
           </h3>
           {offerRate > 0 && (
             <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full border", STATUS_META.offer.badge)}>
-              🎉 {offerRate}% successo dai colloqui
+              🎉 {t("candidature.successRate", { rate: offerRate })}
             </span>
           )}
         </div>
@@ -742,12 +750,12 @@ function StatsView({ applications }: { applications: Application[] }) {
                 {convPct !== null && (
                   <div className="flex items-center gap-2 py-1 pl-[108px]">
                     <ArrowRight className="w-3 h-3 text-muted-foreground/40 shrink-0" />
-                    <span className="text-[11px] text-muted-foreground font-medium">{convPct}% di conversione</span>
+                    <span className="text-[11px] text-muted-foreground font-medium">{t("candidature.conversionPct", { pct: convPct })}</span>
                   </div>
                 )}
                 <div className="flex items-center gap-3">
                   <div className="w-24 shrink-0 text-right">
-                    <span className={cn("text-xs font-semibold", m.color)}>{m.emoji} {m.label}</span>
+                    <span className={cn("text-xs font-semibold", m.color)}>{m.emoji} {t(`candidature.status.${stage.status}`)}</span>
                   </div>
                   <div className="flex-1 bg-muted rounded-full h-8 overflow-hidden">
                     <div className={cn("h-full rounded-full transition-all duration-700 ease-out", m.bg)}
@@ -768,10 +776,10 @@ function StatsView({ applications }: { applications: Application[] }) {
           <div className="mt-5 pt-4 border-t flex items-center gap-3 text-sm">
             <span className="text-base">❌</span>
             <span className="text-muted-foreground">
-              <strong className="text-foreground font-semibold">{counts.rejected}</strong> rifiutat{counts.rejected === 1 ? "a" : "e"}
+              <strong className="text-foreground font-semibold">{counts.rejected}</strong> {t(`candidature.status.rejected`).toLowerCase()}
             </span>
             <span className={cn("text-xs px-2 py-0.5 rounded-full border font-medium", STATUS_META.rejected.badge)}>
-              {Math.round((counts.rejected / total) * 100)}% del totale
+              {Math.round((counts.rejected / total) * 100)}% {t("candidature.ofTotal")}
             </span>
           </div>
         )}
@@ -781,7 +789,7 @@ function StatsView({ applications }: { applications: Application[] }) {
       {monthlyData.length > 0 && (
         <div className="bg-background rounded-2xl border p-5">
           <h3 className="text-sm font-semibold mb-5 flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-primary" /> Candidature nel tempo
+            <Calendar className="w-4 h-4 text-primary" /> {t("candidature.overTime")}
           </h3>
           <div className="flex items-end gap-2" style={{ height: 120 }}>
             {monthlyData.map(({ month, count }) => {
@@ -801,7 +809,7 @@ function StatsView({ applications }: { applications: Application[] }) {
             })}
           </div>
           <p className="text-xs text-muted-foreground mt-3 text-right">
-            Media: {(total / Math.max(monthlyData.length, 1)).toFixed(1)} candidature/mese
+            {t("candidature.avgPerMonth", { avg: (total / Math.max(monthlyData.length, 1)).toFixed(1) })}
           </p>
         </div>
       )}

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -40,12 +41,15 @@ function initials(name: string) {
   return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 }
 
-function formatRelDate(iso: string) {
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  if (d === 0) return "Oggi";
-  if (d === 1) return "Ieri";
-  if (d < 7) return `${d}g fa`;
-  return new Date(iso).toLocaleDateString("it-IT", { day: "numeric", month: "short" });
+function useFormatRelDate() {
+  const { t, i18n } = useTranslation();
+  return (iso: string) => {
+    const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+    if (d === 0) return t("amici.today");
+    if (d === 1) return t("amici.yesterday");
+    if (d < 7) return `${d}d`;
+    return new Date(iso).toLocaleDateString(i18n.language, { day: "numeric", month: "short" });
+  };
 }
 
 const AVATAR_COLORS = [
@@ -63,12 +67,14 @@ function avatarColor(id: number) {
 
 /* ═══════════════════════════════════════════════════════════════════════ */
 export default function Amici() {
+  const { t } = useTranslation();
   const { user, isLoggedIn } = useAuth();
+  const formatRelDate = useFormatRelDate();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("amici");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const searchRef = useRef<ReturnType<typeof setTimeout>>();
+  const searchRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     clearTimeout(searchRef.current);
@@ -138,9 +144,9 @@ export default function Amici() {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
         <Users className="w-12 h-12 text-primary/30 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Accedi per vedere i tuoi amici</h2>
-        <p className="text-muted-foreground mb-6">Connettiti con altri utenti NorthStar.</p>
-        <Button asChild><Link href="/">Vai alla home</Link></Button>
+        <h2 className="text-xl font-semibold mb-2">{t("amici.loginRequired")}</h2>
+        <p className="text-muted-foreground mb-6">{t("amici.loginRequiredDesc")}</p>
+        <Button asChild><Link href="/">{t("amici.goHome")}</Link></Button>
       </div>
     );
   }
@@ -158,10 +164,10 @@ export default function Amici() {
           <div className="flex items-start justify-between gap-4 mb-5">
             <div>
               <h1 className="text-2xl font-serif font-bold text-foreground flex items-center gap-2">
-                <Users className="w-6 h-6 text-primary" /> Amici
+                <Users className="w-6 h-6 text-primary" /> {t("amici.title")}
               </h1>
               <p className="text-sm text-muted-foreground mt-0.5">
-                {friends.length === 0 ? "Connettiti con altri utenti NorthStar" : `${friends.length} amici su NorthStar`}
+                {friends.length === 0 ? t("amici.connectWithOthers") : t("amici.friendsCount", { count: friends.length })}
               </p>
             </div>
           </div>
@@ -169,9 +175,9 @@ export default function Amici() {
           {/* Tabs */}
           <div className="flex gap-1">
             {([
-              { id: "amici", label: "Amici", count: friends.length },
-              { id: "richieste", label: "Richieste", count: pendingCount },
-              { id: "cerca", label: "Cerca", count: null },
+              { id: "amici", label: t("amici.tabs.friends"), count: friends.length },
+              { id: "richieste", label: t("amici.tabs.requests"), count: pendingCount },
+              { id: "cerca", label: t("amici.tabs.search"), count: null },
             ] as { id: Tab; label: string; count: number | null }[]).map(({ id, label, count }) => (
               <button
                 key={id}
@@ -206,9 +212,9 @@ export default function Amici() {
           ) : friends.length === 0 ? (
             <EmptyState
               icon={<Users className="w-10 h-10 text-muted-foreground/30" />}
-              title="Nessun amico ancora"
-              desc="Cerca altri utenti con profilo pubblico e invia loro una richiesta di amicizia."
-              action={<Button onClick={() => setTab("cerca")} className="rounded-full gap-2"><Search className="w-4 h-4" /> Cerca utenti</Button>}
+              title={t("amici.noFriendsYet")}
+              desc={t("amici.noFriendsDesc")}
+              action={<Button onClick={() => setTab("cerca")} className="rounded-full gap-2"><Search className="w-4 h-4" /> {t("amici.search")}</Button>}
             />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -231,11 +237,11 @@ export default function Amici() {
               {/* Incoming */}
               <section>
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  In arrivo ({incoming.length})
+                  {t("amici.incomingCount", { count: incoming.length })}
                 </h2>
                 {incoming.length === 0 ? (
                   <div className="text-center py-8 text-sm text-muted-foreground bg-background rounded-2xl border">
-                    Nessuna richiesta in arrivo
+                    {t("amici.noIncoming")}
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -258,7 +264,7 @@ export default function Amici() {
                             {acceptMutation.isPending && (acceptMutation.variables as number) === f.friendshipId
                               ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                               : <Check className="w-3.5 h-3.5" />}
-                            Accetta
+                            {t("amici.accept")}
                           </Button>
                           <Button size="sm" variant="outline" className="rounded-full h-8 w-8 p-0"
                             onClick={() => rejectMutation.mutate(f.friendshipId)}
@@ -278,11 +284,11 @@ export default function Amici() {
               {/* Outgoing */}
               <section>
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  Inviate ({outgoing.length})
+                  {t("amici.outgoingCount", { count: outgoing.length })}
                 </h2>
                 {outgoing.length === 0 ? (
                   <div className="text-center py-8 text-sm text-muted-foreground bg-background rounded-2xl border">
-                    Nessuna richiesta inviata
+                    {t("amici.noOutgoing")}
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -293,7 +299,7 @@ export default function Amici() {
                           <p className="font-semibold text-sm truncate">{f.name}</p>
                           <p className="text-xs text-muted-foreground truncate">{f.email}</p>
                           <p className="text-[11px] text-amber-600 font-medium flex items-center gap-1 mt-0.5">
-                            <Clock className="w-2.5 h-2.5" /> In attesa di risposta
+                            <Clock className="w-2.5 h-2.5" /> {t("amici.waitingReply")}
                           </p>
                         </div>
                         <Button size="sm" variant="outline" className="rounded-full h-8 px-3 gap-1.5 text-muted-foreground shrink-0"
@@ -302,7 +308,7 @@ export default function Amici() {
                           {removeMutation.isPending && (removeMutation.variables as number) === f.friendshipId
                             ? <Loader2 className="w-3 h-3 animate-spin" />
                             : <X className="w-3 h-3" />}
-                          Annulla
+                          {t("amici.cancelRequest")}
                         </Button>
                       </div>
                     ))}
@@ -322,7 +328,7 @@ export default function Amici() {
                 id="search-input"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Cerca per nome o email…"
+                placeholder={t("amici.searchPlaceholder")}
                 className="pl-9 rounded-xl h-11 text-sm"
               />
               {search && (
@@ -336,16 +342,16 @@ export default function Amici() {
             {debouncedSearch.length < 2 ? (
               <div className="text-center py-12">
                 <Globe className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">Cerca tra gli utenti con profilo pubblico.</p>
-                <p className="text-xs text-muted-foreground/60 mt-1">Scrivi almeno 2 caratteri per cercare</p>
+                <p className="text-sm text-muted-foreground">{t("amici.searchPublicHint")}</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">{t("amici.minChars")}</p>
               </div>
             ) : searchLoading ? (
               <LoadingGrid rows={3} />
             ) : !searchData?.users?.length ? (
               <EmptyState
                 icon={<Search className="w-8 h-8 text-muted-foreground/30" />}
-                title="Nessun risultato"
-                desc={`Nessun utente trovato per "${debouncedSearch}". Solo i profili pubblici appaiono nei risultati.`}
+                title={t("amici.noResults")}
+                desc={t("amici.noResultsDesc", { query: debouncedSearch })}
               />
             ) : (
               <div className="space-y-2">
@@ -382,6 +388,7 @@ function Avatar({ name, userId, size = "md" }: { name: string; userId: number; s
 function FriendCard({ friend, onRemove, removing }: {
   friend: FriendEntry; onRemove: () => void; removing: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="bg-background rounded-2xl border p-4 flex items-center gap-3 hover:shadow-sm transition-shadow group">
       <Avatar name={friend.name} userId={friend.id} size="md" />
@@ -390,8 +397,8 @@ function FriendCard({ friend, onRemove, removing }: {
         <p className="text-xs text-muted-foreground truncate">{friend.email}</p>
         <div className="flex items-center gap-1 mt-0.5">
           {friend.isPublic
-            ? <><Globe className="w-2.5 h-2.5 text-emerald-500" /><span className="text-[10px] text-emerald-600 font-medium">Profilo pubblico</span></>
-            : <><Lock className="w-2.5 h-2.5 text-muted-foreground" /><span className="text-[10px] text-muted-foreground">Profilo privato</span></>}
+            ? <><Globe className="w-2.5 h-2.5 text-emerald-500" /><span className="text-[10px] text-emerald-600 font-medium">{t("amici.publicProfile")}</span></>
+            : <><Lock className="w-2.5 h-2.5 text-muted-foreground" /><span className="text-[10px] text-muted-foreground">{t("amici.privateProfile")}</span></>}
         </div>
       </div>
       <div className="flex gap-1.5 shrink-0">
@@ -419,6 +426,7 @@ function SearchResultCard({ user, onSendRequest, onCancel, sendingRequest, cance
   sendingRequest: boolean;
   cancelling: boolean;
 }) {
+  const { t } = useTranslation();
   const isAccepted = user.friendshipStatus === "accepted";
   const isPending = user.friendshipStatus === "pending";
 
@@ -430,18 +438,18 @@ function SearchResultCard({ user, onSendRequest, onCancel, sendingRequest, cance
         <p className="text-xs text-muted-foreground truncate">{user.email}</p>
         <div className="flex items-center gap-1 mt-0.5">
           <Globe className="w-2.5 h-2.5 text-emerald-500" />
-          <span className="text-[10px] text-emerald-600 font-medium">Profilo pubblico</span>
+          <span className="text-[10px] text-emerald-600 font-medium">{t("amici.publicProfile")}</span>
         </div>
       </div>
       <div className="shrink-0">
         {isAccepted ? (
           <Badge variant="outline" className="text-xs gap-1 bg-emerald-50 text-emerald-700 border-emerald-200">
-            <UserCheck className="w-3 h-3" /> Amici
+            <UserCheck className="w-3 h-3" /> {t("amici.tabs.friends")}
           </Badge>
         ) : isPending && !user.iAmRequester ? (
           <div className="flex gap-1.5">
             <Button size="sm" className="rounded-full h-8 px-3 gap-1.5 text-xs" onClick={onSendRequest} disabled={sendingRequest}>
-              <Check className="w-3 h-3" /> Accetta
+              <Check className="w-3 h-3" /> {t("amici.accept")}
             </Button>
             <Button size="sm" variant="outline" className="rounded-full h-8 w-8 p-0" onClick={onCancel} disabled={cancelling}>
               <X className="w-3 h-3" />
@@ -450,12 +458,12 @@ function SearchResultCard({ user, onSendRequest, onCancel, sendingRequest, cance
         ) : isPending && user.iAmRequester ? (
           <Button size="sm" variant="outline" className="rounded-full h-8 px-3 gap-1.5 text-xs text-muted-foreground" onClick={onCancel} disabled={cancelling}>
             {cancelling ? <Loader2 className="w-3 h-3 animate-spin" /> : <Clock className="w-3 h-3" />}
-            In attesa
+            {t("amici.waitingReply")}
           </Button>
         ) : (
           <Button size="sm" className="rounded-full h-8 px-3 gap-1.5 text-xs" onClick={onSendRequest} disabled={sendingRequest}>
             {sendingRequest ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserPlus className="w-3 h-3" />}
-            Aggiungi
+            {t("amici.add")}
           </Button>
         )}
       </div>

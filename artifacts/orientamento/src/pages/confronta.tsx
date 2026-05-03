@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { usePageMeta } from "@/lib/seo";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -60,6 +61,7 @@ function SectorPicker({
   label: string;
   otherValue: number | null;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const selected = sectors.find((s) => s.id === value) ?? null;
@@ -86,7 +88,7 @@ function SectorPicker({
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-foreground truncate">{selected.name}</p>
-              <p className="text-xs text-muted-foreground">Clicca per cambiare</p>
+              <p className="text-xs text-muted-foreground">{t("confronta.pickerChangeHint")}</p>
             </div>
             <button
               onClick={(e) => { e.stopPropagation(); onChange(null); }}
@@ -102,7 +104,7 @@ function SectorPicker({
             </div>
             <div className="flex-1">
               <p className="font-medium text-muted-foreground">{label}</p>
-              <p className="text-xs text-muted-foreground/60">Scegli un settore da confrontare</p>
+              <p className="text-xs text-muted-foreground/60">{t("confronta.pickerChoose")}</p>
             </div>
             <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", open && "rotate-180")} />
           </>
@@ -114,7 +116,7 @@ function SectorPicker({
           <div className="p-3 border-b">
             <input
               autoFocus
-              placeholder="Cerca settore…"
+              placeholder={t("confronta.pickerSearch")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full text-sm px-3 py-2 rounded-xl border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -134,7 +136,7 @@ function SectorPicker({
               </button>
             ))}
             {filtered.length === 0 && (
-              <p className="text-center text-sm text-muted-foreground py-6">Nessun risultato</p>
+              <p className="text-center text-sm text-muted-foreground py-6">{t("confronta.noResults")}</p>
             )}
           </div>
         </div>
@@ -144,13 +146,14 @@ function SectorPicker({
 }
 
 function WinnerBadge({ side }: { side: "left" | "right" | "tie" }) {
-  if (side === "tie") return <span className="text-xs text-muted-foreground font-medium px-2 py-0.5 rounded-full bg-muted">Pari</span>;
+  const { t } = useTranslation();
+  if (side === "tie") return <span className="text-xs text-muted-foreground font-medium px-2 py-0.5 rounded-full bg-muted">{t("confronta.tie")}</span>;
   return (
     <span className={cn(
       "text-xs font-bold px-2 py-0.5 rounded-full",
       side === "left" ? "bg-primary/15 text-primary" : "bg-violet-100 text-violet-700"
     )}>
-      Migliore
+      {t("confronta.best")}
     </span>
   );
 }
@@ -165,9 +168,10 @@ function SalaryBar({ value, max, color }: { value: number; max: number; color: s
 }
 
 export default function Confronta() {
+  const { t } = useTranslation();
   usePageMeta({
-    title: "Confronta i settori professionali",
-    description: "Metti a confronto due settori fianco a fianco: stipendi, crescita annua, rischio AI, competenze e opportunità. Link condivisibile per confronti salvati.",
+    title: t("confronta.title"),
+    description: t("confronta.subtitle"),
     path: "/confronta",
   });
 
@@ -247,13 +251,13 @@ export default function Confronta() {
         <div className="container mx-auto px-4 max-w-4xl text-center">
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium mb-5">
             <GitCompare className="w-4 h-4" />
-            Confronto settori
+            {t("confronta.badgeLabel")}
           </div>
           <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground mb-4">
-            Metti a confronto
+            {t("confronta.headline")}
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">
-            Scegli due settori e vedi le differenze chiave affiancate: stipendi, crescita, rischio e molto altro.
+            {t("confronta.desc")}
           </p>
         </div>
       </section>
@@ -268,8 +272,8 @@ export default function Confronta() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
-            <SectorPicker sectors={sectors} value={leftId} onChange={setLeftId} label="Primo settore" otherValue={rightId} />
-            <SectorPicker sectors={sectors} value={rightId} onChange={setRightId} label="Secondo settore" otherValue={leftId} />
+            <SectorPicker sectors={sectors} value={leftId} onChange={setLeftId} label={t("confronta.firstSector")} otherValue={rightId} />
+            <SectorPicker sectors={sectors} value={rightId} onChange={setRightId} label={t("confronta.secondSector")} otherValue={leftId} />
           </div>
         )}
 
@@ -279,11 +283,11 @@ export default function Confronta() {
             <GitCompare className="w-12 h-12 mx-auto text-muted-foreground/30 mb-4" />
             <p className="font-serif text-xl font-medium text-foreground mb-2">
               {!leftId && !rightId
-                ? "Scegli due settori per iniziare"
-                : "Scegli anche il secondo settore"}
+                ? t("confronta.chooseBoth")
+                : t("confronta.chooseSecond")}
             </p>
             <p className="text-muted-foreground text-sm max-w-sm mx-auto">
-              Seleziona i settori dai menu qui sopra e vedrai subito le differenze chiave affiancate.
+              {t("confronta.placeholderDesc")}
             </p>
           </div>
         )}
@@ -304,8 +308,8 @@ export default function Confronta() {
                 )}
               >
                 {copied
-                  ? <><CheckCheck className="w-4 h-4" /> Link copiato!</>
-                  : <><Link2 className="w-4 h-4" /> Copia link confronto</>
+                  ? <><CheckCheck className="w-4 h-4" /> {t("confronta.linkCopied")}</>
+                  : <><Link2 className="w-4 h-4" /> {t("confronta.copyLink")}</>
                 }
               </button>
             </div>
@@ -335,7 +339,7 @@ export default function Confronta() {
             <div className="rounded-2xl border bg-card p-6">
               <div className="flex items-center gap-2 mb-5">
                 <DollarSign className="w-4 h-4 text-muted-foreground" />
-                <h3 className="font-semibold text-foreground">Stipendio medio annuo lordo</h3>
+                <h3 className="font-semibold text-foreground">{t("confronta.annualSalary")}</h3>
                 <WinnerBadge side={salaryWinner()} />
               </div>
               <div className="grid grid-cols-2 gap-8">
@@ -348,10 +352,10 @@ export default function Confronta() {
                       <span className="text-2xl font-bold font-serif text-foreground">
                         €{s.avgSalaryMin / 1000}k
                       </span>
-                      <span className="text-sm text-muted-foreground">fino a €{s.avgSalaryMax / 1000}k</span>
+                      <span className="text-sm text-muted-foreground">{t("confronta.upTo", { amount: s.avgSalaryMax / 1000 })}</span>
                     </div>
                     <SalaryBar value={s.avgSalaryMax} max={maxSalary} color={color} />
-                    <p className="text-xs text-muted-foreground mt-1">Massimo: €{s.avgSalaryMax / 1000}k/anno</p>
+                    <p className="text-xs text-muted-foreground mt-1">{t("confronta.maximum", { amount: s.avgSalaryMax / 1000 })}</p>
                   </div>
                 ))}
               </div>
@@ -364,7 +368,7 @@ export default function Confronta() {
               <div className="rounded-2xl border bg-card p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <TrendingUp className="w-4 h-4 text-muted-foreground" />
-                  <h3 className="font-semibold text-foreground text-sm">Crescita annua</h3>
+                  <h3 className="font-semibold text-foreground text-sm">{t("confronta.annualGrowth")}</h3>
                   <WinnerBadge side={growthWinner()} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -384,7 +388,7 @@ export default function Confronta() {
               <div className="rounded-2xl border bg-card p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <Bot className="w-4 h-4 text-muted-foreground" />
-                  <h3 className="font-semibold text-foreground text-sm">Rischio automazione</h3>
+                  <h3 className="font-semibold text-foreground text-sm">{t("confronta.automationRisk")}</h3>
                   <WinnerBadge side={riskWinner()} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -393,7 +397,7 @@ export default function Confronta() {
                     return (
                       <div key={i} className="text-center p-3 rounded-xl bg-muted/40">
                         <span className={cn("text-sm font-bold px-2 py-1 rounded-lg border", meta.color)}>
-                          {meta.label}
+                          {t(`confronta.risk.${s.automationRisk}`, { defaultValue: meta.label })}
                         </span>
                         <p className="text-xs text-muted-foreground truncate mt-2">{s.name.split(" ")[0]}</p>
                       </div>
@@ -406,7 +410,7 @@ export default function Confronta() {
               <div className="rounded-2xl border bg-card p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <BarChart2 className="w-4 h-4 text-muted-foreground" />
-                  <h3 className="font-semibold text-foreground text-sm">Trend di mercato</h3>
+                  <h3 className="font-semibold text-foreground text-sm">{t("confronta.marketTrend")}</h3>
                   <WinnerBadge side={trendWinner()} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -415,7 +419,7 @@ export default function Confronta() {
                     return (
                       <div key={i} className="text-center p-3 rounded-xl bg-muted/40">
                         <span className={cn("text-xs font-semibold px-2 py-1 rounded-lg border", meta.color)}>
-                          {meta.label}
+                          {t(`confronta.trend.${s.trend}`, { defaultValue: meta.label })}
                         </span>
                         <p className="text-xs text-muted-foreground truncate mt-2">{s.name.split(" ")[0]}</p>
                       </div>
@@ -432,7 +436,7 @@ export default function Confronta() {
               <div className="rounded-2xl border bg-card p-5 col-span-2 md:col-span-1">
                 <div className="flex items-center gap-2 mb-3">
                   <Clock className="w-4 h-4 text-muted-foreground" />
-                  <h3 className="font-semibold text-foreground text-sm">Tempo per lavorare autonomamente</h3>
+                  <h3 className="font-semibold text-foreground text-sm">{t("confronta.timeToAutonomy")}</h3>
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="p-3 rounded-xl bg-primary/5 border border-primary/10">
@@ -450,7 +454,7 @@ export default function Confronta() {
               <div className="rounded-2xl border bg-card p-5 col-span-2 md:col-span-1">
                 <div className="flex items-center gap-2 mb-3">
                   <Sparkles className="w-4 h-4 text-muted-foreground" />
-                  <h3 className="font-semibold text-foreground text-sm">Tipo di personalità adatto (RIASEC)</h3>
+                  <h3 className="font-semibold text-foreground text-sm">{t("confronta.riasecType")}</h3>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   {[left, right].map((s, i) => (
@@ -477,10 +481,10 @@ export default function Confronta() {
 
             {/* ── Competenze ── */}
             <div className="rounded-2xl border bg-card p-6">
-              <h3 className="font-semibold text-foreground mb-1">Competenze richieste</h3>
+              <h3 className="font-semibold text-foreground mb-1">{t("confronta.requiredSkills")}</h3>
               {commonSkills.size > 0 && (
                 <p className="text-xs text-muted-foreground mb-4">
-                  <span className="font-medium text-primary">{commonSkills.size} competenze in comune</span> — evidenziate in verde
+                  <span className="font-medium text-primary">{t("confronta.commonSkillsCount", { count: commonSkills.size })}</span>
                 </p>
               )}
               <div className="grid grid-cols-2 gap-6">
@@ -530,7 +534,7 @@ export default function Confronta() {
                     <h3 className="font-semibold text-foreground text-sm">{s.name}</h3>
                   </div>
                   <div className="space-y-2 mb-4">
-                    <p className="text-xs font-medium text-emerald-600 uppercase tracking-wider">Vantaggi</p>
+                    <p className="text-xs font-medium text-emerald-600 uppercase tracking-wider">{t("confronta.advantages")}</p>
                     {s.advantages.slice(0, 3).map((adv, j) => (
                       <div key={j} className="flex items-start gap-2 text-sm text-muted-foreground">
                         <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
@@ -539,7 +543,7 @@ export default function Confronta() {
                     ))}
                   </div>
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-amber-600 uppercase tracking-wider">Da considerare</p>
+                    <p className="text-xs font-medium text-amber-600 uppercase tracking-wider">{t("confronta.considerations")}</p>
                     {s.disadvantages.slice(0, 2).map((dis, j) => (
                       <div key={j} className="flex items-start gap-2 text-sm text-muted-foreground">
                         <Minus className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
@@ -553,7 +557,7 @@ export default function Confronta() {
 
             {/* ── Opportunità future ── */}
             <div className="rounded-2xl border bg-card p-6">
-              <h3 className="font-semibold text-foreground mb-4">Ruoli e opportunità future</h3>
+              <h3 className="font-semibold text-foreground mb-4">{t("confronta.futureOpportunities")}</h3>
               <div className="grid grid-cols-2 gap-6">
                 {[
                   { s: left,  chipCls: "bg-primary/8 text-primary border-primary/15" },
@@ -592,7 +596,7 @@ export default function Confronta() {
                       "inline-flex items-center gap-1 text-xs font-medium",
                       i === 0 ? "text-primary" : "text-violet-600"
                     )}>
-                      Approfondisci <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                      {t("confronta.deepen")} <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                     </span>
                   </div>
                 </Link>
@@ -602,9 +606,9 @@ export default function Confronta() {
                   <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center mx-auto mb-3">
                     <Sparkles className="w-5 h-5 text-primary-foreground" />
                   </div>
-                  <p className="font-semibold text-foreground text-sm mb-1">Non sei sicuro?</p>
+                  <p className="font-semibold text-foreground text-sm mb-1">{t("confronta.notSure")}</p>
                   <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
-                    Fai il test gratuito <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                    {t("confronta.takeFreeTest")} <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                   </span>
                 </div>
               </Link>

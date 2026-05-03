@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { usePageMeta } from "@/lib/seo";
 import { useQuery } from "@tanstack/react-query";
 import { Newspaper, ExternalLink, Clock, Tag, Sparkles, RefreshCw, Bookmark, BookmarkCheck, Star } from "lucide-react";
@@ -8,22 +8,15 @@ import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
 interface NewsItem {
-  id: string;
-  title: string;
-  description: string;
-  source: string;
-  url: string;
-  publishedAt: string;
-  image: string | null;
-  category: string;
-  sector: string | null;
-  tags: string[];
-  relevance: number;
-  plan: "free" | "premium";
+  id: string; title: string; description: string;
+  source: string; url: string; publishedAt: string;
+  image: string | null; category: string; sector: string | null;
+  tags: string[]; relevance: number; plan: "free" | "premium";
 }
 
 interface ProfileData {
@@ -31,31 +24,27 @@ interface ProfileData {
 }
 
 const FREE_CATEGORIES = [
-  { id: "general",    label: "Panoramica",  emoji: "🌍" },
-  { id: "technology", label: "Tecnologia",  emoji: "💻" },
-  { id: "business",   label: "Business",    emoji: "📈" },
-  { id: "science",    label: "Scienza",     emoji: "🔬" },
-  { id: "health",     label: "Salute",      emoji: "❤️" },
-  { id: "finance",    label: "Finanza",     emoji: "💰" },
-  { id: "education",  label: "Formazione",  emoji: "🎓" },
+  { id: "general",    emoji: "🌍" },
+  { id: "technology", emoji: "💻" },
+  { id: "business",   emoji: "📈" },
+  { id: "science",    emoji: "🔬" },
+  { id: "health",     emoji: "❤️" },
+  { id: "finance",    emoji: "💰" },
+  { id: "education",  emoji: "🎓" },
 ] as const;
 
-const CATEGORY_LABELS: Record<string, string> = {
-  general: "Panoramica", technology: "Tecnologia", business: "Business",
-  science: "Scienza", health: "Salute", finance: "Finanza", education: "Formazione",
-};
-
-function timeAgo(dateStr: string): string {
+function timeAgoLabel(dateStr: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const h = Math.floor(diff / 3600000);
-  if (h < 1) return "meno di 1 ora fa";
-  if (h === 1) return "1 ora fa";
-  if (h < 24) return `${h} ore fa`;
+  if (h < 1) return t("news.timeAgo.lessThan1h");
+  if (h === 1) return t("news.timeAgo.1h");
+  if (h < 24) return t("news.timeAgo.hours", { h });
   const d = Math.floor(h / 24);
-  return d === 1 ? "ieri" : `${d} giorni fa`;
+  return d === 1 ? t("news.timeAgo.yesterday") : t("news.timeAgo.days", { d });
 }
 
 function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boolean }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { isNewsFavorite, getNewsFavoriteId, addFavorite, removeFavorite, isLoading } = useFavorites();
   const saved = isNewsFavorite(item.url);
@@ -79,6 +68,8 @@ function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boole
     }
   }
 
+  const catLabel = t(`news.categories.${item.category}`, { defaultValue: item.category });
+
   return (
     <article className="bg-white border border-slate-100 rounded-2xl overflow-hidden hover:shadow-md transition-shadow group flex flex-col">
       {item.image && (
@@ -94,24 +85,20 @@ function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boole
       <div className="p-5 flex flex-col flex-1">
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="secondary" className="text-xs font-medium">
-              {CATEGORY_LABELS[item.category] ?? item.category}
-            </Badge>
+            <Badge variant="secondary" className="text-xs font-medium">{catLabel}</Badge>
             <span className="text-xs text-slate-400 flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              {timeAgo(item.publishedAt)}
+              {timeAgoLabel(item.publishedAt, t)}
             </span>
           </div>
           {showSave && user && (
             <button
               onClick={toggleSave}
               disabled={isLoading}
-              title={saved ? "Rimuovi dai salvati" : "Salva articolo"}
+              title={saved ? t("news.removeFromSaved") : t("news.saveArticle")}
               className={cn(
                 "shrink-0 p-1.5 rounded-lg transition-colors",
-                saved
-                  ? "text-primary bg-primary/10"
-                  : "text-slate-400 hover:text-primary hover:bg-primary/5"
+                saved ? "text-primary bg-primary/10" : "text-slate-400 hover:text-primary hover:bg-primary/5"
               )}
             >
               {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
@@ -132,7 +119,7 @@ function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boole
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
           >
-            Leggi <ExternalLink className="h-3 w-3" />
+            {t("common.readMore")} <ExternalLink className="h-3 w-3" />
           </a>
         </div>
       </div>
@@ -158,21 +145,22 @@ function NewsCardSkeleton() {
 }
 
 function UpgradeCTA() {
+  const { t } = useTranslation();
   return (
     <div className="bg-gradient-to-r from-primary/5 via-background to-primary/5 border border-primary/15 rounded-2xl p-8 text-center">
       <div className="inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-2xl mb-4">
         <Sparkles className="h-5 w-5 text-primary" />
       </div>
-      <h3 className="font-serif font-bold text-xl text-foreground mb-2">Sblocca le News del tuo Settore</h3>
+      <h3 className="font-serif font-bold text-xl text-foreground mb-2">{t("news.upgrade.title")}</h3>
       <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto leading-relaxed">
-        Completa il test e conferma il tuo settore per ricevere notizie mirate: trend, opportunità di lavoro, aziende e certificazioni.
+        {t("news.upgrade.desc")}
       </p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <Button asChild className="rounded-full font-medium">
-          <Link href="/premium"><Sparkles className="h-4 w-4 mr-1.5" />Scopri Premium</Link>
+          <Link href="/premium"><Sparkles className="h-4 w-4 mr-1.5" />{t("news.upgrade.discoverPremium")}</Link>
         </Button>
         <Button asChild variant="outline" className="rounded-full font-medium">
-          <Link href="/test">Fai il test</Link>
+          <Link href="/test">{t("news.upgrade.takeTest")}</Link>
         </Button>
       </div>
     </div>
@@ -180,12 +168,15 @@ function UpgradeCTA() {
 }
 
 export default function News() {
+  const { t } = useTranslation();
+
   usePageMeta({
-    title: "News & Tendenze del mercato del lavoro",
-    description: "Aggiornamenti su tecnologia, business, finanza, salute e formazione per il mercato del lavoro italiano. Articoli selezionati per settore professionale.",
+    title: t("seo.news.title"),
+    description: t("seo.news.description"),
     path: "/news",
     type: "article",
   });
+
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<string>("general");
 
@@ -205,7 +196,7 @@ export default function News() {
     queryKey: ["news", activeTab],
     queryFn: async () => {
       const res = await fetch(`${BASE}api/news?category=${activeTab}&limit=6`);
-      if (!res.ok) throw new Error("Errore nel caricamento");
+      if (!res.ok) throw new Error("error");
       return res.json() as Promise<{ news: NewsItem[]; source: "live" | "static" }>;
     },
     enabled: activeTab !== "__sector__",
@@ -234,12 +225,10 @@ export default function News() {
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium mb-4">
               <Newspaper className="h-4 w-4" />
-              Aggiornamenti dal mondo del lavoro
+              {t("news.badge")}
             </div>
-            <h1 className="font-serif font-bold text-4xl text-slate-900 mb-3">News & Tendenze</h1>
-            <p className="text-lg text-slate-500 leading-relaxed">
-              Resta aggiornato sul mercato del lavoro, i settori emergenti e le opportunità di crescita professionale.
-            </p>
+            <h1 className="font-serif font-bold text-4xl text-slate-900 mb-3">{t("news.title")}</h1>
+            <p className="text-lg text-slate-500 leading-relaxed">{t("news.subtitle")}</p>
           </div>
         </div>
       </div>
@@ -273,37 +262,35 @@ export default function News() {
               }`}
             >
               <span>{cat.emoji}</span>
-              {cat.label}
+              {t(`news.categories.${cat.id}`)}
             </button>
           ))}
         </div>
 
-        {/* Sector tab context banner */}
         {activeTab === "__sector__" && confirmedSector && (
           <div className="flex items-center gap-3 mb-6 bg-primary/5 border border-primary/15 rounded-xl px-5 py-3">
             <span className="text-2xl">{confirmedSector.icon}</span>
             <div>
-              <p className="font-semibold text-foreground text-sm">News per il tuo settore</p>
+              <p className="font-semibold text-foreground text-sm">{t("news.sectorNewsTitle")}</p>
               <p className="text-xs text-muted-foreground">
-                Aggiornamenti su {confirmedSector.name} — trend, opportunità e innovazioni
+                {t("news.sectorNewsDesc", { name: confirmedSector.name })}
               </p>
             </div>
             <Badge className="ml-auto bg-primary/10 text-primary border-0 text-xs font-medium">
-              Il tuo settore
+              {t("news.yourSector")}
             </Badge>
           </div>
         )}
 
         {isError && activeTab !== "__sector__" && (
           <div className="text-center py-12">
-            <p className="text-slate-500 mb-4">Impossibile caricare le news al momento.</p>
+            <p className="text-slate-500 mb-4">{t("news.loadError")}</p>
             <Button variant="outline" onClick={() => refetch()} className="gap-2 rounded-full">
-              <RefreshCw className="h-4 w-4" /> Riprova
+              <RefreshCw className="h-4 w-4" /> {t("news.retry")}
             </Button>
           </div>
         )}
 
-        {/* News grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {displayLoading
             ? Array.from({ length: 6 }).map((_, i) => <NewsCardSkeleton key={i} />)
@@ -315,17 +302,16 @@ export default function News() {
         {!displayLoading && displayNews.length > 0 && (
           <p className="text-xs text-slate-400 flex items-center gap-1.5 mb-10">
             <Tag className="h-3 w-3" />
-            {displaySource === "live" ? "Notizie aggiornate in tempo reale" : "Contenuto editoriale selezionato"}
-            {user && <span className="ml-2">· Usa il segnalibro 🔖 per salvare gli articoli nel profilo</span>}
+            {displaySource === "live" ? t("news.sourceLabel.live") : t("news.sourceLabel.static")}
+            {user && <span className="ml-2">· {t("news.bookmarkHint")}</span>}
           </p>
         )}
 
-        {/* Upgrade CTA — only if no confirmed sector */}
         {!confirmedSector && (
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-6">
               <Sparkles className="h-5 w-5 text-primary" />
-              <h2 className="font-serif font-bold text-xl text-slate-800">News per il tuo settore</h2>
+              <h2 className="font-serif font-bold text-xl text-slate-800">{t("news.upgrade.sectionTitle")}</h2>
               <Badge className="bg-primary/10 text-primary border-0 text-xs">Premium</Badge>
             </div>
             <UpgradeCTA />

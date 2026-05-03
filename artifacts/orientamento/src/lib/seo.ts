@@ -1,4 +1,13 @@
 import { useEffect } from "react";
+import i18n from "i18next";
+
+const LANG_TO_OG_LOCALE: Record<string, string> = {
+  it: "it_IT",
+  en: "en_US",
+  es: "es_ES",
+  fr: "fr_FR",
+  de: "de_DE",
+};
 
 const SITE_URL = "https://northstar.app";
 const DEFAULT_IMAGE = `${SITE_URL}/opengraph.jpg`;
@@ -7,6 +16,7 @@ export interface PageMetaOptions {
   title: string;
   description: string;
   path?: string;
+  canonicalPath?: string;
   type?: "website" | "article";
   image?: string;
   imageAlt?: string;
@@ -49,6 +59,7 @@ export function usePageMeta({
   title,
   description,
   path,
+  canonicalPath,
   type = "website",
   image,
   imageAlt,
@@ -57,7 +68,8 @@ export function usePageMeta({
 }: PageMetaOptions) {
   useEffect(() => {
     const fullTitle = `${title} | NorthStar`;
-    const fullUrl = path ? `${SITE_URL}${path}` : SITE_URL;
+    const resolvedPath = canonicalPath ?? path;
+    const fullUrl = resolvedPath ? `${SITE_URL}${resolvedPath}` : SITE_URL;
     const imgUrl = image ?? DEFAULT_IMAGE;
     const imgAlt = imageAlt ?? title;
 
@@ -75,7 +87,7 @@ export function usePageMeta({
     setMeta("property", "og:image:alt", imgAlt);
     setMeta("property", "og:image:width", "1200");
     setMeta("property", "og:image:height", "630");
-    setMeta("property", "og:locale", "it_IT");
+    setMeta("property", "og:locale", LANG_TO_OG_LOCALE[i18n.language] ?? "it_IT");
     setMeta("property", "og:site_name", "NorthStar");
 
     setMeta("name", "twitter:card", "summary_large_image");
@@ -90,7 +102,7 @@ export function usePageMeta({
     }
 
     return () => { cleanup?.(); };
-  }, [title, description, path, type, image, imageAlt, noIndex]);
+  }, [title, description, path, canonicalPath, type, image, imageAlt, noIndex]);
 }
 
 export function buildSectorMeta(sector: {
@@ -104,26 +116,18 @@ export function buildSectorMeta(sector: {
   avgSalaryMax: number;
   riasecTypes: string[];
 }): PageMetaOptions {
-  const trendLabel: Record<string, string> = {
-    booming: "in forte crescita",
-    growing: "in crescita",
-    stable: "stabile",
-    declining: "in calo",
-  };
-
-  const riskLabel: Record<string, string> = {
-    low: "basso rischio automazione",
-    medium: "rischio automazione medio",
-    high: "alto rischio automazione",
-  };
-
   const salaryMin = Math.round(sector.avgSalaryMin / 1000);
   const salaryMax = Math.round(sector.avgSalaryMax / 1000);
 
+  const trendLabel = i18n.t(`confronta.trend.${sector.trend}`, { defaultValue: sector.trend });
+  const riskLabel = i18n.t(`confronta.risk.${sector.automationRisk}`, { defaultValue: "" });
+
   const description =
     `${sector.description.slice(0, 120).replace(/\.$/, "")}. ` +
-    `Stipendio medio €${salaryMin}k–${salaryMax}k, crescita annua +${sector.growthRate}%, ` +
-    `${trendLabel[sector.trend] ?? sector.trend}, ${riskLabel[sector.automationRisk] ?? ""}.`;
+    i18n.t("seo.sectorDescSuffix", {
+      min: salaryMin, max: salaryMax, rate: sector.growthRate,
+      trend: trendLabel, risk: riskLabel,
+    });
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -137,7 +141,7 @@ export function buildSectorMeta(sector: {
     },
     estimatedSalary: {
       "@type": "MonetaryAmountDistribution",
-      name: "Stipendio annuale (Italia)",
+      name: i18n.t("seo.sectorJsonLdSalary"),
       currency: "EUR",
       duration: "P1Y",
       minValue: sector.avgSalaryMin,
@@ -147,12 +151,12 @@ export function buildSectorMeta(sector: {
   };
 
   return {
-    title: `${sector.name} — Settore professionale`,
+    title: i18n.t("seo.sectorTitle", { name: sector.name }),
     description,
     path: `/settore/${sector.id}`,
     type: "article",
     image: `${SITE_URL}/api/og-image/settore/${sector.id}`,
-    imageAlt: `${sector.name} — dati e opportunità del settore su NorthStar`,
+    imageAlt: i18n.t("seo.sectorImageAlt", { name: sector.name }),
     jsonLd,
   };
 }

@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import "./i18n";
 
 if ("serviceWorker" in navigator) {
   const swPath = `${import.meta.env.BASE_URL}sw.js`.replace(/\/+/g, "/").replace(/^([^/])/, "/$1");

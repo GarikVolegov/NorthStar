@@ -1,0 +1,1981 @@
+{
+  "nav": {
+    "test": "The Test",
+    "sectors": "Sectors",
+    "growth": "Growth",
+    "news": "News",
+    "premium": "Premium",
+    "login": "Sign in",
+    "startJourney": "Start your journey",
+    "back": "Back",
+    "startFreeTest": "Start the Free Test",
+    "myProfile": "My profile",
+    "applications": "Applications",
+    "calendar": "Calendar",
+    "friends": "Friends",
+    "logout": "Sign out",
+    "language": "Language"
+  },
+  "footer": {
+    "tagline": "A compass for your future. We don't tell you where to go — we show you the possibilities so you can choose your path with awareness.",
+    "resources": "Resources",
+    "product": "Product",
+    "links": {
+      "test": "The RIASEC Test",
+      "sectors": "Explore sectors",
+      "growth": "Personal Growth",
+      "news": "Sector News",
+      "premium": "Premium Plan",
+      "contact": "Contact",
+      "about": "About us",
+      "howItWorks": "How it works",
+      "affiliation": "Affiliation",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Service",
+      "sitemap": "Sitemap"
+    },
+    "rights": "All rights reserved.",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "about": "About"
+  },
+  "common": {
+    "back": "Back",
+    "loading": "Loading…",
+    "error": "Error",
+    "retry": "Retry",
+    "save": "Save",
+    "saved": "Saved",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "explore": "Explore",
+    "readMore": "Read",
+    "learnMore": "Learn more",
+    "seeAll": "See all",
+    "goBack": "Go back",
+    "search": "Search",
+    "filter": "Filter",
+    "clearFilters": "Clear all filters",
+    "results": "results",
+    "notFound": "Not found",
+    "networkError": "Network error. Please try again.",
+    "compare": "Compare",
+    "salary": "Salary",
+    "growth": "Growth",
+    "aiRisk": "AI Risk",
+    "trend": "Market trend",
+    "min": "min"
+  },
+  "home": {
+    "badge": "Discover your potential",
+    "title": "Find your path,",
+    "titleHighlight": "with awareness.",
+    "subtitle": "NorthStar doesn't tell you what to do. It offers you a compass to explore sectors that resonate with your nature, guiding you toward an authentic choice.",
+    "startTest": "Start the Free Test",
+    "reviewResults": "Review your results",
+    "alreadyAccount": "Already have an account? Sign in",
+    "welcomeBack": "Welcome back, {{name}} ✦",
+    "stats": {
+      "guided": "People guided",
+      "sectors": "Sectors analyzed",
+      "avgGrowth": "Average growth"
+    },
+    "trending": {
+      "badge": "Featured sectors this week",
+      "title": "Most in demand right now",
+      "subtitle": "The sectors with the most interest among users, based on real choices and market data.",
+      "exploreAll": "Explore all 21 sectors",
+      "topThisWeek": "Most requested this week",
+      "deepen": "Learn more",
+      "compareWith": "Compare with another sector"
+    },
+    "personalized": {
+      "badge": "Personalized recommendations",
+      "title": "The sectors best suited to your profile",
+      "sortedBy": "Sorted by your preference:",
+      "fullDetail": "Full detail",
+      "chosen": "✓ Chosen"
+    },
+    "news": {
+      "title": "Latest from the world of work",
+      "subtitle": "Fresh news from the sectors that matter."
+    },
+    "howItWorks": {
+      "badge": "How it works",
+      "title": "Three steps toward your direction",
+      "step1Title": "Take the test",
+      "step1Desc": "17 quick questions to map your RIASEC inclinations and your Inner Compass.",
+      "step2Title": "Discover your profile",
+      "step2Desc": "The system processes your answers and shows you the sectors most compatible with your personality.",
+      "step3Title": "Build your path",
+      "step3Desc": "Explore recommended sectors, compare them, and choose the one that truly resonates with you.",
+      "startNow": "Start now"
+    }
+  },
+  "test": {
+    "back": "Back",
+    "questionOf": "Question {{current}} of {{total}}",
+    "innerCompass": "Inner Compass",
+    "innerCompassCount": "Inner Compass · {{current}} of {{total}}",
+    "options": {
+      "1": "Not at all",
+      "2": "A little",
+      "3": "Neutral",
+      "4": "Quite a bit",
+      "5": "Very much"
+    },
+    "transition": {
+      "badge": "Inner Compass",
+      "title": "Part two: the Five Spirits",
+      "intro": "Great analysis of your external inclinations. Now let's explore your inner energy through the",
+      "fiveSpirits": "Five Spirits",
+      "tradition": "of Chinese tradition.",
+      "details": "You will answer <strong>15 questions</strong> — 3 per spirit — to precisely map your balance between presence, vision, instinct, analysis, and will. There are no right or wrong answers: always follow your first instinct.",
+      "startCompass": "Start the Inner Compass",
+      "spirits": {
+        "presence": {
+          "name": "Presence",
+          "desc": "Awareness"
+        },
+        "vision": {
+          "name": "Vision",
+          "desc": "Direction"
+        },
+        "instinct": {
+          "name": "Instinct",
+          "desc": "Energy"
+        },
+        "focus": {
+          "name": "Focus",
+          "desc": "Analysis"
+        },
+        "tenacity": {
+          "name": "Tenacity",
+          "desc": "Will"
+        }
+      }
+    },
+    "complete": {
+      "title": "Analysis complete!",
+      "subtitle": "We have analyzed your RIASEC profile and your Inner Compass. We are ready to reveal the sectors best suited to you.",
+      "savedAccount": "Results will be automatically saved to your account.",
+      "discoverResults": "Discover your results",
+      "processing": "Processing…",
+      "submitError": "Submission error. Please retry."
+    },
+    "questions": {
+      "riasec": {
+        "q1": "I enjoy building, repairing, or working with my hands.",
+        "q2": "I enjoy analyzing data, solving logical problems, or doing research.",
+        "q3": "I enjoy expressing myself through art, music, writing, or design.",
+        "q4": "I enjoy helping, teaching, or caring for others.",
+        "q5": "I enjoy leading projects, making decisions, or starting new initiatives.",
+        "q6": "I enjoy organizing, planning, and working with clear procedures.",
+        "q7": "I prefer working outdoors or with concrete tools rather than in an office.",
+        "q8": "I am curious about understanding how things work at a deep level.",
+        "q9": "I prefer a flexible and unstructured work environment.",
+        "q10": "It is important to me that my work has a positive social impact.",
+        "q11": "I feel comfortable persuading others or negotiating agreements.",
+        "q12": "I am a very detail-oriented and precise person."
+      },
+      "spirits": {
+        "shen_1": "I often feel clear and centered in my emotions, even in difficult moments.",
+        "shen_2": "I easily recognize when my mood changes and know how to regain balance.",
+        "shen_3": "People perceive me as someone present, attentive, and capable of understanding others' emotions.",
+        "hun_1": "I can easily imagine my ideal future and feel it is truly possible.",
+        "hun_2": "I often have original ideas that excite me and push me to explore new paths.",
+        "hun_3": "I have a clear sense of direction in my life: I know where I want to go, even without knowing the entire journey yet.",
+        "po_1": "I strongly feel energy in my body when I do something I am truly passionate about.",
+        "po_2": "I often trust my physical and instinctive sensations to understand whether a situation is right for me.",
+        "po_3": "When I am in an environment I like, I feel it immediately in my body — even before my mind processes it.",
+        "yi_1": "I find it easy to focus for a long time on study, analysis, or problem solving.",
+        "yi_2": "I find satisfaction in breaking down a complex problem into simpler parts and solving it step by step.",
+        "yi_3": "I easily remember important details and can keep many pieces of information in mind at once.",
+        "zhi_1": "I carry my decisions forward even when they become difficult or require sacrifices.",
+        "zhi_2": "When facing obstacles, I always look for a way to continue rather than stop.",
+        "zhi_3": "Once I commit to a goal, I work on it steadily even in moments of fatigue."
+      }
+    }
+  },
+  "results": {
+    "savedBanner": "Results saved to your account — you can always find them in your profile, {{name}}.",
+    "riasecProfile": "Your RIASEC profile",
+    "innerCompass": "Inner Compass",
+    "fiveSpirits": "Your Five Spirits · 15 questions, 3 per spirit",
+    "dominantSpirit": "Dominant spirit",
+    "yourSectors": "Your recommended sectors",
+    "sectorCount": "{{count}} sectors compatible with your profile",
+    "workModeTitle": "Preferred work mode",
+    "workModeSuggested": "Based on your RIASEC profile, we suggest:",
+    "workModeQuestion": "How do you prefer to work?",
+    "workModeConfirmed": "Preference saved",
+    "confirmSector": "I choose this sector",
+    "confirmSectorDesc": "Confirm your choice to unlock roadmaps and advanced tools.",
+    "confirmedBadge": "✓ Your sector",
+    "sessionNotFound": "Session not found",
+    "sessionNotFoundDesc": "We could not load the results of this test.",
+    "retakeTest": "Retake the Test",
+    "matchScore": "{{score}}% match",
+    "quickCompare": "Quick comparison of your paths",
+    "quickCompareBest": "The green dot indicates the best value",
+    "deepCompare": "In-depth comparison:",
+    "vs": "vs",
+    "maxSalary": "Max salary",
+    "annualGrowth": "Annual growth",
+    "marketTrend": "Market trend",
+    "spirits": {
+      "shen": "Presence",
+      "hun": "Vision",
+      "po": "Instinct",
+      "yi": "Focus",
+      "zhi": "Tenacity",
+      "shen_desc": "Awareness & Presence",
+      "hun_desc": "Vision & Direction",
+      "po_desc": "Instinct & Energy",
+      "yi_desc": "Concentration & Analysis",
+      "zhi_desc": "Will & Resilience"
+    },
+    "workModes": {
+      "dipendente": "Employed",
+      "autonomo": "Self-employed / Freelance",
+      "ibrido": "Hybrid",
+      "unknown": "Not defined"
+    },
+    "trend": {
+      "booming": "Booming",
+      "growing": "Growing",
+      "stable": "Stable",
+      "declining": "Declining"
+    },
+    "risk": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    }
+  },
+  "sectors": {
+    "title": "Explore sectors",
+    "badge": "{{count}} professional sectors",
+    "subtitle": "Don't know what to do yet? Browse all sectors, filter by your style, and discover where you might thrive.",
+    "filterTitle": "Filter sectors",
+    "searchPlaceholder": "Search by name or description…",
+    "personalityType": "Personality type",
+    "automationRisk": "Automation risk (AI replacement)",
+    "removeFilters": "Clear all filters",
+    "removeFiltersBtn": "Clear filters",
+    "allSectors": "{{count}} sectors",
+    "filteredSectors": "{{filtered}} of {{total}} sectors",
+    "noResults": "No sectors found",
+    "noResultsHint": "Try changing the filters or your search",
+    "discover": "Explore",
+    "compareSide": "Compare two sectors side by side",
+    "ctaTitle": "Don't know where to start?",
+    "ctaDesc": "Take the free test: 17 questions to discover which sectors best fit your personality and values.",
+    "startFreeTest": "Start the free test",
+    "trend": {
+      "booming": "Booming",
+      "growing": "Growing",
+      "stable": "Stable",
+      "declining": "Declining"
+    },
+    "risk": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    }
+  },
+  "sector": {
+    "backToResults": "Back to results",
+    "annualSalary": "Average annual salary",
+    "growth": "Growth",
+    "annualGrowth": "+{{rate}}% annual",
+    "trainingTime": "Training Time",
+    "automationRisk": "Automation risk",
+    "compareNotSure": "Not sure? Compare",
+    "compareDesc": "Compare {{name}} with another sector side by side",
+    "compare": "Compare",
+    "premiumTools": "Premium Tools",
+    "deepenWithAI": "Go deeper with AI",
+    "wikiAI": "AI Wiki",
+    "wikiDesc": "Ask specific questions about the sector and receive personalized answers from AI.",
+    "openChat": "Open chat",
+    "roadmap": "Detailed Roadmap",
+    "roadmapDesc": "A step-by-step plan generated by AI to enter the sector with concrete resources.",
+    "generatePlan": "Generate plan",
+    "knowledgeGraph": "Knowledge Graph",
+    "graphDesc": "Visualize roles, skills, and tools in the sector in an interactive graph.",
+    "exploreGraph": "Explore the graph",
+    "tabs": {
+      "overview": "Overview",
+      "career": "Career Path",
+      "skills": "Skills",
+      "data": "Data & Trends"
+    },
+    "advantages": "Advantages",
+    "disadvantages": "Disadvantages",
+    "opportunities": "Future Opportunities",
+    "keySkills": "Key Skills",
+    "skillsDesc": "To excel in this sector, you will need to develop this skill set. Don't worry if you don't have all of them now — {{time}} is the estimated time to acquire them.",
+    "careerPath": "Career Path",
+    "employed": "Employed",
+    "freelance": "Self-employed / Freelance",
+    "employedDesc": "Typical path for those who want to work as an <strong>employee</strong> in the {{name}} sector. Stable, structured, with clear progression.",
+    "freelanceDesc": "Path for those who want to work <strong>independently or as a freelancer</strong> in the {{name}} sector. More freedom, but also more responsibility in running the business.",
+    "noEmployedPath": "Employed path not yet available for this sector.",
+    "noFreelancePath": "Freelance path not yet available for this sector.",
+    "growthProjection": "Sector Growth Projection",
+    "platformStats": "Platform Statistics",
+    "shortTerm": "Short Term",
+    "midTerm": "Mid Term",
+    "longTerm": "Long Term",
+    "notFound": "Sector not found",
+    "goHome": "Back to home"
+  },
+  "premium": {
+    "badge": "NorthStar Premium",
+    "title": "Unlock your full potential",
+    "subtitle": "Go beyond the free test. With Premium you get advanced tools to turn your inclinations into a concrete professional path.",
+    "features": {
+      "wiki": {
+        "title": "Personalized AI Wiki",
+        "desc": "Access an intelligent knowledge base that answers your specific questions about your chosen sector."
+      },
+      "graph": {
+        "title": "Knowledge Graph",
+        "desc": "Visualize training paths, skills, and connections between professional roles interactively."
+      },
+      "roadmap": {
+        "title": "Detailed Roadmap",
+        "desc": "Receive a personalized step-by-step plan to enter your ideal sector within the estimated time."
+      },
+      "updates": {
+        "title": "Real-Time Updates",
+        "desc": "Updated market data, job offers, and fresh sector trends."
+      }
+    },
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "mostPopular": "Most Popular",
+    "planName": "Premium Plan",
+    "planAccess": "Full access to all features",
+    "perMonth": "/month",
+    "perYear": "/year",
+    "savingsMsg": "Equals €{{price}}/month · Save 17%",
+    "includes": {
+      "wiki": "Personalized AI wiki",
+      "graph": "Knowledge graph",
+      "roadmap": "Step-by-step roadmap",
+      "liveData": "Live market data",
+      "support": "Priority support",
+      "goals": "Unlimited goals"
+    },
+    "waitlistTitle": "Payments coming soon",
+    "waitlistDesc": "The payment system is being activated. Leave your email and we'll notify you as soon as it's available.",
+    "waitlistEmail": "Your email",
+    "notifyMe": "Notify me when ready",
+    "joinedTitle": "You're on the list!",
+    "joinedDesc": "We'll contact you as soon as payment is available.",
+    "guarantee": "14-day money-back guarantee",
+    "cancelAnytime": "Cancel at any time"
+  },
+  "auth": {
+    "login": "Sign in",
+    "register": "Sign up",
+    "titles": {
+      "login": "Welcome back",
+      "register": "Create your account",
+      "verify": "Confirm your email",
+      "forgot": "Forgot password",
+      "forgotSent": "Check your email",
+      "resetSent": "Password reset"
+    },
+    "descriptions": {
+      "login": "Sign in to find your journey and results.",
+      "register": "Sign up to save your journey and access premium content.",
+      "verify": "Enter the 6-digit code sent to {{email}}.",
+      "forgot": "Enter your email and we'll send you a link to reset your password.",
+      "forgotSent": "We sent a link to {{email}}. Check your inbox (and spam).",
+      "resetSent": "Your password has been reset. You can now sign in."
+    },
+    "or": "or",
+    "googleLoading": "Signing in with Google…",
+    "backToLogin": "Back to sign in",
+    "email": "Email",
+    "emailPlaceholder": "your@email.com",
+    "password": "Password",
+    "passwordPlaceholder": "••••••••",
+    "forgotPassword": "Forgot your password?",
+    "loginBtn": "Sign in",
+    "noAccount": "Don't have an account?",
+    "name": "Name",
+    "namePlaceholder": "Your name",
+    "passwordMin": "Min. 6 characters",
+    "confirmPassword": "Confirm password",
+    "confirmPasswordPlaceholder": "Repeat your password",
+    "passwordMismatch": "Passwords do not match",
+    "createAccount": "Create account",
+    "hasAccount": "Already have an account?",
+    "verifyCode": "Verification code",
+    "devMode": "Dev mode — code:",
+    "devToken": "Dev mode — reset token:",
+    "openReset": "Open reset page →",
+    "verifyBtn": "Verify account",
+    "noCodeReceived": "Didn't receive the code?",
+    "resend": "Resend",
+    "devCodeLabel": "Dev code:",
+    "forgotEmailLabel": "Your account email",
+    "sendResetLink": "Send reset link",
+    "backToLoginBtn": "Back to sign in",
+    "errors": {
+      "googleError": "Error with Google. Please try again.",
+      "networkError": "Network error. Please try again.",
+      "loginError": "Login error",
+      "registerError": "Registration error",
+      "invalidCode": "Invalid code",
+      "enterCode": "Enter the 6-digit code",
+      "passwordsNoMatch": "Passwords do not match",
+      "missingData": "Missing data"
+    }
+  },
+  "growth": {
+    "badge": "Personal Growth",
+    "title": "The library of your",
+    "titleHighlight": "evolution",
+    "subtitle": "Articles, guides, and practical exercises on habits, mindset, motivation, and professional growth. Curated content for those who want to improve with intention.",
+    "stats": {
+      "articles": "articles",
+      "areas": "topic areas",
+      "updated": "Continuously updated"
+    },
+    "forYou": "For you",
+    "forYouSubtitle": "Selected based on your profile",
+    "yourProfile": "Your profile",
+    "unlockContent": "Unlock content for you",
+    "unlockDesc": "Take the RIASEC test to receive growth articles aligned with your personality profile.",
+    "takeTest": "Take the test",
+    "personalizedContent": "Personalized content for your profile",
+    "personalizedDesc": "Sign in or sign up to receive articles selected based on your RIASEC personality type.",
+    "login": "Sign in",
+    "signup": "Sign up",
+    "exploreByArea": "Explore by area",
+    "exploreByAreaDesc": "Choose the theme you want to work on now.",
+    "latestArticles": "Latest articles",
+    "latestArticlesDesc": "The most recently added content.",
+    "seeAll": "See all",
+    "ctaTitle": "Don't know where to start?",
+    "ctaDesc": "Take the RIASEC + Five Spirits test: knowing who you are is always the first step.",
+    "startJourney": "Start the journey",
+    "recommended": "For you",
+    "article": "article",
+    "articles": "articles",
+    "difficulty": {
+      "base": "Beginner",
+      "intermedio": "Intermediate",
+      "avanzato": "Advanced"
+    },
+    "backToGrowth": "← Back to Personal Growth",
+    "inThisArea": "articles in this area",
+    "searchArticles": "Search articles…",
+    "all": "All",
+    "noArticles": "No articles found",
+    "noArticlesHint": "Try changing the filters",
+    "tags": "Tags",
+    "otherAreas": "Other areas",
+    "readArticle": "Read",
+    "saveArticle": "Save article",
+    "savedArticle": "Article saved",
+    "loginToSave": "Sign in to save",
+    "updatedOn": "Updated on",
+    "details": "Details",
+    "category": "Category",
+    "level": "Level",
+    "readTime": "Read time",
+    "relatedArticles": "Read also",
+    "allArticles": "All articles",
+    "saveThisArticle": "Save this article",
+    "saveDesc": "Sign in to save content and find it in your profile.",
+    "startJourney2": "Start the journey",
+    "discoverProfile": "Discover your profile",
+    "discoverProfileDesc": "Take the RIASEC test to find the right direction.",
+    "doTest": "Take the test",
+    "reads": "reads"
+  },
+  "news": {
+    "title": "News from the world of work",
+    "badge": "Updates from the world of work",
+    "subtitle": "Updated news from the professional sectors that matter.",
+    "allNews": "All news",
+    "savedNews": "Saved",
+    "personalizedNews": "For you",
+    "savedEmpty": "No saved news",
+    "savedEmptyDesc": "Save the news you're interested in to find it here.",
+    "browseNews": "Browse news",
+    "personalizedEmpty": "No personalized news",
+    "personalizedEmptyDesc": "Take the test to receive news based on your profile.",
+    "takeTest": "Take the test",
+    "loading": "Loading news…",
+    "errorLoad": "Error loading news",
+    "loadError": "Unable to load news at this time.",
+    "retry": "Retry",
+    "noResults": "No news found",
+    "noResultsHint": "Try changing the filters or category.",
+    "sectorNewsTitle": "News for your sector",
+    "sectorNewsDesc": "Updates on {{name}} — trends, opportunities and innovations",
+    "yourSector": "Your sector",
+    "removeFromSaved": "Remove from saved",
+    "saveArticle": "Save article",
+    "sourceLabel": {
+      "live": "Real-time updated news",
+      "static": "Selected editorial content"
+    },
+    "bookmarkHint": "Use the bookmark 🔖 to save articles to your profile",
+    "upgrade": {
+      "sectionTitle": "News for your sector",
+      "title": "Unlock Your Sector News",
+      "desc": "Complete the test and confirm your sector to receive targeted news: trends, job opportunities, companies and certifications.",
+      "discoverPremium": "Discover Premium",
+      "takeTest": "Take the test"
+    },
+    "categories": {
+      "general": "Overview",
+      "technology": "Technology",
+      "business": "Business",
+      "science": "Science",
+      "health": "Health",
+      "finance": "Finance",
+      "education": "Education"
+    },
+    "timeAgo": {
+      "lessThan1h": "less than 1 hour ago",
+      "1h": "1 hour ago",
+      "hours": "{{h}} hours ago",
+      "yesterday": "yesterday",
+      "days": "{{d}} days ago"
+    },
+    "read": "Read",
+    "save": "Save",
+    "saved": "Saved"
+  },
+  "profilo": {
+    "title": "Your profile",
+    "notLoggedIn": "Sign in to view your profile.",
+    "accountInfo": "Account information",
+    "name": "Name",
+    "email": "Email",
+    "memberSince": "Member since",
+    "emailVerified": "Email verified",
+    "emailNotVerified": "Email not verified",
+    "changePassword": "Change password",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmNewPassword": "Confirm new password",
+    "passwordUpdated": "Password updated successfully",
+    "savePassword": "Update password",
+    "privacy": "Profile visibility",
+    "publicProfile": "Public profile",
+    "privateProfile": "Private profile",
+    "publicDesc": "Other users can view your profile.",
+    "privateDesc": "Your profile is visible only to you.",
+    "workMode": "Work preference",
+    "workModeDesc": "How do you prefer to work? This influences recommendations.",
+    "favorites": "Favorites",
+    "savedSectors": "Saved sectors",
+    "savedNews": "Saved news",
+    "noSavedSectors": "No saved sectors",
+    "noSavedNews": "No saved news",
+    "remove": "Remove",
+    "upcomingEvents": "Upcoming events"
+  },
+  "register": {
+    "title": "The journey starts now.",
+    "subtitle": "Sign up to save your test results and receive a personalized roadmap.",
+    "benefits": {
+      "riasec": "Detailed analysis of your RIASEC profile",
+      "stepByStep": "Step-by-step guides for your confirmed sector",
+      "track": "Track your growth over time"
+    },
+    "formTitle": "Create your account",
+    "formSubtitle": "Free, no card required.",
+    "name": "Name",
+    "email": "Email",
+    "createAccount": "Create account",
+    "registering": "Registering…",
+    "successTitle": "Welcome aboard, {{name}}!",
+    "successDesc": "Your profile has been saved successfully. We sent you an email with the detailed roadmap for your chosen sector.",
+    "backHome": "Back to Home",
+    "errors": {
+      "missingData": "Missing data",
+      "missingDataDesc": "Please enter your name and email to proceed.",
+      "registerError": "Registration error",
+      "registerErrorDesc": "An error occurred during registration. Please try again."
+    }
+  },
+  "notFound": {
+    "title": "Page not found",
+    "subtitle": "The page you are looking for does not exist or has been moved.",
+    "goHome": "Back to home"
+  },
+  "chiSiamo": {
+    "title": "About us",
+    "subtitle": "A digital compass for your professional future",
+    "badge": "Our story",
+    "missionTitle": "Our mission",
+    "missionDesc": "Making professional guidance accessible, scientific, and deeply human.",
+    "valuesTitle": "Our values",
+    "ourValues": "Our values",
+    "methodTitle": "Our method",
+    "ourMethod": "Our method",
+    "teamTitle": "The team",
+    "whatWeDo": "What we do",
+    "whatWeDoCombines": "NorthStar combines personality tests, professional sector analysis, updated news and personal organisation tools in one clear, useful and easy-to-use space.",
+    "whyWeExist": "Why we exist",
+    "whyWeExistP1": "Millions of people every year choose studies or jobs without having the tools to understand whether that direction is truly consistent with who they are.",
+    "whyWeExistP2": "The result is disorientation, dissatisfaction and paths that constantly change without a clear compass.",
+    "whyWeExistP3": "Our mission is to transform that disorientation into clarity — offering concrete tools to navigate among opportunities, studies, professions and career possibilities.",
+    "whoWeServe": "Who we serve",
+    "whoWeServeIntro": "NorthStar is designed for anyone who finds themselves at a crossroads in their professional or educational life:",
+    "values": [
+      {
+        "title": "Clarity",
+        "desc": "We transform disorientation into concrete direction, without empty promises."
+      },
+      {
+        "title": "Empathy",
+        "desc": "Every person has a unique path: we respect and accompany it."
+      },
+      {
+        "title": "Awareness",
+        "desc": "The best choices come from self-knowledge, not chance."
+      },
+      {
+        "title": "Real data",
+        "desc": "We use updated data on sectors, salaries and growth to guide you in the market."
+      },
+      {
+        "title": "Learning",
+        "desc": "Growth is continuous: we offer content to learn and stay updated over time."
+      },
+      {
+        "title": "Innovation",
+        "desc": "We combine psychology, AI and market data for the future of orientation."
+      }
+    ],
+    "methodSteps": [
+      {
+        "title": "RIASEC Test + Five Spirits",
+        "desc": "Discover your external profile (skills and interests) and inner profile (energy, vision, instinct) through 17 questions."
+      },
+      {
+        "title": "Sector matching",
+        "desc": "The system cross-references your profile with 21 professional sectors and calculates a compatibility score based on real data."
+      },
+      {
+        "title": "Explore in depth",
+        "desc": "Each sector includes data on salary, growth, automation risk, key skills, roadmap and knowledge graph."
+      },
+      {
+        "title": "Build your path",
+        "desc": "Save preferences, follow your sector news, set career goals and track progress over time."
+      }
+    ],
+    "whatWeDoFeatures": [
+      {
+        "label": "RIASEC Test + Five Spirits",
+        "desc": "Understand your personality in two dimensions: interests and deep identity."
+      },
+      {
+        "label": "21 professional sectors",
+        "desc": "Each sector with real data on salary, growth, automation and skills."
+      },
+      {
+        "label": "Sector news",
+        "desc": "Updated content filterable by the sectors that interest you."
+      },
+      {
+        "label": "Roadmap and knowledge graph",
+        "desc": "Visualize skills, roles and paths of each sector interactively."
+      }
+    ],
+    "whoWeServeItems": [
+      "High school students who need to choose a university",
+      "University students who want to understand which sector to enter",
+      "Workers evaluating a career change",
+      "Those returning to the workforce after a break",
+      "Those who want to better understand their inclinations and strengths"
+    ],
+    "ctaTitle": "Ready to find your direction?",
+    "ctaDesc": "Take the free test in less than 10 minutes and discover the sectors most aligned with your personality.",
+    "explorePremium": "Explore Premium",
+    "readNews": "Read the news",
+    "startFree": "Start the free test"
+  },
+  "comeFunziona": {
+    "title": "How NorthStar works",
+    "subtitle": "Three steps to find your professional direction with real data and validated psychological tools.",
+    "badge": "The NorthStar method",
+    "heroTitle": "How it works",
+    "heroSubtitle": "A three-step approach combining scientific psychology, real market data, and an inner compass to help you choose with clarity.",
+    "startTest": "Start the Free Test",
+    "stepsTitle": "The three-step journey",
+    "stepsSubtitle": "Each step is designed to give you progressive clarity, not performance anxiety.",
+    "steps": [
+      {
+        "title": "Take the test",
+        "subtitle": "12 questions, less than 3 minutes",
+        "description": "The NorthStar test combines the RIASEC model — scientifically validated by over 60 years of research — with the Inner Compass of the Five Spirits. There are no right or wrong answers: the system measures your natural inclinations, not your knowledge.",
+        "detail": "The questions cover 6 dimensions of professional personality (Realistic, Investigative, Artistic, Social, Enterprising, Conventional) and 5 inner qualities (Presence, Vision, Instinct, Focus, Tenacity)."
+      },
+      {
+        "title": "Discover your profile",
+        "subtitle": "Your professional DNA",
+        "description": "The system processes your answers and generates a unique RIASEC profile — a combination of letters describing your dominant aptitudes — and an Inner Compass map with your five balanced spirits.",
+        "detail": "The RIASEC profile is used by universities, Fortune 500 companies and employment centers worldwide. The Inner Compass is an original NorthStar model that integrates dimensions of inner motivation."
+      },
+      {
+        "title": "Explore your sectors",
+        "subtitle": "3 personalized recommendations with real data",
+        "description": "The algorithm cross-references your profile with data from 21 professional sectors: salaries, market growth, AI automation risk and trends. You receive 3 sectors where your natural talent meets a real opportunity.",
+        "detail": "You can explore each sector, compare them, confirm your choice and access premium features (Wiki, Roadmap, Knowledge Graph) to chart your concrete path."
+      }
+    ],
+    "riasec": [
+      {
+        "name": "Realistic",
+        "desc": "Loves working with hands, tools, machines. Concrete, practical, action-oriented."
+      },
+      {
+        "name": "Investigative",
+        "desc": "Curious, analytical, intellectual. Loves solving complex problems and doing research."
+      },
+      {
+        "name": "Artistic",
+        "desc": "Creative, expressive, original. Prefers unstructured environments and freedom of expression."
+      },
+      {
+        "name": "Social",
+        "desc": "Empathetic, collaborative, people-oriented. Finds meaning in helping others."
+      },
+      {
+        "name": "Enterprising",
+        "desc": "Natural leader, persuasive, ambitious. Loves leading, selling, managing projects."
+      },
+      {
+        "name": "Conventional",
+        "desc": "Organized, precise, reliable. Excels in structured environments with clear rules."
+      }
+    ],
+    "spirits": [
+      {
+        "key": "Presence",
+        "desc": "Awareness of the moment, ability to be fully present in work situations."
+      },
+      {
+        "key": "Vision",
+        "desc": "Ability to see the future, plan long-term and give direction."
+      },
+      {
+        "key": "Instinct",
+        "desc": "Intuitive energy, decisional speed, trust in one's own feelings."
+      },
+      {
+        "key": "Focus",
+        "desc": "Deep concentration, accurate analysis, ability to go into detail."
+      },
+      {
+        "key": "Tenacity",
+        "desc": "Will, resilience, determination in pursuing goals even under pressure."
+      }
+    ],
+    "faq": [
+      {
+        "q": "Is the test free?",
+        "a": "Yes, the RIASEC + Inner Compass test and the 3 sector recommendations are completely free. No registration is required to complete the test. Premium features (personalized Wiki, detailed Roadmap, Knowledge Graph) require a subscription."
+      },
+      {
+        "q": "How long does it take to complete the test?",
+        "a": "The full test takes about 3-5 minutes. There are 12 RIASEC questions and 15 Inner Compass questions (3 for each of the 5 spirits). You can answer at your own pace without pressure."
+      },
+      {
+        "q": "Is the RIASEC model scientifically valid?",
+        "a": "Yes. The RIASEC model (also known as Holland's theory) was developed by psychologist John L. Holland in the 1950s and is one of the most studied and validated professional orientation models in the world, with over 500 peer-reviewed studies."
+      },
+      {
+        "q": "What are the Five Spirits?",
+        "a": "The Inner Compass of the Five Spirits is an original NorthStar model that measures five fundamental inner qualities at work: Presence (moment awareness), Vision (future orientation), Instinct (intuition and speed), Focus (concentration and analysis) and Tenacity (resilience and determination)."
+      },
+      {
+        "q": "Is my data safe?",
+        "a": "Absolutely yes. Your test answers are anonymous by default. If you choose to register, your data is saved securely and never sold to third parties. You can delete your account at any time."
+      },
+      {
+        "q": "Can I take the test multiple times?",
+        "a": "Yes. You can repeat the test at any time. People change over time and your inclinations can evolve with experience. If you have an account, each session is saved and you can compare results over time."
+      },
+      {
+        "q": "Are salary and growth data up to date?",
+        "a": "Market data (average salaries, growth rate, AI risk) is based on annually updated sources (ISTAT, EUROSTAT, sector reports). Salary ranges represent the typical range for entry/mid/senior roles."
+      }
+    ],
+    "privacyBadge": "Your data is safe",
+    "privacyTitle": "Privacy and full control",
+    "privacyPoints": [
+      "The test is anonymous by default — no registration required",
+      "Your data is never sold to third parties",
+      "You can delete your account and all data at any time",
+      "Test answers are not used to train AI models",
+      "Secure HTTPS connection on all devices"
+    ],
+    "faqBadge": "Frequently asked questions",
+    "faqTitle": "Still have doubts?",
+    "pageTitle": "How NorthStar works | Professional orientation method",
+    "pageDesc": "Discover how NorthStar works: the RIASEC model, the Inner Compass of the Five Spirits, market data and frequently asked questions about our professional orientation method.",
+    "ctaTitle": "Ready to discover your compass?",
+    "ctaDesc": "Less than 5 minutes. No registration required. Zero wrong answers.",
+    "startFree": "Start the free test — it's free"
+  },
+  "contatti": {
+    "title": "Contact us",
+    "subtitle": "Have questions, feedback or need support? Write to us and we will reply within 24 working hours.",
+    "badge": "We're here for you",
+    "formTitle": "Send a message",
+    "sendMessage": "Send us a message",
+    "name": "Name",
+    "email": "Email",
+    "message": "Message",
+    "messagePlaceholder": "Describe your request in detail…",
+    "subjectLabel": "Subject",
+    "subjects": [
+      {
+        "value": "info",
+        "label": "General information"
+      },
+      {
+        "value": "supporto",
+        "label": "Technical support"
+      },
+      {
+        "value": "premium",
+        "label": "Plans and payments"
+      },
+      {
+        "value": "privacy",
+        "label": "Privacy and personal data"
+      },
+      {
+        "value": "feedback",
+        "label": "Feedback and suggestions"
+      },
+      {
+        "value": "altro",
+        "label": "Other"
+      }
+    ],
+    "faq": [
+      {
+        "q": "Is the test really free?",
+        "a": "Yes, the RIASEC + Five Spirits test is completely free. You can complete it without registering and see basic results immediately."
+      },
+      {
+        "q": "What does the Premium plan include?",
+        "a": "Premium unlocks AI Wiki per sector, personalized career Roadmap, interactive Knowledge Graph with AI chat, and unlimited career goals."
+      },
+      {
+        "q": "Can I delete my account?",
+        "a": "Yes. You can request deletion of your account and all associated data by writing to privacy@northstar.app."
+      },
+      {
+        "q": "Is my data safe?",
+        "a": "Absolutely yes. Data is encrypted, never sold to third parties and processed in accordance with GDPR. Read our Privacy Policy for all details."
+      }
+    ],
+    "send": "Send",
+    "submit": "Send message",
+    "sending": "Sending…",
+    "sent": "Message sent!",
+    "sentDesc": "Thank you for writing to us. We will reply to the email address provided within 24 working hours.",
+    "sendAnother": "Send another message",
+    "contactInfo": "Contact information",
+    "generalEmail": "General email",
+    "privacyEmail": "Privacy & data",
+    "pageTitle": "Contact — NorthStar",
+    "pageDesc": "Contact the NorthStar team for support, information about Premium plans, feedback or privacy questions. We respond within 24 hours.",
+    "successTitle": "Message sent!",
+    "successDesc": "We will reply as soon as possible."
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "lastUpdated": "Last updated",
+    "badge": "Transparency and data protection",
+    "intro": "This policy describes how NorthStar collects, uses and protects the personal data of users who access the platform.",
+    "toc": "Table of contents",
+    "ctaTitle": "Questions about privacy?",
+    "ctaDesc": "We are available for any clarification on the processing of your personal data.",
+    "ctaBtn": "Contact us",
+    "ctaLink": "Read the Terms of Service",
+    "legalNote": "Legal notice",
+    "legalNoteText": "This policy is an operational draft. Validation by a legal professional is recommended before final publication.",
+    "s1Title": "Data controller",
+    "s1P1": "The data controller is NorthStar, reachable at the dedicated privacy email address.",
+    "s1P2": "For any request regarding the processing of your data, contact us at:",
+    "s2Title": "Types of data collected",
+    "s2Intro": "NorthStar only collects data necessary for the service to function:",
+    "s2Items": [
+      "Registration data: name, email address, encrypted password.",
+      "Responses to orientation tests (RIASEC and Five Spirits) and related results.",
+      "Saved preferences: favourite sectors, saved articles, career goals.",
+      "Technical and usage data: IP address, browser type, pages visited, date and time of access.",
+      "Payment data: securely handled by Stripe; NorthStar does not store card details."
+    ],
+    "s3Title": "Purposes and legal bases",
+    "s3Intro": "We process your data for the following purposes:",
+    "s3Bases": [
+      {
+        "base": "Contract performance",
+        "desc": "Providing the service, managing the account, saving results and preferences."
+      },
+      {
+        "base": "Legitimate interest",
+        "desc": "Improving the platform, IT security, fraud prevention."
+      },
+      {
+        "base": "Consent",
+        "desc": "Sending marketing communications and newsletters, if explicitly authorised by the user."
+      },
+      {
+        "base": "Legal obligation",
+        "desc": "Retention of accounting and tax data as required by law."
+      }
+    ],
+    "s4Title": "Cookies and similar technologies",
+    "s4P1": "NorthStar uses technical cookies necessary for the platform to function. We do not use third-party profiling cookies.",
+    "s4P2": "Technical cookies do not require consent. You can manage cookie settings from your browser at any time.",
+    "s4BoxTitle": "Cookies used",
+    "s4BoxText": "Session cookies (authentication), UI preference cookies (theme, language). No third-party tracking or marketing cookies.",
+    "s5Title": "Storage methods and duration",
+    "s5Intro": "Personal data is processed with adequate security measures and retained for the strictly necessary time:",
+    "s5Items": [
+      "Account data: until the account is deleted by the user.",
+      "Test results: retained for the entire duration of the account, deleted on request.",
+      "Payment data: according to Stripe's policies and applicable tax obligations.",
+      "Technical logs: retained for a maximum of 90 days."
+    ],
+    "s6Title": "Data recipients",
+    "s6Intro": "Personal data may only be shared with third parties in the following cases:",
+    "s6Items": [
+      "Technical service providers (hosting, database, CDN) bound by confidentiality agreements.",
+      "Stripe, for secure payment processing.",
+      "Competent authorities, if required by law."
+    ],
+    "s6Footer": "Data is not sold or transferred to third parties for commercial purposes.",
+    "s7Title": "User rights",
+    "s7Intro": "Under the GDPR (EU Reg. 2016/679), you have the right to:",
+    "s7Rights": [
+      {
+        "right": "Access",
+        "desc": "Obtain a copy of your personal data."
+      },
+      {
+        "right": "Rectification",
+        "desc": "Correct inaccurate or incomplete data."
+      },
+      {
+        "right": "Erasure",
+        "desc": "Request the deletion of your data."
+      },
+      {
+        "right": "Restriction",
+        "desc": "Restrict processing under certain circumstances."
+      },
+      {
+        "right": "Portability",
+        "desc": "Receive data in a structured, readable format."
+      },
+      {
+        "right": "Objection",
+        "desc": "Object to processing based on legitimate interests or marketing."
+      }
+    ],
+    "s7Footer": "To exercise your rights, write to privacy@northstar.app. You also have the right to lodge a complaint with the data protection authority.",
+    "s8Title": "Policy updates",
+    "s8P1": "This Privacy Policy may be updated periodically to reflect regulatory or service changes.",
+    "s8P2": "The updated version will always be available on this page with the date of last update indicated at the top."
+  },
+  "terms": {
+    "title": "Terms of Service",
+    "lastUpdated": "Last updated",
+    "badge": "Service usage conditions",
+    "intro": "By accessing or using NorthStar, the user fully accepts these Terms of Service. Please read them carefully.",
+    "toc": "Table of contents",
+    "ctaTitle": "Questions about the Terms?",
+    "ctaDesc": "We are here to answer any questions about the use of the platform.",
+    "ctaBtn": "Contact us",
+    "ctaLink": "Read the Privacy Policy",
+    "legalNote": "Legal notice",
+    "legalNoteText": "These Terms constitute an operational draft. Validation by a legal professional is recommended before final publication.",
+    "s1Title": "Service description",
+    "s1P1": "NorthStar is a SaaS orientation and personal growth platform providing informational tools for personality analysis, professional sector discovery, educational content and career planning.",
+    "s1P2": "The information provided by the platform is for informational purposes only and does not constitute specialised professional advice. For important decisions, consulting qualified professionals is recommended.",
+    "s2Title": "Account and registration",
+    "s2Intro": "To access reserved features, you must create an account. The user is responsible for:",
+    "s2Items": [
+      "Keeping credentials confidential and not sharing them with third parties.",
+      "Providing accurate and up-to-date information during registration.",
+      "Immediately notifying NorthStar in case of unauthorised access to their account.",
+      "Complying with these terms of use when using the platform."
+    ],
+    "s2Footer": "NorthStar reserves the right to suspend or delete accounts that violate these Terms.",
+    "s3Title": "Free and Premium plans",
+    "s3FreePlan": "Free Plan",
+    "s3PremiumPlan": "Premium Plan",
+    "s3FreeItems": [
+      "RIASEC + Five Spirits test",
+      "Basic results and personality profile",
+      "Access to 21 professional sectors",
+      "General and sector news",
+      "Up to 5 career goals",
+      "Basic preference saving"
+    ],
+    "s3PremiumItems": [
+      "Everything in Free plan",
+      "AI Wiki for every sector",
+      "Personalised career roadmap",
+      "Interactive knowledge graph",
+      "RAG chat with the graph",
+      "Unlimited career goals",
+      "Exclusive premium content"
+    ],
+    "s4Title": "Payments and renewals",
+    "s4Intro": "The Premium Plan is available with monthly or annual subscription. Payments are securely processed by Stripe, a PCI-DSS certified provider. NorthStar does not store credit card data.",
+    "s4Items": [
+      {
+        "t": "Automatic renewal",
+        "d": "The subscription automatically renews at the end of the selected period, unless explicitly cancelled."
+      },
+      {
+        "t": "Cancellation",
+        "d": "The user can cancel the subscription at any time from their profile."
+      },
+      {
+        "t": "Refunds",
+        "d": "Refunds are assessed on a case-by-case basis within 14 days of purchase, in accordance with EU regulations."
+      },
+      {
+        "t": "Price changes",
+        "d": "NorthStar reserves the right to change prices, with at least 30 days' notice to active subscribers."
+      }
+    ],
+    "s5Title": "Permitted and prohibited use",
+    "s5Intro": "NorthStar is intended for personal and non-commercial use. The following are expressly prohibited:",
+    "s5Items": [
+      "Using the platform for illegal, fraudulent or harmful activities.",
+      "Attempting to gain unauthorised access to systems, accounts or data of others.",
+      "Scraping, reverse engineering or systematic copying of content.",
+      "Spreading offensive, discriminatory content or content violating third-party rights.",
+      "Using automated tools (bots, crawlers) without explicit authorisation.",
+      "Reselling or sublicensing platform access to third parties."
+    ],
+    "s6Title": "Intellectual property",
+    "s6P1": "All content on NorthStar is the exclusive property of NorthStar or its licensors and is protected by applicable intellectual property laws.",
+    "s6P2": "Personal and non-commercial use of content is permitted. Any reproduction, distribution or commercial use requires prior written authorisation.",
+    "s6P3": "Data entered by the user remains the property of the user. NorthStar reserves the right to use this data in anonymous and aggregated form to improve the service.",
+    "s7Title": "Limitation of liability",
+    "s7Intro": "NorthStar provides the platform as-is and does not guarantee:",
+    "s7Items": [
+      "Uninterrupted service availability (maintenance, updates and technical interruptions are possible).",
+      "Absolute accuracy of sector, salary and labour market trend data.",
+      "Suitability of test results for every individual situation."
+    ],
+    "s7Footer": "NorthStar is not responsible for personal, professional or financial decisions made based on platform content. NorthStar's maximum liability is limited to the amount paid by the user in the last 12 months.",
+    "s8Title": "Applicable law and jurisdiction",
+    "s8P1": "These Terms are governed by Italian law. For any dispute related to the use of the platform, the competent jurisdiction is that of the consumer's place of residence or domicile.",
+    "s8P2": "Before taking legal action, NorthStar encourages users to contact our support team for an amicable resolution of any disputes."
+  },
+  "sitemap": {
+    "title": "Sitemap",
+    "subtitle": "All NorthStar pages in one place.",
+    "nav": "Full navigation",
+    "desc": "All NorthStar pages in one place. Find sections, professional sectors, premium resources and institutional pages.",
+    "pagesTotal": "{{count}} total pages",
+    "downloadXml": "Download sitemap.xml",
+    "pages": "pages",
+    "ctaTitle": "Don't know where to start?",
+    "ctaDesc": "The test guides you in 10 minutes to the sectors most aligned with your personality.",
+    "startTest": "Start the free test",
+    "sectorDesc": "Overview, data and match",
+    "wikiDesc": "AI in-depth content",
+    "roadmapDesc": "Step-by-step path",
+    "grafoDesc": "Interactive AI visualization",
+    "groups": {
+      "main": "Main",
+      "sectors": "Explore sectors",
+      "brand": "Product & brand",
+      "sectorPages": "Professional sectors",
+      "wiki": "Wiki by sector",
+      "roadmap": "Career roadmap",
+      "grafo": "Knowledge graph"
+    },
+    "items": {
+      "home": {
+        "label": "Home",
+        "desc": "Your compass for the future"
+      },
+      "test": {
+        "label": "The Test",
+        "desc": "RIASEC + Five Spirits test (17 questions)"
+      },
+      "news": {
+        "label": "News",
+        "desc": "Updated articles by sector"
+      },
+      "premium": {
+        "label": "Premium",
+        "desc": "Plans and advanced features"
+      },
+      "profilo": {
+        "label": "My profile",
+        "desc": "Account, goals and test history"
+      },
+      "settori": {
+        "label": "All sectors",
+        "desc": "Grid of 21 sectors with RIASEC and AI filters"
+      },
+      "confronta": {
+        "label": "Compare sectors",
+        "desc": "Side-by-side comparator with shareable URL"
+      },
+      "chiSiamo": {
+        "label": "About us",
+        "desc": "NorthStar mission, method and values"
+      },
+      "comeFunziona": {
+        "label": "How it works",
+        "desc": "RIASEC, Five Spirits, FAQ and privacy"
+      },
+      "contatti": {
+        "label": "Contact",
+        "desc": "Write to the NorthStar team"
+      },
+      "sitemapPage": {
+        "label": "Sitemap",
+        "desc": "Overview of all pages"
+      },
+      "privacy": {
+        "label": "Privacy Policy",
+        "desc": "Personal data processing (GDPR)"
+      },
+      "termini": {
+        "label": "Terms of service",
+        "desc": "Platform usage conditions"
+      }
+    }
+  },
+  "wiki": {
+    "title": "AI Wiki",
+    "subtitle": "Ask specific questions about this sector and receive personalized answers.",
+    "placeholder": "E.g. What are the salaries for a junior in this sector?",
+    "send": "Send",
+    "premiumRequired": "Premium Feature",
+    "premiumDesc": "Access Premium to use the AI Wiki and receive personalized answers about your sector.",
+    "upgrade": "Upgrade to Premium",
+    "accessRequired": "Access required",
+    "accessRequiredDesc": "Sign up for free to access the personalized AI Wiki.",
+    "registerFree": "Sign up for free",
+    "expertOf": "Expert in {{name}}",
+    "chatDesc": "Ask any question about this sector: training paths, required skills, salaries, opportunities, and much more.",
+    "newChat": "New chat",
+    "askPlaceholder": "Ask something about {{name}}…",
+    "inputHint": "Enter to send · Shift+Enter for new line",
+    "errorMessage": "Communication error. Please try again in a moment.",
+    "suggestedQuestions": [
+      "What are the most in-demand skills right now?",
+      "How can I stand out from the competition in this field?",
+      "What is the recommended training path to get started?",
+      "How is this sector changing with AI?",
+      "Which certifications increase salary?",
+      "How to best prepare for a job interview?"
+    ]
+  },
+  "roadmap": {
+    "title": "Roadmap",
+    "subtitle": "Your step-by-step plan to enter the sector.",
+    "generate": "Generate roadmap",
+    "generating": "Generating…",
+    "premiumRequired": "Premium Feature",
+    "premiumDesc": "Access Premium to generate your personalized roadmap.",
+    "upgrade": "Upgrade to Premium",
+    "accessRequired": "Access required",
+    "accessRequiredDesc": "Sign up for free to generate your personalized roadmap.",
+    "registerFree": "Sign up for free",
+    "phase": "Phase",
+    "concreteActions": "Concrete actions",
+    "recommendedResources": "Recommended resources",
+    "milestone": "Milestone",
+    "pathToward": "Your path toward {{name}}",
+    "generateDesc": "Generate a personalized step-by-step plan with phases, concrete actions, recommended resources and measurable milestones to enter the sector.",
+    "generateCta": "Generate my Roadmap",
+    "building": "Building your roadmap…",
+    "buildingDesc": "The AI is analyzing the sector and building a tailored plan for you",
+    "totalDuration": "Total duration",
+    "phasesCount": "Path phases",
+    "concreteActionsCount": "Concrete actions",
+    "phasesTimeline": "The Path Phases",
+    "salaryEvolution": "Salary Evolution",
+    "topRoles": "Roles you can aspire to",
+    "keyTip": "Key tip",
+    "regenerate": "Regenerate roadmap",
+    "detailed": "Detailed Roadmap"
+  },
+  "grafo": {
+    "title": "Knowledge Graph",
+    "subtitle": "Visualize roles, skills, and tools in the sector.",
+    "generating": "Generating graph…",
+    "premiumRequired": "Premium Feature",
+    "upgrade": "Upgrade to Premium",
+    "accessRequired": "Access required",
+    "accessRequiredDesc": "Sign up for free to explore the knowledge graph.",
+    "registerFree": "Sign up for free",
+    "downloadPng": "Download as PNG",
+    "exporting": "Exporting…",
+    "regenerate": "Regenerate",
+    "addNode": "Add node",
+    "addNodeTitle": "Add a node to the graph",
+    "nodeTypeLabel": "Type",
+    "connectTo": "Connect to (optional)",
+    "noConnection": "No connection",
+    "nodeName": "Name *",
+    "nodeDescription": "Description (optional)",
+    "nodeDescPlaceholder": "Brief description...",
+    "errorResponse": "Error generating response. Please try again.",
+    "tabGraph": "Graph",
+    "tabChat": "Ask the Graph",
+    "chatTitle": "Ask the Graph",
+    "chatDesc": "The AI responds using the graph nodes as a knowledge base. You can ask about roles, skills, connections, or paths.",
+    "chatQuestion1": "What skills should I develop to become a key role?",
+    "chatQuestion2": "What tools should I learn as a priority?",
+    "chatQuestion3": "What certifications are most useful for entering the sector?",
+    "chatPlaceholder": "Ask something about the graph…",
+    "generateGraph": "Generate graph",
+    "buildingGraph": "The AI is building the graph…",
+    "buildingGraphTime": "This may take 20-30 seconds",
+    "notAvailable": "The graph is not yet available",
+    "connection": "Connection",
+    "connections": "{{count}} connections",
+    "yourNode": "yours",
+    "yourNodes": "your nodes",
+    "processing": "Processing…",
+    "generateFirst": "Generate the graph first to ask questions based on nodes.",
+    "nodeTypes": {
+      "role": "Role",
+      "skill": "Skill",
+      "tool": "Tool",
+      "certification": "Certification"
+    }
+  },
+  "confronta": {
+    "title": "Compare sectors",
+    "subtitle": "Compare two professional sectors side by side.",
+    "selectFirst": "Select the first sector",
+    "selectSecond": "Select the second sector",
+    "compare": "Compare",
+    "vs": "vs",
+    "metrics": {
+      "salary": "Salary",
+      "growth": "Growth",
+      "risk": "AI Risk",
+      "trend": "Trend"
+    },
+    "badgeLabel": "Sector comparison",
+    "headline": "Compare",
+    "desc": "Choose two sectors and see the key differences side by side: salaries, growth, risk, and much more.",
+    "firstSector": "First sector",
+    "secondSector": "Second sector",
+    "pickerChangeHint": "Click to change",
+    "pickerChoose": "Choose a sector to compare",
+    "pickerSearch": "Search sector…",
+    "noResults": "No results",
+    "tie": "Tie",
+    "best": "Better",
+    "chooseBoth": "Choose two sectors to start",
+    "chooseSecond": "Choose the second sector too",
+    "placeholderDesc": "Select sectors from the menus above and you'll immediately see the key differences side by side.",
+    "copyLink": "Copy comparison link",
+    "linkCopied": "Link copied!",
+    "annualSalary": "Average gross annual salary",
+    "upTo": "up to €{{amount}}k",
+    "maximum": "Maximum: €{{amount}}k/year",
+    "annualGrowth": "Annual growth",
+    "automationRisk": "Automation risk",
+    "marketTrend": "Market trend",
+    "timeToAutonomy": "Time to work independently",
+    "riasecType": "Suitable personality type (RIASEC)",
+    "requiredSkills": "Required skills",
+    "commonSkillsCount": "{{count}} skills in common",
+    "commonSkillsHint": "highlighted in green",
+    "advantages": "Advantages",
+    "considerations": "Considerations",
+    "futureOpportunities": "Future roles and opportunities",
+    "deepen": "Learn more",
+    "notSure": "Not sure?",
+    "takeFreeTest": "Take the free test",
+    "trend": {
+      "booming": "Booming",
+      "growing": "Growing",
+      "stable": "Stable",
+      "declining": "Declining"
+    },
+    "risk": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "scale": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    }
+  },
+  "affiliazione": {
+    "title": "Affiliation",
+    "subtitle": "Bring NorthStar to your organisation.",
+    "schools": "Schools",
+    "universities": "Universities",
+    "agencies": "Employment agencies",
+    "training": "Training centres",
+    "contactUs": "Contact us",
+    "learnMore": "Learn more",
+    "backTo": "Back to affiliation page",
+    "requestDemo": "Request a free demo",
+    "requestDemoShort": "Request demo",
+    "heroBadge": "Partner & Affiliation Programme",
+    "howItWorks": "How it works",
+    "problemTitle": "Traditional orientation is no longer enough",
+    "solutionTitle": "NorthStar: digital orientation for institutions",
+    "solutionDesc": "A complete platform you can integrate into your services within days.",
+    "partnerTypesTitle": "Who can join",
+    "institutionBenefitsTitle": "Benefits for the institution",
+    "userBenefitsTitle": "Benefits for your users",
+    "modelsTitle": "Collaboration models",
+    "modelsDesc": "Every institution is different. Together we choose the most suitable model.",
+    "howFunctionTitle": "How it works",
+    "howFunctionDesc": "From the first call to activation: a simple and guided process.",
+    "contactTitle": "Become a NorthStar partner",
+    "contactDesc": "Fill in the form: we will contact you within 24 working hours.",
+    "contactReply": "Guaranteed reply within 24 working hours",
+    "contactFree": "Free demo, no obligation",
+    "contactGdpr": "Data processed in accordance with GDPR",
+    "usefulLinks": "Useful links",
+    "faqTitle": "Frequently asked questions",
+    "ctaTitle": "Ready to bring NorthStar to your institution?",
+    "ctaDesc": "Free demo, no commitment, reply in 24 hours.",
+    "ctaContact": "Write to the team",
+    "formInstitution": "Institution name *",
+    "formPartnerType": "Partner type *",
+    "formUsers": "Estimated users",
+    "formName": "Your name *",
+    "formEmail": "Email *",
+    "formPhone": "Phone",
+    "formMessage": "Message",
+    "formSelect": "Select...",
+    "formUsersUnknown": "Not sure yet",
+    "formSending": "Sending...",
+    "formSubmit": "Request a free demo",
+    "formNote": "No commitment. Reply within 24 working hours.",
+    "formSuccessTitle": "Request sent!",
+    "formSuccessDesc": "We will contact you within 24 working hours to arrange a personalised demo.",
+    "formErrorGeneric": "Unexpected error",
+    "formErrorNetwork": "Network error. Please try again.",
+    "formInstitutionPlaceholder": "E.g. Springfield High School",
+    "formNamePlaceholder": "First and last name",
+    "formEmailPlaceholder": "email@institution.com",
+    "formPhonePlaceholder": "+1 555 1234567",
+    "formMessagePlaceholder": "Briefly describe your context...",
+    "partnerTypes": {
+      "scuolaMedie": "Middle school",
+      "scuoleSuperiori": "High school",
+      "universita": "University / Polytechnic",
+      "agenziaLavoro": "Employment agency",
+      "centroFormazione": "Vocational training centre",
+      "entePubblico": "Public body / Local authority",
+      "orientatore": "Career counsellor / Individual consultant",
+      "altro": "Other"
+    },
+    "userRanges": {
+      "lt100": "Less than 100",
+      "r100_500": "100 - 500",
+      "r500_2000": "500 - 2,000",
+      "gt2000": "Over 2,000"
+    },
+    "scuole": {
+      "title": "NorthStar for schools",
+      "desc": "From middle to high school: digital orientation tools.",
+      "mTitle": "Middle schools",
+      "mDesc": "Initial orientation, interest discovery.",
+      "sTitle": "High schools",
+      "sDesc": "Post-diploma orientation towards university, vocational training or work.",
+      "benefitsTitle": "What your institution gets",
+      "ctaTitle": "Bring NorthStar to your school",
+      "ctaDesc": "Free 30-minute demo, teaching materials included, no commitment."
+    },
+    "universita": {
+      "title": "NorthStar for universities",
+      "desc": "From entry orientation to post-graduation career planning.",
+      "usesTitle": "How universities use NorthStar",
+      "benefitsTitle": "What the university gets",
+      "ctaTitle": "Integrate NorthStar into your university",
+      "ctaDesc": "Tailored institutional licence, white label available, free demo."
+    },
+    "agenzie": {
+      "title": "NorthStar for employment agencies",
+      "desc": "Improve matching between candidates and opportunities.",
+      "usesTitle": "How agencies use NorthStar",
+      "benefitsTitle": "Competitive advantages for your agency",
+      "ctaTitle": "Enhance your placement service",
+      "ctaDesc": "Referral commission or multi-consultant licence. Free demo in 30 minutes."
+    },
+    "formazione": {
+      "title": "NorthStar for training centres",
+      "desc": "ITS Academy, VTC, training organisations: help your users discover the best technical careers.",
+      "contextsTitle": "For every type of training centre",
+      "featuresTitle": "Key features for training",
+      "ctaTitle": "Bring NorthStar to your training centre",
+      "ctaDesc": "Free demo, referral model or volume licence."
+    },
+    "heroTitle": "Bring orientation to your institution with",
+    "heroDesc": "A digital platform to help students, candidates and users discover their direction with personalised tests, real sector data and concrete paths.",
+    "partnerTypesDesc": "The programme is open to all organisations working in orientation, training and the labour market.",
+    "quote": "NorthStar does not replace the career counsellor: it empowers them with data, digital tools and a structured path that users can explore on their own.",
+    "formPrivacy": "Privacy Policy"
+  },
+  "candidature": {
+    "title": "Your applications",
+    "empty": "No applications yet",
+    "emptyDesc": "Start exploring sectors and save the opportunities that interest you.",
+    "status": {
+      "saved": "Saved",
+      "applied": "Applied",
+      "interview": "Interview",
+      "offer": "Offer",
+      "rejected": "Rejected"
+    },
+    "loginRequired": "Sign in to see your applications",
+    "loginRequiredDesc": "Track all your applications in one place.",
+    "goHome": "Go to home",
+    "myCandidatures": "My Applications",
+    "totalCount": "{{count}} application",
+    "totalCountPlural": "{{count}} total applications",
+    "noCandidatures": "No applications yet",
+    "add": "Add",
+    "kanban": "Kanban",
+    "statistics": "Statistics",
+    "staleInterview_one": "You have 1 interview without updates for more than 7 days",
+    "staleInterview_other": "You have {{count}} interviews without updates for more than 7 days",
+    "staleInterviewReminder": "You will receive an email reminder. Click on an interview to update its status.",
+    "startTracking": "Start tracking your applications",
+    "startTrackingDesc": "Add job offers that interest you and monitor every step of the selection process.",
+    "addFirst": "Add first application",
+    "noApps": "No applications",
+    "addTo": "Add to {{status}}",
+    "moveTo": "Move to {{status}}",
+    "editApp": "Edit application",
+    "newApp": "New application",
+    "company": "Company *",
+    "role": "Role *",
+    "link": "Job offer link",
+    "optional": "(optional)",
+    "location": "Location",
+    "salary": "Salary / Compensation",
+    "notes": "Notes",
+    "notesPlaceholder": "Contacts, impressions, important details...",
+    "companyPlaceholder": "e.g. Google",
+    "rolePlaceholder": "e.g. UX Designer",
+    "saveChanges": "Save changes",
+    "openOffer": "Open offer",
+    "closeDiary": "Close diary",
+    "openDiary": "Open notes diary",
+    "noNotesYet": "No notes yet. Write the first update!",
+    "addNotePlaceholder": "E.g. Called HR, passed technical interview…",
+    "addNoteTitle": "Add note (Enter)",
+    "addStatNote": "Add applications to see statistics",
+    "totalLabel": "Total",
+    "tracked": "applications tracked",
+    "responseRate": "Response rate",
+    "responseRateDesc": "applied → interview",
+    "inProgress": "In progress",
+    "inProgressDesc": "awaiting response",
+    "totalNotes": "Total notes",
+    "perApp": "per application",
+    "funnelTitle": "Advancement funnel",
+    "successRate": "{{rate}}% success from interviews",
+    "conversionPct": "{{pct}}% conversion",
+    "now": "Just now",
+    "cancel": "Cancel",
+    "statusLbl": "Status",
+    "ofTotal": "of total",
+    "overTime": "Applications over time",
+    "avgPerMonth": "Avg: {{avg}} applications/month",
+    "requiredFields": "Company and role are required"
+  },
+  "amici": {
+    "title": "Friends",
+    "search": "Search users",
+    "pending": "Pending requests",
+    "yourFriends": "Your friends",
+    "noFriends": "You have no friends on NorthStar yet.",
+    "sendRequest": "Send request",
+    "accept": "Accept",
+    "decline": "Decline",
+    "remove": "Remove",
+    "loginRequired": "Sign in to see your friends",
+    "loginRequiredDesc": "Connect with other NorthStar users.",
+    "goHome": "Go to home",
+    "tabs": {
+      "friends": "Friends",
+      "requests": "Requests",
+      "search": "Search"
+    },
+    "friendsCount": "{{count}} friends on NorthStar",
+    "connectWithOthers": "Connect with other NorthStar users",
+    "noFriendsYet": "No friends yet",
+    "noFriendsDesc": "Search for users with public profiles and send them a friend request.",
+    "incomingCount": "Incoming ({{count}})",
+    "noIncoming": "No incoming requests",
+    "outgoingCount": "Sent ({{count}})",
+    "noOutgoing": "No sent requests",
+    "waitingReply": "Awaiting reply",
+    "searchPlaceholder": "Search by name or email…",
+    "searchPublicHint": "Search among users with public profiles.",
+    "minChars": "Type at least 2 characters to search",
+    "noResults": "No results",
+    "noResultsDesc": "No user found for \"{{query}}\". Only public profiles appear in results.",
+    "publicProfile": "Public profile",
+    "privateProfile": "Private profile",
+    "viewProfile": "Profile",
+    "alreadyFriends": "Friends",
+    "waiting": "Pending",
+    "add": "Add",
+    "today": "Today",
+    "yesterday": "Yesterday"
+  },
+  "resetPassword": {
+    "title": "Reset password",
+    "subtitle": "Enter your new password.",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "reset": "Reset password",
+    "success": "Password reset successfully.",
+    "invalidToken": "Invalid or expired link.",
+    "invalidLinkTitle": "Invalid link",
+    "invalidLinkDesc": "The password reset link is invalid or has already been used.",
+    "goHome": "Back to home",
+    "successTitle": "Password reset!",
+    "successDesc": "You can now sign in with your new password.",
+    "goLogin": "Go to login",
+    "newPasswordLabel": "New password",
+    "passwordPlaceholder": "Min. 6 characters",
+    "confirmPasswordLabel": "Confirm password",
+    "confirmPasswordPlaceholder": "Repeat your new password",
+    "chooseNew": "Choose a new password for your account.",
+    "passwordMismatch": "Passwords do not match",
+    "resetError": "Error during reset",
+    "networkError": "Network error. Please try again.",
+    "resetting": "Resetting…"
+  },
+  "premiumSuccess": {
+    "title": "Welcome to Premium!",
+    "subtitle": "Your account is now upgraded. You have access to all features.",
+    "goHome": "Go to dashboard",
+    "badge": "Welcome to Premium",
+    "activated": "Subscription activated!",
+    "desc": "Your Premium access is now active. You can start exploring the AI Wiki, knowledge graph, and your personalized roadmap.",
+    "exploreNow": "Explore now",
+    "retakeTest": "Retake the test"
+  },
+  "utente": {
+    "notFound": "User not found",
+    "profile": "Profile",
+    "sectors": "Explored sectors",
+    "noPublicInfo": "This profile is private.",
+    "notFoundDesc": "This profile does not exist or is not accessible.",
+    "backToFriends": "Back to friends",
+    "publicProfile": "Public profile",
+    "privateProfile": "Private profile",
+    "memberSince": "On NorthStar since {{date}}",
+    "areFriends": "You are friends",
+    "removeFriend": "Remove",
+    "requestSent": "Request sent",
+    "cancelRequest": "Cancel",
+    "acceptRequest": "Accept request",
+    "rejectRequest": "Reject",
+    "addFriend": "Add friend",
+    "editProfile": "Edit your profile",
+    "privateContent": "Private content",
+    "privateContentDesc": "Become friends with {{name}} to see their full profile.",
+    "loginToAdd": "Sign in to NorthStar to send a friend request.",
+    "goHome": "Go to home"
+  },
+  "workMode": {
+    "dipendente": "Employed",
+    "autonomo": "Self-employed/Freelance",
+    "ibrido": "Hybrid"
+  },
+  "seo": {
+    "home": {
+      "title": "NorthStar — Discover your professional direction",
+      "description": "Take the free RIASEC test and discover the professional sectors best suited to your personality. Real data on salaries, growth, and AI risk."
+    },
+    "test": {
+      "title": "The Orientation Test — NorthStar",
+      "description": "Answer 27 questions and discover the professional sectors most compatible with your RIASEC personality and Inner Compass."
+    },
+    "sectors": {
+      "title": "Explore 21 professional sectors",
+      "description": "Browse all professional sectors. Filter by RIASEC type, AI automation risk, and market trends."
+    },
+    "premium": {
+      "title": "NorthStar Premium — Advanced orientation tools",
+      "description": "Personalized AI wiki, detailed roadmaps, knowledge graph, and live market data."
+    },
+    "growth": {
+      "title": "Personal Growth — NorthStar",
+      "description": "Articles, guides, and practical exercises on habits, mindset, motivation, and professional growth."
+    },
+    "news": {
+      "title": "News from the world of work — NorthStar",
+      "description": "The latest news on professional sectors: technology, business, finance, health, and much more."
+    },
+    "sectorTitle": "{{name}} — Professional sector",
+    "sectorDescSuffix": "Average salary €{{min}}k–{{max}}k, annual growth +{{rate}}%, {{trend}}, {{risk}}.",
+    "sectorImageAlt": "{{name}} — sector data and opportunities on NorthStar",
+    "sectorJsonLdSalary": "Annual salary (Italy)"
+  },
+  "notifiche": {
+    "title": "Notifications",
+    "newBadge": "{{count}} new",
+    "markAllRead": "Mark all read",
+    "empty": "No notifications"
+  },
+  "dashboard": {
+    "yourJourney": "Your journey",
+    "welcome": "Welcome back, {{name}} ✦",
+    "welcomeDesc": "Here's a summary of your journey and the next recommended steps.",
+    "confirmedPath": "Your confirmed path",
+    "confirmed": "Confirmed",
+    "compatibility": "{{score}}% compatibility",
+    "sectorRoadmap": "Sector roadmap",
+    "competenceGraph": "Competency graph",
+    "yourProgress": "Your progress",
+    "objectivesLoading": "Objectives",
+    "objectivesCompleted": "{{done}} / {{total}} objectives completed",
+    "yourObjectives": "Your objectives",
+    "manage": "Manage",
+    "noObjectives": "You don't have any objectives yet. Create one from your profile.",
+    "goToProfile": "Go to profile",
+    "overallProgress": "Overall progress",
+    "allDone": "All objectives completed!",
+    "yourResults": "Your results",
+    "fullDetail": "Full detail",
+    "chosen": "✓ Chosen",
+    "matchScore": "{{score}}% match",
+    "recommendedGrowth": "Recommended growth",
+    "articlesForProfile": "Articles for your profile",
+    "articlesComingSoon": "Personalized articles will be available soon.",
+    "exploreGrowth": "Explore the Growth section",
+    "seeAll": "See all",
+    "yourProfile": "Your profile",
+    "profileDesc": "Account settings, preferences, and saved sectors",
+    "diffBase": "Basic",
+    "diffIntermediate": "Intermediate",
+    "diffAdvanced": "Advanced",
+    "read": "Read"
+  },
+  "cv": {
+    "myResume": "My Resume",
+    "uploadedAt": "Uploaded {{date}}. Use it to generate your optimized CV with the graph.",
+    "uploadedRecently": "Uploaded recently. Use it to generate your optimized CV with the graph.",
+    "generateCv": "Generate CV",
+    "generateWithout": "Generate without CV",
+    "skillsDetected": "Detected skills ({{count}})",
+    "toolsCount": "Tools ({{count}})",
+    "expCount": "Experience ({{count}})",
+    "lessExp": "Less experience",
+    "moreExp": "+{{count}} more",
+    "education": "Education",
+    "certifications": "Certifications",
+    "languages": "Languages",
+    "addToGraph": "Add to Knowledge Graph",
+    "suggestedNodes": "{{count}} nodes suggested from your CV",
+    "clickToAdd": "Click to add nodes to the sector graph.",
+    "openGraph": "Open graph →",
+    "uploadDesc": "Upload your CV to integrate it with the Knowledge Graph and generate an optimized version.",
+    "uploadFile": "Upload file",
+    "pasteText": "Paste text",
+    "dragHere": "Drag your CV here or click to select it",
+    "fileLimit": "PDF or TXT · Max 10 MB",
+    "analyzingAI": "Analyzing with AI…",
+    "extractingSkills": "Extracting skills, experience and education",
+    "pasteHere": "Paste your CV text here…",
+    "analyzeWithAI": "Analyze with AI",
+    "invalidFormat": "Unsupported format. Use PDF or TXT.",
+    "uploadError": "Error during upload",
+    "addPlaceholder": "Add...",
+    "featureGraph": "Graph Integration",
+    "featureGraphDesc": "Suggests skill/tool nodes to add to your sector graph",
+    "featureCv": "Optimized CV",
+    "featureCvDesc": "Generates a professional CV based on the graph and RIASEC profile",
+    "featurePrint": "Print & Download",
+    "featurePrintDesc": "Export the generated CV to PDF with one click",
+    "personalInfo": "Personal information",
+    "fullName": "Full name",
+    "professionalTitle": "Professional title",
+    "email": "Email",
+    "phone": "Phone",
+    "cityCountry": "City / Country",
+    "linkedinUrl": "LinkedIn URL",
+    "website": "Website",
+    "professionalProfile": "Professional profile",
+    "profilePlaceholder": "Write a professional summary...",
+    "experience": "Experience",
+    "experienceN": "Experience ({{count}})",
+    "experienceRow": "Experience {{n}}",
+    "roleLabel": "Role *",
+    "companyLabel": "Company *",
+    "periodLabel": "Period *",
+    "locationLabel": "Location",
+    "descriptionLabel": "Description",
+    "bulletHint": "Use → for bullet points: → Activity description...",
+    "skillsLabel": "Skills (press Enter)",
+    "addExperience": "Add experience",
+    "education2": "Education",
+    "educationN": "Education ({{count}})",
+    "educationRow": "Qualification {{n}}",
+    "degreeLabel": "Degree *",
+    "institutionLabel": "Institution *",
+    "yearLabel": "Year",
+    "eduNotes": "Notes (grade, specialization…)",
+    "addEducation": "Add qualification",
+    "skillsSection": "Skills",
+    "toolsSection": "Tools",
+    "languagesSection": "Languages",
+    "langName": "Language",
+    "langLevel": "Level",
+    "addLanguage": "Add language",
+    "certsSection": "Certifications",
+    "generatedTitle": "CV Generated with NorthStar",
+    "targetRole": "Target: {{role}}",
+    "savedAt": "Saved {{when}}",
+    "unsavedChanges": "Unsaved changes",
+    "edit": "Edit",
+    "doneEdit": "Done editing",
+    "saving": "Saving…",
+    "saved": "Saved!",
+    "saveError": "Error",
+    "saveChanges": "Save changes",
+    "downloadPdf": "Download PDF",
+    "downloadingPdf": "PDF…",
+    "print": "Print",
+    "generating": "Generating CV…",
+    "generatingDesc": "Integrating the knowledge graph{{cvSuffix}} with the RIASEC profile",
+    "generatingDescWithCv": " and your CV",
+    "errorGenerating": "Generation error",
+    "retry": "Retry",
+    "livePreview": "Live preview →",
+    "noTabMobile": "Edit",
+    "previewTabMobile": "Preview",
+    "editCv": "Edit CV",
+    "savingFull": "Saving…",
+    "savedFull": "Saved successfully!",
+    "saveErrorFull": "Error — try again",
+    "unsavedNote": "You have unsaved changes",
+    "lastSaved": "Last saved: {{when}}",
+    "adaptCvTitle": "Adapt CV to Job Offer",
+    "howItWorks": "How it works",
+    "tailorSteps": [
+      "The AI analyzes the job posting text",
+      "Rewrites the profile and descriptions to highlight required skills",
+      "Reorders skills and tools to maximize ATS match",
+      "Does NOT invent experience: works only with what you already have"
+    ],
+    "jobPostingLabel": "Job posting text",
+    "jobPostingPlaceholder": "Paste the full job posting here...\n\nE.g.:\nWe're looking for a Software Engineer...\nRequirements: React, TypeScript, Node.js...\nResponsibilities: frontend development...",
+    "chars": "characters",
+    "charsMin": "— at least 30 needed",
+    "adaptedSuccess": "CV successfully adapted!",
+    "highlightedKeywords": "Highlighted keywords:",
+    "adaptedNote": "Check the CV in preview, then save or add as a version to keep it.",
+    "adapting": "Adapting…",
+    "adapt": "Adapt CV",
+    "adaptAnother": "↩ Adapt another offer",
+    "aiRewriteNote": "AI will rewrite the CV keeping all your real experiences",
+    "savedVersions": "Saved versions",
+    "saveCurrentVersion": "Save current version",
+    "noVersions": "No saved versions",
+    "noVersionsDesc": "Use the form above to save a version of the current CV",
+    "versionSaved": "Saved!",
+    "save": "Save",
+    "rename": "Rename",
+    "load": "Load",
+    "deleteVersion": "Delete version",
+    "coverLetter": "Cover Letter",
+    "company": "Company",
+    "targetRoleLabel": "Target role",
+    "jobPostingRequired": "Job posting text *",
+    "extraNotes": "Additional notes",
+    "optional": "(optional)",
+    "letterSteps": [
+      "The AI reads your CV and the job requirements",
+      "Writes a personalized letter highlighting relevant skills",
+      "Adapts the tone based on the sector and required role"
+    ],
+    "generatingLetter": "Generating…",
+    "generateLetter": "Generate Letter",
+    "checkAndEdit": "Letter ready! Check and edit.",
+    "paragraph": "Paragraph {{n}}",
+    "generateAnother": "↩ Generate another letter",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "atsScoreTitle": "Analyze ATS compatibility",
+    "jobPostingLabelShort": "Job posting text",
+    "jobPostingPlaceholderShort": "Paste the job posting text...",
+    "analyzing": "Analyzing…",
+    "analyze": "Analyze",
+    "sectionDetail": "Section detail",
+    "strengths": "Strengths",
+    "missingKeywords": "Missing keywords",
+    "howToImprove": "How to improve",
+    "useAdaptNote": "Use Adapt to Offer to automatically improve your score",
+    "analyzeAnother": "↩ Analyze another offer",
+    "versionNamePlaceholder": "Version name (optional)",
+    "letterButton": "Letter",
+    "versionsButton": "Versions",
+    "regenerate": "Regenerate",
+    "tailorButton": "Adapt to Offer",
+    "atsButton": "ATS Score",
+    "letterJobPostingPlaceholder": "Paste the full job posting...\n\nThe AI will analyze the required skills and write a personalized letter highlighting your most relevant competencies.",
+    "letterCharsMin": "— at least 30 needed",
+    "letterMotivations": "E.g. personal motivations, availability, achievements to highlight...",
+    "letterCopied": "Copied!",
+    "letterDownloadPdf": "Download PDF",
+    "closeLetter": "Close",
+    "atsSectionDetail": "Section detail",
+    "atsStrengths": "Strengths",
+    "atsMissing": "Missing keywords",
+    "atsImprove": "How to improve",
+    "atsUseAdapt": "Use Adapt to Offer to automatically improve your score",
+    "atsAnalyzeAnother": "↩ Analyze another offer",
+    "renameTitle": "Rename",
+    "letterTitle": "Cover Letter",
+    "atsTitle": "ATS Compatibility Score",
+    "letterCompany": "Company",
+    "letterRole": "Target role",
+    "letterRoleShort": "Role",
+    "letterJobPlaceholder": "Paste the full job posting text...\n\nThe AI will analyze the required qualifications and write a personalized letter highlighting your most relevant skills.",
+    "extraNotesPlaceholder": "E.g. personal motivations, availability, achievements to highlight...",
+    "letterGenerated": "Letter generated! You can edit each paragraph.",
+    "letterReady": "Letter ready! Review and edit.",
+    "subject": "Subject",
+    "salutation": "Greeting",
+    "paragraphN": "Paragraph {{n}}",
+    "closing": "Closing",
+    "letterWriting": "Writing…",
+    "generatingShort": "Generating…",
+    "copyText": "Copy text",
+    "copyShort": "Copy",
+    "generateAnotherLetter": "Generate another letter",
+    "atsJobPlaceholder": "Paste the job posting text...\n\nThe AI will analyze each CV section to compute ATS compatibility.",
+    "atsJobShortPlaceholder": "Paste the job posting text...",
+    "jobPostingShort": "Job posting text",
+    "jobPostingShortReq": "Job posting text *",
+    "jobShortPlaceholder": "Paste the job posting text here...",
+    "sectionBreakdown": "Section breakdown",
+    "analyzeCompat": "Analyze compatibility",
+    "atsTipUseTailor": "Use Tailor to Job to automatically improve your score",
+    "atsSteps": [
+      "The AI simulates a real ATS system",
+      "Evaluates keyword match, experience, skills, education",
+      "Shows what's missing and how to improve the score"
+    ],
+    "cvAdaptedMobile": "CV adapted! Check the preview.",
+    "tailorMobileDesc": "The AI analyzes the posting and rewrites the CV to maximize ATS match, without inventing experiences.",
+    "editCvShort": "Edit CV",
+    "goToPreview": "Go to Preview to see",
+    "loadVersion": "Load",
+    "footerUnsaved": "Unsaved changes — click \"Save changes\" to keep them",
+    "footerEditing": "Edit fields — the CV updates in real time",
+    "footerSavedAt": "CV saved on {{when}} · Reopening the modal will show this version",
+    "footerHelp": "\"Edit\" to edit · \"Print / PDF\" to export · \"Save\" to keep changes",
+    "companyPlaceholder": "Company name",
+    "periodPlaceholder": "Jan 2022 – Present",
+    "locationPlaceholder": "London",
+    "institutionPlaceholder": "University of...",
+    "realPdfTitle": "Download real PDF (via server)"
+  },
+  "calendar": {
+    "editEvent": "Edit event",
+    "newEvent": "New event",
+    "title": "Title *",
+    "titlePlaceholder": "E.g. Study session...",
+    "description": "Description",
+    "descPlaceholder": "Additional notes...",
+    "allDay": "All day",
+    "startDate": "Start date *",
+    "startTime": "Start time",
+    "endDate": "End date *",
+    "endTime": "End time",
+    "category": "Category",
+    "priority": "Priority",
+    "status": "Status",
+    "linkedSector": "Related sector",
+    "noSector": "No sector",
+    "suggestedContent": "Suggested content for {{name}}",
+    "wikiLabel": "Wiki articles",
+    "roadmapLabel": "Sector roadmap",
+    "growthLabel": "Growth paths",
+    "premiumNote": "Upgrade to Premium to see wiki, roadmap and paths related to {{name}}.",
+    "linkedGoal": "Linked objective",
+    "linkedGoalPlaceholder": "Link to an objective...",
+    "noGoal": "No objective",
+    "addGoalsHint": "Add objectives in your dashboard to link them to events.",
+    "linkedGoalInput": "E.g. Find a job in the tech sector...",
+    "reminders": "Reminders",
+    "premiumReminders": "10 min and 24h reminders are available for Premium users.",
+    "upgradePremium": "Upgrade to Premium →",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "saveChanges": "Save changes",
+    "createEvent": "Create event",
+    "freeLimitTitle": "Limit reached",
+    "premiumFeatureTitle": "Premium feature",
+    "premiumFeatureDesc": "Upgrade to Premium to use these reminders.",
+    "errorTitle": "Error",
+    "networkError": "Network error",
+    "eventUpdated": "Event updated",
+    "eventCreated": "Event created",
+    "errorSaving": "Error saving",
+    "categories": {
+      "study": "Study",
+      "training": "Training",
+      "interview": "Interview",
+      "deadline": "Deadline",
+      "task": "Task",
+      "follow-up": "Follow-up"
+    },
+    "priorities": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "statuses": {
+      "todo": "To do",
+      "in-progress": "In progress",
+      "done": "Done",
+      "postponed": "Postponed"
+    },
+    "remindersLabels": {
+      "10": "10 min before",
+      "30": "30 min before",
+      "120": "2 hours before",
+      "1440": "24 hours before"
+    }
+  }
+}

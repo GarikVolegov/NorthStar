@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Send, Brain, Sparkles, MessageSquare, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -12,15 +13,6 @@ interface Message {
   role: "user" | "assistant";
   content: string;
 }
-
-const SUGGESTED_QUESTIONS = [
-  "Quali sono le competenze più richieste al momento?",
-  "Come posso distinguermi dalla concorrenza in questo campo?",
-  "Qual è il percorso formativo consigliato per iniziare?",
-  "Come sta cambiando questo settore con l'AI?",
-  "Quali certificazioni aumentano lo stipendio?",
-  "Come prepararsi al meglio per un colloquio?",
-];
 
 function formatLine(line: string, key: number) {
   const parts = line.split(/\*\*(.*?)\*\*/g);
@@ -69,6 +61,7 @@ function MessageContent({ content }: { content: string }) {
 }
 
 export default function Wiki() {
+  const { t } = useTranslation();
   const params = useParams();
   const id = parseInt(params.id || "0", 10);
   const { user } = useAuth();
@@ -77,6 +70,8 @@ export default function Wiki() {
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const suggestedQuestions = t("wiki.suggestedQuestions", { returnObjects: true }) as string[];
 
   const { data: sector, isLoading: sectorLoading } = useGetSector(id, {
     query: { enabled: !!id && !!user, queryKey: ["sector", id] },
@@ -142,7 +137,7 @@ export default function Wiki() {
         const msgs = [...prev];
         msgs[msgs.length - 1] = {
           role: "assistant",
-          content: "Errore nella comunicazione. Riprova tra un momento.",
+          content: t("wiki.errorMessage"),
         };
         return msgs;
       });
@@ -163,12 +158,10 @@ export default function Wiki() {
         <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
           <Brain className="w-8 h-8 text-primary" />
         </div>
-        <h2 className="text-2xl font-serif font-bold mb-3">Accesso richiesto</h2>
-        <p className="text-muted-foreground mb-8">
-          Registrati gratuitamente per accedere alla Wiki AI personalizzata.
-        </p>
+        <h2 className="text-2xl font-serif font-bold mb-3">{t("wiki.accessRequired")}</h2>
+        <p className="text-muted-foreground mb-8">{t("wiki.accessRequiredDesc")}</p>
         <Button asChild>
-          <Link href="/registra">Registrati gratis</Link>
+          <Link href="/registra">{t("wiki.registerFree")}</Link>
         </Button>
       </div>
     );
@@ -196,7 +189,7 @@ export default function Wiki() {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="font-semibold text-sm truncate">Wiki AI</h1>
+            <h1 className="font-semibold text-sm truncate">{t("wiki.title")}</h1>
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/20 text-primary bg-primary/5 shrink-0">
               <Sparkles className="w-2 h-2 mr-1" />Premium
             </Badge>
@@ -212,7 +205,7 @@ export default function Wiki() {
             className="text-xs text-muted-foreground shrink-0"
             onClick={() => setMessages([])}
           >
-            Nuova chat
+            {t("wiki.newChat")}
           </Button>
         )}
       </div>
@@ -226,14 +219,14 @@ export default function Wiki() {
                 <Brain className="w-7 h-7 text-primary" />
               </div>
               <h2 className="text-xl font-serif font-bold mb-2">
-                Esperto di {sector?.name}
+                {t("wiki.expertOf", { name: sector?.name })}
               </h2>
               <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                Fai qualsiasi domanda su questo settore: percorsi formativi, competenze richieste, salari, opportunità e molto altro.
+                {t("wiki.chatDesc")}
               </p>
             </div>
             <div className="grid sm:grid-cols-2 gap-2.5">
-              {SUGGESTED_QUESTIONS.map((q, i) => (
+              {Array.isArray(suggestedQuestions) && suggestedQuestions.map((q, i) => (
                 <button
                   key={i}
                   onClick={() => sendMessage(q)}
@@ -301,11 +294,11 @@ export default function Wiki() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             onInput={(e) => {
-              const t = e.currentTarget;
-              t.style.height = "auto";
-              t.style.height = `${Math.min(t.scrollHeight, 120)}px`;
+              const target = e.currentTarget;
+              target.style.height = "auto";
+              target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
             }}
-            placeholder={`Chiedi qualcosa su ${sector?.name ?? "questo settore"}…`}
+            placeholder={t("wiki.askPlaceholder", { name: sector?.name ?? "…" })}
             rows={1}
             disabled={isStreaming}
             className="flex-1 resize-none rounded-xl border bg-card px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 placeholder:text-muted-foreground/50 min-h-[42px] max-h-[120px] leading-relaxed"
@@ -324,7 +317,7 @@ export default function Wiki() {
           </Button>
         </div>
         <p className="text-center text-[10px] text-muted-foreground/40 mt-1.5">
-          Invio per inviare · Shift+Invio per nuova riga
+          {t("wiki.inputHint")}
         </p>
       </div>
     </div>

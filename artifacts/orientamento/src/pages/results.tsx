@@ -25,6 +25,7 @@ import { WorkModeSelector, WorkModeBadge, useWorkPreference } from "@/components
 import type { WorkPreference } from "@/components/WorkModeSelector";
 import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
 import { useReducedMotion } from "@/lib/motion";
+import { useTranslation } from "react-i18next";
 import { getWorkModeAlignment } from "@/lib/work-mode-utils";
 import { useAgentAnalysis } from "@/hooks/useAgentAnalysis";
 import type { ProfessionResult, EducationResult, WorkModeResult } from "@/hooks/useAgentAnalysis";
@@ -172,6 +173,7 @@ type Rec = {
 };
 
 function QuickCompare({ recs }: { recs: Rec[] }) {
+  const { t } = useTranslation();
   if (recs.length < 2) return null;
 
   const cols = recs.slice(0, 3);
@@ -214,8 +216,8 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
     <div className="mt-10 mb-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex items-center gap-2 mb-4">
         <GitCompare className="w-5 h-5 text-primary" />
-        <h3 className="font-serif text-xl font-bold text-foreground">Confronto rapido tra i tuoi percorsi</h3>
-        <span className="text-sm text-muted-foreground ml-1">· Il punto verde indica il valore migliore</span>
+        <h3 className="font-serif text-xl font-bold text-foreground">{t("results.quickCompare")}</h3>
+        <span className="text-sm text-muted-foreground ml-1">· {t("results.quickCompareBest")}</span>
       </div>
 
       <div className="rounded-2xl border bg-card overflow-hidden shadow-sm">
@@ -224,7 +226,7 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
             <thead>
               <tr className="border-b bg-muted/30">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-32">
-                  Metrica
+                  {t("confronta.vs", { defaultValue: "Metrica" })}
                 </th>
                 {cols.map((rec, i) => (
                   <th key={rec.sectorId} className="px-4 py-3 text-center min-w-[160px]">
@@ -254,7 +256,7 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
                 <td className="px-4 py-3 text-sm text-muted-foreground font-medium whitespace-nowrap">
                   <div className="flex items-center gap-1.5">
                     <DollarSign className="w-3.5 h-3.5" />
-                    Stipendio max
+                    {t("results.maxSalary")}
                   </div>
                 </td>
                 {cols.map((rec, i) => (
@@ -269,7 +271,7 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
                 <td className="px-4 py-3 text-sm text-muted-foreground font-medium whitespace-nowrap">
                   <div className="flex items-center gap-1.5">
                     <TrendingUp className="w-3.5 h-3.5" />
-                    Crescita annua
+                    {t("results.annualGrowth")}
                   </div>
                 </td>
                 {cols.map((rec, i) => (
@@ -284,7 +286,7 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
                 <td className="px-4 py-3 text-sm text-muted-foreground font-medium whitespace-nowrap">
                   <div className="flex items-center gap-1.5">
                     <Bot className="w-3.5 h-3.5" />
-                    Rischio AI
+                    {t("common.aiRisk")}
                   </div>
                 </td>
                 {cols.map((rec, i) => {
@@ -299,7 +301,7 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
                         {winnerIdx(riskVals) === i && (
                           <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 mr-0.5" />
                         )}
-                        {meta.label}
+                        {t(`confronta.risk.${rec.sector?.automationRisk ?? "medium"}`, { defaultValue: meta.label })}
                       </span>
                     </td>
                   );
@@ -309,13 +311,13 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
                 <td className="px-4 py-3 text-sm text-muted-foreground font-medium whitespace-nowrap">
                   <div className="flex items-center gap-1.5">
                     <Activity className="w-3.5 h-3.5" />
-                    Trend mercato
+                    {t("results.marketTrend")}
                   </div>
                 </td>
                 {cols.map((rec, i) => (
                   <Cell
                     key={rec.sectorId}
-                    val={TREND_LABEL[rec.sector?.trend ?? ""]?.label ?? rec.sector?.trend ?? "—"}
+                    val={t(`confronta.trend.${rec.sector?.trend ?? "stable"}`, { defaultValue: rec.sector?.trend ?? "—" })}
                     isWinner={winnerIdx(trendVals) === i}
                   />
                 ))}
@@ -325,7 +327,7 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-2 px-4 py-4 border-t bg-muted/20">
-          <span className="text-xs text-muted-foreground font-medium mr-1">Confronto approfondito:</span>
+          <span className="text-xs text-muted-foreground font-medium mr-1">{t("results.deepCompare")}</span>
           {PAIRS.map(([a, b]) => (
             <Link
               key={`${a}-${b}`}
@@ -337,7 +339,7 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
                   style={{ backgroundColor: ACCENT[a] }}
                 />
                 {cols[a].sector?.name?.split(" ")[0]}
-                <span className="text-muted-foreground">vs</span>
+                <span className="text-muted-foreground">{t("results.vs")}</span>
                 <span
                   className="inline-block w-2 h-2 rounded-full border"
                   style={{ backgroundColor: ACCENT[b] }}
@@ -354,10 +356,11 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
 }
 
 export default function Results() {
+  const { t } = useTranslation();
   const prefersReduced = useReducedMotion();
   usePageMeta({
-    title: "I tuoi risultati RIASEC",
-    description: "I tuoi risultati personalizzati del test RIASEC + Bussola Interiore. Scopri i settori professionali più adatti al tuo profilo di personalità.",
+    title: t("seo.test.title"),
+    description: t("seo.test.description"),
     noIndex: true,
   });
   const params = useParams();
@@ -443,9 +446,9 @@ export default function Results() {
     return (
       <div className="container mx-auto px-4 py-24 text-center max-w-lg">
         <AlertTriangle className="w-16 h-16 text-destructive mx-auto mb-6 opacity-80" />
-        <h2 className="text-3xl font-serif font-bold mb-4">Sessione non trovata</h2>
-        <p className="text-muted-foreground mb-8">Non siamo riusciti a caricare i risultati di questo test.</p>
-        <Button asChild><Link href="/test">Rifai il Test</Link></Button>
+        <h2 className="text-3xl font-serif font-bold mb-4">{t("results.sessionNotFound")}</h2>
+        <p className="text-muted-foreground mb-8">{t("results.sessionNotFoundDesc")}</p>
+        <Button asChild><Link href="/test">{t("results.retakeTest")}</Link></Button>
       </div>
     );
   }
@@ -495,7 +498,7 @@ export default function Results() {
         <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-5 py-3 mb-8 animate-in slide-in-from-top-2 fade-in duration-500">
           <UserCheck className="w-5 h-5 shrink-0 text-emerald-600" />
           <p className="text-sm font-medium">
-            Risultati salvati sul tuo account — li ritrovi sempre nel tuo profilo, {user.name}.
+            {t("results.savedBanner", { name: user.name })}
           </p>
         </div>
       )}
@@ -503,7 +506,7 @@ export default function Results() {
       {/* Profile Header */}
       <div className="text-center mb-12 max-w-3xl mx-auto animate-in slide-in-from-bottom-4 fade-in duration-700">
         <Badge variant="outline" className="mb-6 border-primary/20 text-primary bg-primary/5 px-4 py-1 text-sm rounded-full">
-          Il tuo profilo RIASEC
+          {t("results.riasecProfile")}
         </Badge>
         <h1 className="text-4xl md:text-6xl font-serif font-bold mb-6 capitalize text-foreground">
           {primaryProfile}
@@ -523,13 +526,13 @@ export default function Results() {
                 <Sparkles className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h2 className="font-serif text-xl font-bold text-foreground">Bussola Interiore</h2>
-                <p className="text-sm text-muted-foreground">I tuoi Cinque Spiriti · 15 domande, 3 per spirito</p>
+                <h2 className="font-serif text-xl font-bold text-foreground">{t("results.innerCompass")}</h2>
+                <p className="text-sm text-muted-foreground">{t("results.fiveSpirits")}</p>
               </div>
               {dominantMeta && (
                 <div className={cn("ml-auto flex items-center gap-2 border rounded-full px-4 py-1.5 text-sm font-semibold", dominantMeta.color)}>
                   <span>{dominantMeta.emoji}</span>
-                  {dominantMeta.label} dominante
+                  {t(`results.spirits.${dominantSpirit}`, { defaultValue: dominantMeta.label })} {t("results.dominantSpirit")}
                 </div>
               )}
             </div>
@@ -537,7 +540,7 @@ export default function Results() {
             <div className="grid md:grid-cols-2 gap-8 mb-8">
               <div className="flex flex-col items-center justify-center bg-background/40 rounded-2xl border border-primary/10 py-4">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">
-                  Mappa interiore
+                  {t("results.innerCompass")}
                 </p>
                 <SpiritRadarChart spiritScores={spiritScores!} />
               </div>
@@ -545,7 +548,7 @@ export default function Results() {
                 <div className="flex flex-col justify-center bg-background/60 rounded-2xl p-6 border border-primary/10">
                   <div className="text-2xl mb-3">{dominantMeta?.emoji ?? "✨"}</div>
                   <h3 className="font-semibold text-foreground mb-2 text-sm uppercase tracking-wide">
-                    Il tuo profilo interiore
+                    {t("results.innerCompass")}
                   </h3>
                   <p className="text-foreground leading-relaxed">{spiritInsight}</p>
                 </div>
@@ -554,7 +557,7 @@ export default function Results() {
 
             <div className="bg-background/40 rounded-2xl border border-primary/10 p-5 space-y-4">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
-                Dettaglio spiriti (media su 3 domande ciascuno)
+                {t("results.fiveSpirits")}
               </p>
               {(["shen", "hun", "po", "yi", "zhi"] as const).map((key) => {
                 const score = spiritScores![key];
@@ -584,10 +587,10 @@ export default function Results() {
       <div className="mb-12">
         <AnimateOnScroll>
           <h2 className="text-2xl md:text-3xl font-serif font-bold text-center mb-4">
-            I tuoi percorsi ideali
+            {t("results.yourSectors")}
           </h2>
           <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
-            Basandoci sulla tua tipologia di personalità (il modello RIASEC classifica 6 tendenze: Realistico, Investigativo, Artistico, Sociale, Imprenditivo, Convenzionale) e sulla tua Bussola Interiore, ecco i 3 settori dove potresti eccellere.
+            {t("results.sectorCount", { count: (effectiveSession?.recommendations ?? session?.recommendations ?? []).length })}
           </p>
         </AnimateOnScroll>
 
@@ -611,7 +614,7 @@ export default function Results() {
               >
                 {rec.matchScore >= 90 && (
                   <div className="bg-primary text-primary-foreground text-xs font-bold uppercase tracking-wider text-center py-1.5">
-                    Miglior Affinità
+                    {t("results.matchScore", { score: rec.matchScore })}
                   </div>
                 )}
 
@@ -666,7 +669,7 @@ export default function Results() {
                     <div className="grid grid-cols-2 gap-3 pt-2">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                          <DollarSign className="w-3.5 h-3.5 mr-1" /> Stipendio medio annuo
+                          <DollarSign className="w-3.5 h-3.5 mr-1" /> {t("sector.annualSalary")}
                         </div>
                         <span className="font-semibold text-sm">
                           €{(rec.sector?.avgSalaryMin ?? 0) / 1000}k - €{(rec.sector?.avgSalaryMax ?? 0) / 1000}k
@@ -674,23 +677,27 @@ export default function Results() {
                       </div>
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                          <TrendingUp className="w-3.5 h-3.5 mr-1" /> Crescita
+                          <TrendingUp className="w-3.5 h-3.5 mr-1" /> {t("common.growth")}
                         </div>
                         <span className="font-semibold text-sm text-emerald-600">
-                          +{rec.sector?.growthRate}% annuo
+                          {t("sector.annualGrowth", { rate: rec.sector?.growthRate })}
                         </span>
                       </div>
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                          <Activity className="w-3.5 h-3.5 mr-1" /> Trend
+                          <Activity className="w-3.5 h-3.5 mr-1" /> {t("common.trend")}
                         </div>
-                        <span className="font-semibold text-sm capitalize">{rec.sector?.trend}</span>
+                        <span className="font-semibold text-sm capitalize">
+                          {t(`results.trend.${rec.sector?.trend}`, { defaultValue: rec.sector?.trend ?? "" })}
+                        </span>
                       </div>
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                          <Bot className="w-3.5 h-3.5 mr-1" /> Rischio automazione
+                          <Bot className="w-3.5 h-3.5 mr-1" /> {t("sector.automationRisk")}
                         </div>
-                        <span className="font-semibold text-sm capitalize">{rec.sector?.automationRisk}</span>
+                        <span className="font-semibold text-sm capitalize">
+                          {t(`results.risk.${rec.sector?.automationRisk}`, { defaultValue: rec.sector?.automationRisk ?? "" })}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -698,14 +705,14 @@ export default function Results() {
 
                 <CardFooter className="p-6 pt-0 flex flex-col gap-3">
                   <Button asChild variant="outline" className="w-full">
-                    <Link href={`/settore/${rec.sectorId}`}>Vedi dettagli completi</Link>
+                    <Link href={`/settore/${rec.sectorId}`}>{t("home.personalized.fullDetail")}</Link>
                   </Button>
                   <Button
                     className="w-full"
                     onClick={() => handleConfirm(rec.sectorId)}
                     disabled={confirmSector.isPending}
                   >
-                    {user ? "Salva questa direzione" : "Conferma questa direzione"}
+                    {user ? t("results.confirmSector") : t("results.confirmSectorDesc")}
                   </Button>
                 </CardFooter>
               </Card>
@@ -930,10 +937,10 @@ export default function Results() {
       {stats && (
         <div className="mt-20 bg-card border rounded-2xl p-8 text-center animate-in fade-in duration-1000 delay-500">
           <BarChart3 className="w-10 h-10 mx-auto text-muted-foreground mb-4 opacity-50" />
-          <h3 className="font-serif text-xl font-medium mb-2">Lo sapevi?</h3>
+          <h3 className="font-serif text-xl font-medium mb-2">{t("home.stats.guided", { defaultValue: "Lo sapevi?" })}</h3>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Sei in buona compagnia. Finora <strong className="text-foreground">{stats.totalTestsTaken}</strong> persone hanno completato questo test.
-            I settori più scelti sono: {stats.topSectors.slice(0, 3).map(s => s.name).join(", ")}.
+            {t("results.sectorCount", { count: stats.totalTestsTaken })} {t("results.quickCompare", { defaultValue: "" })}
+            {stats.topSectors.slice(0, 3).map(s => s.name).join(", ")}.
           </p>
         </div>
       )}
@@ -945,34 +952,34 @@ export default function Results() {
             <div className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center">
               <Newspaper className="w-5 h-5 text-primary" />
             </div>
-            <h4 className="font-semibold text-foreground text-sm">News settoriali</h4>
+            <h4 className="font-semibold text-foreground text-sm">{t("premium.features.updates.title")}</h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Aggiornamenti mirati sul tuo settore: trend, opportunità, aziende e certificazioni.
+              {t("premium.features.updates.desc")}
             </p>
           </div>
           <div className="flex flex-col items-center text-center p-8 gap-3">
             <div className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center">
               <Brain className="w-5 h-5 text-primary" />
             </div>
-            <h4 className="font-semibold text-foreground text-sm">Wiki personalizzata</h4>
+            <h4 className="font-semibold text-foreground text-sm">{t("premium.features.wiki.title")}</h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Una knowledge base intelligente che risponde alle tue domande specifiche sul settore.
+              {t("premium.features.wiki.desc")}
             </p>
           </div>
           <div className="flex flex-col items-center text-center p-8 gap-3">
             <div className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center">
               <Map className="w-5 h-5 text-primary" />
             </div>
-            <h4 className="font-semibold text-foreground text-sm">Roadmap dettagliata</h4>
+            <h4 className="font-semibold text-foreground text-sm">{t("premium.features.roadmap.title")}</h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Un piano step-by-step personalizzato per entrare nel tuo settore ideale.
+              {t("premium.features.roadmap.desc")}
             </p>
           </div>
         </div>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 px-8 py-6 border-t border-primary/10 bg-primary/3">
-          <p className="text-sm text-muted-foreground">Vuoi andare più in profondità?</p>
+          <p className="text-sm text-muted-foreground">{t("sector.deepenWithAI")}</p>
           <Button asChild className="rounded-full" size="sm">
-            <Link href="/premium"><Sparkles className="h-3.5 w-3.5 mr-1.5" />Scopri NorthStar Premium</Link>
+            <Link href="/premium"><Sparkles className="h-3.5 w-3.5 mr-1.5" />{t("wiki.upgrade")}</Link>
           </Button>
         </div>
       </div>

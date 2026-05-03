@@ -6,6 +6,7 @@ import { Bookmark, BookmarkCheck, ArrowRight, Clock, BarChart2, RefreshCw } from
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -71,7 +72,7 @@ function renderContent(content: string): React.ReactNode {
           {line.slice(3)}
         </h2>
       );
-    } else if (line.startsWith("**") && line.endsWith("**") && !line.includes("**", 2, line.length - 2)) {
+    } else if (line.startsWith("**") && line.endsWith("**") && !line.slice(2, -2).includes("**")) {
       elements.push(
         <p key={i} className="font-semibold text-foreground mt-4 mb-1">{line.slice(2, -2)}</p>
       );
@@ -108,6 +109,7 @@ function fmtDate(iso: string) {
 }
 
 export default function CrescitaArticolo() {
+  const { t } = useTranslation();
   const { slug } = useParams<{ slug: string }>();
   const { isLoggedIn } = useAuth();
   const queryClient = useQueryClient();
@@ -148,7 +150,7 @@ export default function CrescitaArticolo() {
     return (
       <div className="container mx-auto px-4 md:px-6 max-w-3xl py-20 text-center text-muted-foreground">
         <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 opacity-40" />
-        Caricamento…
+        {t("common.loading", { defaultValue: "Caricamento…" })}
       </div>
     );
   }
@@ -156,9 +158,9 @@ export default function CrescitaArticolo() {
   if (error || !article) {
     return (
       <div className="container mx-auto px-4 md:px-6 max-w-3xl py-20 text-center">
-        <p className="text-muted-foreground">Articolo non trovato.</p>
+        <p className="text-muted-foreground">{t("growth.articleNotFound", { defaultValue: "Articolo non trovato." })}</p>
         <Link href="/crescita">
-          <Button variant="outline" className="mt-4 rounded-full">← Torna alla libreria</Button>
+          <Button variant="outline" className="mt-4 rounded-full">← {t("growth.backToLibrary", { defaultValue: "Torna alla libreria" })}</Button>
         </Link>
       </div>
     );
@@ -170,7 +172,7 @@ export default function CrescitaArticolo() {
       {/* Breadcrumb */}
       <div className="border-b bg-muted/30">
         <div className="container mx-auto px-4 md:px-6 max-w-4xl py-3 flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
-          <Link href="/crescita" className="hover:text-primary transition-colors">Crescita Personale</Link>
+          <Link href="/crescita" className="hover:text-primary transition-colors">{t("growth.title", { defaultValue: "Crescita Personale" })}</Link>
           <span>/</span>
           <Link href={`/crescita/categoria/${article.category}`} className="hover:text-primary transition-colors capitalize">
             {CATEGORY_ICONS[article.category]} {article.category.replace(/-/g, " ")}
@@ -220,7 +222,7 @@ export default function CrescitaArticolo() {
                   title={!isLoggedIn ? "Accedi per salvare" : undefined}
                 >
                   {saved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
-                  {saved ? "Salvato" : "Salva"}
+                  {saved ? t("news.saved") : t("news.save")}
                 </Button>
               </div>
             </div>
@@ -282,10 +284,10 @@ export default function CrescitaArticolo() {
             {/* CTA save */}
             {!isLoggedIn && (
               <div className="mt-8 rounded-2xl border bg-primary/5 border-primary/20 p-6 text-center">
-                <p className="font-semibold text-foreground mb-1">Salva questo articolo</p>
-                <p className="text-sm text-muted-foreground mb-4">Accedi per salvare i contenuti e ritrovarli nel tuo profilo.</p>
+                <p className="font-semibold text-foreground mb-1">{t("growth.saveArticleTitle", { defaultValue: "Salva questo articolo" })}</p>
+                <p className="text-sm text-muted-foreground mb-4">{t("growth.saveArticleDesc", { defaultValue: "Accedi per salvare i contenuti e ritrovarli nel tuo profilo." })}</p>
                 <Link href="/test">
-                  <Button className="rounded-full">Inizia il percorso</Button>
+                  <Button className="rounded-full">{t("growth.startJourney", { defaultValue: "Inizia il percorso" })}</Button>
                 </Link>
               </div>
             )}
@@ -296,7 +298,7 @@ export default function CrescitaArticolo() {
 
             {/* Save */}
             <div className="rounded-2xl border bg-card p-4">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Azioni</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">{t("growth.actions", { defaultValue: "Azioni" })}</p>
               <Button
                 variant={saved ? "default" : "outline"}
                 size="sm"
@@ -305,19 +307,19 @@ export default function CrescitaArticolo() {
                 disabled={saveLoading || !isLoggedIn}
               >
                 {saved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
-                {saved ? "Articolo salvato" : "Salva articolo"}
+                {saved ? t("growth.articleSaved", { defaultValue: "Articolo salvato" }) : t("growth.saveArticleBtn", { defaultValue: "Salva articolo" })}
               </Button>
               {!isLoggedIn && (
-                <p className="text-xs text-muted-foreground mt-2 text-center">Accedi per salvare</p>
+                <p className="text-xs text-muted-foreground mt-2 text-center">{t("growth.loginToSave", { defaultValue: "Accedi per salvare" })}</p>
               )}
             </div>
 
             {/* Info */}
             <div className="rounded-2xl border bg-card p-4 space-y-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Dettagli</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("growth.details", { defaultValue: "Dettagli" })}</p>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Categoria</span>
+                  <span className="text-muted-foreground">{t("growth.category", { defaultValue: "Categoria" })}</span>
                   <Link href={`/crescita/categoria/${article.category}`}>
                     <span className="font-medium text-primary hover:underline cursor-pointer capitalize">
                       {CATEGORY_ICONS[article.category]} {article.category.replace(/-/g, " ")}
@@ -325,11 +327,11 @@ export default function CrescitaArticolo() {
                   </Link>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Livello</span>
+                  <span className="text-muted-foreground">{t("growth.level", { defaultValue: "Livello" })}</span>
                   <span className="font-medium">{DIFFICULTY_LABELS[article.difficulty]}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Lettura</span>
+                  <span className="text-muted-foreground">{t("growth.reading", { defaultValue: "Lettura" })}</span>
                   <span className="font-medium">{article.readTimeMinutes} min</span>
                 </div>
               </div>
@@ -338,7 +340,7 @@ export default function CrescitaArticolo() {
             {/* Related */}
             {article.related.length > 0 && (
               <div className="rounded-2xl border bg-card p-4">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Leggi anche</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">{t("growth.readAlso", { defaultValue: "Leggi anche" })}</p>
                 <div className="space-y-3">
                   {article.related.map(r => (
                     <Link key={r.id} href={`/crescita/articolo/${r.slug}`}>
@@ -355,7 +357,7 @@ export default function CrescitaArticolo() {
                 </div>
                 <Link href={`/crescita/categoria/${article.category}`}>
                   <div className="flex items-center gap-1 text-xs text-primary mt-3 pt-3 border-t hover:underline cursor-pointer">
-                    Tutti gli articoli <ArrowRight className="w-3 h-3" />
+                    {t("growth.allArticles", { defaultValue: "Tutti gli articoli" })} <ArrowRight className="w-3 h-3" />
                   </div>
                 </Link>
               </div>
@@ -363,11 +365,11 @@ export default function CrescitaArticolo() {
 
             {/* CTA */}
             <div className="rounded-2xl border bg-primary/5 border-primary/20 p-4 text-center">
-              <p className="text-sm font-semibold text-foreground mb-2">Scopri il tuo profilo</p>
-              <p className="text-xs text-muted-foreground mb-3">Fai il test RIASEC per trovare la direzione giusta.</p>
+              <p className="text-sm font-semibold text-foreground mb-2">{t("growth.discoverProfile", { defaultValue: "Scopri il tuo profilo" })}</p>
+              <p className="text-xs text-muted-foreground mb-3">{t("growth.discoverProfileDesc", { defaultValue: "Fai il test RIASEC per trovare la direzione giusta." })}</p>
               <Link href="/test">
                 <Button size="sm" className="w-full rounded-xl">
-                  Fai il test
+                  {t("growth.doTest", { defaultValue: "Fai il test" })}
                 </Button>
               </Link>
             </div>

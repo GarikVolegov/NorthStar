@@ -14,8 +14,10 @@ import { WorkModeBadge, useWorkPreference } from "@/components/WorkModeSelector"
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { getWorkModeAlignment } from "@/lib/work-mode-utils";
+import { useTranslation } from "react-i18next";
 
 export default function Sector() {
+  const { t } = useTranslation();
   const params = useParams();
   const id = parseInt(params.id || "0", 10);
   const { user } = useAuth();
@@ -67,9 +69,9 @@ export default function Sector() {
   if (sectorError || !sector) {
     return (
       <div className="container mx-auto px-4 py-24 text-center">
-        <h2 className="text-2xl font-bold mb-4">Settore non trovato</h2>
+        <h2 className="text-2xl font-bold mb-4">{t("sector.notFound")}</h2>
         <Button asChild variant="outline">
-          <Link href="/">Torna alla home</Link>
+          <Link href="/">{t("sector.goHome")}</Link>
         </Button>
       </div>
     );
@@ -86,7 +88,7 @@ export default function Sector() {
     <div className="container mx-auto px-4 py-8 md:py-16 max-w-5xl">
       <Button asChild variant="ghost" size="sm" className="mb-8 rounded-full">
         <button onClick={() => window.history.back()}>
-          <ArrowLeft className="w-4 h-4 mr-2" /> Torna ai risultati
+          <ArrowLeft className="w-4 h-4 mr-2" /> {t("sector.backToResults")}
         </button>
       </Button>
 
@@ -157,7 +159,7 @@ export default function Sector() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-16">
         <div className="bg-card border rounded-2xl p-5 flex flex-col justify-center">
           <div className="flex items-center text-muted-foreground text-sm font-medium mb-2 uppercase tracking-wider">
-            <DollarSign className="w-4 h-4 mr-1.5" /> Stipendio medio annuo
+            <DollarSign className="w-4 h-4 mr-1.5" /> {t("sector.annualSalary")}
           </div>
           <div className="text-xl md:text-2xl font-semibold">
             €{sector.avgSalaryMin / 1000}k - {sector.avgSalaryMax / 1000}k
@@ -165,15 +167,15 @@ export default function Sector() {
         </div>
         <div className="bg-card border rounded-2xl p-5 flex flex-col justify-center">
           <div className="flex items-center text-muted-foreground text-sm font-medium mb-2 uppercase tracking-wider">
-            <TrendingUp className="w-4 h-4 mr-1.5" /> Crescita
+            <TrendingUp className="w-4 h-4 mr-1.5" /> {t("sector.growth")}
           </div>
           <div className="text-xl md:text-2xl font-semibold text-emerald-600">
-            +{sector.growthRate}% annuo
+            {t("sector.annualGrowth", { rate: sector.growthRate })}
           </div>
         </div>
         <div className="bg-card border rounded-2xl p-5 flex flex-col justify-center">
           <div className="flex items-center text-muted-foreground text-sm font-medium mb-2 uppercase tracking-wider">
-            <Clock className="w-4 h-4 mr-1.5" /> Tempo Formazione
+            <Clock className="w-4 h-4 mr-1.5" /> {t("sector.trainingTime")}
           </div>
           <div className="text-xl md:text-2xl font-semibold capitalize">
             {sector.timeToAutonomy}
@@ -181,10 +183,10 @@ export default function Sector() {
         </div>
         <div className="bg-card border rounded-2xl p-5 flex flex-col justify-center">
           <div className="flex items-center text-muted-foreground text-sm font-medium mb-2 uppercase tracking-wider">
-            <Bot className="w-4 h-4 mr-1.5" /> Rischio automazione
+            <Bot className="w-4 h-4 mr-1.5" /> {t("sector.automationRisk")}
           </div>
           <div className="text-xl md:text-2xl font-semibold capitalize">
-            {sector.automationRisk}
+            {t(`sectors.risk.${sector.automationRisk}`, { defaultValue: sector.automationRisk })}
           </div>
         </div>
       </div>
@@ -196,13 +198,13 @@ export default function Sector() {
             <GitCompare className="w-4 h-4" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-foreground">Non sei sicuro? Metti a confronto</p>
-            <p className="text-xs text-muted-foreground">Confronta {sector.name} con un altro settore affiancato</p>
+            <p className="text-sm font-semibold text-foreground">{t("sector.compareNotSure")}</p>
+            <p className="text-xs text-muted-foreground">{t("sector.compareDesc", { name: sector.name })}</p>
           </div>
         </div>
         <Link href={`/confronta?a=${id}`}>
           <div className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
-            Confronta <ArrowRight className="w-3.5 h-3.5" />
+            {t("sector.compare")} <ArrowRight className="w-3.5 h-3.5" />
           </div>
         </Link>
       </div>
@@ -211,9 +213,9 @@ export default function Sector() {
       <div className="mb-12">
         <div className="flex items-center gap-2 mb-5">
           <Badge variant="outline" className="border-primary/20 text-primary bg-primary/5 text-xs">
-            <Sparkles className="w-3 h-3 mr-1" /> Strumenti Premium
+            <Sparkles className="w-3 h-3 mr-1" /> {t("sector.premiumTools")}
           </Badge>
-          <span className="text-sm text-muted-foreground">Approfondisci con l'AI</span>
+          <span className="text-sm text-muted-foreground">{t("sector.deepenWithAI")}</span>
         </div>
         <div className="grid sm:grid-cols-3 gap-4">
           <Link href={`/wiki/${id}`} className="block">
@@ -221,12 +223,12 @@ export default function Sector() {
               <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-4 group-hover:bg-indigo-100 transition-colors">
                 <Brain className="w-5 h-5 text-indigo-600" />
               </div>
-              <h4 className="font-semibold mb-1.5 text-sm">Wiki AI</h4>
+              <h4 className="font-semibold mb-1.5 text-sm">{t("sector.wikiAI")}</h4>
               <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-                Fai domande specifiche sul settore e ricevi risposte personalizzate dall'AI.
+                {t("sector.wikiDesc")}
               </p>
               <div className="flex items-center text-indigo-600 text-xs font-medium">
-                Apri la chat <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
+                {t("sector.openChat")} <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
           </Link>
@@ -236,12 +238,12 @@ export default function Sector() {
               <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mb-4 group-hover:bg-emerald-100 transition-colors">
                 <MapPin className="w-5 h-5 text-emerald-600" />
               </div>
-              <h4 className="font-semibold mb-1.5 text-sm">Roadmap Dettagliata</h4>
+              <h4 className="font-semibold mb-1.5 text-sm">{t("sector.roadmap")}</h4>
               <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-                Piano step-by-step generato dall'AI per entrare nel settore con risorse concrete.
+                {t("sector.roadmapDesc")}
               </p>
               <div className="flex items-center text-emerald-600 text-xs font-medium">
-                Genera il piano <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
+                {t("sector.generatePlan")} <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
           </Link>
@@ -251,12 +253,12 @@ export default function Sector() {
               <div className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center mb-4 group-hover:bg-violet-100 transition-colors">
                 <Network className="w-5 h-5 text-violet-600" />
               </div>
-              <h4 className="font-semibold mb-1.5 text-sm">Grafo della Conoscenza</h4>
+              <h4 className="font-semibold mb-1.5 text-sm">{t("sector.knowledgeGraph")}</h4>
               <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-                Visualizza ruoli, competenze e strumenti del settore in un grafo interattivo.
+                {t("sector.graphDesc")}
               </p>
               <div className="flex items-center text-violet-600 text-xs font-medium">
-                Esplora il grafo <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
+                {t("sector.exploreGraph")} <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
           </Link>
@@ -270,25 +272,25 @@ export default function Sector() {
             value="overview" 
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 py-3 text-base"
           >
-            Panoramica
+            {t("sector.tabs.overview")}
           </TabsTrigger>
           <TabsTrigger 
             value="percorso" 
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 py-3 text-base"
           >
-            Percorso di Carriera
+            {t("sector.tabs.career")}
           </TabsTrigger>
           <TabsTrigger 
             value="skills" 
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 py-3 text-base"
           >
-            Competenze
+            {t("sector.tabs.skills")}
           </TabsTrigger>
           <TabsTrigger 
             value="data" 
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 py-3 text-base"
           >
-            Dati & Trend
+            {t("sector.tabs.data")}
           </TabsTrigger>
         </TabsList>
 
@@ -296,7 +298,7 @@ export default function Sector() {
           <div className="max-w-3xl">
             <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
               <h3 className="text-2xl font-serif font-bold flex items-center gap-2">
-                Percorso di Carriera
+                {t("sector.careerPath")}
               </h3>
               <div className="flex items-center gap-2 bg-muted rounded-xl p-1">
                 <button
@@ -308,7 +310,7 @@ export default function Sector() {
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <Briefcase className="w-4 h-4" /> Dipendente
+                  <Briefcase className="w-4 h-4" /> {t("sector.employed")}
                 </button>
                 <button
                   onClick={() => setStepsView("autonomo")}
@@ -319,7 +321,7 @@ export default function Sector() {
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <Laptop className="w-4 h-4" /> Autonomo / Freelance
+                  <Laptop className="w-4 h-4" /> {t("sector.freelance")}
                 </button>
               </div>
             </div>
@@ -327,14 +329,13 @@ export default function Sector() {
             {stepsView === "dipendente" ? (
               <div>
                 <p className="text-muted-foreground mb-8 text-base">
-                  Percorso tipico per chi vuole lavorare come <strong>dipendente</strong> nel settore {sector.name}.
-                  Stabile, strutturato, con progressione chiara.
+                  <span dangerouslySetInnerHTML={{ __html: t("sector.employedDesc", { name: sector.name }) }} />
                 </p>
                 {(() => {
                   const dipendentiSteps = sector.dipendentiSteps ?? null;
                   if (!dipendentiSteps || dipendentiSteps.length === 0) {
                     return (
-                      <p className="text-muted-foreground italic">Percorso dipendente non ancora disponibile per questo settore.</p>
+                      <p className="text-muted-foreground italic">{t("sector.noEmployedPath")}</p>
                     );
                   }
                   return (
@@ -360,14 +361,13 @@ export default function Sector() {
             ) : (
               <div>
                 <p className="text-muted-foreground mb-8 text-base">
-                  Percorso per chi vuole lavorare in modo <strong>autonomo o freelance</strong> nel settore {sector.name}.
-                  Più libertà, ma anche più responsabilità nella gestione del business.
+                  <span dangerouslySetInnerHTML={{ __html: t("sector.freelanceDesc", { name: sector.name }) }} />
                 </p>
                 {(() => {
                   const freelanceSteps = sector.freelanceSteps ?? null;
                   if (!freelanceSteps || freelanceSteps.length === 0) {
                     return (
-                      <p className="text-muted-foreground italic">Percorso freelance non ancora disponibile per questo settore.</p>
+                      <p className="text-muted-foreground italic">{t("sector.noFreelancePath")}</p>
                     );
                   }
                   return (
@@ -398,7 +398,7 @@ export default function Sector() {
           <div className="grid md:grid-cols-2 gap-8">
             <div className="space-y-6">
               <h3 className="text-xl font-serif font-bold flex items-center">
-                <Plus className="w-5 h-5 mr-2 text-emerald-500" /> Vantaggi
+                <Plus className="w-5 h-5 mr-2 text-emerald-500" /> {t("sector.advantages")}
               </h3>
               <ul className="space-y-4">
                 {sector.advantages.map((adv, i) => (
@@ -411,7 +411,7 @@ export default function Sector() {
             </div>
             <div className="space-y-6">
               <h3 className="text-xl font-serif font-bold flex items-center">
-                <Minus className="w-5 h-5 mr-2 text-amber-500" /> Svantaggi
+                <Minus className="w-5 h-5 mr-2 text-amber-500" /> {t("sector.disadvantages")}
               </h3>
               <ul className="space-y-4">
                 {sector.disadvantages.map((dis, i) => (
@@ -426,7 +426,7 @@ export default function Sector() {
 
           <div className="bg-primary/5 rounded-3xl p-8 border border-primary/10">
             <h3 className="text-xl font-serif font-bold flex items-center mb-6">
-              <Sparkles className="w-5 h-5 mr-2 text-primary" /> Opportunità Future
+              <Sparkles className="w-5 h-5 mr-2 text-primary" /> {t("sector.opportunities")}
             </h3>
             <ul className="grid md:grid-cols-2 gap-6">
               {sector.opportunities.map((opp, i) => (
@@ -444,10 +444,10 @@ export default function Sector() {
         <TabsContent value="skills" className="animate-in fade-in duration-500">
           <div className="max-w-3xl">
             <h3 className="text-2xl font-serif font-bold mb-6 flex items-center">
-              <Target className="w-6 h-6 mr-3 text-primary" /> Competenze Chiave
+              <Target className="w-6 h-6 mr-3 text-primary" /> {t("sector.keySkills")}
             </h3>
             <p className="text-muted-foreground mb-8 text-lg">
-              Per eccellere in questo settore, dovrai sviluppare questo set di competenze. Non preoccuparti se non le possiedi tutte ora, {sector.timeToAutonomy} è il tempo stimato per acquisirle.
+              {t("sector.skillsDesc", { time: sector.timeToAutonomy })}
             </p>
             <div className="flex flex-wrap gap-3">
               {sector.skills.map((skill, i) => (
@@ -465,7 +465,7 @@ export default function Sector() {
           ) : stats ? (
             <div className="grid md:grid-cols-5 gap-8">
               <div className="md:col-span-3 bg-card border rounded-3xl p-6 md:p-8 shadow-sm">
-                <h3 className="text-xl font-serif font-bold mb-8">Proiezione di Crescita del Settore</h3>
+                <h3 className="text-xl font-serif font-bold mb-8">{t("sector.growthProjection")}</h3>
                 <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
@@ -498,32 +498,32 @@ export default function Sector() {
               </div>
               <div className="md:col-span-2 space-y-6">
                 <div className="bg-card border rounded-3xl p-6 shadow-sm">
-                  <h4 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-4">Statistiche della Piattaforma</h4>
+                  <h4 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-4">{t("sector.platformStats")}</h4>
                   <div className="space-y-6">
                     <div>
                       <div className="text-3xl font-serif font-bold text-foreground mb-1">{stats.timesPicked}</div>
-                      <div className="text-sm text-muted-foreground">Volte scelto dagli utenti</div>
+                      <div className="text-sm text-muted-foreground">{t("sector.platformStatsUsers", { defaultValue: "Volte scelto dagli utenti" })}</div>
                     </div>
                     <Separator />
                     <div>
                       <div className="text-3xl font-serif font-bold text-foreground mb-1">{stats.avgMatchScore}%</div>
-                      <div className="text-sm text-muted-foreground">Affinità media</div>
+                      <div className="text-sm text-muted-foreground">{t("sector.platformStatsMatch", { defaultValue: "Affinità media" })}</div>
                     </div>
                   </div>
                 </div>
                 <div className="bg-primary text-primary-foreground rounded-3xl p-6 shadow-md">
-                  <h4 className="font-serif font-bold text-lg mb-2">Pronto a iniziare?</h4>
+                  <h4 className="font-serif font-bold text-lg mb-2">{t("sector.readyTitle", { defaultValue: "Pronto a iniziare?" })}</h4>
                   <p className="text-primary-foreground/80 text-sm mb-6">
-                    Se questo settore risuona con te, confermalo nei tuoi risultati per ricevere una roadmap dettagliata.
+                    {t("sector.readyDesc", { defaultValue: "Se questo settore risuona con te, confermalo nei tuoi risultati per ricevere una roadmap dettagliata." })}
                   </p>
                   <Button variant="secondary" className="w-full" asChild>
-                    <button onClick={() => window.history.back()}>Torna e conferma</button>
+                    <button onClick={() => window.history.back()}>{t("sector.backAndConfirm", { defaultValue: "Torna e conferma" })}</button>
                   </Button>
                 </div>
               </div>
             </div>
           ) : (
-            <p className="text-muted-foreground">Dati statistici non disponibili al momento.</p>
+            <p className="text-muted-foreground">{t("sector.noStats", { defaultValue: "Dati statistici non disponibili al momento." })}</p>
           )}
         </TabsContent>
       </Tabs>

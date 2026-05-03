@@ -6,6 +6,7 @@ import {
   BookOpen, BarChart3, Newspaper, ArrowRight, CheckCircle2,
 } from "lucide-react";
 import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
+import { useTranslation } from "react-i18next";
 
 function useSeo(title: string, description: string) {
   useEffect(() => {
@@ -41,21 +42,8 @@ function useJsonLd(data: object) {
   }, []);
 }
 
-const VALUES = [
-  { icon: Target,    title: "Chiarezza",    desc: "Trasformiamo il disorientamento in direzione concreta, senza promesse vuote." },
-  { icon: Heart,     title: "Empatia",      desc: "Ogni persona ha un percorso unico: lo rispettiamo e lo accompagniamo." },
-  { icon: Lightbulb, title: "Consapevolezza", desc: "Le scelte migliori nascono dalla conoscenza di sé, non dal caso." },
-  { icon: BarChart3, title: "Dati reali",   desc: "Usiamo dati aggiornati su settori, salari e crescita per orientarti nel mercato." },
-  { icon: BookOpen,  title: "Formazione",   desc: "La crescita è continua: offriamo contenuti per imparare e aggiornarsi nel tempo." },
-  { icon: Sparkles,  title: "Innovazione",  desc: "Combiniamo psicologia, AI e dati di mercato per un orientamento del futuro." },
-];
-
-const METHOD_STEPS = [
-  { n: "01", title: "Test RIASEC + Cinque Spiriti", desc: "Scopri il tuo profilo esterno (competenze e interessi) e quello interiore (energia, visione, istinto) attraverso 17 domande." },
-  { n: "02", title: "Matching settori",             desc: "Il sistema incrocia il tuo profilo con 21 settori professionali e calcola un punteggio di compatibilità basato su dati reali." },
-  { n: "03", title: "Esplora in profondità",        desc: "Ogni settore include dati su salario, crescita, rischio di automazione, competenze chiave, roadmap e grafo della conoscenza." },
-  { n: "04", title: "Costruisci il tuo percorso",  desc: "Salva preferenze, segui le news del tuo settore, imposta obiettivi di carriera e traccia i progressi nel tempo." },
-];
+const VALUE_ICONS = [Target, Heart, Lightbulb, BarChart3, BookOpen, Sparkles];
+const METHOD_STEP_NUMBERS = ["01", "02", "03", "04"];
 
 export default function ChiSiamo() {
   useSeo(
@@ -86,6 +74,19 @@ export default function ChiSiamo() {
     ],
   });
 
+  const { t } = useTranslation();
+
+  const valuesText = t("chiSiamo.values", { returnObjects: true }) as Array<{ title: string; desc: string }>;
+  const VALUES = VALUE_ICONS.map((icon, i) => ({ icon, ...(valuesText[i] || {}) }));
+
+  const methodStepsText = t("chiSiamo.methodSteps", { returnObjects: true }) as Array<{ title: string; desc: string }>;
+  const METHOD_STEPS = METHOD_STEP_NUMBERS.map((n, i) => ({ n, ...(methodStepsText[i] || {}) }));
+
+  const whatWeDoFeatures = t("chiSiamo.whatWeDoFeatures", { returnObjects: true }) as Array<{ label: string; desc: string }>;
+  const WHAT_WE_DO_ICONS = [Target, BarChart3, Newspaper, BookOpen];
+
+  const whoWeServeItems = t("chiSiamo.whoWeServeItems", { returnObjects: true }) as string[];
+
   return (
     <div className="min-h-screen">
 
@@ -94,20 +95,20 @@ export default function ChiSiamo() {
         <div className="container mx-auto px-4 max-w-4xl text-center">
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium mb-6">
             <Compass className="w-4 h-4" />
-            La nostra storia
+            {t("chiSiamo.badge", { defaultValue: "La nostra storia" })}
           </div>
           <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground leading-tight mb-6">
-            Chi siamo
+            {t("chiSiamo.title")}
           </h1>
           <p className="text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-8">
-            NorthStar è una piattaforma SaaS di orientamento e crescita personale progettata per aiutare persone diverse a trovare direzione nello studio, nel lavoro e nella propria evoluzione personale.
+            {t("chiSiamo.subtitle")}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Button asChild className="rounded-full px-6">
-              <Link href="/test">Inizia il test <ArrowRight className="w-4 h-4 ml-1.5" /></Link>
+              <Link href="/test">{t("home.startTest")} <ArrowRight className="w-4 h-4 ml-1.5" /></Link>
             </Button>
             <Button asChild variant="outline" className="rounded-full px-6">
-              <Link href="/premium">Esplora il Premium</Link>
+              <Link href="/premium">{t("chiSiamo.explorePremium", { defaultValue: "Esplora il Premium" })}</Link>
             </Button>
           </div>
         </div>
@@ -118,18 +119,15 @@ export default function ChiSiamo() {
         {/* Cosa facciamo */}
         <AnimateOnScroll>
         <section>
-          <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-6">Cosa facciamo</h2>
+          <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-6">{t("chiSiamo.whatWeDo")}</h2>
           <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-            NorthStar combina <strong className="text-foreground">test di personalità</strong>, analisi dei settori professionali, news aggiornate e strumenti di organizzazione personale in un unico spazio chiaro, utile e facile da usare.
+            {t("chiSiamo.whatWeDoCombines", { defaultValue: "NorthStar combina test di personalità, analisi dei settori professionali, news aggiornate e strumenti di organizzazione personale in un unico spazio chiaro, utile e facile da usare." })}
           </p>
           <AnimateOnScroll stagger>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[
-              { icon: Target,    label: "Test RIASEC + Cinque Spiriti",   desc: "Comprendi la tua personalità in due dimensioni: interessi e identità profonda." },
-              { icon: BarChart3, label: "21 settori professionali",        desc: "Ogni settore con dati reali su salario, crescita, automazione e competenze." },
-              { icon: Newspaper, label: "News settoriali",                 desc: "Contenuti aggiornati filtrabili per i settori che ti interessano." },
-              { icon: BookOpen,  label: "Roadmap e grafo della conoscenza", desc: "Visualizza le competenze, i ruoli e i percorsi di ogni settore in forma interattiva." },
-            ].map(({ icon: Icon, label, desc }) => (
+            {whatWeDoFeatures.map(({ label, desc }, i) => {
+              const Icon = WHAT_WE_DO_ICONS[i];
+              return (
               <AnimateOnScrollItem key={label}>
               <div className="flex gap-4 p-5 rounded-2xl border bg-card h-full">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -141,7 +139,8 @@ export default function ChiSiamo() {
                 </div>
               </div>
               </AnimateOnScrollItem>
-            ))}
+              );
+            })}
           </div>
           </AnimateOnScroll>
         </section>
@@ -150,16 +149,16 @@ export default function ChiSiamo() {
         {/* Perché esistiamo */}
         <AnimateOnScroll>
         <section>
-          <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-6">Perché esistiamo</h2>
+          <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-6">{t("chiSiamo.whyWeExist")}</h2>
           <div className="bg-primary/5 border border-primary/20 rounded-3xl p-8 md:p-10">
             <p className="text-lg text-foreground leading-relaxed mb-4">
-              Milioni di persone ogni anno scelgono studi o lavori senza avere gli strumenti per capire se quella direzione è davvero coerente con chi sono.
+              {t("chiSiamo.whyWeExistP1")}
             </p>
             <p className="text-lg text-muted-foreground leading-relaxed mb-4">
-              Il risultato è disorientamento, insoddisfazione e percorsi che cambiano continuamente senza una bussola chiara.
+              {t("chiSiamo.whyWeExistP2")}
             </p>
             <p className="text-lg text-foreground leading-relaxed font-medium">
-              La nostra missione è trasformare quel disorientamento in chiarezza — offrendo strumenti concreti per orientarsi tra opportunità, studi, mestieri e possibilità di carriera.
+              {t("chiSiamo.whyWeExistP3")}
             </p>
           </div>
         </section>
@@ -168,7 +167,7 @@ export default function ChiSiamo() {
         {/* Il nostro metodo */}
         <section>
           <AnimateOnScroll>
-          <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-8">Il nostro metodo</h2>
+          <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-8">{t("chiSiamo.ourMethod")}</h2>
           </AnimateOnScroll>
           <AnimateOnScroll stagger>
           <div className="space-y-6">
@@ -192,21 +191,14 @@ export default function ChiSiamo() {
         {/* A chi ci rivolgiamo */}
         <AnimateOnScroll>
         <section>
-          <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-6">A chi ci rivolgiamo</h2>
+          <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-6">{t("chiSiamo.whoWeServe")}</h2>
           <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-            NorthStar è pensato per chiunque si trovi a un bivio nella propria vita professionale o formativa:
+            {t("chiSiamo.whoWeServeIntro")}
           </p>
           <AnimateOnScroll stagger>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {[
-              "Studenti delle superiori che devono scegliere l'università",
-              "Universitari che vogliono capire in quale settore entrare",
-              "Lavoratori che valutano un cambiamento di carriera",
-              "Chi rientra nel mondo del lavoro dopo una pausa",
-              "Chi vuole capire meglio le proprie inclinazioni e punti di forza",
-              "Professionisti che cercano nuove direzioni di crescita",
-            ].map((item) => (
-              <AnimateOnScrollItem key={item}>
+            {whoWeServeItems.map((item, i) => (
+              <AnimateOnScrollItem key={i}>
               <div className="flex items-start gap-3 p-4 rounded-xl border bg-card h-full">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                 <p className="text-sm text-foreground leading-snug">{item}</p>
@@ -221,7 +213,7 @@ export default function ChiSiamo() {
         {/* I nostri valori */}
         <section>
           <AnimateOnScroll>
-          <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-8">I nostri valori</h2>
+          <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-8">{t("chiSiamo.ourValues")}</h2>
           </AnimateOnScroll>
           <AnimateOnScroll stagger>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -244,17 +236,17 @@ export default function ChiSiamo() {
         <AnimateOnScroll>
         <section className="bg-primary/5 border border-primary/20 rounded-3xl p-10 text-center">
           <h2 className="text-2xl font-serif font-bold text-foreground mb-3">
-            Pronto a trovare la tua direzione?
+            {t("chiSiamo.ctaTitle")}
           </h2>
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            Fai il test gratuito in meno di 10 minuti e scopri i settori professionali più coerenti con la tua personalità.
+            {t("chiSiamo.ctaDesc")}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Button asChild className="rounded-full px-8">
-              <Link href="/test">Inizia il test gratuito <ArrowRight className="w-4 h-4 ml-1.5" /></Link>
+              <Link href="/test">{t("home.startTest")} <ArrowRight className="w-4 h-4 ml-1.5" /></Link>
             </Button>
             <Button asChild variant="outline" className="rounded-full px-6">
-              <Link href="/news">Leggi le news</Link>
+              <Link href="/news">{t("chiSiamo.readNews", { defaultValue: "Leggi le news" })}</Link>
             </Button>
           </div>
         </section>

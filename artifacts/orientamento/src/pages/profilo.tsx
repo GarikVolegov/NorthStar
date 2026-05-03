@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { ProssimiEventi } from "@/components/calendario/ProssimiEventi";
 import { WorkModeSelector, useWorkPreference } from "@/components/WorkModeSelector";
 import type { WorkPreference } from "@/components/WorkModeSelector";
+import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -293,14 +294,15 @@ function WorkModeCard({ userId }: { userId: number }) {
 }
 
 export default function Profilo() {
+  const { t } = useTranslation();
   const { user, logout, isLoggedIn } = useAuth();
   const { data: profile } = useProfile(user?.id ?? 0);
 
   if (!isLoggedIn || !user) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
-        <p className="text-muted-foreground mb-6">Accedi al tuo account per vedere il profilo.</p>
-        <Button asChild><Link href="/">Vai alla home</Link></Button>
+        <p className="text-muted-foreground mb-6">{t("profilo.notLoggedIn")}</p>
+        <Button asChild><Link href="/">{t("notFound.goHome")}</Link></Button>
       </div>
     );
   }
@@ -309,11 +311,11 @@ export default function Profilo() {
     <div className="container mx-auto px-4 py-10 max-w-5xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-foreground">Il mio profilo</h1>
-          <p className="text-muted-foreground mt-1">Gestisci il tuo account e consulta la tua storia</p>
+          <h1 className="text-3xl font-serif font-bold text-foreground">{t("profilo.title")}</h1>
+          <p className="text-muted-foreground mt-1">{t("profilo.subtitle", { defaultValue: "Gestisci il tuo account e consulta la tua storia" })}</p>
         </div>
         <Button variant="outline" size="sm" className="rounded-full w-fit" onClick={logout}>
-          Esci dall'account
+          {t("profilo.logout", { defaultValue: "Esci dall'account" })}
         </Button>
       </div>
 
@@ -322,7 +324,7 @@ export default function Profilo() {
           <Card className="rounded-2xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <User className="w-4 h-4 text-primary" /> Account
+                <User className="w-4 h-4 text-primary" /> {t("profilo.accountInfo")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -330,11 +332,11 @@ export default function Profilo() {
                 <span className="text-2xl font-serif font-bold text-primary">{user.name.charAt(0).toUpperCase()}</span>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Nome</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">{t("profilo.name")}</p>
                 <p className="font-semibold text-foreground">{user.name}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Email</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">{t("profilo.email")}</p>
                 <div className="flex items-center gap-1.5">
                   <Mail className="w-3.5 h-3.5 text-muted-foreground" />
                   <p className="text-sm truncate">{user.email}</p>
@@ -342,7 +344,7 @@ export default function Profilo() {
               </div>
               {profile && (
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Membro dal</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">{t("profilo.memberSince")}</p>
                   <div className="flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
                     <p className="text-sm">{formatDate(profile.createdAt)}</p>
@@ -351,7 +353,7 @@ export default function Profilo() {
               )}
               <div className="flex items-center gap-1.5 pt-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="text-xs text-emerald-700 font-medium">Email verificata</span>
+                <span className="text-xs text-emerald-700 font-medium">{t("profilo.emailVerified")}</span>
               </div>
             </CardContent>
           </Card>
@@ -359,7 +361,7 @@ export default function Profilo() {
           <Card className="rounded-2xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <KeyRound className="w-4 h-4 text-primary" /> Cambia password
+                <KeyRound className="w-4 h-4 text-primary" /> {t("profilo.changePassword")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -376,11 +378,11 @@ export default function Profilo() {
           <Card className="rounded-2xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-primary" /> Cronologia test
+                <Sparkles className="w-4 h-4 text-primary" /> {t("profilo.testHistory", { defaultValue: "Cronologia test" })}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Cronologia disponibile.</p>
+              <p className="text-sm text-muted-foreground">{t("profilo.historyAvailable", { defaultValue: "Cronologia disponibile." })}</p>
             </CardContent>
           </Card>
           <SavedItems />
