@@ -6,113 +6,54 @@ import {
   Briefcase, Laptop, GitMerge, HelpCircle, ChevronDown, ChevronUp, ArrowRight, CheckCircle2,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
+import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
 export type WorkPreference = "dipendente" | "autonomo" | "ibrido" | "unknown";
 
-const WORK_MODE_OPTIONS: Array<{
+const WORK_MODE_STATIC: Array<{
   value: WorkPreference;
-  label: string;
-  sublabel: string;
   icon: React.ReactNode;
-  description: string;
   color: string;
   selectedColor: string;
 }> = [
   {
     value: "dipendente",
-    label: "Dipendente",
-    sublabel: "Lavoratore dipendente",
     icon: <Briefcase className="w-6 h-6" />,
-    description: "Contratto fisso, stipendio mensile, team strutturato e carriera in azienda.",
     color: "border-blue-200 hover:border-blue-400 hover:bg-blue-50/50",
     selectedColor: "border-blue-500 bg-blue-50 ring-2 ring-blue-500/20",
   },
   {
     value: "autonomo",
-    label: "Autonomo / Freelance",
-    sublabel: "Libero professionista",
     icon: <Laptop className="w-6 h-6" />,
-    description: "Lavoro per conto proprio, clienti multipli, piena libertà di orari e progetto.",
     color: "border-violet-200 hover:border-violet-400 hover:bg-violet-50/50",
     selectedColor: "border-violet-500 bg-violet-50 ring-2 ring-violet-500/20",
   },
   {
     value: "ibrido",
-    label: "Ibrido",
-    sublabel: "Flessibilità mista",
     icon: <GitMerge className="w-6 h-6" />,
-    description: "Combina stabilità e autonomia: consulenza, part-time, contratti flessibili.",
     color: "border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50/50",
     selectedColor: "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20",
   },
   {
     value: "unknown",
-    label: "Non lo so ancora",
-    sublabel: "Aiutami a scegliere",
     icon: <HelpCircle className="w-6 h-6" />,
-    description: "Non hai ancora le idee chiare? Ti mostriamo un confronto per aiutarti a decidere.",
     color: "border-amber-200 hover:border-amber-400 hover:bg-amber-50/50",
     selectedColor: "border-amber-500 bg-amber-50 ring-2 ring-amber-500/20",
   },
 ];
 
-const COMPARISON_ROWS: Array<{
-  dimension: string;
-  dipendente: string;
-  autonomo: string;
-  icon: string;
-}> = [
-  {
-    dimension: "Libertà",
-    dipendente: "Limitata — orari e progetti decisi dall'azienda",
-    autonomo: "Massima — scegli clienti, orari e modalità",
-    icon: "🕊️",
-  },
-  {
-    dimension: "Stabilità",
-    dipendente: "Alta — stipendio fisso, contributi automatici",
-    autonomo: "Variabile — dipende dai clienti e dal mercato",
-    icon: "⚖️",
-  },
-  {
-    dimension: "Rischio finanziario",
-    dipendente: "Basso — protezioni contrattuali e TFR",
-    autonomo: "Alto — no reddito garantito nei periodi vuoti",
-    icon: "📉",
-  },
-  {
-    dimension: "Gestione clienti",
-    dipendente: "Non richiesta — ci pensa l'azienda",
-    autonomo: "Essenziale — devi trovare e mantenere i clienti",
-    icon: "🤝",
-  },
-  {
-    dimension: "Orari",
-    dipendente: "Strutturati — solitamente 9-18 in sede o smart",
-    autonomo: "Flessibili — ma richiedono autodisciplina",
-    icon: "⏰",
-  },
-  {
-    dimension: "Crescita economica",
-    dipendente: "Graduale — aumenti e promozioni aziendali",
-    autonomo: "Potenzialmente alta — scala con clienti e tariffe",
-    icon: "📈",
-  },
-  {
-    dimension: "Complessità amm.",
-    dipendente: "Bassa — busta paga gestita dall'azienda",
-    autonomo: "Alta — Partita IVA, fatture, tasse, contributi",
-    icon: "🗂️",
-  },
-  {
-    dimension: "Comunità",
-    dipendente: "Alta — colleghi, team, cultura aziendale",
-    autonomo: "Dipende da te — rischio isolamento senza sforzo",
-    icon: "👥",
-  },
-];
+const COMPARISON_ROW_KEYS = [
+  { key: "freedom",   icon: "🕊️" },
+  { key: "stability", icon: "⚖️" },
+  { key: "risk",      icon: "📉" },
+  { key: "clients",   icon: "🤝" },
+  { key: "schedule",  icon: "⏰" },
+  { key: "growth",    icon: "📈" },
+  { key: "admin",     icon: "🗂️" },
+  { key: "community", icon: "👥" },
+] as const;
 
 interface WorkModeSelectorProps {
   suggestedMode?: WorkPreference;
@@ -129,6 +70,7 @@ export function WorkModeSelector({
   onSelect,
   isPending,
 }: WorkModeSelectorProps) {
+  const { t } = useTranslation();
   const [selected, setSelected] = useState<WorkPreference | null>(initialValue ?? null);
   const [showComparison, setShowComparison] = useState(false);
 
@@ -148,14 +90,14 @@ export function WorkModeSelector({
       {/* Header */}
       <div className="text-center mb-8">
         <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-3">
-          Come vuoi lavorare?
+          {t("workModeSelector.header")}
         </h2>
         <p className="text-muted-foreground max-w-xl mx-auto">
-          La tua preferenza influenza il ranking dei settori consigliati e i percorsi di carriera mostrati.
+          {t("workModeSelector.subtitle")}
         </p>
         {suggestedMode && suggestedLabel && (
           <div className="inline-flex items-center gap-2 mt-4 bg-primary/5 border border-primary/20 rounded-full px-4 py-2 text-sm">
-            <span className="text-primary font-medium">💡 Il tuo profilo RIASEC suggerisce:</span>
+            <span className="text-primary font-medium">{t("workModeSelector.riasecSuggests")}</span>
             <Badge variant="secondary" className="capitalize font-semibold">{suggestedLabel}</Badge>
           </div>
         )}
@@ -163,7 +105,7 @@ export function WorkModeSelector({
 
       {/* Option Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        {WORK_MODE_OPTIONS.map((opt) => {
+        {WORK_MODE_STATIC.map((opt) => {
           const isSelected = selected === opt.value;
           return (
             <button
@@ -182,18 +124,24 @@ export function WorkModeSelector({
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
-                  <span className="font-semibold text-foreground">{opt.label}</span>
+                  <span className="font-semibold text-foreground">
+                    {t(`workModeSelector.options.${opt.value}_label`)}
+                  </span>
                   {isSelected && <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />}
                 </div>
-                <p className="text-xs text-muted-foreground mb-1">{opt.sublabel}</p>
-                <p className="text-sm text-foreground/70 leading-relaxed">{opt.description}</p>
+                <p className="text-xs text-muted-foreground mb-1">
+                  {t(`workModeSelector.options.${opt.value}_sublabel`)}
+                </p>
+                <p className="text-sm text-foreground/70 leading-relaxed">
+                  {t(`workModeSelector.options.${opt.value}_desc`)}
+                </p>
               </div>
             </button>
           );
         })}
       </div>
 
-      {/* Comparison panel for "Non lo so ancora" */}
+      {/* Comparison panel for "unknown" */}
       {selected === "unknown" && (
         <div className="mb-6 rounded-2xl border bg-card overflow-hidden animate-in fade-in slide-in-from-top-2 duration-500">
           <button
@@ -201,7 +149,7 @@ export function WorkModeSelector({
             className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-foreground hover:bg-muted/50 transition-colors"
           >
             <span className="flex items-center gap-2">
-              <span>📊</span> Confronto Dipendente vs Autonomo
+              {t("workModeSelector.compareTitle")}
             </span>
             {showComparison ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
@@ -214,10 +162,11 @@ export function WorkModeSelector({
                   <span className="text-xl">🔭</span>
                   <div>
                     <p className="text-sm font-semibold text-foreground mb-1">
-                      Il tuo profilo RIASEC tende verso: <span className="text-primary capitalize">{suggestedLabel}</span>
+                      {t("workModeSelector.riasecTendency")}{" "}
+                      <span className="text-primary capitalize">{suggestedLabel}</span>
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Questo non è un giudizio definitivo — è un punto di partenza per la riflessione. La scelta finale spetta solo a te.
+                      {t("workModeSelector.riasecNote")}
                     </p>
                   </div>
                 </div>
@@ -228,33 +177,39 @@ export function WorkModeSelector({
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted/30 border-b">
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-36">Dimensione</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-36">
+                        {t("workModeSelector.dimensionHeader")}
+                      </th>
                       <th className="px-4 py-3 text-center min-w-[180px]">
                         <div className="flex flex-col items-center gap-1">
                           <Briefcase className="w-4 h-4 text-blue-500" />
-                          <span className="font-semibold text-blue-700">Dipendente</span>
+                          <span className="font-semibold text-blue-700">
+                            {t("workModeSelector.options.dipendente_label")}
+                          </span>
                         </div>
                       </th>
                       <th className="px-4 py-3 text-center min-w-[180px]">
                         <div className="flex flex-col items-center gap-1">
                           <Laptop className="w-4 h-4 text-violet-500" />
-                          <span className="font-semibold text-violet-700">Autonomo</span>
+                          <span className="font-semibold text-violet-700">
+                            {t("workModeSelector.options.autonomo_label")}
+                          </span>
                         </div>
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {COMPARISON_ROWS.map((row) => (
-                      <tr key={row.dimension} className="hover:bg-muted/20 transition-colors">
+                    {COMPARISON_ROW_KEYS.map((row) => (
+                      <tr key={row.key} className="hover:bg-muted/20 transition-colors">
                         <td className="px-4 py-3 font-medium text-foreground whitespace-nowrap">
                           <span className="mr-1.5">{row.icon}</span>
-                          {row.dimension}
+                          {t(`workModeSelector.compare.${row.key}_dim`)}
                         </td>
                         <td className="px-4 py-3 text-center text-muted-foreground text-xs leading-relaxed">
-                          {row.dipendente}
+                          {t(`workModeSelector.compare.${row.key}_emp`)}
                         </td>
                         <td className="px-4 py-3 text-center text-muted-foreground text-xs leading-relaxed">
-                          {row.autonomo}
+                          {t(`workModeSelector.compare.${row.key}_free`)}
                         </td>
                       </tr>
                     ))}
@@ -264,24 +219,29 @@ export function WorkModeSelector({
 
               {/* Choose anyway CTAs */}
               <div className="flex flex-col sm:flex-row gap-3 px-5 py-4 border-t bg-muted/20">
-                <p className="text-xs text-muted-foreground self-center mr-2 shrink-0">Scegli comunque:</p>
+                <p className="text-xs text-muted-foreground self-center mr-2 shrink-0">
+                  {t("workModeSelector.chooseAnyway")}
+                </p>
                 <button
                   onClick={() => { setSelected("dipendente"); setShowComparison(false); }}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl border-2 border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors text-sm font-semibold"
                 >
-                  <Briefcase className="w-4 h-4" /> Dipendente
+                  <Briefcase className="w-4 h-4" />
+                  {t("workModeSelector.options.dipendente_label")}
                 </button>
                 <button
                   onClick={() => { setSelected("autonomo"); setShowComparison(false); }}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl border-2 border-violet-200 text-violet-700 bg-violet-50 hover:bg-violet-100 transition-colors text-sm font-semibold"
                 >
-                  <Laptop className="w-4 h-4" /> Autonomo
+                  <Laptop className="w-4 h-4" />
+                  {t("workModeSelector.options.autonomo_label")}
                 </button>
                 <button
                   onClick={() => { setSelected("ibrido"); setShowComparison(false); }}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl border-2 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors text-sm font-semibold"
                 >
-                  <GitMerge className="w-4 h-4" /> Ibrido
+                  <GitMerge className="w-4 h-4" />
+                  {t("workModeSelector.options.ibrido_label")}
                 </button>
               </div>
             </div>
@@ -298,7 +258,7 @@ export function WorkModeSelector({
             disabled={isPending}
             className="rounded-full px-10"
           >
-            Conferma preferenza <ArrowRight className="ml-2 w-4 h-4" />
+            {t("workModeSelector.confirmBtn")} <ArrowRight className="ml-2 w-4 h-4" />
           </Button>
         </div>
       )}
@@ -313,17 +273,14 @@ export function WorkModeBadge({
   modes: Array<"dipendente" | "autonomo" | "ibrido"> | null | undefined;
   size?: "xs" | "sm";
 }) {
+  const { t } = useTranslation();
+
   if (!modes || modes.length === 0) return null;
 
   const MODE_STYLES: Record<string, string> = {
     dipendente: "bg-blue-50 text-blue-700 border-blue-200",
     autonomo: "bg-violet-50 text-violet-700 border-violet-200",
     ibrido: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  };
-  const MODE_LABELS: Record<string, string> = {
-    dipendente: "Dipendente",
-    autonomo: "Autonomo",
-    ibrido: "Ibrido",
   };
 
   const textSize = size === "xs" ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-0.5";
@@ -339,7 +296,7 @@ export function WorkModeBadge({
             MODE_STYLES[mode] ?? "bg-muted text-muted-foreground border-border",
           )}
         >
-          {MODE_LABELS[mode] ?? mode}
+          {t(`workModeSelector.options.${mode}_label`, { defaultValue: mode })}
         </span>
       ))}
     </div>
