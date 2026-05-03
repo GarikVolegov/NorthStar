@@ -15,7 +15,7 @@ router.get("/objectives/me", authMiddleware, async (req, res): Promise<void> => 
 });
 
 router.get("/objectives/:userId", async (req, res): Promise<void> => {
-  const userId = parseInt(req.params.userId, 10);
+  const userId = parseInt(String(req.params.userId), 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const objectives = await db
@@ -42,7 +42,7 @@ router.post("/objectives", async (req, res): Promise<void> => {
 });
 
 router.patch("/objectives/:id", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const { completed, progress, text, category, dueDate } = req.body;
@@ -69,7 +69,7 @@ router.patch("/objectives/:id", async (req, res): Promise<void> => {
 });
 
 router.delete("/objectives/:id", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
   await db.delete(userObjectivesTable).where(eq(userObjectivesTable.id, id));
   res.json({ ok: true });

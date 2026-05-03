@@ -43,22 +43,18 @@ router.post("/test-sessions", async (req, res): Promise<void> => {
   const { answers } = parsed.data;
   const allAnswers = answers as Record<string, number>;
 
-  // Deterministic RIASEC scoring
   const riasecScores = computeRiasecScores(allAnswers);
   const primaryTypes = getPrimaryTypes(riasecScores);
   const profileSummary = buildProfileSummary(primaryTypes);
 
-  // Deterministic Spirit scoring
   const spiritScores = extractSpiritAnswers(allAnswers);
   const dominantSpirit = getDominantSpirit(spiritScores);
   const secondarySpirit = getSecondarySpiritS(spiritScores);
   const spiritInsight = buildSpiritInsight(dominantSpirit, secondarySpirit, spiritScores);
 
-  // Detect user and plan from JWT/session (test sessions can be submitted by both authed and anon)
   const authenticatedUserId = getAuthenticatedUserId(req);
   const plan = authenticatedUserId ? await getUserPlan(authenticatedUserId) : "free";
 
-  // Fetch user work preference for boosting sector scores
   let userWorkMode: WorkMode = "unknown";
   if (authenticatedUserId) {
     const [userRow] = await db
@@ -70,7 +66,6 @@ router.post("/test-sessions", async (req, res): Promise<void> => {
     }
   }
 
-  // Run SectorAgent to collect curated match reasons (best-effort; does not limit sector selection)
   const agentReasonMap: Record<number, string> = {};
   try {
     const _agentStart = Date.now();
@@ -104,8 +99,6 @@ router.post("/test-sessions", async (req, res): Promise<void> => {
     logger.warn({ err }, "SectorAgent failed, using computed match reasons");
   }
 
-  // Score every sector in the catalog (RIASEC + spirit); enrich with agent match reasons where available.
-  // Storing the full ranked slate lets work-mode preference re-rank across the entire catalog on GET.
   const allSectors = await db.select().from(sectorsTable);
   const allScored = allSectors
     .map((sector) => {
@@ -192,7 +185,6 @@ router.get("/test-sessions/latest", async (req, res): Promise<void> => {
     return;
   }
 
-  // Prefer the latest session by user_id, fall back to the linked testSessionId
   const sessionsByUser = await db
     .select()
     .from(testSessionsTable)
@@ -319,7 +311,6 @@ router.get("/test-sessions/:id", async (req, res): Promise<void> => {
   const secondarySpirit = getSecondarySpiritS(spiritScores);
   const spiritInsight = buildSpiritInsight(dominantSpirit, secondarySpirit, spiritScores);
 
-  // Compute suggested work mode from RIASEC primary types
   const primaryTypesForWorkMode = (session.primaryTypes ?? []) as string[];
   const suggestedWorkMode = primaryTypesForWorkMode.length > 0
     ? (RIASEC_SUGGESTED_WORK_MODE[primaryTypesForWorkMode[0] as keyof typeof RIASEC_SUGGESTED_WORK_MODE] ?? "ibrido")
@@ -343,7 +334,7 @@ router.get("/test-sessions/:id", async (req, res): Promise<void> => {
 });
 
 router.post("/test-sessions/:id/assign-user", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "ID non valido" });
     return;

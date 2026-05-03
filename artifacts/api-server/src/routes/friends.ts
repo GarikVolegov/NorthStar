@@ -9,7 +9,7 @@ type FriendshipStatus = "pending" | "accepted" | "rejected";
 
 // ── GET /api/friends/:userId ────────────────────────────────────────────
 router.get("/friends/:userId", async (req, res): Promise<void> => {
-  const userId = parseInt(req.params.userId, 10);
+  const userId = parseInt(String(req.params.userId), 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const friendships = await db
@@ -62,7 +62,7 @@ router.get("/friends/:userId", async (req, res): Promise<void> => {
 // ── GET /api/users/search?q=...&userId=... ─────────────────────────────
 router.get("/users/search", async (req, res): Promise<void> => {
   const q = (req.query.q as string || "").trim();
-  const userId = parseInt(req.query.userId as string, 10);
+  const userId = parseInt(String(req.query.userId as string), 10);
 
   if (q.length < 2) { res.json({ users: [] }); return; }
   if (isNaN(userId)) { res.status(400).json({ error: "userId richiesto" }); return; }
@@ -105,8 +105,8 @@ router.get("/users/search", async (req, res): Promise<void> => {
 
 // ── GET /api/users/:id/public ───────────────────────────────────────────
 router.get("/users/:id/public", async (req, res): Promise<void> => {
-  const targetId = parseInt(req.params.id, 10);
-  const viewerId = parseInt(req.query.viewerId as string, 10);
+  const targetId = parseInt(String(req.params.id), 10);
+  const viewerId = parseInt(String(req.query.viewerId as string), 10);
   if (isNaN(targetId)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const [target] = await db
@@ -195,7 +195,7 @@ router.post("/friends/request", async (req, res): Promise<void> => {
 
 // ── PATCH /api/friends/:id/accept ──────────────────────────────────────
 router.patch("/friends/:id/accept", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const [updated] = await db
@@ -210,7 +210,7 @@ router.patch("/friends/:id/accept", async (req, res): Promise<void> => {
 
 // ── PATCH /api/friends/:id/reject ─────────────────────────────────────
 router.patch("/friends/:id/reject", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const [updated] = await db
@@ -225,7 +225,7 @@ router.patch("/friends/:id/reject", async (req, res): Promise<void> => {
 
 // ── DELETE /api/friends/:id ────────────────────────────────────────────
 router.delete("/friends/:id", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   await db.delete(friendshipsTable).where(eq(friendshipsTable.id, id));
@@ -234,7 +234,7 @@ router.delete("/friends/:id", async (req, res): Promise<void> => {
 
 // ── PATCH /api/users/:userId/privacy ──────────────────────────────────
 router.patch("/users/:userId/privacy", async (req, res): Promise<void> => {
-  const userId = parseInt(req.params.userId, 10);
+  const userId = parseInt(String(req.params.userId), 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const { isPublic } = req.body;

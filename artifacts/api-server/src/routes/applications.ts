@@ -7,7 +7,7 @@ const router: IRouter = Router();
 
 // ── GET /api/applications/:userId ──────────────────────────────────────
 router.get("/applications/:userId", async (req, res): Promise<void> => {
-  const userId = parseInt(req.params.userId, 10);
+  const userId = parseInt(String(req.params.userId), 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const apps = await db
@@ -64,7 +64,7 @@ const updateSchema = z.object({
 });
 
 router.patch("/applications/:id", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const parsed = updateSchema.safeParse(req.body);
@@ -89,7 +89,7 @@ const noteSchema = z.object({
 });
 
 router.post("/applications/:id/notes", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const parsed = noteSchema.safeParse(req.body);
@@ -117,8 +117,8 @@ router.post("/applications/:id/notes", async (req, res): Promise<void> => {
 
 // ── DELETE /api/applications/:id/notes/:index ──────────────────────────
 router.delete("/applications/:id/notes/:index", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
-  const index = parseInt(req.params.index, 10);
+  const id = parseInt(String(req.params.id), 10);
+  const index = parseInt(String(req.params.index), 10);
   if (isNaN(id) || isNaN(index)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const [app] = await db
@@ -142,7 +142,7 @@ router.delete("/applications/:id/notes/:index", async (req, res): Promise<void> 
 
 // ── DELETE /api/applications/:id ───────────────────────────────────────
 router.delete("/applications/:id", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   await db.delete(jobApplicationsTable).where(eq(jobApplicationsTable.id, id));

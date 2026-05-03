@@ -28,7 +28,7 @@ interface ChatMessage {
 }
 
 router.get("/grafo/:sectorId", async (req, res): Promise<void> => {
-  const sectorId = parseInt(req.params.sectorId, 10);
+  const sectorId = parseInt(String(req.params.sectorId), 10);
   if (isNaN(sectorId)) {
     res.status(400).json({ error: "ID non valido" });
     return;
@@ -101,7 +101,7 @@ Regole tassative:
 });
 
 router.post("/grafo/:sectorId/chat", async (req, res): Promise<void> => {
-  const sectorId = parseInt(req.params.sectorId, 10);
+  const sectorId = parseInt(String(req.params.sectorId), 10);
   if (isNaN(sectorId)) {
     res.status(400).json({ error: "ID non valido" });
     return;

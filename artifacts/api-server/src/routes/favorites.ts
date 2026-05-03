@@ -5,7 +5,7 @@ import { eq, and } from "drizzle-orm";
 const router: IRouter = Router();
 
 router.get("/favorites/:userId", async (req, res): Promise<void> => {
-  const userId = parseInt(req.params.userId, 10);
+  const userId = parseInt(String(req.params.userId), 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const favorites = await db
@@ -72,7 +72,7 @@ router.post("/favorites", async (req, res): Promise<void> => {
 });
 
 router.delete("/favorites/:id", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
   await db.delete(userFavoritesTable).where(eq(userFavoritesTable.id, id));
   res.json({ ok: true });

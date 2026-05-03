@@ -13,7 +13,7 @@ const ChangePasswordBody = z.object({
 });
 
 router.get("/profile/:userId", async (req, res): Promise<void> => {
-  const userId = parseInt(req.params.userId, 10);
+  const userId = parseInt(String(req.params.userId), 10);
   if (isNaN(userId)) {
     res.status(400).json({ error: "ID non valido" });
     return;
@@ -33,12 +33,10 @@ router.get("/profile/:userId", async (req, res): Promise<void> => {
 
   const sectors = await db.select().from(sectorsTable);
 
-  // Collect confirmed sector IDs for quick lookup
   const confirmedSectorIds = new Set(
     sessions.map((s) => s.confirmedSectorId).filter(Boolean)
   );
 
-  // Build session data (all 3 recs with full sector info)
   const sessionData = sessions.map((s) => {
     const recs = (s.recommendations ?? []) as Array<{
       sectorId: number;
@@ -94,7 +92,6 @@ router.get("/profile/:userId", async (req, res): Promise<void> => {
     };
   });
 
-  // Build deduplicated explored sectors (best match score wins)
   const sectorMap = new Map<
     number,
     {
