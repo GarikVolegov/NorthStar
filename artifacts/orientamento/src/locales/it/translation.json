@@ -555,7 +555,9 @@
       "declining": "In declino"
     },
     "loadingTitle": "Settore professionale",
-    "loadingDesc": "Scopri dettagli, stipendi, crescita e rischio AI di questo settore professionale su NorthStar."
+    "loadingDesc": "Scopri dettagli, stipendi, crescita e rischio AI di questo settore professionale su NorthStar.",
+    "dataSourceNote": "Fonte: dati mercato del lavoro italiano (ISTAT, EUROSTAT, INAPP). Le fasce salariali e i tassi di crescita si riferiscono al mercato italiano.",
+    "italianMarketNote": "Mercato italiano"
   },
   "premium": {
     "badge": "NorthStar Premium",

@@ -165,6 +165,7 @@ export default function Sector() {
           <div className="text-xl md:text-2xl font-semibold">
             €{sector.avgSalaryMin / 1000}k - {sector.avgSalaryMax / 1000}k
           </div>
+          <div className="text-xs text-muted-foreground/60 mt-1">{t("sector.italianMarketNote")}</div>
         </div>
         <div className="bg-card border rounded-2xl p-5 flex flex-col justify-center">
           <div className="flex items-center text-muted-foreground text-sm font-medium mb-2 uppercase tracking-wider">
@@ -513,28 +514,33 @@ export default function Sector() {
                   <div className="space-y-6">
                     <div>
                       <div className="text-3xl font-serif font-bold text-foreground mb-1">{stats.timesPicked}</div>
-                      <div className="text-sm text-muted-foreground">{t("sector.platformStatsUsers", { defaultValue: "Volte scelto dagli utenti" })}</div>
+                      <div className="text-sm text-muted-foreground">{t("sector.platformStatsUsers")}</div>
                     </div>
                     <Separator />
                     <div>
                       <div className="text-3xl font-serif font-bold text-foreground mb-1">{stats.avgMatchScore}%</div>
-                      <div className="text-sm text-muted-foreground">{t("sector.platformStatsMatch", { defaultValue: "Affinità media" })}</div>
+                      <div className="text-sm text-muted-foreground">{t("sector.platformStatsMatch")}</div>
                     </div>
                   </div>
                 </div>
                 <div className="bg-primary text-primary-foreground rounded-3xl p-6 shadow-md">
-                  <h4 className="font-serif font-bold text-lg mb-2">{t("sector.readyTitle", { defaultValue: "Pronto a iniziare?" })}</h4>
+                  <h4 className="font-serif font-bold text-lg mb-2">{t("sector.readyTitle")}</h4>
                   <p className="text-primary-foreground/80 text-sm mb-6">
-                    {t("sector.readyDesc", { defaultValue: "Se questo settore risuona con te, confermalo nei tuoi risultati per ricevere una roadmap dettagliata." })}
+                    {t("sector.readyDesc")}
                   </p>
                   <Button variant="secondary" className="w-full" asChild>
-                    <button onClick={() => window.history.back()}>{t("sector.backAndConfirm", { defaultValue: "Torna e conferma" })}</button>
+                    <button onClick={() => window.history.back()}>{t("sector.backAndConfirm")}</button>
                   </Button>
                 </div>
               </div>
             </div>
           ) : (
-            <p className="text-muted-foreground">{t("sector.noStats", { defaultValue: "Dati statistici non disponibili al momento." })}</p>
+            <p className="text-muted-foreground">{t("sector.noStats")}</p>
+          )}
+          {stats && (
+            <p className="text-xs text-muted-foreground/60 mt-6 leading-relaxed">
+              {t("sector.dataSourceNote")}
+            </p>
           )}
         </TabsContent>
       </Tabs>

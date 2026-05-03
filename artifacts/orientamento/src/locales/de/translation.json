@@ -555,7 +555,9 @@
       "declining": "Rückläufig"
     },
     "loadingTitle": "Berufsfeld",
-    "loadingDesc": "Entdecke Details, Gehälter, Wachstum und KI-Risiko dieses Berufsfelds auf NorthStar."
+    "loadingDesc": "Entdecke Details, Gehälter, Wachstum und KI-Risiko dieses Berufsfelds auf NorthStar.",
+    "dataSourceNote": "Quelle: Italienische Arbeitsmarktdaten (ISTAT, EUROSTAT, INAPP). Gehaltsklassen und Wachstumsraten beziehen sich auf den italienischen Markt.",
+    "italianMarketNote": "Italienischer Markt"
   },
   "premium": {
     "badge": "NorthStar Premium",

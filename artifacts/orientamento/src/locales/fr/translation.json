@@ -555,7 +555,9 @@
       "declining": "En déclin"
     },
     "loadingTitle": "Secteur professionnel",
-    "loadingDesc": "Découvrez les détails, salaires, croissance et risque IA de ce secteur professionnel sur NorthStar."
+    "loadingDesc": "Découvrez les détails, salaires, croissance et risque IA de ce secteur professionnel sur NorthStar.",
+    "dataSourceNote": "Source : données du marché du travail italien (ISTAT, EUROSTAT, INAPP). Les fourchettes salariales et les taux de croissance se réfèrent au marché italien.",
+    "italianMarketNote": "Marché italien"
   },
   "premium": {
     "badge": "NorthStar Premium",
