@@ -11,7 +11,7 @@ export interface LeadPayload {
   phone?: string | null;
   message?: string | null;
   estimatedUsers?: string | null;
-  createdAt: string;
+  createdAt: Date | string;
 }
 
 const PARTNER_LABELS: Record<string, string> = {
