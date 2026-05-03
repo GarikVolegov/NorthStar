@@ -337,6 +337,124 @@
       "community_free": "Liegt bei dir — Isolierungsrisiko ohne Aufwand"
     }
   },
+  "careerSteps": {
+    "freelance": {
+      "tech": {
+        "1": { "title": "Öffentliches Portfolio aufbauen", "desc": "Erstelle persönliche oder Open-Source-Projekte, die deine technischen Fähigkeiten zeigen." },
+        "2": { "title": "Spezialisierung definieren", "desc": "Wähle eine Nische (z.B. Backend, Mobile), um dich im Markt abzuheben." },
+        "3": { "title": "Erste Kunden gewinnen", "desc": "Starte auf Plattformen wie Upwork oder Fiverr, dann baue direkte Unternehmensbeziehungen auf." },
+        "4": { "title": "Steuerliche Aspekte regeln", "desc": "Melde ein Gewerbe an und erfasse abzugsfähige Ausgaben." },
+        "5": { "title": "Zu Premium-Tarifen skalieren", "desc": "Mit aufgebautem Ruf erhöhe die Stundensätze und wähle hochwertigere Kunden." }
+      },
+      "health": {
+        "1": { "title": "Notwendige Zertifizierungen erhalten", "desc": "Gesundheitsberufe erfordern spezifische Zulassungen. Überprüfe die Anforderungen für deine Spezialisierung." },
+        "2": { "title": "Privatpraxis eröffnen", "desc": "Registriere das Unternehmen, finde geeignete Räumlichkeiten und befolge lokale Gesundheitsvorschriften." },
+        "3": { "title": "Überweisungsnetzwerk aufbauen", "desc": "Arbeite mit anderen Spezialisten zusammen, die Patienten an dich verweisen können." },
+        "4": { "title": "Verwaltungsmanagement", "desc": "Berufshaftpflichtversicherung, Rechnungsstellung und Terminverwaltung sind im Selbstständigenleben unerlässlich." },
+        "5": { "title": "Wachstum und Spezialisierung", "desc": "Hebe dich durch Weiterbildung ab und baue einen Online-Ruf auf." }
+      },
+      "creative": {
+        "1": { "title": "Kreative Marke aufbauen", "desc": "Erstelle ein Online-Portfolio (Behance, persönliche Website), das deinen einzigartigen Stil zeigt." },
+        "2": { "title": "Plattformen auswählen", "desc": "Finde heraus, wo deine idealen Kunden sind: Agenturen, Startups, Privatpersonen, internationale Märkte." },
+        "3": { "title": "Servicepakete definieren", "desc": "Biete klare Pakete mit transparenten Preisen an, um endlose Verhandlungen zu vermeiden." },
+        "4": { "title": "Langfristige Beziehungen aufbauen", "desc": "Ein loyaler Kunde ist weit mehr wert als zehn Einmalkunden. Pflege die Nachprojektbeziehung." },
+        "5": { "title": "Einkommensquellen diversifizieren", "desc": "Ergänze Dienstleistungen durch digitale Produkte (Vorlagen, Kurse) für passives Einkommen." }
+      },
+      "entrepreneur": {
+        "1": { "title": "Geschäftsidee validieren", "desc": "Teste den Markt mit einem MVP, bevor du erhebliche Ressourcen investierst." },
+        "2": { "title": "Rechtliche Struktur aufbauen", "desc": "Wähle die passende Rechtsform (Einzelunternehmen, GmbH, UG) je nach Projekt." },
+        "3": { "title": "Erste Kunden oder Investoren finden", "desc": "Bootstrapping oder Angel-Vorsaat-Finanzierung sind komplementäre Wege." },
+        "4": { "title": "Team aufbauen", "desc": "Identifiziere fehlende Schlüsselrollen und rekrutiere Mitarbeiter oder Mitgründer." },
+        "5": { "title": "Skalieren und konsolidieren", "desc": "Mit nachgewiesener Traktion suche institutionelle Finanzierung oder reinvestiere Gewinne." }
+      },
+      "consulting": {
+        "1": { "title": "Vertikale Spezialisierung aufbauen", "desc": "Wähle einen Sektor oder ein spezifisches Problem, um der Experte der Wahl zu werden." },
+        "2": { "title": "Wertvolle Inhalte erstellen", "desc": "Veröffentliche Einblicke auf LinkedIn und schreibe Artikel, um Autorität aufzubauen." },
+        "3": { "title": "Professionelles Netzwerk aufbauen", "desc": "Networking ist in der Beratung unerlässlich. 70% der Aufträge kommen über Empfehlungen." },
+        "4": { "title": "Angebot strukturieren", "desc": "Definiere klare Methoden, Liefergegenstände und Preise für jeden Service." },
+        "5": { "title": "Mit Mitarbeitern skalieren", "desc": "Wenn die Nachfrage die Kapazität übersteigt, bringe Juniorberater oder Freelance-Spezialisten hinzu." }
+      },
+      "data": {
+        "1": { "title": "Technisches Fachwissen konsolidieren", "desc": "Vertiefe ein spezifisches Gebiet (Data Engineering, ML, BI), um eine Referenz zu werden." },
+        "2": { "title": "Analyseportfolio aufbauen", "desc": "Veröffentliche Analysen auf öffentlichen Datensätzen und nimm an Kaggle teil." },
+        "3": { "title": "Projektbasierte Beratung anbieten", "desc": "Beginne mit kleinen Datenanalysemandaten für Unternehmen ohne internes Team." },
+        "4": { "title": "Mit SaaS-Tools automatisieren", "desc": "Nutze Tools wie Metabase oder Tableau, um Analysen ohne Mehrarbeit zu skalieren." },
+        "5": { "title": "Zu monatlichen Retainern wechseln", "desc": "Biete monatliche Abonnements für kontinuierliches Reporting an: wiederkehrendes Einkommen." }
+      },
+      "hr": {
+        "1": { "title": "Erfahrung im Unternehmen sammeln", "desc": "Bevor du selbstständig wirst, sammle 3–5 Jahre Erfahrung in strukturierten Organisationen." },
+        "2": { "title": "Anerkannter Experte werden", "desc": "Veröffentliche, halte Vorträge auf Konferenzen, baue einen Ruf in deinem Fachbereich auf." },
+        "3": { "title": "Teilzeit-Beratung starten", "desc": "Behalte die Stabilität der Festanstellung, während du erste Kunden aufbaust." },
+        "4": { "title": "Geschäft formalisieren", "desc": "Als Selbstständiger anmelden, Standardverträge definieren und Datenschutz (DSGVO) einhalten." },
+        "5": { "title": "Team aufbauen", "desc": "Wenn das Volumen wächst, bringe spezialisierte Mitarbeiter hinzu, um Leistungen zu diversifizieren." }
+      },
+      "default": {
+        "1": { "title": "Schlüsselkompetenzen konsolidieren", "desc": "Vertiefe die technischen und sozialen Kompetenzen, die im Sektor gefragt sind." },
+        "2": { "title": "Netzwerk aufbauen", "desc": "Selbstständige Chancen kommen oft von Menschen, die du kennst. Investiere in Berufsbeziehungen." },
+        "3": { "title": "Mit Teilzeitprojekten beginnen", "desc": "Teste den Markt und behalte die Sicherheit eines Festeinkommens." },
+        "4": { "title": "Geschäft formalisieren", "desc": "Als Selbstständiger anmelden und die Buchhaltung führen." },
+        "5": { "title": "Skalieren und diversifizieren", "desc": "Erhöhe die Preise, wähle bessere Kunden und füge ergänzende Leistungen hinzu." }
+      }
+    },
+    "dipendente": {
+      "tech": {
+        "1": { "title": "Technische Ausbildung", "desc": "Informatik- oder Softwareingenieurstudium abschließen. Programmier- und Systemgrundlagen erwerben." },
+        "2": { "title": "Praktikum oder erste Juniorstelle", "desc": "Als Junior-Entwickler in ein Unternehmen eintreten. Entwicklungszyklus lernen und Portfolio aufbauen." },
+        "3": { "title": "Technische Spezialisierung", "desc": "Bereich wählen: Frontend, Backend, Cloud, DevOps oder Mobile. Frameworks und Tools vertiefen." },
+        "4": { "title": "Senior-Rolle und technische Führung", "desc": "Nach 3–5 Jahren Senior Developer oder Tech Lead werden. Architekturentscheidungen treffen." },
+        "5": { "title": "Staff Engineer oder Engineering Manager", "desc": "Zwischen technischem oder Management-Pfad wählen. Beide erfordern starken Ruf und strategische Vision." }
+      },
+      "health": {
+        "1": { "title": "Spezialisierte akademische Ausbildung", "desc": "Medizin, Pflege oder Gesundheitsmanagement studieren. Digitale Kompetenzen ergänzen, wo relevant." },
+        "2": { "title": "Praktikum und erste Stelle", "desc": "In Krankenhaus oder Gesundheitsunternehmen als Juniorarzt, Pfleger oder Analyst arbeiten." },
+        "3": { "title": "Klinische oder digitale Spezialisierung", "desc": "Medizinische Spezialisierung wählen oder Karriere Richtung Digitale Gesundheit (EHR, Telemedizin) lenken." },
+        "4": { "title": "Senior-Kliniker oder Bereichsleiter", "desc": "Senior-Spezialist oder Stationsleiter werden. Teams koordinieren und Behandlungspfade managen." },
+        "5": { "title": "Ärztlicher Direktor oder Gesundheitsdirektor", "desc": "Klinische oder Managementführung auf Krankenhaus- oder Organisationsebene erreichen." }
+      },
+      "creative": {
+        "1": { "title": "Design-Ausbildung", "desc": "Designschule besuchen oder spezialisierter Online-Kurs. Figma und Adobe Suite meistern." },
+        "2": { "title": "Junior Designer (Praktikum oder erste Stelle)", "desc": "In Agentur oder Unternehmen als Junior Designer eintreten. Portfolio aufbauen und von Seniors lernen." },
+        "3": { "title": "Spezialisierung", "desc": "Fokus wählen: Product Design, UX-Forschung, Motion Design, Brand Identity oder Design-Systeme." },
+        "4": { "title": "Senior Designer oder Design Lead", "desc": "Kreative Richtung von Produkten führen. Junioren mentoren und mit Produktmanagern zusammenarbeiten." },
+        "5": { "title": "Head of Design oder Creative Director", "desc": "Design auf Unternehmensebene leiten. Visuelle Sprache und UX-Strategie definieren." }
+      },
+      "entrepreneur": {
+        "1": { "title": "Management-Ausbildung", "desc": "Wirtschaft, Management oder Ingenieurswesen studieren. Ein MBA beschleunigt den Zugang zu Schlüsselrollen." },
+        "2": { "title": "Analyst oder Junior in einem Unternehmen", "desc": "Als Analyst oder Junior-Projektmanager einsteigen. Geschäftsprozesse von innen verstehen." },
+        "3": { "title": "Vertikales Fachwissen entwickeln", "desc": "In einem Sektor oder einer Funktion spezialisieren. Tiefes Wissen öffnet Rollen mit höherer Verantwortung." },
+        "4": { "title": "Manager oder Bereichsleiter", "desc": "Ein Team oder eine Unternehmensfunktion leiten. Verantwortung für Budget, Mitarbeiter und Ergebnisse." },
+        "5": { "title": "Director oder C-Suite", "desc": "Führungsrollen erreichen: CEO, COO, CFO oder Director. Strategische Vision mit Umsetzung verbinden." }
+      },
+      "consulting": {
+        "1": { "title": "Akademische Höchstleistung", "desc": "Wirtschaft oder Management an einer renommierten Universität studieren. GPA und Aktivitäten zählen." },
+        "2": { "title": "Analyst bei Big4 oder strategischer Boutique", "desc": "Als Junior-Analyst/Consultant eintreten. Analysen, Benchmarking und C-Suite-Präsentationen erarbeiten." },
+        "3": { "title": "Senior Associate oder Consultant", "desc": "Eigenständige Workstreams managen und Analystteams leiten. Vertikales Fachwissen aufbauen." },
+        "4": { "title": "Manager", "desc": "Ganze Projekte und Kundenbeziehungen managen. Internes und externes Networking wird essenziell." },
+        "5": { "title": "Partner oder Director", "desc": "Neues Geschäft einbringen, eine Praxis leiten und Beziehungen zu Schlüsselkunden aufbauen." }
+      },
+      "data": {
+        "1": { "title": "Analytische Ausbildung", "desc": "Statistik, angewandte Mathematik, Python oder R studieren. Weg in Data Science oder Informatik." },
+        "2": { "title": "Junior Data Analyst", "desc": "Mit echten Datensätzen arbeiten. SQL, BI-Tools lernen und Erkenntnisse an Entscheidungsträger kommunizieren." },
+        "3": { "title": "Spezialisierung in Data Science oder Engineering", "desc": "Machine Learning oder Datenpipelines vertiefen. Die am besten passende Richtung wählen." },
+        "4": { "title": "Senior Data Scientist oder Data Engineer", "desc": "Modellierungsprojekte oder komplexe Datenarchitekturen leiten. Mit Produkt und Business zusammenarbeiten." },
+        "5": { "title": "Head of Data oder Data Lead", "desc": "Das Datenteam koordinieren, Datenstrategie definieren und Qualität und Governance sicherstellen." }
+      },
+      "hr": {
+        "1": { "title": "Psychologie oder Wirtschaftsstudium", "desc": "Arbeitspsychologie oder Betriebswirtschaft studieren. Ein HR-Management-Master beschleunigt den Weg." },
+        "2": { "title": "HR-Assistent oder Junior-Recruiter", "desc": "In einem Unternehmen oder einer Personalvermittlung arbeiten. Stellenanzeigen, Screening und Onboarding." },
+        "3": { "title": "HR-Spezialisierung", "desc": "Vertikale wählen: Talent Acquisition, HRBP, L&D, Compensation oder People Analytics." },
+        "4": { "title": "HR-Manager oder HR Business Partner", "desc": "HR-Funktion für einen Unternehmensbereich managen. Manager bei Personalentscheidungen unterstützen." },
+        "5": { "title": "HR-Direktor oder Chief People Officer", "desc": "People-Strategie der Organisation leiten: Kultur, Talente, Bindung und Entwicklung." }
+      },
+      "default": {
+        "1": { "title": "Branchenausbildung", "desc": "Die erforderlichen akademischen und beruflichen Qualifikationen im gewünschten Sektor erwerben." },
+        "2": { "title": "Erste Einstiegsposition", "desc": "In einem Unternehmen in einer Juniorrolle beginnen. Prozesse lernen, Beziehungen aufbauen, Erfahrung sammeln." },
+        "3": { "title": "Kompetenzentwicklung", "desc": "Technische und soziale Kompetenzen vertiefen. Mentoren und interne Wachstumschancen suchen." },
+        "4": { "title": "Senior- oder Spezialistenrolle", "desc": "Mit solider Erfahrung in Senior- oder Spezialistenrollen wechseln. Junioren koordinieren oder Projekte leiten." },
+        "5": { "title": "Führung und Management", "desc": "Verantwortungsrollen erreichen: Team Lead, Manager oder Director. Strategische Vision entwickeln." }
+      }
+    }
+  },
   "sectors": {
     "title": "Branchen erkunden",
     "badge": "{{count}} Berufsfelder",

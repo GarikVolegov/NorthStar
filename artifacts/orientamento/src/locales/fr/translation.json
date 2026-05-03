@@ -337,6 +337,124 @@
       "community_free": "Dépend de vous — risque d'isolement sans effort"
     }
   },
+  "careerSteps": {
+    "freelance": {
+      "tech": {
+        "1": { "title": "Construire un portfolio public", "desc": "Créez des projets personnels ou open source qui mettent en valeur vos compétences techniques." },
+        "2": { "title": "Définir votre spécialisation", "desc": "Choisissez un créneau (ex. backend, mobile) pour vous démarquer sur le marché." },
+        "3": { "title": "Acquérir les premiers clients", "desc": "Commencez sur des plateformes comme Upwork ou Fiverr, puis construisez des relations directes avec des entreprises." },
+        "4": { "title": "Gérer l'aspect fiscal", "desc": "Créez un statut d'indépendant et suivez les dépenses déductibles." },
+        "5": { "title": "Monter en gamme", "desc": "Avec la réputation construite, augmentez vos tarifs et sélectionnez des clients de meilleure qualité." }
+      },
+      "health": {
+        "1": { "title": "Obtenir les certifications nécessaires", "desc": "Les professions de santé exigent des agréments spécifiques. Vérifiez les exigences pour votre spécialisation." },
+        "2": { "title": "Ouvrir un cabinet privé", "desc": "Enregistrez l'activité, trouvez un espace adapté et respectez la réglementation sanitaire locale." },
+        "3": { "title": "Construire un réseau de référencement", "desc": "Collaborez avec d'autres spécialistes qui peuvent vous envoyer des patients." },
+        "4": { "title": "Gestion administrative", "desc": "Assurance professionnelle, facturation et gestion de l'agenda sont incontournables en indépendant." },
+        "5": { "title": "Croissance et spécialisation", "desc": "Démarquez-vous grâce à la formation continue et construisez une réputation en ligne." }
+      },
+      "creative": {
+        "1": { "title": "Construire votre marque créative", "desc": "Créez un portfolio en ligne (Behance, site personnel) qui représente votre style unique." },
+        "2": { "title": "Choisir vos plateformes", "desc": "Identifiez où se trouvent vos clients idéaux : agences, startups, particuliers, marchés internationaux." },
+        "3": { "title": "Définir vos forfaits de services", "desc": "Proposez des offres claires avec des tarifs transparents pour éviter les négociations interminables." },
+        "4": { "title": "Construire des relations à long terme", "desc": "Un client fidèle vaut bien plus que dix clients occasionnels. Soignez la relation post-projet." },
+        "5": { "title": "Diversifier les sources de revenus", "desc": "Complétez les services par des produits numériques (modèles, cours) pour un revenu passif." }
+      },
+      "entrepreneur": {
+        "1": { "title": "Valider l'idée de business", "desc": "Testez le marché avec un MVP avant d'investir des ressources significatives." },
+        "2": { "title": "Constituer la structure juridique", "desc": "Choisissez la forme juridique adaptée (auto-entrepreneur, SARL, SAS) selon le projet." },
+        "3": { "title": "Trouver les premiers clients ou investisseurs", "desc": "Le bootstrapping ou le financement pré-seed par des business angels sont des voies complémentaires." },
+        "4": { "title": "Constituer l'équipe", "desc": "Identifiez les rôles clés manquants et recrutez des collaborateurs ou des cofondateurs." },
+        "5": { "title": "Scaler et consolider", "desc": "Avec une traction démontrée, cherchez un financement institutionnel ou réinvestissez les bénéfices." }
+      },
+      "consulting": {
+        "1": { "title": "Construire une spécialisation verticale", "desc": "Choisissez un secteur ou un problème spécifique pour devenir l'expert de référence." },
+        "2": { "title": "Créer du contenu à valeur ajoutée", "desc": "Publiez des insights sur LinkedIn et écrivez des articles pour asseoir votre autorité." },
+        "3": { "title": "Construire votre réseau professionnel", "desc": "Le networking est fondamental en conseil. 70% des missions arrivent par des recommandations." },
+        "4": { "title": "Structurer l'offre", "desc": "Définissez des méthodologies, des livrables et des tarifs clairs pour chaque service." },
+        "5": { "title": "Scaler avec des collaborateurs", "desc": "Quand la demande dépasse vos capacités, faites appel à des consultants juniors ou des freelances." }
+      },
+      "data": {
+        "1": { "title": "Consolider l'expertise technique", "desc": "Approfondissez un domaine spécifique (data engineering, ML, BI) pour devenir une référence." },
+        "2": { "title": "Construire un portfolio d'analyses", "desc": "Publiez des analyses sur des jeux de données publics et participez à Kaggle." },
+        "3": { "title": "Proposer des consultations par projet", "desc": "Commencez par de petites missions d'analyse de données pour des entreprises sans équipe interne." },
+        "4": { "title": "Automatiser avec des outils SaaS", "desc": "Utilisez des outils comme Metabase ou Tableau pour scaler vos analyses sans heures supplémentaires." },
+        "5": { "title": "Passer aux retainers mensuels", "desc": "Proposez des abonnements mensuels pour des rapports continus : revenus récurrents et relations stables." }
+      },
+      "hr": {
+        "1": { "title": "Accumuler de l'expérience en entreprise", "desc": "Avant de vous lancer, accumulez 3 à 5 ans d'expérience dans des organisations structurées." },
+        "2": { "title": "Devenir un expert reconnu", "desc": "Publiez, intervenez à des conférences, construisez une réputation dans votre domaine spécifique." },
+        "3": { "title": "Démarrer le conseil à temps partiel", "desc": "Maintenez la stabilité de l'emploi tout en construisant les premiers clients." },
+        "4": { "title": "Formaliser l'activité", "desc": "Créez un statut d'indépendant, définissez des contrats types et gérez la protection des données (RGPD)." },
+        "5": { "title": "Constituer une équipe", "desc": "Quand le volume augmente, faites appel à des collaborateurs spécialisés pour diversifier les services." }
+      },
+      "default": {
+        "1": { "title": "Consolider les compétences clés", "desc": "Approfondissez les compétences techniques et transversales requises dans le secteur." },
+        "2": { "title": "Construire votre réseau", "desc": "Les opportunités en indépendant arrivent souvent des personnes que vous connaissez." },
+        "3": { "title": "Commencer par des projets à temps partiel", "desc": "Testez le marché tout en conservant la sécurité d'un revenu fixe." },
+        "4": { "title": "Formaliser l'activité", "desc": "Créez un statut d'indépendant et gérez la comptabilité." },
+        "5": { "title": "Scaler et diversifier", "desc": "Augmentez les tarifs, sélectionnez de meilleurs clients et ajoutez des services complémentaires." }
+      }
+    },
+    "dipendente": {
+      "tech": {
+        "1": { "title": "Formation technique", "desc": "Obtenez un diplôme en informatique ou en génie logiciel. Acquérez les bases de la programmation et des systèmes." },
+        "2": { "title": "Stage ou premier poste junior", "desc": "Rejoignez une entreprise comme développeur junior. Apprenez le cycle de développement et constituez votre portfolio." },
+        "3": { "title": "Spécialisation technique", "desc": "Choisissez un domaine : frontend, backend, cloud, DevOps ou mobile. Approfondissez les frameworks requis." },
+        "4": { "title": "Rôle senior et leadership technique", "desc": "Après 3 à 5 ans, devenez Senior Developer ou Tech Lead. Pilotez les décisions architecturales." },
+        "5": { "title": "Staff Engineer ou Engineering Manager", "desc": "Choisissez entre le chemin technique avancé ou le management. Les deux exigent réputation et vision." }
+      },
+      "health": {
+        "1": { "title": "Formation académique spécialisée", "desc": "Terminez un cursus en médecine, soins infirmiers ou gestion de la santé. Ajoutez des compétences numériques si pertinent." },
+        "2": { "title": "Stage et premier poste", "desc": "Travaillez dans un hôpital ou une entreprise de santé en tant que médecin junior, infirmier ou analyste." },
+        "3": { "title": "Spécialisation clinique ou numérique", "desc": "Choisissez une spécialisation médicale ou orientez votre carrière vers la santé numérique (DPI, télémédecine)." },
+        "4": { "title": "Clinicien senior ou chef de service", "desc": "Devenez spécialiste senior ou responsable de service. Coordonnez les équipes et gérez les parcours de soins." },
+        "5": { "title": "Directeur médical ou Directeur de santé", "desc": "Atteignez le leadership clinique ou managérial au niveau hospitalier ou organisationnel." }
+      },
+      "creative": {
+        "1": { "title": "Formation en design", "desc": "Fréquentez une école de design ou un cours spécialisé en ligne. Maîtrisez Figma et la suite Adobe." },
+        "2": { "title": "Designer junior (stage ou premier poste)", "desc": "Rejoignez une agence ou une entreprise comme designer junior. Constituez le portfolio et apprenez des seniors." },
+        "3": { "title": "Spécialisation", "desc": "Choisissez un focus : design produit, recherche UX, motion design, identité de marque ou systèmes de design." },
+        "4": { "title": "Designer senior ou Design Lead", "desc": "Pilotez la direction créative des produits. Mentorez les juniors et collaborez avec les product managers." },
+        "5": { "title": "Head of Design ou Directeur Créatif", "desc": "Dirigez le design au niveau de l'entreprise. Définissez le langage visuel et la stratégie UX." }
+      },
+      "entrepreneur": {
+        "1": { "title": "Formation en management", "desc": "Étudiez l'économie, la gestion ou l'ingénierie. Un MBA accélère l'accès aux postes clés en entreprise." },
+        "2": { "title": "Analyste ou junior dans une structure organisée", "desc": "Rejoignez une entreprise comme analyste ou chef de projet junior. Comprenez les processus de l'intérieur." },
+        "3": { "title": "Développer une expertise verticale", "desc": "Spécialisez-vous dans un secteur ou une fonction. La profondeur de compétences ouvre des rôles à plus haute responsabilité." },
+        "4": { "title": "Manager ou responsable de zone", "desc": "Gérez une équipe ou une fonction d'entreprise. Responsable du budget, des personnes et des résultats." },
+        "5": { "title": "Directeur ou C-suite", "desc": "Atteignez des rôles de direction : CEO, COO, CFO ou Directeur. Combinez vision stratégique et exécution." }
+      },
+      "consulting": {
+        "1": { "title": "Excellence académique", "desc": "Étudiez l'économie ou la gestion dans une université de prestige. Le GPA et les activités extra comptent." },
+        "2": { "title": "Analyste chez Big4 ou boutique stratégique", "desc": "Rejoignez en tant qu'Analyste/Consultant junior. Travaillez sur des analyses, benchmarking et présentations C-suite." },
+        "3": { "title": "Senior Associate ou Consultant", "desc": "Gérez des workstreams autonomes et dirigez des équipes d'analystes. Construisez une expertise verticale." },
+        "4": { "title": "Manager", "desc": "Gérez des projets entiers et les relations clients. Le networking interne et externe devient essentiel." },
+        "5": { "title": "Associé ou Directeur", "desc": "Apportez de nouveaux contrats, dirigez une pratique et construisez des relations avec des clients clés." }
+      },
+      "data": {
+        "1": { "title": "Formation analytique", "desc": "Étudiez la statistique, les mathématiques appliquées, Python ou R. Un cursus en science des données ou informatique." },
+        "2": { "title": "Junior Data Analyst", "desc": "Travaillez avec des jeux de données réels. Apprenez SQL, les outils BI et communiquez les insights aux décideurs." },
+        "3": { "title": "Spécialisation en Data Science ou Engineering", "desc": "Approfondissez le machine learning ou les pipelines de données. Choisissez la direction la plus adaptée." },
+        "4": { "title": "Senior Data Scientist ou Data Engineer", "desc": "Pilotez des projets de modélisation ou des architectures de données complexes. Collaborez avec le produit et le business." },
+        "5": { "title": "Head of Data ou Data Lead", "desc": "Coordonnez l'équipe data, définissez la stratégie de données et assurez la qualité et la gouvernance." }
+      },
+      "hr": {
+        "1": { "title": "Formation en psychologie ou gestion", "desc": "Étudiez la psychologie du travail ou la gestion d'entreprise. Un master en RH accélère le parcours." },
+        "2": { "title": "Assistant RH ou Recruteur junior", "desc": "Travaillez en entreprise ou en agence de recrutement. Gérez les annonces, le tri et l'onboarding." },
+        "3": { "title": "Spécialisation RH", "desc": "Choisissez un vertical : talent acquisition, HRBP, L&D, rémunération ou people analytics." },
+        "4": { "title": "RH Manager ou HR Business Partner", "desc": "Gérez la fonction RH pour un domaine d'activité. Soutenez les managers dans les décisions liées aux personnes." },
+        "5": { "title": "Directeur RH ou Chief People Officer", "desc": "Pilotez la stratégie people de l'organisation : culture, talents, rétention et développement." }
+      },
+      "default": {
+        "1": { "title": "Formation dans le secteur", "desc": "Obtenez les qualifications académiques et professionnelles requises dans votre secteur d'intérêt." },
+        "2": { "title": "Premier poste débutant", "desc": "Rejoignez une entreprise dans un rôle junior. Apprenez les processus, construisez des relations, gagnez en expérience." },
+        "3": { "title": "Développement des compétences", "desc": "Approfondissez les compétences techniques et transversales. Cherchez des mentors et des opportunités de croissance." },
+        "4": { "title": "Rôle senior ou spécialiste", "desc": "Avec une solide expérience, accédez à des rôles seniors ou spécialisés. Coordonnez des juniors ou pilotez des projets." },
+        "5": { "title": "Leadership et management", "desc": "Atteignez des rôles de responsabilité : team lead, manager ou director. Développez une vision stratégique." }
+      }
+    }
+  },
   "sectors": {
     "title": "Explorer les secteurs",
     "badge": "{{count}} secteurs professionnels",

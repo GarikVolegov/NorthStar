@@ -14,6 +14,7 @@ import { WorkModeBadge, useWorkPreference } from "@/components/WorkModeSelector"
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { getWorkModeAlignment } from "@/lib/work-mode-utils";
+import { getCareerStepGroup } from "@/lib/career-steps-utils";
 import { useTranslation } from "react-i18next";
 
 export default function Sector() {
@@ -338,6 +339,7 @@ export default function Sector() {
                       <p className="text-muted-foreground italic">{t("sector.noEmployedPath")}</p>
                     );
                   }
+                  const stepGroup = getCareerStepGroup(sector.name);
                   return (
                     <div className="space-y-0">
                       {dipendentiSteps.map((s, i) => (
@@ -349,8 +351,12 @@ export default function Sector() {
                             {i < dipendentiSteps.length - 1 && <div className="w-0.5 h-full bg-blue-100 mt-1" />}
                           </div>
                           <div className="pb-8">
-                            <h4 className="font-semibold text-foreground mb-1">{s.title}</h4>
-                            <p className="text-sm text-muted-foreground leading-relaxed">{s.description}</p>
+                            <h4 className="font-semibold text-foreground mb-1">
+                              {t(`careerSteps.dipendente.${stepGroup}.${s.step}.title`, { defaultValue: s.title })}
+                            </h4>
+                            <p className="text-sm text-muted-foreground leading-relaxed">
+                              {t(`careerSteps.dipendente.${stepGroup}.${s.step}.desc`, { defaultValue: s.description })}
+                            </p>
                           </div>
                         </div>
                       ))}
@@ -370,6 +376,7 @@ export default function Sector() {
                       <p className="text-muted-foreground italic">{t("sector.noFreelancePath")}</p>
                     );
                   }
+                  const stepGroup = getCareerStepGroup(sector.name);
                   return (
                     <div className="space-y-0">
                       {freelanceSteps.map((s, i) => (
@@ -381,8 +388,12 @@ export default function Sector() {
                             {i < freelanceSteps.length - 1 && <div className="w-0.5 h-full bg-violet-100 mt-1" />}
                           </div>
                           <div className="pb-8">
-                            <h4 className="font-semibold text-foreground mb-1">{s.title}</h4>
-                            <p className="text-sm text-muted-foreground leading-relaxed">{s.description}</p>
+                            <h4 className="font-semibold text-foreground mb-1">
+                              {t(`careerSteps.freelance.${stepGroup}.${s.step}.title`, { defaultValue: s.title })}
+                            </h4>
+                            <p className="text-sm text-muted-foreground leading-relaxed">
+                              {t(`careerSteps.freelance.${stepGroup}.${s.step}.desc`, { defaultValue: s.description })}
+                            </p>
                           </div>
                         </div>
                       ))}
