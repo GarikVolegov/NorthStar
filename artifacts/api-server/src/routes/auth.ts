@@ -22,7 +22,7 @@ function makeAuthLimiter(max: number, windowMs = 60_000, message = "Troppi tenta
 const loginLimiter = makeAuthLimiter(5, 60_000, "Troppi tentativi di accesso. Riprova tra un minuto.");
 const registerLimiter = makeAuthLimiter(5, 60_000, "Troppi tentativi di registrazione. Riprova tra un minuto.");
 const forgotLimiter = makeAuthLimiter(5, 60_000, "Troppi tentativi. Riprova tra un minuto.");
-const verifyLimiter = makeAuthLimiter(10, 60_000, "Troppi tentativi di verifica. Riprova tra un minuto.");
+const verifyLimiter = makeAuthLimiter(5, 60_000, "Troppi tentativi di verifica. Riprova tra un minuto.");
 const resendLimiter = makeAuthLimiter(3, 60_000, "Hai richiesto troppi codici. Riprova tra un minuto.");
 
 const router: IRouter = Router();
