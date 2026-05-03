@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { eq } from "drizzle-orm";
 import { db, sectorsTable } from "@workspace/db";
 import { getInterFont } from "../lib/og-font";
+import satori from "satori";
 
 const router: IRouter = Router();
 
@@ -34,7 +35,6 @@ async function generateSectorPng(sector: {
   avgSalaryMax: number;
   riasecTypes: string[];
 }): Promise<Buffer> {
-  const { default: satori } = await import("satori");
   const { Resvg } = await import("@resvg/resvg-js");
   const font = await getInterFont();
 
@@ -71,40 +71,27 @@ async function generateSectorPng(sector: {
               {
                 type: "div",
                 props: {
-                  style: {
-                    fontSize: 28,
-                    color: "#4ade80",
-                  },
+                  style: { fontSize: 28, color: "#4ade80" },
                   children: "★",
                 },
               },
               {
                 type: "div",
                 props: {
-                  style: {
-                    fontSize: 22,
-                    fontWeight: 700,
-                    color: "#ffffff",
-                    letterSpacing: "-0.5px",
-                  },
+                  style: { fontSize: 22, fontWeight: 700, color: "#ffffff", letterSpacing: "-0.5px" },
                   children: "NorthStar",
                 },
               },
               {
                 type: "div",
                 props: {
-                  style: {
-                    marginLeft: "8px",
-                    fontSize: 16,
-                    color: "rgba(255,255,255,0.35)",
-                  },
+                  style: { marginLeft: "8px", fontSize: 16, color: "rgba(255,255,255,0.35)" },
                   children: "· northstar.app",
                 },
               },
             ],
           },
         },
-
         {
           type: "div",
           props: {
@@ -120,30 +107,17 @@ async function generateSectorPng(sector: {
             children: sector.name,
           },
         },
-
         {
           type: "div",
           props: {
-            style: {
-              fontSize: 24,
-              color: "rgba(255,255,255,0.65)",
-              lineHeight: 1.4,
-              marginBottom: "auto",
-              maxWidth: 900,
-            },
+            style: { fontSize: 24, color: "rgba(255,255,255,0.65)", lineHeight: 1.4, marginBottom: "auto", maxWidth: 900 },
             children: desc,
           },
         },
-
         {
           type: "div",
           props: {
-            style: {
-              display: "flex",
-              gap: "16px",
-              marginTop: "48px",
-              alignItems: "center",
-            },
+            style: { display: "flex", gap: "16px", marginTop: "48px", alignItems: "center" },
             children: [
               {
                 type: "div",
@@ -158,24 +132,11 @@ async function generateSectorPng(sector: {
                     gap: "2px",
                   },
                   children: [
-                    {
-                      type: "div",
-                      props: {
-                        style: { fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 700, letterSpacing: "1px" },
-                        children: "STIPENDIO",
-                      },
-                    },
-                    {
-                      type: "div",
-                      props: {
-                        style: { fontSize: 20, fontWeight: 700, color: "#4ade80" },
-                        children: `€${salaryMin}k – €${salaryMax}k`,
-                      },
-                    },
+                    { type: "div", props: { style: { fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 700, letterSpacing: "1px" }, children: "STIPENDIO" } },
+                    { type: "div", props: { style: { fontSize: 20, fontWeight: 700, color: "#4ade80" }, children: `€${salaryMin}k – €${salaryMax}k` } },
                   ],
                 },
               },
-
               {
                 type: "div",
                 props: {
@@ -189,24 +150,11 @@ async function generateSectorPng(sector: {
                     gap: "2px",
                   },
                   children: [
-                    {
-                      type: "div",
-                      props: {
-                        style: { fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 700, letterSpacing: "1px" },
-                        children: "CRESCITA",
-                      },
-                    },
-                    {
-                      type: "div",
-                      props: {
-                        style: { fontSize: 20, fontWeight: 700, color: "#ffffff" },
-                        children: `+${sector.growthRate}% / anno`,
-                      },
-                    },
+                    { type: "div", props: { style: { fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 700, letterSpacing: "1px" }, children: "CRESCITA" } },
+                    { type: "div", props: { style: { fontSize: 20, fontWeight: 700, color: "#ffffff" }, children: `+${sector.growthRate}% / anno` } },
                   ],
                 },
               },
-
               {
                 type: "div",
                 props: {
@@ -220,24 +168,11 @@ async function generateSectorPng(sector: {
                     gap: "2px",
                   },
                   children: [
-                    {
-                      type: "div",
-                      props: {
-                        style: { fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 700, letterSpacing: "1px" },
-                        children: "TREND",
-                      },
-                    },
-                    {
-                      type: "div",
-                      props: {
-                        style: { fontSize: 20, fontWeight: 700, color: "#ffffff" },
-                        children: trend,
-                      },
-                    },
+                    { type: "div", props: { style: { fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 700, letterSpacing: "1px" }, children: "TREND" } },
+                    { type: "div", props: { style: { fontSize: 20, fontWeight: 700, color: "#ffffff" }, children: trend } },
                   ],
                 },
               },
-
               {
                 type: "div",
                 props: {
@@ -251,20 +186,8 @@ async function generateSectorPng(sector: {
                     gap: "2px",
                   },
                   children: [
-                    {
-                      type: "div",
-                      props: {
-                        style: { fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 700, letterSpacing: "1px" },
-                        children: "RISCHIO AI",
-                      },
-                    },
-                    {
-                      type: "div",
-                      props: {
-                        style: { fontSize: 20, fontWeight: 700, color: "#ffffff" },
-                        children: `${riskEmoji} ${sector.automationRisk === "low" ? "Basso" : sector.automationRisk === "medium" ? "Medio" : "Alto"}`,
-                      },
-                    },
+                    { type: "div", props: { style: { fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 700, letterSpacing: "1px" }, children: "RISCHIO AI" } },
+                    { type: "div", props: { style: { fontSize: 20, fontWeight: 700, color: "#ffffff" }, children: `${riskEmoji} ${sector.automationRisk === "low" ? "Basso" : sector.automationRisk === "medium" ? "Medio" : "Alto"}` } },
                   ],
                 },
               },
@@ -275,7 +198,7 @@ async function generateSectorPng(sector: {
     },
   };
 
-  const svg = await satori(element as Parameters<typeof satori>[0], {
+  const svg = await satori(element as any, {
     width: 1200,
     height: 630,
     fonts: [
