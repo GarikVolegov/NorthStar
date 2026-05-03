@@ -641,8 +641,8 @@ export default function Results() {
                     {workModes && workModes.length > 0 && (
                       <WorkModeBadge modes={workModes} size="xs" />
                     )}
-                    {currentWorkMode && currentWorkMode !== "unknown" && alignment.tooltip && (
-                      <div title={alignment.tooltip} className={cn(
+                    {currentWorkMode && currentWorkMode !== "unknown" && alignment.tooltipKey && (
+                      <div title={t(alignment.tooltipKey, alignment.tooltipParams)} className={cn(
                         "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border w-fit",
                         alignment.type === "aligned" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
                         alignment.type === "partial" ? "bg-amber-50 text-amber-700 border-amber-200" :

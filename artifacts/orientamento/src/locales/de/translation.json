@@ -455,6 +455,11 @@
       }
     }
   },
+  "workModeAlignment": {
+    "aligned": "Entspricht deiner bevorzugten Arbeitsweise",
+    "partialHybrid": "Kompatibel mit deinem hybriden Modus, aber nicht optimal",
+    "misaligned": "Dieser Sektor ist hauptsächlich für {{modes}}"
+  },
   "sectors": {
     "title": "Branchen erkunden",
     "badge": "{{count}} Berufsfelder",
@@ -542,6 +547,11 @@
       "aligned": "✓ Ausgerichtet",
       "partial": "~ Kompatibel",
       "misaligned": "⚠ Nicht ausgerichtet"
+    },
+    "trendValues": {
+      "growing": "Wachsend",
+      "stable": "Stabil",
+      "declining": "Rückläufig"
     },
     "loadingTitle": "Berufsfeld",
     "loadingDesc": "Entdecke Details, Gehälter, Wachstum und KI-Risiko dieses Berufsfelds auf NorthStar."

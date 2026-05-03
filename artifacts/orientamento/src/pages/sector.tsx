@@ -114,7 +114,7 @@ export default function Sector() {
               );
             })}
             <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50">
-              <TrendingUp className="w-3 h-3 mr-1" /> {sector.trend}
+              <TrendingUp className="w-3 h-3 mr-1" /> {t(`sector.trendValues.${sector.trend}`, { defaultValue: sector.trend })}
             </Badge>
             {sector.workMode && sector.workMode.length > 0 && (
               <WorkModeBadge modes={sector.workMode} size="sm" />
@@ -122,10 +122,10 @@ export default function Sector() {
             {workPreference && workPreference !== "unknown" && (
               (() => {
                 const alignment = getWorkModeAlignment(workPreference, sector.workMode);
-                if (!alignment.tooltip) return null;
+                if (!alignment.tooltipKey) return null;
                 return (
                   <div
-                    title={alignment.tooltip}
+                    title={t(alignment.tooltipKey, alignment.tooltipParams)}
                     className={cn(
                       "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border",
                       alignment.type === "aligned" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
@@ -179,7 +179,7 @@ export default function Sector() {
             <Clock className="w-4 h-4 mr-1.5" /> {t("sector.trainingTime")}
           </div>
           <div className="text-xl md:text-2xl font-semibold capitalize">
-            {sector.timeToAutonomy}
+            {t("sector.timeToAutonomyValue", { defaultValue: sector.timeToAutonomy })}
           </div>
         </div>
         <div className="bg-card border rounded-2xl p-5 flex flex-col justify-center">

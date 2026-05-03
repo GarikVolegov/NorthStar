@@ -455,6 +455,11 @@
       }
     }
   },
+  "workModeAlignment": {
+    "aligned": "Aligned with your preferred work mode",
+    "partialHybrid": "Compatible with your hybrid mode, but not optimal",
+    "misaligned": "This sector is primarily for {{modes}}"
+  },
   "sectors": {
     "title": "Explore sectors",
     "badge": "{{count}} professional sectors",
@@ -542,6 +547,11 @@
       "aligned": "✓ Aligned",
       "partial": "~ Compatible",
       "misaligned": "⚠ Not aligned"
+    },
+    "trendValues": {
+      "growing": "Growing",
+      "stable": "Stable",
+      "declining": "Declining"
     },
     "loadingTitle": "Professional sector",
     "loadingDesc": "Discover details, salaries, growth and AI risk of this professional sector on NorthStar."
