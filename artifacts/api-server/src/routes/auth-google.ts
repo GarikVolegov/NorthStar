@@ -4,6 +4,15 @@ import { db, usersTable } from "@workspace/db";
 import { eq, or } from "drizzle-orm";
 import { z } from "zod";
 import { signToken } from "../lib/auth-jwt.js";
+import rateLimit from "express-rate-limit";
+
+const googleLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Troppi tentativi. Riprova tra un minuto." },
+});
 
 const router: IRouter = Router();
 
@@ -21,7 +30,7 @@ function safeUser(user: typeof usersTable.$inferSelect) {
   };
 }
 
-router.post("/auth/google-token", async (req, res): Promise<void> => {
+router.post("/auth/google-token", googleLimiter, async (req, res): Promise<void> => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) {
     res.status(503).json({ error: "Google login non configurato. Contatta l'amministratore." });

@@ -6,6 +6,24 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { sendVerificationEmail, sendResetEmail, sendPasswordChangedEmail } from "../lib/email";
 import { signToken } from "../lib/auth-jwt.js";
+import rateLimit from "express-rate-limit";
+
+function makeAuthLimiter(max: number, windowMs = 60_000, message = "Troppi tentativi. Riprova tra un minuto.") {
+  return rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: message },
+    skipSuccessfulRequests: false,
+  });
+}
+
+const loginLimiter = makeAuthLimiter(5, 60_000, "Troppi tentativi di accesso. Riprova tra un minuto.");
+const registerLimiter = makeAuthLimiter(5, 60_000, "Troppi tentativi di registrazione. Riprova tra un minuto.");
+const forgotLimiter = makeAuthLimiter(5, 60_000, "Troppi tentativi. Riprova tra un minuto.");
+const verifyLimiter = makeAuthLimiter(10, 60_000, "Troppi tentativi di verifica. Riprova tra un minuto.");
+const resendLimiter = makeAuthLimiter(3, 60_000, "Hai richiesto troppi codici. Riprova tra un minuto.");
 
 const router: IRouter = Router();
 
@@ -76,7 +94,7 @@ async function trySendVerificationEmail(email: string, name: string, code: strin
   }
 }
 
-router.post("/auth/register", async (req, res): Promise<void> => {
+router.post("/auth/register", registerLimiter, async (req, res): Promise<void> => {
   const parsed = RegisterBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Dati non validi" });
@@ -115,7 +133,7 @@ router.post("/auth/register", async (req, res): Promise<void> => {
   res.status(201).json(body);
 });
 
-router.post("/auth/verify-email", async (req, res): Promise<void> => {
+router.post("/auth/verify-email", verifyLimiter, async (req, res): Promise<void> => {
   const parsed = VerifyEmailBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Dati non validi" });
@@ -154,7 +172,7 @@ router.post("/auth/verify-email", async (req, res): Promise<void> => {
   res.json({ ...safeUser(updated), token: signToken(updated.id) });
 });
 
-router.post("/auth/resend-verification", async (req, res): Promise<void> => {
+router.post("/auth/resend-verification", resendLimiter, async (req, res): Promise<void> => {
   const parsed = ResendBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Dati non validi" });
@@ -185,7 +203,7 @@ router.post("/auth/resend-verification", async (req, res): Promise<void> => {
   res.json(body);
 });
 
-router.post("/auth/login", async (req, res): Promise<void> => {
+router.post("/auth/login", loginLimiter, async (req, res): Promise<void> => {
   const parsed = LoginBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Dati non validi" });
@@ -237,7 +255,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   res.json({ ...safeUser(user), token: signToken(user.id) });
 });
 
-router.post("/auth/forgot-password", async (req, res): Promise<void> => {
+router.post("/auth/forgot-password", forgotLimiter, async (req, res): Promise<void> => {
   const parsed = ForgotPasswordBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Dati non validi" });
@@ -273,7 +291,7 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
   res.json(body);
 });
 
-router.post("/auth/reset-password", async (req, res): Promise<void> => {
+router.post("/auth/reset-password", forgotLimiter, async (req, res): Promise<void> => {
   const parsed = ResetPasswordBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Dati non validi" });
