@@ -4,10 +4,11 @@ import { db, sectorsTable } from "@workspace/db";
 import { getInterFont } from "../lib/og-font";
 import * as satoriModule from "satori";
 
-// satori@0.26 ships a namespace export; cast to callable for TS 5.9 compatibility
-const satori = (satoriModule.default ?? satoriModule) as unknown as (
-  ...args: Parameters<typeof satoriModule.default>
-) => ReturnType<typeof satoriModule.default>;
+// satori@0.26 exports a namespace that TS 5.9 cannot infer as callable.
+// We resolve the function at runtime and use a plain hardcoded signature.
+const satori = (
+  (satoriModule as any).default ?? satoriModule
+) as (element: any, options: any) => Promise<string>;
 
 const router: IRouter = Router();
 
@@ -203,7 +204,7 @@ async function generateSectorPng(sector: {
     },
   };
 
-  const svg = await satori(element as any, {
+  const svg = await satori(element, {
     width: 1200,
     height: 630,
     fonts: [
