@@ -7,7 +7,7 @@ import { logger } from "../lib/logger.js";
 type EducationPathType = "universitario" | "professionale" | "online" | "bootcamp";
 
 async function loadEducationPaths() {
-  const rows = await db.select().from(educationPathsTable).where(eq(educationPathsTable.isActive, true));
+  const rows = await db.select().from(educationPathsTable).where(eq(educationPathsTable.isActive, true)).orderBy(educationPathsTable.id);
   return rows.map((r) => ({
     path: r.path,
     type: r.type as EducationPathType,

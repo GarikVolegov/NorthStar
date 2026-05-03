@@ -18,10 +18,12 @@ function adminKeyMiddleware(req: Request, res: Response, next: NextFunction): vo
   next();
 }
 
+const RIASEC_CODES = ["R", "I", "A", "S", "E", "C"] as const;
+
 const ProfessionBody = z.object({
   title:         z.string().min(2),
   sector:        z.string().min(2),
-  riasecFit:     z.array(z.string()).min(1),
+  riasecFit:     z.array(z.enum(RIASEC_CODES)).min(1),
   skills:        z.array(z.string()).min(1),
   workModes:     z.array(z.string()).min(1),
   salaryRange:   z.string().min(1),
@@ -40,8 +42,11 @@ const EducationPathBody = z.object({
   isActive:       z.boolean().optional().default(true),
 });
 
-router.get("/catalog/professions", async (_req, res): Promise<void> => {
-  const rows = await db.select().from(professionsTable).orderBy(professionsTable.id);
+router.get("/catalog/professions", async (req, res): Promise<void> => {
+  const showAll = req.headers["x-admin-key"] === process.env.ADMIN_KEY && !!process.env.ADMIN_KEY;
+  const rows = showAll
+    ? await db.select().from(professionsTable).orderBy(professionsTable.id)
+    : await db.select().from(professionsTable).where(eq(professionsTable.isActive, true)).orderBy(professionsTable.id);
   res.json(rows);
 });
 
@@ -79,8 +84,11 @@ router.delete("/catalog/professions/:id", adminKeyMiddleware, async (req, res): 
   res.json({ ok: true });
 });
 
-router.get("/catalog/education-paths", async (_req, res): Promise<void> => {
-  const rows = await db.select().from(educationPathsTable).orderBy(educationPathsTable.id);
+router.get("/catalog/education-paths", async (req, res): Promise<void> => {
+  const showAll = req.headers["x-admin-key"] === process.env.ADMIN_KEY && !!process.env.ADMIN_KEY;
+  const rows = showAll
+    ? await db.select().from(educationPathsTable).orderBy(educationPathsTable.id)
+    : await db.select().from(educationPathsTable).where(eq(educationPathsTable.isActive, true)).orderBy(educationPathsTable.id);
   res.json(rows);
 });
 

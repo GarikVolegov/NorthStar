@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 
 async function loadProfessions() {
-  const rows = await db.select().from(professionsTable).where(eq(professionsTable.isActive, true));
+  const rows = await db.select().from(professionsTable).where(eq(professionsTable.isActive, true)).orderBy(professionsTable.id);
   return rows.map((r) => ({
     title: r.title,
     sector: r.sector,
