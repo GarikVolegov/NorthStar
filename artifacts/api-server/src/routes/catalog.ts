@@ -61,7 +61,7 @@ router.post("/catalog/professions", adminKeyMiddleware, async (req, res): Promis
 });
 
 router.patch("/catalog/professions/:id", adminKeyMiddleware, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
   const parsed = ProfessionBody.partial().safeParse(req.body);
   if (!parsed.success) {
@@ -78,7 +78,7 @@ router.patch("/catalog/professions/:id", adminKeyMiddleware, async (req, res): P
 });
 
 router.delete("/catalog/professions/:id", adminKeyMiddleware, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
   await db.update(professionsTable).set({ isActive: false, updatedAt: new Date() }).where(eq(professionsTable.id, id));
   res.json({ ok: true });
@@ -103,7 +103,7 @@ router.post("/catalog/education-paths", adminKeyMiddleware, async (req, res): Pr
 });
 
 router.patch("/catalog/education-paths/:id", adminKeyMiddleware, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
   const parsed = EducationPathBody.partial().safeParse(req.body);
   if (!parsed.success) {
@@ -120,7 +120,7 @@ router.patch("/catalog/education-paths/:id", adminKeyMiddleware, async (req, res
 });
 
 router.delete("/catalog/education-paths/:id", adminKeyMiddleware, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
   await db.update(educationPathsTable).set({ isActive: false, updatedAt: new Date() }).where(eq(educationPathsTable.id, id));
   res.json({ ok: true });
