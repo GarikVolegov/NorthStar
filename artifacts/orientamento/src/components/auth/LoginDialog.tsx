@@ -471,7 +471,7 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
                 <p className="text-xs text-amber-700 font-medium mb-1">Modalità sviluppo — token reset:</p>
                 <p className="text-xs font-mono text-amber-800 break-all">{devHint}</p>
-                <a href={`/reset-password?token=${devHint}`} className="mt-2 inline-block text-xs text-primary underline" onClick={() => onOpenChange(false)}>
+                <a href={`${BASE}reset-password?token=${devHint}`} className="mt-2 inline-block text-xs text-primary underline" onClick={() => onOpenChange(false)}>
                   Apri pagina reset →
                 </a>
               </div>
