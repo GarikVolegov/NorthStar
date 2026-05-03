@@ -5,6 +5,7 @@ import {
   Compass, Target, Lightbulb, Users, Heart, Sparkles,
   BookOpen, BarChart3, Newspaper, ArrowRight, CheckCircle2,
 } from "lucide-react";
+import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
 
 function useSeo(title: string, description: string) {
   useEffect(() => {
@@ -115,11 +116,13 @@ export default function ChiSiamo() {
       <div className="container mx-auto px-4 max-w-4xl py-16 space-y-20">
 
         {/* Cosa facciamo */}
+        <AnimateOnScroll>
         <section>
           <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-6">Cosa facciamo</h2>
           <p className="text-lg text-muted-foreground leading-relaxed mb-6">
             NorthStar combina <strong className="text-foreground">test di personalità</strong>, analisi dei settori professionali, news aggiornate e strumenti di organizzazione personale in un unico spazio chiaro, utile e facile da usare.
           </p>
+          <AnimateOnScroll stagger>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
               { icon: Target,    label: "Test RIASEC + Cinque Spiriti",   desc: "Comprendi la tua personalità in due dimensioni: interessi e identità profonda." },
@@ -127,7 +130,8 @@ export default function ChiSiamo() {
               { icon: Newspaper, label: "News settoriali",                 desc: "Contenuti aggiornati filtrabili per i settori che ti interessano." },
               { icon: BookOpen,  label: "Roadmap e grafo della conoscenza", desc: "Visualizza le competenze, i ruoli e i percorsi di ogni settore in forma interattiva." },
             ].map(({ icon: Icon, label, desc }) => (
-              <div key={label} className="flex gap-4 p-5 rounded-2xl border bg-card">
+              <AnimateOnScrollItem key={label}>
+              <div className="flex gap-4 p-5 rounded-2xl border bg-card h-full">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                   <Icon className="w-5 h-5 text-primary" />
                 </div>
@@ -136,11 +140,15 @@ export default function ChiSiamo() {
                   <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
                 </div>
               </div>
+              </AnimateOnScrollItem>
             ))}
           </div>
+          </AnimateOnScroll>
         </section>
+        </AnimateOnScroll>
 
         {/* Perché esistiamo */}
+        <AnimateOnScroll>
         <section>
           <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-6">Perché esistiamo</h2>
           <div className="bg-primary/5 border border-primary/20 rounded-3xl p-8 md:p-10">
@@ -155,13 +163,18 @@ export default function ChiSiamo() {
             </p>
           </div>
         </section>
+        </AnimateOnScroll>
 
         {/* Il nostro metodo */}
         <section>
+          <AnimateOnScroll>
           <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-8">Il nostro metodo</h2>
+          </AnimateOnScroll>
+          <AnimateOnScroll stagger>
           <div className="space-y-6">
             {METHOD_STEPS.map((step) => (
-              <div key={step.n} className="flex gap-5 items-start">
+              <AnimateOnScrollItem key={step.n}>
+              <div className="flex gap-5 items-start">
                 <div className="w-12 h-12 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shrink-0">
                   {step.n}
                 </div>
@@ -170,16 +183,20 @@ export default function ChiSiamo() {
                   <p className="text-muted-foreground leading-relaxed">{step.desc}</p>
                 </div>
               </div>
+              </AnimateOnScrollItem>
             ))}
           </div>
+          </AnimateOnScroll>
         </section>
 
         {/* A chi ci rivolgiamo */}
+        <AnimateOnScroll>
         <section>
           <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-6">A chi ci rivolgiamo</h2>
           <p className="text-lg text-muted-foreground leading-relaxed mb-6">
             NorthStar è pensato per chiunque si trovi a un bivio nella propria vita professionale o formativa:
           </p>
+          <AnimateOnScroll stagger>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
               "Studenti delle superiori che devono scegliere l'università",
@@ -189,31 +206,42 @@ export default function ChiSiamo() {
               "Chi vuole capire meglio le proprie inclinazioni e punti di forza",
               "Professionisti che cercano nuove direzioni di crescita",
             ].map((item) => (
-              <div key={item} className="flex items-start gap-3 p-4 rounded-xl border bg-card">
+              <AnimateOnScrollItem key={item}>
+              <div className="flex items-start gap-3 p-4 rounded-xl border bg-card h-full">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                 <p className="text-sm text-foreground leading-snug">{item}</p>
               </div>
+              </AnimateOnScrollItem>
             ))}
           </div>
+          </AnimateOnScroll>
         </section>
+        </AnimateOnScroll>
 
         {/* I nostri valori */}
         <section>
+          <AnimateOnScroll>
           <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground mb-8">I nostri valori</h2>
+          </AnimateOnScroll>
+          <AnimateOnScroll stagger>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {VALUES.map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="p-5 rounded-2xl border bg-card hover:shadow-md transition-shadow">
+              <AnimateOnScrollItem key={title}>
+              <div className="p-5 rounded-2xl border bg-card hover:shadow-md transition-shadow h-full">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
                   <Icon className="w-5 h-5 text-primary" />
                 </div>
                 <h3 className="font-semibold text-foreground mb-2">{title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
               </div>
+              </AnimateOnScrollItem>
             ))}
           </div>
+          </AnimateOnScroll>
         </section>
 
         {/* CTA */}
+        <AnimateOnScroll>
         <section className="bg-primary/5 border border-primary/20 rounded-3xl p-10 text-center">
           <h2 className="text-2xl font-serif font-bold text-foreground mb-3">
             Pronto a trovare la tua direzione?
@@ -230,6 +258,7 @@ export default function ChiSiamo() {
             </Button>
           </div>
         </section>
+        </AnimateOnScroll>
 
       </div>
     </div>

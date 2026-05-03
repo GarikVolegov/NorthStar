@@ -1,11 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useLocation } from "wouter";
+import { motion, AnimatePresence } from "framer-motion";
+import type { Variants } from "framer-motion";
 import { useSubmitTest } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Loader2, ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useReducedMotion, easings } from "@/lib/motion";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -136,14 +139,28 @@ export default function Test() {
   const [, setLocation] = useLocation();
   const submitTest = useSubmitTest();
   const { user } = useAuth();
+  const prefersReduced = useReducedMotion();
 
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [direction, setDirection] = useState<1 | -1>(1);
   // Separate state for the transition screen — avoids conflicting with question index 12
   const [transitionPassed, setTransitionPassed] = useState(false);
 
   const showTransition = currentStep === RIASEC_QUESTIONS.length && !transitionPassed;
   const isComplete = currentStep >= ALL_QUESTIONS.length;
+
+  const questionVariants: Variants = prefersReduced
+    ? {
+        enter: { opacity: 0 },
+        center: { opacity: 1, transition: { duration: 0.15 } },
+        exit: { opacity: 0, transition: { duration: 0.1 } },
+      }
+    : {
+        enter: (dir: number) => ({ opacity: 0, x: dir > 0 ? 60 : -60 }),
+        center: { opacity: 1, x: 0, transition: { duration: 0.38, ease: easings.easeOut } },
+        exit: (dir: number) => ({ opacity: 0, x: dir > 0 ? -40 : 40, transition: { duration: 0.2, ease: easings.easeIn } }),
+      };
 
   // Spirit sub-progress (which spirit group and which question within it)
   const spiritOffset = currentStep - RIASEC_QUESTIONS.length;
@@ -159,19 +176,19 @@ export default function Test() {
   const progress     = (currentStep / ALL_QUESTIONS.length) * 100;
 
   const handleAnswer = (value: number) => {
+    setDirection(1);
     setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }));
-    setTimeout(() => setCurrentStep((prev) => prev + 1), 300);
+    setTimeout(() => setCurrentStep((prev) => prev + 1), 250);
   };
 
   const handleBack = () => {
+    setDirection(-1);
     if (showTransition) {
-      // Go back to last RIASEC question
       setTransitionPassed(false);
       setCurrentStep(RIASEC_QUESTIONS.length - 1);
       return;
     }
     if (currentStep === RIASEC_QUESTIONS.length && transitionPassed) {
-      // Back into transition screen
       setTransitionPassed(false);
       return;
     }
@@ -287,78 +304,104 @@ export default function Test() {
     <div className="container max-w-2xl mx-auto px-4 py-12 min-h-[70vh]">
       {/* Progress bar + counter */}
       <div className="flex items-center justify-between mb-4">
-        <button
+        <motion.button
           onClick={handleBack}
           disabled={currentStep === 0}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+          whileHover={prefersReduced ? {} : { x: -2 }}
+          whileTap={prefersReduced ? {} : { scale: 0.97 }}
         >
           <ArrowLeft className="w-4 h-4" /> Indietro
-        </button>
+        </motion.button>
         <span className="text-sm text-muted-foreground">
           {isSpiritQ
             ? `Bussola Interiore · ${stepDisplay - RIASEC_QUESTIONS.length} di ${SPIRIT_QUESTIONS.length}`
             : `Domanda ${stepDisplay} di ${totalDisplay}`}
         </span>
       </div>
-      <Progress value={progress} className="mb-10 h-1.5" />
+      <motion.div
+        initial={false}
+        animate={{ scaleX: progress / 100 }}
+        transition={prefersReduced ? { duration: 0 } : { duration: 0.4, ease: easings.easeOut }}
+        style={{ transformOrigin: "left" }}
+        className="h-1.5 bg-primary rounded-full mb-10"
+      />
 
-      {/* Spirit header */}
-      {spiritQ && (
-        <div className="flex items-center gap-3 mb-6">
-          <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-full px-4 py-1.5">
-            <span>{spiritQ.emoji}</span>
-            <span className="text-sm font-medium text-primary">
-              {spiritQ.spirit} · {spiritQ.description}
-            </span>
-          </div>
-          {/* 3-dot sub-progress */}
-          <div className="flex gap-1.5 ml-auto">
-            {[1, 2, 3].map((n) => (
-              <span
-                key={n}
-                className={cn(
-                  "w-2 h-2 rounded-full transition-colors",
-                  n <= questionInGroup ? "bg-primary" : "bg-muted"
-                )}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      <h2 className="text-2xl md:text-3xl font-serif font-semibold text-foreground mb-10 leading-snug">
-        {currentQuestion?.text}
-      </h2>
-
-      <div className="space-y-3">
-        {OPTIONS.map((opt) => {
-          const selected = answers[currentQuestion?.id] === opt.value;
-          return (
-            <button
-              key={opt.value}
-              onClick={() => handleAnswer(opt.value)}
-              className={cn(
-                "w-full flex items-center justify-between px-5 py-4 rounded-xl border text-left text-base font-medium transition-all duration-150",
-                selected
-                  ? "bg-primary text-primary-foreground border-primary shadow-md"
-                  : "bg-card border-border hover:border-primary/40 hover:bg-primary/5 text-foreground"
-              )}
-            >
-              {opt.label}
-              <div
-                className={cn(
-                  "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
-                  selected
-                    ? "border-primary-foreground bg-primary-foreground/20"
-                    : "border-muted-foreground"
-                )}
-              >
-                {selected && <div className="w-2.5 h-2.5 rounded-full bg-primary-foreground" />}
+      <AnimatePresence mode="wait" custom={direction}>
+        <motion.div
+          key={currentStep}
+          custom={direction}
+          variants={questionVariants}
+          initial="enter"
+          animate="center"
+          exit="exit"
+        >
+          {/* Spirit header */}
+          {spiritQ && (
+            <div className="flex items-center gap-3 mb-6">
+              <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-full px-4 py-1.5">
+                <span>{spiritQ.emoji}</span>
+                <span className="text-sm font-medium text-primary">
+                  {spiritQ.spirit} · {spiritQ.description}
+                </span>
               </div>
-            </button>
-          );
-        })}
-      </div>
+              {/* 3-dot sub-progress */}
+              <div className="flex gap-1.5 ml-auto">
+                {[1, 2, 3].map((n) => (
+                  <span
+                    key={n}
+                    className={cn(
+                      "w-2 h-2 rounded-full",
+                      n <= questionInGroup ? "bg-primary" : "bg-muted"
+                    )}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <h2 className="text-2xl md:text-3xl font-serif font-semibold text-foreground mb-10 leading-snug">
+            {currentQuestion?.text}
+          </h2>
+
+          <div className="space-y-3">
+            {OPTIONS.map((opt, optIdx) => {
+              const selected = answers[currentQuestion?.id] === opt.value;
+              return (
+                <motion.button
+                  key={opt.value}
+                  onClick={() => handleAnswer(opt.value)}
+                  initial={prefersReduced ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={prefersReduced ? { duration: 0 } : { delay: optIdx * 0.04, duration: 0.3, ease: easings.easeOut }}
+                  whileHover={prefersReduced ? undefined : { scale: 1.01 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.98 }}
+                  className={cn(
+                    "w-full flex items-center justify-between px-5 py-4 rounded-xl border text-left text-base font-medium transition-colors duration-150",
+                    selected
+                      ? "bg-primary text-primary-foreground border-primary shadow-md"
+                      : "bg-card border-border hover:border-primary/40 hover:bg-primary/5 text-foreground"
+                  )}
+                >
+                  {opt.label}
+                  <motion.div
+                    className={cn(
+                      "w-5 h-5 rounded-full border-2 flex items-center justify-center",
+                      selected
+                        ? "border-primary-foreground bg-primary-foreground/20"
+                        : "border-muted-foreground"
+                    )}
+                    animate={prefersReduced ? {} : { scale: selected ? [1, 1.2, 1] : 1 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    {selected && <div className="w-2.5 h-2.5 rounded-full bg-primary-foreground" />}
+                  </motion.div>
+                </motion.button>
+              );
+            })}
+          </div>
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

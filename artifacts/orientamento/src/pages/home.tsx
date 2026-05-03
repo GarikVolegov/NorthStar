@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "wouter";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ProssimiEventi } from "@/components/calendario/ProssimiEventi";
 import { ArrowRight, Compass, ExternalLink, LogIn, MapPin, Newspaper, Clock, Sparkles, Star, TrendingUp, Users, Bot, DollarSign, GitCompare, Flame, Briefcase, Laptop, GitMerge } from "lucide-react";
@@ -12,6 +13,8 @@ import { SectorIcon } from "@/lib/sector-icon";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-fetch";
 import { UserDashboard } from "@/components/UserDashboard";
+import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
+import { useReducedMotion, listItem } from "@/lib/motion";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -332,6 +335,7 @@ function AnimatedNumber({ value, suffix = "" }: { value: number, suffix?: string
 }
 
 export default function Home() {
+  const prefersReduced = useReducedMotion();
   const { data: stats, isLoading: isStatsLoading } = useGetStatsSummary();
   const { data: trendingData } = useTrendingSectors();
   const { data: newsData, isLoading: isNewsLoading } = useHomeNews();
@@ -458,24 +462,26 @@ export default function Home() {
       {/* Trending sectors */}
       <section className="py-12 md:py-20 bg-background">
         <div className="container mx-auto px-4 md:px-6 max-w-6xl">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 md:mb-10">
-            <div>
-              <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-sm font-medium mb-3">
-                <Flame className="w-3.5 h-3.5" /> Settori in evidenza questa settimana
+          <AnimateOnScroll>
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 md:mb-10">
+              <div>
+                <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-sm font-medium mb-3">
+                  <Flame className="w-3.5 h-3.5" /> Settori in evidenza questa settimana
+                </div>
+                <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
+                  I più richiesti in questo momento
+                </h2>
+                <p className="text-muted-foreground mt-2 max-w-xl">
+                  I settori con maggiore interesse tra gli utenti, basati su scelte reali e dati di mercato.
+                </p>
               </div>
-              <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
-                I più richiesti in questo momento
-              </h2>
-              <p className="text-muted-foreground mt-2 max-w-xl">
-                I settori con maggiore interesse tra gli utenti, basati su scelte reali e dati di mercato.
-              </p>
+              <Link href="/settori">
+                <div className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-border text-sm font-medium text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors">
+                  Esplora tutti i 21 settori <ArrowRight className="w-3.5 h-3.5" />
+                </div>
+              </Link>
             </div>
-            <Link href="/settori">
-              <div className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-border text-sm font-medium text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors">
-                Esplora tutti i 21 settori <ArrowRight className="w-3.5 h-3.5" />
-              </div>
-            </Link>
-          </div>
+          </AnimateOnScroll>
 
           {isStatsLoading || !trendingData ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -484,11 +490,13 @@ export default function Home() {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <AnimateOnScroll stagger className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {trendingData.map((sector, i) => (
-                <TrendingSectorCard key={sector.id} sector={sector} rank={i + 1} />
+                <AnimateOnScrollItem key={sector.id}>
+                  <TrendingSectorCard sector={sector} rank={i + 1} />
+                </AnimateOnScrollItem>
               ))}
-            </div>
+            </AnimateOnScroll>
           )}
         </div>
       </section>
@@ -496,24 +504,26 @@ export default function Home() {
       {/* News Section */}
       <section className="py-12 md:py-20 bg-card border-y">
         <div className="container mx-auto px-4 md:px-6 max-w-6xl">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 md:mb-10">
-            <div>
-              <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-sm font-medium mb-3">
-                <Newspaper className="w-3.5 h-3.5" /> News dal mondo del lavoro
+          <AnimateOnScroll>
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 md:mb-10">
+              <div>
+                <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-sm font-medium mb-3">
+                  <Newspaper className="w-3.5 h-3.5" /> News dal mondo del lavoro
+                </div>
+                <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
+                  Aggiornamenti in evidenza
+                </h2>
+                <p className="text-muted-foreground mt-2 max-w-xl">
+                  Le ultime notizie su tecnologia, business e formazione professionale, selezionate per te.
+                </p>
               </div>
-              <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
-                Aggiornamenti in evidenza
-              </h2>
-              <p className="text-muted-foreground mt-2 max-w-xl">
-                Le ultime notizie su tecnologia, business e formazione professionale, selezionate per te.
-              </p>
+              <Link href="/news">
+                <div className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-border text-sm font-medium text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors bg-background">
+                  Tutte le notizie <ArrowRight className="w-3.5 h-3.5" />
+                </div>
+              </Link>
             </div>
-            <Link href="/news">
-              <div className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-border text-sm font-medium text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors bg-background">
-                Tutte le notizie <ArrowRight className="w-3.5 h-3.5" />
-              </div>
-            </Link>
-          </div>
+          </AnimateOnScroll>
 
           {isNewsLoading || !newsData ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -522,11 +532,13 @@ export default function Home() {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <AnimateOnScroll stagger className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {newsData.news.slice(0, 3).map((item) => (
-                <HomeNewsCard key={item.id} item={item} />
+                <AnimateOnScrollItem key={item.id}>
+                  <HomeNewsCard item={item} />
+                </AnimateOnScrollItem>
               ))}
-            </div>
+            </AnimateOnScroll>
           )}
         </div>
       </section>
@@ -534,81 +546,111 @@ export default function Home() {
       {/* How it works */}
       <section id="come-funziona" className="py-14 md:py-24 bg-background">
         <div className="container mx-auto px-4 md:px-6">
-          <div className="text-center max-w-3xl mx-auto mb-10 md:mb-16">
-            <h2 className="text-2xl md:text-4xl font-serif font-bold text-foreground mb-3 md:mb-4">Un percorso in tre passi</h2>
-            <p className="text-base md:text-lg text-muted-foreground">Il nostro approccio è basato sul modello RIASEC, validato scientificamente, unito a dati di mercato in tempo reale.</p>
-          </div>
+          <AnimateOnScroll>
+            <div className="text-center max-w-3xl mx-auto mb-10 md:mb-16">
+              <h2 className="text-2xl md:text-4xl font-serif font-bold text-foreground mb-3 md:mb-4">Un percorso in tre passi</h2>
+              <p className="text-base md:text-lg text-muted-foreground">Il nostro approccio è basato sul modello RIASEC, validato scientificamente, unito a dati di mercato in tempo reale.</p>
+            </div>
+          </AnimateOnScroll>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 relative">
+          <AnimateOnScroll stagger className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 relative">
             <div className="hidden md:block absolute top-12 left-[15%] right-[15%] h-px bg-border -z-10" />
-            
-            <div className="flex flex-col items-center text-center group">
-              <div className="w-24 h-24 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center mb-6 shadow-sm group-hover:scale-105 transition-transform duration-300">
-                <Users className="h-10 w-10" />
+
+            <AnimateOnScrollItem>
+              <div className="flex flex-col items-center text-center group">
+                <motion.div
+                  className="w-24 h-24 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center mb-6 shadow-sm"
+                  whileHover={prefersReduced ? undefined : { scale: 1.08 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                >
+                  <Users className="h-10 w-10" />
+                </motion.div>
+                <h3 className="text-xl font-bold font-serif mb-3">1. Chi sei</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  Rispondi a 12 semplici domande basate su attitudini e preferenze. Non ci sono risposte giuste o sbagliate, solo la tua verità.
+                </p>
               </div>
-              <h3 className="text-xl font-bold font-serif mb-3">1. Chi sei</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Rispondi a 12 semplici domande basate su attitudini e preferenze. Non ci sono risposte giuste o sbagliate, solo la tua verità.
-              </p>
-            </div>
+            </AnimateOnScrollItem>
             
-            <div className="flex flex-col items-center text-center group">
-              <div className="w-24 h-24 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-6 shadow-sm group-hover:scale-105 transition-transform duration-300">
-                <Compass className="h-10 w-10" />
+            <AnimateOnScrollItem>
+              <div className="flex flex-col items-center text-center group">
+                <motion.div
+                  className="w-24 h-24 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-6 shadow-sm"
+                  whileHover={prefersReduced ? undefined : { scale: 1.08 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                >
+                  <Compass className="h-10 w-10" />
+                </motion.div>
+                <h3 className="text-xl font-bold font-serif mb-3">2. La mappa</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  Scopri il tuo profilo RIASEC e ricevi 3 raccomandazioni di settori professionali in linea con la tua natura.
+                </p>
               </div>
-              <h3 className="text-xl font-bold font-serif mb-3">2. La mappa</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Scopri il tuo profilo RIASEC e ricevi 3 raccomandazioni di settori professionali in linea con la tua natura.
-              </p>
-            </div>
+            </AnimateOnScrollItem>
             
-            <div className="flex flex-col items-center text-center group">
-              <div className="w-24 h-24 rounded-full bg-accent text-accent-foreground flex items-center justify-center mb-6 shadow-sm group-hover:scale-105 transition-transform duration-300">
-                <MapPin className="h-10 w-10" />
+            <AnimateOnScrollItem>
+              <div className="flex flex-col items-center text-center group">
+                <motion.div
+                  className="w-24 h-24 rounded-full bg-accent text-accent-foreground flex items-center justify-center mb-6 shadow-sm"
+                  whileHover={prefersReduced ? undefined : { scale: 1.08 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                >
+                  <MapPin className="h-10 w-10" />
+                </motion.div>
+                <h3 className="text-xl font-bold font-serif mb-3">3. La direzione</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  Esplora dati reali: stipendi, prospettive di crescita e rischio di automazione. Scegli la tua strada e registra il tuo percorso.
+                </p>
               </div>
-              <h3 className="text-xl font-bold font-serif mb-3">3. La direzione</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Esplora dati reali: stipendi, prospettive di crescita e rischio di automazione. Scegli la tua strada e registra il tuo percorso.
-              </p>
-            </div>
-          </div>
+            </AnimateOnScrollItem>
+          </AnimateOnScroll>
         </div>
       </section>
 
       {/* Testimonial / Philosophy */}
       <section className="py-14 md:py-24 bg-primary text-primary-foreground">
         <div className="container mx-auto px-5 md:px-6">
-          <div className="max-w-4xl mx-auto text-center">
-            <Compass className="h-10 w-10 md:h-12 md:w-12 mx-auto mb-6 md:mb-8 opacity-80" />
-            <blockquote className="text-xl md:text-4xl font-serif font-medium leading-relaxed mb-6 md:mb-8">
-              "Il futuro non si indovina, si costruisce. La migliore carriera non è quella che paga di più in assoluto, ma quella in cui il tuo talento naturale incontra una reale opportunità di mercato."
-            </blockquote>
-            <p className="text-primary-foreground/80 font-medium tracking-wider uppercase text-sm">
-              La Filosofia di NorthStar
-            </p>
-          </div>
+          <AnimateOnScroll>
+            <div className="max-w-4xl mx-auto text-center">
+              <motion.div
+                whileHover={prefersReduced ? undefined : { rotate: 20 }}
+                transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                className="inline-block mb-6 md:mb-8"
+              >
+                <Compass className="h-10 w-10 md:h-12 md:w-12 opacity-80" />
+              </motion.div>
+              <blockquote className="text-xl md:text-4xl font-serif font-medium leading-relaxed mb-6 md:mb-8">
+                "Il futuro non si indovina, si costruisce. La migliore carriera non è quella che paga di più in assoluto, ma quella in cui il tuo talento naturale incontra una reale opportunità di mercato."
+              </blockquote>
+              <p className="text-primary-foreground/80 font-medium tracking-wider uppercase text-sm">
+                La Filosofia di NorthStar
+              </p>
+            </div>
+          </AnimateOnScroll>
         </div>
       </section>
 
       {/* CTA Section */}
       <section className="py-14 md:py-24 bg-background">
         <div className="container mx-auto px-4 md:px-6">
-          <div className="bg-card rounded-3xl p-7 md:p-16 text-center border shadow-xl max-w-5xl mx-auto relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
-              <TrendingUp className="w-64 h-64" />
+          <AnimateOnScroll>
+            <div className="bg-card rounded-3xl p-7 md:p-16 text-center border shadow-xl max-w-5xl mx-auto relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+                <TrendingUp className="w-64 h-64" />
+              </div>
+              <div className="relative z-10">
+                <h2 className="text-2xl md:text-5xl font-serif font-bold text-foreground mb-4 md:mb-6">
+                  Pronto a scoprire la tua direzione?
+                </h2>
+                <p className="text-base md:text-xl text-muted-foreground mb-7 md:mb-10 max-w-2xl mx-auto font-light">
+                  Il test richiede meno di 3 minuti. Senza registrazione obbligatoria.
+                </p>
+                <Button asChild size="lg" className="rounded-full text-base md:text-lg h-12 md:h-14 px-8 md:px-10 shadow-lg hover:shadow-xl transition-all">
+                  <Link href="/test">Inizia Ora</Link>
+                </Button>
+              </div>
             </div>
-            <div className="relative z-10">
-              <h2 className="text-2xl md:text-5xl font-serif font-bold text-foreground mb-4 md:mb-6">
-                Pronto a scoprire la tua direzione?
-              </h2>
-              <p className="text-base md:text-xl text-muted-foreground mb-7 md:mb-10 max-w-2xl mx-auto font-light">
-                Il test richiede meno di 3 minuti. Senza registrazione obbligatoria.
-              </p>
-              <Button asChild size="lg" className="rounded-full text-base md:text-lg h-12 md:h-14 px-8 md:px-10 shadow-lg hover:shadow-xl transition-all">
-                <Link href="/test">Inizia Ora</Link>
-              </Button>
-            </div>
-          </div>
+          </AnimateOnScroll>
         </div>
       </section>
 

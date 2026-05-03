@@ -1,8 +1,10 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { motion, AnimatePresence } from "framer-motion";
+import { useReducedMotion, easings, durations } from "@/lib/motion";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Test from "@/pages/test";
@@ -45,6 +47,76 @@ import { BackButton } from "@/components/layout/back-button";
 
 const queryClient = new QueryClient();
 
+function AnimatedRoutes() {
+  const [location] = useLocation();
+  const prefersReduced = useReducedMotion();
+
+  const routes = (loc: string) => (
+    <Switch location={loc}>
+      <Route path="/" component={Home} />
+      <Route path="/test" component={Test} />
+      <Route path="/risultati/:id" component={Results} />
+      <Route path="/settore/:id" component={Sector} />
+      <Route path="/registra" component={Register} />
+      <Route path="/premium" component={Premium} />
+      <Route path="/premium/successo" component={PremiumSuccess} />
+      <Route path="/news" component={News} />
+      <Route path="/reset-password" component={ResetPassword} />
+      <Route path="/profilo" component={Profilo} />
+      <Route path="/candidature" component={Candidature} />
+      <Route path="/calendario" component={Calendario} />
+      <Route path="/amici" component={Amici} />
+      <Route path="/utente/:id" component={Utente} />
+      <Route path="/wiki/:id" component={Wiki} />
+      <Route path="/roadmap/:id" component={Roadmap} />
+      <Route path="/grafo/:id" component={Grafo} />
+      <Route path="/settori" component={Settori} />
+      <Route path="/confronta" component={Confronta} />
+      <Route path="/contatti" component={Contatti} />
+      <Route path="/sitemap" component={SitemapPage} />
+      <Route path="/chi-siamo" component={ChiSiamo} />
+      <Route path="/come-funziona" component={ComeFunziona} />
+      <Route path="/privacy-policy" component={PrivacyPolicy} />
+      <Route path="/termini-di-servizio" component={TerminiDiServizio} />
+      <Route path="/crescita" component={Crescita} />
+      <Route path="/crescita/categoria/:cat" component={CrescitaCategoria} />
+      <Route path="/crescita/articolo/:slug" component={CrescitaArticolo} />
+      <Route path="/affiliazione" component={Affiliazione} />
+      <Route path="/affiliazione/scuole" component={AffiliazioneScuole} />
+      <Route path="/affiliazione/universita" component={AffiliazioneUniversita} />
+      <Route path="/affiliazione/agenzie-lavoro" component={AffiliazioneAgenzie} />
+      <Route path="/affiliazione/centri-formazione" component={AffiliazioneFormazione} />
+      <Route component={NotFound} />
+    </Switch>
+  );
+
+  if (prefersReduced) {
+    return routes(location);
+  }
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={location}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          transition: { duration: durations.slow, ease: easings.easeOut },
+        }}
+        exit={{
+          opacity: 0,
+          y: -6,
+          transition: { duration: durations.normal, ease: easings.easeIn },
+        }}
+        style={{ willChange: "opacity, transform" }}
+      >
+        {routes(location)}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 function Router() {
   return (
     <Switch>
@@ -58,42 +130,7 @@ function Router() {
           <Navbar />
           <main className="flex-1">
             <BackButton />
-            <Switch>
-              <Route path="/" component={Home} />
-              <Route path="/test" component={Test} />
-              <Route path="/risultati/:id" component={Results} />
-              <Route path="/settore/:id" component={Sector} />
-              <Route path="/registra" component={Register} />
-              <Route path="/premium" component={Premium} />
-              <Route path="/premium/successo" component={PremiumSuccess} />
-              <Route path="/news" component={News} />
-              <Route path="/reset-password" component={ResetPassword} />
-              <Route path="/profilo" component={Profilo} />
-              <Route path="/candidature" component={Candidature} />
-              <Route path="/calendario" component={Calendario} />
-              <Route path="/amici" component={Amici} />
-              <Route path="/utente/:id" component={Utente} />
-              <Route path="/wiki/:id" component={Wiki} />
-              <Route path="/roadmap/:id" component={Roadmap} />
-              <Route path="/grafo/:id" component={Grafo} />
-              <Route path="/settori" component={Settori} />
-              <Route path="/confronta" component={Confronta} />
-              <Route path="/contatti" component={Contatti} />
-              <Route path="/sitemap" component={SitemapPage} />
-              <Route path="/chi-siamo" component={ChiSiamo} />
-              <Route path="/come-funziona" component={ComeFunziona} />
-              <Route path="/privacy-policy" component={PrivacyPolicy} />
-              <Route path="/termini-di-servizio" component={TerminiDiServizio} />
-              <Route path="/crescita" component={Crescita} />
-              <Route path="/crescita/categoria/:cat" component={CrescitaCategoria} />
-              <Route path="/crescita/articolo/:slug" component={CrescitaArticolo} />
-              <Route path="/affiliazione" component={Affiliazione} />
-              <Route path="/affiliazione/scuole" component={AffiliazioneScuole} />
-              <Route path="/affiliazione/universita" component={AffiliazioneUniversita} />
-              <Route path="/affiliazione/agenzie-lavoro" component={AffiliazioneAgenzie} />
-              <Route path="/affiliazione/centri-formazione" component={AffiliazioneFormazione} />
-              <Route component={NotFound} />
-            </Switch>
+            <AnimatedRoutes />
           </main>
           <Footer />
         </div>

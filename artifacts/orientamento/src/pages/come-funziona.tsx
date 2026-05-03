@@ -12,6 +12,7 @@ import {
   Sparkles, BarChart3, Flame, Star, BookOpen, HelpCircle,
   CheckCircle2, Zap, Heart,
 } from "lucide-react";
+import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
 
 function useSeo(title: string, description: string) {
   useEffect(() => {
@@ -151,16 +152,20 @@ export default function ComeFunziona() {
       {/* 3 Steps */}
       <section className="py-24 bg-background">
         <div className="container mx-auto px-4 md:px-6 max-w-5xl">
+          <AnimateOnScroll>
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground mb-3">Il percorso in tre passi</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">Ogni passo è progettato per darti chiarezza progressiva, non ansia da prestazione.</p>
           </div>
+          </AnimateOnScroll>
 
+          <AnimateOnScroll stagger>
           <div className="space-y-10">
             {STEPS.map((step, i) => {
               const Icon = step.icon;
               return (
-                <div key={i} className="flex flex-col md:flex-row gap-8 items-start">
+                <AnimateOnScrollItem key={i}>
+                <div className="flex flex-col md:flex-row gap-8 items-start">
                   <div className="shrink-0 flex flex-col items-center md:items-start gap-3">
                     <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${step.color}`}>
                       <Icon className="w-7 h-7" />
@@ -176,15 +181,18 @@ export default function ComeFunziona() {
                     </div>
                   </div>
                 </div>
+                </AnimateOnScrollItem>
               );
             })}
           </div>
+          </AnimateOnScroll>
         </div>
       </section>
 
       {/* RIASEC */}
       <section className="py-24 bg-card border-y">
         <div className="container mx-auto px-4 md:px-6 max-w-5xl">
+          <AnimateOnScroll>
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-sm font-medium mb-4">
               <Brain className="w-3.5 h-3.5" /> Il modello RIASEC
@@ -196,10 +204,13 @@ export default function ComeFunziona() {
               Il modello RIASEC, sviluppato dallo psicologo John L. Holland, identifica sei orientamenti professionali fondamentali. Ogni persona è una combinazione unica di questi sei tipi.
             </p>
           </div>
+          </AnimateOnScroll>
 
+          <AnimateOnScroll stagger>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {RIASEC_TYPES.map((t) => (
-              <div key={t.letter} className={`rounded-2xl border p-5 ${t.color.replace('text-', 'border-').replace(/border-\S+/, '')} bg-card`}>
+              <AnimateOnScrollItem key={t.letter}>
+              <div className={`rounded-2xl border p-5 ${t.color.replace('text-', 'border-').replace(/border-\S+/, '')} bg-card h-full`}>
                 <div className="flex items-center gap-3 mb-3">
                   <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-serif font-bold text-xl ${t.color}`}>
                     {t.letter}
@@ -208,20 +219,25 @@ export default function ComeFunziona() {
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">{t.desc}</p>
               </div>
+              </AnimateOnScrollItem>
             ))}
           </div>
+          </AnimateOnScroll>
 
+          <AnimateOnScroll delay={0.1}>
           <div className="mt-8 bg-primary/5 border border-primary/15 rounded-2xl p-6 text-center">
             <p className="text-sm text-muted-foreground">
               Il tuo profilo RIASEC sarà una combinazione di due o più lettere, come <span className="font-semibold text-foreground">R + I</span> o <span className="font-semibold text-foreground">S + A + E</span>. Non esiste una combinazione migliore delle altre: ognuna ha settori in cui eccelle naturalmente.
             </p>
           </div>
+          </AnimateOnScroll>
         </div>
       </section>
 
       {/* Cinque Spiriti */}
       <section className="py-24 bg-background">
         <div className="container mx-auto px-4 md:px-6 max-w-5xl">
+          <AnimateOnScroll>
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-sm font-medium mb-4">
               <Sparkles className="w-3.5 h-3.5" /> La Bussola Interiore
@@ -233,16 +249,21 @@ export default function ComeFunziona() {
               Un modello originale NorthStar che misura cinque qualità interiori fondamentali. Non sono tratti fissi: sono energie che puoi allenare e sviluppare nel tempo.
             </p>
           </div>
+          </AnimateOnScroll>
 
+          <AnimateOnScroll stagger>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {SPIRITS.map((s) => (
-              <div key={s.key} className="bg-card border rounded-2xl p-5 flex flex-col items-center text-center hover:border-primary/30 transition-colors">
+              <AnimateOnScrollItem key={s.key}>
+              <div className="bg-card border rounded-2xl p-5 flex flex-col items-center text-center hover:border-primary/30 transition-colors h-full">
                 <span className="text-3xl mb-3">{s.emoji}</span>
                 <h3 className="font-serif font-bold text-foreground mb-2">{s.key}</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">{s.desc}</p>
               </div>
+              </AnimateOnScrollItem>
             ))}
           </div>
+          </AnimateOnScroll>
         </div>
       </section>
 

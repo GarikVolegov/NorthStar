@@ -1,6 +1,9 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
+import { motion } from "framer-motion"
+import type { Transition } from "framer-motion"
+import { useReducedMotion } from "@/lib/motion"
 
 import { cn } from "@/lib/utils"
 
@@ -11,24 +14,17 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-           // @replit: no hover, and add primary border
            "bg-primary text-primary-foreground border border-primary-border",
         destructive:
           "bg-destructive text-destructive-foreground shadow-sm border-destructive-border",
         outline:
-          // @replit Shows the background color of whatever card / sidebar / accent background it is inside of.
-          // Inherits the current text color. Uses shadow-xs. no shadow on active
-          // No hover state
           " border [border-color:var(--button-outline)] shadow-xs active:shadow-none ",
         secondary:
-          // @replit border, no hover, no shadow, secondary border.
           "border bg-secondary text-secondary-foreground border border-secondary-border ",
-        // @replit no hover, transparent border
         ghost: "border border-transparent",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        // @replit changed sizes
         default: "min-h-9 px-4 py-2",
         sm: "min-h-8 rounded-md px-3 text-xs",
         lg: "min-h-10 rounded-md px-8",
@@ -42,6 +38,15 @@ const buttonVariants = cva(
   }
 )
 
+const springTransition: Transition = {
+  type: "spring",
+  stiffness: 500,
+  damping: 30,
+  mass: 0.6,
+}
+
+const MotionSlot = motion.create(Slot as React.ForwardRefExoticComponent<React.HTMLAttributes<HTMLElement> & React.RefAttributes<HTMLElement>>)
+
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
@@ -50,12 +55,48 @@ export interface ButtonProps
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button"
+    const prefersReduced = useReducedMotion()
+
+    if (asChild) {
+      if (prefersReduced) {
+        return (
+          <Slot
+            className={cn(buttonVariants({ variant, size, className }))}
+            ref={ref}
+            {...props}
+          />
+        )
+      }
+      return (
+        <MotionSlot
+          className={cn(buttonVariants({ variant, size, className }))}
+          ref={ref as React.Ref<HTMLElement>}
+          whileHover={variant === "link" ? undefined : { scale: 1.015, y: -1 }}
+          whileTap={{ scale: 0.97 }}
+          transition={springTransition}
+          {...(props as React.ComponentPropsWithoutRef<typeof MotionSlot>)}
+        />
+      )
+    }
+
+    if (prefersReduced) {
+      return (
+        <button
+          className={cn(buttonVariants({ variant, size, className }))}
+          ref={ref}
+          {...props}
+        />
+      )
+    }
+
     return (
-      <Comp
+      <motion.button
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
-        {...props}
+        whileHover={variant === "link" ? undefined : { scale: 1.015, y: -1 }}
+        whileTap={{ scale: 0.97 }}
+        transition={springTransition}
+        {...(props as React.ComponentPropsWithoutRef<typeof motion.button>)}
       />
     )
   }

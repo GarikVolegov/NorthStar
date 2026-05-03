@@ -1,4 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
+import { motion } from "framer-motion";
+import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
 import { usePageMeta } from "@/lib/seo";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -87,6 +89,7 @@ export default function Settori() {
       {/* Header */}
       <section className="border-b bg-gradient-to-b from-primary/5 to-background py-14 md:py-20">
         <div className="container mx-auto px-4 max-w-5xl text-center">
+          <AnimateOnScroll>
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium mb-5">
             <Zap className="w-4 h-4" />
             {sectors.length} settori professionali
@@ -97,6 +100,7 @@ export default function Settori() {
           <p className="text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">
             Non sai ancora cosa fare? Sfoglia tutti i settori, filtra in base al tuo stile e scopri dove potresti trovarti bene.
           </p>
+          </AnimateOnScroll>
         </div>
       </section>
 
@@ -217,12 +221,13 @@ export default function Settori() {
             <p className="text-sm mt-1">Prova a modificare i filtri o la ricerca</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <AnimateOnScroll stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {filtered.map((sector) => {
               const trend   = TREND_META[sector.trend] ?? TREND_META["stable"];
               const risk    = RISK_META[sector.automationRisk] ?? RISK_META["medium"];
               return (
-                <Link key={sector.id} href={`/settore/${sector.id}`}>
+                <AnimateOnScrollItem key={sector.id}>
+                <Link href={`/settore/${sector.id}`}>
                   <div className="group h-full flex flex-col border bg-card rounded-2xl overflow-hidden hover:border-primary/40 hover:shadow-md transition-all duration-200 cursor-pointer">
 
                     {/* Card header */}
@@ -295,9 +300,10 @@ export default function Settori() {
 
                   </div>
                 </Link>
+                </AnimateOnScrollItem>
               );
             })}
-          </div>
+          </AnimateOnScroll>
         )}
 
         {/* Compare CTA */}

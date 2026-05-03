@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { motion } from "framer-motion";
 import { usePageMeta } from "@/lib/seo";
 import { useParams, Link, useLocation } from "wouter";
 import { useGetTestSession, useConfirmSector, useGetStatsSummary, getGetTestSessionQueryKey } from "@workspace/api-client-react";
@@ -22,6 +23,8 @@ import {
 } from "recharts";
 import { WorkModeSelector, WorkModeBadge, useWorkPreference } from "@/components/WorkModeSelector";
 import type { WorkPreference } from "@/components/WorkModeSelector";
+import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
+import { useReducedMotion } from "@/lib/motion";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -85,6 +88,7 @@ function SpiritBar({ spirit, score }: { spirit: string; score: number }) {
 }
 
 function SpiritRadarChart({ spiritScores }: { spiritScores: Record<string, number> }) {
+  const prefersReduced = useReducedMotion();
   const data = SPIRIT_RADAR_ORDER.map((key) => ({
     spirit: `${SPIRIT_META[key]?.emoji} ${SPIRIT_META[key]?.label}`,
     value: spiritScores[key] ?? 0,
@@ -92,24 +96,30 @@ function SpiritRadarChart({ spiritScores }: { spiritScores: Record<string, numbe
   }));
 
   return (
-    <ResponsiveContainer width="100%" height={260}>
-      <RadarChart data={data} margin={{ top: 16, right: 24, bottom: 16, left: 24 }}>
-        <PolarGrid stroke="hsl(var(--border))" strokeOpacity={0.6} />
-        <PolarAngleAxis
-          dataKey="spirit"
-          tick={{ fontSize: 13, fontWeight: 600, fill: "hsl(var(--foreground))" }}
-          tickLine={false}
-        />
-        <Radar
-          dataKey="value"
-          stroke="hsl(var(--primary))"
-          fill="hsl(var(--primary))"
-          fillOpacity={0.22}
-          strokeWidth={2.5}
-          dot={{ r: 4, fill: "hsl(var(--primary))", strokeWidth: 0 }}
-        />
-      </RadarChart>
-    </ResponsiveContainer>
+    <motion.div
+      initial={prefersReduced ? {} : { opacity: 0, scale: 0.88 }}
+      animate={prefersReduced ? {} : { opacity: 1, scale: 1 }}
+      transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
+    >
+      <ResponsiveContainer width="100%" height={260}>
+        <RadarChart data={data} margin={{ top: 16, right: 24, bottom: 16, left: 24 }}>
+          <PolarGrid stroke="hsl(var(--border))" strokeOpacity={0.6} />
+          <PolarAngleAxis
+            dataKey="spirit"
+            tick={{ fontSize: 13, fontWeight: 600, fill: "hsl(var(--foreground))" }}
+            tickLine={false}
+          />
+          <Radar
+            dataKey="value"
+            stroke="hsl(var(--primary))"
+            fill="hsl(var(--primary))"
+            fillOpacity={0.22}
+            strokeWidth={2.5}
+            dot={{ r: 4, fill: "hsl(var(--primary))", strokeWidth: 0 }}
+          />
+        </RadarChart>
+      </ResponsiveContainer>
+    </motion.div>
   );
 }
 
@@ -339,6 +349,7 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
 }
 
 export default function Results() {
+  const prefersReduced = useReducedMotion();
   usePageMeta({
     title: "I tuoi risultati RIASEC",
     description: "I tuoi risultati personalizzati del test RIASEC + Bussola Interiore. Scopri i settori professionali più adatti al tuo profilo di personalità.",
@@ -541,25 +552,30 @@ export default function Results() {
 
       {/* Recommendations */}
       <div className="mb-12">
-        <h2 className="text-2xl md:text-3xl font-serif font-bold text-center mb-4">
-          I tuoi percorsi ideali
-        </h2>
-        <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
-          Basandoci sulla tua tipologia di personalità (il modello RIASEC classifica 6 tendenze: Realistico, Investigativo, Artistico, Sociale, Imprenditivo, Convenzionale) e sulla tua Bussola Interiore, ecco i 3 settori dove potresti eccellere.
-        </p>
+        <AnimateOnScroll>
+          <h2 className="text-2xl md:text-3xl font-serif font-bold text-center mb-4">
+            I tuoi percorsi ideali
+          </h2>
+          <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
+            Basandoci sulla tua tipologia di personalità (il modello RIASEC classifica 6 tendenze: Realistico, Investigativo, Artistico, Sociale, Imprenditivo, Convenzionale) e sulla tua Bussola Interiore, ecco i 3 settori dove potresti eccellere.
+          </p>
+        </AnimateOnScroll>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <AnimateOnScroll stagger className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {(effectiveSession?.recommendations ?? session?.recommendations ?? []).map((rec, index) => {
             const workModes = rec.sector?.workMode ?? null;
 
             return (
+              <AnimateOnScrollItem key={rec.sectorId}>
+              <motion.div
+                whileHover={prefersReduced ? undefined : { y: -4, boxShadow: "0 12px 32px -4px hsl(160 20% 30% / 0.14)" }}
+                transition={{ type: "spring", stiffness: 350, damping: 28 }}
+              >
               <Card
-                key={rec.sectorId}
                 className={cn(
-                  "flex flex-col border-2 overflow-hidden hover:shadow-xl transition-all duration-300 animate-in slide-in-from-bottom-8 fade-in fill-mode-both",
+                  "flex flex-col border-2 overflow-hidden transition-colors duration-300",
                   rec.matchScore >= 90 ? "border-primary shadow-lg" : "border-border",
                 )}
-                style={{ animationDelay: `${index * 150}ms` }}
               >
                 {rec.matchScore >= 90 && (
                   <div className="bg-primary text-primary-foreground text-xs font-bold uppercase tracking-wider text-center py-1.5">
@@ -643,9 +659,11 @@ export default function Results() {
                   </Button>
                 </CardFooter>
               </Card>
+              </motion.div>
+              </AnimateOnScrollItem>
             );
           })}
-        </div>
+        </AnimateOnScroll>
 
         <QuickCompare recs={session.recommendations as Rec[]} />
       </div>
