@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, varchar, timestamp, real, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, varchar, timestamp, real, index, jsonb } from "drizzle-orm/pg-core";
 
 // Personal "Obsidian-like" knowledge graph: per-user nodes (notes, skills,
 // documents, sectors, roles, tools, certifications, links, concepts) and
@@ -16,6 +16,9 @@ export const knowledgeNodesTable = pgTable(
     sectorId: integer("sector_id"),
     x: real("x").notNull().default(0),
     y: real("y").notNull().default(0),
+    // RAG: vector embedding of (title + content). number[] of 1536 dims (text-embedding-3-small).
+    embedding: jsonb("embedding").$type<number[] | null>(),
+    embeddedText: text("embedded_text"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

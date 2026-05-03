@@ -168,15 +168,17 @@ Built using Replit AI Integrations (OpenAI, no API key needed). Accessible to al
 - Frontend: card selettore con fitScore colorato e badge "Consigliato per te", dettaglio percorso selezionato con pros/cons, fasi accordion, sezione "Confronto onesto" + "Percorsi formativi laterali"
 - File: `artifacts/api-server/src/routes/roadmap.ts`, `artifacts/orientamento/src/pages/roadmap.tsx`
 
-### Grafo della Conoscenza personale (`/grafo`) — Obsidian-like
+### Grafo della Conoscenza personale (`/grafo`) — Obsidian-like + RAG
 - Personal, persistent knowledge graph per user (notes, skills, documents, roles, tools, certifications, concepts, links)
-- DB-backed: `knowledge_nodes` + `knowledge_edges` (per-user, cascading deletes via app logic)
+- DB-backed: `knowledge_nodes` (with `embedding` jsonb + `embedded_text`) + `knowledge_edges`
 - Full SVG canvas: pan, wheel-zoom, drag nodes (positions persisted via debounced bulk PATCH `/api/knowledge/nodes/positions`)
 - Side panel editor: title, type, URL (link/document), markdown content, edge list with delete
 - Link mode: click-to-connect two nodes with optional edge label
 - Search + type filter, auto-circle layout for unpositioned nodes
-- Routes: `GET /api/knowledge/graph`, `POST/PATCH/DELETE /api/knowledge/nodes(/:id)`, `POST/DELETE /api/knowledge/edges(/:id)`, all auth-protected and user-scoped
-- Schema: `lib/db/src/schema/knowledge.ts`; page: `artifacts/orientamento/src/pages/grafo-conoscenza.tsx`
+- **RAG (Retrieval-Augmented Generation)**: ogni nodo viene embeddato (`text-embedding-3-small`, 1536 dims) all'insert/update; route `POST /api/knowledge/ask` (SSE streaming) calcola similarità coseno tra domanda e nodi, prende top-K=6, espande con i vicini diretti tramite gli archi del grafo, e passa tutto a `gpt-5.1` con istruzione di rispondere SOLO dai nodi citando `[#id]`. Frontend: pannello chat laterale "Chiedi al grafo" con suggerimenti, citazioni cliccabili che focalizzano il nodo, indicatori di stato (embedding/retrieving/answering).
+- Backfill: `POST /api/knowledge/embeddings/backfill` rigenera gli embedding mancanti; il route `/ask` fa anche backfill inline (max 30 per volta) se trova nodi senza embedding.
+- Routes: `GET /api/knowledge/graph`, `POST/PATCH/DELETE /api/knowledge/nodes(/:id)`, `POST/DELETE /api/knowledge/edges(/:id)`, `POST /api/knowledge/ask`, `POST /api/knowledge/embeddings/backfill` — tutte auth-protected e user-scoped
+- Schema: `lib/db/src/schema/knowledge.ts`; route: `artifacts/api-server/src/routes/knowledge.ts`; page: `artifacts/orientamento/src/pages/grafo-conoscenza.tsx`
 
 ### Grafo competenze settore (legacy, `/grafo/:sectorId`)
 - AI-generated per-sector graph (still available): 5 roles, 7 skills, 5 tools, 4 certs
@@ -191,6 +193,8 @@ Built using Replit AI Integrations (OpenAI, no API key needed). Accessible to al
 - `GET /api/grafo/:sectorId` — sector graph data (cached, AI-generated)
 - `GET /api/knowledge/graph` — personal knowledge graph nodes + edges (Obsidian-like)
 - `POST/PATCH/DELETE /api/knowledge/nodes(/:id)`, `POST /api/knowledge/nodes/positions`, `POST/DELETE /api/knowledge/edges(/:id)`
+- `POST /api/knowledge/ask` — RAG streaming SSE (embed query → cosine sim → top-K + neighbors → gpt-5.1 with citations)
+- `POST /api/knowledge/embeddings/backfill` — regenerate missing embeddings for the user's nodes
 
 ### AI Integration Setup
 - `AI_INTEGRATIONS_OPENAI_BASE_URL` + `AI_INTEGRATIONS_OPENAI_API_KEY` — auto-set via Replit

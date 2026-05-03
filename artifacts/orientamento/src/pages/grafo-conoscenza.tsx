@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import {
   ArrowLeft, Plus, Save, Trash2, Link2, X, Search, Sparkles, Loader2,
   StickyNote, Lightbulb, FileText, Target, Briefcase, Wrench, Award, Network, Globe,
+  MessageCircleQuestion, Send, ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,7 @@ export default function GrafoConoscenza() {
   const [edgeLabelDraft, setEdgeLabelDraft] = useState("");
   const [pendingEdge, setPendingEdge] = useState<{ sourceId: number; targetId: number } | null>(null);
   const [creatingType, setCreatingType] = useState<NodeType>("note");
+  const [chatOpen, setChatOpen] = useState(false);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const dragState = useRef<{ id: number; offsetX: number; offsetY: number; moved: boolean } | null>(null);
@@ -382,6 +384,17 @@ export default function GrafoConoscenza() {
           <Button size="sm" className="rounded-xl h-8" onClick={() => handleAddNode()}>
             <Plus className="w-3.5 h-3.5 mr-1" /> Nuovo nodo
           </Button>
+          <Button
+            size="sm"
+            variant={chatOpen ? "default" : "outline"}
+            className="rounded-xl h-8"
+            onClick={() => {
+              setChatOpen((v) => !v);
+              if (!chatOpen) setSelectedId(null);
+            }}
+          >
+            <MessageCircleQuestion className="w-3.5 h-3.5 mr-1" /> Chiedi al grafo
+          </Button>
         </div>
       </div>
 
@@ -593,7 +606,7 @@ export default function GrafoConoscenza() {
         </div>
 
         {/* Side panel (selected node) */}
-        {selected && (
+        {selected && !chatOpen && (
           <NodeEditor
             key={selected.id}
             node={selected}
@@ -606,8 +619,306 @@ export default function GrafoConoscenza() {
             onDeleteEdge={(id) => handleDeleteEdge(id)}
           />
         )}
+
+        {/* RAG chat panel */}
+        {chatOpen && (
+          <ChatPanel
+            nodes={data.nodes}
+            onClose={() => setChatOpen(false)}
+            onFocusNode={(id) => {
+              setChatOpen(false);
+              setSelectedId(id);
+            }}
+          />
+        )}
       </div>
     </div>
+  );
+}
+
+// ─── RAG chat panel ─────────────────────────────────────────────────────────
+
+interface Citation {
+  id: number;
+  title: string;
+  type: NodeType;
+  score?: number;
+}
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  citations?: Citation[];
+  neighbors?: Citation[];
+  status?: string;
+  error?: string;
+}
+
+interface ChatPanelProps {
+  nodes: KNode[];
+  onClose: () => void;
+  onFocusNode: (id: number) => void;
+}
+
+function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
+  const [question, setQuestion] = useState("");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [busy, setBusy] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  async function ask() {
+    const q = question.trim();
+    if (!q || busy) return;
+    setQuestion("");
+    setBusy(true);
+
+    const userMsg: ChatMessage = { role: "user", content: q };
+    const assistantMsg: ChatMessage = { role: "assistant", content: "", status: "starting" };
+    setMessages((m) => [...m, userMsg, assistantMsg]);
+
+    try {
+      const res = await apiFetch(`${BASE}api/knowledge/ask`, {
+        method: "POST",
+        body: JSON.stringify({ question: q }),
+      });
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("Nessun reader");
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() ?? "";
+        for (const part of parts) {
+          if (!part.startsWith("data: ")) continue;
+          try {
+            const data = JSON.parse(part.slice(6));
+            setMessages((prev) => {
+              const next = prev.slice();
+              const last = next[next.length - 1];
+              if (last.role !== "assistant") return prev;
+              if (data.content) {
+                next[next.length - 1] = {
+                  ...last,
+                  content: last.content + data.content,
+                  status: undefined,
+                };
+              } else if (data.status) {
+                next[next.length - 1] = { ...last, status: data.status };
+              } else if (data.citations) {
+                next[next.length - 1] = {
+                  ...last,
+                  citations: data.citations,
+                  neighbors: data.neighbors,
+                };
+              } else if (data.error) {
+                next[next.length - 1] = {
+                  ...last,
+                  error: data.error,
+                  status: undefined,
+                };
+              }
+              return next;
+            });
+          } catch {
+            /* malformed sse */
+          }
+        }
+      }
+    } catch (err) {
+      setMessages((prev) => {
+        const next = prev.slice();
+        const last = next[next.length - 1];
+        if (last.role === "assistant") {
+          next[next.length - 1] = {
+            ...last,
+            error: err instanceof Error ? err.message : "Errore di rete",
+            status: undefined,
+          };
+        }
+        return next;
+      });
+    }
+
+    setBusy(false);
+  }
+
+  function renderAnswer(content: string, citations?: Citation[]) {
+    // Replace [#NN] tokens with clickable badges
+    const parts: React.ReactNode[] = [];
+    const regex = /\[#(\d+)\]/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    let key = 0;
+    while ((match = regex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(content.slice(lastIndex, match.index));
+      }
+      const id = Number(match[1]);
+      const node = nodes.find((n) => n.id === id);
+      const cite = citations?.find((c) => c.id === id);
+      const label = node?.title ?? cite?.title ?? `#${id}`;
+      parts.push(
+        <button
+          key={`c-${key++}`}
+          onClick={() => onFocusNode(id)}
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded bg-primary/10 text-primary text-[11px] font-medium hover:bg-primary/20 align-baseline"
+          title={`Vai al nodo ${label}`}
+        >
+          {label}
+        </button>,
+      );
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < content.length) parts.push(content.slice(lastIndex));
+    return parts;
+  }
+
+  const suggestions = [
+    "Quali competenze ho già acquisito?",
+    "Cosa mi manca per il ruolo che voglio?",
+    "Riassumi i miei appunti su questo settore.",
+    "Quali nodi sono più collegati tra loro?",
+  ];
+
+  return (
+    <aside className="w-full max-w-md border-l bg-card flex flex-col">
+      <div className="flex items-center gap-2 px-4 py-3 border-b">
+        <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+          <MessageCircleQuestion className="w-4 h-4" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">RAG</p>
+          <p className="text-sm font-semibold truncate">Chiedi al tuo grafo</p>
+        </div>
+        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onClose}>
+          <X className="w-4 h-4" />
+        </Button>
+      </div>
+
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 && (
+          <div className="text-center py-6">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <p className="text-sm font-semibold mb-1">Interroga il tuo grafo</p>
+            <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
+              L'AI cerca i nodi più rilevanti, considera i loro collegamenti e risponde solo
+              in base ai tuoi appunti. {nodes.length} nodi disponibili.
+            </p>
+            <div className="space-y-1.5 text-left">
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setQuestion(s)}
+                  className="w-full text-left px-3 py-2 rounded-lg border bg-background hover:border-primary/40 hover:bg-primary/5 text-xs transition-colors flex items-center gap-2"
+                >
+                  <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
+                  <span>{s}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {messages.map((m, i) => (
+          <div key={i}>
+            {m.role === "user" ? (
+              <div className="flex justify-end">
+                <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-3.5 py-2 text-sm">
+                  {m.content}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {m.citations && m.citations.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+                      Nodi rilevanti
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {m.citations.map((c) => {
+                        const meta = TYPE_META[c.type] ?? TYPE_META.note;
+                        return (
+                          <button
+                            key={c.id}
+                            onClick={() => onFocusNode(c.id)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] hover:opacity-80"
+                            style={{ backgroundColor: meta.bg, color: meta.color, borderColor: meta.border }}
+                            title={`Affinità ${c.score ? Math.round(c.score * 100) : 0}% — clicca per aprire`}
+                          >
+                            <meta.Icon className="w-2.5 h-2.5" />
+                            <span className="font-medium">{c.title}</span>
+                            {c.score !== undefined && (
+                              <span className="opacity-70">{Math.round(c.score * 100)}%</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <div className="bg-muted/40 border rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap">
+                  {m.error ? (
+                    <span className="text-destructive">{m.error}</span>
+                  ) : m.content ? (
+                    renderAnswer(m.content, m.citations)
+                  ) : m.status ? (
+                    <span className="text-muted-foreground italic flex items-center gap-2">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      {m.status === "embedding" && "Calcolo embedding mancanti…"}
+                      {m.status === "retrieving" && "Cerco i nodi più rilevanti…"}
+                      {m.status === "answering" && "Sto rispondendo…"}
+                      {m.status === "starting" && "Avvio…"}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="border-t p-3">
+        <div className="flex items-end gap-2">
+          <Textarea
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void ask();
+              }
+            }}
+            placeholder="Chiedi qualcosa sui tuoi nodi…"
+            rows={2}
+            className="rounded-xl text-sm resize-none flex-1"
+            disabled={busy}
+          />
+          <Button
+            size="icon"
+            className="rounded-xl h-9 w-9 shrink-0"
+            disabled={busy || !question.trim()}
+            onClick={() => void ask()}
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          </Button>
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-1.5">
+          ↵ per inviare · Shift+↵ per andare a capo
+        </p>
+      </div>
+    </aside>
   );
 }
 
