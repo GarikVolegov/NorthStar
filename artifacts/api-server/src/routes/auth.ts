@@ -209,7 +209,11 @@ router.post("/auth/login", async (req, res): Promise<void> => {
       .update(usersTable)
       .set({ verificationCode: newCode, verificationCodeExpires: newExpires })
       .where(eq(usersTable.id, user.id));
-    await trySendVerificationEmail(email, user.name, newCode);
+    try {
+      await trySendVerificationEmail(email, user.name, newCode);
+    } catch {
+      console.warn("[auth] verification email failed during login");
+    }
 
     const body: Record<string, unknown> = {
       error: "Email non verificata. Ti abbiamo inviato un nuovo codice.",
