@@ -27,6 +27,12 @@ function safeUser(user: typeof usersTable.$inferSelect) {
     email: user.email,
     avatarUrl: user.avatarUrl,
     testSessionId: user.testSessionId,
+    emailVerified: user.emailVerified,
+    stripeSubscriptionId: user.stripeSubscriptionId,
+    workPreference: user.workPreference,
+    autonomyPreference: user.autonomyPreference,
+    stabilityPreference: user.stabilityPreference,
+    timezone: user.timezone,
   };
 }
 

@@ -200,6 +200,17 @@ Added 3 card links directly on `/settore/:id` above the tabs:
 
 - `GET /api/sectors` and `GET /api/sectors/:id` now serialize `createdAt` as ISO string before Zod parsing (fixes ZodError "Expected string, received date")
 
+## Auth Hardening (May 2026)
+
+- **JWT_SECRET persistente**: `artifacts/api-server/src/lib/auth-jwt.ts` ora salva il secret in `artifacts/api-server/.local/.jwt-secret` (mode 0600) se `JWT_SECRET` env non è impostato. I token sopravvivono ai restart del server (prima ogni restart scollegava tutti gli utenti).
+- **Codici di verifica sicuri**: sostituito `Math.random()` con `crypto.randomInt(100000, 1000000)`.
+- **Email failure surfacing**: gli endpoint `/auth/register`, `/auth/login`, `/auth/resend-verification`, `/auth/forgot-password` ora restituiscono `emailSent: boolean` (e `emailError` in dev). Il frontend può avvisare l'utente quando l'email non parte.
+- **`GET /api/auth/me`**: nuovo endpoint protetto da `authMiddleware` per validare il token al mount dell'app.
+- **AuthContext con validazione mount**: al primo render, se c'è un token in localStorage, chiama `/auth/me` per validarlo. Se 401 → logout silenzioso (niente flash di "loggato" seguito da kick mid-session). Espone `authReady` per consumer che vogliono attendere.
+- **api-fetch**: l'evento `northstar:auth-expired` ora scatta SOLO se la chiamata aveva effettivamente un token attaccato. 401 su endpoint pubblici non scollega più l'utente.
+- **`safeUser` esteso**: include `emailVerified`, `stripeSubscriptionId`, `workPreference`, `autonomyPreference`, `stabilityPreference`, `timezone`. Allineato anche `auth-google.ts`.
+- **Deliverability**: l'email `FROM` di default è `onboarding@resend.dev`. Resend free tier consente l'invio solo all'email del proprietario dell'account a meno che il dominio non sia verificato. Per produzione: impostare `EMAIL_FROM` con un dominio verificato su Resend.
+
 ## Roadmap (Future Phases)
 
 - **Phase 2:** Fix Stripe key + seed products, activate premium checkout

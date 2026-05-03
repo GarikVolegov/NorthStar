@@ -5,7 +5,7 @@ import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { sendVerificationEmail, sendResetEmail, sendPasswordChangedEmail } from "../lib/email";
-import { signToken } from "../lib/auth-jwt.js";
+import { signToken, authMiddleware } from "../lib/auth-jwt.js";
 import rateLimit from "express-rate-limit";
 
 function makeAuthLimiter(max: number, windowMs = 60_000, message = "Troppi tentativi. Riprova tra un minuto.") {
@@ -63,12 +63,18 @@ function safeUser(user: typeof usersTable.$inferSelect) {
     name: user.name,
     email: user.email,
     testSessionId: user.testSessionId,
+    emailVerified: user.emailVerified,
+    stripeSubscriptionId: user.stripeSubscriptionId,
+    workPreference: user.workPreference,
+    autonomyPreference: user.autonomyPreference,
+    stabilityPreference: user.stabilityPreference,
+    timezone: user.timezone,
     createdAt: user.createdAt.toISOString(),
   };
 }
 
 function generateCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(crypto.randomInt(100000, 1000000));
 }
 
 function getAppBaseUrl(): string {
@@ -86,11 +92,17 @@ function getAppBaseUrl(): string {
 
 const isDevMode = !process.env.RESEND_API_KEY;
 
-async function trySendVerificationEmail(email: string, name: string, code: string): Promise<void> {
+async function trySendVerificationEmail(
+  email: string,
+  name: string,
+  code: string,
+): Promise<{ ok: boolean; error?: string }> {
   try {
     await sendVerificationEmail(email, name, code);
+    return { ok: true };
   } catch (err) {
     console.error("[auth] verification email failed", err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -123,11 +135,15 @@ router.post("/auth/register", registerLimiter, async (req, res): Promise<void> =
     verificationCodeExpires,
   });
 
-  await trySendVerificationEmail(email, name, verificationCode);
+  const sendResult = await trySendVerificationEmail(email, name, verificationCode);
 
   const body: Record<string, unknown> = {
-    message: "Registrazione completata. Controlla la tua email per il codice di verifica.",
+    message: sendResult.ok
+      ? "Registrazione completata. Controlla la tua email per il codice di verifica."
+      : "Registrazione completata, ma non siamo riusciti a inviare l'email di verifica. Usa il pulsante 'Invia di nuovo'.",
+    emailSent: sendResult.ok,
   };
+  if (!sendResult.ok && sendResult.error) body.emailError = sendResult.error;
   if (isDevMode) body.devCode = verificationCode;
 
   res.status(201).json(body);
@@ -195,9 +211,15 @@ router.post("/auth/resend-verification", resendLimiter, async (req, res): Promis
     .set({ verificationCode, verificationCodeExpires })
     .where(eq(usersTable.id, user.id));
 
-  await trySendVerificationEmail(email, user.name, verificationCode);
+  const sendResult = await trySendVerificationEmail(email, user.name, verificationCode);
 
-  const body: Record<string, unknown> = { message: "Nuovo codice inviato." };
+  const body: Record<string, unknown> = {
+    message: sendResult.ok
+      ? "Nuovo codice inviato. Controlla la tua email."
+      : "Non siamo riusciti a inviare l'email. Riprova tra qualche minuto.",
+    emailSent: sendResult.ok,
+  };
+  if (!sendResult.ok && sendResult.error) body.emailError = sendResult.error;
   if (isDevMode) body.devCode = verificationCode;
 
   res.json(body);
@@ -236,23 +258,33 @@ router.post("/auth/login", loginLimiter, async (req, res): Promise<void> => {
       .update(usersTable)
       .set({ verificationCode: newCode, verificationCodeExpires: newExpires })
       .where(eq(usersTable.id, user.id));
-    try {
-      await trySendVerificationEmail(email, user.name, newCode);
-    } catch {
-      console.warn("[auth] verification email failed during login");
-    }
+    const sendResult = await trySendVerificationEmail(email, user.name, newCode);
 
     const body: Record<string, unknown> = {
-      error: "Email non verificata. Ti abbiamo inviato un nuovo codice.",
+      error: sendResult.ok
+        ? "Email non verificata. Ti abbiamo inviato un nuovo codice."
+        : "Email non verificata. Non siamo riusciti a inviare un nuovo codice — riprova dalla schermata di verifica.",
       needsVerification: true,
       email,
+      emailSent: sendResult.ok,
     };
+    if (!sendResult.ok && sendResult.error) body.emailError = sendResult.error;
     if (isDevMode) body.devCode = newCode;
     res.status(403).json(body);
     return;
   }
 
   res.json({ ...safeUser(user), token: signToken(user.id) });
+});
+
+router.get("/auth/me", authMiddleware, async (_req, res): Promise<void> => {
+  const userId = res.locals.userId as number;
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+  if (!user) {
+    res.status(401).json({ error: "Utente non trovato" });
+    return;
+  }
+  res.json(safeUser(user));
 });
 
 router.post("/auth/forgot-password", forgotLimiter, async (req, res): Promise<void> => {
@@ -279,12 +311,18 @@ router.post("/auth/forgot-password", forgotLimiter, async (req, res): Promise<vo
       .where(eq(usersTable.id, user.id));
 
     const resetUrl = `${getAppBaseUrl()}/reset-password?token=${resetToken}`;
+    let emailSent = true;
+    let emailError: string | undefined;
     try {
       await sendResetEmail(email, resetUrl);
     } catch (err) {
+      emailSent = false;
+      emailError = err instanceof Error ? err.message : String(err);
       console.error("[auth] reset email failed", err);
     }
 
+    body.emailSent = emailSent;
+    if (!emailSent && emailError) body.emailError = emailError;
     if (isDevMode) body.devToken = resetToken;
   }
 

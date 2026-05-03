@@ -1,17 +1,52 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import type { Request, Response, NextFunction } from "express";
 
-const JWT_SECRET =
-  process.env.JWT_SECRET ??
-  (() => {
-    const s = crypto.randomBytes(32).toString("hex");
+function loadOrCreateSecret(): string {
+  const fromEnv = process.env.JWT_SECRET;
+  if (fromEnv && fromEnv.length >= 16) return fromEnv;
+
+  const cacheDir = path.resolve(process.cwd(), ".local");
+  const cacheFile = path.join(cacheDir, ".jwt-secret");
+
+  try {
+    if (fs.existsSync(cacheFile)) {
+      const cached = fs.readFileSync(cacheFile, "utf-8").trim();
+      if (cached.length >= 32) {
+        if (process.env.NODE_ENV !== "test") {
+          console.warn(
+            "[auth-jwt] JWT_SECRET non impostato — uso secret persistente da .local/.jwt-secret. Imposta JWT_SECRET in produzione.",
+          );
+        }
+        return cached;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  const generated = crypto.randomBytes(48).toString("hex");
+  try {
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(cacheFile, generated, { mode: 0o600 });
     if (process.env.NODE_ENV !== "test") {
       console.warn(
-        "[auth-jwt] JWT_SECRET not set — generated an ephemeral secret. Tokens will be invalidated on restart.",
+        "[auth-jwt] JWT_SECRET non impostato — generato nuovo secret e salvato in .local/.jwt-secret (i token NON saranno invalidati ai prossimi restart).",
       );
     }
-    return s;
-  })();
+  } catch (err) {
+    if (process.env.NODE_ENV !== "test") {
+      console.error(
+        "[auth-jwt] Impossibile salvare il secret persistente (i token verranno invalidati al prossimo restart):",
+        err,
+      );
+    }
+  }
+  return generated;
+}
+
+const JWT_SECRET = loadOrCreateSecret();
 
 const HEADER_B64 = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString(
   "base64url",
