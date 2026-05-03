@@ -361,8 +361,9 @@ export default function Home() {
     );
   }
 
-  if (isLoggedIn && user && hasConfirmedSector && latestResult) {
-    return <UserDashboard userName={user.name} latestResult={latestResult} />;
+  if (isLoggedIn && user) {
+    const isPremium = !!(user as { stripeSubscriptionId?: string }).stripeSubscriptionId;
+    return <UserDashboard userName={user.name} latestResult={latestResult ?? null} isPremium={isPremium} />;
   }
 
   return (

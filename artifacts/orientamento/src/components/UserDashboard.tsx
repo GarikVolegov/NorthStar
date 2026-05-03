@@ -6,8 +6,9 @@ import { SectorIcon } from "@/lib/sector-icon";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-fetch";
 import {
-  ArrowRight, BookOpen, CheckCircle2, ChevronRight, Circle, Clock,
-  ExternalLink, GitBranch, Map, Newspaper, Sparkles, Target, TrendingUp, User,
+  ArrowRight, BookOpen, Briefcase, Calendar, CheckCircle2, ChevronRight, Circle, Clock,
+  Compass, Crown, ExternalLink, GitBranch, GitCompare, LayoutGrid, Map, Newspaper,
+  Sparkles, Target, TrendingUp, Trophy, User, Users,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -136,13 +137,67 @@ function ObjectiveRow({ obj }: { obj: Objective }) {
   );
 }
 
-interface UserDashboardProps {
-  userName: string;
-  latestResult: LatestResult;
+type ToolItem = {
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  badge?: string;
+  premium?: boolean;
+  accent?: string;
+};
+
+function ToolCard({ tool }: { tool: ToolItem }) {
+  const accent = tool.accent ?? "primary";
+  return (
+    <Link href={tool.href}>
+      <div className="group h-full flex flex-col p-5 rounded-2xl border bg-card hover:shadow-md hover:border-primary/30 transition-all duration-200 cursor-pointer relative">
+        {tool.badge && (
+          <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 rounded-full px-2 py-0.5">
+            {tool.badge}
+          </span>
+        )}
+        {tool.premium && (
+          <span className="absolute top-3 right-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+            <Crown className="w-3 h-3" /> Premium
+          </span>
+        )}
+        <div className={cn(
+          "w-11 h-11 rounded-xl flex items-center justify-center mb-3 transition-colors shrink-0",
+          accent === "primary" && "bg-primary/10 text-primary group-hover:bg-primary/15",
+          accent === "amber" && "bg-amber-50 text-amber-700 group-hover:bg-amber-100",
+          accent === "emerald" && "bg-emerald-50 text-emerald-700 group-hover:bg-emerald-100",
+          accent === "violet" && "bg-violet-50 text-violet-700 group-hover:bg-violet-100",
+          accent === "blue" && "bg-blue-50 text-blue-700 group-hover:bg-blue-100",
+          accent === "rose" && "bg-rose-50 text-rose-700 group-hover:bg-rose-100",
+        )}>
+          {tool.icon}
+        </div>
+        <h3 className="font-semibold text-foreground leading-snug mb-1 group-hover:text-primary transition-colors">
+          {tool.title}
+        </h3>
+        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 flex-1">
+          {tool.description}
+        </p>
+        <div className="flex items-center gap-1 text-xs font-medium text-primary mt-3">
+          Apri <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+        </div>
+      </div>
+    </Link>
+  );
 }
 
-export function UserDashboard({ userName, latestResult }: UserDashboardProps) {
-  const { confirmedSectorId, sessionId, recommendations } = latestResult;
+interface UserDashboardProps {
+  userName: string;
+  latestResult: LatestResult | null;
+  isPremium?: boolean;
+}
+
+export function UserDashboard({ userName, latestResult, isPremium = false }: UserDashboardProps) {
+  const confirmedSectorId = latestResult?.confirmedSectorId ?? null;
+  const sessionId = latestResult?.sessionId ?? null;
+  const recommendations = latestResult?.recommendations ?? [];
+
   const { data: sector, isLoading: sectorLoading } = useSectorDetail(confirmedSectorId);
   const { data: articlesData, isLoading: articlesLoading } = usePersonalizedArticles();
   const { data: objectives, isLoading: objectivesLoading } = useObjectives();
@@ -154,6 +209,97 @@ export function UserDashboard({ userName, latestResult }: UserDashboardProps) {
   const totalCount = objectives?.length ?? 0;
   const inProgressObjectives = objectives?.filter((o) => !o.completed).slice(0, 3) ?? [];
 
+  const hasTestSession = !!sessionId;
+  const hasConfirmedSector = !!confirmedSectorId;
+
+  const tools: ToolItem[] = [
+    {
+      href: hasTestSession ? `/risultati/${sessionId}` : "/test",
+      icon: <Trophy className="w-5 h-5" />,
+      title: hasTestSession ? "I tuoi risultati" : "Fai il test",
+      description: hasTestSession
+        ? "Rivedi il tuo profilo RIASEC e i settori raccomandati."
+        : "Scopri il tuo profilo e i settori più adatti a te.",
+      badge: hasTestSession ? undefined : "Inizia",
+      accent: "primary",
+    },
+    {
+      href: "/settori",
+      icon: <Compass className="w-5 h-5" />,
+      title: "Esplora i settori",
+      description: "Sfoglia tutti i settori professionali con dettagli e prospettive.",
+      accent: "blue",
+    },
+    {
+      href: "/confronta",
+      icon: <GitCompare className="w-5 h-5" />,
+      title: "Confronta settori",
+      description: "Metti due settori a confronto: stipendi, crescita, rischio.",
+      accent: "violet",
+    },
+    {
+      href: hasConfirmedSector ? `/roadmap/${confirmedSectorId}` : "/settori",
+      icon: <Map className="w-5 h-5" />,
+      title: "Roadmap personale",
+      description: hasConfirmedSector
+        ? `Step by step verso ${sectorName}.`
+        : "Conferma un settore per attivare la tua roadmap.",
+      accent: "emerald",
+    },
+    {
+      href: hasConfirmedSector ? `/grafo/${confirmedSectorId}` : "/settori",
+      icon: <GitBranch className="w-5 h-5" />,
+      title: "Grafo competenze",
+      description: hasConfirmedSector
+        ? "Visualizza le skill chiave del tuo settore."
+        : "Mappa visiva delle competenze per settore.",
+      accent: "violet",
+    },
+    {
+      href: "/crescita",
+      icon: <BookOpen className="w-5 h-5" />,
+      title: "Crescita personale",
+      description: "Articoli, guide e contenuti formativi per il tuo profilo.",
+      accent: "primary",
+    },
+    {
+      href: "/candidature",
+      icon: <Briefcase className="w-5 h-5" />,
+      title: "Le tue candidature",
+      description: "Traccia colloqui, candidature e fasi di ricerca lavoro.",
+      accent: "blue",
+    },
+    {
+      href: "/calendario",
+      icon: <Calendar className="w-5 h-5" />,
+      title: "Calendario",
+      description: "Eventi, scadenze e promemoria per non perdere occasioni.",
+      accent: "rose",
+    },
+    {
+      href: "/amici",
+      icon: <Users className="w-5 h-5" />,
+      title: "Amici e rete",
+      description: "Connettiti con persone che condividono il tuo percorso.",
+      accent: "emerald",
+    },
+    {
+      href: "/profilo",
+      icon: <User className="w-5 h-5" />,
+      title: "Profilo e CV",
+      description: "Gestisci dati, preferenze, obiettivi e curriculum.",
+      accent: "primary",
+    },
+    ...(isPremium ? [] : [{
+      href: "/premium",
+      icon: <Crown className="w-5 h-5" />,
+      title: "Passa a Premium",
+      description: "Sblocca tutti gli strumenti avanzati e le analisi AI.",
+      premium: true,
+      accent: "amber",
+    } as ToolItem]),
+  ];
+
   return (
     <div className="flex flex-col w-full animate-in fade-in duration-500">
 
@@ -164,59 +310,101 @@ export function UserDashboard({ userName, latestResult }: UserDashboardProps) {
           <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full bg-primary/5 blur-3xl translate-y-1/2 -translate-x-1/4" />
         </div>
         <div className="container mx-auto px-5 md:px-6 max-w-5xl relative z-10">
-          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-sm font-medium mb-4">
-            <Sparkles className="w-3.5 h-3.5" /> Il tuo percorso
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-sm font-medium">
+              <Sparkles className="w-3.5 h-3.5" /> Il tuo percorso
+            </div>
+            {isPremium && (
+              <div className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-3 py-1 text-sm font-semibold">
+                <Crown className="w-3.5 h-3.5" /> Premium
+              </div>
+            )}
           </div>
           <h1 className="text-3xl md:text-5xl font-serif font-bold text-foreground mb-2 leading-tight">
             Bentornato, <span className="text-primary italic">{userName}</span> ✦
           </h1>
           <p className="text-muted-foreground text-base md:text-lg max-w-xl">
-            Ecco il riepilogo del tuo percorso e i prossimi passi consigliati.
+            {hasConfirmedSector
+              ? "Ecco il riepilogo del tuo percorso e i prossimi passi consigliati."
+              : hasTestSession
+                ? "Hai completato il test. Conferma un settore per personalizzare ancora di più la tua esperienza."
+                : "Inizia il tuo viaggio: il test è il primo passo per costruire un percorso su misura."}
           </p>
         </div>
       </section>
 
-      {/* Confirmed sector card + quick links */}
+      {/* Confirmed sector card OR call-to-test card */}
       <section className="py-10 bg-background border-b">
         <div className="container mx-auto px-4 md:px-6 max-w-5xl">
           <h2 className="text-xl font-serif font-bold text-foreground mb-5">
-            Il tuo percorso confermato
+            {hasConfirmedSector ? "Il tuo percorso confermato" : "Il prossimo passo"}
           </h2>
-          {sectorLoading ? (
-            <Skeleton className="h-40 w-full rounded-2xl" />
-          ) : (
-            <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-6">
-              {/* Icon + name */}
-              <div className="flex items-center gap-4 flex-1">
-                <div className="w-16 h-16 rounded-2xl bg-primary/15 flex items-center justify-center text-primary shrink-0">
-                  <SectorIcon name={sector?.icon} size={32} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <CheckCircle2 className="w-4 h-4 text-primary" />
-                    <span className="text-xs font-semibold text-primary uppercase tracking-wider">Confermato</span>
+
+          {hasConfirmedSector ? (
+            sectorLoading ? (
+              <Skeleton className="h-40 w-full rounded-2xl" />
+            ) : (
+              <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-6">
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="w-16 h-16 rounded-2xl bg-primary/15 flex items-center justify-center text-primary shrink-0">
+                    <SectorIcon name={sector?.icon} size={32} />
                   </div>
-                  <h3 className="text-2xl font-serif font-bold text-foreground leading-tight">{sectorName}</h3>
-                  {sector?.description && (
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2 max-w-md">{sector.description}</p>
-                  )}
-                  {confirmedRec && (
-                    <div className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/10 rounded-full px-3 py-1">
-                      <TrendingUp className="w-3 h-3" /> {confirmedRec.matchScore}% di compatibilità
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <CheckCircle2 className="w-4 h-4 text-primary" />
+                      <span className="text-xs font-semibold text-primary uppercase tracking-wider">Confermato</span>
                     </div>
-                  )}
+                    <h3 className="text-2xl font-serif font-bold text-foreground leading-tight">{sectorName}</h3>
+                    {sector?.description && (
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2 max-w-md">{sector.description}</p>
+                    )}
+                    {confirmedRec && (
+                      <div className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/10 rounded-full px-3 py-1">
+                        <TrendingUp className="w-3 h-3" /> {confirmedRec.matchScore}% di compatibilità
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row md:flex-col gap-3 shrink-0">
+                  <Link href={`/roadmap/${confirmedSectorId}`}>
+                    <Button className="w-full rounded-xl gap-2">
+                      <Map className="w-4 h-4" /> Roadmap del settore
+                    </Button>
+                  </Link>
+                  <Link href={`/grafo/${confirmedSectorId}`}>
+                    <Button variant="outline" className="w-full rounded-xl gap-2">
+                      <GitBranch className="w-4 h-4" /> Grafo delle competenze
+                    </Button>
+                  </Link>
                 </div>
               </div>
-              {/* CTA buttons */}
+            )
+          ) : (
+            <div className="rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-6">
+              <div className="flex items-center gap-4 flex-1">
+                <div className="w-16 h-16 rounded-2xl bg-primary/15 flex items-center justify-center text-primary shrink-0">
+                  <Compass className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-serif font-bold text-foreground leading-tight mb-1">
+                    {hasTestSession ? "Conferma il tuo settore" : "Fai il test di orientamento"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground max-w-md">
+                    {hasTestSession
+                      ? "Hai i risultati ma non hai ancora scelto un settore. Conferma il preferito per attivare roadmap e grafo personali."
+                      : "Bastano 10 minuti per scoprire i settori più allineati al tuo profilo RIASEC e Spirit."}
+                  </p>
+                </div>
+              </div>
               <div className="flex flex-col sm:flex-row md:flex-col gap-3 shrink-0">
-                <Link href={`/roadmap/${confirmedSectorId}`}>
+                <Link href={hasTestSession ? `/risultati/${sessionId}` : "/test"}>
                   <Button className="w-full rounded-xl gap-2">
-                    <Map className="w-4 h-4" /> Roadmap del settore
+                    {hasTestSession ? <>Vedi i risultati <ArrowRight className="w-4 h-4" /></> : <>Inizia il test <ArrowRight className="w-4 h-4" /></>}
                   </Button>
                 </Link>
-                <Link href={`/grafo/${confirmedSectorId}`}>
+                <Link href="/settori">
                   <Button variant="outline" className="w-full rounded-xl gap-2">
-                    <GitBranch className="w-4 h-4" /> Grafo delle competenze
+                    <Compass className="w-4 h-4" /> Esplora i settori
                   </Button>
                 </Link>
               </div>
@@ -225,8 +413,32 @@ export function UserDashboard({ userName, latestResult }: UserDashboardProps) {
         </div>
       </section>
 
+      {/* Tools grid — ALL features */}
+      <section className="py-12 bg-card border-b">
+        <div className="container mx-auto px-4 md:px-6 max-w-5xl">
+          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+            <div>
+              <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-sm font-medium mb-2">
+                <LayoutGrid className="w-3.5 h-3.5" /> Tutti gli strumenti
+              </div>
+              <h2 className="text-2xl font-serif font-bold text-foreground">
+                Le tue funzionalità
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Tutto quello che NorthStar mette a tua disposizione, in un colpo d'occhio.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+            {tools.map((tool) => (
+              <ToolCard key={tool.href + tool.title} tool={tool} />
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Il tuo progresso — objectives */}
-      <section className="py-10 bg-card border-b">
+      <section className="py-10 bg-background border-b">
         <div className="container mx-auto px-4 md:px-6 max-w-5xl">
           <div className="flex items-center justify-between mb-5">
             <div>
@@ -257,8 +469,7 @@ export function UserDashboard({ userName, latestResult }: UserDashboardProps) {
               </Link>
             </div>
           ) : (
-            <div className="rounded-2xl border bg-background overflow-hidden">
-              {/* Progress bar */}
+            <div className="rounded-2xl border bg-card overflow-hidden">
               {totalCount > 0 && (
                 <div className="px-5 pt-4 pb-2">
                   <div className="flex items-center justify-between mb-1.5">
@@ -288,46 +499,50 @@ export function UserDashboard({ userName, latestResult }: UserDashboardProps) {
         </div>
       </section>
 
-      {/* Recommendations summary */}
-      <section className="py-10 bg-background border-b">
-        <div className="container mx-auto px-4 md:px-6 max-w-5xl">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-xl font-serif font-bold text-foreground">I tuoi risultati</h2>
-            <Link href={`/risultati/${sessionId}`}>
-              <div className="inline-flex items-center gap-1.5 text-sm text-primary font-medium hover:underline">
-                Dettaglio completo <ArrowRight className="w-3.5 h-3.5" />
-              </div>
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {recommendations.map((rec, i) => (
-              <Link key={rec.sectorId} href={`/settore/${rec.sectorId}`}>
-                <div className={cn(
-                  "group flex items-start gap-3 p-4 rounded-2xl border bg-card hover:shadow-md hover:border-primary/30 transition-all duration-200 cursor-pointer h-full",
-                  rec.sectorId === confirmedSectorId && "border-primary/40 bg-primary/5",
-                )}>
-                  <div className="shrink-0 w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary text-sm font-serif font-bold">
-                    {i + 1}
+      {/* Recommendations summary — only if test taken */}
+      {recommendations.length > 0 && (
+        <section className="py-10 bg-card border-b">
+          <div className="container mx-auto px-4 md:px-6 max-w-5xl">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-serif font-bold text-foreground">I tuoi risultati</h2>
+              {sessionId && (
+                <Link href={`/risultati/${sessionId}`}>
+                  <div className="inline-flex items-center gap-1.5 text-sm text-primary font-medium hover:underline">
+                    Dettaglio completo <ArrowRight className="w-3.5 h-3.5" />
                   </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-foreground leading-tight mb-0.5 group-hover:text-primary transition-colors">
-                      {rec.sectorName}
-                      {rec.sectorId === confirmedSectorId && (
-                        <span className="ml-2 text-xs font-medium text-primary bg-primary/10 rounded-full px-2 py-0.5">✓ Scelto</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{rec.matchReason}</p>
-                    <div className="mt-1.5 text-xs font-semibold text-primary">{rec.matchScore}% match</div>
+                </Link>
+              )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {recommendations.slice(0, 3).map((rec, i) => (
+                <Link key={rec.sectorId} href={`/settore/${rec.sectorId}`}>
+                  <div className={cn(
+                    "group flex items-start gap-3 p-4 rounded-2xl border bg-background hover:shadow-md hover:border-primary/30 transition-all duration-200 cursor-pointer h-full",
+                    rec.sectorId === confirmedSectorId && "border-primary/40 bg-primary/5",
+                  )}>
+                    <div className="shrink-0 w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary text-sm font-serif font-bold">
+                      {i + 1}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-foreground leading-tight mb-0.5 group-hover:text-primary transition-colors">
+                        {rec.sectorName}
+                        {rec.sectorId === confirmedSectorId && (
+                          <span className="ml-2 text-xs font-medium text-primary bg-primary/10 rounded-full px-2 py-0.5">✓ Scelto</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{rec.matchReason}</p>
+                      <div className="mt-1.5 text-xs font-semibold text-primary">{rec.matchScore}% match</div>
+                    </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Crescita consigliata */}
-      <section className="py-10 bg-card border-b">
+      <section className="py-10 bg-background border-b">
         <div className="container mx-auto px-4 md:px-6 max-w-5xl">
           <div className="flex items-center justify-between mb-5">
             <div>
@@ -364,17 +579,17 @@ export function UserDashboard({ userName, latestResult }: UserDashboardProps) {
       </section>
 
       {/* Profile link */}
-      <section className="py-8 bg-background">
+      <section className="py-8 bg-card">
         <div className="container mx-auto px-4 md:px-6 max-w-5xl">
           <Link href="/profilo">
-            <div className="flex items-center justify-between p-5 rounded-2xl border bg-card hover:border-primary/30 hover:shadow-md transition-all duration-200 cursor-pointer group">
+            <div className="flex items-center justify-between p-5 rounded-2xl border bg-background hover:border-primary/30 hover:shadow-md transition-all duration-200 cursor-pointer group">
               <div className="flex items-center gap-4">
                 <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                   <User className="w-5 h-5" />
                 </div>
                 <div>
                   <p className="font-semibold text-foreground group-hover:text-primary transition-colors">Il tuo profilo</p>
-                  <p className="text-sm text-muted-foreground">Impostazioni account, preferenze e settori salvati</p>
+                  <p className="text-sm text-muted-foreground">Impostazioni account, preferenze, CV e settori salvati</p>
                 </div>
               </div>
               <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
