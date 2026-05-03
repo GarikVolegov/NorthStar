@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { sendVerificationEmail, sendResetEmail, sendPasswordChangedEmail } from "../lib/email";
 import { signToken, authMiddleware } from "../lib/auth-jwt.js";
-import rateLimit from "express-rate-limit";
+import { rateLimit } from "express-rate-limit";
 
 function makeAuthLimiter(max: number, windowMs = 60_000, message = "Troppi tentativi. Riprova tra un minuto.") {
   return rateLimit({
