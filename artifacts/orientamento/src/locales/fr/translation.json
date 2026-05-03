@@ -550,6 +550,7 @@
     },
     "trendValues": {
       "growing": "En croissance",
+      "booming": "En plein essor",
       "stable": "Stable",
       "declining": "En déclin"
     },

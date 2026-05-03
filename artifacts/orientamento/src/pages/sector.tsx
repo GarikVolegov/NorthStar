@@ -125,7 +125,7 @@ export default function Sector() {
                 if (!alignment.tooltipKey) return null;
                 return (
                   <div
-                    title={t(alignment.tooltipKey, alignment.tooltipParams)}
+                    title={t(alignment.tooltipKey, alignment.tooltipModes ? { modes: alignment.tooltipModes.map(m => t(`workMode.${m}`, { defaultValue: m })).join("/") } : undefined)}
                     className={cn(
                       "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border",
                       alignment.type === "aligned" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
