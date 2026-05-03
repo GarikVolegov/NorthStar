@@ -54,11 +54,19 @@ function generateCode(): string {
 }
 
 function getAppBaseUrl(): string {
-  const raw = process.env.APP_BASE_URL ?? process.env.PUBLIC_APP_URL ?? process.env.APP_URL ?? "https://northstar.app";
+  const replitDomains = process.env.REPLIT_DOMAINS;
+  const replitDomain = replitDomains ? replitDomains.split(",")[0].trim() : null;
+  const raw =
+    process.env.APP_BASE_URL ??
+    process.env.PUBLIC_APP_URL ??
+    process.env.APP_URL ??
+    (replitDomain ? `https://${replitDomain}` : null) ??
+    (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null) ??
+    "https://northstar.app";
   return raw.startsWith("http://") || raw.startsWith("https://") ? raw.replace(/\/$/, "") : `https://${raw.replace(/^\/+/, "").replace(/\/$/, "")}`;
 }
 
-const isDevMode = !process.env.SMTP_HOST;
+const isDevMode = !process.env.RESEND_API_KEY;
 
 async function trySendVerificationEmail(email: string, name: string, code: string): Promise<void> {
   try {
@@ -253,7 +261,11 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
       .where(eq(usersTable.id, user.id));
 
     const resetUrl = `${getAppBaseUrl()}/reset-password?token=${resetToken}`;
-    await sendResetEmail(email, resetUrl);
+    try {
+      await sendResetEmail(email, resetUrl);
+    } catch (err) {
+      console.error("[auth] reset email failed", err);
+    }
 
     if (isDevMode) body.devToken = resetToken;
   }
