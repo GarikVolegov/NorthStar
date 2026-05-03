@@ -10,9 +10,28 @@ import { ArrowLeft, Clock, DollarSign, Bot, Sparkles, TrendingUp, Target, Plus, 
 import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { usePageMeta, buildSectorMeta } from "@/lib/seo";
-import { WorkModeBadge, useWorkPreference } from "@/components/WorkModeSelector";
+import { WorkModeBadge, useWorkPreference, type WorkPreference } from "@/components/WorkModeSelector";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+
+function getWorkModeAlignment(userWorkMode: WorkPreference | null | undefined, sectorModes: Array<string> | null | undefined): { type: "aligned" | "partial" | "misaligned"; tooltip: string } {
+  if (!userWorkMode || userWorkMode === "unknown" || !sectorModes || sectorModes.length === 0) {
+    return { type: "aligned", tooltip: "" };
+  }
+  
+  if (userWorkMode === "ibrido") {
+    if (sectorModes.includes("ibrido")) {
+      return { type: "aligned", tooltip: "Allineato alla tua modalità di lavoro preferita" };
+    }
+    return { type: "partial", tooltip: "Compatibile con la tua modalità ibrida, ma non ottimale" };
+  }
+  
+  if (sectorModes.includes(userWorkMode)) {
+    return { type: "aligned", tooltip: "Allineato alla tua modalità di lavoro preferita" };
+  }
+  
+  return { type: "misaligned", tooltip: `Questo settore è principalmente per ${sectorModes.join("/")}` };
+}
 
 export default function Sector() {
   const params = useParams();
@@ -114,6 +133,33 @@ export default function Sector() {
             </Badge>
             {sector.workMode && sector.workMode.length > 0 && (
               <WorkModeBadge modes={sector.workMode} size="sm" />
+            )}
+            {workPreference && workPreference !== "unknown" && (
+              (() => {
+                const alignment = getWorkModeAlignment(workPreference, sector.workMode);
+                if (!alignment.tooltip) return null;
+                return (
+                  <div
+                    title={alignment.tooltip}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border",
+                      alignment.type === "aligned" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                      alignment.type === "partial" ? "bg-amber-50 text-amber-700 border-amber-200" :
+                      "bg-rose-50 text-rose-700 border-rose-200"
+                    )}
+                  >
+                    <span className="inline-block w-1.5 h-1.5 rounded-full" style={{
+                      backgroundColor:
+                        alignment.type === "aligned" ? "rgb(16 185 129)" :
+                        alignment.type === "partial" ? "rgb(217 119 6)" :
+                        "rgb(220 38 38)"
+                    }} />
+                    {alignment.type === "aligned" ? "✓ Allineato" :
+                     alignment.type === "partial" ? "~ Compatibile" :
+                     "⚠ Non allineato"}
+                  </div>
+                );
+              })()
             )}
           </div>
           <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground mb-4 leading-tight">

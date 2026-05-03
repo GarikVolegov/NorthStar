@@ -156,6 +156,25 @@ const RISK_LABEL: Record<string, { label: string; score: number; color: string }
   high:   { label: "Alto",   score: 1, color: "text-rose-700 bg-rose-50 border-rose-200" },
 };
 
+function getWorkModeAlignment(userWorkMode: WorkPreference | null | undefined, sectorModes: Array<string> | null | undefined): { type: "aligned" | "partial" | "misaligned"; tooltip: string } {
+  if (!userWorkMode || userWorkMode === "unknown" || !sectorModes || sectorModes.length === 0) {
+    return { type: "aligned", tooltip: "" };
+  }
+  
+  if (userWorkMode === "ibrido") {
+    if (sectorModes.includes("ibrido")) {
+      return { type: "aligned", tooltip: "Allineato alla tua modalità di lavoro preferita" };
+    }
+    return { type: "partial", tooltip: "Compatibile con la tua modalità ibrida, ma non ottimale" };
+  }
+  
+  if (sectorModes.includes(userWorkMode)) {
+    return { type: "aligned", tooltip: "Allineato alla tua modalità di lavoro preferita" };
+  }
+  
+  return { type: "misaligned", tooltip: `Questo settore è principalmente per ${sectorModes.join("/")}` };
+}
+
 type Rec = {
   sectorId: number;
   matchScore: number;
@@ -564,6 +583,8 @@ export default function Results() {
         <AnimateOnScroll stagger className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {(effectiveSession?.recommendations ?? session?.recommendations ?? []).map((rec, index) => {
             const workModes = rec.sector?.workMode ?? null;
+            const currentWorkMode = user ? workPreference : anonymousWorkMode;
+            const alignment = getWorkModeAlignment(currentWorkMode, workModes);
 
             return (
               <AnimateOnScrollItem key={rec.sectorId}>
@@ -599,11 +620,29 @@ export default function Results() {
                   <CardDescription className="text-sm line-clamp-2 mt-2">
                     {rec.sector?.description}
                   </CardDescription>
-                  {workModes && workModes.length > 0 && (
-                    <div className="mt-2">
+                  <div className="mt-3 flex flex-col gap-2">
+                    {workModes && workModes.length > 0 && (
                       <WorkModeBadge modes={workModes} size="xs" />
-                    </div>
-                  )}
+                    )}
+                    {currentWorkMode && currentWorkMode !== "unknown" && alignment.tooltip && (
+                      <div title={alignment.tooltip} className={cn(
+                        "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border w-fit",
+                        alignment.type === "aligned" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                        alignment.type === "partial" ? "bg-amber-50 text-amber-700 border-amber-200" :
+                        "bg-rose-50 text-rose-700 border-rose-200"
+                      )}>
+                        <span className="inline-block w-1.5 h-1.5 rounded-full" style={{
+                          backgroundColor: 
+                            alignment.type === "aligned" ? "rgb(16 185 129)" :
+                            alignment.type === "partial" ? "rgb(217 119 6)" :
+                            "rgb(220 38 38)"
+                        }} />
+                        {alignment.type === "aligned" ? "✓ Allineato" :
+                         alignment.type === "partial" ? "~ Compatibile" :
+                         "⚠ Non allineato"}
+                      </div>
+                    )}
+                  </div>
                 </CardHeader>
 
                 <CardContent className="flex-1">
