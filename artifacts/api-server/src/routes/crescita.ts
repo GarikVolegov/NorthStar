@@ -4,7 +4,7 @@ import { desc, eq, and, sql, ilike } from "drizzle-orm";
 import { orchestratorAgent } from "../agents/orchestrator";
 import { logAgentCall } from "../agents/logger";
 import { parseOrchestratorData, getSubAgentOutput, parseGrowthAgentData } from "../lib/agent-helpers";
-import { getUserPlan } from "../lib/plan-utils";
+import { getUserPlan, getAuthenticatedUserId } from "../lib/plan-utils";
 import { logger } from "../lib/logger";
 
 const RIASEC_TO_ITALIAN: Record<string, string> = {
@@ -39,8 +39,9 @@ function getUser(req: any) {
 }
 
 router.get("/crescita/per-te", async (req, res): Promise<void> => {
-  const user = getUser(req);
-  if (!user) { res.status(401).json({ error: "Non autenticato" }); return; }
+  const userId = getAuthenticatedUserId(req);
+  if (!userId) { res.status(401).json({ error: "Non autenticato" }); return; }
+  const user = { id: userId };
 
   const [latestSession] = await db
     .select({ primaryTypes: testSessionsTable.primaryTypes })

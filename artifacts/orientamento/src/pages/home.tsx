@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { SectorIcon } from "@/lib/sector-icon";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-fetch";
+import { UserDashboard } from "@/components/UserDashboard";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -336,6 +337,29 @@ export default function Home() {
   const { data: newsData, isLoading: isNewsLoading } = useHomeNews();
   const { isLoggedIn, user } = useAuth();
   const [loginOpen, setLoginOpen] = useState(false);
+
+  const { data: latestResult, isLoading: isLatestLoading } = useLatestRecommendations(isLoggedIn && !!user);
+
+  const hasConfirmedSector = !!(latestResult?.confirmedSectorId);
+
+  if (isLoggedIn && user && isLatestLoading) {
+    return (
+      <div className="flex flex-col w-full">
+        <div className="py-16 md:py-24 container mx-auto px-4 max-w-5xl">
+          <Skeleton className="h-10 w-64 mb-4 rounded-xl" />
+          <Skeleton className="h-5 w-80 mb-8 rounded-xl" />
+          <Skeleton className="h-40 w-full rounded-2xl mb-6" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-32 rounded-2xl" />)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoggedIn && user && hasConfirmedSector && latestResult) {
+    return <UserDashboard userName={user.name} latestResult={latestResult} />;
+  }
 
   return (
     <div className="flex flex-col w-full">
