@@ -4,6 +4,7 @@ import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
+// @ts-ignore — react@19 ships its own types but TS cannot resolve them with `types:["node"]`
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { CvPdfDocument } from "../cv-pdf.js";
@@ -117,7 +118,8 @@ router.post("/cv/upload", upload.single("file"), async (req, res): Promise<void>
   if (req.file) {
     if (req.file.mimetype === "application/pdf") {
       try {
-        const { default: pdfParse } = await import("pdf-parse");
+        // @ts-ignore — pdf-parse@2.4.5 types do not expose a callable default in CJS interop
+        const pdfParse = ((await import("pdf-parse")) as any).default ?? (await import("pdf-parse"));
         const parsed = await pdfParse(req.file.buffer);
         text = parsed.text;
       } catch {
