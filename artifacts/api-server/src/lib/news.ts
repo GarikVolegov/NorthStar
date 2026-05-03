@@ -220,10 +220,10 @@ async function fetchFromGNews(params: URLSearchParams): Promise<NewsItem[]> {
   const url = `${baseUrl}/${endpoint}?${params.toString()}`;
 
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return [];
+    const fetchRes: globalThis.Response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!fetchRes.ok) return [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = await res.json() as { articles?: any[] };
+    const data = await fetchRes.json() as { articles?: any[] };
     return (data.articles || []) as NewsItem[];
   } catch {
     return [];
