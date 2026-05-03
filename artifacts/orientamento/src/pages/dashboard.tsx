@@ -208,14 +208,17 @@ function AgentLoadingSkeleton() {
 }
 
 export default function Dashboard() {
-  usePageMeta({ title: "Dashboard AI — NorthStar" });
+  usePageMeta({
+    title: "Dashboard AI — NorthStar",
+    description: "La tua analisi AI personalizzata: professioni consigliate, percorsi formativi e modalità di lavoro ottimale per il tuo profilo RIASEC.",
+  });
 
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, authReady } = useAuth();
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    if (!authLoading && !user) navigate("/");
-  }, [user, authLoading, navigate]);
+    if (authReady && !user) navigate("/");
+  }, [user, authReady, navigate]);
 
   const { data: latestSession, isLoading: sessionLoading } = useLatestSession();
   const sessionId = latestSession?.sessionId ?? null;
@@ -238,7 +241,7 @@ export default function Dashboard() {
   const educationPaths = summary?.educationPaths ?? [];
   const workMode = summary?.workMode;
 
-  if (authLoading || sessionLoading) {
+  if (!authReady || sessionLoading) {
     return (
       <div className="container mx-auto px-4 py-20 max-w-5xl">
         <Skeleton className="h-10 w-72 mb-3" />
@@ -252,7 +255,7 @@ export default function Dashboard() {
 
   if (!user) return null;
 
-  if (!sessionId && !sessionLoading) {
+  if (!sessionId && !sessionLoading && authReady) {
     return (
       <div className="container mx-auto px-4 py-20 max-w-2xl text-center">
         <Bot className="w-14 h-14 text-muted-foreground mx-auto mb-4 opacity-60" />

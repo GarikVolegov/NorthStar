@@ -162,8 +162,10 @@ const RISK_LABEL: Record<string, { label: string; score: number; color: string }
 type Rec = {
   sectorId: number;
   matchScore: number;
+  matchReason?: string | null;
   sector?: {
-    name?: string; icon?: string; avgSalaryMax?: number;
+    name?: string; icon?: string; description?: string;
+    avgSalaryMin?: number; avgSalaryMax?: number;
     growthRate?: number; automationRisk?: string; trend?: string;
     workMode?: Array<"dipendente" | "autonomo" | "ibrido"> | null;
   } | null;
@@ -448,19 +450,27 @@ export default function Results() {
     );
   }
 
-  const primaryTypes = session.primaryTypes as string[];
+  type SessionExt = typeof session & {
+    spiritScores?: Record<string, number> | null;
+    dominantSpirit?: string | null;
+    spiritInsight?: string | null;
+    suggestedWorkMode?: WorkPreference | null;
+  };
+  const s = session as SessionExt;
+
+  const primaryTypes = s.primaryTypes as string[];
   const primaryProfile = primaryTypes.join(" + ");
-  const spiritScores = session.spiritScores as Record<string, number> | null | undefined;
-  const dominantSpirit = session.dominantSpirit;
-  const spiritInsight = session.spiritInsight;
+  const spiritScores = s.spiritScores;
+  const dominantSpirit = s.dominantSpirit;
+  const spiritInsight = s.spiritInsight;
   const hasSpiritData = spiritScores && Object.keys(spiritScores).length > 0;
   const dominantMeta = dominantSpirit ? SPIRIT_META[dominantSpirit] : null;
 
-  const suggestedWorkMode: WorkPreference = (session.suggestedWorkMode as WorkPreference | null | undefined)
-    ?? (RIASEC_SUGGESTED_WORK_MODE[primaryTypes[0]] ?? "ibrido");
+  const suggestedWorkMode: WorkPreference =
+    s.suggestedWorkMode ?? (RIASEC_SUGGESTED_WORK_MODE[primaryTypes[0]] ?? "ibrido");
   const suggestedLabel = WORK_MODE_LABELS[suggestedWorkMode];
 
-  const riasecScoresAI = (session as Record<string, unknown>).riasecScores as Record<string, number> | undefined;
+  const riasecScoresAI = session.riasecScores as Record<string, number> | undefined;
   const topSectorsForAgent = (session.recommendations as Rec[])
     .map((r) => ({ sectorName: r.sector?.name ?? "" }))
     .filter((r) => r.sectorName);
@@ -582,7 +592,7 @@ export default function Results() {
         </AnimateOnScroll>
 
         <AnimateOnScroll stagger className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {(effectiveSession?.recommendations ?? session?.recommendations ?? []).map((rec, index) => {
+          {((effectiveSession?.recommendations ?? session?.recommendations ?? []) as Rec[]).map((rec, index) => {
             const workModes = rec.sector?.workMode ?? null;
             const currentWorkMode = user ? workPreference : anonymousWorkMode;
             const alignment = getWorkModeAlignment(currentWorkMode, workModes);

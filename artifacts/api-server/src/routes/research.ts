@@ -33,6 +33,11 @@ router.get("/research/news", async (req, res): Promise<void> => {
 });
 
 router.post("/admin/research/news/run", async (req, res): Promise<void> => {
+  const adminKey = req.headers["x-admin-key"] as string | undefined;
+  if (!adminKey || adminKey !== process.env.ADMIN_KEY) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   try {
     const sectorNames = Array.isArray(req.body?.sectorNames) ? (req.body.sectorNames as string[]) : [];
     const result = await runNewsResearch(sectorNames);
@@ -44,6 +49,11 @@ router.post("/admin/research/news/run", async (req, res): Promise<void> => {
 });
 
 router.post("/admin/research/growth/run", async (req, res): Promise<void> => {
+  const adminKey = req.headers["x-admin-key"] as string | undefined;
+  if (!adminKey || adminKey !== process.env.ADMIN_KEY) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   try {
     const result = await runGrowthResearch();
     res.json({ success: true, ...result });
