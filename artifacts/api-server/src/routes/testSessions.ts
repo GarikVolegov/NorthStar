@@ -21,6 +21,11 @@ import {
   computeSpiritBoost,
   buildSpiritInsight,
 } from "../lib/spirits";
+import { orchestratorAgent } from "../agents/orchestrator";
+import { logAgentCall } from "../agents/logger";
+import { parseOrchestratorData, getSubAgentOutput, parseSectorAgentData } from "../lib/agent-helpers";
+import { getAuthenticatedUserId, getUserPlan } from "../lib/plan-utils";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -34,48 +39,117 @@ router.post("/test-sessions", async (req, res): Promise<void> => {
   const { answers } = parsed.data;
   const allAnswers = answers as Record<string, number>;
 
-  // RIASEC scoring (q1–q12)
+  // Deterministic RIASEC scoring
   const riasecScores = computeRiasecScores(allAnswers);
   const primaryTypes = getPrimaryTypes(riasecScores);
   const profileSummary = buildProfileSummary(primaryTypes);
 
-  // Spirit scoring (shen, hun, po, yi, zhi keys)
+  // Deterministic Spirit scoring
   const spiritScores = extractSpiritAnswers(allAnswers);
   const dominantSpirit = getDominantSpirit(spiritScores);
   const secondarySpirit = getSecondarySpiritS(spiritScores);
-
-  const sectors = await db.select().from(sectorsTable);
-
-  const recommendations = sectors
-    .map((sector) => {
-      const baseScore = computeMatchScore(riasecScores, sector.riasecTypes as string[]);
-      const spiritBoost = computeSpiritBoost(spiritScores, sector.name);
-      const matchScore = Math.min(99, baseScore + spiritBoost);
-      const matchReason = buildMatchReason(primaryTypes, sector.name, sector.riasecTypes as string[]);
-      return {
-        sectorId: sector.id,
-        sectorName: sector.name,
-        matchScore,
-        matchReason,
-        sector: {
-          ...sector,
-          riasecTypes: sector.riasecTypes as string[],
-          skills: sector.skills as string[],
-          advantages: sector.advantages as string[],
-          disadvantages: sector.disadvantages as string[],
-          opportunities: sector.opportunities as string[],
-          createdAt: sector.createdAt.toISOString(),
-        },
-      };
-    })
-    .sort((a, b) => b.matchScore - a.matchScore)
-    .slice(0, 3);
-
   const spiritInsight = buildSpiritInsight(dominantSpirit, secondarySpirit, spiritScores);
+
+  // Detect user and plan from JWT/session (test sessions can be submitted by both authed and anon)
+  const authenticatedUserId = getAuthenticatedUserId(req);
+  const plan = authenticatedUserId ? await getUserPlan(authenticatedUserId) : "free";
+
+  // Delegate sector matching to SectorAgent via orchestrator
+  let agentRecommendations: Array<{
+    sectorId: number;
+    sectorName: string;
+    matchScore: number;
+    matchReason: string;
+    sector: Record<string, unknown>;
+  }> = [];
+
+  try {
+    const _agentStart = Date.now();
+    const agentResult = await orchestratorAgent.run({
+      taskType: "sector_match",
+      payload: { riasecScores, spiritScores, primaryTypes },
+      context: { userId: authenticatedUserId, plan, sharedState: {} },
+    });
+    await logAgentCall({
+      agentName: "OrchestratorAgent",
+      userId: authenticatedUserId,
+      taskType: "sector_match",
+      inputSummary: { source: "test-sessions", plan },
+      outputSummary: { success: agentResult.success },
+      durationMs: Date.now() - _agentStart,
+      error: agentResult.error,
+      retryCount: 0,
+    });
+
+    if (agentResult.success) {
+      const orcData = parseOrchestratorData(agentResult);
+      const sectorData = orcData
+        ? parseSectorAgentData(getSubAgentOutput(orcData, "SectorAgent"))
+        : null;
+
+      if (sectorData && sectorData.sectors.length > 0) {
+        const allSectors = await db.select().from(sectorsTable);
+        agentRecommendations = sectorData.sectors.map((s) => {
+          const dbSector = allSectors.find((sec) => sec.id === s.sectorId);
+          return {
+            sectorId: s.sectorId,
+            sectorName: s.sectorName,
+            matchScore: s.matchScore,
+            matchReason: s.motivation,
+            sector: dbSector
+              ? {
+                  ...dbSector,
+                  riasecTypes: dbSector.riasecTypes as string[],
+                  skills: dbSector.skills as string[],
+                  advantages: dbSector.advantages as string[],
+                  disadvantages: dbSector.disadvantages as string[],
+                  opportunities: dbSector.opportunities as string[],
+                  createdAt: dbSector.createdAt.toISOString(),
+                }
+              : {},
+          };
+        });
+      }
+    }
+  } catch (err) {
+    logger.warn({ err }, "SectorAgent delegation failed, falling back to direct computation");
+  }
+
+  // Fallback: deterministic sector computation if agent failed
+  if (agentRecommendations.length === 0) {
+    const sectors = await db.select().from(sectorsTable);
+    agentRecommendations = sectors
+      .map((sector) => {
+        const baseScore = computeMatchScore(riasecScores, sector.riasecTypes as string[]);
+        const spiritBoost = computeSpiritBoost(spiritScores, sector.name);
+        const matchScore = Math.min(99, baseScore + spiritBoost);
+        const matchReason = buildMatchReason(primaryTypes, sector.name, sector.riasecTypes as string[]);
+        return {
+          sectorId: sector.id,
+          sectorName: sector.name,
+          matchScore,
+          matchReason,
+          sector: {
+            ...sector,
+            riasecTypes: sector.riasecTypes as string[],
+            skills: sector.skills as string[],
+            advantages: sector.advantages as string[],
+            disadvantages: sector.disadvantages as string[],
+            opportunities: sector.opportunities as string[],
+            createdAt: sector.createdAt.toISOString(),
+          },
+        };
+      })
+      .sort((a, b) => b.matchScore - a.matchScore)
+      .slice(0, 3);
+  }
+
+  const recommendations = agentRecommendations;
 
   const [session] = await db
     .insert(testSessionsTable)
     .values({
+      ...(authenticatedUserId ? { userId: authenticatedUserId } : {}),
       answers: allAnswers,
       riasecScores,
       primaryTypes,

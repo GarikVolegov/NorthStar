@@ -1,6 +1,11 @@
 import { Router, type IRouter } from "express";
 import { db, growthArticlesTable, userFavoritesTable, testSessionsTable } from "@workspace/db";
 import { desc, eq, and, sql, ilike } from "drizzle-orm";
+import { orchestratorAgent } from "../agents/orchestrator";
+import { logAgentCall } from "../agents/logger";
+import { parseOrchestratorData, getSubAgentOutput, parseGrowthAgentData } from "../lib/agent-helpers";
+import { getUserPlan } from "../lib/plan-utils";
+import { logger } from "../lib/logger";
 
 const RIASEC_TO_ITALIAN: Record<string, string> = {
   R: "realistica",
@@ -50,26 +55,79 @@ router.get("/crescita/per-te", async (req, res): Promise<void> => {
   }
 
   const rawTypes = latestSession.primaryTypes as string[];
-  const italianTypes = rawTypes.map(t => RIASEC_TO_ITALIAN[t]).filter(Boolean);
+  if (rawTypes.length === 0) {
+    res.json({ articles: [], hasProfile: false, types: rawTypes });
+    return;
+  }
+
+  const plan = await getUserPlan(user.id);
+
+  // Delegate to GrowthAgent via orchestrator
+  try {
+    const _agentStart = Date.now();
+    const agentResult = await orchestratorAgent.run({
+      taskType: "growth_suggestions",
+      payload: { primaryTypes: rawTypes },
+      context: { userId: user.id, plan, sharedState: {} },
+    });
+    await logAgentCall({
+      agentName: "OrchestratorAgent",
+      userId: user.id,
+      taskType: "growth_suggestions",
+      inputSummary: { source: "crescita/per-te", plan },
+      outputSummary: { success: agentResult.success },
+      durationMs: Date.now() - _agentStart,
+      error: agentResult.error,
+      retryCount: 0,
+    });
+
+    if (agentResult.success) {
+      const orcData = parseOrchestratorData(agentResult);
+      const growthData = orcData
+        ? parseGrowthAgentData(getSubAgentOutput(orcData, "GrowthAgent"))
+        : null;
+
+      if (growthData?.articles) {
+        const italianTypes = rawTypes
+          .map((t: string) => RIASEC_TO_ITALIAN[t])
+          .filter((t): t is string => Boolean(t));
+        res.json({
+          articles: growthData.articles,
+          hasProfile: true,
+          types: rawTypes,
+          italianTypes,
+          personalized: growthData.personalized,
+          plan,
+        });
+        return;
+      }
+    }
+  } catch (err) {
+    logger.warn({ err }, "GrowthAgent delegation failed, falling back to direct query");
+  }
+
+  // Fallback: direct DB query
+  const italianTypes = rawTypes
+    .map((t: string) => RIASEC_TO_ITALIAN[t])
+    .filter((t): t is string => Boolean(t));
 
   if (italianTypes.length === 0) {
     res.json({ articles: [], hasProfile: false, types: rawTypes });
     return;
   }
 
-  const typeArray = `ARRAY[${italianTypes.map(t => `'${t}'`).join(",")}]::text[]`;
-
+  const typeArray = `ARRAY[${italianTypes.map((t: string) => `'${t}'`).join(",")}]::text[]`;
   const articles = await db
     .select()
     .from(growthArticlesTable)
     .where(and(
       eq(growthArticlesTable.status, "published"),
-      sql`${growthArticlesTable.personalityMatches} && ${sql.raw(typeArray)}`
+      sql`${growthArticlesTable.personalityMatches} && ${sql.raw(typeArray)}`,
     ))
     .orderBy(desc(growthArticlesTable.viewCount), desc(growthArticlesTable.updatedAt))
     .limit(4);
 
-  res.json({ articles, hasProfile: true, types: rawTypes, italianTypes });
+  res.json({ articles, hasProfile: true, types: rawTypes, italianTypes, plan });
 });
 
 router.get("/crescita/categorie", async (_req, res): Promise<void> => {
@@ -114,29 +172,28 @@ router.get("/crescita", async (req, res): Promise<void> => {
   const limit  = Math.min(Number(lim) || 12, 50);
   const offset = Number(off) || 0;
 
-  let query = db.select().from(growthArticlesTable)
-    .where(eq(growthArticlesTable.status, "published")) as any;
+  const filter = and(
+    eq(growthArticlesTable.status, "published"),
+    category ? eq(growthArticlesTable.category, category) : undefined,
+    tag ? sql`${tag} = ANY(${growthArticlesTable.tags})` : undefined,
+    q?.trim() ? ilike(growthArticlesTable.title, `%${q.trim()}%`) : undefined,
+  );
 
-  const conditions: any[] = [eq(growthArticlesTable.status, "published")];
+  const [articles, [countRow]] = await Promise.all([
+    db
+      .select()
+      .from(growthArticlesTable)
+      .where(filter)
+      .orderBy(desc(growthArticlesTable.updatedAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(growthArticlesTable)
+      .where(filter),
+  ]);
 
-  if (category) conditions.push(eq(growthArticlesTable.category, category));
-  if (tag)      conditions.push(sql`${tag} = ANY(${growthArticlesTable.tags})`);
-  if (q?.trim()) conditions.push(ilike(growthArticlesTable.title, `%${q.trim()}%`));
-
-  const articles = await db
-    .select()
-    .from(growthArticlesTable)
-    .where(and(...conditions))
-    .orderBy(desc(growthArticlesTable.updatedAt))
-    .limit(limit)
-    .offset(offset);
-
-  const [{ total }] = await db
-    .select({ total: sql<number>`count(*)::int` })
-    .from(growthArticlesTable)
-    .where(and(...conditions));
-
-  res.json({ articles, total, limit, offset });
+  res.json({ articles, total: countRow?.total ?? 0, limit, offset });
 });
 
 router.get("/crescita/:slug", async (req, res): Promise<void> => {

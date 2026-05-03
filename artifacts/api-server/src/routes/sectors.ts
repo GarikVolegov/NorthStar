@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db, sectorsTable, testSessionsTable } from "@workspace/db";
 import {
   GetSectorParams,
@@ -9,12 +9,89 @@ import {
   GetStatsSummaryResponse,
   ListSectorsResponse,
 } from "@workspace/api-zod";
+import { orchestratorAgent } from "../agents/orchestrator";
+import { logAgentCall } from "../agents/logger";
+import { getAuthenticatedUserId, getUserPlan } from "../lib/plan-utils";
+import { parseOrchestratorData, getSubAgentOutput, parseSectorAgentData } from "../lib/agent-helpers";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
 router.get("/sectors", async (_req, res): Promise<void> => {
   const sectors = await db.select().from(sectorsTable).orderBy(sectorsTable.id);
   res.json(ListSectorsResponse.parse(sectors.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() }))));
+});
+
+router.get("/sectors/personalized", async (req, res): Promise<void> => {
+  const userId = getAuthenticatedUserId(req);
+  if (!userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const plan = await getUserPlan(userId);
+
+  const [latestSession] = await db
+    .select()
+    .from(testSessionsTable)
+    .where(eq(testSessionsTable.userId, userId))
+    .orderBy(desc(testSessionsTable.createdAt))
+    .limit(1);
+
+  if (!latestSession) {
+    res.status(404).json({ error: "Nessuna sessione di test trovata. Completa il test per ricevere settori personalizzati." });
+    return;
+  }
+
+  const riasecScores = latestSession.riasecScores as Record<string, number> | null;
+  const primaryTypes = latestSession.primaryTypes as string[] | null;
+
+  if (!riasecScores || !primaryTypes || primaryTypes.length === 0) {
+    res.status(422).json({ error: "La sessione non contiene dati RIASEC validi." });
+    return;
+  }
+
+  const spiritScores = latestSession.spiritScores as Record<string, number> | undefined;
+
+  const start = Date.now();
+  try {
+    const result = await orchestratorAgent.run({
+      taskType: "sector_match",
+      payload: { riasecScores, primaryTypes, spiritScores },
+      context: { userId, plan, sharedState: {} },
+    });
+
+    const durationMs = Date.now() - start;
+    await logAgentCall({
+      agentName: "OrchestratorAgent",
+      userId,
+      taskType: "sector_match",
+      inputSummary: { source: "sectors/personalized", plan },
+      outputSummary: { success: result.success },
+      durationMs,
+      error: result.error,
+      retryCount: 0,
+    });
+
+    if (!result.success) {
+      res.status(500).json({ error: result.error ?? "Errore nel calcolo dei settori personalizzati." });
+      return;
+    }
+
+    const orcData = parseOrchestratorData(result);
+    const sectorData = orcData ? parseSectorAgentData(getSubAgentOutput(orcData, "SectorAgent")) : null;
+
+    res.json({
+      personalized: true,
+      plan,
+      sessionId: latestSession.id,
+      sectors: sectorData?.sectors ?? [],
+      total: sectorData?.total ?? 0,
+    });
+  } catch (err) {
+    logger.error({ err }, "Orchestrator failed in /sectors/personalized");
+    res.status(500).json({ error: "Errore interno nel calcolo dei settori personalizzati." });
+  }
 });
 
 router.get("/sectors/:id", async (req, res): Promise<void> => {

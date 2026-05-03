@@ -7,3 +7,4 @@ export * from "./contactMessages";
 export * from "./affiliationLeads";
 export * from "./growthArticles";
 export * from "./calendar";
+export * from "./agentLogs";

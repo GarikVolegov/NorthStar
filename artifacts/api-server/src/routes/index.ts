@@ -27,6 +27,7 @@ import calendarRouter from "./calendar";
 import notificationsRouter from "./notifications";
 import pushRouter from "./push";
 import meRouter from "./me";
+import agentRouter from "./agent";
 
 const router: IRouter = Router();
 
@@ -52,6 +53,7 @@ router.use(affiliazioneRouter);
 router.use(crescitaRouter);
 router.use(cvRouter);
 router.use(applicationsRouter);
+router.use(agentRouter);
 router.use(remindersRouter);
 router.use(friendsRouter);
 router.use(calendarRouter);
