@@ -3,51 +3,19 @@ import { ProfessionInputSchema, ProfessionOutputSchema } from "./types";
 import { RIASEC_LABELS, type RiasecType } from "../lib/riasec";
 import { db, professionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { logger } from "../lib/logger.js";
 
-interface ProfessionTemplate {
-  title: string;
-  sector: string;
-  riasecFit: RiasecType[];
-  skills: string[];
-  workModes: string[];
-  salaryRange: string;
-  growthOutlook: string;
-}
-
-const PROFESSION_FALLBACK: ProfessionTemplate[] = [
-  { title: "Sviluppatore Software", sector: "tecnologia & software", riasecFit: ["I", "R"], skills: ["Programmazione", "Problem solving", "Debugging", "Git"], workModes: ["dipendente", "freelance", "autonomo"], salaryRange: "€30.000 – €65.000", growthOutlook: "Molto alto" },
-  { title: "Data Analyst", sector: "data & analytics", riasecFit: ["I", "C"], skills: ["SQL", "Python", "Statistica", "Visualizzazione dati"], workModes: ["dipendente", "freelance"], salaryRange: "€28.000 – €55.000", growthOutlook: "Alto" },
-  { title: "UX/UI Designer", sector: "design & creatività digitale", riasecFit: ["A", "I"], skills: ["Figma", "Ricerca utente", "Prototipazione", "CSS"], workModes: ["dipendente", "freelance"], salaryRange: "€25.000 – €50.000", growthOutlook: "Alto" },
-  { title: "Marketing Manager", sector: "marketing & growth", riasecFit: ["E", "A"], skills: ["SEO/SEM", "Copywriting", "Analytics", "Social media"], workModes: ["dipendente"], salaryRange: "€28.000 – €55.000", growthOutlook: "Stabile" },
-  { title: "Consulente Aziendale", sector: "consulenza & strategia", riasecFit: ["E", "I"], skills: ["Analisi strategica", "Project management", "Presentazione", "Excel"], workModes: ["dipendente", "autonomo"], salaryRange: "€35.000 – €80.000", growthOutlook: "Stabile" },
-  { title: "Infermiere/a", sector: "salute & benessere", riasecFit: ["S", "R"], skills: ["Cura del paziente", "Procedure cliniche", "Lavoro di squadra"], workModes: ["dipendente"], salaryRange: "€25.000 – €42.000", growthOutlook: "Molto alto" },
-  { title: "Insegnante", sector: "istruzione & formazione", riasecFit: ["S", "A"], skills: ["Comunicazione", "Progettazione didattica", "Gestione classe"], workModes: ["dipendente"], salaryRange: "€22.000 – €38.000", growthOutlook: "Stabile" },
-  { title: "Imprenditore Digitale", sector: "business & imprenditoria", riasecFit: ["E", "A"], skills: ["Visione strategica", "Marketing", "Gestione risorse", "Vendita"], workModes: ["autonomo", "imprenditore"], salaryRange: "€20.000 – €100.000+", growthOutlook: "Variabile" },
-  { title: "Ingegnere Gestionale", sector: "ingegneria & sistemi tecnici", riasecFit: ["R", "C"], skills: ["Lean manufacturing", "Project management", "Analisi processi"], workModes: ["dipendente"], salaryRange: "€30.000 – €58.000", growthOutlook: "Stabile" },
-  { title: "Avvocato", sector: "legal tech & servizi legali digitali", riasecFit: ["E", "C"], skills: ["Diritto civile/penale", "Contrattualistica", "Negoziazione"], workModes: ["dipendente", "autonomo"], salaryRange: "€25.000 – €80.000+", growthOutlook: "Stabile" },
-  { title: "Creativo/Content Creator", sector: "creatività & design", riasecFit: ["A", "E"], skills: ["Storytelling", "Video editing", "Social media", "Fotografia"], workModes: ["freelance", "autonomo"], salaryRange: "€15.000 – €60.000", growthOutlook: "Alto" },
-  { title: "Ricercatore/Scienziato", sector: "biotech & life sciences", riasecFit: ["I", "R"], skills: ["Metodo scientifico", "Laboratorio", "Pubblicazioni", "Statistiche"], workModes: ["dipendente"], salaryRange: "€25.000 – €60.000", growthOutlook: "Alto" },
-  { title: "HR Manager", sector: "risorse umane & people operations", riasecFit: ["S", "E"], skills: ["Selezione personale", "Formazione", "Relazioni sindacali"], workModes: ["dipendente"], salaryRange: "€28.000 – €55.000", growthOutlook: "Stabile" },
-  { title: "Financial Analyst", sector: "finanza & investimenti", riasecFit: ["I", "C"], skills: ["Modellazione finanziaria", "Excel avanzato", "Bloomberg", "Valutazione"], workModes: ["dipendente"], salaryRange: "€30.000 – €70.000", growthOutlook: "Stabile" },
-  { title: "Agronomo", sector: "agroalimentare & food industry", riasecFit: ["R", "I"], skills: ["Agronomia", "Sostenibilità", "Gestione terreni", "Normative"], workModes: ["dipendente", "autonomo"], salaryRange: "€22.000 – €45.000", growthOutlook: "Crescente" },
-];
-
-async function loadProfessions(): Promise<ProfessionTemplate[]> {
-  try {
-    const rows = await db.select().from(professionsTable).where(eq(professionsTable.isActive, true));
-    if (rows.length === 0) return PROFESSION_FALLBACK;
-    return rows.map((r) => ({
-      title: r.title,
-      sector: r.sector,
-      riasecFit: (r.riasecFit ?? []) as RiasecType[],
-      skills: r.skills ?? [],
-      workModes: r.workModes ?? [],
-      salaryRange: r.salaryRange,
-      growthOutlook: r.growthOutlook,
-    }));
-  } catch {
-    return PROFESSION_FALLBACK;
-  }
+async function loadProfessions() {
+  const rows = await db.select().from(professionsTable).where(eq(professionsTable.isActive, true));
+  return rows.map((r) => ({
+    title: r.title,
+    sector: r.sector,
+    riasecFit: (r.riasecFit ?? []) as RiasecType[],
+    skills: r.skills ?? [],
+    workModes: r.workModes ?? [],
+    salaryRange: r.salaryRange,
+    growthOutlook: r.growthOutlook,
+  }));
 }
 
 export const professionAgent: Agent = {
@@ -70,7 +38,26 @@ export const professionAgent: Agent = {
       const limit = isPremium ? 6 : 3;
       const sectorNames = (topSectors ?? []).map((s) => s.sectorName.toLowerCase());
 
-      const templates = await loadProfessions();
+      let templates;
+      try {
+        templates = await loadProfessions();
+      } catch (dbErr) {
+        logger.error({ err: dbErr }, "[ProfessionAgent] DB query failed — no professions available");
+        return {
+          agentName: this.name,
+          success: false,
+          data: { professions: [] },
+          error: "Impossibile caricare le professioni dal catalogo.",
+        };
+      }
+
+      if (templates.length === 0) {
+        return {
+          agentName: this.name,
+          success: true,
+          data: { professions: [] },
+        };
+      }
 
       let candidates = templates.filter((p) => {
         const riasecMatch = p.riasecFit.some((r) => primaryTypes.includes(r));
@@ -116,11 +103,7 @@ export const professionAgent: Agent = {
         };
       }
 
-      return {
-        agentName: this.name,
-        success: true,
-        data: output,
-      };
+      return { agentName: this.name, success: true, data: output };
     } catch (err) {
       return {
         agentName: this.name,

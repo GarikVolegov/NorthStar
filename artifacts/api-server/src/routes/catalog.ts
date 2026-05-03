@@ -1,10 +1,22 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { db, professionsTable, educationPathsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { authMiddleware } from "../lib/auth-jwt.js";
 
 const router: IRouter = Router();
+
+function adminKeyMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const adminKey = process.env.ADMIN_KEY;
+  if (!adminKey) {
+    res.status(503).json({ error: "Admin non configurato. Contatta l'amministratore." });
+    return;
+  }
+  if (req.headers["x-admin-key"] !== adminKey) {
+    res.status(403).json({ error: "Accesso non autorizzato." });
+    return;
+  }
+  next();
+}
 
 const ProfessionBody = z.object({
   title:         z.string().min(2),
@@ -33,7 +45,7 @@ router.get("/catalog/professions", async (_req, res): Promise<void> => {
   res.json(rows);
 });
 
-router.post("/catalog/professions", authMiddleware, async (req, res): Promise<void> => {
+router.post("/catalog/professions", adminKeyMiddleware, async (req, res): Promise<void> => {
   const parsed = ProfessionBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Dati non validi", details: parsed.error.issues });
@@ -43,10 +55,9 @@ router.post("/catalog/professions", authMiddleware, async (req, res): Promise<vo
   res.status(201).json(created);
 });
 
-router.patch("/catalog/professions/:id", authMiddleware, async (req, res): Promise<void> => {
+router.patch("/catalog/professions/:id", adminKeyMiddleware, async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
-
   const parsed = ProfessionBody.partial().safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Dati non validi", details: parsed.error.issues });
@@ -61,7 +72,7 @@ router.patch("/catalog/professions/:id", authMiddleware, async (req, res): Promi
   res.json(updated);
 });
 
-router.delete("/catalog/professions/:id", authMiddleware, async (req, res): Promise<void> => {
+router.delete("/catalog/professions/:id", adminKeyMiddleware, async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
   await db.update(professionsTable).set({ isActive: false, updatedAt: new Date() }).where(eq(professionsTable.id, id));
@@ -73,7 +84,7 @@ router.get("/catalog/education-paths", async (_req, res): Promise<void> => {
   res.json(rows);
 });
 
-router.post("/catalog/education-paths", authMiddleware, async (req, res): Promise<void> => {
+router.post("/catalog/education-paths", adminKeyMiddleware, async (req, res): Promise<void> => {
   const parsed = EducationPathBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Dati non validi", details: parsed.error.issues });
@@ -83,10 +94,9 @@ router.post("/catalog/education-paths", authMiddleware, async (req, res): Promis
   res.status(201).json(created);
 });
 
-router.patch("/catalog/education-paths/:id", authMiddleware, async (req, res): Promise<void> => {
+router.patch("/catalog/education-paths/:id", adminKeyMiddleware, async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
-
   const parsed = EducationPathBody.partial().safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Dati non validi", details: parsed.error.issues });
@@ -101,7 +111,7 @@ router.patch("/catalog/education-paths/:id", authMiddleware, async (req, res): P
   res.json(updated);
 });
 
-router.delete("/catalog/education-paths/:id", authMiddleware, async (req, res): Promise<void> => {
+router.delete("/catalog/education-paths/:id", adminKeyMiddleware, async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
   await db.update(educationPathsTable).set({ isActive: false, updatedAt: new Date() }).where(eq(educationPathsTable.id, id));
