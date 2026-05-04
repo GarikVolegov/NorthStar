@@ -71,6 +71,7 @@ catalogs:
       version: 3.25.76
 
 overrides:
+  openai>zod: '>=3.0.0 <4'
   '@esbuild-kit/esm-loader': npm:tsx@^4.21.0
   '@expo/ngrok-bin>@expo/ngrok-bin-darwin-arm64': '-'
   '@expo/ngrok-bin>@expo/ngrok-bin-darwin-x64': '-'
@@ -721,7 +722,7 @@ importers:
     dependencies:
       openai:
         specifier: ^6.27.0
-        version: 6.35.0(ws@8.20.0)(zod@4.3.6)
+        version: 6.35.0(ws@8.20.0)(zod@3.25.76)
       p-limit:
         specifier: ^7.3.0
         version: 7.3.0
@@ -3114,7 +3115,7 @@ packages:
     hasBin: true
     peerDependencies:
       ws: ^8.18.0
-      zod: ^3.25 || ^4.0
+      zod: '>=3.0.0 <4'
     peerDependenciesMeta:
       ws:
         optional: true
@@ -6310,10 +6311,10 @@ snapshots:
     dependencies:
       wrappy: 1.0.2
 
-  openai@6.35.0(ws@8.20.0)(zod@4.3.6):
+  openai@6.35.0(ws@8.20.0)(zod@3.25.76):
     optionalDependencies:
       ws: 8.20.0
-      zod: 4.3.6
+      zod: 3.25.76
 
   orval@8.5.3(prettier@3.8.1)(typescript@5.9.3):
     dependencies:

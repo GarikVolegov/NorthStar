@@ -307,6 +307,31 @@ Backoffice at `/admin/review` for reviewing AI agent outputs before publication.
 - Route: `artifacts/api-server/src/routes/admin-review.ts`
 - Page: `artifacts/orientamento/src/pages/admin-review.tsx`
 
+## Performance & Reliability (May 2026)
+
+### Lazy Loading + Code Splitting
+- All 35+ pages converted to `React.lazy()` + `Suspense` with `<PageLoader />` fallback
+- Vite manual chunks: `vendor-react`, `vendor-ui`, `vendor-radix`, `vendor-charts`, `vendor-query`, `vendor-motion`, `vendor-forms`
+- `PageLoader` component: `artifacts/orientamento/src/components/PageLoader.tsx`
+
+### Error Boundaries
+- `ErrorBoundary` class component wraps all routes (public and admin)
+- Shows a localized Italian fallback UI with Retry + Home buttons on any render crash
+- File: `artifacts/orientamento/src/components/ErrorBoundary.tsx`
+
+### TanStack Query — Retry Logic
+- `QueryClient` configured with exponential backoff retry (max 2 retries, up to 10s delay)
+- Skips retry on 401/403/404 responses
+- Default `staleTime: 30s`
+
+### Workflow Configuration
+- Frontend: `PORT=8081 BASE_PATH=/ pnpm --filter @workspace/orientamento run dev`
+- API Server: `PORT=8080 pnpm --filter @workspace/api-server run dev`
+- DB migration: `cd lib/db && pnpm exec drizzle-kit migrate`
+
+### OpenAI Integration Fix
+- `lib/integrations-openai-ai-server/src/image/client.ts` refactored to lazy-initialize — server no longer crashes at startup when `AI_INTEGRATIONS_OPENAI_BASE_URL` is not set
+
 ## Roadmap (Future Phases)
 
 - **Phase 2:** Fix Stripe key + seed products, activate premium checkout

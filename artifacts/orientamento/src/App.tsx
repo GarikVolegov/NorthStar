@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -5,52 +6,67 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { useReducedMotion, easings, durations } from "@/lib/motion";
-import NotFound from "@/pages/not-found";
-import Home from "@/pages/home";
-import Test from "@/pages/test";
-import Results from "@/pages/results";
-import Sector from "@/pages/sector";
-import Register from "@/pages/register";
-import Premium from "@/pages/premium";
-import PremiumSuccess from "@/pages/premium-success";
-import News from "@/pages/news";
-import ResetPassword from "@/pages/reset-password";
-import Profilo from "@/pages/profilo";
-import Wiki from "@/pages/wiki";
-import Roadmap from "@/pages/roadmap";
-import Grafo from "@/pages/grafo";
-import GrafoConoscenza from "@/pages/grafo-conoscenza";
-import Settori from "@/pages/settori";
-import Confronta from "@/pages/confronta";
-import Contatti from "@/pages/contatti";
-import AdminMessaggi from "@/pages/admin-messaggi";
-import AdminAffiliazione from "@/pages/admin-affiliazione";
-import AdminReview from "@/pages/admin-review";
-import SitemapPage from "@/pages/sitemap";
-import ChiSiamo from "@/pages/chi-siamo";
-import ComeFunziona from "@/pages/come-funziona";
-import PrivacyPolicy from "@/pages/privacy-policy";
-import TerminiDiServizio from "@/pages/termini-di-servizio";
-import Crescita from "@/pages/crescita";
-import CrescitaCategoria from "@/pages/crescita-categoria";
-import CrescitaArticolo from "@/pages/crescita-articolo";
-import Candidature from "@/pages/candidature";
-import Amici from "@/pages/amici";
-import Utente from "@/pages/utente";
-import Calendario from "@/pages/Calendario";
-import Ruolo from "@/pages/ruolo";
-import Ruoli from "@/pages/ruoli";
-import Affiliazione from "@/pages/affiliazione";
-import Dashboard from "@/pages/dashboard";
-import AffiliazioneScuole from "@/pages/affiliazione-scuole";
-import AffiliazioneUniversita from "@/pages/affiliazione-universita";
-import AffiliazioneAgenzie from "@/pages/affiliazione-agenzie";
-import AffiliazioneFormazione from "@/pages/affiliazione-formazione";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { PageLoader } from "@/components/PageLoader";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { BackButton } from "@/components/layout/back-button";
 
-const queryClient = new QueryClient();
+const NotFound = lazy(() => import("@/pages/not-found"));
+const Home = lazy(() => import("@/pages/home"));
+const Test = lazy(() => import("@/pages/test"));
+const Results = lazy(() => import("@/pages/results"));
+const Sector = lazy(() => import("@/pages/sector"));
+const Register = lazy(() => import("@/pages/register"));
+const Premium = lazy(() => import("@/pages/premium"));
+const PremiumSuccess = lazy(() => import("@/pages/premium-success"));
+const News = lazy(() => import("@/pages/news"));
+const ResetPassword = lazy(() => import("@/pages/reset-password"));
+const Profilo = lazy(() => import("@/pages/profilo"));
+const Wiki = lazy(() => import("@/pages/wiki"));
+const Roadmap = lazy(() => import("@/pages/roadmap"));
+const Grafo = lazy(() => import("@/pages/grafo"));
+const GrafoConoscenza = lazy(() => import("@/pages/grafo-conoscenza"));
+const Settori = lazy(() => import("@/pages/settori"));
+const Confronta = lazy(() => import("@/pages/confronta"));
+const Contatti = lazy(() => import("@/pages/contatti"));
+const AdminMessaggi = lazy(() => import("@/pages/admin-messaggi"));
+const AdminAffiliazione = lazy(() => import("@/pages/admin-affiliazione"));
+const AdminReview = lazy(() => import("@/pages/admin-review"));
+const SitemapPage = lazy(() => import("@/pages/sitemap"));
+const ChiSiamo = lazy(() => import("@/pages/chi-siamo"));
+const ComeFunziona = lazy(() => import("@/pages/come-funziona"));
+const PrivacyPolicy = lazy(() => import("@/pages/privacy-policy"));
+const TerminiDiServizio = lazy(() => import("@/pages/termini-di-servizio"));
+const Crescita = lazy(() => import("@/pages/crescita"));
+const CrescitaCategoria = lazy(() => import("@/pages/crescita-categoria"));
+const CrescitaArticolo = lazy(() => import("@/pages/crescita-articolo"));
+const Candidature = lazy(() => import("@/pages/candidature"));
+const Amici = lazy(() => import("@/pages/amici"));
+const Utente = lazy(() => import("@/pages/utente"));
+const Calendario = lazy(() => import("@/pages/Calendario"));
+const Ruolo = lazy(() => import("@/pages/ruolo"));
+const Ruoli = lazy(() => import("@/pages/ruoli"));
+const Affiliazione = lazy(() => import("@/pages/affiliazione"));
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const AffiliazioneScuole = lazy(() => import("@/pages/affiliazione-scuole"));
+const AffiliazioneUniversita = lazy(() => import("@/pages/affiliazione-universita"));
+const AffiliazioneAgenzie = lazy(() => import("@/pages/affiliazione-agenzie"));
+const AffiliazioneFormazione = lazy(() => import("@/pages/affiliazione-formazione"));
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error: unknown) => {
+        const status = (error as { status?: number })?.status;
+        if (status === 401 || status === 403 || status === 404) return false;
+        return failureCount < 2;
+      },
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
+      staleTime: 30_000,
+    },
+  },
+});
 
 function AnimatedRoutes() {
   const [location] = useLocation();
@@ -100,29 +116,39 @@ function AnimatedRoutes() {
   );
 
   if (prefersReduced) {
-    return routes(location);
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
+          {routes(location)}
+        </Suspense>
+      </ErrorBoundary>
+    );
   }
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={location}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{
-          opacity: 1,
-          y: 0,
-          transition: { duration: durations.slow, ease: easings.easeOut },
-        }}
-        exit={{
-          opacity: 0,
-          y: -6,
-          transition: { duration: durations.normal, ease: easings.easeIn },
-        }}
-        style={{ willChange: "opacity, transform" }}
-      >
-        {routes(location)}
-      </motion.div>
-    </AnimatePresence>
+    <ErrorBoundary>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={location}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{
+            opacity: 1,
+            y: 0,
+            transition: { duration: durations.slow, ease: easings.easeOut },
+          }}
+          exit={{
+            opacity: 0,
+            y: -6,
+            transition: { duration: durations.normal, ease: easings.easeIn },
+          }}
+          style={{ willChange: "opacity, transform" }}
+        >
+          <Suspense fallback={<PageLoader />}>
+            {routes(location)}
+          </Suspense>
+        </motion.div>
+      </AnimatePresence>
+    </ErrorBoundary>
   );
 }
 
@@ -130,9 +156,27 @@ function Router() {
   return (
     <Switch>
       {/* Admin — no navbar/footer */}
-      <Route path="/admin/messaggi" component={AdminMessaggi} />
-      <Route path="/admin/affiliazione" component={AdminAffiliazione} />
-      <Route path="/admin/review" component={AdminReview} />
+      <Route path="/admin/messaggi">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminMessaggi />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+      <Route path="/admin/affiliazione">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminAffiliazione />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+      <Route path="/admin/review">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminReview />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
 
       {/* Public layout */}
       <Route>
