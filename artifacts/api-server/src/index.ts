@@ -1,3 +1,12 @@
+// Catch uncaught exceptions BEFORE any import that might throw,
+// so Vercel returns a JSON 500 with the error message instead of a silent crash.
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason);
+});
+
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedSectors, patchDipendentiSteps, patchWorkModeFields, seedProfessions, seedEducationPaths } from "./lib/seed";
