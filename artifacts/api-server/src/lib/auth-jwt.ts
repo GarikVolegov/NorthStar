@@ -27,6 +27,8 @@ function loadOrCreateSecret(): string {
   }
 
   const generated = crypto.randomBytes(48).toString("hex");
+
+  // On read-only filesystems (e.g. Vercel serverless), skip the write silently.
   try {
     fs.mkdirSync(cacheDir, { recursive: true });
     fs.writeFileSync(cacheFile, generated, { mode: 0o600 });
@@ -35,14 +37,16 @@ function loadOrCreateSecret(): string {
         "[auth-jwt] JWT_SECRET non impostato — generato nuovo secret e salvato in .local/.jwt-secret (i token NON saranno invalidati ai prossimi restart).",
       );
     }
-  } catch (err) {
+  } catch {
+    // Filesystem is read-only (e.g. Vercel) — use in-memory secret.
+    // Tokens will be invalidated on every cold start. Set JWT_SECRET env var to fix this.
     if (process.env.NODE_ENV !== "test") {
-      console.error(
-        "[auth-jwt] Impossibile salvare il secret persistente (i token verranno invalidati al prossimo restart):",
-        err,
+      console.warn(
+        "[auth-jwt] JWT_SECRET non impostato e impossibile scrivere su disco — il secret è in-memory e i token saranno invalidati ad ogni restart. Imposta JWT_SECRET.",
       );
     }
   }
+
   return generated;
 }
 
