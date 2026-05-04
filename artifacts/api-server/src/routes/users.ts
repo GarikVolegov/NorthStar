@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, usersTable, testSessionsTable } from "@workspace/db";
 import { RegisterUserBody } from "@workspace/api-zod";
 import { eq } from "drizzle-orm";
+import { signToken } from "../lib/auth-jwt.js";
 
 const router: IRouter = Router();
 
@@ -42,12 +43,18 @@ router.post("/users", async (req, res): Promise<void> => {
       .where(eq(testSessionsTable.id, testSessionId));
   }
 
+  const token = signToken(user.id);
+
   res.status(201).json({
     id: user.id,
     name: user.name,
     email: user.email,
     testSessionId: user.testSessionId,
+    workPreference: user.workPreference,
+    emailVerified: user.emailVerified,
+    stripeSubscriptionId: user.stripeSubscriptionId ?? null,
     createdAt: user.createdAt.toISOString(),
+    token,
   });
 });
 

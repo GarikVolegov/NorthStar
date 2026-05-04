@@ -4,15 +4,17 @@ import { useRegisterUser } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Compass, Mail, User as UserIcon, CheckCircle2, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Register() {
   const { t } = useTranslation();
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { login } = useAuth();
   const registerUser = useRegisterUser();
 
   const searchParams = new URLSearchParams(window.location.search);
@@ -20,7 +22,6 @@ export default function Register() {
   const pendingWorkMode = searchParams.get("work_mode");
 
   const [formData, setFormData] = useState({ name: "", email: "" });
-  const [isSuccess, setIsSuccess] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,27 +32,20 @@ export default function Register() {
     registerUser.mutate({
       data: { name: formData.name, email: formData.email, testSessionId: sessionId, workPreference: pendingWorkMode ?? undefined }
     }, {
-      onSuccess: () => { setIsSuccess(true); },
+      onSuccess: (data) => {
+        const { token, ...user } = data as typeof data & { token: string };
+        login(user as Parameters<typeof login>[0], token);
+        if (sessionId) {
+          setLocation(`/risultati/${sessionId}`);
+        } else {
+          setLocation("/");
+        }
+      },
       onError: () => {
         toast({ title: t("register.errors.registerError"), description: t("register.errors.registerErrorDesc"), variant: "destructive" });
       }
     });
   };
-
-  if (isSuccess) {
-    return (
-      <div className="container max-w-lg mx-auto px-4 py-24 flex flex-col items-center justify-center min-h-[70vh] text-center">
-        <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-8 animate-in zoom-in duration-500">
-          <CheckCircle2 className="w-10 h-10" />
-        </div>
-        <h1 className="text-3xl md:text-4xl font-serif font-bold mb-4 text-foreground">{t("register.successTitle", { name: formData.name.split(" ")[0] })}</h1>
-        <p className="text-lg text-muted-foreground mb-8 leading-relaxed">{t("register.successDesc")}</p>
-        <Button size="lg" onClick={() => setLocation("/")} className="rounded-full px-8 h-14">
-          {t("register.backHome")} <ArrowRight className="ml-2 h-5 w-5" />
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto px-4 py-12 md:py-24 flex justify-center min-h-[80vh] items-center">
