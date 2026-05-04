@@ -1,0 +1,426 @@
+# NorthStar Master Specification
+
+## 1. Project Overview
+
+NorthStar is a career, growth, and planning platform designed to help users discover suitable sectors, roles, and learning paths, then transform those discoveries into personal execution plans and growth content.
+
+The system must support:
+- career orientation after a test;
+- sector discovery;
+- role discovery inside each sector;
+- education path discovery, including online courses and certifications;
+- personal calendar planning for each user;
+- growth-personal content research;
+- work mode selection: employee, autonomous, freelance, or hybrid;
+- dynamic content updates through AI agents;
+- Free and Premium product tiers.
+
+The project must be built in a modular way that is easy to extend, test, and maintain. Replit Agent should use this file as the primary project context and implementation guide. [web:469][web:477][web:488]
+
+## 2. Product Goal
+
+The goal of NorthStar is not just to suggest jobs, but to guide the user through a complete path:
+- understand who they are;
+- suggest sectors that fit them;
+- suggest roles inside those sectors;
+- suggest relevant educational paths;
+- show whether the user is better suited to employee or autonomous work;
+- help them build a personal execution calendar;
+- support their personal growth with real educational content.
+
+The platform should feel like a structured, intelligent advisor rather than a generic content app. [web:459][web:486]
+
+## 3. System Architecture
+
+NorthStar must use a hierarchical, agent-based architecture.
+
+### Main layers
+- Discovery Layer.
+- Personal Execution Layer.
+- Control Layer.
+
+### Discovery Layer agents
+- Sector Discovery Agent.
+- Role Discovery Agent.
+- Education Path Agent.
+
+### Personal Execution Layer agents
+- Calendar Agent.
+- Growth Agent.
+
+### Control Layer agents
+- Validator Agent.
+- Review Queue.
+- Orchestrator when needed.
+
+This structure fits a hierarchical or supervisor-worker pattern where some agents work in teams and some work independently on clearly defined tasks. [web:459][web:461][web:486]
+
+## 4. Agent Hierarchy
+
+### 4.1 Sector Discovery Agent
+This agent researches and updates sectors.
+It must:
+- identify new sectors;
+- refine sector definitions;
+- detect emerging sub-sectors;
+- score sector relevance;
+- store suggestions for review.
+
+### 4.2 Role Discovery Agent
+This agent researches and updates roles inside each sector.
+It must:
+- find new job roles;
+- update role descriptions;
+- classify roles by work mode;
+- identify the most suitable roles for the user;
+- store candidates for validation.
+
+### 4.3 Education Path Agent
+This agent researches educational paths linked to sectors and roles.
+It must include:
+- universities;
+- ITS and technical training;
+- master programs;
+- bootcamps;
+- online courses with certification;
+- professional certificates;
+- micro-credentials;
+- stackable learning paths.
+
+It must compare paths by relevance, cost, duration, market recognition, and work mode fit. [web:396][web:399][web:402][web:405][web:408]
+
+### 4.4 Calendar Agent
+This agent works for the individual user only.
+It must:
+- read user goals, deadlines, and availability;
+- create a personal schedule;
+- build weekly, monthly, and long-term execution plans;
+- adapt plans when priorities change;
+- focus on planning, not market discovery.
+
+### 4.5 Growth Agent
+This agent works independently and researches personal growth content.
+It must:
+- search for content on discipline, awareness, habits, focus, identity, resilience, productivity, and self-development;
+- organize content by theme and usefulness;
+- connect content to user goals and progress;
+- avoid limiting itself to generic motivational content.
+
+### 4.6 Validator Agent
+This agent checks:
+- duplicates;
+- consistency;
+- confidence level;
+- taxonomy quality;
+- whether data can be published.
+
+### 4.7 Orchestrator
+The orchestrator should coordinate only where needed.
+It should:
+- route discovery tasks;
+- collect results;
+- unify outputs;
+- trigger validation;
+- avoid unnecessary complexity for the Calendar and Growth agents if they can work independently.
+
+This is aligned with recommended multi-agent orchestration patterns that emphasize controlled handoffs and centralized supervision for complex workflows. [web:459][web:464][web:466][web:486]
+
+## 5. Discovery Workflow
+
+The discovery agents must work as a team.
+
+### Flow
+1. User completes the test.
+2. Sector Discovery Agent proposes sectors.
+3. Role Discovery Agent proposes roles for those sectors.
+4. Education Path Agent proposes learning paths for those sectors and roles.
+5. Validator Agent checks the results.
+6. Review Queue stores pending changes.
+7. Approved data becomes visible in the app.
+
+The discovery team must share a consistent user profile, but each agent should own its domain. [web:457][web:461][web:463]
+
+## 6. Personal Execution Workflow
+
+The personal execution layer must work after discovery.
+
+### Calendar Agent flow
+1. Read the user profile.
+2. Read selected sector, role, goals, and deadlines.
+3. Convert them into a concrete plan.
+4. Schedule tasks in time blocks.
+5. Update the plan when the user changes goals.
+
+### Growth Agent flow
+1. Read the user profile and personal goals.
+2. Search for useful growth content.
+3. Classify it by topic and depth.
+4. Recommend practical content, not only inspiration.
+5. Keep the content updated over time.
+
+These agents can operate independently, but they must share the same user context data model. [web:426][web:433][web:434][web:440]
+
+## 7. Data Model
+
+Use a relational database as the source of truth.
+
+### Core tables
+- users
+- user_profiles
+- personality_results
+- sectors
+- roles
+- education_paths
+- user_sector_scores
+- user_role_scores
+- role_education_paths
+- calendar_events
+- growth_contents
+- agent_suggestions
+- agent_runs
+- review_queue
+- notifications
+
+### Important relations
+- One user can have many sectors, roles, plans, and saved contents.
+- One sector can contain many roles.
+- One role can have many education paths.
+- One education path can apply to many roles.
+- Calendar and growth content belong to one user profile context.
+
+## 8. Content Classification Rules
+
+### Sector
+Each sector must include:
+- title;
+- description;
+- growth score;
+- market relevance;
+- sub-sector grouping;
+- verified status;
+- last review date.
+
+### Role
+Each role must include:
+- title;
+- description;
+- required skills;
+- work mode;
+- autonomy score;
+- stability score;
+- sector links;
+- user match score;
+- last review date.
+
+### Education Path
+Each path must include:
+- title;
+- type;
+- sector links;
+- role links;
+- duration;
+- cost;
+- certificate included;
+- market recognition;
+- online or in-person;
+- stackable or not;
+- job-ready or not.
+
+### Growth Content
+Each content item must include:
+- topic;
+- category;
+- depth level;
+- practical value;
+- relation to goals;
+- source or author if needed;
+- last review date.
+
+## 9. Work Mode Logic
+
+NorthStar must support these work modes:
+- employee;
+- autonomous;
+- freelance;
+- hybrid.
+
+The user must be able to express a preference, and that preference must influence:
+- sector ranking;
+- role ranking;
+- education path ranking;
+- suggested career paths.
+
+## 10. UI Requirements
+
+### After the test
+Show:
+- top sectors;
+- reasons for each sector;
+- CTA to open the sector.
+
+### Inside each sector
+Show:
+- overview;
+- key roles;
+- roles best suited to the user;
+- work mode badges;
+- skills required;
+- education paths;
+- emerging roles.
+
+### Inside each role
+Show:
+- role description;
+- what the job actually involves;
+- user match score;
+- work mode;
+- skills;
+- related courses;
+- sector links.
+
+### Inside each education path
+Show:
+- path type;
+- certification status;
+- recognition;
+- duration;
+- cost;
+- suitable for employee or autonomous work.
+
+### Inside the calendar
+Show:
+- goals;
+- deadlines;
+- time blocks;
+- priority tasks;
+- execution plan.
+
+### Inside the growth section
+Show:
+- topics;
+- recommended content;
+- saved content;
+- practical exercises;
+- personal growth journey.
+
+## 11. API Structure
+
+### Discovery APIs
+- `POST /api/test/submit`
+- `GET /api/sectors/recommended`
+- `GET /api/sectors/:slug`
+- `GET /api/sectors/:slug/roles`
+- `GET /api/roles/:slug`
+- `GET /api/roles/:slug/education-paths`
+- `GET /api/education-paths/:slug`
+
+### Personal execution APIs
+- `GET /api/users/:id/calendar`
+- `POST /api/users/:id/calendar/events`
+- `GET /api/users/:id/growth`
+- `POST /api/users/:id/growth/save`
+
+### Agent APIs
+- `POST /api/agents/sector-discovery/run`
+- `POST /api/agents/role-discovery/run`
+- `POST /api/agents/education-path/run`
+- `POST /api/agents/calendar/run`
+- `POST /api/agents/growth/run`
+- `POST /api/agents/validator/run`
+
+### Review APIs
+- `GET /api/review-queue`
+- `POST /api/review-queue/:id/approve`
+- `POST /api/review-queue/:id/reject`
+
+## 12. Background Jobs
+
+The app should run scheduled jobs for:
+- sector updates;
+- role updates;
+- education path refresh;
+- calendar plan refresh;
+- growth content refresh;
+- review queue cleanup;
+- recommendation recalculation.
+
+## 13. Validation and Publishing Rules
+
+Do not publish agent-generated content directly.
+
+### Required flow
+1. Agent creates suggestion.
+2. Suggestion is stored in `agent_suggestions`.
+3. Validator checks it.
+4. Suggestion enters review queue.
+5. Admin or trusted process approves it.
+6. Approved content becomes public.
+
+This is essential for keeping the system reliable and avoiding inconsistent taxonomies or duplicate entities. [web:459][web:464][web:486]
+
+## 14. MVP Priority
+
+Build in this order:
+1. User test and profile.
+2. Sector suggestions.
+3. Role suggestions inside each sector.
+4. Education path suggestions, including online certified courses.
+5. Work mode selection.
+6. Calendar Agent.
+7. Growth Agent.
+8. Validator and review queue.
+9. Automation and refresh jobs.
+10. Premium monetization.
+
+## 15. Replit Implementation Notes
+
+Use this file as the master source of truth for Replit Agent.
+
+### Replit rules
+- Keep code modular.
+- Use clear component separation.
+- Prefer typed data structures.
+- Keep agents isolated by responsibility.
+- Update this file when the architecture evolves.
+- Implement incrementally with checkpoints.
+- Use short, outcome-focused prompts when asking Replit to build parts of the system. [web:469][web:472][web:477][web:488]
+
+### Suggested folder layout
+```txt
+northstar/
+  app/
+    web/
+      pages/
+      components/
+      features/
+        sectors/
+        roles/
+        education/
+        calendar/
+        growth/
+        onboarding/
+    api/
+      routes/
+      controllers/
+      services/
+      jobs/
+      agents/
+        orchestrator/
+        sector-discovery/
+        role-discovery/
+        education-path/
+        calendar/
+        growth/
+        validator/
+      schemas/
+      utils/
+  db/
+    migrations/
+    seeds/
+  content/
+    prompts/
+    sectors/
+    roles/
+    education/
+  docs/
+  tests/
