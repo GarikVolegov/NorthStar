@@ -164,7 +164,7 @@ interface CacheEntry {
 }
 
 const cache = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 30 * 60 * 1000;
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 function getCached(key: string): NewsItem[] | null {
   const entry = cache.get(key);
@@ -323,6 +323,12 @@ function deduplicateNews(news: NewsItem[]): NewsItem[] {
     seen.add(n.id);
     return true;
   });
+}
+
+/** Pre-populate in-memory cache for the most common categories at startup. */
+export async function warmCache(): Promise<void> {
+  const WARM_CATEGORIES: FreeCategory[] = ["general", "technology", "business", "science", "health"];
+  await Promise.all(WARM_CATEGORIES.map((cat) => getFreeNews(cat, 6).catch(() => {})));
 }
 
 export { FREE_CATEGORIES, type FreeCategory };

@@ -3,16 +3,18 @@ import {
   getFreeNews,
   getSectorNews,
   getMultiCategoryNews,
+  warmCache,
   FREE_CATEGORIES,
   type FreeCategory,
 } from "../lib/news";
-import { orchestratorAgent } from "../agents/orchestrator";
-import { logAgentCall } from "../agents/logger";
 import { getAuthenticatedUserId, getUserPlan } from "../lib/plan-utils";
-import { parseOrchestratorData, getSubAgentOutput, parseNewsAgentData } from "../lib/agent-helpers";
 import { logger } from "../lib/logger";
 
 const router = Router();
+
+// Warm the most common categories eagerly on first import so the
+// in-memory cache is populated before the first user request.
+warmCache().catch((err) => logger.warn({ err }, "News cache warm-up failed"));
 
 router.get("/news", async (req, res) => {
   const category = (req.query["category"] as string) || "general";
@@ -32,137 +34,45 @@ router.get("/news", async (req, res) => {
     return res.status(400).json({ error: "Categoria non valida" });
   }
 
-  const userId = getAuthenticatedUserId(req);
-  const plan = userId ? await getUserPlan(userId) : "free";
-  const start = Date.now();
-
   try {
-    const result = await orchestratorAgent.run({
-      taskType: "news_filter",
-      payload: { categories: [category] },
-      context: { userId, plan, sharedState: {} },
-    });
-
-    const durationMs = Date.now() - start;
-    await logAgentCall({
-      agentName: "OrchestratorAgent",
-      userId,
-      taskType: "news_filter",
-      inputSummary: { source: "/news", category, plan },
-      outputSummary: { success: result.success },
-      durationMs,
-      error: result.error,
-      retryCount: 0,
-    });
-
-    if (result.success) {
-      const orcData = parseOrchestratorData(result);
-      const newsData = orcData ? parseNewsAgentData(getSubAgentOutput(orcData, "NewsAgent")) : null;
-      if (newsData) {
-        return res.json({ news: newsData.news.slice(0, limit), source: newsData.source });
-      }
-    }
+    const news = await getFreeNews(category as FreeCategory, limit);
+    return res.json({ news, source: process.env["GNEWS_API_KEY"] ? "live" : "static" });
   } catch (err) {
-    logger.warn({ err }, "NewsAgent delegation failed in /news, falling back");
+    logger.error({ err }, "getFreeNews failed in /news");
+    return res.status(500).json({ error: "Errore nel caricamento delle notizie" });
   }
-
-  const news = await getFreeNews(category as FreeCategory, limit);
-  return res.json({ news, source: process.env["GNEWS_API_KEY"] ? "live" : "static" });
 });
 
 router.get("/news/sector/:sector", async (req, res) => {
   const { sector } = req.params;
   const limit = Math.min(Number(req.query["limit"]) || 8, 20);
 
-  const userId = getAuthenticatedUserId(req);
-  const plan = userId ? await getUserPlan(userId) : "free";
-  const start = Date.now();
-
   try {
-    const result = await orchestratorAgent.run({
-      taskType: "news_filter",
-      payload: { topSectors: [{ sectorName: sector }] },
-      context: { userId, plan, sharedState: {} },
-    });
-
-    const durationMs = Date.now() - start;
-    await logAgentCall({
-      agentName: "OrchestratorAgent",
-      userId,
-      taskType: "news_filter",
-      inputSummary: { source: "/news/sector/:sector", sector, plan },
-      outputSummary: { success: result.success },
-      durationMs,
-      error: result.error,
-      retryCount: 0,
-    });
-
-    if (result.success) {
-      const orcData = parseOrchestratorData(result);
-      const newsData = orcData ? parseNewsAgentData(getSubAgentOutput(orcData, "NewsAgent")) : null;
-      if (newsData) {
-        return res.json({ news: newsData.news.slice(0, limit), source: newsData.source });
-      }
-    }
+    const news = await getSectorNews(sector, limit);
+    return res.json({ news, source: process.env["GNEWS_API_KEY"] ? "live" : "static" });
   } catch (err) {
-    logger.warn({ err }, "NewsAgent delegation failed in /news/sector/:sector, falling back");
+    logger.error({ err }, "getSectorNews failed in /news/sector/:sector");
+    return res.status(500).json({ error: "Errore nel caricamento delle notizie di settore" });
   }
-
-  const news = await getSectorNews(sector, limit);
-  return res.json({ news, source: process.env["GNEWS_API_KEY"] ? "live" : "static" });
 });
 
 router.get("/news/personalizzate", async (req, res) => {
   const userId = getAuthenticatedUserId(req);
   const plan = userId ? await getUserPlan(userId) : "free";
 
-  const sectors = req.query["sectors"]
-    ? (req.query["sectors"] as string).split(",").map((s) => ({ sectorName: s.trim() }))
-    : [];
   const categories = req.query["categories"]
-    ? (req.query["categories"] as string).split(",")
-    : ["general", "technology"];
+    ? (req.query["categories"] as string)
+        .split(",")
+        .filter((c) => FREE_CATEGORIES.includes(c as FreeCategory)) as FreeCategory[]
+    : (["general", "technology"] as FreeCategory[]);
 
-  const start = Date.now();
   try {
-    const agentResult = await orchestratorAgent.run({
-      taskType: "news_filter",
-      payload: { topSectors: sectors, categories },
-      context: { userId, plan, sharedState: {} },
-    });
-
-    const durationMs = Date.now() - start;
-    await logAgentCall({
-      agentName: "OrchestratorAgent",
-      userId,
-      taskType: "news_filter",
-      inputSummary: { source: "/news/personalizzate", plan },
-      outputSummary: { success: agentResult.success },
-      durationMs,
-      error: agentResult.error,
-      retryCount: 0,
-    });
-
-    if (agentResult.success) {
-      const orcData = parseOrchestratorData(agentResult);
-      if (orcData) {
-        const newsOutput = parseNewsAgentData(getSubAgentOutput(orcData, "NewsAgent"));
-        if (newsOutput) {
-          return res.json({
-            news: newsOutput.news,
-            personalized: newsOutput.personalized,
-            source: newsOutput.source,
-            plan,
-          });
-        }
-      }
-    }
+    const news = await getMultiCategoryNews(categories, 3);
+    return res.json({ news, source: process.env["GNEWS_API_KEY"] ? "live" : "static", personalized: false, plan });
   } catch (err) {
-    logger.warn({ err }, "NewsAgent delegation failed, falling back to direct fetch");
+    logger.error({ err }, "getMultiCategoryNews failed in /news/personalizzate");
+    return res.status(500).json({ error: "Errore nel caricamento delle notizie personalizzate" });
   }
-
-  const news = await getFreeNews("general", 6);
-  return res.json({ news, source: "fallback", personalized: false, plan });
 });
 
 export default router;

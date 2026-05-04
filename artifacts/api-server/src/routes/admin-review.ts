@@ -17,7 +17,7 @@ function adminKeyMiddleware(req: Request, res: Response, next: NextFunction): vo
   next();
 }
 
-router.use(adminKeyMiddleware);
+router.use("/admin", adminKeyMiddleware);
 
 router.get("/admin/queue", async (req, res): Promise<void> => {
   const status = req.query.status as string | undefined;
