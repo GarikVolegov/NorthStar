@@ -32,6 +32,7 @@ import agentRouter from "./agent";
 import catalogRouter from "./catalog";
 import researchRouter from "./research";
 import rolesRouter from "./roles";
+import adminReviewRouter from "./admin-review";
 
 const router: IRouter = Router();
 
@@ -43,6 +44,7 @@ router.use(objectivesRouter);
 router.use(healthRouter);
 router.use(sectorsRouter);
 router.use(rolesRouter);
+router.use(adminReviewRouter);
 router.use(testSessionsRouter);
 router.use(usersRouter);
 router.use(stripeRouter);

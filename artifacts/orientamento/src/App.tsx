@@ -25,6 +25,7 @@ import Confronta from "@/pages/confronta";
 import Contatti from "@/pages/contatti";
 import AdminMessaggi from "@/pages/admin-messaggi";
 import AdminAffiliazione from "@/pages/admin-affiliazione";
+import AdminReview from "@/pages/admin-review";
 import SitemapPage from "@/pages/sitemap";
 import ChiSiamo from "@/pages/chi-siamo";
 import ComeFunziona from "@/pages/come-funziona";
@@ -129,6 +130,7 @@ function Router() {
       {/* Admin — no navbar/footer */}
       <Route path="/admin/messaggi" component={AdminMessaggi} />
       <Route path="/admin/affiliazione" component={AdminAffiliazione} />
+      <Route path="/admin/review" component={AdminReview} />
 
       {/* Public layout */}
       <Route>

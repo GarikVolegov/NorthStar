@@ -275,6 +275,38 @@ Requires `TAVILY_API_KEY` env secret (now configured).
 ### Tavily client
 - `artifacts/api-server/src/lib/tavily.ts` — search wrapper with URL normalization and lightweight URL hashing for deduplication
 
+## Admin Review Dashboard
+
+Backoffice at `/admin/review` for reviewing AI agent outputs before publication. Uses the same `ADMIN_KEY` + `x-admin-key` header auth as other admin pages.
+
+### Database Tables
+- `agent_runs` — tracks agent execution (name, input/output summary, duration, errors)
+- `agent_suggestions` — entity proposals with confidence scores, status flow: draft → pending_review → approved/rejected → archived
+- `review_queue` — human review workflow with priority levels (high/normal/low)
+- `audit_logs` — tracks all admin actions (approve/reject/edit/archive) with metadata
+
+### API Endpoints (all require `x-admin-key` header)
+- `GET /api/admin/stats` — dashboard statistics (pending/approved/rejected/archived counts)
+- `GET /api/admin/queue` — review queue with status/priority/entity_type filters
+- `GET /api/admin/suggestions` — all suggestions with status/entity_type/search filters + pagination
+- `GET /api/admin/suggestions/:id` — detail view with linked agent run and queue item
+- `POST /api/admin/suggestions/:id/approve` — approve suggestion
+- `POST /api/admin/suggestions/:id/reject` — reject with optional notes
+- `PATCH /api/admin/suggestions/:id` — edit suggestion fields (entityName, payloadJson, notes, confidenceScore)
+- `POST /api/admin/suggestions/:id/archive` — archive suggestion
+- `GET /api/admin/agent-runs` — agent execution logs with agent name filter
+- `GET /api/admin/logs` — audit trail with action filter
+
+### Frontend (`/admin/review`)
+- Sidebar navigation: Queue, Suggestions, Agent Runs, Audit Log, Settings
+- Stats panel: pending/approved/rejected/runs counts
+- List/detail split view with filters (status, entity type, search)
+- Approve/Reject/Archive actions with rejection notes
+- Confidence score badges, entity type badges, status badges
+- Schema: `lib/db/src/schema/agentReview.ts`
+- Route: `artifacts/api-server/src/routes/admin-review.ts`
+- Page: `artifacts/orientamento/src/pages/admin-review.tsx`
+
 ## Roadmap (Future Phases)
 
 - **Phase 2:** Fix Stripe key + seed products, activate premium checkout

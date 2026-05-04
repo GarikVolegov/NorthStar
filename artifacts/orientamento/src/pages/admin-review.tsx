@@ -1,0 +1,749 @@
+import { useEffect, useState, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
+import {
+  ShieldAlert, RefreshCw, LogOut, Search, ChevronRight,
+  CheckCircle2, XCircle, Archive, Clock, Eye, Bot,
+  BarChart3, FileText, Briefcase, GraduationCap, Calendar,
+  TrendingUp, Sparkles, ClipboardList, History, Settings,
+  Filter, ChevronDown, Pencil, X,
+} from "lucide-react";
+
+const BASE = import.meta.env.BASE_URL || "/";
+const LS_KEY = "ns_admin_key";
+
+type SuggestionStatus = "draft" | "pending_review" | "approved" | "rejected" | "archived";
+type EntityType = "sector" | "role" | "education_path" | "calendar_plan" | "growth_content" | "work_mode";
+
+type Suggestion = {
+  id: number;
+  agentRunId: number | null;
+  entityType: string;
+  entityName: string;
+  payloadJson: Record<string, unknown> | null;
+  confidenceScore: number | null;
+  status: SuggestionStatus;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type AgentRun = {
+  id: number;
+  agentName: string;
+  userId: number | null;
+  inputSummary: string | null;
+  outputSummary: string | null;
+  status: string;
+  startedAt: string;
+  finishedAt: string | null;
+  durationMs: number | null;
+  errorMessage: string | null;
+  createdAt: string;
+};
+
+type AuditLogEntry = {
+  id: number;
+  userId: string | null;
+  action: string;
+  targetType: string;
+  targetId: number | null;
+  metadataJson: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+type DashboardStats = {
+  pending: number;
+  approved: number;
+  rejected: number;
+  archived: number;
+  totalRuns: number;
+};
+
+type SuggestionDetail = {
+  suggestion: Suggestion;
+  agentRun: AgentRun | null;
+  queueItem: { id: number; queueStatus: string; priority: string } | null;
+};
+
+const STATUS_CONFIG: Record<SuggestionStatus, { label: string; color: string; icon: typeof CheckCircle2 }> = {
+  draft: { label: "Bozza", color: "bg-slate-100 text-slate-700", icon: FileText },
+  pending_review: { label: "In Revisione", color: "bg-amber-100 text-amber-700", icon: Clock },
+  approved: { label: "Approvato", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 },
+  rejected: { label: "Rifiutato", color: "bg-red-100 text-red-700", icon: XCircle },
+  archived: { label: "Archiviato", color: "bg-slate-100 text-slate-500", icon: Archive },
+};
+
+const ENTITY_CONFIG: Record<string, { label: string; icon: typeof Briefcase }> = {
+  sector: { label: "Settore", icon: BarChart3 },
+  role: { label: "Ruolo", icon: Briefcase },
+  education_path: { label: "Percorso", icon: GraduationCap },
+  calendar_plan: { label: "Calendario", icon: Calendar },
+  growth_content: { label: "Crescita", icon: TrendingUp },
+  work_mode: { label: "Work Mode", icon: Sparkles },
+};
+
+type SidebarSection = "queue" | "suggestions" | "runs" | "logs" | "settings";
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleString("it-IT", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function fmtShortDate(iso: string) {
+  return new Date(iso).toLocaleString("it-IT", {
+    day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function StatusBadge({ status }: { status: SuggestionStatus }) {
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.draft;
+  const Icon = cfg.icon;
+  return (
+    <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium", cfg.color)}>
+      <Icon className="w-3 h-3" /> {cfg.label}
+    </span>
+  );
+}
+
+function EntityBadge({ type }: { type: string }) {
+  const cfg = ENTITY_CONFIG[type] || { label: type, icon: FileText };
+  const Icon = cfg.icon;
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+      <Icon className="w-3 h-3" /> {cfg.label}
+    </span>
+  );
+}
+
+function ConfidenceBadge({ score }: { score: number | null }) {
+  if (score == null) return null;
+  const pct = Math.round(score * 100);
+  const color = pct >= 80 ? "text-emerald-600" : pct >= 50 ? "text-amber-600" : "text-red-600";
+  return <span className={cn("text-xs font-mono font-semibold", color)}>{pct}%</span>;
+}
+
+export default function AdminReview() {
+  useEffect(() => { document.title = "Admin Review — NorthStar"; }, []);
+
+  const [key, setKey] = useState(() => localStorage.getItem(LS_KEY) || "");
+  const [inputKey, setInputKey] = useState("");
+  const [authed, setAuthed] = useState(false);
+  const [authError, setAuthError] = useState(false);
+
+  const [section, setSection] = useState<SidebarSection>("queue");
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestionsTotal, setSuggestionsTotal] = useState(0);
+  const [runs, setRuns] = useState<AgentRun[]>([]);
+  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [detail, setDetail] = useState<SuggestionDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterEntity, setFilterEntity] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [editNotes, setEditNotes] = useState("");
+  const [showEditNotes, setShowEditNotes] = useState(false);
+
+  const apiFetch = useCallback(async (path: string, options?: RequestInit) => {
+    const res = await fetch(`${BASE}api${path}`, {
+      ...options,
+      headers: {
+        "x-admin-key": key,
+        "Content-Type": "application/json",
+        ...(options?.headers || {}),
+      },
+    });
+    if (res.status === 403) { setAuthed(false); setAuthError(true); throw new Error("auth"); }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }, [key]);
+
+  const loadStats = useCallback(async () => {
+    try {
+      const data = await apiFetch("/admin/stats");
+      setStats(data);
+      setAuthed(true);
+    } catch { /* handled by apiFetch */ }
+  }, [apiFetch]);
+
+  const loadSuggestions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filterStatus !== "all") params.set("status", filterStatus);
+      if (filterEntity !== "all") params.set("entity_type", filterEntity);
+      if (searchTerm) params.set("search", searchTerm);
+      params.set("limit", "100");
+      const data = await apiFetch(`/admin/suggestions?${params}`);
+      setSuggestions(data.items);
+      setSuggestionsTotal(data.total);
+      setAuthed(true);
+    } catch { /* handled */ }
+    setLoading(false);
+  }, [apiFetch, filterStatus, filterEntity, searchTerm]);
+
+  const loadRuns = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiFetch("/admin/agent-runs?limit=100");
+      setRuns(data);
+      setAuthed(true);
+    } catch { /* handled */ }
+    setLoading(false);
+  }, [apiFetch]);
+
+  const loadLogs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiFetch("/admin/logs?limit=100");
+      setLogs(data);
+      setAuthed(true);
+    } catch { /* handled */ }
+    setLoading(false);
+  }, [apiFetch]);
+
+  const loadDetail = useCallback(async (id: number) => {
+    setDetailLoading(true);
+    try {
+      const data = await apiFetch(`/admin/suggestions/${id}`);
+      setDetail(data);
+    } catch { /* handled */ }
+    setDetailLoading(false);
+  }, [apiFetch]);
+
+  useEffect(() => {
+    if (!key) return;
+    loadStats();
+  }, [key, loadStats]);
+
+  useEffect(() => {
+    if (!authed) return;
+    if (section === "suggestions" || section === "queue") loadSuggestions();
+    else if (section === "runs") loadRuns();
+    else if (section === "logs") loadLogs();
+  }, [authed, section, loadSuggestions, loadRuns, loadLogs]);
+
+  function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = inputKey.trim();
+    if (!trimmed) return;
+    localStorage.setItem(LS_KEY, trimmed);
+    setKey(trimmed);
+    setAuthError(false);
+  }
+
+  function handleLogout() {
+    localStorage.removeItem(LS_KEY);
+    setKey("");
+    setAuthed(false);
+    setStats(null);
+    setSuggestions([]);
+    setDetail(null);
+  }
+
+  async function handleApprove(id: number) {
+    try {
+      await apiFetch(`/admin/suggestions/${id}/approve`, { method: "POST", body: JSON.stringify({}) });
+      loadSuggestions();
+      loadStats();
+      if (detail?.suggestion.id === id) loadDetail(id);
+    } catch { /* handled */ }
+  }
+
+  async function handleReject(id: number) {
+    const notes = editNotes.trim() || undefined;
+    try {
+      await apiFetch(`/admin/suggestions/${id}/reject`, { method: "POST", body: JSON.stringify({ notes }) });
+      setShowEditNotes(false);
+      setEditNotes("");
+      loadSuggestions();
+      loadStats();
+      if (detail?.suggestion.id === id) loadDetail(id);
+    } catch { /* handled */ }
+  }
+
+  async function handleArchive(id: number) {
+    try {
+      await apiFetch(`/admin/suggestions/${id}/archive`, { method: "POST", body: JSON.stringify({}) });
+      loadSuggestions();
+      loadStats();
+      if (detail?.suggestion.id === id) loadDetail(id);
+    } catch { /* handled */ }
+  }
+
+  if (!authed) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-background flex items-center justify-center px-4">
+        <div className="w-full max-w-sm">
+          <div className="rounded-3xl border bg-card p-8 shadow-sm">
+            <div className="flex flex-col items-center mb-8">
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+                <ShieldAlert className="w-7 h-7 text-primary" />
+              </div>
+              <h1 className="text-xl font-serif font-bold text-foreground">Admin Review</h1>
+              <p className="text-sm text-muted-foreground text-center mt-1">
+                Pannello di controllo per la revisione dei risultati AI
+              </p>
+            </div>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <Input
+                type="password"
+                value={inputKey}
+                onChange={(e) => setInputKey(e.target.value)}
+                placeholder="Chiave admin…"
+                className="text-center"
+              />
+              {authError && (
+                <p className="text-destructive text-sm text-center">Chiave non valida.</p>
+              )}
+              <Button type="submit" className="w-full">Accedi</Button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const sidebarItems: { key: SidebarSection; label: string; icon: typeof ClipboardList; count?: number }[] = [
+    { key: "queue", label: "Queue Revisione", icon: ClipboardList, count: stats?.pending },
+    { key: "suggestions", label: "Suggerimenti", icon: Bot },
+    { key: "runs", label: "Esecuzioni Agenti", icon: History },
+    { key: "logs", label: "Audit Log", icon: FileText },
+    { key: "settings", label: "Impostazioni", icon: Settings },
+  ];
+
+  const pendingCount = stats?.pending ?? 0;
+  const queueSuggestions = section === "queue"
+    ? suggestions.filter((s) => s.status === "pending_review")
+    : suggestions;
+
+  return (
+    <div className="min-h-screen bg-background flex">
+      {/* Sidebar */}
+      <aside className="w-64 border-r bg-card flex flex-col shrink-0">
+        <div className="p-6 border-b">
+          <div className="flex items-center gap-2 mb-1">
+            <Bot className="w-5 h-5 text-primary" />
+            <h1 className="font-serif font-bold text-lg">Admin Review</h1>
+          </div>
+          <p className="text-xs text-muted-foreground">Pannello di controllo AI</p>
+        </div>
+
+        {stats && (
+          <div className="p-4 border-b">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-amber-50 rounded-xl p-3 text-center">
+                <div className="text-xl font-bold text-amber-700">{stats.pending}</div>
+                <div className="text-[10px] text-amber-600 uppercase tracking-wider">In Attesa</div>
+              </div>
+              <div className="bg-emerald-50 rounded-xl p-3 text-center">
+                <div className="text-xl font-bold text-emerald-700">{stats.approved}</div>
+                <div className="text-[10px] text-emerald-600 uppercase tracking-wider">Approvati</div>
+              </div>
+              <div className="bg-red-50 rounded-xl p-3 text-center">
+                <div className="text-xl font-bold text-red-700">{stats.rejected}</div>
+                <div className="text-[10px] text-red-600 uppercase tracking-wider">Rifiutati</div>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3 text-center">
+                <div className="text-xl font-bold text-slate-700">{stats.totalRuns}</div>
+                <div className="text-[10px] text-slate-500 uppercase tracking-wider">Esecuzioni</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <nav className="flex-1 p-3 space-y-1">
+          {sidebarItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.key}
+                onClick={() => { setSection(item.key); setDetail(null); }}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left",
+                  section === item.key
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="flex-1">{item.label}</span>
+                {item.count != null && item.count > 0 && (
+                  <span className="text-xs bg-amber-500 text-white px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                    {item.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="p-4 border-t">
+          <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground" onClick={handleLogout}>
+            <LogOut className="w-4 h-4 mr-2" /> Esci
+          </Button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <header className="h-14 border-b bg-card flex items-center justify-between px-6 shrink-0">
+          <h2 className="font-semibold text-foreground">
+            {section === "queue" && `Queue Revisione${pendingCount > 0 ? ` (${pendingCount})` : ""}`}
+            {section === "suggestions" && `Tutti i Suggerimenti (${suggestionsTotal})`}
+            {section === "runs" && "Esecuzioni Agenti"}
+            {section === "logs" && "Audit Log"}
+            {section === "settings" && "Impostazioni"}
+          </h2>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                loadStats();
+                if (section === "suggestions" || section === "queue") loadSuggestions();
+                else if (section === "runs") loadRuns();
+                else if (section === "logs") loadLogs();
+              }}
+            >
+              <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+            </Button>
+          </div>
+        </header>
+
+        <div className="flex-1 flex overflow-hidden">
+          {/* List Panel */}
+          <div className={cn("flex-1 overflow-y-auto", detail && "hidden lg:block lg:w-1/2 lg:border-r")}>
+            {(section === "queue" || section === "suggestions") && (
+              <>
+                {/* Filters */}
+                <div className="p-4 border-b bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Cerca per nome…"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-9 h-9"
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowFilters(!showFilters)}
+                      className="shrink-0"
+                    >
+                      <Filter className="w-4 h-4 mr-1" />
+                      Filtri
+                      <ChevronDown className={cn("w-3 h-3 ml-1 transition-transform", showFilters && "rotate-180")} />
+                    </Button>
+                  </div>
+                  {showFilters && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <select
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                        className="text-sm border rounded-lg px-3 py-1.5 bg-background"
+                      >
+                        <option value="all">Tutti gli stati</option>
+                        <option value="pending_review">In Revisione</option>
+                        <option value="approved">Approvati</option>
+                        <option value="rejected">Rifiutati</option>
+                        <option value="archived">Archiviati</option>
+                        <option value="draft">Bozze</option>
+                      </select>
+                      <select
+                        value={filterEntity}
+                        onChange={(e) => setFilterEntity(e.target.value)}
+                        className="text-sm border rounded-lg px-3 py-1.5 bg-background"
+                      >
+                        <option value="all">Tutti i tipi</option>
+                        <option value="sector">Settori</option>
+                        <option value="role">Ruoli</option>
+                        <option value="education_path">Percorsi</option>
+                        <option value="calendar_plan">Calendari</option>
+                        <option value="growth_content">Crescita</option>
+                        <option value="work_mode">Work Mode</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {loading ? (
+                  <div className="p-8 text-center text-muted-foreground">Caricamento…</div>
+                ) : queueSuggestions.length === 0 ? (
+                  <div className="p-12 text-center">
+                    <CheckCircle2 className="w-12 h-12 text-emerald-300 mx-auto mb-4" />
+                    <p className="text-muted-foreground font-medium">
+                      {section === "queue" ? "Nessun elemento in attesa di revisione" : "Nessun suggerimento trovato"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {queueSuggestions.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => loadDetail(s.id)}
+                        className={cn(
+                          "w-full text-left p-4 hover:bg-muted/50 transition-colors flex items-center gap-4",
+                          detail?.suggestion.id === s.id && "bg-primary/5 border-l-2 border-primary"
+                        )}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-foreground truncate">{s.entityName}</span>
+                            <ConfidenceBadge score={s.confidenceScore} />
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <EntityBadge type={s.entityType} />
+                            <StatusBadge status={s.status} />
+                            <span className="text-xs text-muted-foreground">{fmtShortDate(s.createdAt)}</span>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {section === "runs" && (
+              <div className="divide-y">
+                {runs.length === 0 ? (
+                  <div className="p-12 text-center text-muted-foreground">Nessuna esecuzione registrata</div>
+                ) : runs.map((run) => (
+                  <div key={run.id} className="p-4">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium text-foreground">{run.agentName}</span>
+                      <Badge variant={run.status === "completed" ? "secondary" : "destructive"} className="text-xs">
+                        {run.status}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>{fmtShortDate(run.startedAt)}</span>
+                      {run.durationMs != null && <span>{run.durationMs}ms</span>}
+                      {run.userId && <span>User #{run.userId}</span>}
+                    </div>
+                    {run.errorMessage && (
+                      <p className="text-xs text-red-600 mt-1 truncate">{run.errorMessage}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {section === "logs" && (
+              <div className="divide-y">
+                {logs.length === 0 ? (
+                  <div className="p-12 text-center text-muted-foreground">Nessun log registrato</div>
+                ) : logs.map((log) => (
+                  <div key={log.id} className="p-4 flex items-center gap-3">
+                    <div className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                      log.action === "approve" && "bg-emerald-100",
+                      log.action === "reject" && "bg-red-100",
+                      log.action === "archive" && "bg-slate-100",
+                      log.action === "edit" && "bg-blue-100",
+                    )}>
+                      {log.action === "approve" && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                      {log.action === "reject" && <XCircle className="w-4 h-4 text-red-600" />}
+                      {log.action === "archive" && <Archive className="w-4 h-4 text-slate-500" />}
+                      {log.action === "edit" && <Pencil className="w-4 h-4 text-blue-600" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium capitalize">{log.action} — {log.targetType} #{log.targetId}</p>
+                      <p className="text-xs text-muted-foreground">{fmtDate(log.createdAt)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {section === "settings" && (
+              <div className="p-8">
+                <h3 className="text-lg font-serif font-bold mb-4">Impostazioni</h3>
+                <div className="space-y-4">
+                  <div className="bg-card border rounded-2xl p-6">
+                    <h4 className="font-semibold mb-2">Stato del Sistema</h4>
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <p>Suggerimenti totali: <strong className="text-foreground">{suggestionsTotal}</strong></p>
+                      <p>In attesa: <strong className="text-amber-600">{stats?.pending ?? 0}</strong></p>
+                      <p>Approvati: <strong className="text-emerald-600">{stats?.approved ?? 0}</strong></p>
+                      <p>Rifiutati: <strong className="text-red-600">{stats?.rejected ?? 0}</strong></p>
+                      <p>Esecuzioni agenti: <strong className="text-foreground">{stats?.totalRuns ?? 0}</strong></p>
+                    </div>
+                  </div>
+                  <div className="bg-card border rounded-2xl p-6">
+                    <h4 className="font-semibold mb-2">Agenti Attivi</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {["Sector", "Role", "Education", "Calendar", "Growth", "WorkMode", "Validator"].map((name) => (
+                        <Badge key={name} variant="secondary">{name}Agent</Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Detail Panel */}
+          {detail && (
+            <div className="w-full lg:w-1/2 overflow-y-auto border-l bg-card">
+              <div className="sticky top-0 bg-card border-b p-4 flex items-center justify-between z-10">
+                <h3 className="font-semibold truncate flex-1">{detail.suggestion.entityName}</h3>
+                <Button variant="ghost" size="sm" onClick={() => setDetail(null)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {detailLoading ? (
+                <div className="p-8 text-center text-muted-foreground">Caricamento dettagli…</div>
+              ) : (
+                <div className="p-6 space-y-6">
+                  {/* Status & Meta */}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <StatusBadge status={detail.suggestion.status} />
+                    <EntityBadge type={detail.suggestion.entityType} />
+                    {detail.suggestion.confidenceScore != null && (
+                      <span className="text-sm text-muted-foreground">
+                        Confidence: <ConfidenceBadge score={detail.suggestion.confidenceScore} />
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Dates */}
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>Creato: {fmtDate(detail.suggestion.createdAt)}</p>
+                    <p>Aggiornato: {fmtDate(detail.suggestion.updatedAt)}</p>
+                    {detail.suggestion.reviewedAt && (
+                      <p>Revisionato: {fmtDate(detail.suggestion.reviewedAt)} da {detail.suggestion.reviewedBy}</p>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Agent Run Info */}
+                  {detail.agentRun && (
+                    <div className="bg-muted/30 rounded-xl p-4">
+                      <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                        <Bot className="w-4 h-4 text-primary" /> Agente: {detail.agentRun.agentName}
+                      </h4>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <p>Stato: {detail.agentRun.status}</p>
+                        {detail.agentRun.durationMs && <p>Durata: {detail.agentRun.durationMs}ms</p>}
+                        {detail.agentRun.inputSummary && <p>Input: {detail.agentRun.inputSummary}</p>}
+                        {detail.agentRun.errorMessage && (
+                          <p className="text-red-600">Errore: {detail.agentRun.errorMessage}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Payload */}
+                  {detail.suggestion.payloadJson && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                        <Eye className="w-4 h-4" /> Contenuto Completo
+                      </h4>
+                      <pre className="bg-muted/50 rounded-xl p-4 text-xs overflow-x-auto max-h-80 whitespace-pre-wrap font-mono">
+                        {JSON.stringify(detail.suggestion.payloadJson, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  {detail.suggestion.notes && (
+                    <div className="bg-amber-50 rounded-xl p-4 border border-amber-100">
+                      <h4 className="text-sm font-semibold text-amber-800 mb-1">Note</h4>
+                      <p className="text-sm text-amber-700">{detail.suggestion.notes}</p>
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  {/* Actions */}
+                  {detail.suggestion.status === "pending_review" && (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-semibold">Azioni</h4>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1"
+                          onClick={() => handleApprove(detail.suggestion.id)}
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-1" /> Approva
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="flex-1"
+                          onClick={() => {
+                            if (showEditNotes) {
+                              handleReject(detail.suggestion.id);
+                            } else {
+                              setShowEditNotes(true);
+                            }
+                          }}
+                        >
+                          <XCircle className="w-4 h-4 mr-1" /> Rifiuta
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleArchive(detail.suggestion.id)}
+                        >
+                          <Archive className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      {showEditNotes && (
+                        <div className="space-y-2">
+                          <Input
+                            placeholder="Motivo del rifiuto (opzionale)…"
+                            value={editNotes}
+                            onChange={(e) => setEditNotes(e.target.value)}
+                          />
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="destructive" className="flex-1" onClick={() => handleReject(detail.suggestion.id)}>
+                              Conferma Rifiuto
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => { setShowEditNotes(false); setEditNotes(""); }}>
+                              Annulla
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {detail.suggestion.status !== "pending_review" && (
+                    <div className="flex gap-2">
+                      {detail.suggestion.status !== "archived" && (
+                        <Button size="sm" variant="outline" onClick={() => handleArchive(detail.suggestion.id)}>
+                          <Archive className="w-4 h-4 mr-1" /> Archivia
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
