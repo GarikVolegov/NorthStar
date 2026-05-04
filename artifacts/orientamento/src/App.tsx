@@ -39,6 +39,7 @@ import Amici from "@/pages/amici";
 import Utente from "@/pages/utente";
 import Calendario from "@/pages/Calendario";
 import Ruolo from "@/pages/ruolo";
+import Ruoli from "@/pages/ruoli";
 import Affiliazione from "@/pages/affiliazione";
 import Dashboard from "@/pages/dashboard";
 import AffiliazioneScuole from "@/pages/affiliazione-scuole";
@@ -77,6 +78,7 @@ function AnimatedRoutes() {
       <Route path="/grafo" component={GrafoConoscenza} />
       <Route path="/grafo/:id" component={Grafo} />
       <Route path="/settori" component={Settori} />
+      <Route path="/ruoli" component={Ruoli} />
       <Route path="/confronta" component={Confronta} />
       <Route path="/contatti" component={Contatti} />
       <Route path="/sitemap" component={SitemapPage} />

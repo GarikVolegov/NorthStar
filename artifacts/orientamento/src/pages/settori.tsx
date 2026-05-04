@@ -213,14 +213,14 @@ export default function Settori() {
             <p className="text-sm mt-1">{t("sectors.noResultsHint")}</p>
           </div>
         ) : (
-          <AnimateOnScroll stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {filtered.map((sector) => {
               const trendColor = TREND_COLOR[sector.trend] ?? TREND_COLOR["stable"];
               const trendLabel = t(`sectors.trend.${sector.trend}`, { defaultValue: sector.trend });
               const riskColor  = RISK_COLOR[sector.automationRisk] ?? RISK_COLOR["medium"];
               const riskLabel  = t(`sectors.risk.${sector.automationRisk}`, { defaultValue: sector.automationRisk });
               return (
-                <AnimateOnScrollItem key={sector.id}>
+                <div key={sector.id}>
                 <Link href={`/settore/${sector.id}`}>
                   <div className="group h-full flex flex-col border bg-card rounded-2xl overflow-hidden hover:border-primary/40 hover:shadow-md transition-all duration-200 cursor-pointer">
                     <div className="p-5 pb-4 flex items-start gap-4">
@@ -288,10 +288,10 @@ export default function Settori() {
                     </div>
                   </div>
                 </Link>
-                </AnimateOnScrollItem>
+                </div>
               );
             })}
-          </AnimateOnScroll>
+          </div>
         )}
 
         {!isLoading && sectors.length > 0 && (

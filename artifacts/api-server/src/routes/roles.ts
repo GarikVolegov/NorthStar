@@ -4,6 +4,43 @@ import { eq, and } from "drizzle-orm";
 
 const router: IRouter = Router();
 
+// Public endpoint — all active roles with optional sector info
+router.get("/roles", async (req, res): Promise<void> => {
+  const search = (req.query.search as string | undefined)?.toLowerCase();
+  const sectorId = req.query.sector_id ? parseInt(req.query.sector_id as string, 10) : undefined;
+  const riasec = req.query.riasec as string | undefined;
+  const limit = Math.min(parseInt(req.query.limit as string) || 200, 200);
+
+  const allRoles = await db
+    .select({
+      id: professionsTable.id,
+      title: professionsTable.title,
+      description: professionsTable.description,
+      skills: professionsTable.skills,
+      workModes: professionsTable.workModes,
+      riasecFit: professionsTable.riasecFit,
+      salaryRange: professionsTable.salaryRange,
+      growthOutlook: professionsTable.growthOutlook,
+      autonomyScore: professionsTable.autonomyScore,
+      stabilityScore: professionsTable.stabilityScore,
+      sectorId: professionsTable.sectorId,
+      sectorName: sectorsTable.name,
+      sectorIcon: sectorsTable.icon,
+    })
+    .from(professionsTable)
+    .leftJoin(sectorsTable, eq(professionsTable.sectorId, sectorsTable.id))
+    .where(eq(professionsTable.isActive, true))
+    .orderBy(professionsTable.title)
+    .limit(limit);
+
+  let filtered = allRoles;
+  if (search) filtered = filtered.filter((r) => r.title.toLowerCase().includes(search) || (r.description ?? "").toLowerCase().includes(search));
+  if (sectorId && !isNaN(sectorId)) filtered = filtered.filter((r) => r.sectorId === sectorId);
+  if (riasec) filtered = filtered.filter((r) => (r.riasecFit as string[]).includes(riasec));
+
+  res.json(filtered);
+});
+
 router.get("/sectors/:id/roles", async (req, res): Promise<void> => {
   const sectorId = parseInt(req.params.id, 10);
   if (isNaN(sectorId)) {
