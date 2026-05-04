@@ -1,14 +1,23 @@
-import React, { useState } from "react";
 import { useLocation } from "wouter";
 import { useRegisterUser } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Compass, Mail, User as UserIcon, CheckCircle2, ArrowRight } from "lucide-react";
+import { Compass, Mail, User as UserIcon, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+
+const registerSchema = z.object({
+  name: z.string().min(2, "Nome troppo corto (min. 2 caratteri)").max(80, "Nome troppo lungo"),
+  email: z.string().email("Inserisci un indirizzo email valido"),
+});
+
+type RegisterFormData = z.infer<typeof registerSchema>;
 
 export default function Register() {
   const { t } = useTranslation();
@@ -21,30 +30,28 @@ export default function Register() {
   const sessionId = searchParams.get("session") ? parseInt(searchParams.get("session") as string, 10) : null;
   const pendingWorkMode = searchParams.get("work_mode");
 
-  const [formData, setFormData] = useState({ name: "", email: "" });
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.email) {
-      toast({ title: t("register.errors.missingData"), description: t("register.errors.missingDataDesc"), variant: "destructive" });
-      return;
-    }
-    registerUser.mutate({
-      data: { name: formData.name, email: formData.email, testSessionId: sessionId, workPreference: pendingWorkMode ?? undefined }
-    }, {
-      onSuccess: (data) => {
-        const { token, ...user } = data as typeof data & { token: string };
-        login(user as Parameters<typeof login>[0], token);
-        if (sessionId) {
-          setLocation(`/risultati/${sessionId}`);
-        } else {
-          setLocation("/");
-        }
-      },
-      onError: () => {
-        toast({ title: t("register.errors.registerError"), description: t("register.errors.registerErrorDesc"), variant: "destructive" });
+  const onSubmit = (data: RegisterFormData) => {
+    registerUser.mutate(
+      { data: { name: data.name, email: data.email, testSessionId: sessionId, workPreference: pendingWorkMode ?? undefined } },
+      {
+        onSuccess: (res) => {
+          const { token, ...user } = res as typeof res & { token: string };
+          login(user as Parameters<typeof login>[0], token);
+          setLocation(sessionId ? `/risultati/${sessionId}` : "/");
+        },
+        onError: () => {
+          toast({ title: t("register.errors.registerError"), description: t("register.errors.registerErrorDesc"), variant: "destructive" });
+        },
       }
-    });
+    );
   };
 
   return (
@@ -77,7 +84,7 @@ export default function Register() {
             <CardDescription>{t("register.formSubtitle")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
               <div className="space-y-2">
                 <Label htmlFor="name">{t("register.name")}</Label>
                 <div className="relative">
@@ -85,13 +92,16 @@ export default function Register() {
                   <Input
                     id="name"
                     placeholder={t("register.name")}
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    className="pl-9 rounded-xl"
-                    required
+                    {...register("name")}
+                    className={`pl-9 rounded-xl ${errors.name ? "border-destructive" : ""}`}
+                    autoComplete="name"
                   />
                 </div>
+                {errors.name && (
+                  <p className="text-xs text-destructive">{errors.name.message}</p>
+                )}
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="email">{t("register.email")}</Label>
                 <div className="relative">
@@ -100,14 +110,21 @@ export default function Register() {
                     id="email"
                     type="email"
                     placeholder="la-tua@email.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                    className="pl-9 rounded-xl"
-                    required
+                    {...register("email")}
+                    className={`pl-9 rounded-xl ${errors.email ? "border-destructive" : ""}`}
+                    autoComplete="email"
                   />
                 </div>
+                {errors.email && (
+                  <p className="text-xs text-destructive">{errors.email.message}</p>
+                )}
               </div>
-              <Button type="submit" className="w-full rounded-full h-12" disabled={registerUser.isPending}>
+
+              <Button
+                type="submit"
+                className="w-full rounded-full h-12"
+                disabled={registerUser.isPending || isSubmitting}
+              >
                 {registerUser.isPending ? t("register.registering") : t("register.createAccount")}
               </Button>
             </form>

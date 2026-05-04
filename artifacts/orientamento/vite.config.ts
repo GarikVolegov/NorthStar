@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+import { VitePWA } from "vite-plugin-pwa";
 
 const rawPort = process.env.PORT;
 
@@ -29,6 +30,33 @@ export default defineConfig({
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
+    VitePWA({
+      registerType: "autoUpdate",
+      includeAssets: ["favicon.svg", "hero.png", "robots.txt"],
+      manifest: {
+        name: "NorthStar — Orientamento e Crescita Personale",
+        short_name: "NorthStar",
+        description: "Scopri la tua via. Test RIASEC + Cinque Spiriti, matching con settori professionali e strumenti per la tua carriera.",
+        theme_color: "#4f46e5",
+        background_color: "#ffffff",
+        display: "standalone",
+        lang: "it",
+        start_url: "/",
+        icons: [
+          { src: "/favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" },
+        ],
+      },
+      workbox: {
+        globPatterns: ["**/*.{js,css,html,svg,png,jpg,woff2}"],
+        runtimeCaching: [
+          {
+            urlPattern: /\/api\/(sectors|stats)/,
+            handler: "StaleWhileRevalidate",
+            options: { cacheName: "api-cache", expiration: { maxAgeSeconds: 3600 } },
+          },
+        ],
+      },
+    }),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [

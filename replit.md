@@ -332,6 +332,27 @@ Backoffice at `/admin/review` for reviewing AI agent outputs before publication.
 ### OpenAI Integration Fix
 - `lib/integrations-openai-ai-server/src/image/client.ts` refactored to lazy-initialize — server no longer crashes at startup when `AI_INTEGRATIONS_OPENAI_BASE_URL` is not set
 
+## Fase 2 — PWA, Skeleton Screens, Form Validation (May 2026)
+
+### PWA (Progressive Web App)
+- `vite-plugin-pwa` installato e configurato in `vite.config.ts`
+- Manifest: nome, short_name, theme_color `#4f46e5`, display `standalone`, lingua `it`
+- Workbox: precache di JS/CSS/HTML/SVG/PNG/woff2 + runtime cache per `/api/sectors` e `/api/stats` (StaleWhileRevalidate, 1h TTL)
+- L'app è ora installabile come PWA su mobile e desktop
+
+### Skeleton Screens condivisi
+- `artifacts/orientamento/src/components/skeletons/NewsCardSkeleton.tsx` — skeleton card notizie + `NewsGridSkeleton`
+- `artifacts/orientamento/src/components/skeletons/SectorCardSkeleton.tsx` — skeleton card settore + `SectorGridSkeleton`
+- `artifacts/orientamento/src/components/skeletons/ResultsSkeleton.tsx` — skeleton pagina risultati completa (header, RIASEC bars, Bussola Interiore, top 3 settori)
+- `pages/results.tsx`: loading state sostituito con `<ResultsSkeleton />`
+- `pages/news.tsx`: skeleton inline rimosso, usa `<NewsGridSkeleton count={6} />`
+
+### React Hook Form + Zod — Form validation
+Migrati 3 form da stato manuale a RHF + Zod con validazione inline:
+- **`register.tsx`**: schema `name` (min 2) + `email` (valida), errori inline, `noValidate`
+- **`contatti.tsx`**: schema completo con `name`, `email`, `subject` (Controller), `message` (min 10, max 1000, contatore caratteri live), sidebar ricostruita, `noValidate`
+- **`profilo.tsx` — ChangePasswordForm**: schema `oldPassword` + `newPassword` (min 6) + `confirm` con `.refine()` cross-field, reset automatico al successo
+
 ## Roadmap (Future Phases)
 
 - **Phase 2:** Fix Stripe key + seed products, activate premium checkout

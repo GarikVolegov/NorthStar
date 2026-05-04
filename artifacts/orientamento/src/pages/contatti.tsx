@@ -4,14 +4,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import {
-  Mail, MessageCircle, CheckCircle2, Loader2,
-  ArrowRight, Shield, Clock, Users,
-} from "lucide-react";
+import { Mail, MessageCircle, CheckCircle2, Loader2, ArrowRight, Shield, Clock, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
+const contactSchema = z.object({
+  name: z.string().min(2, "Nome troppo corto").max(80, "Nome troppo lungo"),
+  email: z.string().email("Email non valida").max(120),
+  subject: z.string().min(1),
+  message: z.string().min(10, "Messaggio troppo breve (min. 10 caratteri)").max(1000, "Messaggio troppo lungo (max. 1000 caratteri)"),
+});
+
+type ContactFormData = z.infer<typeof contactSchema>;
 
 export default function Contatti() {
   const { t } = useTranslation();
@@ -24,32 +32,39 @@ export default function Contatti() {
   const SUBJECTS = t("contatti.subjects", { returnObjects: true }) as Array<{ value: string; label: string }>;
   const FAQ = t("contatti.faq", { returnObjects: true }) as Array<{ q: string; a: string }>;
 
-  const [form, setForm] = useState({ name: "", email: "", subject: "info", message: "" });
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  function setField(field: string, value: string) {
-    setForm((f) => ({ ...f, [field]: value }));
-  }
+  const {
+    register,
+    handleSubmit,
+    control,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<ContactFormData>({
+    resolver: zodResolver(contactSchema),
+    defaultValues: { name: "", email: "", subject: "info", message: "" },
+  });
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.name.trim() || !form.email.trim() || !form.message.trim()) return;
+  const messageValue = watch("message");
+
+  async function onSubmit(data: ContactFormData) {
     setStatus("sending");
     setErrorMsg("");
     try {
       const res = await fetch(`${BASE}api/contact`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(data),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Errore invio messaggio");
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || "Errore invio messaggio");
       }
       setStatus("sent");
-      setForm({ name: "", email: "", subject: "info", message: "" });
+      reset();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Errore di rete. Riprova.");
       setStatus("error");
@@ -101,7 +116,7 @@ export default function Contatti() {
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
 
                 {/* Name + Email */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -110,12 +125,10 @@ export default function Contatti() {
                     <Input
                       id="name"
                       placeholder="Mario Rossi"
-                      value={form.name}
-                      onChange={(e) => setField("name", e.target.value)}
-                      required
-                      maxLength={80}
-                      className="rounded-xl"
+                      {...register("name")}
+                      className={cn("rounded-xl", errors.name && "border-destructive")}
                     />
+                    {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="email">{t("profilo.email")} *</Label>
@@ -123,35 +136,39 @@ export default function Contatti() {
                       id="email"
                       type="email"
                       placeholder="mario@esempio.it"
-                      value={form.email}
-                      onChange={(e) => setField("email", e.target.value)}
-                      required
-                      maxLength={120}
-                      className="rounded-xl"
+                      {...register("email")}
+                      className={cn("rounded-xl", errors.email && "border-destructive")}
                     />
+                    {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
                   </div>
                 </div>
 
                 {/* Subject */}
                 <div className="space-y-2">
                   <Label>{t("contatti.subjectLabel")} *</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {SUBJECTS.map((s) => (
-                      <button
-                        key={s.value}
-                        type="button"
-                        onClick={() => setField("subject", s.value)}
-                        className={cn(
-                          "px-3 py-1.5 rounded-xl border text-sm font-medium transition-colors",
-                          form.subject === s.value
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border bg-background text-muted-foreground hover:border-primary/40"
-                        )}
-                      >
-                        {s.label}
-                      </button>
-                    ))}
-                  </div>
+                  <Controller
+                    control={control}
+                    name="subject"
+                    render={({ field }) => (
+                      <div className="flex flex-wrap gap-2">
+                        {SUBJECTS.map((s) => (
+                          <button
+                            key={s.value}
+                            type="button"
+                            onClick={() => field.onChange(s.value)}
+                            className={cn(
+                              "px-3 py-1.5 rounded-xl border text-sm font-medium transition-colors",
+                              field.value === s.value
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                            )}
+                          >
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  />
                 </div>
 
                 {/* Message */}
@@ -159,19 +176,21 @@ export default function Contatti() {
                   <Label htmlFor="message">
                     {t("contatti.message")} *
                     <span className="ml-2 text-xs text-muted-foreground font-normal">
-                      {form.message.length}/1000
+                      {(messageValue ?? "").length}/1000
                     </span>
                   </Label>
                   <textarea
                     id="message"
                     placeholder={t("contatti.messagePlaceholder")}
-                    value={form.message}
-                    onChange={(e) => setField("message", e.target.value)}
-                    required
+                    {...register("message")}
                     maxLength={1000}
                     rows={6}
-                    className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+                    className={cn(
+                      "w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none",
+                      errors.message && "border-destructive"
+                    )}
                   />
+                  {errors.message && <p className="text-xs text-destructive">{errors.message.message}</p>}
                 </div>
 
                 {/* Privacy notice */}
@@ -189,7 +208,7 @@ export default function Contatti() {
                 <Button
                   type="submit"
                   className="rounded-full px-8"
-                  disabled={status === "sending" || !form.name.trim() || !form.email.trim() || !form.message.trim()}
+                  disabled={status === "sending"}
                 >
                   {status === "sending" ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t("contatti.sending")}</>
@@ -201,117 +220,79 @@ export default function Contatti() {
             )}
           </div>
 
-          {/* Info sidebar — right */}
-          <div className="lg:col-span-2 space-y-6">
-
+          {/* Sidebar */}
+          <div className="lg:col-span-2 space-y-8">
             {/* Contact info */}
-            <div className="rounded-2xl border bg-card p-6 space-y-5">
-              <h2 className="font-serif font-bold text-foreground">{t("contatti.contactInfo")}</h2>
-              <div className="space-y-4">
+            <div className="space-y-4">
+              <h3 className="font-semibold text-foreground">{t("contatti.contactInfo", { defaultValue: "Come raggiungerci" })}</h3>
+              <div className="space-y-3">
                 <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
                     <Mail className="w-4 h-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-foreground">{t("contatti.generalEmail")}</p>
-                    <a href="mailto:info@northstar.app" className="text-sm text-primary hover:underline">
-                      info@northstar.app
-                    </a>
+                    <p className="text-sm font-medium text-foreground">Email</p>
+                    <p className="text-sm text-muted-foreground">support@northstar.app</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
-                    <Shield className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{t("contatti.privacyEmail")}</p>
-                    <a href="mailto:privacy@northstar.app" className="text-sm text-primary hover:underline">
-                      privacy@northstar.app
-                    </a>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
-                    <Clock className="w-4 h-4 text-amber-600" />
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <Clock className="w-4 h-4 text-primary" />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">{t("contatti.responseTime", { defaultValue: "Tempi di risposta" })}</p>
-                    <p className="text-sm text-muted-foreground">{t("contatti.responseTimeDesc", { defaultValue: "Entro 24 ore lavorative" })}</p>
+                    <p className="text-sm text-muted-foreground">{t("contatti.responseTimeDesc", { defaultValue: "Entro 24 ore nei giorni lavorativi" })}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-                    <Users className="w-4 h-4 text-blue-600" />
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <Users className="w-4 h-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-foreground">{t("contatti.team", { defaultValue: "Team" })}</p>
-                    <p className="text-sm text-muted-foreground">{t("contatti.teamDesc", { defaultValue: "Piccolo team, risposte umane" })}</p>
+                    <p className="text-sm font-medium text-foreground">{t("contatti.community", { defaultValue: "Community" })}</p>
+                    <p className="text-sm text-muted-foreground">{t("contatti.communityDesc", { defaultValue: "Unisciti alla community NorthStar" })}</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Quick links */}
-            <div className="rounded-2xl border bg-card p-6">
-              <h2 className="font-serif font-bold text-foreground mb-4">{t("contatti.usefulLinks", { defaultValue: "Link utili" })}</h2>
-              <div className="space-y-2">
-                {[
-                  { label: t("nav.startFreeTest", { defaultValue: "Inizia il test gratuito" }), href: "/test" },
-                  { label: t("contatti.explorePremium", { defaultValue: "Esplora il Premium" }),  href: "/premium" },
-                  { label: "Privacy Policy",                                                       href: "/privacy-policy" },
-                  { label: t("footer.links.terms", { defaultValue: "Termini di servizio" }),       href: "/termini-di-servizio" },
-                  { label: t("footer.about", { defaultValue: "Chi siamo" }),                       href: "/chi-siamo" },
-                ].map((link) => (
-                  <Link key={link.href} href={link.href}>
-                    <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground hover:text-primary transition-colors group cursor-pointer">
-                      <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                      {link.label}
-                    </div>
-                  </Link>
-                ))}
+            {/* Privacy badge */}
+            <div className="rounded-2xl border bg-card p-5 flex items-start gap-3">
+              <Shield className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-foreground mb-1">{t("contatti.privacy", { defaultValue: "I tuoi dati sono al sicuro" })}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {t("contatti.privacyDesc", { defaultValue: "Non condividiamo mai i tuoi dati con terze parti. Puoi leggere la nostra" })}{" "}
+                  <Link href="/privacy-policy" className="text-primary hover:underline">Privacy Policy</Link>.
+                </p>
               </div>
             </div>
 
-          </div>
-        </div>
-
-        {/* FAQ section */}
-        <div className="mt-16">
-          <h2 className="text-2xl font-serif font-bold text-foreground mb-8 text-center">
-            {t("comeFunziona.faqTitle", { defaultValue: "Domande frequenti" })}
-          </h2>
-          <div className="max-w-3xl mx-auto space-y-3">
-            {FAQ.map((item, i) => (
-              <div key={i} className="rounded-2xl border bg-card overflow-hidden">
-                <button
-                  className="w-full flex items-center justify-between px-5 py-4 text-left"
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                >
-                  <span className="font-medium text-foreground pr-4">{item.q}</span>
-                  <span
-                    className={cn(
-                      "text-muted-foreground shrink-0 transition-transform",
-                      openFaq === i && "rotate-180"
-                    )}
-                  >
-                    ▾
-                  </span>
-                </button>
-                {openFaq === i && (
-                  <div className="px-5 pb-5 text-sm text-muted-foreground leading-relaxed border-t pt-4">
-                    {item.a}
-                    {item.q.includes("Privacy") && (
-                      <Link href="/privacy-policy" className="ml-1 text-primary hover:underline">
-                        {t("contatti.readPrivacy", { defaultValue: "Leggi la Privacy Policy →" })}
-                      </Link>
-                    )}
-                  </div>
-                )}
+            {/* FAQ */}
+            {Array.isArray(FAQ) && FAQ.length > 0 && (
+              <div>
+                <h3 className="font-semibold text-foreground mb-3">FAQ</h3>
+                <div className="space-y-2">
+                  {FAQ.map((item, i) => (
+                    <div key={i} className="rounded-xl border bg-card overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                        className="w-full text-left px-4 py-3 text-sm font-medium flex items-center justify-between gap-2"
+                      >
+                        <span>{item.q}</span>
+                        <span className="text-muted-foreground text-xs shrink-0">{openFaq === i ? "▲" : "▼"}</span>
+                      </button>
+                      {openFaq === i && (
+                        <div className="px-4 pb-3 text-sm text-muted-foreground border-t">{item.a}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
+            )}
           </div>
         </div>
-
       </div>
     </div>
   );

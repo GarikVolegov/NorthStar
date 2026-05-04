@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { usePageMeta } from "@/lib/seo";
+import { NewsGridSkeleton } from "@/components/skeletons/NewsCardSkeleton";
 import { useQuery } from "@tanstack/react-query";
 import { Newspaper, ExternalLink, Clock, Tag, Sparkles, RefreshCw, Bookmark, BookmarkCheck, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -127,22 +128,6 @@ function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boole
   );
 }
 
-function NewsCardSkeleton() {
-  return (
-    <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden animate-pulse">
-      <div className="h-44 bg-slate-100" />
-      <div className="p-5 space-y-3">
-        <div className="flex gap-2">
-          <div className="h-5 w-20 bg-slate-100 rounded-full" />
-          <div className="h-5 w-16 bg-slate-100 rounded-full" />
-        </div>
-        <div className="h-4 bg-slate-100 rounded w-full" />
-        <div className="h-4 bg-slate-100 rounded w-4/5" />
-        <div className="h-3 bg-slate-100 rounded w-3/5" />
-      </div>
-    </div>
-  );
-}
 
 function UpgradeCTA() {
   const { t } = useTranslation();
@@ -291,12 +276,16 @@ export default function News() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div className="mb-8">
           {displayLoading
-            ? Array.from({ length: 6 }).map((_, i) => <NewsCardSkeleton key={i} />)
-            : displayNews.map((item) => (
-                <NewsCard key={item.id} item={item} showSave={!!user} />
-              ))}
+            ? <NewsGridSkeleton count={6} />
+            : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {displayNews.map((item) => (
+                  <NewsCard key={item.id} item={item} showSave={!!user} />
+                ))}
+              </div>
+            )}
         </div>
 
         {!displayLoading && displayNews.length > 0 && (

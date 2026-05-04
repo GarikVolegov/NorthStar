@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { usePageMeta } from "@/lib/seo";
+import { ResultsSkeleton } from "@/components/skeletons/ResultsSkeleton";
 import { useParams, Link, useLocation } from "wouter";
 import { useGetTestSession, useConfirmSector, useGetStatsSummary, getGetTestSessionQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -422,27 +423,7 @@ export default function Results() {
   };
 
   if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-12 md:py-24 max-w-5xl">
-        <div className="text-center mb-16">
-          <Skeleton className="h-10 w-64 mx-auto mb-4" />
-          <Skeleton className="h-6 w-full max-w-2xl mx-auto" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[1, 2, 3].map(i => (
-            <Card key={i} className="overflow-hidden">
-              <Skeleton className="h-48 w-full" />
-              <CardContent className="p-6">
-                <Skeleton className="h-8 w-3/4 mb-4" />
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-4 w-5/6 mb-6" />
-                <Skeleton className="h-10 w-full rounded-full" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
+    return <ResultsSkeleton />;
   }
 
   if (error || !session) {
