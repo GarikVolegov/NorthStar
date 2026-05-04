@@ -252,13 +252,21 @@ export default function Crescita() {
 
   const { data: catData = [] } = useQuery<Category[]>({
     queryKey: ["crescita-categorie"],
-    queryFn: () => fetch(`${BASE}api/crescita/categorie`).then(r => r.json()),
+    queryFn: async () => {
+      const res = await fetch(`${BASE}api/crescita/categorie`);
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: recentData } = useQuery<{ articles: Article[] }>({
     queryKey: ["crescita-recent"],
-    queryFn: () => fetch(`${BASE}api/crescita?limit=6`).then(r => r.json()),
+    queryFn: async () => {
+      const res = await fetch(`${BASE}api/crescita?limit=6`);
+      const data = await res.json();
+      return Array.isArray(data?.articles) ? data : { articles: [] };
+    },
     staleTime: 1000 * 60 * 5,
   });
 
