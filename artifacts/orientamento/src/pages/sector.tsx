@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useGetSector, useGetSectorStats } from "@workspace/api-client-react";
+import { useGetSector, useGetSectorStats, useGetSectorRoles } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,6 +38,10 @@ export default function Sector() {
 
   const { data: stats, isLoading: isLoadingStats } = useGetSectorStats(id, {
     query: { enabled: !!id, queryKey: ["sectorStats", id] }
+  });
+
+  const { data: roles, isLoading: isLoadingRoles } = useGetSectorRoles(id, {
+    query: { enabled: !!id, queryKey: ["sectorRoles", id] }
   });
 
   usePageMeta(
@@ -294,6 +298,15 @@ export default function Sector() {
           >
             {t("sector.tabs.data")}
           </TabsTrigger>
+          <TabsTrigger 
+            value="roles" 
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 py-3 text-base"
+          >
+            {t("role.rolesTab")}
+            {roles && roles.length > 0 && (
+              <span className="ml-1.5 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">{roles.length}</span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="percorso" className="animate-in fade-in duration-500">
@@ -541,6 +554,54 @@ export default function Sector() {
             <p className="text-xs text-muted-foreground/60 mt-6 leading-relaxed">
               {t("sector.dataSourceNote")}
             </p>
+          )}
+        </TabsContent>
+
+        <TabsContent value="roles" className="animate-in fade-in duration-500">
+          {isLoadingRoles ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-48 rounded-2xl" />
+              ))}
+            </div>
+          ) : roles && roles.length > 0 ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {roles.map((role) => (
+                <Link key={role.id} href={`/ruolo/${role.id}`} className="block group">
+                  <div className="h-full bg-card border rounded-2xl p-5 hover:border-primary/30 hover:shadow-md transition-all">
+                    <h4 className="font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
+                      {role.title}
+                    </h4>
+                    {role.description && (
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-4 line-clamp-3">
+                        {role.description}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {role.skills?.slice(0, 3).map((skill, i) => (
+                        <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-secondary/60 text-secondary-foreground">
+                          {skill}
+                        </span>
+                      ))}
+                      {role.skills && role.skills.length > 3 && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                          +{role.skills.length - 3}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="font-medium">{role.salaryRange}</span>
+                      <span className="text-emerald-600 font-medium">{role.growthOutlook}</span>
+                    </div>
+                    <div className="mt-3 flex items-center text-primary text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                      {t("role.viewRole")} <ArrowRight className="w-3 h-3 ml-1" />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-12">{t("role.noRoles")}</p>
           )}
         </TabsContent>
       </Tabs>

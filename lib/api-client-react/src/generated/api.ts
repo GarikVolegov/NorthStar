@@ -34,6 +34,8 @@ import type {
   ListNotifications200,
   ListNotificationsParams,
   RegisterUserBody,
+  RoleDetail,
+  RoleSummary,
   Sector,
   SectorStats,
   StatsSummary,
@@ -791,6 +793,180 @@ export function useGetSectorStats<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetSectorStatsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List roles (professions) belonging to a sector
+ */
+export const getGetSectorRolesUrl = (id: number) => {
+  return `/api/sectors/${id}/roles`;
+};
+
+export const getSectorRoles = async (
+  id: number,
+  options?: RequestInit,
+): Promise<RoleSummary[]> => {
+  return customFetch<RoleSummary[]>(getGetSectorRolesUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetSectorRolesQueryKey = (id: number) => {
+  return [`/api/sectors/${id}/roles`] as const;
+};
+
+export const getGetSectorRolesQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSectorRoles>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSectorRoles>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetSectorRolesQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getSectorRoles>>> = ({
+    signal,
+  }) => getSectorRoles(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSectorRoles>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSectorRolesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSectorRoles>>
+>;
+export type GetSectorRolesQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary List roles (professions) belonging to a sector
+ */
+
+export function useGetSectorRoles<
+  TData = Awaited<ReturnType<typeof getSectorRoles>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSectorRoles>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSectorRolesQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get full details for a single role including linked education paths
+ */
+export const getGetRoleDetailUrl = (id: number) => {
+  return `/api/roles/${id}`;
+};
+
+export const getRoleDetail = async (
+  id: number,
+  options?: RequestInit,
+): Promise<RoleDetail> => {
+  return customFetch<RoleDetail>(getGetRoleDetailUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetRoleDetailQueryKey = (id: number) => {
+  return [`/api/roles/${id}`] as const;
+};
+
+export const getGetRoleDetailQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRoleDetail>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getRoleDetail>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetRoleDetailQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getRoleDetail>>> = ({
+    signal,
+  }) => getRoleDetail(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getRoleDetail>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetRoleDetailQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRoleDetail>>
+>;
+export type GetRoleDetailQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get full details for a single role including linked education paths
+ */
+
+export function useGetRoleDetail<
+  TData = Awaited<ReturnType<typeof getRoleDetail>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getRoleDetail>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetRoleDetailQueryOptions(id, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

@@ -33,6 +33,9 @@ scripts/
 ## Database Schema
 
 - **sectors** — Career sectors with RIASEC types, salary ranges, growth rates, pros/cons
+- **professions** — Roles/professions with sectorId FK, description, skills, work modes, salary, growth, autonomyScore, stabilityScore
+- **education_paths** — Education paths (university, bootcamp, online, professional)
+- **profession_education_paths** — Join table linking professions ↔ education paths
 - **test_sessions** — User test answers, RIASEC scores, spirit scores, recommendations, confirmed sector
 - **users** — Registered users linked to test sessions (with stripeCustomerId, stripeSubscriptionId)
 - **user_objectives** — Career goals per user: text, category (formazione/certificazione/networking/esperienza/altro), progress 0–100, dueDate, completed, completedAt
@@ -75,6 +78,8 @@ Added as a second layer of personality analysis after RIASEC:
 - `GET /api/sectors` — List all sectors
 - `GET /api/sectors/:id` — Get sector detail
 - `GET /api/sectors/:id/stats` — Sector statistics
+- `GET /api/sectors/:id/roles` — List roles (professions) for a sector
+- `GET /api/roles/:id` — Role detail with linked education paths
 - `GET /api/stats/summary` — Platform statistics summary
 - `POST /api/test-sessions` — Submit test answers (RIASEC + spirits) → get recommendations
 - `GET /api/test-sessions/:id` — Get test session with recommendations + spirit data

@@ -42,21 +42,6 @@ export const SectorTrend = {
   booming: "booming",
 } as const;
 
-export type SectorWorkModeItem =
-  (typeof SectorWorkModeItem)[keyof typeof SectorWorkModeItem];
-
-export const SectorWorkModeItem = {
-  dipendente: "dipendente",
-  autonomo: "autonomo",
-  ibrido: "ibrido",
-} as const;
-
-export interface FreelanceStep {
-  step: number;
-  title: string;
-  description: string;
-}
-
 export interface Sector {
   id: number;
   name: string;
@@ -75,13 +60,6 @@ export interface Sector {
   opportunities: string[];
   icon: string;
   color: string;
-  workMode?: SectorWorkModeItem[] | null;
-  autonomyScore?: number | null;
-  stabilityScore?: number | null;
-  clientAcquisitionRequired?: boolean | null;
-  remoteFriendly?: boolean | null;
-  freelanceSteps?: FreelanceStep[] | null;
-  dipendentiSteps?: FreelanceStep[] | null;
   createdAt: string;
 }
 
@@ -91,6 +69,60 @@ export interface SectorRecommendation {
   matchScore: number;
   matchReason: string;
   sector: Sector;
+}
+
+export interface RoleSummary {
+  id: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  skills: string[];
+  workModes: string[];
+  riasecFit: string[];
+  salaryRange: string;
+  growthOutlook: string;
+  /** @nullable */
+  autonomyScore?: number | null;
+  /** @nullable */
+  stabilityScore?: number | null;
+}
+
+export interface EducationPathSummary {
+  id: number;
+  path: string;
+  type: string;
+  duration: string;
+  cost: string;
+  steps: string[];
+  careerOutcomes: string[];
+}
+
+export interface SectorInfo {
+  id: number;
+  name: string;
+  icon: string;
+  color: string;
+}
+
+export interface RoleDetail {
+  id: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  sector: string;
+  /** @nullable */
+  sectorId?: number | null;
+  sectorInfo?: SectorInfo | null;
+  riasecFit: string[];
+  skills: string[];
+  workModes: string[];
+  salaryRange: string;
+  growthOutlook: string;
+  /** @nullable */
+  autonomyScore?: number | null;
+  /** @nullable */
+  stabilityScore?: number | null;
+  educationPaths: EducationPathSummary[];
 }
 
 export type TestSessionAnswers = { [key: string]: unknown };
@@ -105,10 +137,6 @@ export interface TestSession {
   riasecScores: TestSessionRiasecScores;
   primaryTypes: string[];
   profileSummary: string;
-  suggestedWorkMode?: string | null;
-  spiritScores?: { [key: string]: number } | null;
-  dominantSpirit?: string | null;
-  spiritInsight?: string | null;
   recommendations: SectorRecommendation[];
   /** @nullable */
   confirmedSectorId?: number | null;
@@ -136,7 +164,6 @@ export interface RegisterUserBody {
   email: string;
   /** @nullable */
   testSessionId?: number | null;
-  workPreference?: string;
 }
 
 export interface User {

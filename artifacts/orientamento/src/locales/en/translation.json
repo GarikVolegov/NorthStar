@@ -340,118 +340,358 @@
   "careerSteps": {
     "freelance": {
       "tech": {
-        "1": { "title": "Build a public portfolio", "desc": "Create personal or open-source projects that showcase your technical skills." },
-        "2": { "title": "Define your specialization", "desc": "Choose a niche (e.g. backend, mobile) to stand out in the market." },
-        "3": { "title": "Acquire your first clients", "desc": "Start on platforms like Upwork or Fiverr, then build direct relationships with companies." },
-        "4": { "title": "Handle the tax side", "desc": "Register as self-employed and track deductible expenses." },
-        "5": { "title": "Scale to premium rates", "desc": "With your reputation built, raise your rates and select higher-quality clients." }
+        "1": {
+          "title": "Build a public portfolio",
+          "desc": "Create personal or open-source projects that showcase your technical skills."
+        },
+        "2": {
+          "title": "Define your specialization",
+          "desc": "Choose a niche (e.g. backend, mobile) to stand out in the market."
+        },
+        "3": {
+          "title": "Acquire your first clients",
+          "desc": "Start on platforms like Upwork or Fiverr, then build direct relationships with companies."
+        },
+        "4": {
+          "title": "Handle the tax side",
+          "desc": "Register as self-employed and track deductible expenses."
+        },
+        "5": {
+          "title": "Scale to premium rates",
+          "desc": "With your reputation built, raise your rates and select higher-quality clients."
+        }
       },
       "health": {
-        "1": { "title": "Obtain necessary certifications", "desc": "Healthcare professions require specific licences. Check requirements for your specialization." },
-        "2": { "title": "Open a private practice", "desc": "Register your business, find a suitable space, and comply with local health regulations." },
-        "3": { "title": "Build a referral network", "desc": "Collaborate with other specialists who can refer patients to you." },
-        "4": { "title": "Administrative management", "desc": "Professional insurance, invoicing, and diary management are essential when working independently." },
-        "5": { "title": "Growth and specialization", "desc": "Differentiate yourself with continuing education and build an online reputation." }
+        "1": {
+          "title": "Obtain necessary certifications",
+          "desc": "Healthcare professions require specific licences. Check requirements for your specialization."
+        },
+        "2": {
+          "title": "Open a private practice",
+          "desc": "Register your business, find a suitable space, and comply with local health regulations."
+        },
+        "3": {
+          "title": "Build a referral network",
+          "desc": "Collaborate with other specialists who can refer patients to you."
+        },
+        "4": {
+          "title": "Administrative management",
+          "desc": "Professional insurance, invoicing, and diary management are essential when working independently."
+        },
+        "5": {
+          "title": "Growth and specialization",
+          "desc": "Differentiate yourself with continuing education and build an online reputation."
+        }
       },
       "creative": {
-        "1": { "title": "Build your creative brand", "desc": "Create an online portfolio (Behance, personal site) that represents your unique style." },
-        "2": { "title": "Choose your platforms", "desc": "Identify where your ideal clients are: agencies, startups, private clients, international markets." },
-        "3": { "title": "Define your service packages", "desc": "Offer clear packages with transparent pricing to avoid endless negotiations." },
-        "4": { "title": "Build long-term relationships", "desc": "A loyal client is worth far more than ten one-time clients. Nurture the post-project relationship." },
-        "5": { "title": "Diversify income streams", "desc": "Add digital products (templates, courses) alongside services for passive income." }
+        "1": {
+          "title": "Build your creative brand",
+          "desc": "Create an online portfolio (Behance, personal site) that represents your unique style."
+        },
+        "2": {
+          "title": "Choose your platforms",
+          "desc": "Identify where your ideal clients are: agencies, startups, private clients, international markets."
+        },
+        "3": {
+          "title": "Define your service packages",
+          "desc": "Offer clear packages with transparent pricing to avoid endless negotiations."
+        },
+        "4": {
+          "title": "Build long-term relationships",
+          "desc": "A loyal client is worth far more than ten one-time clients. Nurture the post-project relationship."
+        },
+        "5": {
+          "title": "Diversify income streams",
+          "desc": "Add digital products (templates, courses) alongside services for passive income."
+        }
       },
       "entrepreneur": {
-        "1": { "title": "Validate your business idea", "desc": "Test the market with an MVP before investing significant resources." },
-        "2": { "title": "Set up the legal structure", "desc": "Choose the right legal form (sole trader, LLC, partnership) based on your project." },
-        "3": { "title": "Find first clients or investors", "desc": "Bootstrapping or angel pre-seed funding are complementary paths." },
-        "4": { "title": "Build the team", "desc": "Identify missing key roles and recruit collaborators or co-founders." },
-        "5": { "title": "Scale and consolidate", "desc": "With demonstrated traction, seek institutional funding or reinvest profits to grow." }
+        "1": {
+          "title": "Validate your business idea",
+          "desc": "Test the market with an MVP before investing significant resources."
+        },
+        "2": {
+          "title": "Set up the legal structure",
+          "desc": "Choose the right legal form (sole trader, LLC, partnership) based on your project."
+        },
+        "3": {
+          "title": "Find first clients or investors",
+          "desc": "Bootstrapping or angel pre-seed funding are complementary paths."
+        },
+        "4": {
+          "title": "Build the team",
+          "desc": "Identify missing key roles and recruit collaborators or co-founders."
+        },
+        "5": {
+          "title": "Scale and consolidate",
+          "desc": "With demonstrated traction, seek institutional funding or reinvest profits to grow."
+        }
       },
       "consulting": {
-        "1": { "title": "Build a vertical specialization", "desc": "Choose a sector or specific problem to become the go-to expert on." },
-        "2": { "title": "Create valuable content", "desc": "Publish insights on LinkedIn and write articles to build authority." },
-        "3": { "title": "Build your professional network", "desc": "Networking is essential in consulting. 70% of mandates come from referrals." },
-        "4": { "title": "Structure your offering", "desc": "Define clear methodologies, deliverables, and pricing for each service." },
-        "5": { "title": "Scale with collaborators", "desc": "When demand exceeds your capacity, bring in junior consultants or freelance specialists." }
+        "1": {
+          "title": "Build a vertical specialization",
+          "desc": "Choose a sector or specific problem to become the go-to expert on."
+        },
+        "2": {
+          "title": "Create valuable content",
+          "desc": "Publish insights on LinkedIn and write articles to build authority."
+        },
+        "3": {
+          "title": "Build your professional network",
+          "desc": "Networking is essential in consulting. 70% of mandates come from referrals."
+        },
+        "4": {
+          "title": "Structure your offering",
+          "desc": "Define clear methodologies, deliverables, and pricing for each service."
+        },
+        "5": {
+          "title": "Scale with collaborators",
+          "desc": "When demand exceeds your capacity, bring in junior consultants or freelance specialists."
+        }
       },
       "data": {
-        "1": { "title": "Consolidate your technical expertise", "desc": "Deepen a specific area (data engineering, ML, BI) to become a go-to reference." },
-        "2": { "title": "Build an analysis portfolio", "desc": "Publish analyses on public datasets and participate in Kaggle." },
-        "3": { "title": "Offer project-based consulting", "desc": "Start with small data analysis mandates for companies without an internal team." },
-        "4": { "title": "Automate with SaaS tools", "desc": "Use tools like Metabase or Tableau to scale your analyses without extra hours." },
-        "5": { "title": "Move to monthly retainers", "desc": "Propose monthly subscriptions for ongoing reporting: recurring revenue and stable relationships." }
+        "1": {
+          "title": "Consolidate your technical expertise",
+          "desc": "Deepen a specific area (data engineering, ML, BI) to become a go-to reference."
+        },
+        "2": {
+          "title": "Build an analysis portfolio",
+          "desc": "Publish analyses on public datasets and participate in Kaggle."
+        },
+        "3": {
+          "title": "Offer project-based consulting",
+          "desc": "Start with small data analysis mandates for companies without an internal team."
+        },
+        "4": {
+          "title": "Automate with SaaS tools",
+          "desc": "Use tools like Metabase or Tableau to scale your analyses without extra hours."
+        },
+        "5": {
+          "title": "Move to monthly retainers",
+          "desc": "Propose monthly subscriptions for ongoing reporting: recurring revenue and stable relationships."
+        }
       },
       "hr": {
-        "1": { "title": "Build experience in a company", "desc": "Before going independent, accumulate 3–5 years of experience in structured organizations." },
-        "2": { "title": "Become a recognized expert", "desc": "Publish, speak at conferences, build a reputation in your specific field." },
-        "3": { "title": "Start part-time consulting", "desc": "Maintain employment stability while building your first clients." },
-        "4": { "title": "Formalize the business", "desc": "Register as self-employed, define standard contracts, and manage data privacy (GDPR)." },
-        "5": { "title": "Build a team", "desc": "As volume grows, bring in specialized collaborators to diversify services." }
+        "1": {
+          "title": "Build experience in a company",
+          "desc": "Before going independent, accumulate 3–5 years of experience in structured organizations."
+        },
+        "2": {
+          "title": "Become a recognized expert",
+          "desc": "Publish, speak at conferences, build a reputation in your specific field."
+        },
+        "3": {
+          "title": "Start part-time consulting",
+          "desc": "Maintain employment stability while building your first clients."
+        },
+        "4": {
+          "title": "Formalize the business",
+          "desc": "Register as self-employed, define standard contracts, and manage data privacy (GDPR)."
+        },
+        "5": {
+          "title": "Build a team",
+          "desc": "As volume grows, bring in specialized collaborators to diversify services."
+        }
       },
       "default": {
-        "1": { "title": "Consolidate key skills", "desc": "Deepen the technical and soft skills required in the sector before going independent." },
-        "2": { "title": "Build your network", "desc": "Independent opportunities often come from people you know. Invest in professional relationships." },
-        "3": { "title": "Start with part-time projects", "desc": "Test the market while keeping the security of a fixed income." },
-        "4": { "title": "Formalize your business", "desc": "Register as self-employed and manage your accounting." },
-        "5": { "title": "Scale and diversify", "desc": "Raise your rates, select better clients, and add complementary services." }
+        "1": {
+          "title": "Consolidate key skills",
+          "desc": "Deepen the technical and soft skills required in the sector before going independent."
+        },
+        "2": {
+          "title": "Build your network",
+          "desc": "Independent opportunities often come from people you know. Invest in professional relationships."
+        },
+        "3": {
+          "title": "Start with part-time projects",
+          "desc": "Test the market while keeping the security of a fixed income."
+        },
+        "4": {
+          "title": "Formalize your business",
+          "desc": "Register as self-employed and manage your accounting."
+        },
+        "5": {
+          "title": "Scale and diversify",
+          "desc": "Raise your rates, select better clients, and add complementary services."
+        }
       }
     },
     "dipendente": {
       "tech": {
-        "1": { "title": "Technical education", "desc": "Get a degree in computer science or software engineering. Build foundations in programming and systems." },
-        "2": { "title": "Internship or first junior role", "desc": "Join a company as a junior developer. Learn the development cycle and build your professional portfolio." },
-        "3": { "title": "Technical specialization", "desc": "Choose an area: frontend, backend, cloud, DevOps, or mobile. Deepen the frameworks and tools required." },
-        "4": { "title": "Senior role and technical leadership", "desc": "After 3–5 years, become a Senior Developer or Tech Lead. Drive architectural decisions." },
-        "5": { "title": "Staff Engineer or Engineering Manager", "desc": "Choose between an advanced technical path or a management path. Both require strong reputation and strategic vision." }
+        "1": {
+          "title": "Technical education",
+          "desc": "Get a degree in computer science or software engineering. Build foundations in programming and systems."
+        },
+        "2": {
+          "title": "Internship or first junior role",
+          "desc": "Join a company as a junior developer. Learn the development cycle and build your professional portfolio."
+        },
+        "3": {
+          "title": "Technical specialization",
+          "desc": "Choose an area: frontend, backend, cloud, DevOps, or mobile. Deepen the frameworks and tools required."
+        },
+        "4": {
+          "title": "Senior role and technical leadership",
+          "desc": "After 3–5 years, become a Senior Developer or Tech Lead. Drive architectural decisions."
+        },
+        "5": {
+          "title": "Staff Engineer or Engineering Manager",
+          "desc": "Choose between an advanced technical path or a management path. Both require strong reputation and strategic vision."
+        }
       },
       "health": {
-        "1": { "title": "Specialized academic training", "desc": "Complete a degree in medicine, nursing, or healthcare management. Add digital skills where relevant." },
-        "2": { "title": "Internship and first role", "desc": "Work in a hospital or healthcare company as a junior doctor, nurse, or health analyst." },
-        "3": { "title": "Clinical or digital specialization", "desc": "Choose a medical specialization or move towards digital health (EHR, telemedicine, AI)." },
-        "4": { "title": "Senior clinician or area head", "desc": "Become a senior specialist or ward lead. Coordinate teams and manage care pathways." },
-        "5": { "title": "Medical Director or Health Director", "desc": "Reach clinical or managerial leadership at hospital or organizational level." }
+        "1": {
+          "title": "Specialized academic training",
+          "desc": "Complete a degree in medicine, nursing, or healthcare management. Add digital skills where relevant."
+        },
+        "2": {
+          "title": "Internship and first role",
+          "desc": "Work in a hospital or healthcare company as a junior doctor, nurse, or health analyst."
+        },
+        "3": {
+          "title": "Clinical or digital specialization",
+          "desc": "Choose a medical specialization or move towards digital health (EHR, telemedicine, AI)."
+        },
+        "4": {
+          "title": "Senior clinician or area head",
+          "desc": "Become a senior specialist or ward lead. Coordinate teams and manage care pathways."
+        },
+        "5": {
+          "title": "Medical Director or Health Director",
+          "desc": "Reach clinical or managerial leadership at hospital or organizational level."
+        }
       },
       "creative": {
-        "1": { "title": "Design education", "desc": "Attend a design school or a specialized online course. Master Figma and Adobe Suite." },
-        "2": { "title": "Junior Designer (internship or first role)", "desc": "Join an agency or company as a junior designer. Build your portfolio and learn from seniors." },
-        "3": { "title": "Specialization", "desc": "Choose a focus: product design, UX research, motion design, brand identity, or design systems." },
-        "4": { "title": "Senior Designer or Design Lead", "desc": "Drive the creative direction of products. Mentor juniors and collaborate with product managers." },
-        "5": { "title": "Head of Design or Creative Director", "desc": "Lead design at company level. Define the visual language and UX strategy." }
+        "1": {
+          "title": "Design education",
+          "desc": "Attend a design school or a specialized online course. Master Figma and Adobe Suite."
+        },
+        "2": {
+          "title": "Junior Designer (internship or first role)",
+          "desc": "Join an agency or company as a junior designer. Build your portfolio and learn from seniors."
+        },
+        "3": {
+          "title": "Specialization",
+          "desc": "Choose a focus: product design, UX research, motion design, brand identity, or design systems."
+        },
+        "4": {
+          "title": "Senior Designer or Design Lead",
+          "desc": "Drive the creative direction of products. Mentor juniors and collaborate with product managers."
+        },
+        "5": {
+          "title": "Head of Design or Creative Director",
+          "desc": "Lead design at company level. Define the visual language and UX strategy."
+        }
       },
       "entrepreneur": {
-        "1": { "title": "Management education", "desc": "Study business, management, or engineering. An MBA accelerates access to key company roles." },
-        "2": { "title": "Analyst or junior in a structured company", "desc": "Join a company as an analyst or junior project manager. Understand business processes from the inside." },
-        "3": { "title": "Develop vertical expertise", "desc": "Specialize in a sector or business function. Deep skills open higher-responsibility roles." },
-        "4": { "title": "Manager or area lead", "desc": "Manage a team or company function. You are responsible for budget, people, and results." },
-        "5": { "title": "Director or C-suite", "desc": "Reach senior leadership: CEO, COO, CFO, or Director. Combine strategic vision with execution." }
+        "1": {
+          "title": "Management education",
+          "desc": "Study business, management, or engineering. An MBA accelerates access to key company roles."
+        },
+        "2": {
+          "title": "Analyst or junior in a structured company",
+          "desc": "Join a company as an analyst or junior project manager. Understand business processes from the inside."
+        },
+        "3": {
+          "title": "Develop vertical expertise",
+          "desc": "Specialize in a sector or business function. Deep skills open higher-responsibility roles."
+        },
+        "4": {
+          "title": "Manager or area lead",
+          "desc": "Manage a team or company function. You are responsible for budget, people, and results."
+        },
+        "5": {
+          "title": "Director or C-suite",
+          "desc": "Reach senior leadership: CEO, COO, CFO, or Director. Combine strategic vision with execution."
+        }
       },
       "consulting": {
-        "1": { "title": "Top academic performance", "desc": "Study business or management at a prestigious university. GPA and extracurriculars matter for top firm selection." },
-        "2": { "title": "Analyst at Big4 or strategic boutique", "desc": "Join as a junior Analyst/Consultant. Work on analysis, benchmarking, and C-suite presentations." },
-        "3": { "title": "Senior Associate or Consultant", "desc": "Manage independent workstreams and lead analyst teams. Build vertical expertise." },
-        "4": { "title": "Manager", "desc": "Manage whole projects and client relationships. Internal and external networking becomes essential." },
-        "5": { "title": "Partner or Director", "desc": "Bring in new business, lead a practice, and build relationships with key clients." }
+        "1": {
+          "title": "Top academic performance",
+          "desc": "Study business or management at a prestigious university. GPA and extracurriculars matter for top firm selection."
+        },
+        "2": {
+          "title": "Analyst at Big4 or strategic boutique",
+          "desc": "Join as a junior Analyst/Consultant. Work on analysis, benchmarking, and C-suite presentations."
+        },
+        "3": {
+          "title": "Senior Associate or Consultant",
+          "desc": "Manage independent workstreams and lead analyst teams. Build vertical expertise."
+        },
+        "4": {
+          "title": "Manager",
+          "desc": "Manage whole projects and client relationships. Internal and external networking becomes essential."
+        },
+        "5": {
+          "title": "Partner or Director",
+          "desc": "Bring in new business, lead a practice, and build relationships with key clients."
+        }
       },
       "data": {
-        "1": { "title": "Analytical education", "desc": "Study statistics, applied mathematics, Python, or R. A path in data science, economics, or computer science." },
-        "2": { "title": "Junior Data Analyst", "desc": "Work with real datasets. Learn SQL, BI tools, and how to communicate insights to decision-makers." },
-        "3": { "title": "Specialization in Data Science or Engineering", "desc": "Deepen machine learning or data pipelines. Choose the direction that fits your profile." },
-        "4": { "title": "Senior Data Scientist or Data Engineer", "desc": "Lead modelling projects or complex data architectures. Collaborate with product and business." },
-        "5": { "title": "Head of Data or Data Lead", "desc": "Coordinate the data team, define data strategy, and ensure quality and governance." }
+        "1": {
+          "title": "Analytical education",
+          "desc": "Study statistics, applied mathematics, Python, or R. A path in data science, economics, or computer science."
+        },
+        "2": {
+          "title": "Junior Data Analyst",
+          "desc": "Work with real datasets. Learn SQL, BI tools, and how to communicate insights to decision-makers."
+        },
+        "3": {
+          "title": "Specialization in Data Science or Engineering",
+          "desc": "Deepen machine learning or data pipelines. Choose the direction that fits your profile."
+        },
+        "4": {
+          "title": "Senior Data Scientist or Data Engineer",
+          "desc": "Lead modelling projects or complex data architectures. Collaborate with product and business."
+        },
+        "5": {
+          "title": "Head of Data or Data Lead",
+          "desc": "Coordinate the data team, define data strategy, and ensure quality and governance."
+        }
       },
       "hr": {
-        "1": { "title": "Psychology or business education", "desc": "Study occupational psychology or business administration. An HR management master's degree accelerates the path." },
-        "2": { "title": "HR Assistant or junior Recruiter", "desc": "Work in a company or recruitment agency. Handle job ads, screening, and onboarding." },
-        "3": { "title": "HR specialization", "desc": "Choose a vertical: talent acquisition, HRBP, L&D, compensation, or people analytics." },
-        "4": { "title": "HR Manager or HR Business Partner", "desc": "Manage the HR function for a business area. Support managers on people decisions." },
-        "5": { "title": "HR Director or Chief People Officer", "desc": "Lead the organization's people strategy: culture, talent, retention, and development." }
+        "1": {
+          "title": "Psychology or business education",
+          "desc": "Study occupational psychology or business administration. An HR management master's degree accelerates the path."
+        },
+        "2": {
+          "title": "HR Assistant or junior Recruiter",
+          "desc": "Work in a company or recruitment agency. Handle job ads, screening, and onboarding."
+        },
+        "3": {
+          "title": "HR specialization",
+          "desc": "Choose a vertical: talent acquisition, HRBP, L&D, compensation, or people analytics."
+        },
+        "4": {
+          "title": "HR Manager or HR Business Partner",
+          "desc": "Manage the HR function for a business area. Support managers on people decisions."
+        },
+        "5": {
+          "title": "HR Director or Chief People Officer",
+          "desc": "Lead the organization's people strategy: culture, talent, retention, and development."
+        }
       },
       "default": {
-        "1": { "title": "Sector education", "desc": "Obtain the academic and professional qualifications required in your sector of interest." },
-        "2": { "title": "First entry-level role", "desc": "Join a company in a junior role. Learn processes, build relationships, and gain experience." },
-        "3": { "title": "Skills development", "desc": "Deepen technical and soft skills. Seek mentors and internal growth opportunities." },
-        "4": { "title": "Senior or specialist role", "desc": "With solid experience, move into senior or specialist roles. Coordinate juniors or lead projects." },
-        "5": { "title": "Leadership and management", "desc": "Reach responsibility roles: team lead, manager, or director. Develop strategic vision and leadership." }
+        "1": {
+          "title": "Sector education",
+          "desc": "Obtain the academic and professional qualifications required in your sector of interest."
+        },
+        "2": {
+          "title": "First entry-level role",
+          "desc": "Join a company in a junior role. Learn processes, build relationships, and gain experience."
+        },
+        "3": {
+          "title": "Skills development",
+          "desc": "Deepen technical and soft skills. Seek mentors and internal growth opportunities."
+        },
+        "4": {
+          "title": "Senior or specialist role",
+          "desc": "With solid experience, move into senior or specialist roles. Coordinate juniors or lead projects."
+        },
+        "5": {
+          "title": "Leadership and management",
+          "desc": "Reach responsibility roles: team lead, manager, or director. Develop strategic vision and leadership."
+        }
       }
     }
   },
@@ -2204,5 +2444,23 @@
       "120": "2 hours before",
       "1440": "24 hours before"
     }
+  },
+  "role": {
+    "notFound": "Role not found",
+    "goHome": "Go to home",
+    "back": "Back",
+    "salary": "Salary",
+    "growth": "Outlook",
+    "autonomy": "Autonomy",
+    "stability": "Stability",
+    "skills": "Required Skills",
+    "educationPaths": "Education Paths",
+    "steps": "Steps",
+    "careerOutcomes": "Career Outcomes",
+    "exploreSector": "Explore the Sector",
+    "exploreSectorDesc": "Discover all the opportunities in the {{sector}} sector",
+    "noRoles": "No roles available for this sector.",
+    "rolesTab": "Roles",
+    "viewRole": "Learn more"
   }
 }

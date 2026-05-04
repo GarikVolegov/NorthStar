@@ -340,118 +340,358 @@
   "careerSteps": {
     "freelance": {
       "tech": {
-        "1": { "title": "Construir un portfolio público", "desc": "Crea proyectos personales o de código abierto que demuestren tus habilidades técnicas." },
-        "2": { "title": "Definir tu especialización", "desc": "Elige un nicho (p. ej. backend, móvil) para destacar en el mercado." },
-        "3": { "title": "Conseguir los primeros clientes", "desc": "Empieza en plataformas como Upwork o Fiverr, luego construye relaciones directas con empresas." },
-        "4": { "title": "Gestionar el aspecto fiscal", "desc": "Regístrate como autónomo y lleva un registro de gastos deducibles." },
-        "5": { "title": "Escalar hacia tarifas premium", "desc": "Con la reputación construida, sube tus tarifas y selecciona clientes de mayor calidad." }
+        "1": {
+          "title": "Construir un portfolio público",
+          "desc": "Crea proyectos personales o de código abierto que demuestren tus habilidades técnicas."
+        },
+        "2": {
+          "title": "Definir tu especialización",
+          "desc": "Elige un nicho (p. ej. backend, móvil) para destacar en el mercado."
+        },
+        "3": {
+          "title": "Conseguir los primeros clientes",
+          "desc": "Empieza en plataformas como Upwork o Fiverr, luego construye relaciones directas con empresas."
+        },
+        "4": {
+          "title": "Gestionar el aspecto fiscal",
+          "desc": "Regístrate como autónomo y lleva un registro de gastos deducibles."
+        },
+        "5": {
+          "title": "Escalar hacia tarifas premium",
+          "desc": "Con la reputación construida, sube tus tarifas y selecciona clientes de mayor calidad."
+        }
       },
       "health": {
-        "1": { "title": "Obtener las certificaciones necesarias", "desc": "Las profesiones sanitarias requieren habilitaciones específicas. Verifica los requisitos para tu especialización." },
-        "2": { "title": "Abrir una consulta privada", "desc": "Registra la actividad, encuentra un espacio adecuado y cumple la normativa sanitaria local." },
-        "3": { "title": "Construir una red de referencias", "desc": "Colabora con otros especialistas que puedan derivarte pacientes." },
-        "4": { "title": "Gestión administrativa", "desc": "El seguro profesional, la facturación y la gestión de agenda son fundamentales en la autonomía." },
-        "5": { "title": "Crecimiento y especialización", "desc": "Diferénciate con formación continua y construye una reputación en línea." }
+        "1": {
+          "title": "Obtener las certificaciones necesarias",
+          "desc": "Las profesiones sanitarias requieren habilitaciones específicas. Verifica los requisitos para tu especialización."
+        },
+        "2": {
+          "title": "Abrir una consulta privada",
+          "desc": "Registra la actividad, encuentra un espacio adecuado y cumple la normativa sanitaria local."
+        },
+        "3": {
+          "title": "Construir una red de referencias",
+          "desc": "Colabora con otros especialistas que puedan derivarte pacientes."
+        },
+        "4": {
+          "title": "Gestión administrativa",
+          "desc": "El seguro profesional, la facturación y la gestión de agenda son fundamentales en la autonomía."
+        },
+        "5": {
+          "title": "Crecimiento y especialización",
+          "desc": "Diferénciate con formación continua y construye una reputación en línea."
+        }
       },
       "creative": {
-        "1": { "title": "Construir tu marca creativa", "desc": "Crea un portfolio en línea (Behance, sitio personal) que represente tu estilo único." },
-        "2": { "title": "Elegir tus plataformas", "desc": "Identifica dónde están tus clientes ideales: agencias, startups, particulares, mercados internacionales." },
-        "3": { "title": "Definir tus paquetes de servicios", "desc": "Ofrece propuestas claras con precios transparentes para evitar negociaciones interminables." },
-        "4": { "title": "Construir relaciones a largo plazo", "desc": "Un cliente fiel vale mucho más que diez clientes ocasionales. Cuida la relación post-proyecto." },
-        "5": { "title": "Diversificar las fuentes de ingresos", "desc": "Complementa los servicios con productos digitales (plantillas, cursos) para ingresos pasivos." }
+        "1": {
+          "title": "Construir tu marca creativa",
+          "desc": "Crea un portfolio en línea (Behance, sitio personal) que represente tu estilo único."
+        },
+        "2": {
+          "title": "Elegir tus plataformas",
+          "desc": "Identifica dónde están tus clientes ideales: agencias, startups, particulares, mercados internacionales."
+        },
+        "3": {
+          "title": "Definir tus paquetes de servicios",
+          "desc": "Ofrece propuestas claras con precios transparentes para evitar negociaciones interminables."
+        },
+        "4": {
+          "title": "Construir relaciones a largo plazo",
+          "desc": "Un cliente fiel vale mucho más que diez clientes ocasionales. Cuida la relación post-proyecto."
+        },
+        "5": {
+          "title": "Diversificar las fuentes de ingresos",
+          "desc": "Complementa los servicios con productos digitales (plantillas, cursos) para ingresos pasivos."
+        }
       },
       "entrepreneur": {
-        "1": { "title": "Validar la idea de negocio", "desc": "Testa el mercado con un MVP antes de invertir recursos significativos." },
-        "2": { "title": "Constituir la estructura legal", "desc": "Elige la forma jurídica adecuada (autónomo, SL, SA) según el proyecto." },
-        "3": { "title": "Encontrar primeros clientes o inversores", "desc": "El bootstrapping o la financiación pre-seed de un business angel son caminos complementarios." },
-        "4": { "title": "Construir el equipo", "desc": "Identifica los roles clave que faltan y recluta colaboradores o cofundadores." },
-        "5": { "title": "Escalar y consolidar", "desc": "Con tracción demostrada, busca financiación institucional o reinvierte los beneficios para crecer." }
+        "1": {
+          "title": "Validar la idea de negocio",
+          "desc": "Testa el mercado con un MVP antes de invertir recursos significativos."
+        },
+        "2": {
+          "title": "Constituir la estructura legal",
+          "desc": "Elige la forma jurídica adecuada (autónomo, SL, SA) según el proyecto."
+        },
+        "3": {
+          "title": "Encontrar primeros clientes o inversores",
+          "desc": "El bootstrapping o la financiación pre-seed de un business angel son caminos complementarios."
+        },
+        "4": {
+          "title": "Construir el equipo",
+          "desc": "Identifica los roles clave que faltan y recluta colaboradores o cofundadores."
+        },
+        "5": {
+          "title": "Escalar y consolidar",
+          "desc": "Con tracción demostrada, busca financiación institucional o reinvierte los beneficios para crecer."
+        }
       },
       "consulting": {
-        "1": { "title": "Construir una especialización vertical", "desc": "Elige un sector o problema específico para ser el experto de referencia." },
-        "2": { "title": "Crear contenido de valor", "desc": "Publica insights en LinkedIn y escribe artículos para construir autoridad." },
-        "3": { "title": "Construir tu red profesional", "desc": "El networking es clave en consultoría. El 70% de los mandatos viene por referencias." },
-        "4": { "title": "Estructurar la oferta", "desc": "Define metodologías, entregables y precios claros para cada servicio." },
-        "5": { "title": "Escalar con colaboradores", "desc": "Cuando la demanda supere tu capacidad, incorpora consultores junior o especialistas freelance." }
+        "1": {
+          "title": "Construir una especialización vertical",
+          "desc": "Elige un sector o problema específico para ser el experto de referencia."
+        },
+        "2": {
+          "title": "Crear contenido de valor",
+          "desc": "Publica insights en LinkedIn y escribe artículos para construir autoridad."
+        },
+        "3": {
+          "title": "Construir tu red profesional",
+          "desc": "El networking es clave en consultoría. El 70% de los mandatos viene por referencias."
+        },
+        "4": {
+          "title": "Estructurar la oferta",
+          "desc": "Define metodologías, entregables y precios claros para cada servicio."
+        },
+        "5": {
+          "title": "Escalar con colaboradores",
+          "desc": "Cuando la demanda supere tu capacidad, incorpora consultores junior o especialistas freelance."
+        }
       },
       "data": {
-        "1": { "title": "Consolidar la experiencia técnica", "desc": "Profundiza en un área específica (ingeniería de datos, ML, BI) para convertirte en referente." },
-        "2": { "title": "Construir un portfolio de análisis", "desc": "Publica análisis en datasets públicos y participa en Kaggle." },
-        "3": { "title": "Ofrecer consultoría por proyecto", "desc": "Empieza con pequeños mandatos de análisis de datos para empresas sin equipo interno." },
-        "4": { "title": "Automatizar con herramientas SaaS", "desc": "Usa herramientas como Metabase o Tableau para escalar tus análisis sin más horas." },
-        "5": { "title": "Pasar a retainers mensuales", "desc": "Propón suscripciones mensuales para informes continuos: ingresos recurrentes y relaciones estables." }
+        "1": {
+          "title": "Consolidar la experiencia técnica",
+          "desc": "Profundiza en un área específica (ingeniería de datos, ML, BI) para convertirte en referente."
+        },
+        "2": {
+          "title": "Construir un portfolio de análisis",
+          "desc": "Publica análisis en datasets públicos y participa en Kaggle."
+        },
+        "3": {
+          "title": "Ofrecer consultoría por proyecto",
+          "desc": "Empieza con pequeños mandatos de análisis de datos para empresas sin equipo interno."
+        },
+        "4": {
+          "title": "Automatizar con herramientas SaaS",
+          "desc": "Usa herramientas como Metabase o Tableau para escalar tus análisis sin más horas."
+        },
+        "5": {
+          "title": "Pasar a retainers mensuales",
+          "desc": "Propón suscripciones mensuales para informes continuos: ingresos recurrentes y relaciones estables."
+        }
       },
       "hr": {
-        "1": { "title": "Acumular experiencia en empresa", "desc": "Antes de independizarte, acumula 3-5 años de experiencia en organizaciones estructuradas." },
-        "2": { "title": "Convertirte en experto reconocido", "desc": "Publica, participa en congresos, construye una reputación en tu ámbito específico." },
-        "3": { "title": "Iniciar la consultoría a tiempo parcial", "desc": "Mantén la estabilidad del empleo mientras construyes los primeros clientes." },
-        "4": { "title": "Formalizar la actividad", "desc": "Regístrate como autónomo, define contratos estándar y gestiona la privacidad de datos (RGPD)." },
-        "5": { "title": "Construir un equipo", "desc": "Cuando el volumen crezca, incorpora colaboradores especializados para diversificar servicios." }
+        "1": {
+          "title": "Acumular experiencia en empresa",
+          "desc": "Antes de independizarte, acumula 3-5 años de experiencia en organizaciones estructuradas."
+        },
+        "2": {
+          "title": "Convertirte en experto reconocido",
+          "desc": "Publica, participa en congresos, construye una reputación en tu ámbito específico."
+        },
+        "3": {
+          "title": "Iniciar la consultoría a tiempo parcial",
+          "desc": "Mantén la estabilidad del empleo mientras construyes los primeros clientes."
+        },
+        "4": {
+          "title": "Formalizar la actividad",
+          "desc": "Regístrate como autónomo, define contratos estándar y gestiona la privacidad de datos (RGPD)."
+        },
+        "5": {
+          "title": "Construir un equipo",
+          "desc": "Cuando el volumen crezca, incorpora colaboradores especializados para diversificar servicios."
+        }
       },
       "default": {
-        "1": { "title": "Consolidar las competencias clave", "desc": "Profundiza las habilidades técnicas y transversales requeridas en el sector." },
-        "2": { "title": "Construir tu red", "desc": "Las oportunidades autónomas suelen llegar a través de las personas que conoces." },
-        "3": { "title": "Empezar con proyectos a tiempo parcial", "desc": "Testa el mercado manteniendo la seguridad de un ingreso fijo." },
-        "4": { "title": "Formalizar la actividad", "desc": "Regístrate como autónomo y gestiona la contabilidad." },
-        "5": { "title": "Escalar y diversificar", "desc": "Sube las tarifas, selecciona mejores clientes y añade servicios complementarios." }
+        "1": {
+          "title": "Consolidar las competencias clave",
+          "desc": "Profundiza las habilidades técnicas y transversales requeridas en el sector."
+        },
+        "2": {
+          "title": "Construir tu red",
+          "desc": "Las oportunidades autónomas suelen llegar a través de las personas que conoces."
+        },
+        "3": {
+          "title": "Empezar con proyectos a tiempo parcial",
+          "desc": "Testa el mercado manteniendo la seguridad de un ingreso fijo."
+        },
+        "4": {
+          "title": "Formalizar la actividad",
+          "desc": "Regístrate como autónomo y gestiona la contabilidad."
+        },
+        "5": {
+          "title": "Escalar y diversificar",
+          "desc": "Sube las tarifas, selecciona mejores clientes y añade servicios complementarios."
+        }
       }
     },
     "dipendente": {
       "tech": {
-        "1": { "title": "Formación técnica", "desc": "Obtén un grado en informática o ingeniería de software. Adquiere bases de programación y sistemas." },
-        "2": { "title": "Prácticas o primer puesto junior", "desc": "Únete a una empresa como desarrollador junior. Aprende el ciclo de desarrollo y construye tu portfolio." },
-        "3": { "title": "Especialización técnica", "desc": "Elige un área: frontend, backend, cloud, DevOps o móvil. Profundiza en frameworks y herramientas." },
-        "4": { "title": "Rol senior y liderazgo técnico", "desc": "Tras 3-5 años, conviértete en Senior Developer o Tech Lead. Toma decisiones arquitectónicas." },
-        "5": { "title": "Staff Engineer o Engineering Manager", "desc": "Elige entre la senda técnica avanzada o la de gestión. Ambas requieren reputación y visión estratégica." }
+        "1": {
+          "title": "Formación técnica",
+          "desc": "Obtén un grado en informática o ingeniería de software. Adquiere bases de programación y sistemas."
+        },
+        "2": {
+          "title": "Prácticas o primer puesto junior",
+          "desc": "Únete a una empresa como desarrollador junior. Aprende el ciclo de desarrollo y construye tu portfolio."
+        },
+        "3": {
+          "title": "Especialización técnica",
+          "desc": "Elige un área: frontend, backend, cloud, DevOps o móvil. Profundiza en frameworks y herramientas."
+        },
+        "4": {
+          "title": "Rol senior y liderazgo técnico",
+          "desc": "Tras 3-5 años, conviértete en Senior Developer o Tech Lead. Toma decisiones arquitectónicas."
+        },
+        "5": {
+          "title": "Staff Engineer o Engineering Manager",
+          "desc": "Elige entre la senda técnica avanzada o la de gestión. Ambas requieren reputación y visión estratégica."
+        }
       },
       "health": {
-        "1": { "title": "Formación académica especializada", "desc": "Completa la carrera de medicina, enfermería o gestión sanitaria. Añade competencias digitales si aplica." },
-        "2": { "title": "Prácticas y primer puesto", "desc": "Trabaja en hospital o empresa sanitaria como médico junior, enfermero o analista de salud." },
-        "3": { "title": "Especialización clínica o digital", "desc": "Elige una especialización médica o dirige la carrera hacia la salud digital (HCE, telemedicina, IA)." },
-        "4": { "title": "Clínico senior o jefe de área", "desc": "Conviértete en especialista senior o responsable de planta. Coordina equipos y gestiona vías de atención." },
-        "5": { "title": "Director médico o Director de Salud", "desc": "Alcanza el liderazgo clínico o de gestión a nivel hospitalario u organizativo." }
+        "1": {
+          "title": "Formación académica especializada",
+          "desc": "Completa la carrera de medicina, enfermería o gestión sanitaria. Añade competencias digitales si aplica."
+        },
+        "2": {
+          "title": "Prácticas y primer puesto",
+          "desc": "Trabaja en hospital o empresa sanitaria como médico junior, enfermero o analista de salud."
+        },
+        "3": {
+          "title": "Especialización clínica o digital",
+          "desc": "Elige una especialización médica o dirige la carrera hacia la salud digital (HCE, telemedicina, IA)."
+        },
+        "4": {
+          "title": "Clínico senior o jefe de área",
+          "desc": "Conviértete en especialista senior o responsable de planta. Coordina equipos y gestiona vías de atención."
+        },
+        "5": {
+          "title": "Director médico o Director de Salud",
+          "desc": "Alcanza el liderazgo clínico o de gestión a nivel hospitalario u organizativo."
+        }
       },
       "creative": {
-        "1": { "title": "Formación en diseño", "desc": "Asiste a una escuela de diseño o un curso especializado en línea. Domina Figma y Adobe Suite." },
-        "2": { "title": "Diseñador junior (prácticas o primer puesto)", "desc": "Únete a una agencia o empresa como diseñador junior. Construye el portfolio y aprende de los seniors." },
-        "3": { "title": "Especialización", "desc": "Elige un enfoque: diseño de producto, investigación UX, motion design, identidad de marca o sistemas de diseño." },
-        "4": { "title": "Diseñador senior o Design Lead", "desc": "Dirige la dirección creativa de productos. Mentoriza juniors y colabora con product managers." },
-        "5": { "title": "Head of Design o Director Creativo", "desc": "Lidera el diseño a nivel empresarial. Define el lenguaje visual y la estrategia UX." }
+        "1": {
+          "title": "Formación en diseño",
+          "desc": "Asiste a una escuela de diseño o un curso especializado en línea. Domina Figma y Adobe Suite."
+        },
+        "2": {
+          "title": "Diseñador junior (prácticas o primer puesto)",
+          "desc": "Únete a una agencia o empresa como diseñador junior. Construye el portfolio y aprende de los seniors."
+        },
+        "3": {
+          "title": "Especialización",
+          "desc": "Elige un enfoque: diseño de producto, investigación UX, motion design, identidad de marca o sistemas de diseño."
+        },
+        "4": {
+          "title": "Diseñador senior o Design Lead",
+          "desc": "Dirige la dirección creativa de productos. Mentoriza juniors y colabora con product managers."
+        },
+        "5": {
+          "title": "Head of Design o Director Creativo",
+          "desc": "Lidera el diseño a nivel empresarial. Define el lenguaje visual y la estrategia UX."
+        }
       },
       "entrepreneur": {
-        "1": { "title": "Formación en gestión", "desc": "Estudia economía, administración de empresas o ingeniería. Un MBA acelera el acceso a puestos clave." },
-        "2": { "title": "Analista o junior en empresa estructurada", "desc": "Únete a una empresa como analista o project manager junior. Comprende los procesos desde dentro." },
-        "3": { "title": "Desarrollar experiencia vertical", "desc": "Especialízate en un sector o función. Las habilidades profundas abren roles de mayor responsabilidad." },
-        "4": { "title": "Manager o responsable de área", "desc": "Gestiona un equipo o función empresarial. Responsable de presupuesto, personas y resultados." },
-        "5": { "title": "Director o C-suite", "desc": "Alcanza roles de alta dirección: CEO, COO, CFO o Director. Combina visión estratégica y ejecución." }
+        "1": {
+          "title": "Formación en gestión",
+          "desc": "Estudia economía, administración de empresas o ingeniería. Un MBA acelera el acceso a puestos clave."
+        },
+        "2": {
+          "title": "Analista o junior en empresa estructurada",
+          "desc": "Únete a una empresa como analista o project manager junior. Comprende los procesos desde dentro."
+        },
+        "3": {
+          "title": "Desarrollar experiencia vertical",
+          "desc": "Especialízate en un sector o función. Las habilidades profundas abren roles de mayor responsabilidad."
+        },
+        "4": {
+          "title": "Manager o responsable de área",
+          "desc": "Gestiona un equipo o función empresarial. Responsable de presupuesto, personas y resultados."
+        },
+        "5": {
+          "title": "Director o C-suite",
+          "desc": "Alcanza roles de alta dirección: CEO, COO, CFO o Director. Combina visión estratégica y ejecución."
+        }
       },
       "consulting": {
-        "1": { "title": "Excelencia académica", "desc": "Estudia economía o gestión en una universidad de prestigio. El expediente y las actividades extracurriculares importan." },
-        "2": { "title": "Analista en Big4 o boutique estratégica", "desc": "Incorporarte como Analista/Consultor junior. Trabaja en análisis, benchmarking y presentaciones para C-suite." },
-        "3": { "title": "Senior Associate o Consultor", "desc": "Gestiona workstreams independientes y lidera equipos de analistas. Construye experiencia vertical." },
-        "4": { "title": "Manager", "desc": "Gestiona proyectos completos y relaciones con clientes. El networking interno y externo es esencial." },
-        "5": { "title": "Socio o Director", "desc": "Aporta nuevo negocio, lidera una práctica y construye relaciones con clientes clave." }
+        "1": {
+          "title": "Excelencia académica",
+          "desc": "Estudia economía o gestión en una universidad de prestigio. El expediente y las actividades extracurriculares importan."
+        },
+        "2": {
+          "title": "Analista en Big4 o boutique estratégica",
+          "desc": "Incorporarte como Analista/Consultor junior. Trabaja en análisis, benchmarking y presentaciones para C-suite."
+        },
+        "3": {
+          "title": "Senior Associate o Consultor",
+          "desc": "Gestiona workstreams independientes y lidera equipos de analistas. Construye experiencia vertical."
+        },
+        "4": {
+          "title": "Manager",
+          "desc": "Gestiona proyectos completos y relaciones con clientes. El networking interno y externo es esencial."
+        },
+        "5": {
+          "title": "Socio o Director",
+          "desc": "Aporta nuevo negocio, lidera una práctica y construye relaciones con clientes clave."
+        }
       },
       "data": {
-        "1": { "title": "Formación analítica", "desc": "Estudia estadística, matemáticas aplicadas, Python o R. Camino en ciencia de datos, economía o informática." },
-        "2": { "title": "Junior Data Analyst", "desc": "Trabaja con conjuntos de datos reales. Aprende SQL, herramientas BI y comunica insights a los decisores." },
-        "3": { "title": "Especialización en Data Science o Engineering", "desc": "Profundiza en machine learning o pipelines de datos. Elige la dirección que mejor encaje con tu perfil." },
-        "4": { "title": "Senior Data Scientist o Data Engineer", "desc": "Lidera proyectos de modelización o arquitecturas de datos complejas. Colabora con producto y negocio." },
-        "5": { "title": "Head of Data o Data Lead", "desc": "Coordina el equipo de datos, define la estrategia de datos y asegura calidad y gobernanza." }
+        "1": {
+          "title": "Formación analítica",
+          "desc": "Estudia estadística, matemáticas aplicadas, Python o R. Camino en ciencia de datos, economía o informática."
+        },
+        "2": {
+          "title": "Junior Data Analyst",
+          "desc": "Trabaja con conjuntos de datos reales. Aprende SQL, herramientas BI y comunica insights a los decisores."
+        },
+        "3": {
+          "title": "Especialización en Data Science o Engineering",
+          "desc": "Profundiza en machine learning o pipelines de datos. Elige la dirección que mejor encaje con tu perfil."
+        },
+        "4": {
+          "title": "Senior Data Scientist o Data Engineer",
+          "desc": "Lidera proyectos de modelización o arquitecturas de datos complejas. Colabora con producto y negocio."
+        },
+        "5": {
+          "title": "Head of Data o Data Lead",
+          "desc": "Coordina el equipo de datos, define la estrategia de datos y asegura calidad y gobernanza."
+        }
       },
       "hr": {
-        "1": { "title": "Psicología o formación empresarial", "desc": "Estudia psicología del trabajo o administración de empresas. Un máster en RRHH acelera el camino." },
-        "2": { "title": "Asistente de RRHH o Recruiter junior", "desc": "Trabaja en empresa o agencia de selección. Gestiona anuncios, criba y onboarding." },
-        "3": { "title": "Especialización en RRHH", "desc": "Elige un vertical: talent acquisition, HRBP, L&D, compensación o people analytics." },
-        "4": { "title": "HR Manager o HR Business Partner", "desc": "Gestiona la función de RRHH para un área empresarial. Apoya a los managers en decisiones de personas." },
-        "5": { "title": "HR Director o Chief People Officer", "desc": "Lidera la estrategia de personas de la organización: cultura, talento, retención y desarrollo." }
+        "1": {
+          "title": "Psicología o formación empresarial",
+          "desc": "Estudia psicología del trabajo o administración de empresas. Un máster en RRHH acelera el camino."
+        },
+        "2": {
+          "title": "Asistente de RRHH o Recruiter junior",
+          "desc": "Trabaja en empresa o agencia de selección. Gestiona anuncios, criba y onboarding."
+        },
+        "3": {
+          "title": "Especialización en RRHH",
+          "desc": "Elige un vertical: talent acquisition, HRBP, L&D, compensación o people analytics."
+        },
+        "4": {
+          "title": "HR Manager o HR Business Partner",
+          "desc": "Gestiona la función de RRHH para un área empresarial. Apoya a los managers en decisiones de personas."
+        },
+        "5": {
+          "title": "HR Director o Chief People Officer",
+          "desc": "Lidera la estrategia de personas de la organización: cultura, talento, retención y desarrollo."
+        }
       },
       "default": {
-        "1": { "title": "Formación en el sector", "desc": "Obtén las cualificaciones académicas y profesionales requeridas en tu sector de interés." },
-        "2": { "title": "Primer puesto de entrada", "desc": "Únete a una empresa en un rol junior. Aprende procesos, construye relaciones y gana experiencia." },
-        "3": { "title": "Desarrollo de competencias", "desc": "Profundiza en habilidades técnicas y transversales. Busca mentores y oportunidades de crecimiento interno." },
-        "4": { "title": "Rol senior o especialista", "desc": "Con experiencia sólida, accede a roles senior o de especialización. Coordina juniors o lidera proyectos." },
-        "5": { "title": "Liderazgo y gestión", "desc": "Alcanza roles de responsabilidad: team lead, manager o director. Desarrolla visión estratégica." }
+        "1": {
+          "title": "Formación en el sector",
+          "desc": "Obtén las cualificaciones académicas y profesionales requeridas en tu sector de interés."
+        },
+        "2": {
+          "title": "Primer puesto de entrada",
+          "desc": "Únete a una empresa en un rol junior. Aprende procesos, construye relaciones y gana experiencia."
+        },
+        "3": {
+          "title": "Desarrollo de competencias",
+          "desc": "Profundiza en habilidades técnicas y transversales. Busca mentores y oportunidades de crecimiento interno."
+        },
+        "4": {
+          "title": "Rol senior o especialista",
+          "desc": "Con experiencia sólida, accede a roles senior o de especialización. Coordina juniors o lidera proyectos."
+        },
+        "5": {
+          "title": "Liderazgo y gestión",
+          "desc": "Alcanza roles de responsabilidad: team lead, manager o director. Desarrolla visión estratégica."
+        }
       }
     }
   },
@@ -2204,5 +2444,23 @@
       "120": "2 horas antes",
       "1440": "24 horas antes"
     }
+  },
+  "role": {
+    "notFound": "Rol no encontrado",
+    "goHome": "Ir al inicio",
+    "back": "Atrás",
+    "salary": "Salario",
+    "growth": "Perspectivas",
+    "autonomy": "Autonomía",
+    "stability": "Estabilidad",
+    "skills": "Competencias Requeridas",
+    "educationPaths": "Itinerarios Formativos",
+    "steps": "Pasos",
+    "careerOutcomes": "Salidas Profesionales",
+    "exploreSector": "Explora el Sector",
+    "exploreSectorDesc": "Descubre todas las oportunidades en el sector {{sector}}",
+    "noRoles": "No hay roles disponibles para este sector.",
+    "rolesTab": "Roles",
+    "viewRole": "Saber más"
   }
 }

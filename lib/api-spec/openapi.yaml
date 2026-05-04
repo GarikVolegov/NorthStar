@@ -143,6 +143,143 @@ components:
         - matchReason
         - sector
 
+    RoleSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        skills:
+          type: array
+          items:
+            type: string
+        workModes:
+          type: array
+          items:
+            type: string
+        riasecFit:
+          type: array
+          items:
+            type: string
+        salaryRange:
+          type: string
+        growthOutlook:
+          type: string
+        autonomyScore:
+          type: ["integer", "null"]
+        stabilityScore:
+          type: ["integer", "null"]
+      required:
+        - id
+        - title
+        - skills
+        - workModes
+        - riasecFit
+        - salaryRange
+        - growthOutlook
+
+    EducationPathSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        path:
+          type: string
+        type:
+          type: string
+        duration:
+          type: string
+        cost:
+          type: string
+        steps:
+          type: array
+          items:
+            type: string
+        careerOutcomes:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - path
+        - type
+        - duration
+        - cost
+        - steps
+        - careerOutcomes
+
+    SectorInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        icon:
+          type: string
+        color:
+          type: string
+      required:
+        - id
+        - name
+        - icon
+        - color
+
+    RoleDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        sector:
+          type: string
+        sectorId:
+          type: ["integer", "null"]
+        sectorInfo:
+          oneOf:
+            - $ref: "#/components/schemas/SectorInfo"
+            - type: "null"
+        riasecFit:
+          type: array
+          items:
+            type: string
+        skills:
+          type: array
+          items:
+            type: string
+        workModes:
+          type: array
+          items:
+            type: string
+        salaryRange:
+          type: string
+        growthOutlook:
+          type: string
+        autonomyScore:
+          type: ["integer", "null"]
+        stabilityScore:
+          type: ["integer", "null"]
+        educationPaths:
+          type: array
+          items:
+            $ref: "#/components/schemas/EducationPathSummary"
+      required:
+        - id
+        - title
+        - sector
+        - riasecFit
+        - skills
+        - workModes
+        - salaryRange
+        - growthOutlook
+        - educationPaths
+
     TestSession:
       type: object
       properties:
@@ -596,6 +733,58 @@ paths:
                 $ref: "#/components/schemas/SectorStats"
         "404":
           description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sectors/{id}/roles:
+    get:
+      operationId: getSectorRoles
+      tags: [sectors]
+      summary: List roles (professions) belonging to a sector
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of roles for the sector
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoleSummary"
+        "404":
+          description: Sector not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /roles/{id}:
+    get:
+      operationId: getRoleDetail
+      tags: [sectors]
+      summary: Get full details for a single role including linked education paths
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Role detail with education paths
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleDetail"
+        "404":
+          description: Role not found
           content:
             application/json:
               schema:

@@ -35,13 +35,6 @@ export const ListSectorsResponseItem = zod.object({
   opportunities: zod.array(zod.string()),
   icon: zod.string(),
   color: zod.string(),
-  workMode: zod.array(zod.enum(["dipendente", "autonomo", "ibrido"])).nullish(),
-  autonomyScore: zod.number().nullish(),
-  stabilityScore: zod.number().nullish(),
-  clientAcquisitionRequired: zod.boolean().nullish(),
-  remoteFriendly: zod.boolean().nullish(),
-  freelanceSteps: zod.array(zod.object({ step: zod.number(), title: zod.string(), description: zod.string() })).nullish(),
-  dipendentiSteps: zod.array(zod.object({ step: zod.number(), title: zod.string(), description: zod.string() })).nullish(),
   createdAt: zod.string(),
 });
 export const ListSectorsResponse = zod.array(ListSectorsResponseItem);
@@ -71,17 +64,6 @@ export const GetSectorResponse = zod.object({
   opportunities: zod.array(zod.string()),
   icon: zod.string(),
   color: zod.string(),
-  workMode: zod.array(zod.enum(["dipendente", "autonomo", "ibrido"])).nullish(),
-  autonomyScore: zod.number().nullish(),
-  stabilityScore: zod.number().nullish(),
-  clientAcquisitionRequired: zod.boolean().nullish(),
-  remoteFriendly: zod.boolean().nullish(),
-  freelanceSteps: zod.array(zod.object({
-    step: zod.number(),
-    title: zod.string(),
-    description: zod.string(),
-  })).nullish(),
-  dipendentiSteps: zod.array(zod.object({ step: zod.number(), title: zod.string(), description: zod.string() })).nullish(),
   createdAt: zod.string(),
 });
 
@@ -109,10 +91,6 @@ export const GetTestSessionResponse = zod.object({
   riasecScores: zod.record(zod.string(), zod.unknown()),
   primaryTypes: zod.array(zod.string()),
   profileSummary: zod.string(),
-  suggestedWorkMode: zod.string().nullish(),
-  spiritScores: zod.record(zod.string(), zod.number()).nullish(),
-  dominantSpirit: zod.string().nullish(),
-  spiritInsight: zod.string().nullish(),
   recommendations: zod.array(
     zod.object({
       sectorId: zod.number(),
@@ -137,13 +115,6 @@ export const GetTestSessionResponse = zod.object({
         opportunities: zod.array(zod.string()),
         icon: zod.string(),
         color: zod.string(),
-        workMode: zod.array(zod.enum(["dipendente", "autonomo", "ibrido"])).nullish(),
-        autonomyScore: zod.number().nullish(),
-        stabilityScore: zod.number().nullish(),
-        clientAcquisitionRequired: zod.boolean().nullish(),
-        remoteFriendly: zod.boolean().nullish(),
-        freelanceSteps: zod.array(zod.object({ step: zod.number(), title: zod.string(), description: zod.string() })).nullish(),
-        dipendentiSteps: zod.array(zod.object({ step: zod.number(), title: zod.string(), description: zod.string() })).nullish(),
         createdAt: zod.string(),
       }),
     }),
@@ -170,10 +141,6 @@ export const ConfirmSectorResponse = zod.object({
   riasecScores: zod.record(zod.string(), zod.unknown()),
   primaryTypes: zod.array(zod.string()),
   profileSummary: zod.string(),
-  suggestedWorkMode: zod.string().nullish(),
-  spiritScores: zod.record(zod.string(), zod.number()).nullish(),
-  dominantSpirit: zod.string().nullish(),
-  spiritInsight: zod.string().nullish(),
   recommendations: zod.array(
     zod.object({
       sectorId: zod.number(),
@@ -198,13 +165,6 @@ export const ConfirmSectorResponse = zod.object({
         opportunities: zod.array(zod.string()),
         icon: zod.string(),
         color: zod.string(),
-        workMode: zod.array(zod.enum(["dipendente", "autonomo", "ibrido"])).nullish(),
-        autonomyScore: zod.number().nullish(),
-        stabilityScore: zod.number().nullish(),
-        clientAcquisitionRequired: zod.boolean().nullish(),
-        remoteFriendly: zod.boolean().nullish(),
-        freelanceSteps: zod.array(zod.object({ step: zod.number(), title: zod.string(), description: zod.string() })).nullish(),
-        dipendentiSteps: zod.array(zod.object({ step: zod.number(), title: zod.string(), description: zod.string() })).nullish(),
         createdAt: zod.string(),
       }),
     }),
@@ -220,7 +180,6 @@ export const RegisterUserBody = zod.object({
   name: zod.string(),
   email: zod.string(),
   testSessionId: zod.number().nullish(),
-  workPreference: zod.string().optional(),
 });
 
 /**
@@ -255,6 +214,71 @@ export const GetSectorStatsResponse = zod.object({
     midTerm: zod.string(),
     longTerm: zod.string(),
   }),
+});
+
+/**
+ * @summary List roles (professions) belonging to a sector
+ */
+export const GetSectorRolesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetSectorRolesResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  skills: zod.array(zod.string()),
+  workModes: zod.array(zod.string()),
+  riasecFit: zod.array(zod.string()),
+  salaryRange: zod.string(),
+  growthOutlook: zod.string(),
+  autonomyScore: zod.number().nullish(),
+  stabilityScore: zod.number().nullish(),
+});
+export const GetSectorRolesResponse = zod.array(GetSectorRolesResponseItem);
+
+/**
+ * @summary Get full details for a single role including linked education paths
+ */
+export const GetRoleDetailParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetRoleDetailResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  sector: zod.string(),
+  sectorId: zod.number().nullish(),
+  sectorInfo: zod
+    .union([
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+        icon: zod.string(),
+        color: zod.string(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+  riasecFit: zod.array(zod.string()),
+  skills: zod.array(zod.string()),
+  workModes: zod.array(zod.string()),
+  salaryRange: zod.string(),
+  growthOutlook: zod.string(),
+  autonomyScore: zod.number().nullish(),
+  stabilityScore: zod.number().nullish(),
+  educationPaths: zod.array(
+    zod.object({
+      id: zod.number(),
+      path: zod.string(),
+      type: zod.string(),
+      duration: zod.string(),
+      cost: zod.string(),
+      steps: zod.array(zod.string()),
+      careerOutcomes: zod.array(zod.string()),
+    }),
+  ),
 });
 
 /**
