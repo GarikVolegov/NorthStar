@@ -6,8 +6,11 @@
 # pronto da copiare in Replit Secrets o nel tuo file .env.
 #
 # Utilizzo:
+#   pnpm run secrets              # stampa i valori pronti da copiare
+#   pnpm run secrets:env          # salva anche in .env (non committare!)
+# Oppure direttamente:
 #   bash scripts/generate-secrets.sh
-#   bash scripts/generate-secrets.sh --env   # salva anche in .env (non committare!)
+#   bash scripts/generate-secrets.sh --env
 # =============================================================================
 
 set -euo pipefail
