@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { optionalAuthMiddleware } from "../lib/auth-jwt.js";
 import { aiChatRateLimiter } from "../lib/rate-limiter.js";
 import { getPrompt, fillTemplate } from "../lib/prompt-store.js";
+import { rejectIfOpenAINotConfigured, openAIErrorMessage } from "../lib/openai-availability.js";
 
 const router = Router();
 
@@ -23,6 +24,8 @@ router.post("/interview/:sectorId/ask", optionalAuthMiddleware, aiChatRateLimite
 
   const [sector] = await db.select().from(sectorsTable).where(eq(sectorsTable.id, sectorId));
   if (!sector) { res.status(404).json({ error: "Settore non trovato" }); return; }
+
+  if (rejectIfOpenAINotConfigured(res)) return;
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -54,8 +57,8 @@ router.post("/interview/:sectorId/ask", optionalAuthMiddleware, aiChatRateLimite
       const content = chunk.choices[0]?.delta?.content;
       if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
     }
-  } catch {
-    res.write(`data: ${JSON.stringify({ error: "Errore AI. Riprova." })}\n\n`);
+  } catch (err) {
+    res.write(`data: ${JSON.stringify({ error: openAIErrorMessage(err) })}\n\n`);
   }
 
   res.write(`data: ${JSON.stringify({ done: true })}\n\n`);

@@ -4,6 +4,7 @@ import { db, sectorsTable, usersTable, testSessionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { optionalAuthMiddleware } from "../lib/auth-jwt.js";
 import { aiGenerationRateLimiter } from "../lib/rate-limiter.js";
+import { rejectIfOpenAINotConfigured, openAIErrorMessage } from "../lib/openai-availability.js";
 
 const router: IRouter = Router();
 
@@ -115,6 +116,8 @@ router.post(
     const userId = res.locals.userId as number | undefined;
     const ctx = userId ? await fetchUserContext(userId, sectorId) : null;
 
+    if (rejectIfOpenAINotConfigured(res)) return;
+
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -222,7 +225,7 @@ Regole tassative:
     } catch (err) {
       res.write(
         `data: ${JSON.stringify({
-          error: "Errore nella generazione. Riprova.",
+          error: openAIErrorMessage(err),
           detail: err instanceof Error ? err.message : "unknown",
         })}\n\n`,
       );

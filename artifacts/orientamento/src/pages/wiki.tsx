@@ -103,6 +103,10 @@ export default function Wiki() {
         body: JSON.stringify({ question: trimmed, history }),
       });
 
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error ?? "Servizio non disponibile. Riprova più tardi.");
+      }
       const reader = res.body?.getReader();
       if (!reader) throw new Error("No reader");
       const decoder = new TextDecoder();

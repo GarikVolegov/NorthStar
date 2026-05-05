@@ -5,6 +5,7 @@ import { eq, desc } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth-jwt.js";
 import { aiChatRateLimiter } from "../lib/rate-limiter.js";
 import { getPrompt } from "../lib/prompt-store.js";
+import { rejectIfOpenAINotConfigured, openAIErrorMessage } from "../lib/openai-availability.js";
 
 const router = Router();
 
@@ -77,6 +78,8 @@ ${user?.cvText ? `- CV in possesso: sì (${user.cvText.slice(0, 200)}...)` : ""}
 
 ${instructions}`;
 
+  if (rejectIfOpenAINotConfigured(res)) return;
+
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
@@ -106,8 +109,8 @@ ${instructions}`;
         res.write(`data: ${JSON.stringify({ content })}\n\n`);
       }
     }
-  } catch {
-    res.write(`data: ${JSON.stringify({ error: "Errore AI. Riprova." })}\n\n`);
+  } catch (err) {
+    res.write(`data: ${JSON.stringify({ error: openAIErrorMessage(err) })}\n\n`);
   }
 
   try {

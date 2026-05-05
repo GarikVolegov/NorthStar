@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { optionalAuthMiddleware } from "../lib/auth-jwt.js";
 import { aiChatRateLimiter } from "../lib/rate-limiter.js";
 import { getPrompt, fillTemplate } from "../lib/prompt-store.js";
+import { rejectIfOpenAINotConfigured, openAIErrorMessage } from "../lib/openai-availability.js";
 
 const router = Router();
 
@@ -25,6 +26,8 @@ router.post("/wiki/:sectorId/ask", optionalAuthMiddleware, aiChatRateLimiter, as
     res.status(404).json({ error: "Settore non trovato" });
     return;
   }
+
+  if (rejectIfOpenAINotConfigured(res)) return;
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -64,8 +67,8 @@ router.post("/wiki/:sectorId/ask", optionalAuthMiddleware, aiChatRateLimiter, as
       const content = chunk.choices[0]?.delta?.content;
       if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
     }
-  } catch {
-    res.write(`data: ${JSON.stringify({ error: "Errore nella generazione. Riprova." })}\n\n`);
+  } catch (err) {
+    res.write(`data: ${JSON.stringify({ error: openAIErrorMessage(err) })}\n\n`);
   }
 
   res.write(`data: ${JSON.stringify({ done: true })}\n\n`);

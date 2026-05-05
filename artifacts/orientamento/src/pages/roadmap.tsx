@@ -319,6 +319,11 @@ export default function Roadmap() {
         body: JSON.stringify({}),
       });
 
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        setErrorMsg(errData.error ?? "Servizio AI non disponibile. Riprova più tardi.");
+        return;
+      }
       const reader = res.body?.getReader();
       if (!reader) throw new Error("Nessun reader");
       const decoder = new TextDecoder();
