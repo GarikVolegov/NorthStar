@@ -20,16 +20,18 @@ const REQUIRED: EnvEntry[] = [
 ];
 
 const OPTIONAL: EnvEntry[] = [
-  { key: "JWT_SECRET",           description: "Secret JWT — senza questo i token scadono ad ogni restart" },
-  { key: "STRIPE_SECRET_KEY",    description: "Stripe — checkout e abbonamenti disabilitati" },
-  { key: "STRIPE_WEBHOOK_SECRET",description: "Stripe webhooks — eventi pagamento non processati" },
-  { key: "GNEWS_API_KEY",        description: "GNews — scheduler notizie disabilitato" },
-  { key: "TAVILY_API_KEY",       description: "Tavily — scheduler ricerca disabilitato" },
-  { key: "RESEND_API_KEY",       description: "Resend — email reminder e digest settimanale disabilitati" },
-  { key: "VAPID_PUBLIC_KEY",     description: "Web Push — notifiche push disabilitate" },
-  { key: "VAPID_PRIVATE_KEY",    description: "Web Push — notifiche push disabilitate" },
-  { key: "VAPID_EMAIL",          description: "Web Push — notifiche push disabilitate" },
-  { key: "GOOGLE_CLIENT_ID",     description: "Google OAuth — login con Google disabilitato" },
+  { key: "JWT_SECRET",                      description: "Secret JWT — senza questo i token scadono ad ogni restart" },
+  { key: "STRIPE_SECRET_KEY",               description: "Stripe — checkout e abbonamenti disabilitati" },
+  { key: "STRIPE_WEBHOOK_SECRET",           description: "Stripe webhooks — eventi pagamento non processati" },
+  { key: "GNEWS_API_KEY",                   description: "GNews — scheduler notizie disabilitato" },
+  { key: "TAVILY_API_KEY",                  description: "Tavily — scheduler ricerca disabilitato" },
+  { key: "RESEND_API_KEY",                  description: "Resend — email reminder e digest settimanale disabilitati" },
+  { key: "VAPID_PUBLIC_KEY",                description: "Web Push — notifiche push disabilitate" },
+  { key: "VAPID_PRIVATE_KEY",               description: "Web Push — notifiche push disabilitate" },
+  { key: "VAPID_EMAIL",                     description: "Web Push — notifiche push disabilitate" },
+  { key: "GOOGLE_CLIENT_ID",                description: "Google OAuth — login con Google disabilitato" },
+  { key: "AI_INTEGRATIONS_OPENAI_BASE_URL", description: "Integrazione Replit OpenAI — Wiki AI, Roadmap, Growth Research disabilitati" },
+  { key: "AI_INTEGRATIONS_OPENAI_API_KEY",  description: "Integrazione Replit OpenAI — necessaria insieme a AI_INTEGRATIONS_OPENAI_BASE_URL" },
 ];
 
 export interface StartupCheckResult {
