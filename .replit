@@ -1,4 +1,4 @@
-modules = ["nodejs-24", "python-3.11", "postgresql-16"]
+modules = ["nodejs-20", "web", "python-3.11"]
 
 [deployment]
 router = "application"
@@ -61,12 +61,13 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd artifacts/ai-agents && python -m uvicorn main:app --host 0.0.0.0 --port 8000 --no-access-log"
+args = "cd artifacts/ai-agents && python3.12 -m uvicorn main:app --host 0.0.0.0 --port 8000 --no-access-log"
 waitForPort = 8000
 
 [agent]
-stack = "PNPM_WORKSPACE"
+stack = "BEST_EFFORT_FALLBACK"
 expertMode = true
+integrations = ["javascript_openai_ai_integrations:2.0.0", "python_openai_ai_integrations:1.0.0"]
 
 [postMerge]
 path = "scripts/post-merge.sh"
