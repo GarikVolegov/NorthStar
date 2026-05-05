@@ -57,6 +57,7 @@ const Colloquio = lazy(() => import("@/pages/colloquio"));
 const SkillsGap = lazy(() => import("@/pages/skills-gap"));
 const Coach = lazy(() => import("@/pages/coach"));
 const AdminMetriche = lazy(() => import("@/pages/admin-metriche"));
+const AdminStatus = lazy(() => import("@/pages/admin-status"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -188,6 +189,13 @@ function Router() {
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <AdminMetriche />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+      <Route path="/admin/status">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminStatus />
           </Suspense>
         </ErrorBoundary>
       </Route>
