@@ -1,0 +1,94 @@
+Ho analizzato in dettaglio la dashboard, il profilo, e l'intera struttura dell'app.  Ecco tutte le feature che mancano all'utente, raggruppate per area.
+
+***
+
+## 🧠 Personalizzazione & Identità Utente
+
+L'utente attuale ha solo un'iniziale del nome come avatar e nessun modo per arricchire il proprio profilo.  La piattaforma si posiziona come strumento di crescita personale, ma non cattura abbastanza del "chi sei" oltre al test RIASEC.
+
+- **Avatar/foto profilo** — upload immagine o selezione da un set di avatar illustrati tematici (es. spiriti dei Cinque Spiriti come avatar)
+- **Bio personale** — campo testo breve (max 160 caratteri) visibile nel profilo pubblico e nella scheda amici
+- **Tag di skill personali** — l'utente dichiara le skill che già possiede (usate poi nel Skills Gap), separati dai risultati AI
+- **Lingua preferita persistente lato profilo** — ora il cambio lingua è solo in localStorage, ma non è sincronizzato al profilo utente su DB
+
+***
+
+## 📊 Progressione & Gamification
+
+Il Kanban degli obiettivi esiste  ma manca tutto il layer di motivazione e progressione visibile.
+
+- **Streak di utilizzo** — badge che mostra quanti giorni consecutivi l'utente è tornato sulla piattaforma (come Duolingo), visibile in profilo
+- **Livelli di completamento profilo** — barra di progresso `"Profilo al 60%"` con azioni consigliate (completa bio, aggiungi skill, esegui colloquio AI, ecc.)
+- **Badge e traguardi** — sistema di achievement: `"Primo test completato"`, `"Roadmap generata"`, `"5 obiettivi completati"`, `"Profilo condiviso"`, ecc.
+- **Punteggio di prontezza al lavoro** — un numero sintetico (0–100) che aggrega risultato RIASEC + skills gap + obiettivi completati + colloquio AI score
+
+***
+
+## 🔁 Re-engagement & Storico
+
+La pagina Profilo ha un placeholder `"Cronologia test disponibile"` che non mostra nulla di utile. 
+
+- **Storico sessioni test** — lista di tutti i test svolti con data, tipo RIASEC dominante, settori consigliati — con possibilità di confrontare due sessioni nel tempo (vedi come sei cambiato)
+- **Storico sessioni Coach AI** — la pagina `/coach` ha sessioni multiple, ma non c'è accesso rapido alle sessioni passate dal profilo
+- **Storico colloqui simulati** — punteggi dei colloqui AI svolti, per vedere il miglioramento nel tempo
+- **Notifiche in-app leggibili** — il `NotificationBell` esiste già nella navbar , ma non si sa se le notifiche sono persistenti e leggibili in una pagina dedicata
+
+***
+
+## 🤝 Dimensione Sociale
+
+La sezione amici esiste (`/amici`, 22KB) ma è isolata.  La piattaforma ha potenziale social non sfruttato.
+
+- **Feed attività amici** — "Mario ha completato una roadmap in Tech", "Giulia ha raggiunto l'obiettivo X" — opzionale e privacy-first (solo con profilo pubblico)
+- **Confronto settori con un amico** — la pagina `/confronta` esiste ma probabilmente confronta settori generici; permettere di confrontare il proprio profilo RIASEC con quello di un amico
+- **Referral personalizzato** — link di invito unico per l'utente con tracking conversioni, con incentivo (es. mese Premium gratis se porti 3 amici)
+
+***
+
+## 🗓️ Pianificazione & Produttività
+
+Il Calendario esiste (`/calendario`) ma il suo scope non è chiaro dal codice. 
+
+- **Integrazione obiettivi ↔ calendario** — ogni obiettivo del Kanban dovrebbe avere una scadenza che appare automaticamente nel calendario
+- **Promemoria settmanali personalizzati** — l'utente sceglie quali aree monitorare (roadmap, obiettivi, colloqui) e riceve il Weekly Digest email già implementato  arricchito con i suoi progressi reali
+- **Slot "focus time"** — blocchi di tempo dedicati allo studio/preparazione, collegati ai percorsi formativi consigliati nella dashboard
+
+***
+
+## 💼 Candidature & Job Tracker
+
+La pagina `/candidature` esiste (40KB — la più grande dopo results)  ma probabilmente è ancora in sviluppo.
+
+- **Kanban candidature** — colonne: `Da inviare / Inviata / Colloquio / Offerta / Rifiutata` — con drag-and-drop come gli obiettivi
+- **Template lettera di presentazione AI** — input: ruolo + azienda → output: bozza personalizzata basata sul profilo RIASEC dell'utente
+- **Reminder follow-up** — se una candidatura è in stato "Inviata" da più di 2 settimane, mostra un promemoria
+- **Collegamento ruoli/settori** — ogni candidatura è linkabile a un settore o ruolo da `/ruoli` e `/settori`, così i consigli AI rimangono contestuali
+
+***
+
+## 🔔 Onboarding Post-Registrazione
+
+Il modal di onboarding esiste (4 step)  ma è limitato ai risultati del test. Manca un onboarding progressivo per gli utenti che tornano.
+
+- **"Prossimo passo" dinamico** — un widget in dashboard/profilo che suggerisce sempre la cosa più utile da fare in base a dove è arrivato l'utente (es. "Hai fatto il test ma non hai ancora generato una roadmap → Fallo ora")
+- **Tour guidato interattivo** — al primo accesso post-login, highlight delle sezioni principali con tooltips (usa una libreria come `driver.js` o `intro.js`)
+- **Checklist di attivazione** — lista di 5–7 azioni da completare la prima settimana, con progress bar (`"Completa il tuo profilo"`, `"Esplora il tuo settore consigliato"`, `"Genera la tua Roadmap"`, ecc.)
+
+***
+
+## Priorità per Impatto
+
+| Feature | Impatto utente | Difficoltà | Priorità |
+|---------|---------------|------------|----------|
+| Storico sessioni test con confronto | 🔴 Alto | Media | **1** |
+| Barra completamento profilo + next step | 🔴 Alto | Bassa | **2** |
+| Integrazione obiettivi ↔ calendario | 🟠 Medio | Media | **3** |
+| Kanban candidature completo | 🟠 Medio | Alta | **4** |
+| Template lettera AI | 🟠 Medio | Media | **5** |
+| Streak + badge gamification | 🟡 Medio | Media | **6** |
+| Feed attività amici | 🟡 Medio | Alta | **7** |
+| Tour guidato onboarding | 🟡 Medio | Bassa | **8** |
+
+Vuoi che generi un file Markdown di istruzioni per Replit Agent su una di queste feature specifiche?
+
+Fonti

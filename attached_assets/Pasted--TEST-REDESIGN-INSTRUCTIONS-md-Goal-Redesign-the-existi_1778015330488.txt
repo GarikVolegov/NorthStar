@@ -1,0 +1,157 @@
+# TEST_REDESIGN_INSTRUCTIONS.md
+
+## Goal
+
+Redesign the existing `artifacts/orientamento/src/pages/test.tsx` experience into a single guided assessment flow.
+
+The test must feel:
+- linear
+- immersive
+- precise
+- contextual
+- accessible
+- audio-enabled
+
+The user must NOT perceive multiple tests. The current RIASEC + Five Spirits structure should remain logically valid, but UX must present it as one single journey.
+
+---
+
+## Core UX changes
+
+### 1. One-question-per-screen flow
+Refactor the test page so that each step shows:
+- short contextual introduction
+- one precise question
+- one fixed answer scale
+
+Do not show multiple questions on the same screen.
+
+### 2. Keep one unified test
+Do not visually separate “RIASEC test” and “Five Spirits test”.
+Internally, the scoring model can remain distinct, but the UI must present a single path.
+
+Use section transitions like:
+- “Ora approfondiamo come ti muovi nelle situazioni che contano.”
+- “Stiamo completando il tuo profilo personale.”
+
+Do NOT use labels like:
+- “Second test”
+- “Spirits test”
+- “Module 2”
+
+### 3. Question format
+Each question must support this structure:
+- `context`: short situational intro, 1–2 sentences max
+- `prompt`: direct question, concrete and specific
+- `answers`: fixed 1–5 Likert scale
+
+Suggested labels:
+1 = Per niente
+2 = Poco
+3 = Abbastanza
+4 = Molto
+5 = Tantissimo
+
+### 4. Audio support for each step
+Add audio playback for every question screen:
+- read `context` + `prompt`
+- use browser Web Speech API (`speechSynthesis`)
+- add a button “Ascolta”
+- add an optional toggle for “Riproduci automaticamente le domande”
+
+If autoplay is blocked, manual play must still work.
+
+### 5. Better intro
+Create a proper intro screen before the test starts:
+- explain the purpose
+- estimated duration
+- reassure the user that there are no right or wrong answers
+- CTA button: “Inizia il percorso”
+
+### 6. Better progress feedback
+Add a persistent progress header with:
+- current step
+- percentage
+- lightweight narrative label
+
+Examples:
+- “Stai costruendo il tuo profilo”
+- “Siamo quasi alla fine”
+- “Ultimi passaggi”
+
+Avoid cold wording like “Question 8/17” only.
+You can still show numerical progress, but pair it with human text.
+
+### 7. Auto-save
+Persist the current step and current answers in localStorage.
+If the user refreshes the page, offer:
+- “Riprendi da dove eri rimasto”
+- “Ricomincia”
+
+### 8. Transition screens
+Add short transition screens after major internal blocks.
+Example after core RIASEC questions:
+- title: “Ottimo, stiamo entrando più in profondità”
+- subtitle: “Ora ci concentriamo sul tuo modo interiore di orientarti nelle scelte.”
+
+Keep these very short.
+
+---
+
+## Technical refactor
+
+### Create these components
+
+Under `artifacts/orientamento/src/components/test/` create:
+
+- `TestIntro.tsx`
+- `ProgressHeader.tsx`
+- `QuestionCard.tsx`
+- `QuestionAudioPlayer.tsx`
+- `SectionTransition.tsx`
+- `ResumeTestDialog.tsx`
+
+### Responsibilities
+
+#### TestIntro.tsx
+- intro copy
+- estimated duration
+- CTA start button
+
+#### ProgressHeader.tsx
+- progress bar
+- step counter
+- friendly narrative progress label
+
+#### QuestionCard.tsx
+- render context
+- render prompt
+- render scale buttons 1–5
+- next/previous navigation
+
+#### QuestionAudioPlayer.tsx
+- accepts `text`
+- uses `window.speechSynthesis`
+- supports play / stop
+- supports auto-play mode
+
+#### SectionTransition.tsx
+- micro transition between internal sections
+
+#### ResumeTestDialog.tsx
+- shown when draft data exists in localStorage
+
+---
+
+## Data model changes
+
+Refactor question data structure to something like:
+
+```ts
+type TestQuestion = {
+  id: string;
+  dimension: "R" | "I" | "A" | "S" | "E" | "C" | "SHEN" | "HUN" | "PO" | "YI" | "ZHI";
+  section: "core" | "inner";
+  context: string;
+  prompt: string;
+};
