@@ -62,6 +62,13 @@ lib/
 - Admin dashboard with metrics, review queue, AI prompt management
 - Email notifications (Resend), Web Push, Calendar reminders, Weekly digest
 - Stripe subscription for premium tier
+- **T001** Test session history: `GET /api/test-sessions/history` → TestHistoryCard in profilo
+- **T002** Profile completion bar: `GET /api/completion/me` → ProfileCompletionCard (5 steps, % score)
+- **T003** Objectives ↔ calendar: POST/DELETE objectives auto-sync calendarEventsTable
+- **T004** Candidature Kanban drag-and-drop (HTML5 drag API, no lib dep)
+- **T005** AI cover letter: `POST /api/cover-letter/generate` → CoverLetterDialog (Sparkles btn on AppCard)
+- **T006** Streak + badge gamification: `streak_days`/`last_active_at` on users, 6 badges in profilo
+- **T008** Onboarding banner: first-login checklist in UserDashboard (localStorage dismiss)
 
 ## User preferences
 
@@ -76,6 +83,8 @@ lib/
 - esbuild externalizes many native packages (see `build.mjs` external list)
 - pnpm workspace — always run from root or use `--filter` flag
 - Growth research scheduler expects OpenAI to return valid JSON; may warn if model truncates output
+- `completion/me` uses raw SQL for `streak_days`/`last_active_at` (schema pushed, Drizzle types auto-refreshed)
+- Existing tsc errors (api-client-react unbuilt dist, any-typed params in ruolo/sector etc.) are pre-existing, not introduced by T001-T008
 
 ## Pointers
 

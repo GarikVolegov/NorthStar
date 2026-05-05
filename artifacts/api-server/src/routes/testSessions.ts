@@ -33,6 +33,39 @@ import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
+/* ── T001: Test history ── */
+router.get("/test-sessions/history", async (req, res): Promise<void> => {
+  const userId = getAuthenticatedUserId(req);
+  if (!userId) {
+    res.status(401).json({ error: "Non autenticato" });
+    return;
+  }
+
+  const sessions = await db
+    .select()
+    .from(testSessionsTable)
+    .where(eq(testSessionsTable.userId, userId))
+    .orderBy(desc(testSessionsTable.createdAt))
+    .limit(20);
+
+  res.json(
+    sessions.map((s) => ({
+      id: s.id,
+      primaryTypes: (s.primaryTypes as string[]) ?? [],
+      riasecScores: (s.riasecScores as Record<string, number>) ?? {},
+      recommendations: (
+        (s.recommendations as Array<{
+          sectorId: number;
+          sectorName: string;
+          matchScore: number;
+        }>) ?? []
+      ).slice(0, 3),
+      createdAt: (s.createdAt as Date).toISOString(),
+      confirmedSectorId: s.confirmedSectorId ?? null,
+    })),
+  );
+});
+
 router.post("/test-sessions", async (req, res): Promise<void> => {
   const parsed = SubmitTestBody.safeParse(req.body);
   if (!parsed.success) {

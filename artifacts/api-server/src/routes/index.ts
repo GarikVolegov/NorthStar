@@ -39,6 +39,8 @@ import skillsGapRouter from "./skills-gap";
 import coachRouter from "./coach";
 import adminMetricsRouter from "./admin-metrics";
 import adminPromptsRouter from "./admin-prompts";
+import coverLetterRouter from "./cover-letter";
+import completionRouter from "./completion";
 
 const router: IRouter = Router();
 
@@ -82,5 +84,7 @@ router.use(interviewRouter);
 router.use(skillsGapRouter);
 router.use(coachRouter);
 router.use(adminMetricsRouter);
+router.use(coverLetterRouter);
+router.use(completionRouter);
 
 export default router;

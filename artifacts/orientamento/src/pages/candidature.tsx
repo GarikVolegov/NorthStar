@@ -18,8 +18,9 @@ import {
   Building2, Briefcase, MapPin, DollarSign, FileText,
   Link2, Star, Calendar, AlertCircle, Bell, X,
   BarChart3, TrendingUp, ArrowRight, StickyNote, Send,
-  ChevronUp, Clock,
+  ChevronUp, Clock, Copy, Sparkles, GripVertical,
 } from "lucide-react";
+import { apiFetch } from "@/lib/api-fetch";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 
@@ -94,6 +95,8 @@ export default function Candidature() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
   const [view, setView] = useState<"kanban" | "stats">("kanban");
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [coverLetterApp, setCoverLetterApp] = useState<Application | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["applications", user?.id],
@@ -311,7 +314,25 @@ export default function Candidature() {
               const meta = STATUS_META[status];
               const cards = byStatus[status];
               return (
-                <div key={status} className="flex-shrink-0 w-[300px] md:w-[285px] xl:w-[300px] flex flex-col">
+                <div
+                  key={status}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const appId = parseInt(e.dataTransfer.getData("appId"), 10);
+                    if (!isNaN(appId)) {
+                      const existing = applications.find((a) => a.id === appId);
+                      if (existing && existing.status !== status) {
+                        updateMutation.mutate({ id: appId, updates: { status } });
+                      }
+                      setDraggingId(null);
+                    }
+                  }}
+                  className={cn(
+                    "flex-shrink-0 w-[300px] md:w-[285px] xl:w-[300px] flex flex-col rounded-xl transition-colors",
+                    draggingId !== null && "ring-2 ring-inset ring-primary/10",
+                  )}
+                >
                   <div className={cn("flex items-center gap-2 px-3 py-2.5 rounded-xl mb-3", meta.bg)}>
                     <span className="text-base">{meta.emoji}</span>
                     <span className={cn("text-sm font-semibold flex-1", meta.color)}>{t(`candidature.status.${status}`)}</span>
@@ -335,6 +356,10 @@ export default function Candidature() {
                           onDelete={() => deleteMutation.mutate(app.id)}
                           onStatusChange={(s) => updateMutation.mutate({ id: app.id, updates: { status: s } })}
                           deleting={deleteMutation.isPending && deleteMutation.variables === app.id}
+                          isDragging={draggingId === app.id}
+                          onDragStart={(e) => { (e as any).dataTransfer.setData("appId", String(app.id)); setDraggingId(app.id); }}
+                          onDragEnd={() => setDraggingId(null)}
+                          onCoverLetter={() => setCoverLetterApp(app)}
                         />
                       ))
                     )}
@@ -441,7 +466,108 @@ export default function Candidature() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {coverLetterApp && (
+        <CoverLetterDialog app={coverLetterApp} onClose={() => setCoverLetterApp(null)} />
+      )}
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   AI Cover-letter dialog
+═══════════════════════════════════════════════════════════════════════ */
+function CoverLetterDialog({ app, onClose }: { app: Application; onClose: () => void }) {
+  const [jobDescription, setJobDescription] = useState("");
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function generate() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`${BASE}api/cover-letter/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company: app.company, role: app.role, jobDescription }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Errore generazione");
+      setText(data.text ?? "");
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function copyToClipboard() {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" /> Lettera di presentazione AI
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="flex items-center gap-2 text-sm">
+            <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="font-medium">{app.company}</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-muted-foreground">{app.role}</span>
+          </div>
+          <div>
+            <Label className="text-xs font-semibold mb-1.5 block">
+              Descrizione posizione{" "}
+              <span className="font-normal text-muted-foreground">(facoltativo)</span>
+            </Label>
+            <Textarea
+              value={jobDescription}
+              onChange={(e) => setJobDescription(e.target.value)}
+              placeholder="Incolla la descrizione dell'annuncio per una lettera più personalizzata…"
+              className="min-h-[80px] rounded-xl text-sm resize-none"
+            />
+          </div>
+          <Button onClick={generate} disabled={loading} className="w-full rounded-xl gap-2">
+            {loading
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Generazione in corso…</>
+              : <><Sparkles className="w-4 h-4" /> {text ? "Rigenera lettera" : "Genera lettera AI"}</>}
+          </Button>
+          {error && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+              <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
+              <p className="text-xs text-destructive">{error}</p>
+            </div>
+          )}
+          {text && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold">Lettera generata</Label>
+                <button onClick={copyToClipboard} className="flex items-center gap-1 text-xs text-primary hover:underline">
+                  <Copy className="w-3 h-3" /> {copied ? "Copiato!" : "Copia"}
+                </button>
+              </div>
+              <Textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                className="min-h-[240px] rounded-xl text-sm"
+              />
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" className="rounded-xl" onClick={onClose}>Chiudi</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -450,6 +576,7 @@ export default function Candidature() {
 ═══════════════════════════════════════════════════════════════════════ */
 function AppCard({
   app, userId, onEdit, onDelete, onStatusChange, deleting,
+  isDragging, onDragStart, onDragEnd, onCoverLetter,
 }: {
   app: Application;
   userId: number;
@@ -457,6 +584,10 @@ function AppCard({
   onDelete: () => void;
   onStatusChange: (s: AppStatus) => void;
   deleting: boolean;
+  isDragging: boolean;
+  onDragStart: (e: DragEvent) => void;
+  onDragEnd: () => void;
+  onCoverLetter: () => void;
 }) {
   const { t } = useTranslation();
   const formatDate = useFormatDate();
@@ -505,10 +636,16 @@ function AppCard({
   }
 
   return (
-    <div className={cn(
-      "bg-background rounded-xl border border-l-4 shadow-sm hover:shadow-md transition-all",
-      meta.border,
-    )}>
+    <div
+      draggable
+      onDragStart={onDragStart as any}
+      onDragEnd={onDragEnd}
+      className={cn(
+        "bg-background rounded-xl border border-l-4 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing",
+        meta.border,
+        isDragging && "opacity-50 scale-[0.97]",
+      )}
+    >
       {/* ── Clickable card body ── */}
       <div className="p-3 cursor-pointer" onClick={onEdit}>
         {/* Company + Delete */}
@@ -571,6 +708,14 @@ function AppCard({
             <ExternalLink className="w-3 h-3" />
           </a>
         )}
+
+        <button
+          onClick={(e) => { e.stopPropagation(); onCoverLetter(); }}
+          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-violet-600 transition-colors"
+          title="Genera lettera di presentazione AI"
+        >
+          <Sparkles className="w-3 h-3" />
+        </button>
 
         {/* Notes toggle */}
         <button

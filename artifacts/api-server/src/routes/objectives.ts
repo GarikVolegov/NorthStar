@@ -1,7 +1,46 @@
 import { Router, type IRouter } from "express";
-import { db, userObjectivesTable } from "@workspace/db";
+import { db, userObjectivesTable, calendarEventsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth-jwt";
+
+async function syncCalendarEvent(
+  userId: number,
+  objectiveId: number,
+  text: string,
+  dueDate: string,
+): Promise<void> {
+  try {
+    const start = new Date(dueDate);
+    start.setHours(9, 0, 0, 0);
+    const end = new Date(start);
+    end.setHours(9, 30, 0, 0);
+    await db.insert(calendarEventsTable).values({
+      userId,
+      title: `Scadenza: ${text}`,
+      startAt: start,
+      endAt: end,
+      allDay: true,
+      category: "task",
+      priority: "medium",
+      status: "todo",
+      linkedGoal: `objective:${objectiveId}`,
+      tags: [],
+      linkedContentIds: [],
+    });
+  } catch {
+    /* non bloccante */
+  }
+}
+
+async function deleteLinkedCalendarEvent(objectiveId: number): Promise<void> {
+  try {
+    await db
+      .delete(calendarEventsTable)
+      .where(eq(calendarEventsTable.linkedGoal, `objective:${objectiveId}`));
+  } catch {
+    /* non bloccante */
+  }
+}
 
 const router: IRouter = Router();
 
@@ -38,6 +77,10 @@ router.post("/objectives", async (req, res): Promise<void> => {
     progress: 0,
   }).returning();
 
+  if (dueDate && obj) {
+    await syncCalendarEvent(userId, obj.id, obj.text, dueDate);
+  }
+
   res.status(201).json(obj);
 });
 
@@ -71,6 +114,7 @@ router.patch("/objectives/:id", async (req, res): Promise<void> => {
 router.delete("/objectives/:id", async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
+  await deleteLinkedCalendarEvent(id);
   await db.delete(userObjectivesTable).where(eq(userObjectivesTable.id, id));
   res.json({ ok: true });
 });

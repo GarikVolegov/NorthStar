@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, User, Mail, Calendar, CheckCircle2, KeyRound, Sparkles, ShieldCheck, Globe, Lock, Bookmark, X, Users, Briefcase } from "lucide-react";
+import { Loader2, User, Mail, Calendar, CheckCircle2, KeyRound, Sparkles, ShieldCheck, Globe, Lock, Bookmark, X, Users, Briefcase, Trophy, Flame, Award } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,6 +17,9 @@ import { ProssimiEventi } from "@/components/calendario/ProssimiEventi";
 import { WorkModeSelector, useWorkPreference } from "@/components/WorkModeSelector";
 import type { WorkPreference } from "@/components/WorkModeSelector";
 import { useTranslation } from "react-i18next";
+import { TestHistoryCard } from "@/components/TestHistoryCard";
+import { ProfileCompletionCard } from "@/components/ProfileCompletionCard";
+import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -337,10 +340,47 @@ function WorkModeCard({ userId }: { userId: number }) {
   );
 }
 
+type CompletionResponse = {
+  hasTestSession: boolean;
+  hasConfirmedSector: boolean;
+  hasWorkPreference: boolean;
+  hasCv: boolean;
+  isPublic: boolean;
+  streakDays: number;
+  totalObjectives: number;
+  completedObjectives: number;
+};
+
+const BADGE_DEFS: Array<{
+  id: string;
+  emoji: string;
+  label: string;
+  check: (d: CompletionResponse) => boolean;
+}> = [
+  { id: "test",      emoji: "🧠", label: "Primo test",          check: (d) => d.hasTestSession },
+  { id: "sector",    emoji: "🎯", label: "Settore scelto",      check: (d) => d.hasConfirmedSector },
+  { id: "cv",        emoji: "📄", label: "CV caricato",         check: (d) => d.hasCv },
+  { id: "shared",    emoji: "🌐", label: "Profilo pubblico",    check: (d) => d.isPublic },
+  { id: "objectives",emoji: "🏆", label: "5 obiettivi fatti",   check: (d) => d.completedObjectives >= 5 },
+  { id: "streak",    emoji: "🔥", label: "Streak 3 giorni",     check: (d) => d.streakDays >= 3 },
+];
+
 export default function Profilo() {
   const { t } = useTranslation();
   const { user, logout, isLoggedIn } = useAuth();
   const { data: profile } = useProfile(user?.id ?? 0);
+
+  const { data: completionData } = useQuery<CompletionResponse | null>({
+    queryKey: ["completion-me"],
+    queryFn: async () => {
+      const res = await apiFetch(`${BASE}api/completion/me`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!user?.id,
+    staleTime: 60_000,
+    retry: false,
+  });
 
   if (!isLoggedIn || !user) {
     return (
@@ -414,21 +454,58 @@ export default function Profilo() {
           </Card>
 
           <PrivacyCard userId={user.id} />
+          {completionData && (
+            <Card className="rounded-2xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Trophy className="w-4 h-4 text-primary" /> Achievement
+                  {completionData.streakDays > 0 && (
+                    <span className="ml-auto flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                      <Flame className="w-3 h-3" /> {completionData.streakDays} {completionData.streakDays === 1 ? "giorno" : "giorni"}
+                    </span>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-2">
+                  {BADGE_DEFS.map((b) => {
+                    const earned = b.check(completionData);
+                    return (
+                      <div
+                        key={b.id}
+                        className={cn(
+                          "flex items-center gap-2 p-2 rounded-xl border text-xs",
+                          earned
+                            ? "bg-primary/5 border-primary/20 text-foreground"
+                            : "bg-muted/30 border-border text-muted-foreground opacity-40",
+                        )}
+                      >
+                        <span className={cn("text-base", !earned && "grayscale")}>{b.emoji}</span>
+                        <span className="font-medium leading-tight">{b.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <div className="md:col-span-2 space-y-5">
           <ProssimiEventi userId={user.id} limit={5} />
+          {completionData && (
+            <ProfileCompletionCard
+              data={{
+                hasTestSession: completionData.hasTestSession,
+                hasConfirmedSector: completionData.hasConfirmedSector,
+                hasWorkPreference: completionData.hasWorkPreference,
+                hasCv: completionData.hasCv,
+                hasObjectives: completionData.totalObjectives > 0,
+              }}
+            />
+          )}
           <WorkModeCard userId={user.id} />
-          <Card className="rounded-2xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-primary" /> {t("profilo.testHistory", { defaultValue: "Cronologia test" })}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{t("profilo.historyAvailable", { defaultValue: "Cronologia disponibile." })}</p>
-            </CardContent>
-          </Card>
+          <TestHistoryCard />
           <SavedItems />
           <div>
             <h2 className="font-semibold text-base mb-3 flex items-center gap-2">

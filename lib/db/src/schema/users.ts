@@ -25,6 +25,8 @@ export const usersTable = pgTable("users", {
   workPreference: text("work_preference").default("unknown"),
   autonomyPreference: integer("autonomy_preference").default(5),
   stabilityPreference: integer("stability_preference").default(5),
+  lastActiveAt: timestamp("last_active_at", { withTimezone: true }),
+  streakDays: integer("streak_days").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
