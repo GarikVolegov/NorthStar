@@ -27,14 +27,16 @@ router.get("/healthz", (_req, res) => {
 });
 
 // ─── GET /api/health ──────────────────────────────────────────────────────────
-// Full health check: DB, Python AI Service, variabili d'ambiente.
+// Full health check: DB, Python AI Service, OpenAI integration, env vars.
 router.get("/health", async (_req, res): Promise<void> => {
   const AI_AGENTS_URL = process.env.AI_AGENTS_URL ?? "http://localhost:8000";
+  const OPENAI_BASE_URL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
 
-  // Check DB and AI Service in parallel
-  const [dbResult, aiResult] = await Promise.all([
+  // Run all service checks in parallel
+  const [dbResult, aiResult, openaiResult] = await Promise.all([
     checkDatabase(),
     checkAiService(AI_AGENTS_URL),
+    checkOpenAI(OPENAI_BASE_URL),
   ]);
 
   // Env var status
@@ -45,9 +47,12 @@ router.get("/health", async (_req, res): Promise<void> => {
     REQUIRED_VARS.filter((k) => !!process.env[k]).length +
     OPTIONAL_VARS.filter((k) => !!process.env[k]).length;
 
-  // Overall status
+  // Overall status — OpenAI degraded is not a hard error (gracefully disabled)
   const hasError = dbResult.status === "error" || missingRequired.length > 0;
-  const hasDegraded = aiResult.status !== "ok" || missingOptional.length > 0;
+  const hasDegraded =
+    aiResult.status !== "ok" ||
+    openaiResult.status !== "ok" ||
+    missingOptional.length > 0;
   const overallStatus = hasError ? "error" : hasDegraded ? "degraded" : "ok";
 
   const statusCode = hasError ? 503 : 200;
@@ -59,6 +64,7 @@ router.get("/health", async (_req, res): Promise<void> => {
     services: {
       database: dbResult,
       aiAgents: aiResult,
+      openai: openaiResult,
     },
     env: {
       configured: configuredVars,
@@ -108,6 +114,52 @@ async function checkAiService(baseUrl: string): Promise<{ status: string; latenc
       status: isTimeout ? "timeout" : "unreachable",
       latencyMs: Date.now() - t0,
       error: isTimeout ? "timeout after 3s" : (err instanceof Error ? err.message : String(err)),
+    };
+  }
+}
+
+async function checkOpenAI(
+  baseUrl: string | undefined,
+): Promise<{ status: string; latencyMs: number; configured: boolean; error?: string }> {
+  if (!baseUrl) {
+    return {
+      status: "not_configured",
+      latencyMs: 0,
+      configured: false,
+      error: "AI_INTEGRATIONS_OPENAI_BASE_URL non impostato — integrazione Replit OpenAI non attiva",
+    };
+  }
+
+  const t0 = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4000);
+  try {
+    // Probe the models endpoint — lightweight, no token consumed
+    const r = await fetch(`${baseUrl}/models`, {
+      headers: {
+        Authorization: `Bearer ${process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? "dummy"}`,
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    // 200 or 401 both mean the endpoint is reachable
+    if (r.ok || r.status === 401 || r.status === 403) {
+      return { status: "ok", latencyMs: Date.now() - t0, configured: true };
+    }
+    return {
+      status: "error",
+      latencyMs: Date.now() - t0,
+      configured: true,
+      error: `HTTP ${r.status}`,
+    };
+  } catch (err) {
+    clearTimeout(timeout);
+    const isTimeout = err instanceof Error && err.name === "AbortError";
+    return {
+      status: isTimeout ? "timeout" : "unreachable",
+      latencyMs: Date.now() - t0,
+      configured: true,
+      error: isTimeout ? "timeout after 4s" : (err instanceof Error ? err.message : String(err)),
     };
   }
 }

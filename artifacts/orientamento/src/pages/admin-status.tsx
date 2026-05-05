@@ -4,7 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw, Database, Bot, ShieldCheck, ShieldAlert, Clock, Loader2, CheckCircle2, XCircle, AlertTriangle, Wifi } from "lucide-react";
+import {
+  RefreshCw, Database, Bot, Clock, Loader2,
+  CheckCircle2, XCircle, AlertTriangle, Wifi, Sparkles,
+} from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 const REFRESH_INTERVAL_MS = 15_000;
@@ -13,6 +16,7 @@ interface ServiceStatus {
   status: string;
   latencyMs: number;
   error?: string;
+  configured?: boolean;
 }
 
 interface HealthData {
@@ -22,6 +26,7 @@ interface HealthData {
   services: {
     database: ServiceStatus;
     aiAgents: ServiceStatus;
+    openai: ServiceStatus;
   };
   env: {
     configured: number;
@@ -33,18 +38,19 @@ interface HealthData {
 
 function statusColor(s: string) {
   if (s === "ok") return "text-emerald-600 dark:text-emerald-400";
-  if (s === "degraded") return "text-amber-500 dark:text-amber-400";
+  if (s === "degraded" || s === "not_configured") return "text-amber-500 dark:text-amber-400";
   return "text-red-500 dark:text-red-400";
 }
 
 function statusBg(s: string) {
   if (s === "ok") return "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800";
-  if (s === "degraded") return "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800";
+  if (s === "degraded" || s === "not_configured") return "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800";
   return "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800";
 }
 
 function StatusIcon({ status, size = 20 }: { status: string; size?: number }) {
   if (status === "ok") return <CheckCircle2 size={size} className="text-emerald-500" />;
+  if (status === "not_configured") return <AlertTriangle size={size} className="text-amber-500" />;
   if (status === "degraded") return <AlertTriangle size={size} className="text-amber-500" />;
   if (status === "timeout" || status === "unreachable") return <Wifi size={size} className="text-orange-500" />;
   return <XCircle size={size} className="text-red-500" />;
@@ -54,16 +60,19 @@ function ServiceCard({
   title,
   icon,
   service,
+  note,
 }: {
   title: string;
   icon: React.ReactNode;
   service: ServiceStatus;
+  note?: string;
 }) {
+  const showLatency = service.status !== "not_configured" && service.latencyMs > 0;
   return (
     <Card className={`border ${statusBg(service.status)}`}>
       <CardContent className="pt-5">
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2 font-medium">
+          <div className="flex items-center gap-2 font-medium text-sm">
             <span className="text-muted-foreground">{icon}</span>
             {title}
           </div>
@@ -74,14 +83,17 @@ function ServiceCard({
             variant="outline"
             className={`text-xs font-mono capitalize ${statusColor(service.status)}`}
           >
-            {service.status}
+            {service.status.replace("_", " ")}
           </Badge>
-          <span className="text-xs text-muted-foreground font-mono">
-            {service.latencyMs} ms
-          </span>
+          {showLatency && (
+            <span className="text-xs text-muted-foreground font-mono">{service.latencyMs} ms</span>
+          )}
         </div>
         {service.error && (
-          <p className="mt-2 text-xs text-red-500 font-mono break-all">{service.error}</p>
+          <p className="mt-2 text-xs text-muted-foreground break-all leading-relaxed">{service.error}</p>
+        )}
+        {note && !service.error && (
+          <p className="mt-2 text-xs text-muted-foreground">{note}</p>
         )}
       </CardContent>
     </Card>
@@ -110,8 +122,7 @@ export default function AdminStatus() {
     try {
       const res = await fetch(`${BASE}api/health`);
       if (res.ok || res.status === 503) {
-        const json = await res.json();
-        setData(json);
+        setData(await res.json());
         setLastRefresh(new Date());
         setCountdown(REFRESH_INTERVAL_MS / 1000);
       }
@@ -129,9 +140,7 @@ export default function AdminStatus() {
 
   useEffect(() => {
     if (!adminKey || !lastRefresh) return;
-    const tick = setInterval(() => {
-      setCountdown((c) => (c > 0 ? c - 1 : 0));
-    }, 1000);
+    const tick = setInterval(() => setCountdown((c) => (c > 0 ? c - 1 : 0)), 1000);
     return () => clearInterval(tick);
   }, [adminKey, lastRefresh]);
 
@@ -178,12 +187,7 @@ export default function AdminStatus() {
               </p>
             )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchHealth}
-            disabled={loading}
-          >
+          <Button variant="outline" size="sm" onClick={fetchHealth} disabled={loading}>
             {loading
               ? <Loader2 size={14} className="animate-spin mr-1" />
               : <RefreshCw size={14} className="mr-1" />}
@@ -192,17 +196,19 @@ export default function AdminStatus() {
         </div>
 
         {/* Overall status banner */}
-        {!data && loading && (
-          <Skeleton className="h-20 w-full rounded-xl" />
-        )}
+        {!data && loading && <Skeleton className="h-20 w-full rounded-xl" />}
         {data && (
           <Card className={`border-2 ${statusBg(data.status)}`}>
             <CardContent className="pt-5">
               <div className="flex items-center gap-3">
                 <StatusIcon status={data.status} size={28} />
                 <div>
-                  <p className={`text-lg font-bold capitalize ${statusColor(data.status)}`}>
-                    {data.status === "ok" ? "Tutto operativo" : data.status === "degraded" ? "Funzionalità ridotte" : "Errore critico"}
+                  <p className={`text-lg font-bold ${statusColor(data.status)}`}>
+                    {data.status === "ok"
+                      ? "Tutto operativo"
+                      : data.status === "degraded"
+                      ? "Funzionalità ridotte"
+                      : "Errore critico"}
                   </p>
                   <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                     <Clock size={11} />
@@ -218,21 +224,42 @@ export default function AdminStatus() {
         <div>
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Servizi</h2>
           {!data && loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Skeleton className="h-28 rounded-xl" />
               <Skeleton className="h-28 rounded-xl" />
               <Skeleton className="h-28 rounded-xl" />
             </div>
           ) : data ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <ServiceCard title="Database" icon={<Database size={16} />} service={data.services.database} />
-              <ServiceCard title="AI Agents" icon={<Bot size={16} />} service={data.services.aiAgents} />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <ServiceCard
+                title="Database"
+                icon={<Database size={15} />}
+                service={data.services.database}
+              />
+              <ServiceCard
+                title="AI Agents (Python)"
+                icon={<Bot size={15} />}
+                service={data.services.aiAgents}
+              />
+              <ServiceCard
+                title="OpenAI Integration"
+                icon={<Sparkles size={15} />}
+                service={data.services.openai}
+                note={
+                  data.services.openai.configured === false
+                    ? "Attiva l'integrazione OpenAI su Replit per abilitare Wiki, Roadmap e Growth Research."
+                    : undefined
+                }
+              />
             </div>
           ) : null}
         </div>
 
         {/* Env vars */}
         <div>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Variabili d'ambiente</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            Variabili d'ambiente
+          </h2>
           {!data && loading ? (
             <Skeleton className="h-32 rounded-xl" />
           ) : data ? (
@@ -246,7 +273,7 @@ export default function AdminStatus() {
                 </div>
 
                 {data.env.missingRequired.length > 0 && (
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <p className="text-xs font-semibold text-red-500 flex items-center gap-1">
                       <XCircle size={12} /> Obbligatorie mancanti
                     </p>
@@ -259,13 +286,19 @@ export default function AdminStatus() {
                 )}
 
                 {data.env.missingOptional.length > 0 && (
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <p className="text-xs font-semibold text-amber-500 flex items-center gap-1">
                       <AlertTriangle size={12} /> Opzionali non impostate
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {data.env.missingOptional.map((k) => (
-                        <Badge key={k} variant="outline" className="font-mono text-xs text-amber-600 border-amber-300">{k}</Badge>
+                        <Badge
+                          key={k}
+                          variant="outline"
+                          className="font-mono text-xs text-amber-600 border-amber-300"
+                        >
+                          {k}
+                        </Badge>
                       ))}
                     </div>
                   </div>
