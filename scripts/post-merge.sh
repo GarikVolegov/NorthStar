@@ -8,7 +8,19 @@ echo "▶ [post-merge] Installazione dipendenze Python (AI service)..."
 pip install -q -r artifacts/ai-agents/requirements.txt
 
 echo "▶ [post-merge] Applicazione schema database..."
-pnpm --filter @workspace/db push
+if [[ -z "${DATABASE_URL:-}" ]]; then
+  echo ""
+  echo "✗  [post-merge] DATABASE_URL non impostato — schema DB saltato."
+  echo ""
+  echo "   Per creare il database:"
+  echo "     1. Vai su Tools → Database in Replit"
+  echo "     2. Clicca 'Create a database'"
+  echo "     3. DATABASE_URL verrà impostato automaticamente nei Secrets"
+  echo "     4. Riavvia il server o riesegui: bash scripts/post-merge.sh"
+  echo ""
+else
+  pnpm --filter @workspace/db push
+fi
 
 echo "✓ [post-merge] Completato."
 
