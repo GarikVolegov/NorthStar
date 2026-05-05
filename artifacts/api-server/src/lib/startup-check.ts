@@ -14,8 +14,9 @@ interface EnvEntry {
 }
 
 const REQUIRED: EnvEntry[] = [
-  { key: "DATABASE_URL", description: "Connessione PostgreSQL — necessaria per tutto" },
-  { key: "ADMIN_KEY",    description: "Chiave di accesso alle route /admin/*" },
+  { key: "DATABASE_URL",  description: "Connessione PostgreSQL — necessaria per tutto" },
+  { key: "ADMIN_KEY",     description: "Chiave di accesso alle route /admin/*" },
+  { key: "AI_AGENTS_URL", description: "Python AI Service — Wiki, Roadmap e Grafo RAG non funzionano senza" },
 ];
 
 const OPTIONAL: EnvEntry[] = [
@@ -24,7 +25,6 @@ const OPTIONAL: EnvEntry[] = [
   { key: "STRIPE_WEBHOOK_SECRET",description: "Stripe webhooks — eventi pagamento non processati" },
   { key: "GNEWS_API_KEY",        description: "GNews — scheduler notizie disabilitato" },
   { key: "TAVILY_API_KEY",       description: "Tavily — scheduler ricerca disabilitato" },
-  { key: "AI_AGENTS_URL",        description: "Python AI Service — funzionalità AI (Wiki, Roadmap, Grafo) disabilitate" },
   { key: "RESEND_API_KEY",       description: "Resend — email reminder e digest settimanale disabilitati" },
   { key: "VAPID_PUBLIC_KEY",     description: "Web Push — notifiche push disabilitate" },
   { key: "VAPID_PRIVATE_KEY",    description: "Web Push — notifiche push disabilitate" },
