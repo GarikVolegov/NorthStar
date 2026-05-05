@@ -353,7 +353,28 @@ Migrati 3 form da stato manuale a RHF + Zod con validazione inline:
 - **`contatti.tsx`**: schema completo con `name`, `email`, `subject` (Controller), `message` (min 10, max 1000, contatore caratteri live), sidebar ricostruita, `noValidate`
 - **`profilo.tsx` — ChangePasswordForm**: schema `oldPassword` + `newPassword` (min 6) + `confirm` con `.refine()` cross-field, reset automatico al successo
 
+## Fase 3 — Testing, SEO, Mobile UX (May 2026)
+
+### Vitest — Test unitari
+- Configurazione standalone in `artifacts/orientamento/vitest.config.ts` (separata da vite.config.ts che richiede PORT a runtime)
+- Setup file: `src/__tests__/setup.ts` con `@testing-library/jest-dom`
+- **31 test passati** in 3 suite:
+  - `work-mode-utils.test.ts` — 14 test per `getWorkModeAlignment` (null/undefined/unknown, ibrido, dipendente, autonomo)
+  - `motion.test.ts` — 11 test per costanti springs/durations/easings e variants Framer Motion
+  - `seo.test.ts` — 6 test per `buildSectorMeta` (type, path, OG image, JSON-LD, salary, noIndex)
+- Script aggiunti a `package.json`: `test`, `test:watch`, `test:ui`, `test:coverage`
+
+### SEO — index.html migliorato
+Aggiunti tag statici mancanti per crawlers e social previews:
+- `og:url`, `og:image` (opengraph.jpg 1200×630), `og:image:alt/width/height`
+- `twitter:image`, `twitter:image:alt`
+- PWA mobile: `theme-color`, `mobile-web-app-capable`, `apple-mobile-web-app-*`, `apple-touch-icon`
+
+### DB — Fix migrazione professions
+- Colonne mancanti (`sector_id`, `description`, `autonomy_score`, `stability_score`) aggiunte con migrazione `0007_add_professions_columns.sql`
+- Seed ora completa senza errori: `Sectors, professions and education paths seeded successfully`
+
 ## Roadmap (Future Phases)
 
-- **Phase 2:** Fix Stripe key + seed products, activate premium checkout
+- **Phase 4:** Stripe key + seed prodotti, attivazione checkout premium
 - **Phase 5:** B2B (schools, enterprises)
