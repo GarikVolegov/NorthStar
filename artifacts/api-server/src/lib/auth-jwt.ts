@@ -1,56 +1,27 @@
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
 import type { Request, Response, NextFunction } from "express";
 
-function loadOrCreateSecret(): string {
+function loadSecret(): string {
   const fromEnv = process.env.JWT_SECRET;
   if (fromEnv && fromEnv.length >= 16) return fromEnv;
 
-  const cacheDir = path.resolve(process.cwd(), ".local");
-  const cacheFile = path.join(cacheDir, ".jwt-secret");
-
-  try {
-    if (fs.existsSync(cacheFile)) {
-      const cached = fs.readFileSync(cacheFile, "utf-8").trim();
-      if (cached.length >= 32) {
-        if (process.env.NODE_ENV !== "test") {
-          console.warn(
-            "[auth-jwt] JWT_SECRET non impostato — uso secret persistente da .local/.jwt-secret. Imposta JWT_SECRET in produzione.",
-          );
-        }
-        return cached;
-      }
-    }
-  } catch {
-    /* ignore */
+  if (process.env.NODE_ENV === "production") {
+    console.error(
+      "[auth-jwt] FATAL: JWT_SECRET non impostato in produzione. " +
+        "Imposta JWT_SECRET come secret Replit (minimo 32 caratteri). " +
+        "Il server usa un secret in-memory: tutti i token saranno invalidati ad ogni restart.",
+    );
+  } else if (process.env.NODE_ENV !== "test") {
+    console.warn(
+      "[auth-jwt] JWT_SECRET non impostato — uso secret in-memory per sviluppo. " +
+        "I token saranno invalidati ad ogni restart.",
+    );
   }
 
-  const generated = crypto.randomBytes(48).toString("hex");
-
-  // On read-only filesystems (e.g. Vercel serverless), skip the write silently.
-  try {
-    fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(cacheFile, generated, { mode: 0o600 });
-    if (process.env.NODE_ENV !== "test") {
-      console.warn(
-        "[auth-jwt] JWT_SECRET non impostato — generato nuovo secret e salvato in .local/.jwt-secret (i token NON saranno invalidati ai prossimi restart).",
-      );
-    }
-  } catch {
-    // Filesystem is read-only (e.g. Vercel) — use in-memory secret.
-    // Tokens will be invalidated on every cold start. Set JWT_SECRET env var to fix this.
-    if (process.env.NODE_ENV !== "test") {
-      console.warn(
-        "[auth-jwt] JWT_SECRET non impostato e impossibile scrivere su disco — il secret è in-memory e i token saranno invalidati ad ogni restart. Imposta JWT_SECRET.",
-      );
-    }
-  }
-
-  return generated;
+  return crypto.randomBytes(48).toString("hex");
 }
 
-const JWT_SECRET = loadOrCreateSecret();
+const JWT_SECRET = loadSecret();
 
 const HEADER_B64 = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString(
   "base64url",
