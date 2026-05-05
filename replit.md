@@ -10,8 +10,9 @@ A freemium SaaS platform that helps Italian users discover their ideal career pa
 
 ```
 artifacts/
-  api-server/       — Express 5 API backend
+  api-server/       — Express 5 API backend (port 8080)
   orientamento/     — React + Vite frontend (served at /)
+  ai-agents/        — Python FastAPI + LangChain/LangGraph microservice (port 8000)
   mockup-sandbox/   — UI component prototyping (internal)
 lib/
   api-spec/         — OpenAPI spec + Orval codegen config
@@ -26,9 +27,11 @@ scripts/
 
 - **Frontend:** React 19, Vite, Tailwind CSS v4, Wouter (routing), TanStack React Query, Recharts, Lucide icons, Radix UI
 - **Backend:** Express 5, TypeScript, Pino logging
+- **AI Microservice:** Python FastAPI + LangChain + LangGraph (port 8000)
 - **Database:** PostgreSQL via Drizzle ORM
 - **Payments:** Stripe (direct API keys via secrets STRIPE_SECRET_KEY / STRIPE_PUBLISHABLE_KEY)
 - **API:** OpenAPI-first, codegen via Orval
+- **LLM:** OpenAI via Replit AI Integrations proxy (AI_INTEGRATIONS_OPENAI_BASE_URL + AI_INTEGRATIONS_OPENAI_API_KEY)
 
 ## Database Schema
 
@@ -71,6 +74,48 @@ Added as a second layer of personality analysis after RIASEC:
 **UX flow:**
 1. 12 RIASEC questions → transition screen introducing the Cinque Spiriti → 5 spirit questions → completion → submit
 2. Results page shows: RIASEC profile header + "Bussola Interiore" panel + top 3 sectors
+
+## AI Microservice (artifacts/ai-agents)
+
+Python FastAPI + LangChain + LangGraph running on port 8000. Proxied via Express at `/api/ai-agents/*`.
+
+### Python Agents (LangChain structured output, all in Italian)
+
+| Agent | Task Type | Model |
+|-------|-----------|-------|
+| `PersonalityInsightAgent` | `personality_insight` | gpt-4.1-mini (free) / gpt-5.4 (premium) |
+| `SectorMotivationAgent` | `sector_motivation` | gpt-4.1-mini |
+| `WorkModeAdvisorAgent` | `work_mode_advice` | gpt-4.1-mini (free) / gpt-5.4 (premium) |
+| `AffiliationMaterialsAgent` | `affiliation_materials` | gpt-4.1-mini |
+| `CareerChatAgent` | via `/chat` | gpt-4.1-mini (free) / gpt-5.4 (premium) |
+
+### Express Proxy Routes (require JWT auth)
+
+- `POST /api/ai-agents/run` — Run an AI agent task
+- `POST /api/ai-agents/chat` — Conversational career Q&A
+- `GET /api/ai-agents/health` — Proxy health (no auth)
+
+### LangGraph Orchestration
+
+`artifacts/ai-agents/agents/orchestrator.py` — StateGraph with conditional routing: routes by `task_type` to the appropriate LangChain agent, or returns error for unknown tasks.
+
+### Frontend Hooks (artifacts/orientamento/src/hooks/useAIAgents.ts)
+
+- `usePersonalityInsight()` — TanStack Query hook for AI personality narrative
+- `useSectorMotivation()` — AI-generated sector motivations
+- `useWorkModeAdvice()` — Premium AI work mode advice
+- `useCareerChat()` — useMutation for conversational chat
+
+### Frontend Components (artifacts/orientamento/src/components/ai/)
+
+- `PersonalityInsightCard` — Shows AI narrative, headline, unique value, shadow, growth path
+- `CareerChat` — Chat widget with starter questions and full conversation history
+
+### Environment Variables
+
+- `AI_INTEGRATIONS_OPENAI_BASE_URL` — Replit AI proxy base URL (auto-set)
+- `AI_INTEGRATIONS_OPENAI_API_KEY` — Replit AI proxy API key (auto-set)
+- `AI_AGENTS_URL` — Internal Python service URL (default: `http://localhost:8000`)
 
 ## API Endpoints
 

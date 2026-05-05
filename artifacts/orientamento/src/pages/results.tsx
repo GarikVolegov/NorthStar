@@ -30,6 +30,8 @@ import { useTranslation } from "react-i18next";
 import { getWorkModeAlignment } from "@/lib/work-mode-utils";
 import { useAgentAnalysis } from "@/hooks/useAgentAnalysis";
 import type { ProfessionResult, EducationResult, WorkModeResult } from "@/hooks/useAgentAnalysis";
+import { PersonalityInsightCard } from "@/components/ai/PersonalityInsightCard";
+import { CareerChat } from "@/components/ai/CareerChat";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -500,6 +502,16 @@ export default function Results() {
         </p>
       </div>
 
+      {/* AI Personality Insight Card */}
+      {user && (
+        <PersonalityInsightCard
+          riasecScores={riasecScoresAI ?? null}
+          spiritScores={spiritScores as Record<string, number> | undefined}
+          primaryTypes={session.primaryTypes as string[]}
+          isPremium={isPremiumAgent}
+        />
+      )}
+
       {/* Bussola Interiore — Spirit Panel */}
       {hasSpiritData && (
         <div className="mb-14 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
@@ -918,6 +930,32 @@ export default function Results() {
           </div>
         )}
       </div>
+
+      {/* AI Career Chat */}
+      {user && (
+        <div className="mt-14 mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center">
+              <Bot className="w-4 h-4 text-violet-600" />
+            </div>
+            <div>
+              <h2 className="font-serif text-lg font-bold text-foreground">Chatta con NorthStar AI</h2>
+              <p className="text-sm text-muted-foreground">Domande sul tuo profilo, carriera e opportunità</p>
+            </div>
+          </div>
+          <CareerChat
+            profile={{
+              riasecScores: riasecScoresAI,
+              primaryTypes: session.primaryTypes,
+              sectors: agentData?.data?.summary ? agentData.data.summary : undefined,
+              dominantSpirit: spiritScores
+                ? Object.entries(spiritScores as Record<string, number>).sort(([, a], [, b]) => b - a)[0]?.[0]
+                : undefined,
+            }}
+            isPremium={isPremiumAgent}
+          />
+        </div>
+      )}
 
       {/* Stats Footer */}
       {stats && (
