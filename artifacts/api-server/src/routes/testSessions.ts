@@ -66,12 +66,27 @@ router.post("/test-sessions", async (req, res): Promise<void> => {
     }
   }
 
+  // Infer work mode from ctx_1 answer if still unknown
+  if (userWorkMode === "unknown" && allAnswers["ctx_1"] !== undefined) {
+    const ctx1 = allAnswers["ctx_1"];
+    if (ctx1 <= 2) userWorkMode = "dipendente";
+    else if (ctx1 === 3) userWorkMode = "ibrido";
+    else userWorkMode = "autonomo";
+  }
+
+  // Derive career goal from ctx_2 answer
+  const ctx2 = allAnswers["ctx_2"];
+  const careerGoal: "nuovo_percorso" | "scala_esistente" | "aperto" =
+    ctx2 !== undefined
+      ? ctx2 >= 4 ? "nuovo_percorso" : ctx2 <= 2 ? "scala_esistente" : "aperto"
+      : "aperto";
+
   const agentReasonMap: Record<number, string> = {};
   try {
     const _agentStart = Date.now();
     const agentResult = await orchestratorAgent.run({
       taskType: "sector_match",
-      payload: { riasecScores, spiritScores, primaryTypes },
+      payload: { riasecScores, spiritScores, primaryTypes, careerGoal, workMode: userWorkMode },
       context: { userId: authenticatedUserId, plan, sharedState: {} },
     });
     await logAgentCall({
@@ -162,6 +177,7 @@ router.post("/test-sessions", async (req, res): Promise<void> => {
     dominantSpirit: session.dominantSpirit,
     spiritInsight,
     suggestedWorkMode: suggestedWorkModeForSession,
+    careerGoal,
     recommendations: boostedRecommendations,
     confirmedSectorId: session.confirmedSectorId,
     createdAt: session.createdAt.toISOString(),

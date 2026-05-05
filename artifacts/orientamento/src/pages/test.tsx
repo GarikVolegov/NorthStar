@@ -1,11 +1,10 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Variants } from "framer-motion";
 import { useSubmitTest } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Loader2, ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react";
+import { Loader2, ArrowLeft, ArrowRight, Check, Sparkles, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useReducedMotion, easings } from "@/lib/motion";
@@ -21,6 +20,7 @@ const SPIRIT_QUESTION_IDS = [
   "yi_1","yi_2","yi_3",
   "zhi_1","zhi_2","zhi_3",
 ] as const;
+const CTX_QUESTION_IDS = ["ctx_1","ctx_2"] as const;
 
 const RIASEC_TYPES: Record<string, string> = {
   q1:"R",q2:"I",q3:"A",q4:"S",q5:"E",q6:"C",
@@ -48,7 +48,10 @@ const SPIRIT_META: Record<string, { key: SpiritKey; emoji: string; transKey: str
 
 const ALL_RIASEC_IDS = [...RIASEC_QUESTION_IDS];
 const ALL_SPIRIT_IDS = [...SPIRIT_QUESTION_IDS];
-const ALL_IDS = [...ALL_RIASEC_IDS, ...ALL_SPIRIT_IDS];
+const ALL_CTX_IDS = [...CTX_QUESTION_IDS];
+const ALL_IDS = [...ALL_RIASEC_IDS, ...ALL_SPIRIT_IDS, ...ALL_CTX_IDS];
+
+const SPIRITS_END = ALL_RIASEC_IDS.length + ALL_SPIRIT_IDS.length;
 
 async function assignUserToSession(sessionId: number, userId: number): Promise<void> {
   try {
@@ -70,10 +73,30 @@ export default function Test() {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [direction, setDirection] = useState<1 | -1>(1);
-  const [transitionPassed, setTransitionPassed] = useState(false);
+  const [transition1Passed, setTransition1Passed] = useState(false);
+  const [transition2Passed, setTransition2Passed] = useState(false);
 
-  const showTransition = currentStep === ALL_RIASEC_IDS.length && !transitionPassed;
+  const showTransition1 = currentStep === ALL_RIASEC_IDS.length && !transition1Passed;
+  const showTransition2 = currentStep === SPIRITS_END && !transition2Passed;
   const isComplete = currentStep >= ALL_IDS.length;
+
+  const isCtxQ = currentStep >= SPIRITS_END && !showTransition2;
+  const isSpiritQ = currentStep >= ALL_RIASEC_IDS.length && currentStep < SPIRITS_END;
+
+  const ctxOffset = currentStep - SPIRITS_END + 1;
+  const spiritOffset = currentStep - ALL_RIASEC_IDS.length;
+  const questionInGroup = (spiritOffset % 3) + 1;
+
+  const currentId = ALL_IDS[currentStep];
+  const spiritInfo = isSpiritQ ? SPIRIT_META[currentId] : null;
+
+  const progress = (currentStep / ALL_IDS.length) * 100;
+
+  const questionText = isCtxQ
+    ? t(`test.questions.ctx.${currentId}`)
+    : isSpiritQ
+    ? t(`test.questions.spirits.${currentId}`)
+    : t(`test.questions.riasec.${currentId}`);
 
   const questionVariants: Variants = prefersReduced
     ? {
@@ -86,21 +109,6 @@ export default function Test() {
         center: { opacity: 1, x: 0, transition: { duration: 0.38, ease: easings.easeOut } },
         exit: (dir: number) => ({ opacity: 0, x: dir > 0 ? -40 : 40, transition: { duration: 0.2, ease: easings.easeIn } }),
       };
-
-  const spiritOffset = currentStep - ALL_RIASEC_IDS.length;
-  const questionInGroup = (spiritOffset % 3) + 1;
-
-  const currentId = ALL_IDS[currentStep];
-  const isSpiritQ = currentStep >= ALL_RIASEC_IDS.length;
-  const spiritInfo = isSpiritQ ? SPIRIT_META[currentId] : null;
-
-  const totalDisplay = ALL_IDS.length;
-  const stepDisplay = currentStep + 1;
-  const progress = (currentStep / ALL_IDS.length) * 100;
-
-  const questionText = isSpiritQ
-    ? t(`test.questions.spirits.${currentId}`)
-    : t(`test.questions.riasec.${currentId}`);
 
   const OPTIONS = [
     { value: 1, label: t("test.options.1") },
@@ -118,13 +126,20 @@ export default function Test() {
 
   const handleBack = () => {
     setDirection(-1);
-    if (showTransition) {
-      setTransitionPassed(false);
+    if (showTransition1) {
       setCurrentStep(ALL_RIASEC_IDS.length - 1);
       return;
     }
-    if (currentStep === ALL_RIASEC_IDS.length && transitionPassed) {
-      setTransitionPassed(false);
+    if (showTransition2) {
+      setCurrentStep(SPIRITS_END - 1);
+      return;
+    }
+    if (currentStep === ALL_RIASEC_IDS.length && transition1Passed) {
+      setTransition1Passed(false);
+      return;
+    }
+    if (currentStep === SPIRITS_END && transition2Passed) {
+      setTransition2Passed(false);
       return;
     }
     if (currentStep > 0) setCurrentStep((prev) => prev - 1);
@@ -142,8 +157,8 @@ export default function Test() {
     );
   };
 
-  // ── Transition screen ──────────────────────────────────────────────────────
-  if (showTransition) {
+  // ── Transition 1: RIASEC → Spirits ────────────────────────────────────────
+  if (showTransition1) {
     const spiritsTransition = [
       { emoji: "✨", transKey: "presence" },
       { emoji: "🌙", transKey: "vision" },
@@ -187,8 +202,48 @@ export default function Test() {
           <Button variant="ghost" onClick={handleBack} className="rounded-full px-6">
             <ArrowLeft className="mr-2 w-4 h-4" /> {t("test.back")}
           </Button>
-          <Button size="lg" onClick={() => setTransitionPassed(true)} className="rounded-full px-10 h-13">
+          <Button size="lg" onClick={() => setTransition1Passed(true)} className="rounded-full px-10 h-13">
             {t("test.transition.startCompass")} <ArrowRight className="ml-2 w-5 h-5" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Transition 2: Spirits → Context calibration ────────────────────────────
+  if (showTransition2) {
+    return (
+      <div className="container max-w-2xl mx-auto px-4 py-20 flex flex-col items-center justify-center min-h-[70vh] text-center">
+        <div className="w-20 h-20 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-8 animate-in zoom-in duration-500">
+          <Target className="w-10 h-10" />
+        </div>
+        <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-full px-4 py-1.5 mb-6 text-sm font-medium text-primary">
+          <Target className="w-3.5 h-3.5" /> {t("test.transition2.badge")}
+        </div>
+        <h1 className="text-3xl md:text-4xl font-serif font-bold mb-4">{t("test.transition2.title")}</h1>
+        <p className="text-lg text-muted-foreground mb-10 leading-relaxed max-w-xl">
+          {t("test.transition2.subtitle")}
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full mb-10 text-left">
+          <div className="flex flex-col gap-2 bg-card border rounded-2xl px-5 py-4">
+            <span className="text-2xl">💼</span>
+            <div className="font-semibold text-sm text-foreground">{t("test.transition2.card1Title")}</div>
+            <div className="text-xs text-muted-foreground">{t("test.transition2.card1Desc")}</div>
+          </div>
+          <div className="flex flex-col gap-2 bg-card border rounded-2xl px-5 py-4">
+            <span className="text-2xl">🧭</span>
+            <div className="font-semibold text-sm text-foreground">{t("test.transition2.card2Title")}</div>
+            <div className="text-xs text-muted-foreground">{t("test.transition2.card2Desc")}</div>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <Button variant="ghost" onClick={handleBack} className="rounded-full px-6">
+            <ArrowLeft className="mr-2 w-4 h-4" /> {t("test.back")}
+          </Button>
+          <Button size="lg" onClick={() => setTransition2Passed(true)} className="rounded-full px-10 h-13">
+            {t("test.transition2.start")} <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
         </div>
       </div>
@@ -227,6 +282,12 @@ export default function Test() {
   }
 
   // ── Question screen ────────────────────────────────────────────────────────
+  const headerLabel = isCtxQ
+    ? t("test.ctxCount", { current: ctxOffset, total: ALL_CTX_IDS.length })
+    : isSpiritQ
+    ? t("test.innerCompassCount", { current: spiritOffset + 1, total: ALL_SPIRIT_IDS.length })
+    : t("test.questionOf", { current: currentStep + 1, total: ALL_IDS.length });
+
   return (
     <div className="container max-w-2xl mx-auto px-4 py-12 min-h-[70vh]">
       <div className="flex items-center justify-between mb-4">
@@ -239,11 +300,7 @@ export default function Test() {
         >
           <ArrowLeft className="w-4 h-4" /> {t("test.back")}
         </motion.button>
-        <span className="text-sm text-muted-foreground">
-          {isSpiritQ
-            ? t("test.innerCompassCount", { current: stepDisplay - ALL_RIASEC_IDS.length, total: ALL_SPIRIT_IDS.length })
-            : t("test.questionOf", { current: stepDisplay, total: totalDisplay })}
-        </span>
+        <span className="text-sm text-muted-foreground">{headerLabel}</span>
       </div>
       <motion.div
         initial={false}
@@ -277,6 +334,17 @@ export default function Test() {
                     className={cn("w-2 h-2 rounded-full", n <= questionInGroup ? "bg-primary" : "bg-muted")}
                   />
                 ))}
+              </div>
+            </div>
+          )}
+
+          {isCtxQ && (
+            <div className="flex items-center gap-3 mb-6">
+              <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-full px-4 py-1.5">
+                <span>🎯</span>
+                <span className="text-sm font-medium text-primary">
+                  {t("test.ctxBadge", { current: ctxOffset, total: ALL_CTX_IDS.length })}
+                </span>
               </div>
             </div>
           )}

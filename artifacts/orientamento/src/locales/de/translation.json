@@ -125,6 +125,8 @@
       "4": "Ziemlich",
       "5": "Sehr viel"
     },
+    "ctxCount": "Kalibrierung · {{current}} von {{total}}",
+    "ctxBadge": "Dein Ziel · {{current}} von {{total}}",
     "transition": {
       "badge": "Innerer Kompass",
       "title": "Teil zwei: die Fünf Geister",
@@ -156,15 +158,29 @@
         }
       }
     },
+    "transition2": {
+      "badge": "Abschlusskalibrierung",
+      "title": "Fast geschafft — zwei letzte Fragen",
+      "subtitle": "Um deine Ergebnisse zu verfeinern, beantworte diese zwei Fragen zu deinem konkreten Ziel. Deine Antworten personalisieren die empfohlenen Branchen weiter.",
+      "card1Title": "Arbeitsstil",
+      "card1Desc": "Selbstständig, angestellt oder hybrid?",
+      "card2Title": "Karriererichtung",
+      "card2Desc": "Neuer Weg oder bestehenden ausbauen?",
+      "start": "Weiter"
+    },
     "complete": {
       "title": "Analyse abgeschlossen!",
-      "subtitle": "Wir haben dein RIASEC-Profil und deinen Inneren Kompass analysiert. Wir sind bereit, dir die am besten geeigneten Branchen zu zeigen.",
+      "subtitle": "Wir haben dein RIASEC-Profil, deinen Inneren Kompass und deine Ziele analysiert. Wir sind bereit, dir die am besten geeigneten Branchen zu zeigen.",
       "savedAccount": "Ergebnisse werden automatisch in deinem Konto gespeichert.",
       "discoverResults": "Ergebnisse entdecken",
       "processing": "Verarbeitung…",
       "submitError": "Sendefehler. Bitte erneut versuchen."
     },
     "questions": {
+      "ctx": {
+        "ctx_1": "Wenn ich mir meinen idealen Berufsweg vorstelle, sehe ich mich als Freelancer oder Unternehmer — eher als Angestellten einer Organisation.",
+        "ctx_2": "Ich suche eine komplett neue berufliche Richtung, anders als das, was ich bereits im Sinn hatte — anstatt einen bereits klaren Weg weiter auszubauen."
+      },
       "riasec": {
         "q1": "Ich baue, repariere und arbeite gerne mit konkreten Werkzeugen.",
         "q2": "Ich analysiere gerne Daten, löse logische Probleme und forsche.",

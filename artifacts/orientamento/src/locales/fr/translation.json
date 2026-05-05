@@ -125,6 +125,8 @@
       "4": "Assez",
       "5": "Beaucoup"
     },
+    "ctxCount": "Calibration · {{current}} sur {{total}}",
+    "ctxBadge": "Votre objectif · {{current}} sur {{total}}",
     "transition": {
       "badge": "Boussole Intérieure",
       "title": "Deuxième partie : les Cinq Esprits",
@@ -156,15 +158,29 @@
         }
       }
     },
+    "transition2": {
+      "badge": "Calibration finale",
+      "title": "Presque terminé — deux dernières questions",
+      "subtitle": "Pour affiner vos résultats, répondez à ces deux questions sur votre objectif concret. Vos réponses personnaliseront davantage les secteurs recommandés.",
+      "card1Title": "Style de travail",
+      "card1Desc": "Autonome, salarié ou hybride ?",
+      "card2Title": "Direction de carrière",
+      "card2Desc": "Nouvelle voie ou développer celle déjà voulue ?",
+      "start": "Continuer"
+    },
     "complete": {
       "title": "Analyse terminée !",
-      "subtitle": "Nous avons analysé votre profil RIASEC et votre Boussole Intérieure. Nous sommes prêts à vous révéler les secteurs les mieux adaptés à vous.",
+      "subtitle": "Nous avons analysé votre profil RIASEC, votre Boussole Intérieure et vos objectifs. Nous sommes prêts à vous révéler les secteurs les mieux adaptés à vous.",
       "savedAccount": "Les résultats seront automatiquement sauvegardés sur votre compte.",
       "discoverResults": "Découvrez vos résultats",
       "processing": "Traitement…",
       "submitError": "Erreur d'envoi. Veuillez réessayer."
     },
     "questions": {
+      "ctx": {
+        "ctx_1": "Lorsque j'imagine mon parcours idéal, je me vois comme travailleur indépendant ou entrepreneur — plutôt que comme salarié d'une organisation.",
+        "ctx_2": "Je cherche une nouvelle orientation professionnelle, différente de celle que j'avais déjà en tête — plutôt que de consolider ou développer une voie déjà claire."
+      },
       "riasec": {
         "q1": "J'aime construire, réparer et travailler avec des outils concrets.",
         "q2": "J'aime analyser des données, résoudre des problèmes logiques et faire de la recherche.",

@@ -125,6 +125,8 @@
       "4": "Abbastanza",
       "5": "Moltissimo"
     },
+    "ctxCount": "Calibrazione · {{current}} di {{total}}",
+    "ctxBadge": "Il tuo obiettivo · {{current}} di {{total}}",
     "transition": {
       "badge": "Bussola Interiore",
       "title": "Seconda parte: i Cinque Spiriti",
@@ -156,15 +158,29 @@
         }
       }
     },
+    "transition2": {
+      "badge": "Calibrazione finale",
+      "title": "Quasi alla fine — due ultime domande",
+      "subtitle": "Per affinare i tuoi risultati, rispondi a queste due domande sul tuo obiettivo concreto. Le tue risposte personalizzeranno ulteriormente i settori consigliati.",
+      "card1Title": "Stile lavorativo",
+      "card1Desc": "Autonomo, dipendente o ibrido?",
+      "card2Title": "Direzione di carriera",
+      "card2Desc": "Nuovo percorso o sviluppare quello già desiderato?",
+      "start": "Continua"
+    },
     "complete": {
       "title": "Analisi completata!",
-      "subtitle": "Abbiamo analizzato il tuo profilo RIASEC e la tua Bussola Interiore. Siamo pronti a svelarti i settori più adatti a te.",
+      "subtitle": "Abbiamo analizzato il tuo profilo RIASEC, la tua Bussola Interiore e i tuoi obiettivi. Siamo pronti a svelarti i settori più adatti a te.",
       "savedAccount": "I risultati verranno salvati automaticamente sul tuo account.",
       "discoverResults": "Scopri i tuoi risultati",
       "processing": "Elaborazione…",
       "submitError": "Errore nell'invio. Riprova."
     },
     "questions": {
+      "ctx": {
+        "ctx_1": "Quando immagino il mio percorso lavorativo ideale, mi vedo come libero professionista o imprenditore — piuttosto che come dipendente di un'organizzazione.",
+        "ctx_2": "Sto cercando un percorso professionale nuovo e diverso da quello che avevo già in mente — più che rafforzare o scalare una direzione già chiara."
+      },
       "riasec": {
         "q1": "Mi piace costruire, riparare e lavorare con strumenti concreti.",
         "q2": "Mi piace analizzare dati, risolvere problemi logici e fare ricerca.",

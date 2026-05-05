@@ -125,6 +125,8 @@
       "4": "Quite a bit",
       "5": "Very much"
     },
+    "ctxCount": "Calibration · {{current}} of {{total}}",
+    "ctxBadge": "Your goal · {{current}} of {{total}}",
     "transition": {
       "badge": "Inner Compass",
       "title": "Part two: the Five Spirits",
@@ -156,15 +158,29 @@
         }
       }
     },
+    "transition2": {
+      "badge": "Final calibration",
+      "title": "Almost done — two last questions",
+      "subtitle": "To fine-tune your results, answer these two questions about your concrete goal. Your answers will further personalize the recommended sectors.",
+      "card1Title": "Work style",
+      "card1Desc": "Autonomous, employed, or hybrid?",
+      "card2Title": "Career direction",
+      "card2Desc": "New path or develop what you already want?",
+      "start": "Continue"
+    },
     "complete": {
       "title": "Analysis complete!",
-      "subtitle": "We have analyzed your RIASEC profile and your Inner Compass. We are ready to reveal the sectors best suited to you.",
+      "subtitle": "We have analyzed your RIASEC profile, your Inner Compass and your goals. We are ready to reveal the sectors best suited to you.",
       "savedAccount": "Results will be automatically saved to your account.",
       "discoverResults": "Discover your results",
       "processing": "Processing…",
       "submitError": "Submission error. Please retry."
     },
     "questions": {
+      "ctx": {
+        "ctx_1": "When I picture my ideal career path, I see myself as a freelancer or entrepreneur — rather than as an employee of an organization.",
+        "ctx_2": "I am looking for a completely new professional direction, different from what I already had in mind — rather than building on or scaling a path I already know."
+      },
       "riasec": {
         "q1": "I enjoy building, repairing, and working with concrete tools.",
         "q2": "I enjoy analyzing data, solving logical problems, and doing research.",

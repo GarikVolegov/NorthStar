@@ -125,6 +125,8 @@
       "4": "Bastante",
       "5": "Muchísimo"
     },
+    "ctxCount": "Calibración · {{current}} de {{total}}",
+    "ctxBadge": "Tu objetivo · {{current}} de {{total}}",
     "transition": {
       "badge": "Brújula Interior",
       "title": "Segunda parte: los Cinco Espíritus",
@@ -156,15 +158,29 @@
         }
       }
     },
+    "transition2": {
+      "badge": "Calibración final",
+      "title": "Casi al final — dos últimas preguntas",
+      "subtitle": "Para afinar tus resultados, responde estas dos preguntas sobre tu objetivo concreto. Tus respuestas personalizarán aún más los sectores recomendados.",
+      "card1Title": "Estilo de trabajo",
+      "card1Desc": "¿Autónomo, empleado o híbrido?",
+      "card2Title": "Dirección de carrera",
+      "card2Desc": "¿Nuevo camino o desarrollar el que ya tienes en mente?",
+      "start": "Continuar"
+    },
     "complete": {
       "title": "¡Análisis completado!",
-      "subtitle": "Hemos analizado tu perfil RIASEC y tu Brújula Interior. Estamos listos para revelarte los sectores más adecuados para ti.",
+      "subtitle": "Hemos analizado tu perfil RIASEC, tu Brújula Interior y tus objetivos. Estamos listos para revelarte los sectores más adecuados para ti.",
       "savedAccount": "Los resultados se guardarán automáticamente en tu cuenta.",
       "discoverResults": "Descubre tus resultados",
       "processing": "Procesando…",
       "submitError": "Error al enviar. Inténtalo de nuevo."
     },
     "questions": {
+      "ctx": {
+        "ctx_1": "Cuando imagino mi trayectoria ideal, me veo como autónomo o emprendedor — más que como empleado de una organización.",
+        "ctx_2": "Estoy buscando una orientación profesional completamente nueva, diferente a lo que ya tenía en mente — más que consolidar o escalar un camino ya claro."
+      },
       "riasec": {
         "q1": "Me gusta construir, reparar y trabajar con herramientas concretas.",
         "q2": "Me gusta analizar datos, resolver problemas lógicos y hacer investigación.",
