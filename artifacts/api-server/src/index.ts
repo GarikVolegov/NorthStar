@@ -9,6 +9,7 @@ process.on("unhandledRejection", (reason) => {
 
 import app from "./app";
 import { logger } from "./lib/logger";
+import { runStartupCheck } from "./lib/startup-check";
 import { seedSectors, patchDipendentiSteps, patchWorkModeFields, seedProfessions, seedEducationPaths, ensureCoachSessionsTable, ensurePromptsTable } from "./lib/seed";
 import { startInterviewReminderScheduler } from "./lib/interview-reminder.js";
 import { startWeeklyDigestScheduler } from "./lib/weekly-digest.js";
@@ -30,6 +31,13 @@ if (!process.env.VERCEL) {
 
   if (Number.isNaN(port) || port <= 0) {
     throw new Error(`Invalid PORT value: "${rawPort}"`);
+  }
+
+  // Validate environment variables before binding to port.
+  // Logs a clear table of what's present/missing and exits if required vars are absent.
+  const { ok } = runStartupCheck();
+  if (!ok) {
+    process.exit(1);
   }
 
   app.listen(port, async (err?: Error) => {
