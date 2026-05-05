@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Star, LogOut, User, LayoutDashboard, Menu, X,
-  FlaskConical, Layers, BookOpenText, Newspaper, Crown, Briefcase, Users, Calendar, Globe,
+  FlaskConical, Layers, BookOpenText, Newspaper, Crown, Briefcase, Users, Calendar, Globe, BrainCircuit,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -171,6 +171,9 @@ export function Navbar() {
                     <DropdownMenuItem onClick={() => setLocation("/amici")} className="cursor-pointer">
                       <Users className="h-4 w-4 mr-2" /> {t("nav.friends")}
                       {friendsBadge ? <span className="ml-auto text-xs font-semibold text-primary">{friendsBadge}</span> : null}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setLocation("/coach")} className="cursor-pointer">
+                      <BrainCircuit className="h-4 w-4 mr-2" /> Coach AI
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive cursor-pointer">

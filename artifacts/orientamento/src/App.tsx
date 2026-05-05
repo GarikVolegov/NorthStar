@@ -53,6 +53,10 @@ const AffiliazioneScuole = lazy(() => import("@/pages/affiliazione-scuole"));
 const AffiliazioneUniversita = lazy(() => import("@/pages/affiliazione-universita"));
 const AffiliazioneAgenzie = lazy(() => import("@/pages/affiliazione-agenzie"));
 const AffiliazioneFormazione = lazy(() => import("@/pages/affiliazione-formazione"));
+const Colloquio = lazy(() => import("@/pages/colloquio"));
+const SkillsGap = lazy(() => import("@/pages/skills-gap"));
+const Coach = lazy(() => import("@/pages/coach"));
+const AdminMetriche = lazy(() => import("@/pages/admin-metriche"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -111,6 +115,9 @@ function AnimatedRoutes() {
       <Route path="/affiliazione/universita" component={AffiliazioneUniversita} />
       <Route path="/affiliazione/agenzie-lavoro" component={AffiliazioneAgenzie} />
       <Route path="/affiliazione/centri-formazione" component={AffiliazioneFormazione} />
+      <Route path="/colloquio/:id" component={Colloquio} />
+      <Route path="/skills-gap/:id" component={SkillsGap} />
+      <Route path="/coach" component={Coach} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -174,6 +181,13 @@ function Router() {
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <AdminReview />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+      <Route path="/admin/metriche">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminMetriche />
           </Suspense>
         </ErrorBoundary>
       </Route>

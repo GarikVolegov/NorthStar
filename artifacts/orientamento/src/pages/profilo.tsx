@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import { ObjectivesKanban } from "@/components/objectives/ObjectivesKanban";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -429,6 +430,12 @@ export default function Profilo() {
             </CardContent>
           </Card>
           <SavedItems />
+          <div>
+            <h2 className="font-semibold text-base mb-3 flex items-center gap-2">
+              <span>📋</span> I miei obiettivi
+            </h2>
+            <ObjectivesKanban userId={user.id} />
+          </div>
         </div>
       </div>
     </div>

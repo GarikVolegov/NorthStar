@@ -41,6 +41,16 @@ The project employs a monorepo structure using pnpm workspaces, separating conce
 - **News Module:** Fetches career news, either live from GNews API (if API key is present) or from static curated content, with premium sector-specific news.
 - **Research Scheduler:** Automated agents (`news-research`, `growth-research`) use Tavily AI Web Search to periodically fetch and store career news and generate growth articles.
 - **Admin Review Dashboard:** A backoffice interface for reviewing and managing AI agent outputs and suggestions before publication, including workflow for approvals, rejections, and audits.
+- **AI Interview Simulator (Feature 1):** Streaming mock interview with sector-specific HR questions, per-answer feedback, and a final score /100 after 5 turns. Route: `/colloquio/:id`.
+- **Skills Gap Analysis (Feature 2):** Users select current skills, get an AI-powered gap report vs. sector requirements with a Readiness Index (0-100). Route: `/skills-gap/:id`.
+- **Career Coach AI (Feature 3):** Persistent multi-session AI coach with sidebar session management, streaming chat, quick-start prompts. Route: `/coach`. DB: `coach_sessions` table.
+- **Admin Metrics Dashboard (Feature 4):** Password-protected admin dashboard at `/admin/metriche` showing KPIs (users, premium, MRR, tests), daily signups chart, top sectors bar chart.
+- **Onboarding Modal (Feature 5):** 4-step post-test onboarding modal (results, sector pick, first objective, next steps). Shows once per browser via localStorage.
+- **Objectives Kanban (Feature 6):** Drag-and-drop Kanban board (Da fare / In corso / Completati) in profilo.tsx with progress sliders, overdue highlighting.
+- **Profile Share Card (Feature 7):** SVG profile card endpoint at `/og/profile-card/:userId` with RIASEC types, sector name, dominant spirit.
+- **Rate Limiting (Feature 8):** `aiChatRateLimiter` (20/hr free, 500/hr premium) and `aiGenerationRateLimiter` (5/hr free, 50/hr premium) applied to wiki, roadmap, knowledge, interview, skills-gap, and coach routes.
+- **Weekly Digest Email (Feature 9):** Scheduler that sends Monday 8am (Rome time) HTML digest emails with sector news and upcoming objectives. Disabled if `RESEND_API_KEY` not set.
+- **14 Additional Sectors (Feature 10):** Seed expanded to 28 total sectors: Architettura, Ricerca & Accademia, Agricoltura & AgriTech, Energia & Green Economy, Sport & Performance, Logistica, Media & Giornalismo, Moda & Lusso, Diritto & Compliance, Farmaceutico, Psicologia, Elettronica, No Profit, Intelligenza Artificiale & ML.
 
 ## External Dependencies
 

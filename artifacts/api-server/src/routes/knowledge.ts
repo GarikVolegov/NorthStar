@@ -4,6 +4,7 @@ import { and, eq, inArray, or } from "drizzle-orm";
 import { db, knowledgeNodesTable, knowledgeEdgesTable } from "@workspace/db";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { authMiddleware } from "../lib/auth-jwt.js";
+import { aiChatRateLimiter } from "../lib/rate-limiter.js";
 
 const router: IRouter = Router();
 
@@ -320,7 +321,7 @@ router.post(
 
 // ─── RAG: Ask the graph ─────────────────────────────────────────────────────
 
-router.post("/knowledge/ask", authMiddleware, async (req, res): Promise<void> => {
+router.post("/knowledge/ask", authMiddleware, aiChatRateLimiter, async (req, res): Promise<void> => {
   const userId = res.locals.userId as number;
   const parsed = AskBody.safeParse(req.body);
   if (!parsed.success) {

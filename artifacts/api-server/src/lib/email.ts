@@ -2,7 +2,7 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 const FROM = process.env.EMAIL_FROM ?? "NorthStar <onboarding@resend.dev>";
 
-async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+export async function sendEmail(to: string, subject: string, html: string): Promise<void> {
   if (!RESEND_API_KEY) {
     console.warn("[email] RESEND_API_KEY non configurato — email non inviata a:", to);
     return;

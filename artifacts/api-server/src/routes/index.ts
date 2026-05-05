@@ -34,6 +34,10 @@ import catalogRouter from "./catalog";
 import researchRouter from "./research";
 import rolesRouter from "./roles";
 import adminReviewRouter from "./admin-review";
+import interviewRouter from "./interview";
+import skillsGapRouter from "./skills-gap";
+import coachRouter from "./coach";
+import adminMetricsRouter from "./admin-metrics";
 
 const router: IRouter = Router();
 
@@ -72,5 +76,9 @@ router.use(pushRouter);
 router.use(meRouter);
 router.use(catalogRouter);
 router.use(researchRouter);
+router.use(interviewRouter);
+router.use(skillsGapRouter);
+router.use(coachRouter);
+router.use(adminMetricsRouter);
 
 export default router;

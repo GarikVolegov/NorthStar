@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Clock, DollarSign, Bot, Sparkles, TrendingUp, Target, Plus, Minus, Zap, Brain, MapPin, Network, ArrowRight, Newspaper, GitCompare, Briefcase, Laptop, ToggleLeft, ToggleRight } from "lucide-react";
+import { ArrowLeft, Clock, DollarSign, Bot, Sparkles, TrendingUp, Target, Plus, Minus, Zap, Brain, MapPin, Network, ArrowRight, Newspaper, GitCompare, Briefcase, Laptop, ToggleLeft, ToggleRight, MessageSquare } from "lucide-react";
 import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { usePageMeta, buildSectorMeta } from "@/lib/seo";
@@ -223,7 +223,7 @@ export default function Sector() {
           </Badge>
           <span className="text-sm text-muted-foreground">{t("sector.deepenWithAI")}</span>
         </div>
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <Link href={`/wiki/${id}`} className="block">
             <div className="h-full p-5 bg-card border rounded-2xl hover:border-primary/30 hover:shadow-md transition-all cursor-pointer group">
               <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-4 group-hover:bg-indigo-100 transition-colors">
@@ -265,6 +265,36 @@ export default function Sector() {
               </p>
               <div className="flex items-center text-violet-600 text-xs font-medium">
                 {t("sector.exploreGraph")} <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+          </Link>
+
+          <Link href={`/colloquio/${id}`} className="block">
+            <div className="h-full p-5 bg-card border rounded-2xl hover:border-primary/30 hover:shadow-md transition-all cursor-pointer group">
+              <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center mb-4 group-hover:bg-orange-100 transition-colors">
+                <MessageSquare className="w-5 h-5 text-orange-600" />
+              </div>
+              <h4 className="font-semibold mb-1.5 text-sm">Simulatore Colloquio</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+                Preparati con mock interview AI nel tuo settore
+              </p>
+              <div className="flex items-center text-orange-600 text-xs font-medium">
+                Inizia colloquio <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+          </Link>
+
+          <Link href={`/skills-gap/${id}`} className="block">
+            <div className="h-full p-5 bg-card border rounded-2xl hover:border-primary/30 hover:shadow-md transition-all cursor-pointer group">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center mb-4 group-hover:bg-rose-100 transition-colors">
+                <Target className="w-5 h-5 text-rose-600" />
+              </div>
+              <h4 className="font-semibold mb-1.5 text-sm">Skills Gap Analysis</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+                Scopri cosa ti manca per entrare nel settore
+              </p>
+              <div className="flex items-center text-rose-600 text-xs font-medium">
+                Analizza gap <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
           </Link>

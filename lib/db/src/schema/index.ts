@@ -14,3 +14,4 @@ export * from "./professionEducationPaths";
 export * from "./knowledge";
 export * from "./newsArticles";
 export * from "./agentReview";
+export * from "./coachSessions";

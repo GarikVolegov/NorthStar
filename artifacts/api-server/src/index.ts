@@ -9,8 +9,9 @@ process.on("unhandledRejection", (reason) => {
 
 import app from "./app";
 import { logger } from "./lib/logger";
-import { seedSectors, patchDipendentiSteps, patchWorkModeFields, seedProfessions, seedEducationPaths } from "./lib/seed";
+import { seedSectors, patchDipendentiSteps, patchWorkModeFields, seedProfessions, seedEducationPaths, ensureCoachSessionsTable } from "./lib/seed";
 import { startInterviewReminderScheduler } from "./lib/interview-reminder.js";
+import { startWeeklyDigestScheduler } from "./lib/weekly-digest.js";
 import { startCalendarReminderScheduler } from "./lib/calendar-scheduler.js";
 import { startResearchScheduler } from "./lib/research-scheduler.js";
 
@@ -45,6 +46,7 @@ if (!process.env.VERCEL) {
       await patchDipendentiSteps();
       await seedProfessions();
       await seedEducationPaths();
+      await ensureCoachSessionsTable();
       logger.info("Sectors, professions and education paths seeded successfully");
     } catch (seedErr) {
       logger.error({ err: seedErr }, "Failed to seed sectors");
@@ -53,5 +55,6 @@ if (!process.env.VERCEL) {
     startInterviewReminderScheduler();
     startCalendarReminderScheduler();
     startResearchScheduler();
+    startWeeklyDigestScheduler();
   });
 }
