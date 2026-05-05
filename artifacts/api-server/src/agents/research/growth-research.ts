@@ -3,19 +3,7 @@ import { db, growthArticlesTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { logger } from "../../lib/logger";
-
-const GROWTH_QUERIES = [
-  "come migliorare soft skills professionista italiano 2025",
-  "competenze richieste mercato lavoro futuro Italia AI",
-  "come trovare lavoro in Italia 2025 consigli pratici",
-  "networking professionale LinkedIn Italia strategia",
-  "freelance partita IVA lavoro autonomo Italia guida",
-  "intelligenza artificiale competenze professionali futuro Italia",
-  "colloquio lavoro tecniche risposte migliori Italia",
-  "cambio carriera professionista italiano consigli",
-  "stipendio negoziazione Italy professionista guida",
-  "formazione online corsi certificazioni Italia 2025",
-];
+import { getPrompt, fillTemplate } from "../../lib/prompt-store.js";
 
 function slugify(text: string): string {
   return text
@@ -31,6 +19,21 @@ const VALID_CATEGORIES = ["soft-skills", "carriera", "formazione", "networking",
 const VALID_DIFFICULTIES = ["base", "intermedio", "avanzato"];
 
 export async function runGrowthResearch(): Promise<{ added: number; attempted: number }> {
+  const queriesRaw = await getPrompt("growth-research.queries");
+  let GROWTH_QUERIES: string[] = [];
+  try {
+    GROWTH_QUERIES = JSON.parse(queriesRaw) as string[];
+  } catch {
+    GROWTH_QUERIES = [
+      "come migliorare soft skills professionista italiano 2025",
+      "competenze richieste mercato lavoro futuro Italia AI",
+      "come trovare lavoro in Italia 2025 consigli pratici",
+    ];
+  }
+
+  const systemPrompt = await getPrompt("growth-research.system");
+  const userTemplate = await getPrompt("growth-research.user-template");
+
   const shuffled = [...GROWTH_QUERIES].sort(() => Math.random() - 0.5).slice(0, 3);
 
   let added = 0;
@@ -53,33 +56,18 @@ export async function runGrowthResearch(): Promise<{ added: number; attempted: n
         .map((r) => `Fonte: ${r.url}\n${r.content.slice(0, 400)}`)
         .join("\n\n---\n\n");
 
+      const answerLine = res.answer ? `Sintesi ricerca: ${res.answer}` : "";
+      const userContent = fillTemplate(userTemplate, {
+        CONTEXT: context,
+        ANSWER: answerLine,
+      });
+
       const completion = await openai.chat.completions.create({
         model: "gpt-4.1-mini",
         max_tokens: 800,
         messages: [
-          {
-            role: "system",
-            content:
-              "Sei un esperto di crescita professionale e carriera per il mercato italiano. " +
-              "Scrivi articoli formativi in italiano, pratici e basati su informazioni reali. " +
-              "Rispondi SEMPRE con JSON valido senza commenti.",
-          },
-          {
-            role: "user",
-            content:
-              `Basandoti su queste fonti web, crea un articolo di crescita professionale.\n\n` +
-              `Fonti:\n${context}\n\n` +
-              (res.answer ? `Sintesi ricerca: ${res.answer}\n\n` : "") +
-              `Restituisci JSON con questi campi:\n` +
-              `{\n` +
-              `  "title": "titolo accattivante in italiano (max 80 char)",\n` +
-              `  "description": "descrizione breve 2-3 frasi (max 200 char)",\n` +
-              `  "category": "una di: soft-skills|carriera|formazione|networking|tecnologia|autonomo",\n` +
-              `  "difficulty": "una di: base|intermedio|avanzato",\n` +
-              `  "readTimeMinutes": numero intero 4-12,\n` +
-              `  "content": "testo completo dell'articolo in markdown (400-600 parole)"\n` +
-              `}`,
-          },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
         ],
         response_format: { type: "json_object" },
       });

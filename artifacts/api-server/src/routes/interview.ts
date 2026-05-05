@@ -4,6 +4,7 @@ import { db, sectorsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { optionalAuthMiddleware } from "../lib/auth-jwt.js";
 import { aiChatRateLimiter } from "../lib/rate-limiter.js";
+import { getPrompt, fillTemplate } from "../lib/prompt-store.js";
 
 const router = Router();
 
@@ -28,27 +29,17 @@ router.post("/interview/:sectorId/ask", optionalAuthMiddleware, aiChatRateLimite
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders();
 
-  const systemPrompt = `Sei un selezionatore HR esperto nel settore "${sector.name}" in Italia.
-Stai conducendo un colloquio di simulazione per aiutare il candidato a prepararsi.
-
-Settore: ${sector.name}
-Competenze rilevanti: ${(sector.skills as string[]).slice(0, 6).join(", ")}
-Livello stipendio: €${sector.avgSalaryMin / 1000}k–€${sector.avgSalaryMax / 1000}k RAL
-
-REGOLE:
-- Se phase="question": fai UNA domanda di colloquio pertinente al settore. Varia tra: motivazione, esperienze passate, competenze tecniche, scenari ipotetici, soft skills.
-- Se phase="evaluate": valuta la risposta precedente del candidato (punteggio 1-10 + feedback costruttivo specifico di 2-3 righe) e poi fai la domanda successiva.
-- Se phase="final": dai un riepilogo del colloquio con: punti di forza, aree di miglioramento, punteggio complessivo /100, consiglio finale. Formatta in sezioni chiare.
-- Rispondi SEMPRE in italiano, tono professionale ma incoraggiante.
-- Domande concrete e pertinenti al settore, non generiche.`;
+  const template = await getPrompt("interview.system");
+  const systemPrompt = fillTemplate(template, {
+    SECTOR_NAME: sector.name,
+    SECTOR_SKILLS: (sector.skills as string[]).slice(0, 6).join(", "),
+    SALARY_RANGE: `€${sector.avgSalaryMin / 1000}k–€${sector.avgSalaryMax / 1000}k RAL`,
+  });
 
   try {
     const messages = [
       { role: "system" as const, content: systemPrompt },
-      ...history.slice(-12).map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      })),
+      ...history.slice(-12).map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       { role: "user" as const, content: message },
     ];
 

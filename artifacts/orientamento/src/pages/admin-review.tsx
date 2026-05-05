@@ -9,7 +9,8 @@ import {
   CheckCircle2, XCircle, Archive, Clock, Eye, Bot,
   BarChart3, FileText, Briefcase, GraduationCap, Calendar,
   TrendingUp, Sparkles, ClipboardList, History, Settings,
-  Filter, ChevronDown, Pencil, X,
+  Filter, ChevronDown, Pencil, X, Play, RotateCcw,
+  Code2, Save, ChevronUp, Terminal,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -88,7 +89,19 @@ const ENTITY_CONFIG: Record<string, { label: string; icon: typeof Briefcase }> =
   work_mode: { label: "Work Mode", icon: Sparkles },
 };
 
-type SidebarSection = "queue" | "suggestions" | "runs" | "logs" | "settings";
+type SidebarSection = "queue" | "suggestions" | "runs" | "logs" | "settings" | "agents" | "prompts";
+
+type AgentPrompt = {
+  key: string;
+  label: string;
+  description: string;
+  placeholders: string[];
+  defaultValue: string;
+  currentValue: string;
+  isOverridden: boolean;
+  updatedAt: string | null;
+  updatedBy: string | null;
+};
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleString("it-IT", {
@@ -154,6 +167,16 @@ export default function AdminReview() {
   const [showFilters, setShowFilters] = useState(false);
   const [editNotes, setEditNotes] = useState("");
   const [showEditNotes, setShowEditNotes] = useState(false);
+
+  const [agentsRunning, setAgentsRunning] = useState<Set<string>>(new Set());
+  const [agentsResult, setAgentsResult] = useState<Record<string, { ok: boolean; data: Record<string, unknown> }>>({});
+  const [newsSectorInput, setNewsSectorInput] = useState("");
+
+  const [prompts, setPrompts] = useState<AgentPrompt[]>([]);
+  const [promptsLoading, setPromptsLoading] = useState(false);
+  const [promptExpandedKey, setPromptExpandedKey] = useState<string | null>(null);
+  const [promptEditValues, setPromptEditValues] = useState<Record<string, string>>({});
+  const [promptSaving, setPromptSaving] = useState<Set<string>>(new Set());
 
   const apiFetch = useCallback(async (path: string, options?: RequestInit) => {
     const res = await fetch(`${BASE}api${path}`, {
@@ -222,6 +245,56 @@ export default function AdminReview() {
     setDetailLoading(false);
   }, [apiFetch]);
 
+  const loadPrompts = useCallback(async () => {
+    setPromptsLoading(true);
+    try {
+      const data = await apiFetch("/admin/prompts");
+      setPrompts(data as AgentPrompt[]);
+      const vals: Record<string, string> = {};
+      for (const p of data as AgentPrompt[]) vals[p.key] = p.currentValue;
+      setPromptEditValues(vals);
+      setAuthed(true);
+    } catch { /* handled */ }
+    setPromptsLoading(false);
+  }, [apiFetch]);
+
+  const triggerAgent = useCallback(async (agentKey: string, path: string, body?: Record<string, unknown>) => {
+    if (agentsRunning.has(agentKey)) return;
+    setAgentsRunning((prev) => new Set(prev).add(agentKey));
+    setAgentsResult((prev) => ({ ...prev, [agentKey]: { ok: false, data: { status: "running…" } } }));
+    try {
+      const data = await apiFetch(path, {
+        method: "POST",
+        body: JSON.stringify(body ?? {}),
+      });
+      setAgentsResult((prev) => ({ ...prev, [agentKey]: { ok: true, data } }));
+    } catch (err) {
+      setAgentsResult((prev) => ({ ...prev, [agentKey]: { ok: false, data: { error: String(err) } } }));
+    }
+    setAgentsRunning((prev) => { const s = new Set(prev); s.delete(agentKey); return s; });
+  }, [agentsRunning, apiFetch]);
+
+  const savePrompt = useCallback(async (key: string) => {
+    setPromptSaving((prev) => new Set(prev).add(key));
+    try {
+      await apiFetch(`/admin/prompts/${key}`, {
+        method: "PUT",
+        body: JSON.stringify({ value: promptEditValues[key] }),
+      });
+      await loadPrompts();
+    } catch { /* handled */ }
+    setPromptSaving((prev) => { const s = new Set(prev); s.delete(key); return s; });
+  }, [apiFetch, promptEditValues, loadPrompts]);
+
+  const resetPrompt = useCallback(async (key: string) => {
+    setPromptSaving((prev) => new Set(prev).add(key));
+    try {
+      await apiFetch(`/admin/prompts/${key}`, { method: "DELETE" });
+      await loadPrompts();
+    } catch { /* handled */ }
+    setPromptSaving((prev) => { const s = new Set(prev); s.delete(key); return s; });
+  }, [apiFetch, loadPrompts]);
+
   useEffect(() => {
     if (!key) return;
     loadStats();
@@ -232,7 +305,8 @@ export default function AdminReview() {
     if (section === "suggestions" || section === "queue") loadSuggestions();
     else if (section === "runs") loadRuns();
     else if (section === "logs") loadLogs();
-  }, [authed, section, loadSuggestions, loadRuns, loadLogs]);
+    else if (section === "prompts") loadPrompts();
+  }, [authed, section, loadSuggestions, loadRuns, loadLogs, loadPrompts]);
 
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -320,6 +394,8 @@ export default function AdminReview() {
     { key: "suggestions", label: "Suggerimenti", icon: Bot },
     { key: "runs", label: "Esecuzioni Agenti", icon: History },
     { key: "logs", label: "Audit Log", icon: FileText },
+    { key: "agents", label: "Lancia Agenti", icon: Terminal },
+    { key: "prompts", label: "Prompt Agenti", icon: Code2 },
     { key: "settings", label: "Impostazioni", icon: Settings },
   ];
 
@@ -406,6 +482,8 @@ export default function AdminReview() {
             {section === "runs" && "Esecuzioni Agenti"}
             {section === "logs" && "Audit Log"}
             {section === "settings" && "Impostazioni"}
+            {section === "agents" && "Lancia Agenti di Ricerca"}
+            {section === "prompts" && "Gestione Prompt AI"}
           </h2>
           <div className="flex items-center gap-2">
             <Button
@@ -416,6 +494,7 @@ export default function AdminReview() {
                 if (section === "suggestions" || section === "queue") loadSuggestions();
                 else if (section === "runs") loadRuns();
                 else if (section === "logs") loadLogs();
+                else if (section === "prompts") loadPrompts();
               }}
             >
               <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
@@ -570,6 +649,193 @@ export default function AdminReview() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {section === "agents" && (
+              <div className="p-6 space-y-6 max-w-2xl">
+                <p className="text-sm text-muted-foreground">
+                  Avvia manualmente una sessione di ricerca AI. Il processo può richiedere 1-3 minuti.
+                </p>
+
+                {/* News Research */}
+                <div className="bg-card border rounded-2xl p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
+                      <Terminal className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold">News Research</h4>
+                      <p className="text-xs text-muted-foreground">Raccoglie notizie dal mercato del lavoro italiano tramite Tavily</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Input
+                      placeholder="Settori specifici (opzionale, separati da virgola)"
+                      value={newsSectorInput}
+                      onChange={(e) => setNewsSectorInput(e.target.value)}
+                      className="text-sm"
+                    />
+                    <Button
+                      size="sm"
+                      disabled={agentsRunning.has("news")}
+                      onClick={() => {
+                        const sectors = newsSectorInput.trim()
+                          ? newsSectorInput.split(",").map((s) => s.trim()).filter(Boolean)
+                          : [];
+                        triggerAgent("news", "/admin/research/news/run", { sectorNames: sectors });
+                      }}
+                      className="w-full"
+                    >
+                      {agentsRunning.has("news") ? (
+                        <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> In esecuzione…</>
+                      ) : (
+                        <><Play className="w-4 h-4 mr-2" /> Avvia News Research</>
+                      )}
+                    </Button>
+                  </div>
+                  {agentsResult["news"] && (
+                    <div className={cn(
+                      "rounded-xl p-4 text-sm font-mono",
+                      agentsResult["news"].ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"
+                    )}>
+                      {agentsResult["news"].ok ? (
+                        <p>
+                          Completato — aggiunti: <strong>{String(agentsResult["news"].data.added ?? 0)}</strong>,
+                          controllati: <strong>{String(agentsResult["news"].data.checked ?? 0)}</strong>
+                        </p>
+                      ) : (
+                        <p>{JSON.stringify(agentsResult["news"].data)}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Growth Research */}
+                <div className="bg-card border rounded-2xl p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
+                      <TrendingUp className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold">Growth Research</h4>
+                      <p className="text-xs text-muted-foreground">Genera articoli di crescita professionale tramite AI</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={agentsRunning.has("growth")}
+                    onClick={() => triggerAgent("growth", "/admin/research/growth/run")}
+                    className="w-full"
+                  >
+                    {agentsRunning.has("growth") ? (
+                      <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> In esecuzione…</>
+                    ) : (
+                      <><Play className="w-4 h-4 mr-2" /> Avvia Growth Research</>
+                    )}
+                  </Button>
+                  {agentsResult["growth"] && (
+                    <div className={cn(
+                      "rounded-xl p-4 text-sm font-mono",
+                      agentsResult["growth"].ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"
+                    )}>
+                      {agentsResult["growth"].ok ? (
+                        <p>
+                          Completato — aggiunti: <strong>{String(agentsResult["growth"].data.added ?? 0)}</strong>,
+                          tentati: <strong>{String(agentsResult["growth"].data.attempted ?? 0)}</strong>
+                        </p>
+                      ) : (
+                        <p>{JSON.stringify(agentsResult["growth"].data)}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {section === "prompts" && (
+              <div className="p-6 space-y-3 max-w-3xl">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Modifica i prompt degli agenti AI. Le modifiche sono salvate nel database e hanno effetto immediato.
+                  Usa <code className="bg-muted px-1 py-0.5 rounded text-xs">{"{{PLACEHOLDER}}"}</code> per i valori dinamici.
+                </p>
+
+                {promptsLoading ? (
+                  <div className="p-8 text-center text-muted-foreground">Caricamento prompt…</div>
+                ) : prompts.map((prompt) => {
+                  const isExpanded = promptExpandedKey === prompt.key;
+                  const isSaving = promptSaving.has(prompt.key);
+                  const isDirty = promptEditValues[prompt.key] !== prompt.currentValue;
+
+                  return (
+                    <div key={prompt.key} className="bg-card border rounded-2xl overflow-hidden">
+                      <button
+                        className="w-full flex items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
+                        onClick={() => setPromptExpandedKey(isExpanded ? null : prompt.key)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm">{prompt.label}</span>
+                            {prompt.isOverridden && (
+                              <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 border-0">
+                                Modificato
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">{prompt.description}</p>
+                          {prompt.placeholders.length > 0 && (
+                            <div className="flex gap-1 flex-wrap mt-1">
+                              {prompt.placeholders.map((p) => (
+                                <code key={p} className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">{p}</code>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
+                      </button>
+
+                      {isExpanded && (
+                        <div className="border-t p-4 space-y-3 bg-muted/10">
+                          <textarea
+                            value={promptEditValues[prompt.key] ?? ""}
+                            onChange={(e) => setPromptEditValues((prev) => ({ ...prev, [prompt.key]: e.target.value }))}
+                            rows={Math.max(8, (promptEditValues[prompt.key] ?? "").split("\n").length + 2)}
+                            className="w-full text-xs font-mono border rounded-xl p-3 bg-background resize-y focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          />
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              disabled={isSaving || !isDirty}
+                              onClick={() => savePrompt(prompt.key)}
+                            >
+                              {isSaving ? <RefreshCw className="w-3 h-3 mr-1.5 animate-spin" /> : <Save className="w-3 h-3 mr-1.5" />}
+                              Salva
+                            </Button>
+                            {prompt.isOverridden && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={isSaving}
+                                onClick={() => resetPrompt(prompt.key)}
+                              >
+                                <RotateCcw className="w-3 h-3 mr-1.5" />
+                                Ripristina Default
+                              </Button>
+                            )}
+                            {isDirty && (
+                              <span className="text-xs text-amber-600 ml-auto">Modifiche non salvate</span>
+                            )}
+                            {prompt.updatedAt && (
+                              <span className="text-xs text-muted-foreground ml-auto">
+                                Aggiornato: {fmtShortDate(prompt.updatedAt)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 

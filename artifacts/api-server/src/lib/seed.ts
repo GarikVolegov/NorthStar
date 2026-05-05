@@ -1,6 +1,8 @@
 import { db, sectorsTable, professionsTable, educationPathsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 
+export { ensurePromptsTable } from "./prompt-store.js";
+
 export async function ensureCoachSessionsTable(): Promise<void> {
   try {
     await db.execute(sql`

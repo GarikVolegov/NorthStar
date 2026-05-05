@@ -4,6 +4,7 @@ import { db, sectorsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { optionalAuthMiddleware } from "../lib/auth-jwt.js";
 import { aiGenerationRateLimiter } from "../lib/rate-limiter.js";
+import { getPrompt, fillTemplate } from "../lib/prompt-store.js";
 
 const router = Router();
 
@@ -24,36 +25,13 @@ router.post("/skills-gap/analyze", optionalAuthMiddleware, aiGenerationRateLimit
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders();
 
-  const prompt = `Sei un career coach esperto nel settore "${sector.name}" in Italia.
-
-SETTORE TARGET: ${sector.name}
-Competenze richieste dal settore: ${(sector.skills as string[]).join(", ")}
-Livello esperienza target dell'utente: ${experienceLevel}
-
-COMPETENZE ATTUALI DICHIARATE DALL'UTENTE:
-${userSkills.length > 0 ? userSkills.join(", ") : "Nessuna competenza dichiarata"}
-
-Genera un'analisi del gap di competenze DETTAGLIATA e PRATICA con questo formato in markdown:
-
-## 🎯 Indice di Readiness: X/100
-[breve frase motivazionale basata sul punteggio]
-
-## ✅ Competenze già acquisite
-[elenco puntato delle competenze utente già allineate al settore, con una nota su come valorizzarle]
-
-## 🚨 Gap Critici (priorità alta)
-[2-4 competenze fondamentali mancanti. Per ognuna: nome, perché è cruciale, risorsa specifica per apprenderla in Italia (corso, certificazione, piattaforma)]
-
-## 📈 Gap Secondari (priorità media)
-[2-3 competenze utili ma non bloccanti. Stessa struttura sopra]
-
-## 🗺️ Piano d'azione a 6 mesi
-[3-5 step concreti con timeline e azioni specifiche]
-
-## 💡 Consiglio del career coach
-[1 paragrafo di insight personale specifico per questo settore nel mercato italiano]
-
-Rispondi solo in italiano. Sii specifico e pratico, non generico.`;
+  const template = await getPrompt("skills-gap.prompt");
+  const prompt = fillTemplate(template, {
+    SECTOR_NAME: sector.name,
+    SECTOR_SKILLS: (sector.skills as string[]).join(", "),
+    EXPERIENCE_LEVEL: experienceLevel,
+    USER_SKILLS: userSkills.length > 0 ? userSkills.join(", ") : "Nessuna competenza dichiarata",
+  });
 
   try {
     const stream = await openai.chat.completions.create({

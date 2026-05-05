@@ -38,6 +38,7 @@ import interviewRouter from "./interview";
 import skillsGapRouter from "./skills-gap";
 import coachRouter from "./coach";
 import adminMetricsRouter from "./admin-metrics";
+import adminPromptsRouter from "./admin-prompts";
 
 const router: IRouter = Router();
 
@@ -50,6 +51,7 @@ router.use(healthRouter);
 router.use(sectorsRouter);
 router.use(rolesRouter);
 router.use(adminReviewRouter);
+router.use(adminPromptsRouter);
 router.use(testSessionsRouter);
 router.use(usersRouter);
 router.use(stripeRouter);

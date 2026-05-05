@@ -2,9 +2,9 @@ import { Router } from "express";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { db, sectorsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-
 import { optionalAuthMiddleware } from "../lib/auth-jwt.js";
 import { aiChatRateLimiter } from "../lib/rate-limiter.js";
+import { getPrompt, fillTemplate } from "../lib/prompt-store.js";
 
 const router = Router();
 
@@ -31,48 +31,40 @@ router.post("/wiki/:sectorId/ask", optionalAuthMiddleware, aiChatRateLimiter, as
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders();
 
-  const systemPrompt = `Sei un esperto consulente di orientamento professionale specializzato nel settore "${sector.name}" in Italia.
-
-Contesto del settore:
+  const sectorContext = `Contesto del settore:
 - Descrizione: ${sector.description}
-- Competenze richieste: ${sector.skills.join(", ")}
+- Competenze richieste: ${(sector.skills as string[]).join(", ")}
 - RAL media: €${sector.avgSalaryMin / 1000}k - €${sector.avgSalaryMax / 1000}k
 - Crescita annua: +${sector.growthRate}%
 - Rischio automazione: ${sector.automationRisk}
 - Tendenza di mercato: ${sector.trend}
-- Tempo stimato per autonomia: ${sector.timeToAutonomy}
+- Tempo stimato per autonomia: ${sector.timeToAutonomy}`;
 
-Istruzioni:
-- Rispondi SEMPRE in italiano in modo chiaro, concreto e professionale
-- Sii specifico e pratico, evita generalizzazioni
-- Usa elenchi puntati o numerati quando appropriato
-- Massimo 3-4 paragrafi salvo necessità di approfondimento
-- Se non conosci qualcosa con certezza, dillo chiaramente
-- Concentrati sul mercato italiano quando rilevante`;
+  const template = await getPrompt("wiki.system");
+  const systemPrompt = fillTemplate(template, {
+    SECTOR_NAME: sector.name,
+    SECTOR_CONTEXT: sectorContext,
+  });
 
   try {
     const messages = [
       { role: "system" as const, content: systemPrompt },
-      ...history
-        .slice(-10)
-        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+      ...history.slice(-10).map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       { role: "user" as const, content: question },
     ];
 
     const stream = await openai.chat.completions.create({
-      model: "gpt-5.1",
-      max_completion_tokens: 1024,
+      model: "gpt-4.1",
+      max_tokens: 1024,
       messages,
       stream: true,
     });
 
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content;
-      if (content) {
-        res.write(`data: ${JSON.stringify({ content })}\n\n`);
-      }
+      if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
     }
-  } catch (err) {
+  } catch {
     res.write(`data: ${JSON.stringify({ error: "Errore nella generazione. Riprova." })}\n\n`);
   }
 

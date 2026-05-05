@@ -2,25 +2,7 @@ import { tavilySearch, urlHash, normalizeUrl } from "../../lib/tavily";
 import { db, newsArticlesTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../../lib/logger";
-
-const ITALIAN_DOMAINS = [
-  "sole24ore.com",
-  "corriere.it",
-  "repubblica.it",
-  "ansa.it",
-  "money.it",
-  "linkiesta.it",
-  "formiche.net",
-  "ilpost.it",
-];
-
-const BASE_QUERIES = [
-  "mercato del lavoro Italia 2025 trend professioni",
-  "nuove opportunità lavoro digitale Italia 2025",
-  "stipendi retribuzione professionisti Italia 2025",
-  "lavoro futuro intelligenza artificiale Italia 2025",
-  "crescita professionale carriera Italia notizie",
-];
+import { getPrompt } from "../../lib/prompt-store.js";
 
 const SECTOR_QUERY_MAP: Record<string, string> = {
   tecnologia: "lavoro informatica tecnologia digitale Italia",
@@ -36,6 +18,26 @@ const SECTOR_QUERY_MAP: Record<string, string> = {
 };
 
 export async function runNewsResearch(sectorNames: string[] = []): Promise<{ added: number; checked: number }> {
+  const queriesRaw = await getPrompt("news-research.base-queries");
+  let BASE_QUERIES: string[] = [];
+  try {
+    BASE_QUERIES = JSON.parse(queriesRaw) as string[];
+  } catch {
+    BASE_QUERIES = [
+      "mercato del lavoro Italia 2025 trend professioni",
+      "nuove opportunità lavoro digitale Italia 2025",
+      "stipendi retribuzione professionisti Italia 2025",
+    ];
+  }
+
+  const domainsRaw = await getPrompt("news-research.domains");
+  let ITALIAN_DOMAINS: string[] = [];
+  try {
+    ITALIAN_DOMAINS = JSON.parse(domainsRaw) as string[];
+  } catch {
+    ITALIAN_DOMAINS = ["sole24ore.com", "corriere.it", "repubblica.it", "ansa.it"];
+  }
+
   const sectorQueries = sectorNames.slice(0, 4).map((s) => {
     const lower = s.toLowerCase();
     const match = Object.entries(SECTOR_QUERY_MAP).find(([k]) => lower.includes(k));

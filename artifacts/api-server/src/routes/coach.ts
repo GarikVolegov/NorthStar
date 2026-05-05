@@ -4,6 +4,7 @@ import { db, coachSessionsTable, usersTable, testSessionsTable, userObjectivesTa
 import { eq, desc } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth-jwt.js";
 import { aiChatRateLimiter } from "../lib/rate-limiter.js";
+import { getPrompt } from "../lib/prompt-store.js";
 
 const router = Router();
 
@@ -60,6 +61,8 @@ router.post("/coach/sessions/:id/ask", authMiddleware, aiChatRateLimiter, async 
   const objectives = await db.select().from(userObjectivesTable)
     .where(eq(userObjectivesTable.userId, userId)).limit(10);
 
+  const instructions = await getPrompt("coach.instructions");
+
   const systemPrompt = `Sei il Career Coach AI personale di ${user?.name ?? "questo utente"} su NorthStar — piattaforma italiana di orientamento professionale.
 
 PROFILO UTENTE:
@@ -72,14 +75,7 @@ ${testSession ? `- Tipi RIASEC primari: ${(testSession.primaryTypes as string[] 
 ${objectives.length > 0 ? `- Obiettivi attuali: ${objectives.map((o) => `${o.text} (${o.progress}%)`).join("; ")}` : ""}
 ${user?.cvText ? `- CV in possesso: sì (${user.cvText.slice(0, 200)}...)` : ""}
 
-ISTRUZIONI:
-- Sei un coach professionale, empatico e diretto.
-- Conosci bene il mercato del lavoro italiano.
-- Ricorda il contesto della conversazione e fai riferimento alle sessioni precedenti quando rilevante.
-- Fai domande di follow-up pertinenti per approfondire.
-- Non ripetere informazioni del profilo a meno che non siano direttamente rilevanti.
-- Rispondi SEMPRE in italiano.
-- Risposte concise ma sostanziali (max 3-4 paragrafi salvo necessità).`;
+${instructions}`;
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
