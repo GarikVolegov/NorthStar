@@ -69,16 +69,17 @@ playwright.config.ts # Playwright config (baseURL port 5000, API port 8080)
 - **P4** Agent Health Dashboard: `GET /api/admin/agent-health` → `admin-agenti.tsx` (success rate, latency, errors per agent)
 - **P5** Setup Wizard: `admin-status.tsx` per-integration guide cards (Stripe, GNews, Tavily, Resend, Push, Google OAuth)
 - **P6** Career Climber Mode: `user_mode` col on users, `PATCH /api/profile/:id/mode`, `UserModeCard` in profilo, `ClimberToolsSection` in dashboard
+- **P12** User Journey Types: `journey_type` col on users (indeciso/dipendente/autonomo/azienda/investitore), `PATCH /api/profile/:id/journey-type`, PersonaSelector page at `/percorso`, journey badge in navbar dropdown
 - **P7** Post-test Funnel: `PostTestWizard.tsx` overlay (3 steps: work-mode → objectives → calendar) triggered from results page
 - **P8** E2E Playwright: `e2e/auth.spec.ts`, `e2e/test-riasec.spec.ts`, `e2e/admin.spec.ts`, `e2e/objectives.spec.ts`; `pnpm test:e2e`
 - **P9** Growth Queue: `GET/POST /api/admin/growth-queue` + approve/reject/delete → `admin-crescita.tsx`
 - **P10** Admin Discovery vs Execution: `admin-home.tsx` — visual map of all admin sections
 - **P11** Business Idea Validator: `POST /api/business-ideas` → async AI validation → `GET /api/business-ideas/:id`; `POST /api/business-ideas/:id/find-incubators` → incubator/grant report. DB: `business_ideas` table. Python agents: `business_validator.py` (score 0-10, 12 structured fields) + `incubator_finder.py` (5-7 Italian/EU funding opportunities + pitch + canvas). Frontend: `/validatore-idea` (split-pane: sidebar list + detail view with tabs Validazione / Incubatori). Accessible from navbar user dropdown → "Validatore Idea".
 
-## UI/UX System — Dark Brand (martes-ai inspired)
+## UI/UX System — Dark Navy Brand
 
-- **Theme:** Dark-first. Background `hsl(0 0% 5%)` ≈ `#0d0d0d`, foreground `hsl(0 0% 96%)`.
-- **Primary accent:** Vibrant green `hsl(142 69% 58%)` ≈ `#4ade80` (like martes-ai lime-green). Used for CTAs, active nav, highlights.
+- **Theme:** Dark navy-first. Background `hsl(213 62% 8%)` ≈ `#08192e`, foreground `hsl(0 0% 96%)`.
+- **Primary accent:** Gold `hsl(46 65% 52%)` = `#D4AF37`. Used for CTAs, active nav, highlights, glow.
 - **Brand tokens file:** `src/lib/brand.ts` — canonical color hex values + typography + radius + shadows.
 - **CSS variables:** `src/index.css` — all Tailwind theme vars mapped; `--brand` = green; `--glow-primary` for glow effects; `.glass`, `.pill-nav`, `.glow-primary`, `.text-display`, `.text-italic-serif`, `.text-label` utility classes.
 - **Logo:** `/public/logo.svg` (North Star + compass SVG — 4-pointed Polaris star with compass ring + N cardinal marker) + `/public/favicon.svg` (same mark, 64×64).

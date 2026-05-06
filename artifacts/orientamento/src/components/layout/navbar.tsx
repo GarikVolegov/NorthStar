@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LogOut, User, LayoutDashboard, Menu, X,
-  FlaskConical, Layers, BookOpenText, Newspaper, Crown, Briefcase, Users, Calendar, Globe, BrainCircuit, Compass,
+  FlaskConical, Layers, BookOpenText, Newspaper, Crown, Briefcase, Users, Calendar, Globe, BrainCircuit, Compass, MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +26,14 @@ const LANG_LABELS: Record<string, string> = {
   es: "Español",
   fr: "Français",
   de: "Deutsch",
+};
+
+const JOURNEY_LABELS: Record<string, { label: string; color: string }> = {
+  indeciso:    { label: "Indeciso",           color: "text-primary bg-primary/10 border-primary/30" },
+  dipendente:  { label: "Dipendente",         color: "text-[#A8D5BA] bg-[#A8D5BA]/10 border-[#A8D5BA]/30" },
+  autonomo:    { label: "Autonomo",           color: "text-primary bg-primary/10 border-primary/30" },
+  azienda:     { label: "Azienda",            color: "text-[#A8D5BA] bg-[#A8D5BA]/10 border-[#A8D5BA]/30" },
+  investitore: { label: "Investitore",        color: "text-primary bg-primary/10 border-primary/30" },
 };
 
 export function Navbar() {
@@ -141,14 +149,22 @@ export function Navbar() {
                       <span className="max-w-[80px] truncate">{user.name}</span>
                     </motion.button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-52 bg-card border-border">
+                  <DropdownMenuContent align="end" className="w-56 bg-card border-border">
                     <DropdownMenuLabel className="font-normal">
-                      <div className="flex flex-col">
+                      <div className="flex flex-col gap-1">
                         <span className="font-semibold text-sm text-foreground">{user.name}</span>
                         <span className="text-xs text-muted-foreground truncate">{user.email}</span>
+                        {user.journeyType && JOURNEY_LABELS[user.journeyType] && (
+                          <span className={`inline-flex w-fit text-xs font-semibold px-2 py-0.5 rounded-full border mt-0.5 ${JOURNEY_LABELS[user.journeyType].color}`}>
+                            {JOURNEY_LABELS[user.journeyType].label}
+                          </span>
+                        )}
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setLocation("/percorso")} className="cursor-pointer">
+                      <MapPin className="h-4 w-4 mr-2 text-primary" /> Il mio percorso
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setLocation("/profilo")} className="cursor-pointer">
                       <LayoutDashboard className="h-4 w-4 mr-2" /> {t("nav.myProfile")}
                     </DropdownMenuItem>
@@ -290,6 +306,9 @@ export function Navbar() {
                       </button>
                       <button onClick={() => { setLocation("/candidature"); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
                         <Briefcase className="h-4 w-4" /> {t("nav.applications")}
+                      </button>
+                      <button onClick={() => { setLocation("/percorso"); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-primary hover:text-foreground hover:bg-primary/5 transition-colors font-semibold">
+                        <MapPin className="h-4 w-4" /> Il mio percorso
                       </button>
                       <button onClick={() => { setLocation("/validatore-idea"); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
                         <Compass className="h-4 w-4" /> Validatore Idea

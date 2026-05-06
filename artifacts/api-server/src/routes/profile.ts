@@ -197,6 +197,38 @@ router.patch("/profile/:userId/mode", authMiddleware, async (req, res): Promise<
 });
 
 // POST /profile/change-password — FIXED: authMiddleware + ownership (was open to IDOR via userId in body)
+/* ── PATCH /profile/:id/journey-type ── */
+const VALID_JOURNEY_TYPES = ["indeciso", "dipendente", "autonomo", "azienda", "investitore"] as const;
+
+const JourneyTypeBody = z.object({
+  journeyType: z.enum(VALID_JOURNEY_TYPES),
+});
+
+router.patch("/profile/:id/journey-type", authMiddleware, async (req, res): Promise<void> => {
+  const userId = parseInt(String(req.params.id), 10);
+  const requesterId = res.locals.userId as number;
+
+  if (isNaN(userId) || userId !== requesterId) {
+    res.status(403).json({ error: "Non autorizzato" });
+    return;
+  }
+
+  const parsed = JourneyTypeBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Tipo percorso non valido", details: parsed.error.flatten() });
+    return;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+  if (!user) {
+    res.status(404).json({ error: "Utente non trovato" });
+    return;
+  }
+
+  await db.update(usersTable).set({ journeyType: parsed.data.journeyType }).where(eq(usersTable.id, userId));
+  res.json({ journeyType: parsed.data.journeyType });
+});
+
 router.post("/profile/change-password", authMiddleware, async (req, res): Promise<void> => {
   const parsed = ChangePasswordBody.safeParse(req.body);
   if (!parsed.success) {

@@ -28,6 +28,7 @@ export const usersTable = pgTable("users", {
   lastActiveAt: timestamp("last_active_at", { withTimezone: true }),
   streakDays: integer("streak_days").notNull().default(0),
   userMode: text("user_mode").notNull().default("explorer"),
+  journeyType: text("journey_type").notNull().default("indeciso"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

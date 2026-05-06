@@ -13,6 +13,8 @@ export interface AuthUser {
   autonomyPreference?: number | null;
   stabilityPreference?: number | null;
   timezone?: string | null;
+  userMode?: string | null;
+  journeyType?: string | null;
 }
 
 interface AuthContextValue {
