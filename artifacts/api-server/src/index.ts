@@ -1,3 +1,6 @@
+// IMPORTANT: telemetry must be imported FIRST — OTel patches Node.js core modules at startup
+import "./lib/telemetry.js";
+
 // Catch uncaught exceptions BEFORE any import that might throw,
 // so Vercel returns a JSON 500 with the error message instead of a silent crash.
 process.on("uncaughtException", (err) => {
@@ -34,7 +37,6 @@ if (!process.env.VERCEL) {
   }
 
   // Validate environment variables before binding to port.
-  // Logs a clear table of what's present/missing and exits if required vars are absent.
   const { ok } = runStartupCheck();
   if (!ok) {
     process.exit(1);

@@ -1,0 +1,103 @@
+# NorthStar — Docker Compose
+# Usage: docker compose up --build
+# All services start in the correct order with health checks.
+
+services:
+
+  # ─── PostgreSQL ──────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: northstar
+      POSTGRES_PASSWORD: northstar_dev
+      POSTGRES_DB: northstar
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U northstar"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Python AI Microservice ───────────────────────────────────────
+  ai-agents:
+    build:
+      context: ./artifacts/ai-agents
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - AI_INTEGRATIONS_OPENAI_API_KEY=${AI_INTEGRATIONS_OPENAI_API_KEY}
+      - AI_INTEGRATIONS_OPENAI_BASE_URL=${AI_INTEGRATIONS_OPENAI_BASE_URL}
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ─── Express API Server ───────────────────────────────────────────
+  api-server:
+    build:
+      context: .
+      dockerfile: artifacts/api-server/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      NODE_ENV: development
+      DATABASE_URL: postgresql://northstar:northstar_dev@postgres:5432/northstar
+      AI_AGENTS_URL: http://ai-agents:8000
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_KEY: ${ADMIN_KEY}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      GNEWS_API_KEY: ${GNEWS_API_KEY:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      OTEL_SERVICE_NAME: northstar-api
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai-agents:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ─── React Frontend ───────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./artifacts/orientamento
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      VITE_API_URL: http://localhost:8080/api
+    depends_on:
+      api-server:
+        condition: service_healthy
+
+  # ─── Jaeger (distributed tracing UI) ─────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    restart: unless-stopped
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4318:4318"     # OTLP HTTP
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+
+volumes:
+  postgres_data:
