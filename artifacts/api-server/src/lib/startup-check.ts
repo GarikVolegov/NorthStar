@@ -17,10 +17,11 @@ const REQUIRED: EnvEntry[] = [
   { key: "DATABASE_URL",  description: "Connessione PostgreSQL — necessaria per tutto" },
   { key: "ADMIN_KEY",     description: "Chiave di accesso alle route /admin/*" },
   { key: "AI_AGENTS_URL", description: "Python AI Service — Wiki, Roadmap e Grafo RAG non funzionano senza" },
+  // FIX: JWT_SECRET must be required — without it every restart invalidates all user sessions
+  { key: "JWT_SECRET",    description: "Secret JWT — senza questo tutti i token vengono invalidati ad ogni restart" },
 ];
 
 const OPTIONAL: EnvEntry[] = [
-  { key: "JWT_SECRET",                      description: "Secret JWT — senza questo i token scadono ad ogni restart" },
   { key: "STRIPE_SECRET_KEY",               description: "Stripe — checkout e abbonamenti disabilitati" },
   { key: "STRIPE_WEBHOOK_SECRET",           description: "Stripe webhooks — eventi pagamento non processati" },
   { key: "GNEWS_API_KEY",                   description: "GNews — scheduler notizie disabilitato" },

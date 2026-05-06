@@ -2,6 +2,9 @@
  * AI Agents Proxy Route
  * Proxies LLM-intensive tasks to the Python FastAPI microservice (LangChain/LangGraph).
  * Falls back gracefully if the Python service is unavailable.
+ *
+ * FIX: Added explicit AbortController timeout on all proxy calls to prevent
+ * hanging requests when the Python service is down or unresponsive.
  */
 import { Router, type IRouter } from "express";
 import { z } from "zod";
@@ -11,7 +14,10 @@ import { logger } from "../lib/logger";
 const router: IRouter = Router();
 
 const AI_AGENTS_URL = process.env.AI_AGENTS_URL ?? "http://localhost:8000";
-const REQUEST_TIMEOUT_MS = 30_000;
+// FIX: Explicit timeouts per request type — prevents indefinite hangs
+const DEFAULT_TIMEOUT_MS = 30_000;
+const CHAT_TIMEOUT_MS = 60_000;  // chat streams may be slower
+const HEALTH_TIMEOUT_MS = 5_000;
 
 const AI_TASK_TYPES = [
   "personality_insight",
@@ -45,7 +51,7 @@ const ChatRequestSchema = z.object({
 async function callPythonService(
   path: string,
   body: unknown,
-  timeoutMs = REQUEST_TIMEOUT_MS,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<{ ok: boolean; data?: unknown; error?: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -68,7 +74,10 @@ async function callPythonService(
     return { ok: true, data };
   } catch (err) {
     clearTimeout(timer);
-    const msg = err instanceof Error ? err.message : String(err);
+    const isTimeout = err instanceof Error && err.name === "AbortError";
+    const msg = isTimeout
+      ? `Timeout dopo ${timeoutMs}ms — il servizio AI non risponde`
+      : err instanceof Error ? err.message : String(err);
     return { ok: false, error: msg };
   }
 }
@@ -107,7 +116,7 @@ router.post("/ai-agents/run", async (req, res): Promise<void> => {
     payload,
     plan,
     user_id: userId,
-  });
+  }, DEFAULT_TIMEOUT_MS);
   const durationMs = Date.now() - start;
 
   if (!result.ok) {
@@ -143,12 +152,13 @@ router.post("/ai-agents/chat", async (req, res): Promise<void> => {
 
   logger.info({ messageCount: messages.length, userId, plan }, "AI chat request");
 
+  // FIX: chat uses longer timeout since LLM streaming may be slower
   const result = await callPythonService("/chat", {
     messages,
     profile: profile ?? {},
     plan,
     user_id: userId,
-  });
+  }, CHAT_TIMEOUT_MS);
 
   if (!result.ok) {
     logger.warn({ error: result.error }, "AI chat service unavailable");
@@ -166,16 +176,20 @@ router.post("/ai-agents/chat", async (req, res): Promise<void> => {
 // ─── GET /ai-agents/health ───────────────────────────────────────────────────
 router.get("/ai-agents/health", async (_req, res): Promise<void> => {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5_000);
+  const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
 
   try {
     const r = await fetch(`${AI_AGENTS_URL}/health`, { signal: controller.signal });
     clearTimeout(timer);
     const data = await r.json();
     res.json({ proxy: "ok", aiService: data });
-  } catch {
+  } catch (err) {
     clearTimeout(timer);
-    res.status(503).json({ proxy: "ok", aiService: { status: "unavailable" } });
+    const isTimeout = err instanceof Error && err.name === "AbortError";
+    res.status(503).json({
+      proxy: "ok",
+      aiService: { status: isTimeout ? "timeout" : "unavailable" },
+    });
   }
 });
 
