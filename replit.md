@@ -10,7 +10,8 @@
 
 **DB migrations:** `pnpm --filter @workspace/db exec drizzle-kit push`  
 **Build all:** `pnpm run build`  
-**Typecheck:** `pnpm run typecheck`
+**Typecheck:** `pnpm run typecheck`  
+**E2E tests:** `pnpm test:e2e` (Playwright, requires services running)
 
 **Required env vars:** `DATABASE_URL`, `ADMIN_KEY`, `AI_AGENTS_URL`  
 **Optional:** `JWT_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `GNEWS_API_KEY`, `TAVILY_API_KEY`, `RESEND_API_KEY`, `VAPID_*`, `GOOGLE_CLIENT_ID`, `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`
@@ -23,6 +24,7 @@
 - **Database:** PostgreSQL (Replit managed), Drizzle ORM
 - **Auth:** Custom JWT (bcryptjs + persistent JWT_SECRET)
 - **Package manager:** pnpm workspaces (monorepo)
+- **E2E:** Playwright (chromium), tests in `e2e/`
 
 ## Where things live
 
@@ -41,7 +43,8 @@ lib/
   api-spec/          # OpenAPI spec + Orval codegen config
   api-zod/           # Generated Zod schemas
   api-client-react/  # Generated TanStack React Query hooks
-  integrations-openai-ai-server/  # OpenAI server-side utils
+e2e/                 # Playwright E2E test specs
+playwright.config.ts # Playwright config (baseURL port 5000, API port 8080)
 ```
 
 ## Architecture decisions
@@ -62,13 +65,14 @@ lib/
 - Admin dashboard with metrics, review queue, AI prompt management
 - Email notifications (Resend), Web Push, Calendar reminders, Weekly digest
 - Stripe subscription for premium tier
-- **T001** Test session history: `GET /api/test-sessions/history` → TestHistoryCard in profilo
-- **T002** Profile completion bar: `GET /api/completion/me` → ProfileCompletionCard (5 steps, % score)
-- **T003** Objectives ↔ calendar: POST/DELETE objectives auto-sync calendarEventsTable
-- **T004** Candidature Kanban drag-and-drop (HTML5 drag API, no lib dep)
-- **T005** AI cover letter: `POST /api/cover-letter/generate` → CoverLetterDialog (Sparkles btn on AppCard)
-- **T006** Streak + badge gamification: `streak_days`/`last_active_at` on users, 6 badges in profilo
-- **T008** Onboarding banner: first-login checklist in UserDashboard (localStorage dismiss)
+- **P3** Admin Catalogs CRUD: `GET/POST/PATCH/DELETE /api/admin/catalogs/{sectors|professions|education-paths|growth-articles}` → `admin-cataloghi.tsx` (tabbed UI)
+- **P4** Agent Health Dashboard: `GET /api/admin/agent-health` → `admin-agenti.tsx` (success rate, latency, errors per agent)
+- **P5** Setup Wizard: `admin-status.tsx` per-integration guide cards (Stripe, GNews, Tavily, Resend, Push, Google OAuth)
+- **P6** Career Climber Mode: `user_mode` col on users, `PATCH /api/profile/:id/mode`, `UserModeCard` in profilo, `ClimberToolsSection` in dashboard
+- **P7** Post-test Funnel: `PostTestWizard.tsx` overlay (3 steps: work-mode → objectives → calendar) triggered from results page
+- **P8** E2E Playwright: `e2e/auth.spec.ts`, `e2e/test-riasec.spec.ts`, `e2e/admin.spec.ts`, `e2e/objectives.spec.ts`; `pnpm test:e2e`
+- **P9** Growth Queue: `GET/POST /api/admin/growth-queue` + approve/reject/delete → `admin-crescita.tsx`
+- **P10** Admin Discovery vs Execution: `admin-home.tsx` — visual map of all admin sections
 
 ## UI/UX System (applied from design doc)
 
@@ -78,9 +82,9 @@ lib/
 - **MatchBadge:** `components/ui/match-badge.tsx` — reusable score badge for matchScore/fitScore/confidence
 - **Chart theme:** `lib/chart-theme.ts` — `CHART_COLORS` + `CHART_DEFAULTS` for Recharts
 - **SSE hook:** `hooks/useSSEStream.ts` + `components/ui/streaming-indicator.tsx` — unified SSE streaming state
-- **Dashboard Hub:** "I tuoi strumenti" section in `dashboard.tsx` (Wiki AI, Roadmap, Grafo, News cards with brand color)
-- **Results page:** Hero layout — top sector as full-width card with animated match badge; sectors 2–3 as secondary 2-col grid; anonymous "Salva risultati" banner
-- **Grafo mobile:** `grafo-conoscenza.tsx` — node list fallback on `<768px` + desktop banner; improved empty state (🕸️)
+- **Dashboard Hub:** "I tuoi strumenti" section in `dashboard.tsx` + Climber section (when userMode=climber)
+- **Results page:** Hero layout — top sector as full-width card with animated match badge; PostTestWizard overlay on `?onboarding=1`
+- **Grafo mobile:** `grafo-conoscenza.tsx` — node list fallback on `<768px` + desktop banner; improved empty state
 
 ## User preferences
 
@@ -96,8 +100,9 @@ lib/
 - pnpm workspace — always run from root or use `--filter` flag
 - Growth research scheduler expects OpenAI to return valid JSON; may warn if model truncates output
 - `completion/me` uses raw SQL for `streak_days`/`last_active_at` (schema pushed, Drizzle types auto-refreshed)
-- Existing tsc errors (api-client-react unbuilt dist, any-typed params in ruolo/sector etc.) are pre-existing, not introduced by T001-T008
+- Existing tsc errors (api-client-react unbuilt dist, any-typed params in ruolo/sector etc.) are pre-existing, not introduced by new features
 - **Route ordering rule:** `notificationsRouter` and `pushRouter` apply `router.use(authMiddleware)` at root (no path). Any admin route using only `x-admin-key` (no JWT) MUST be registered in `routes/index.ts` BEFORE `calendarRouter` (line ~78), or it will receive 401 from those routers' global auth middleware.
+- Playwright cache: `PLAYWRIGHT_BROWSERS_PATH` defaults to `.cache/ms-playwright` in project root; set `BASE_URL`/`API_URL` env vars when running tests against staging
 
 ## Pointers
 

@@ -58,6 +58,10 @@ const SkillsGap = lazy(() => import("@/pages/skills-gap"));
 const Coach = lazy(() => import("@/pages/coach"));
 const AdminMetriche = lazy(() => import("@/pages/admin-metriche"));
 const AdminStatus = lazy(() => import("@/pages/admin-status"));
+const AdminHome = lazy(() => import("@/pages/admin-home"));
+const AdminAgenti = lazy(() => import("@/pages/admin-agenti"));
+const AdminCataloghi = lazy(() => import("@/pages/admin-cataloghi"));
+const AdminCrescita = lazy(() => import("@/pages/admin-crescita"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -196,6 +200,34 @@ function Router() {
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <AdminStatus />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+      <Route path="/admin/agenti">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminAgenti />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+      <Route path="/admin/cataloghi">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminCataloghi />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+      <Route path="/admin/crescita">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminCrescita />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+      <Route path="/admin">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminHome />
           </Suspense>
         </ErrorBoundary>
       </Route>

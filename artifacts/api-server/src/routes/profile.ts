@@ -156,9 +156,23 @@ router.get("/profile/:userId", async (req, res): Promise<void> => {
     email: user.email,
     emailVerified: user.emailVerified,
     createdAt: user.createdAt.toISOString(),
+    userMode: user.userMode ?? "explorer",
+    workPreference: user.workPreference,
     testSessions: sessionData,
     exploredSectors,
   });
+});
+
+router.patch("/profile/:userId/mode", async (req, res): Promise<void> => {
+  const userId = parseInt(String(req.params.userId), 10);
+  if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
+  const { userMode } = req.body;
+  if (!["explorer", "climber"].includes(userMode)) {
+    res.status(400).json({ error: "userMode deve essere 'explorer' o 'climber'" }); return;
+  }
+  const [updated] = await db.update(usersTable).set({ userMode }).where(eq(usersTable.id, userId)).returning();
+  if (!updated) { res.status(404).json({ error: "Utente non trovato" }); return; }
+  res.json({ userMode: updated.userMode });
 });
 
 router.post("/profile/change-password", async (req, res): Promise<void> => {

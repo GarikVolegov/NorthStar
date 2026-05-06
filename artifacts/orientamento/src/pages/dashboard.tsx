@@ -14,6 +14,7 @@ import {
   Bot, Briefcase, GraduationCap, TrendingUp, Zap, Crown, Lock,
   Loader2, ArrowRight, CheckCircle2, Sparkles, AlertTriangle,
   DollarSign, Clock, MessageSquare, Map, Network, Newspaper,
+  Target, BrainCircuit, Mic2, Trophy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -207,6 +208,90 @@ function AgentLoadingSkeleton() {
   );
 }
 
+function useUserMode(userId: number | undefined) {
+  return useQuery<{ userMode?: string }>({
+    queryKey: ["user-mode-dashboard"],
+    enabled: !!userId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      if (!userId) return { userMode: "explorer" };
+      const res = await apiFetch(`${BASE}api/profile/${userId}`);
+      if (!res.ok) return { userMode: "explorer" };
+      return res.json();
+    },
+  });
+}
+
+function ClimberToolsSection({ sectorId }: { sectorId?: number }) {
+  const tools = [
+    {
+      href: `${BASE}skills-gap/${sectorId ?? ""}`,
+      icon: Target,
+      title: "Analisi Gap Competenze",
+      description: "Identifica le skill mancanti per il tuo ruolo target",
+      color: "text-violet-600",
+      bg: "bg-violet-50",
+    },
+    {
+      href: `${BASE}coach`,
+      icon: BrainCircuit,
+      title: "Career Coach AI",
+      description: "Sessioni di coaching personalizzate per la tua carriera",
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
+    },
+    {
+      href: `${BASE}colloquio`,
+      icon: Mic2,
+      title: "Simulatore Colloquio",
+      description: "Allenati con domande reali del settore",
+      color: "text-sky-600",
+      bg: "bg-sky-50",
+    },
+    {
+      href: `${BASE}obiettivi`,
+      icon: Trophy,
+      title: "Obiettivi & Traguardi",
+      description: "Monitora i tuoi progressi e conquista badge",
+      color: "text-amber-600",
+      bg: "bg-amber-50",
+    },
+  ];
+
+  return (
+    <section>
+      <div className="flex items-center gap-3 mb-5">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-violet-50 text-violet-600">
+          <TrendingUp className="w-4 h-4" />
+        </div>
+        <div>
+          <h2 className="font-serif text-xl font-bold text-foreground flex items-center gap-2">
+            Modalità Climber
+            <span className="text-xs font-medium bg-violet-100 text-violet-700 rounded-full px-2 py-0.5">attiva</span>
+          </h2>
+          <p className="text-xs text-muted-foreground">Strumenti avanzati per accelerare la tua carriera</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {tools.map(({ href, icon: Icon, title, description, color, bg }) => (
+          <Link key={title} href={href}>
+            <div className="group rounded-2xl border bg-card p-5 flex items-start gap-4 hover:shadow-md hover:border-violet-200 transition-all duration-200 cursor-pointer h-full">
+              <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", bg)}>
+                <Icon className={cn("w-5 h-5", color)} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-foreground text-sm leading-snug">{title}</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{description}</p>
+              </div>
+              <ArrowRight className={cn("w-4 h-4 shrink-0 mt-0.5 text-muted-foreground group-hover:translate-x-1 transition-all", `group-hover:${color}`)} />
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function Dashboard() {
   usePageMeta({
     title: "Dashboard AI — NorthStar",
@@ -219,6 +304,9 @@ export default function Dashboard() {
   useEffect(() => {
     if (authReady && !user) navigate("/");
   }, [user, authReady, navigate]);
+
+  const { data: userModeData } = useUserMode(user?.id);
+  const isClimber = (userModeData?.userMode ?? "explorer") === "climber";
 
   const { data: latestSession, isLoading: sessionLoading } = useLatestSession();
   const sessionId = latestSession?.sessionId ?? null;
@@ -384,6 +472,11 @@ export default function Dashboard() {
                 ))}
               </div>
             </section>
+          )}
+
+          {/* Climber Mode Tools */}
+          {isClimber && sessionId && (
+            <ClimberToolsSection sectorId={latestSession?.recommendations?.[0]?.sectorId} />
           )}
 
           {/* Premium Tools Hub */}

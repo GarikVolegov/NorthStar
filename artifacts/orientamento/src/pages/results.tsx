@@ -23,6 +23,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { WorkModeSelector, WorkModeBadge, useWorkPreference } from "@/components/WorkModeSelector";
+import { PostTestWizard } from "@/components/PostTestWizard";
 import type { WorkPreference } from "@/components/WorkModeSelector";
 import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
 import { useReducedMotion } from "@/lib/motion";
@@ -386,6 +387,13 @@ export default function Results() {
   const [workModeConfirmed, setWorkModeConfirmed] = useState(false);
   const [anonymousWorkMode, setAnonymousWorkMode] = useState<WorkPreference | null>(null);
   const [overriddenRecs, setOverriddenRecs] = useState<typeof session | null>(null);
+  const [showWizard, setShowWizard] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("onboarding") === "1";
+    }
+    return false;
+  });
 
   // Effective session merges server data with any anonymous work-mode re-rank
   const effectiveSession = overriddenRecs ?? session;
@@ -1104,5 +1112,30 @@ export default function Results() {
       </div>
 
     </div>
+
+    {/* Post-test onboarding wizard */}
+    {showWizard && user && effectiveSession && (
+      <PostTestWizard
+        userId={user.id}
+        sessionId={id}
+        topSectorName={
+          ((effectiveSession.recommendations as Array<{ sectorName?: string }> | null)?.[0]?.sectorName) ?? "il tuo settore"
+        }
+        onClose={() => setShowWizard(false)}
+        onComplete={() => setShowWizard(false)}
+      />
+    )}
+
+    {/* Floating CTA to open wizard if logged in */}
+    {!showWizard && user && effectiveSession && (
+      <div className="fixed bottom-6 right-6 z-40">
+        <button
+          onClick={() => setShowWizard(true)}
+          className="flex items-center gap-2 bg-primary text-primary-foreground rounded-full px-4 py-2.5 shadow-lg hover:bg-primary/90 transition-all text-sm font-medium"
+        >
+          <span>🎯</span> Pianifica obiettivi
+        </button>
+      </div>
+    )}
   );
 }

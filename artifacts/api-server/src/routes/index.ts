@@ -39,6 +39,9 @@ import skillsGapRouter from "./skills-gap";
 import coachRouter from "./coach";
 import adminMetricsRouter from "./admin-metrics";
 import adminPromptsRouter from "./admin-prompts";
+import adminAgentHealthRouter from "./admin-agent-health";
+import adminCatalogsRouter from "./admin-catalogs";
+import adminGrowthRouter from "./admin-growth";
 import coverLetterRouter from "./cover-letter";
 import completionRouter from "./completion";
 
@@ -75,6 +78,13 @@ router.use(agentRouter);
 router.use(aiAgentsRouter);
 router.use(remindersRouter);
 router.use(friendsRouter);
+// ── Admin routes (x-admin-key only, no JWT) — MUST come before calendarRouter/
+//    notificationsRouter/pushRouter which apply router-level authMiddleware ──
+router.use(adminMetricsRouter);
+router.use(adminAgentHealthRouter);
+router.use(adminCatalogsRouter);
+router.use(adminGrowthRouter);
+// ── Auth-gated routers (apply authMiddleware at root) ───────────────────────
 router.use(calendarRouter);
 router.use(notificationsRouter);
 router.use(pushRouter);
@@ -83,7 +93,6 @@ router.use(catalogRouter);
 router.use(interviewRouter);
 router.use(skillsGapRouter);
 router.use(coachRouter);
-router.use(adminMetricsRouter);
 router.use(coverLetterRouter);
 router.use(completionRouter);
 
