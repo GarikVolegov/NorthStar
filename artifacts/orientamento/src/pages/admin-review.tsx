@@ -91,6 +91,18 @@ const ENTITY_CONFIG: Record<string, { label: string; icon: typeof Briefcase }> =
 
 type SidebarSection = "queue" | "suggestions" | "runs" | "logs" | "settings" | "agents" | "prompts";
 
+type AgentRunRecord = {
+  id: string;
+  agent: "news" | "growth";
+  startedAt: string;
+  finishedAt: string | null;
+  durationMs: number | null;
+  status: "running" | "completed" | "failed";
+  input: Record<string, unknown>;
+  result: Record<string, unknown> | null;
+  error: string | null;
+};
+
 type AgentPrompt = {
   key: string;
   label: string;
@@ -171,6 +183,8 @@ export default function AdminReview() {
   const [agentsRunning, setAgentsRunning] = useState<Set<string>>(new Set());
   const [agentsResult, setAgentsResult] = useState<Record<string, { ok: boolean; data: Record<string, unknown> }>>({});
   const [newsSectorInput, setNewsSectorInput] = useState("");
+  const [runHistory, setRunHistory] = useState<AgentRunRecord[]>([]);
+  const [runHistoryLoading, setRunHistoryLoading] = useState(false);
 
   const [prompts, setPrompts] = useState<AgentPrompt[]>([]);
   const [promptsLoading, setPromptsLoading] = useState(false);
@@ -258,6 +272,16 @@ export default function AdminReview() {
     setPromptsLoading(false);
   }, [apiFetch]);
 
+  const loadRunHistory = useCallback(async () => {
+    setRunHistoryLoading(true);
+    try {
+      const data = await apiFetch("/admin/research/runs");
+      setRunHistory(data as AgentRunRecord[]);
+      setAuthed(true);
+    } catch { /* handled */ }
+    setRunHistoryLoading(false);
+  }, [apiFetch]);
+
   const triggerAgent = useCallback(async (agentKey: string, path: string, body?: Record<string, unknown>) => {
     if (agentsRunning.has(agentKey)) return;
     setAgentsRunning((prev) => new Set(prev).add(agentKey));
@@ -272,7 +296,8 @@ export default function AdminReview() {
       setAgentsResult((prev) => ({ ...prev, [agentKey]: { ok: false, data: { error: String(err) } } }));
     }
     setAgentsRunning((prev) => { const s = new Set(prev); s.delete(agentKey); return s; });
-  }, [agentsRunning, apiFetch]);
+    loadRunHistory();
+  }, [agentsRunning, apiFetch, loadRunHistory]);
 
   const savePrompt = useCallback(async (key: string) => {
     setPromptSaving((prev) => new Set(prev).add(key));
@@ -306,7 +331,8 @@ export default function AdminReview() {
     else if (section === "runs") loadRuns();
     else if (section === "logs") loadLogs();
     else if (section === "prompts") loadPrompts();
-  }, [authed, section, loadSuggestions, loadRuns, loadLogs, loadPrompts]);
+    else if (section === "agents") loadRunHistory();
+  }, [authed, section, loadSuggestions, loadRuns, loadLogs, loadPrompts, loadRunHistory]);
 
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -747,6 +773,93 @@ export default function AdminReview() {
                       ) : (
                         <p>{JSON.stringify(agentsResult["growth"].data)}</p>
                       )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Run History */}
+                <div className="bg-card border rounded-2xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <History className="w-4 h-4 text-muted-foreground" />
+                      <h4 className="font-semibold text-sm">Storico Esecuzioni</h4>
+                      <span className="text-xs text-muted-foreground">({runHistory.length} run in memoria)</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={loadRunHistory}
+                      disabled={runHistoryLoading}
+                      className="h-7 px-2"
+                    >
+                      <RefreshCw className={cn("w-3.5 h-3.5", runHistoryLoading && "animate-spin")} />
+                    </Button>
+                  </div>
+
+                  {runHistory.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Nessuna esecuzione in questa sessione. Avvia un agente per vedere la cronologia.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {runHistory.map((run) => {
+                        const isNews = run.agent === "news";
+                        const secs = run.durationMs != null ? (run.durationMs / 1000).toFixed(1) : null;
+                        const sectors = Array.isArray((run.input as { sectorNames?: string[] }).sectorNames)
+                          ? ((run.input as { sectorNames: string[] }).sectorNames).join(", ")
+                          : "";
+
+                        return (
+                          <div
+                            key={run.id}
+                            className={cn(
+                              "flex items-start gap-3 rounded-xl p-3 text-sm border",
+                              run.status === "completed" && "bg-emerald-50/60 border-emerald-100",
+                              run.status === "failed" && "bg-red-50/60 border-red-100",
+                              run.status === "running" && "bg-amber-50/60 border-amber-100",
+                            )}
+                          >
+                            <div className={cn(
+                              "w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5",
+                              isNews ? "bg-blue-100" : "bg-emerald-100"
+                            )}>
+                              {isNews
+                                ? <Terminal className="w-3.5 h-3.5 text-blue-600" />
+                                : <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                              }
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium capitalize">{isNews ? "News Research" : "Growth Research"}</span>
+                                <span className={cn(
+                                  "text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
+                                  run.status === "completed" && "bg-emerald-100 text-emerald-700",
+                                  run.status === "failed" && "bg-red-100 text-red-700",
+                                  run.status === "running" && "bg-amber-100 text-amber-700",
+                                )}>
+                                  {run.status === "completed" ? "Completato" : run.status === "failed" ? "Fallito" : "In esecuzione…"}
+                                </span>
+                                {secs && <span className="text-xs text-muted-foreground">{secs}s</span>}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                {fmtDate(run.startedAt)}
+                                {sectors && <span className="ml-2">· Settori: {sectors}</span>}
+                              </div>
+                              {run.status === "completed" && run.result && (
+                                <p className="text-xs mt-1 font-mono text-emerald-700">
+                                  {isNews
+                                    ? `aggiunti ${String(run.result.added ?? 0)}, controllati ${String(run.result.checked ?? 0)}`
+                                    : `aggiunti ${String(run.result.added ?? 0)} su ${String(run.result.attempted ?? 0)} tentati`
+                                  }
+                                </p>
+                              )}
+                              {run.status === "failed" && run.error && (
+                                <p className="text-xs mt-1 font-mono text-red-600 truncate">{run.error}</p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

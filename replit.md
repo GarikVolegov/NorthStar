@@ -85,6 +85,7 @@ lib/
 - Growth research scheduler expects OpenAI to return valid JSON; may warn if model truncates output
 - `completion/me` uses raw SQL for `streak_days`/`last_active_at` (schema pushed, Drizzle types auto-refreshed)
 - Existing tsc errors (api-client-react unbuilt dist, any-typed params in ruolo/sector etc.) are pre-existing, not introduced by T001-T008
+- **Route ordering rule:** `notificationsRouter` and `pushRouter` apply `router.use(authMiddleware)` at root (no path). Any admin route using only `x-admin-key` (no JWT) MUST be registered in `routes/index.ts` BEFORE `calendarRouter` (line ~78), or it will receive 401 from those routers' global auth middleware.
 
 ## Pointers
 
