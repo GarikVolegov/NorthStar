@@ -26,7 +26,7 @@ type Sector = {
 const TREND_META: Record<string, { label: string; color: string; score: number }> = {
   booming:  { label: "In forte crescita", color: "text-emerald-700 bg-emerald-50 border-emerald-200", score: 4 },
   growing:  { label: "In crescita",        color: "text-blue-700 bg-blue-50 border-blue-200",         score: 3 },
-  stable:   { label: "Stabile",            color: "text-slate-600 bg-slate-50 border-slate-200",      score: 2 },
+  stable:   { label: "Stabile",            color: "text-muted-foreground bg-muted border-border",      score: 2 },
   declining:{ label: "In calo",            color: "text-rose-700 bg-rose-50 border-rose-200",          score: 1 },
 };
 const RISK_META: Record<string, { label: string; color: string; score: number }> = {

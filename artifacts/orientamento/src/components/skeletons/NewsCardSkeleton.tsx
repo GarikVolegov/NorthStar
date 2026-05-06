@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function NewsCardSkeleton() {
   return (
-    <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden flex flex-col">
+    <div className="bg-card border border-border rounded-2xl overflow-hidden flex flex-col">
       <Skeleton className="aspect-video w-full" />
       <div className="p-4 space-y-3 flex-1">
         <div className="flex gap-2">

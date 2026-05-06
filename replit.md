@@ -74,17 +74,23 @@ playwright.config.ts # Playwright config (baseURL port 5000, API port 8080)
 - **P9** Growth Queue: `GET/POST /api/admin/growth-queue` + approve/reject/delete → `admin-crescita.tsx`
 - **P10** Admin Discovery vs Execution: `admin-home.tsx` — visual map of all admin sections
 
-## UI/UX System (applied from design doc)
+## UI/UX System — Dark Brand (martes-ai inspired)
 
-- **Design tokens:** `--brand` / `--brand-light` / `--brand-dark` CSS vars in `index.css` (violet, premium accent)
-- **Type scale:** `h1`–`h4` base rules in `@layer base` (`index.css`)
+- **Theme:** Dark-first. Background `hsl(0 0% 5%)` ≈ `#0d0d0d`, foreground `hsl(0 0% 96%)`.
+- **Primary accent:** Vibrant green `hsl(142 69% 58%)` ≈ `#4ade80` (like martes-ai lime-green). Used for CTAs, active nav, highlights.
+- **Brand tokens file:** `src/lib/brand.ts` — canonical color hex values + typography + radius + shadows.
+- **CSS variables:** `src/index.css` — all Tailwind theme vars mapped; `--brand` = green; `--glow-primary` for glow effects; `.glass`, `.pill-nav`, `.glow-primary`, `.text-display`, `.text-italic-serif`, `.text-label` utility classes.
+- **Logo:** `/public/logo.png` (AI-generated circular N-mark) + `/public/favicon.svg` (green circle with N-path).
+- **Navbar:** Fixed floating pill (`pill-nav` class), centered links in UPPERCASE, green pill CTA, language switcher, user dropdown. Adds `<div class="h-20" />` spacer.
+- **Typography:** Inter (sans, bold display) + Playfair Display italic serif for accent words in hero headings.
+- **Fonts loaded in:** `index.html` Google Fonts (`Inter` + `Playfair Display:ital,wght@0,700;1,400;1,700`).
 - **Skeleton variants:** `skeleton.tsx` supports `variant="card|avatar|badge|text"` + `lines` prop (backward compat)
-- **MatchBadge:** `components/ui/match-badge.tsx` — reusable score badge for matchScore/fitScore/confidence
-- **Chart theme:** `lib/chart-theme.ts` — `CHART_COLORS` + `CHART_DEFAULTS` for Recharts
-- **SSE hook:** `hooks/useSSEStream.ts` + `components/ui/streaming-indicator.tsx` — unified SSE streaming state
+- **MatchBadge:** `components/ui/match-badge.tsx` — reusable score badge
+- **Chart theme:** `lib/chart-theme.ts` — `CHART_COLORS` + `CHART_DEFAULTS`
+- **SSE hook:** `hooks/useSSEStream.ts` + `components/ui/streaming-indicator.tsx`
 - **Dashboard Hub:** "I tuoi strumenti" section in `dashboard.tsx` + Climber section (when userMode=climber)
 - **Results page:** Hero layout — top sector as full-width card with animated match badge; PostTestWizard overlay on `?onboarding=1`
-- **Grafo mobile:** `grafo-conoscenza.tsx` — node list fallback on `<768px` + desktop banner; improved empty state
+- **Design rule:** Never use light backgrounds (`bg-white`, `bg-gray-*`) — use `bg-background`, `bg-card`, `bg-muted` or Tailwind dark-safe classes only.
 
 ## User preferences
 

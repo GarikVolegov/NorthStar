@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Star, LogOut, User, LayoutDashboard, Menu, X,
+  LogOut, User, LayoutDashboard, Menu, X,
   FlaskConical, Layers, BookOpenText, Newspaper, Crown, Briefcase, Users, Calendar, Globe, BrainCircuit,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -62,67 +62,57 @@ export function Navbar() {
     localStorage.setItem(STORAGE_KEY, lang);
   }
 
+  const currentLang = i18n.language?.slice(0, 2).toUpperCase() ?? "IT";
+
   return (
     <>
       <motion.header
-        className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60"
-        initial={prefersReduced ? {} : { y: -64, opacity: 0 }}
+        className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4"
+        initial={prefersReduced ? {} : { y: -80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       >
-        <div className="container flex h-14 md:h-16 items-center mx-auto px-4 md:px-6">
+        <div className="pill-nav flex items-center h-12 md:h-13 px-2 gap-1 w-full max-w-3xl">
 
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 shrink-0 mr-auto">
-            <motion.div
-              whileHover={prefersReduced ? {} : { rotate: 20, scale: 1.1 }}
-              transition={{ type: "spring", stiffness: 400, damping: 20 }}
-            >
-              <Star className="h-5 w-5 text-primary fill-primary" />
-            </motion.div>
-            <span className="font-serif font-bold text-lg tracking-tight text-primary">
+          <Link href="/" className="flex items-center gap-2 shrink-0 px-2 mr-1">
+            <img src="/logo.png" alt="NorthStar" className="h-7 w-7 rounded-full object-cover" />
+            <span className="font-bold text-sm tracking-tight text-foreground hidden sm:block">
               NorthStar
             </span>
           </Link>
 
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1 mx-4">
+          {/* Desktop nav links — centered */}
+          <nav className="hidden md:flex items-center gap-0.5 flex-1 justify-center">
             {NAV_LINKS.map(({ href, label }) => {
-              const isActive = location === href;
+              const isActive = location === href || location.startsWith(href + "/");
               return (
                 <Link
                   key={href}
                   href={href}
-                  className="relative text-sm font-medium px-3 py-1.5 rounded-full transition-colors whitespace-nowrap"
-                  style={{ color: isActive ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))" }}
+                  className={`relative text-xs font-semibold tracking-wide px-3 py-1.5 rounded-full transition-all duration-200 uppercase whitespace-nowrap ${
+                    isActive
+                      ? "text-primary bg-primary/10"
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                  }`}
                 >
-                  {isActive && !prefersReduced && (
-                    <motion.span
-                      layoutId="nav-active-indicator"
-                      className="absolute inset-0 rounded-full bg-primary/10"
-                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                    />
-                  )}
-                  {isActive && prefersReduced && (
-                    <span className="absolute inset-0 rounded-full bg-primary/10" />
-                  )}
-                  <span className="relative z-10">{label}</span>
+                  {label}
                 </Link>
               );
             })}
           </nav>
 
-          {/* Desktop right actions */}
-          <div className="hidden md:flex items-center gap-2">
-            {/* Language switcher */}
+          {/* Right actions */}
+          <div className="hidden md:flex items-center gap-1.5 ml-auto">
+            {/* Language pill */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="rounded-full px-2 gap-1.5 text-muted-foreground hover:text-foreground">
-                  <Globe className="h-4 w-4" />
-                  <span className="text-xs font-medium uppercase">{i18n.language?.slice(0, 2)}</span>
-                </Button>
+                <button className="flex items-center gap-1 text-xs font-semibold border border-white/10 rounded-full px-2.5 py-1 text-muted-foreground hover:text-foreground hover:border-white/20 transition-all">
+                  <Globe className="h-3 w-3" />
+                  {currentLang}
+                </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-36">
+              <DropdownMenuContent align="end" className="w-36 bg-card border-border">
                 <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">{t("nav.language")}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {SUPPORTED_LANGUAGES.map((lang) => (
@@ -143,18 +133,18 @@ export function Navbar() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <motion.button
-                      className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors"
+                      className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary/40 hover:bg-primary/5 transition-all"
                       whileHover={prefersReduced ? {} : { scale: 1.02 }}
                       whileTap={prefersReduced ? {} : { scale: 0.98 }}
                     >
-                      <User className="h-4 w-4 text-primary" />
-                      <span className="max-w-[100px] truncate">{user.name}</span>
+                      <User className="h-3.5 w-3.5 text-primary" />
+                      <span className="max-w-[80px] truncate">{user.name}</span>
                     </motion.button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuContent align="end" className="w-52 bg-card border-border">
                     <DropdownMenuLabel className="font-normal">
                       <div className="flex flex-col">
-                        <span className="font-semibold text-sm">{user.name}</span>
+                        <span className="font-semibold text-sm text-foreground">{user.name}</span>
                         <span className="text-xs text-muted-foreground truncate">{user.email}</span>
                       </div>
                     </DropdownMenuLabel>
@@ -184,86 +174,56 @@ export function Navbar() {
               </>
             ) : (
               <>
-                <Button variant="ghost" size="sm" className="rounded-full font-medium" onClick={() => setLoginOpen(true)}>
+                <button
+                  onClick={() => setLoginOpen(true)}
+                  className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors px-2"
+                >
                   {t("nav.login")}
-                </Button>
-                <Button asChild size="sm" className="rounded-full font-medium">
-                  <Link href="/test">{t("nav.startJourney")}</Link>
-                </Button>
+                </button>
+                <Link href="/test">
+                  <div className="flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full px-4 py-1.5 hover:bg-primary/90 transition-colors">
+                    {t("nav.startJourney")}
+                  </div>
+                </Link>
               </>
             )}
           </div>
 
-          {/* Mobile right: notification + user avatar or login + hamburger */}
-          <div className="flex md:hidden items-center gap-2">
-            {isLoggedIn && user ? (
-              <>
-                <NotificationBell userId={user.id} />
-                <motion.button
-                  onClick={() => setLocation("/profilo")}
-                  className="flex items-center justify-center w-8 h-8 rounded-full border border-border bg-card hover:bg-accent transition-colors"
-                  whileHover={prefersReduced ? {} : { scale: 1.05 }}
-                  whileTap={prefersReduced ? {} : { scale: 0.95 }}
-                >
-                  <User className="h-4 w-4 text-primary" />
-                </motion.button>
-              </>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="rounded-full font-medium text-sm h-8 px-3"
-                onClick={() => setLoginOpen(true)}
-              >
-                {t("nav.login")}
-              </Button>
-            )}
+          {/* Mobile right */}
+          <div className="flex md:hidden items-center gap-1.5 ml-auto">
+            {isLoggedIn && user && <NotificationBell userId={user.id} />}
 
-            {/* Hamburger */}
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger asChild>
                 <motion.button
-                  className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors"
+                  className="flex items-center justify-center w-8 h-8 rounded-full border border-white/10 hover:border-white/20 hover:bg-white/5 transition-all"
                   whileTap={prefersReduced ? {} : { scale: 0.9 }}
                 >
                   <AnimatePresence mode="wait" initial={false}>
                     {menuOpen ? (
-                      <motion.span
-                        key="close"
-                        initial={prefersReduced ? {} : { rotate: -90, opacity: 0 }}
-                        animate={{ rotate: 0, opacity: 1 }}
-                        exit={prefersReduced ? {} : { rotate: 90, opacity: 0 }}
-                        transition={{ duration: 0.18 }}
-                      >
-                        <X className="h-5 w-5 text-foreground" />
+                      <motion.span key="close" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.18 }}>
+                        <X className="h-4 w-4 text-foreground" />
                       </motion.span>
                     ) : (
-                      <motion.span
-                        key="menu"
-                        initial={prefersReduced ? {} : { rotate: 90, opacity: 0 }}
-                        animate={{ rotate: 0, opacity: 1 }}
-                        exit={prefersReduced ? {} : { rotate: -90, opacity: 0 }}
-                        transition={{ duration: 0.18 }}
-                      >
-                        <Menu className="h-5 w-5 text-foreground" />
+                      <motion.span key="menu" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.18 }}>
+                        <Menu className="h-4 w-4 text-foreground" />
                       </motion.span>
                     )}
                   </AnimatePresence>
                 </motion.button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-72 p-0 flex flex-col">
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b">
+
+              <SheetContent side="right" className="w-72 p-0 flex flex-col bg-card border-border">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-border">
                   <Link href="/" onClick={() => setMenuOpen(false)} className="flex items-center gap-2">
-                    <Star className="h-5 w-5 text-primary fill-primary" />
-                    <span className="font-serif font-bold text-lg text-primary">NorthStar</span>
+                    <img src="/logo.png" alt="NorthStar" className="h-7 w-7 rounded-full object-cover" />
+                    <span className="font-bold text-sm text-foreground">NorthStar</span>
                   </Link>
-                  <button onClick={() => setMenuOpen(false)} className="p-1 rounded-lg hover:bg-muted transition-colors">
+                  <button onClick={() => setMenuOpen(false)} className="p-1 rounded-full hover:bg-muted transition-colors">
                     <X className="h-4 w-4 text-muted-foreground" />
                   </button>
                 </div>
 
-                {/* Nav links */}
                 <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
                   {NAV_LINKS.map(({ href, label, icon: Icon }, i) => {
                     const isActive = location === href;
@@ -277,31 +237,30 @@ export function Navbar() {
                         <Link
                           href={href}
                           onClick={() => setMenuOpen(false)}
-                          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold uppercase tracking-wide transition-colors ${
                             isActive
                               ? "bg-primary/10 text-primary"
-                              : "text-foreground hover:bg-muted"
+                              : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
                           }`}
                         >
-                          <Icon className="h-4 w-4 shrink-0 text-primary/70" />
+                          <Icon className="h-4 w-4 shrink-0" />
                           {label}
                         </Link>
                       </motion.div>
                     );
                   })}
 
-                  {/* Language picker in mobile menu */}
-                  <div className="pt-2 px-4">
-                    <p className="text-xs text-muted-foreground mb-2 font-medium">{t("nav.language")}</p>
+                  <div className="pt-3 px-4">
+                    <p className="text-xs text-muted-foreground mb-2 font-semibold uppercase tracking-wide">{t("nav.language")}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {SUPPORTED_LANGUAGES.map((lang) => (
                         <button
                           key={lang}
                           onClick={() => changeLanguage(lang)}
-                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors font-semibold ${
                             i18n.language?.startsWith(lang)
                               ? "bg-primary text-primary-foreground border-primary"
-                              : "border-border text-muted-foreground hover:border-primary hover:text-primary"
+                              : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
                           }`}
                         >
                           {lang.toUpperCase()}
@@ -311,71 +270,36 @@ export function Navbar() {
                   </div>
                 </nav>
 
-                {/* Bottom actions */}
-                <div className="px-5 pb-8 pt-4 border-t space-y-3">
+                <div className="px-5 pb-8 pt-4 border-t border-border space-y-2">
                   {isLoggedIn && user ? (
                     <>
                       <div className="flex items-center gap-3 px-1 mb-3">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
                           <User className="h-4 w-4 text-primary" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold truncate">{user.name}</p>
+                          <p className="text-sm font-semibold truncate text-foreground">{user.name}</p>
                           <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                         </div>
                       </div>
-                      <Button
-                        variant="outline"
-                        className="w-full rounded-full justify-start gap-2"
-                        onClick={() => { setLocation("/profilo"); setMenuOpen(false); }}
-                      >
+                      <button onClick={() => { setLocation("/profilo"); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
                         <LayoutDashboard className="h-4 w-4" /> {t("nav.myProfile")}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="w-full rounded-full justify-start gap-2"
-                        onClick={() => { setLocation("/candidature"); setMenuOpen(false); }}
-                      >
+                      </button>
+                      <button onClick={() => { setLocation("/candidature"); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
                         <Briefcase className="h-4 w-4" /> {t("nav.applications")}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="w-full rounded-full justify-start gap-2"
-                        onClick={() => { setLocation("/calendario"); setMenuOpen(false); }}
-                      >
-                        <Calendar className="h-4 w-4" /> {t("nav.calendar")}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="w-full rounded-full justify-start gap-2"
-                        onClick={() => { setLocation("/amici"); setMenuOpen(false); }}
-                      >
-                        <Users className="h-4 w-4" /> {t("nav.friends")}
-                        {friendsBadge ? <span className="ml-auto text-xs font-semibold text-primary">{friendsBadge}</span> : null}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="w-full rounded-full justify-start gap-2 text-destructive hover:text-destructive"
-                        onClick={() => { logout(); setMenuOpen(false); }}
-                      >
+                      </button>
+                      <button onClick={() => { logout(); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-destructive/80 hover:text-destructive hover:bg-destructive/5 transition-colors">
                         <LogOut className="h-4 w-4" /> {t("nav.logout")}
-                      </Button>
+                      </button>
                     </>
                   ) : (
                     <>
-                      <Button
-                        className="w-full rounded-full"
-                        onClick={() => { setMenuOpen(false); setTimeout(() => setLoginOpen(true), 150); }}
-                      >
+                      <Link href="/test" onClick={() => setMenuOpen(false)} className="w-full flex items-center justify-center bg-primary text-primary-foreground text-sm font-bold rounded-full py-2.5 hover:bg-primary/90 transition-colors">
                         {t("nav.startFreeTest")}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="w-full rounded-full"
-                        onClick={() => { setMenuOpen(false); setTimeout(() => setLoginOpen(true), 150); }}
-                      >
+                      </Link>
+                      <button onClick={() => { setMenuOpen(false); setTimeout(() => setLoginOpen(true), 150); }} className="w-full flex items-center justify-center border border-border text-sm font-semibold rounded-full py-2.5 text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors">
                         {t("nav.login")}
-                      </Button>
+                      </button>
                     </>
                   )}
                 </div>
@@ -384,6 +308,9 @@ export function Navbar() {
           </div>
         </div>
       </motion.header>
+
+      {/* Spacer to push content below fixed navbar */}
+      <div className="h-20" />
 
       <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
     </>

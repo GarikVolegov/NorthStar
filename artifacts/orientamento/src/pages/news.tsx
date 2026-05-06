@@ -72,7 +72,7 @@ function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boole
   const catLabel = t(`news.categories.${item.category}`, { defaultValue: item.category });
 
   return (
-    <article className="bg-white border border-slate-100 rounded-2xl overflow-hidden hover:shadow-md transition-shadow group flex flex-col">
+    <article className="bg-card border border-border rounded-2xl overflow-hidden hover:border-primary/30 transition-all group flex flex-col">
       {item.image && (
         <div className="aspect-video overflow-hidden shrink-0">
           <img
@@ -87,7 +87,7 @@ function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boole
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="secondary" className="text-xs font-medium">{catLabel}</Badge>
-            <span className="text-xs text-slate-400 flex items-center gap-1">
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
               <Clock className="h-3 w-3" />
               {timeAgoLabel(item.publishedAt, t)}
             </span>
@@ -99,21 +99,21 @@ function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boole
               title={saved ? t("news.removeFromSaved") : t("news.saveArticle")}
               className={cn(
                 "shrink-0 p-1.5 rounded-lg transition-colors",
-                saved ? "text-primary bg-primary/10" : "text-slate-400 hover:text-primary hover:bg-primary/5"
+                saved ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary hover:bg-primary/5"
               )}
             >
               {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
             </button>
           )}
         </div>
-        <h3 className="font-serif font-semibold text-slate-800 leading-snug mb-2 line-clamp-3 text-[1.05rem]">
+        <h3 className="font-semibold text-foreground leading-snug mb-2 line-clamp-3 text-[1.05rem]">
           {item.title}
         </h3>
-        <p className="text-sm text-slate-500 leading-relaxed line-clamp-2 mb-4 flex-1">
+        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 mb-4 flex-1">
           {item.description}
         </p>
         <div className="flex items-center justify-between mt-auto">
-          <span className="text-xs text-slate-400 font-medium">{item.source}</span>
+          <span className="text-xs text-muted-foreground font-medium">{item.source}</span>
           <a
             href={item.url}
             target="_blank"
@@ -204,16 +204,16 @@ export default function News() {
   const displayLoading = activeTab === "__sector__" ? (sectorLoading && !!confirmedSector) : isLoading;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="bg-white border-b border-slate-100">
+    <div className="min-h-screen bg-background">
+      <div className="bg-card border-b border-border">
         <div className="container mx-auto px-4 md:px-6 py-12">
           <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium mb-4">
+            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wide mb-4">
               <Newspaper className="h-4 w-4" />
               {t("news.badge")}
             </div>
-            <h1 className="font-serif font-bold text-4xl text-slate-900 mb-3">{t("news.title")}</h1>
-            <p className="text-lg text-slate-500 leading-relaxed">{t("news.subtitle")}</p>
+            <h1 className="font-bold text-4xl text-foreground mb-3">{t("news.title")}</h1>
+            <p className="text-lg text-muted-foreground leading-relaxed">{t("news.subtitle")}</p>
           </div>
         </div>
       </div>
@@ -243,7 +243,7 @@ export default function News() {
               className={`flex-none flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
                 activeTab === cat.id
                   ? "bg-primary text-white shadow-sm"
-                  : "bg-white border border-slate-200 text-slate-600 hover:border-primary/40 hover:text-primary"
+                  : "bg-card border border-border text-muted-foreground hover:border-primary/40 hover:text-primary"
               }`}
             >
               <span>{cat.emoji}</span>
@@ -269,7 +269,7 @@ export default function News() {
 
         {isError && activeTab !== "__sector__" && (
           <div className="text-center py-12">
-            <p className="text-slate-500 mb-4">{t("news.loadError")}</p>
+            <p className="text-muted-foreground mb-4">{t("news.loadError")}</p>
             <Button variant="outline" onClick={() => refetch()} className="gap-2 rounded-full">
               <RefreshCw className="h-4 w-4" /> {t("news.retry")}
             </Button>
@@ -289,7 +289,7 @@ export default function News() {
         </div>
 
         {!displayLoading && displayNews.length > 0 && (
-          <p className="text-xs text-slate-400 flex items-center gap-1.5 mb-10">
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-10">
             <Tag className="h-3 w-3" />
             {displaySource === "live" ? t("news.sourceLabel.live") : t("news.sourceLabel.static")}
             {user && <span className="ml-2">· {t("news.bookmarkHint")}</span>}
@@ -300,7 +300,7 @@ export default function News() {
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-6">
               <Sparkles className="h-5 w-5 text-primary" />
-              <h2 className="font-serif font-bold text-xl text-slate-800">{t("news.upgrade.sectionTitle")}</h2>
+              <h2 className="font-bold text-xl text-foreground">{t("news.upgrade.sectionTitle")}</h2>
               <Badge className="bg-primary/10 text-primary border-0 text-xs">Premium</Badge>
             </div>
             <UpgradeCTA />
