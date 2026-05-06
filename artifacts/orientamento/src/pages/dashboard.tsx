@@ -13,7 +13,7 @@ import { usePageMeta } from "@/lib/seo";
 import {
   Bot, Briefcase, GraduationCap, TrendingUp, Zap, Crown, Lock,
   Loader2, ArrowRight, CheckCircle2, Sparkles, AlertTriangle,
-  DollarSign, Clock,
+  DollarSign, Clock, MessageSquare, Map, Network, Newspaper,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -381,6 +381,62 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {educationPaths.map((e, i) => (
                   <EducationCard key={`${e.path}-${i}`} e={e} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Premium Tools Hub */}
+          {sessionId && (
+            <section>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "var(--brand-light)", color: "var(--brand)" }}>
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="font-serif text-xl font-bold text-foreground">I tuoi strumenti</h2>
+                  <p className="text-xs text-muted-foreground">Esplora, pianifica e cresci nel tuo settore</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  {
+                    href: `${BASE}wiki/${latestSession?.recommendations?.[0]?.sectorId ?? ""}`,
+                    icon: MessageSquare,
+                    title: "Wiki AI",
+                    description: "Chiedi tutto sul tuo settore a un esperto AI",
+                  },
+                  {
+                    href: `${BASE}roadmap/${latestSession?.recommendations?.[0]?.sectorId ?? ""}`,
+                    icon: Map,
+                    title: "Roadmap",
+                    description: "Percorsi formativi con fit score personalizzato",
+                  },
+                  {
+                    href: `${BASE}grafo`,
+                    icon: Network,
+                    title: "Grafo Conoscenza",
+                    description: "Note, skill e documenti collegati",
+                  },
+                  {
+                    href: `${BASE}news`,
+                    icon: Newspaper,
+                    title: "News di Settore",
+                    description: "Aggiornamenti live dal mondo del lavoro",
+                  },
+                ].map(({ href, icon: Icon, title, description }) => (
+                  <Link key={title} href={href}>
+                    <div className="group rounded-2xl border bg-card p-5 flex flex-col gap-3 hover:border-[var(--brand-border)] hover:shadow-md transition-all duration-200 cursor-pointer h-full">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center transition-colors" style={{ background: "var(--brand-light)", color: "var(--brand)" }}>
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground text-sm leading-snug">{title}</p>
+                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{description}</p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 mt-auto self-end text-muted-foreground group-hover:text-[var(--brand)] group-hover:translate-x-1 transition-all" />
+                    </div>
+                  </Link>
                 ))}
               </div>
             </section>

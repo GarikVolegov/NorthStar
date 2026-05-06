@@ -70,6 +70,18 @@ lib/
 - **T006** Streak + badge gamification: `streak_days`/`last_active_at` on users, 6 badges in profilo
 - **T008** Onboarding banner: first-login checklist in UserDashboard (localStorage dismiss)
 
+## UI/UX System (applied from design doc)
+
+- **Design tokens:** `--brand` / `--brand-light` / `--brand-dark` CSS vars in `index.css` (violet, premium accent)
+- **Type scale:** `h1`–`h4` base rules in `@layer base` (`index.css`)
+- **Skeleton variants:** `skeleton.tsx` supports `variant="card|avatar|badge|text"` + `lines` prop (backward compat)
+- **MatchBadge:** `components/ui/match-badge.tsx` — reusable score badge for matchScore/fitScore/confidence
+- **Chart theme:** `lib/chart-theme.ts` — `CHART_COLORS` + `CHART_DEFAULTS` for Recharts
+- **SSE hook:** `hooks/useSSEStream.ts` + `components/ui/streaming-indicator.tsx` — unified SSE streaming state
+- **Dashboard Hub:** "I tuoi strumenti" section in `dashboard.tsx` (Wiki AI, Roadmap, Grafo, News cards with brand color)
+- **Results page:** Hero layout — top sector as full-width card with animated match badge; sectors 2–3 as secondary 2-col grid; anonymous "Salva risultati" banner
+- **Grafo mobile:** `grafo-conoscenza.tsx` — node list fallback on `<768px` + desktop banner; improved empty state (🕸️)
+
 ## User preferences
 
 - Iterative development with detailed explanations

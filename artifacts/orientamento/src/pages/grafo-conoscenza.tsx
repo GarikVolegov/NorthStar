@@ -80,6 +80,14 @@ export default function GrafoConoscenza() {
   const [pendingEdge, setPendingEdge] = useState<{ sourceId: number; targetId: number } | null>(null);
   const [creatingType, setCreatingType] = useState<NodeType>("note");
   const [chatOpen, setChatOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const dragState = useRef<{ id: number; offsetX: number; offsetY: number; moved: boolean } | null>(null);
@@ -454,16 +462,63 @@ export default function GrafoConoscenza() {
 
       {/* Main layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* SVG canvas */}
+        {/* Mobile fallback — list view */}
+        {isMobile && (
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-900 px-4 py-3 text-sm flex items-start gap-3 mb-2">
+              <span className="text-lg leading-none shrink-0">🖥️</span>
+              <p>Per l'esperienza completa con drag & drop, apri da desktop.</p>
+            </div>
+            {data.nodes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center text-center py-16 gap-4 px-6">
+                <span className="text-5xl">🕸️</span>
+                <h2 className="font-serif text-xl font-bold">Il tuo spazio di conoscenza è vuoto</h2>
+                <p className="text-sm text-muted-foreground max-w-xs">
+                  Aggiungi note, skill, certificazioni e documenti. Collegali tra loro per vedere come si costruisce il tuo percorso professionale.
+                </p>
+                <Button onClick={() => handleAddNode("note")} className="rounded-full">
+                  <Plus className="w-4 h-4 mr-2" /> Aggiungi il primo nodo
+                </Button>
+              </div>
+            ) : (
+              filteredNodes.map((n) => {
+                const meta = TYPE_META[n.type];
+                const Icon = meta.Icon;
+                const connections = data.edges.filter((e) => e.sourceId === n.id || e.targetId === n.id).length;
+                return (
+                  <div
+                    key={n.id}
+                    className="rounded-xl border bg-card p-4 flex items-start gap-3"
+                    onClick={() => setSelectedId(n.id)}
+                  >
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: meta.bg }}>
+                      <Icon className="w-4 h-4" style={{ color: meta.color }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-foreground truncate">{n.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.content}</p>
+                    </div>
+                    <div className="shrink-0 text-xs text-muted-foreground text-right">
+                      <span className="block font-medium" style={{ color: meta.color }}>{meta.label}</span>
+                      <span>{connections} link</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* SVG canvas — desktop only */}
+        {!isMobile && (
         <div className="flex-1 relative bg-[radial-gradient(circle,#e5e7eb_1px,transparent_1px)] [background-size:24px_24px] overflow-hidden">
           {data.nodes.length === 0 && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
-              <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-                <Network className="w-10 h-10 text-primary" />
-              </div>
-              <h2 className="font-serif font-bold text-xl mb-2">Il tuo grafo è vuoto</h2>
+              <span className="text-5xl mb-4">🕸️</span>
+              <h2 className="font-serif font-bold text-xl mb-2">Il tuo spazio di conoscenza è vuoto</h2>
               <p className="text-sm text-muted-foreground max-w-sm mb-5">
-                Aggiungi note, competenze, documenti e collegali tra loro per costruire la tua mappa personale.
+                Aggiungi note, skill, certificazioni e documenti. Collegali tra loro
+                per vedere come si costruisce il tuo percorso professionale.
               </p>
               <div className="flex flex-wrap gap-2 justify-center">
                 {(["note", "skill", "document"] as NodeType[]).map((t) => {
@@ -604,6 +659,7 @@ export default function GrafoConoscenza() {
             </Badge>
           </div>
         </div>
+        )}
 
         {/* Side panel (selected node) */}
         {selected && !chatOpen && (
