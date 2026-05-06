@@ -4,15 +4,16 @@ import { pinoHttp } from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { securityHeaders } from "./lib/security-headers.js";
+import { globalRateLimiter } from "./lib/global-rate-limiter.js";
 
 const app: Express = express();
 
 app.set("trust proxy", 1);
 
-// ─── Security headers (before everything else) ────────────────────────────────
+// ─── 1. Security headers (first — before any response is sent) ────────────────
 app.use(securityHeaders);
 
-// ─── Request logging ─────────────────────────────────────────────────────────
+// ─── 2. Request logging ───────────────────────────────────────────────────────
 app.use(
   pinoHttp({
     logger,
@@ -27,16 +28,20 @@ app.use(
   }),
 );
 
-// ─── Body parsing ─────────────────────────────────────────────────────────────
+// ─── 3. Body parsing (1mb limit prevents DoS via large payloads) ──────────────
 app.use(cors());
-app.use(express.json({ limit: "1mb" }));        // FIX: limit body size to prevent DoS
+app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
-// ─── Health check (no auth, no rate limit) ───────────────────────────────────
+// ─── 4. Global rate limiting (200 req/min per IP, all routes) ────────────────
+app.use(globalRateLimiter);
+
+// ─── 5. Health check (no auth, exempt from rate limit) ───────────────────────
 app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", service: "northstar-api" });
+  res.json({ status: "ok", service: "northstar-api", timestamp: new Date().toISOString() });
 });
 
+// ─── 6. API routes ────────────────────────────────────────────────────────────
 app.use("/api", router);
 
 export default app;
