@@ -44,6 +44,7 @@ import adminCatalogsRouter from "./admin-catalogs";
 import adminGrowthRouter from "./admin-growth";
 import coverLetterRouter from "./cover-letter";
 import completionRouter from "./completion";
+import businessIdeasRouter from "./business-ideas";
 
 const router: IRouter = Router();
 
@@ -95,5 +96,6 @@ router.use(skillsGapRouter);
 router.use(coachRouter);
 router.use(coverLetterRouter);
 router.use(completionRouter);
+router.use(businessIdeasRouter);
 
 export default router;

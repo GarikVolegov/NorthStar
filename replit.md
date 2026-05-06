@@ -73,6 +73,7 @@ playwright.config.ts # Playwright config (baseURL port 5000, API port 8080)
 - **P8** E2E Playwright: `e2e/auth.spec.ts`, `e2e/test-riasec.spec.ts`, `e2e/admin.spec.ts`, `e2e/objectives.spec.ts`; `pnpm test:e2e`
 - **P9** Growth Queue: `GET/POST /api/admin/growth-queue` + approve/reject/delete → `admin-crescita.tsx`
 - **P10** Admin Discovery vs Execution: `admin-home.tsx` — visual map of all admin sections
+- **P11** Business Idea Validator: `POST /api/business-ideas` → async AI validation → `GET /api/business-ideas/:id`; `POST /api/business-ideas/:id/find-incubators` → incubator/grant report. DB: `business_ideas` table. Python agents: `business_validator.py` (score 0-10, 12 structured fields) + `incubator_finder.py` (5-7 Italian/EU funding opportunities + pitch + canvas). Frontend: `/validatore-idea` (split-pane: sidebar list + detail view with tabs Validazione / Incubatori). Accessible from navbar user dropdown → "Validatore Idea".
 
 ## UI/UX System — Dark Brand (martes-ai inspired)
 
@@ -80,7 +81,7 @@ playwright.config.ts # Playwright config (baseURL port 5000, API port 8080)
 - **Primary accent:** Vibrant green `hsl(142 69% 58%)` ≈ `#4ade80` (like martes-ai lime-green). Used for CTAs, active nav, highlights.
 - **Brand tokens file:** `src/lib/brand.ts` — canonical color hex values + typography + radius + shadows.
 - **CSS variables:** `src/index.css` — all Tailwind theme vars mapped; `--brand` = green; `--glow-primary` for glow effects; `.glass`, `.pill-nav`, `.glow-primary`, `.text-display`, `.text-italic-serif`, `.text-label` utility classes.
-- **Logo:** `/public/logo.png` (AI-generated circular N-mark) + `/public/favicon.svg` (green circle with N-path).
+- **Logo:** `/public/logo.svg` (North Star + compass SVG — 4-pointed Polaris star with compass ring + N cardinal marker) + `/public/favicon.svg` (same mark, 64×64).
 - **Navbar:** Fixed floating pill (`pill-nav` class), centered links in UPPERCASE, green pill CTA, language switcher, user dropdown. Adds `<div class="h-20" />` spacer.
 - **Typography:** Inter (sans, bold display) + Playfair Display italic serif for accent words in hero headings.
 - **Fonts loaded in:** `index.html` Google Fonts (`Inter` + `Playfair Display:ital,wght@0,700;1,400;1,700`).

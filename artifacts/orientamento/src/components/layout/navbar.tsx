@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LogOut, User, LayoutDashboard, Menu, X,
-  FlaskConical, Layers, BookOpenText, Newspaper, Crown, Briefcase, Users, Calendar, Globe, BrainCircuit,
+  FlaskConical, Layers, BookOpenText, Newspaper, Crown, Briefcase, Users, Calendar, Globe, BrainCircuit, Compass,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -76,7 +76,7 @@ export function Navbar() {
 
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 shrink-0 px-2 mr-1">
-            <img src="/logo.png" alt="NorthStar" className="h-7 w-7 rounded-full object-cover" />
+            <img src="/logo.svg" alt="NorthStar" className="h-7 w-7 rounded-full object-cover" />
             <span className="font-bold text-sm tracking-tight text-foreground hidden sm:block">
               NorthStar
             </span>
@@ -165,6 +165,9 @@ export function Navbar() {
                     <DropdownMenuItem onClick={() => setLocation("/coach")} className="cursor-pointer">
                       <BrainCircuit className="h-4 w-4 mr-2" /> Coach AI
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setLocation("/validatore-idea")} className="cursor-pointer">
+                      <Compass className="h-4 w-4 mr-2" /> Validatore Idea
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive cursor-pointer">
                       <LogOut className="h-4 w-4 mr-2" /> {t("nav.logout")}
@@ -216,7 +219,7 @@ export function Navbar() {
               <SheetContent side="right" className="w-72 p-0 flex flex-col bg-card border-border">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-border">
                   <Link href="/" onClick={() => setMenuOpen(false)} className="flex items-center gap-2">
-                    <img src="/logo.png" alt="NorthStar" className="h-7 w-7 rounded-full object-cover" />
+                    <img src="/logo.svg" alt="NorthStar" className="h-7 w-7 rounded-full object-cover" />
                     <span className="font-bold text-sm text-foreground">NorthStar</span>
                   </Link>
                   <button onClick={() => setMenuOpen(false)} className="p-1 rounded-full hover:bg-muted transition-colors">
@@ -287,6 +290,9 @@ export function Navbar() {
                       </button>
                       <button onClick={() => { setLocation("/candidature"); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
                         <Briefcase className="h-4 w-4" /> {t("nav.applications")}
+                      </button>
+                      <button onClick={() => { setLocation("/validatore-idea"); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
+                        <Compass className="h-4 w-4" /> Validatore Idea
                       </button>
                       <button onClick={() => { logout(); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-destructive/80 hover:text-destructive hover:bg-destructive/5 transition-colors">
                         <LogOut className="h-4 w-4" /> {t("nav.logout")}

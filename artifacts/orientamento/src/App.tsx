@@ -56,6 +56,7 @@ const AffiliazioneFormazione = lazy(() => import("@/pages/affiliazione-formazion
 const Colloquio = lazy(() => import("@/pages/colloquio"));
 const SkillsGap = lazy(() => import("@/pages/skills-gap"));
 const Coach = lazy(() => import("@/pages/coach"));
+const ValidatoreIdea = lazy(() => import("@/pages/validatore-idea"));
 const AdminMetriche = lazy(() => import("@/pages/admin-metriche"));
 const AdminStatus = lazy(() => import("@/pages/admin-status"));
 const AdminHome = lazy(() => import("@/pages/admin-home"));
@@ -123,6 +124,7 @@ function AnimatedRoutes() {
       <Route path="/colloquio/:id" component={Colloquio} />
       <Route path="/skills-gap/:id" component={SkillsGap} />
       <Route path="/coach" component={Coach} />
+      <Route path="/validatore-idea" component={ValidatoreIdea} />
       <Route component={NotFound} />
     </Switch>
   );

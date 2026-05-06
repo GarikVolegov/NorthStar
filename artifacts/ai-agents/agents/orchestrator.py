@@ -10,6 +10,8 @@ from agents.personality import run_personality_insight
 from agents.sector import run_sector_motivation
 from agents.work_mode import run_work_mode_advice
 from agents.affiliation import run_affiliation_materials
+from agents.business_validator import run_business_validator
+from agents.incubator_finder import run_incubator_finder
 
 
 class AgentState(TypedDict):
@@ -25,6 +27,8 @@ TASK_HANDLERS = {
     "sector_motivation": run_sector_motivation,
     "work_mode_advice": run_work_mode_advice,
     "affiliation_materials": run_affiliation_materials,
+    "business_validator": run_business_validator,
+    "incubator_finder": run_incubator_finder,
 }
 
 

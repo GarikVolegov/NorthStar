@@ -371,7 +371,7 @@ export default function Home() {
             className="mb-8 md:mb-10"
           >
             <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border-2 border-white/15 bg-white/5 flex items-center justify-center overflow-hidden shadow-2xl">
-              <img src="/logo.png" alt="NorthStar" className="w-full h-full object-cover" />
+              <img src="/logo.svg" alt="NorthStar" className="w-full h-full object-cover" />
             </div>
           </motion.div>
 
@@ -614,7 +614,7 @@ export default function Home() {
           <div className="container mx-auto px-4 md:px-6 max-w-3xl text-center">
             <AnimateOnScroll>
               <div className="w-16 h-16 rounded-full border-2 border-white/10 bg-white/5 flex items-center justify-center overflow-hidden mx-auto mb-6">
-                <img src="/logo.png" alt="NorthStar" className="w-full h-full object-cover" />
+                <img src="/logo.svg" alt="NorthStar" className="w-full h-full object-cover" />
               </div>
               <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-4">
                 Pronto a scoprire{" "}

@@ -39,6 +39,8 @@ SUPPORTED_TASKS = [
     "sector_motivation",
     "work_mode_advice",
     "affiliation_materials",
+    "business_validator",
+    "incubator_finder",
 ]
 
 
@@ -49,7 +51,8 @@ async def health() -> dict:
         "service": "northstar-ai-agents",
         "supported_tasks": SUPPORTED_TASKS,
         "agents": ["PersonalityInsightAgent", "SectorMotivationAgent",
-                   "WorkModeAdvisorAgent", "AffiliationMaterialsAgent", "CareerChatAgent"],
+                   "WorkModeAdvisorAgent", "AffiliationMaterialsAgent", "CareerChatAgent",
+                   "BusinessValidatorAgent", "IncubatorFinderAgent"],
     }
 
 
