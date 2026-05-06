@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { ProssimiEventi } from "@/components/calendario/ProssimiEventi";
 import {
   ArrowRight, ExternalLink, LogIn, Newspaper, Clock, Sparkles, TrendingUp, Bot, DollarSign,
@@ -12,12 +12,15 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LoginDialog } from "@/components/auth/LoginDialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { SectorIcon } from "@/lib/sector-icon";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-fetch";
 import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
 import { useReducedMotion } from "@/lib/motion";
 import { useTranslation } from "react-i18next";
+
+const ONBOARDING_KEY = "northstar_onboarding_done";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -687,11 +690,23 @@ export default function Home() {
   const { data: stats, isLoading: isStatsLoading } = useGetStatsSummary();
   const { data: trendingData } = useTrendingSectors();
   const { data: newsData, isLoading: isNewsLoading } = useHomeNews();
-  const { isLoggedIn, user } = useAuth();
+  const { isLoggedIn, user, updateUser } = useAuth();
   const [loginOpen, setLoginOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const prefersReduced = useReducedMotion();
 
   const { data: latestResult, isLoading: isLatestLoading } = useLatestRecommendations(isLoggedIn && !!user);
+
+  // Show onboarding wizard once per browser — after login, if not already completed
+  useEffect(() => {
+    if (!isLoggedIn || !user || isLatestLoading) return;
+    const done = localStorage.getItem(ONBOARDING_KEY);
+    if (!done) {
+      // Small delay so the page renders first
+      const t = setTimeout(() => setShowOnboarding(true), 600);
+      return () => clearTimeout(t);
+    }
+  }, [isLoggedIn, user, isLatestLoading]);
 
   if (isLoggedIn && user && isLatestLoading) {
     return (
@@ -975,6 +990,28 @@ export default function Home() {
       )}
 
       <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
+
+      {/* ── Onboarding wizard (first login) ─────────────── */}
+      <AnimatePresence>
+        {showOnboarding && isLoggedIn && user && (
+          <OnboardingWizard
+            userId={user.id}
+            userName={user.name}
+            currentJourneyType={user.journeyType}
+            sessionId={latestResult?.sessionId}
+            topSectorName={latestResult?.recommendations?.[0]?.sectorName ?? null}
+            onClose={() => {
+              setShowOnboarding(false);
+              localStorage.setItem(ONBOARDING_KEY, "1");
+            }}
+            onComplete={(journeyType) => {
+              setShowOnboarding(false);
+              localStorage.setItem(ONBOARDING_KEY, "1");
+              updateUser({ journeyType });
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

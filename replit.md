@@ -71,6 +71,7 @@ playwright.config.ts # Playwright config (baseURL port 5000, API port 8080)
 - **P6** Career Climber Mode: `user_mode` col on users, `PATCH /api/profile/:id/mode`, `UserModeCard` in profilo, `ClimberToolsSection` in dashboard
 - **P12** User Journey Types: `journey_type` col on users (indeciso/dipendente/autonomo/azienda/investitore), `PATCH /api/profile/:id/journey-type`, PersonaSelector page at `/percorso`, journey badge in navbar dropdown
 - **P7** Post-test Funnel: `PostTestWizard.tsx` overlay (3 steps: work-mode → objectives → calendar) triggered from results page
+- **P13** Onboarding Wizard: `OnboardingWizard.tsx` — 3-step overlay (journey type → pre-filled objectives → confirmation + CTA). Triggered from home.tsx for logged-in users who haven't completed it (localStorage `northstar_onboarding_done` flag). `AuthContext` now exposes `updateUser()` for immediate local state merges.
 - **P8** E2E Playwright: `e2e/auth.spec.ts`, `e2e/test-riasec.spec.ts`, `e2e/admin.spec.ts`, `e2e/objectives.spec.ts`; `pnpm test:e2e`
 - **P9** Growth Queue: `GET/POST /api/admin/growth-queue` + approve/reject/delete → `admin-crescita.tsx`
 - **P10** Admin Discovery vs Execution: `admin-home.tsx` — visual map of all admin sections

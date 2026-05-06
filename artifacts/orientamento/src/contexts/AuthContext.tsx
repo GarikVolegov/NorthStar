@@ -21,6 +21,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   login: (user: AuthUser, token: string) => void;
   logout: () => void;
+  updateUser: (updates: Partial<AuthUser>) => void;
   isLoggedIn: boolean;
   token: string | null;
   authReady: boolean;
@@ -58,6 +59,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
   }, []);
 
+  const updateUser = useCallback((updates: Partial<AuthUser>) => {
+    setUser((prev) => (prev ? { ...prev, ...updates } : prev));
+  }, []);
+
   // Persist + register token getter on every change
   useEffect(() => {
     if (user && token) {
@@ -76,9 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, logout);
   }, [logout]);
 
-  // Validate cached token once on mount: if it's expired/invalid, clear silently
-  // so the user lands on the public home instead of seeing flash-of-logged-in UI
-  // followed by a 401 kick later.
+  // Validate cached token once on mount
   const didMountValidate = useRef(false);
   useEffect(() => {
     if (didMountValidate.current) return;
@@ -100,15 +103,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const fresh = (await res.json()) as AuthUser;
           setUser((prev) => (prev ? { ...prev, ...fresh } : fresh));
         } else if (res.status === 401) {
-          // Token invalid/expired — clear silently
           setUser(null);
           setToken(null);
         }
-        // any other status: keep cached state, just continue
       })
-      .catch(() => {
-        // Network error: keep cached state, user can retry actions
-      })
+      .catch(() => {})
       .finally(() => {
         setAuthReady(true);
       });
@@ -121,7 +120,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u);
     setToken(t);
     setAuthReady(true);
-    // Best-effort timezone sync — never block login on this
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (tz) {
       fetch(`${BASE}api/me`, {
@@ -133,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoggedIn: !!user, token, authReady }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser, isLoggedIn: !!user, token, authReady }}>
       {children}
     </AuthContext.Provider>
   );
