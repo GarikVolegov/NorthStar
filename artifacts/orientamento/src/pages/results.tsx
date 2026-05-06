@@ -485,6 +485,7 @@ export default function Results() {
   const isPremiumAgent = agentData?.plan === "premium";
 
   return (
+    <>
     <div className="container mx-auto px-4 py-12 md:py-20 max-w-6xl">
 
       {/* Saved banner — shown when logged in */}
@@ -1113,7 +1114,7 @@ export default function Results() {
 
     </div>
 
-    {/* Post-test onboarding wizard */}
+    {/* Post-test onboarding wizard — rendered outside the main container so it can overlay freely */}
     {showWizard && user && effectiveSession && (
       <PostTestWizard
         userId={user.id}
@@ -1137,5 +1138,6 @@ export default function Results() {
         </button>
       </div>
     )}
+  </>
   );
 }
