@@ -83,7 +83,10 @@ playwright.config.ts # Playwright config (baseURL port 5000, API port 8080)
 - **Brand tokens file:** `src/lib/brand.ts` — canonical color hex values + typography + radius + shadows.
 - **CSS variables:** `src/index.css` — all Tailwind theme vars mapped; `--brand` = green; `--glow-primary` for glow effects; `.glass`, `.pill-nav`, `.glow-primary`, `.text-display`, `.text-italic-serif`, `.text-label` utility classes.
 - **Logo:** `/public/logo.svg` (North Star + compass SVG — 4-pointed Polaris star with compass ring + N cardinal marker) + `/public/favicon.svg` (same mark, 64×64).
-- **Navbar:** Fixed floating pill (`pill-nav` class), centered links in UPPERCASE, green pill CTA, language switcher, user dropdown. Adds `<div class="h-20" />` spacer.
+- **Navbar:** Fixed floating pill (`pill-nav` class), navy-tinted, centered links UPPERCASE, gold CTA, journey badge in user dropdown, "Il mio percorso" link. Adds `<div class="h-20" />` spacer.
+- **Home (guest):** Persona-first hero — 5 clickable journey cards (Indeciso/Dipendente/Autonomo/Azienda/Investitore) under navy hero. Each card CTA navigates to the right starting point.
+- **Home (logged-in):** Navy hero with personalized greeting, journey type badge, "Prossimo passo" card tailored to persona, top-4 sector match strip, then `QuickToolsSection` (4 tools chosen for journey type), personalized recommendations, upcoming events.
+- **Dashboard:** Journey type banner (navy hero strip), persona-aware tools grid (`JourneyToolsSection`), full AI analysis (professions, work mode, education paths), all-tools hub at bottom.
 - **Typography:** Inter (sans, bold display) + Playfair Display italic serif for accent words in hero headings.
 - **Fonts loaded in:** `index.html` Google Fonts (`Inter` + `Playfair Display:ital,wght@0,700;1,400;1,700`).
 - **Skeleton variants:** `skeleton.tsx` supports `variant="card|avatar|badge|text"` + `lines` prop (backward compat)
