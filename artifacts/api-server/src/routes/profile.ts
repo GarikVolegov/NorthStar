@@ -3,15 +3,20 @@ import bcrypt from "bcryptjs";
 import { db, usersTable, testSessionsTable, sectorsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
+import { authMiddleware } from "../lib/auth-jwt.js";
 
 const router: IRouter = Router();
 
 const ChangePasswordBody = z.object({
-  userId: z.number(),
   oldPassword: z.string().min(1),
-  newPassword: z.string().min(6),
+  newPassword: z.string().min(8), // FIX: raised from 6 to 8 chars minimum
 });
 
+const UserModeBody = z.object({
+  userMode: z.enum(["explorer", "climber"]),
+});
+
+// GET /profile/:userId — public profile (no auth required, limited fields)
 router.get("/profile/:userId", async (req, res): Promise<void> => {
   const userId = parseInt(String(req.params.userId), 10);
   if (isNaN(userId)) {
@@ -163,26 +168,45 @@ router.get("/profile/:userId", async (req, res): Promise<void> => {
   });
 });
 
-router.patch("/profile/:userId/mode", async (req, res): Promise<void> => {
-  const userId = parseInt(String(req.params.userId), 10);
-  if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
-  const { userMode } = req.body;
-  if (!["explorer", "climber"].includes(userMode)) {
-    res.status(400).json({ error: "userMode deve essere 'explorer' o 'climber'" }); return;
+// PATCH /profile/:userId/mode — FIXED: authMiddleware + ownership check (was open to IDOR)
+router.patch("/profile/:userId/mode", authMiddleware, async (req, res): Promise<void> => {
+  const paramId = parseInt(String(req.params.userId), 10);
+  if (isNaN(paramId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+  // FIX: ensure the authenticated user can only update their own mode
+  const authenticatedUserId = res.locals.userId as number;
+  if (paramId !== authenticatedUserId) {
+    res.status(403).json({ error: "Non autorizzato a modificare questo profilo" });
+    return;
   }
-  const [updated] = await db.update(usersTable).set({ userMode }).where(eq(usersTable.id, userId)).returning();
+
+  const parsed = UserModeBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "userMode deve essere 'explorer' o 'climber'" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(usersTable)
+    .set({ userMode: parsed.data.userMode })
+    .where(eq(usersTable.id, authenticatedUserId))
+    .returning();
+
   if (!updated) { res.status(404).json({ error: "Utente non trovato" }); return; }
   res.json({ userMode: updated.userMode });
 });
 
-router.post("/profile/change-password", async (req, res): Promise<void> => {
+// POST /profile/change-password — FIXED: authMiddleware + ownership (was open to IDOR via userId in body)
+router.post("/profile/change-password", authMiddleware, async (req, res): Promise<void> => {
   const parsed = ChangePasswordBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Dati non validi" });
+    res.status(400).json({ error: "Dati non validi", details: parsed.error.flatten() });
     return;
   }
 
-  const { userId, oldPassword, newPassword } = parsed.data;
+  // FIX: userId comes from the JWT token, not from the request body — prevents IDOR
+  const userId = res.locals.userId as number;
+  const { oldPassword, newPassword } = parsed.data;
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
   if (!user) {
@@ -201,7 +225,14 @@ router.post("/profile/change-password", async (req, res): Promise<void> => {
     return;
   }
 
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+  // FIX: prevent reuse of the same password
+  const isSame = await bcrypt.compare(newPassword, user.passwordHash);
+  if (isSame) {
+    res.status(400).json({ error: "La nuova password deve essere diversa da quella attuale" });
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 12); // FIX: raised cost from 10 to 12
   await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, userId));
 
   res.json({ message: "Password aggiornata con successo" });

@@ -1,21 +1,9 @@
-import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { Router, type IRouter } from "express";
 import { db, agentRunsTable, agentSuggestionsTable, reviewQueueTable, auditLogsTable } from "@workspace/db";
 import { eq, desc, and, sql, ilike } from "drizzle-orm";
+import { adminKeyMiddleware } from "../lib/admin-middleware.js";
 
 const router: IRouter = Router();
-
-function adminKeyMiddleware(req: Request, res: Response, next: NextFunction): void {
-  const adminKey = process.env.ADMIN_KEY;
-  if (!adminKey) {
-    res.status(503).json({ error: "Admin non configurato." });
-    return;
-  }
-  if (req.headers["x-admin-key"] !== adminKey) {
-    res.status(403).json({ error: "Accesso non autorizzato." });
-    return;
-  }
-  next();
-}
 
 router.use("/admin", adminKeyMiddleware);
 
