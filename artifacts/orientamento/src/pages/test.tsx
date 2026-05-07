@@ -133,7 +133,7 @@ function SpiritTimer({ totalSec, paused, reduced }: { totalSec: number; paused: 
   );
 }
 
-// ── SectionDivider ─────────────────────────────────────────────────────
+// ── SectionDivider ──────────────────────────────────────────────────────
 const DIVIDER_MS = 1800;
 function SectionDivider({ label, emoji, description, onDone, reduced }: {
   label: string; emoji: string; description: string; onDone: () => void; reduced: boolean;
@@ -186,24 +186,12 @@ function TypewriterText({ text, reduced, className }: TypewriterTextProps) {
 }
 
 // ── WelcomeScreen ────────────────────────────────────────────────────────
-const WELCOME_PILLS = [
-  { icon: "question", label: `${ALL_RIASEC_IDS.length + SPIRIT_QUESTION_IDS.length + CTX_QUESTION_IDS.length} domande` },
-  { icon: "clock",    label: "~8 minuti" },
-  { icon: "layers",   label: "3 fasi" },
-] as const;
-
-interface WelcomeScreenProps {
-  userName?: string;
-  reduced: boolean;
-  onStart: () => void;
-}
+interface WelcomeScreenProps { userName?: string; reduced: boolean; onStart: () => void; }
 function WelcomeScreen({ userName, reduced, onStart }: WelcomeScreenProps) {
   const startBtnRef = useRef<HTMLButtonElement>(null);
 
-  // Autofocus sul bottone per accessibilità da tastiera
   useEffect(() => { startBtnRef.current?.focus(); }, []);
 
-  // Enter / Space avanzano senza bisogno del click
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onStart(); }
@@ -216,103 +204,140 @@ function WelcomeScreen({ userName, reduced, onStart }: WelcomeScreenProps) {
 
   const containerVariants: Variants = reduced
     ? { hidden: { opacity: 0 }, show: { opacity: 1 } }
-    : {
-        hidden: { opacity: 0 },
-        show:   { opacity: 1, transition: { staggerChildren: 0.13, delayChildren: 0.1 } },
-      };
+    : { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.13, delayChildren: 0.1 } } };
   const itemVariants: Variants = reduced
     ? { hidden: { opacity: 0 }, show: { opacity: 1 } }
-    : {
-        hidden: { opacity: 0, y: 20 },
-        show:   { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } },
-      };
+    : { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } } };
 
   return (
-    <div className="container max-w-2xl mx-auto px-4 py-16 flex flex-col items-center justify-center min-h-[80vh]">
-      <motion.div
-        className="flex flex-col items-center text-center gap-6 w-full"
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-      >
-        {/* Avatar con halo */}
-        <motion.div variants={itemVariants} className="relative">
-          {!reduced && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: [0, 0.5, 0], scale: [0.5, 1.4, 1.8] }}
-              transition={{ duration: 1.3, ease: "easeOut", delay: 0.2 }}
-              className="absolute inset-0 m-auto rounded-full pointer-events-none"
-              style={{ background: "var(--primary)", filter: "blur(32px)", width: "100%", height: "100%" }}
-            />
-          )}
-          <LyraAvatar
-            state="curious"
-            phase={0}
-            reduced={reduced}
-            size={160}
-            className="shadow-lg relative z-10"
-          />
-        </motion.div>
+    /*
+     * Fullscreen su mobile: fixed inset-0 + overflow-y-auto
+     * Su sm+ si comporta come prima (centrato, scrollabile con il resto della pagina)
+     */
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-background sm:static sm:z-auto sm:bg-transparent sm:overflow-visible">
+      {/*
+       * Su mobile: flex col, justify-between per spingere il CTA in fondo
+       * Su sm+: torna centrato come prima (justify-center, py-16)
+       */}
+      <div className="flex flex-col justify-between min-h-full px-5 pt-12 pb-[env(safe-area-inset-bottom,1.5rem)] sm:justify-center sm:items-center sm:py-16 sm:pb-16 sm:min-h-0">
 
-        {/* Greeting + titolo */}
-        <motion.div variants={itemVariants} className="space-y-2">
-          <p className="text-base text-muted-foreground font-medium">{greeting}</p>
-          <h1 className="text-3xl sm:text-4xl font-serif font-bold text-foreground leading-tight">
-            Sono Lyra, la tua guida
-          </h1>
-          <p className="text-3xl sm:text-4xl font-serif font-bold text-primary leading-tight">
-            all’orientamento professionale.
-          </p>
-        </motion.div>
-
-        {/* Sottotitolo */}
-        <motion.p
-          variants={itemVariants}
-          className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-md"
+        {/* Contenuto centrale */}
+        <motion.div
+          className="flex flex-col items-center text-center gap-5 w-full max-w-lg mx-auto sm:gap-6"
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
         >
-          Rispondo a qualche domanda su di te — sul modo in cui lavori,
-          pensi e vuoi crescere — e costruisco il tuo profilo professionale su misura.
-        </motion.p>
+          {/* Avatar + halo */}
+          <motion.div variants={itemVariants} className="relative">
+            {!reduced && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: [0, 0.5, 0], scale: [0.5, 1.4, 1.8] }}
+                transition={{ duration: 1.3, ease: "easeOut", delay: 0.2 }}
+                className="absolute inset-0 m-auto rounded-full pointer-events-none"
+                style={{ background: "var(--primary)", filter: "blur(28px)", width: "100%", height: "100%" }}
+              />
+            )}
+            <LyraAvatar
+              state="curious"
+              phase={0}
+              reduced={reduced}
+              size={140}
+              className="shadow-lg relative z-10 sm:w-[170px] sm:h-[170px]"
+            />
+          </motion.div>
 
-        {/* Pillole info */}
-        <motion.div variants={itemVariants} className="flex flex-wrap items-center justify-center gap-2">
-          <div className="flex items-center gap-1.5 bg-muted/60 border border-border/50 rounded-full px-3.5 py-1.5 text-xs font-medium text-muted-foreground">
-            <span className="text-sm">📝</span>
-            {ALL_IDS.length} domande
-          </div>
-          <div className="flex items-center gap-1.5 bg-muted/60 border border-border/50 rounded-full px-3.5 py-1.5 text-xs font-medium text-muted-foreground">
-            <Clock className="w-3.5 h-3.5" />
-            ~8 minuti
-          </div>
-          <div className="flex items-center gap-1.5 bg-muted/60 border border-border/50 rounded-full px-3.5 py-1.5 text-xs font-medium text-muted-foreground">
-            <Layers className="w-3.5 h-3.5" />
-            3 fasi
-          </div>
-        </motion.div>
+          {/* Greeting + titolo */}
+          <motion.div variants={itemVariants} className="space-y-1 sm:space-y-2">
+            <p className="text-sm sm:text-base text-muted-foreground font-medium">{greeting}</p>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold text-foreground leading-tight">
+              Sono Lyra, la tua guida
+            </h1>
+            <p className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold text-primary leading-tight">
+              all’orientamento professionale.
+            </p>
+          </motion.div>
 
-        {/* CTA */}
-        <motion.div variants={itemVariants} className="w-full flex flex-col items-center gap-3 pt-2">
-          <Button
-            ref={startBtnRef}
-            size="lg"
-            onClick={onStart}
-            className="rounded-full px-8 h-14 text-base font-semibold w-full sm:w-auto gap-2 group"
+          {/* Sottotitolo */}
+          <motion.p
+            variants={itemVariants}
+            className="text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed max-w-sm sm:max-w-md"
           >
-            Inizia il percorso
-            <motion.span
-              className="inline-flex"
-              animate={reduced ? {} : { x: [0, 4, 0] }}
-              transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+            Rispondo a qualche domanda su di te — sul modo in cui lavori,
+            pensi e vuoi crescere — e costruisco il tuo profilo professionale su misura.
+          </motion.p>
+
+          {/* Pillole info */}
+          <motion.div variants={itemVariants} className="flex flex-wrap items-center justify-center gap-2">
+            <div className="flex items-center gap-1.5 bg-muted/60 border border-border/50 rounded-full px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              <span className="text-sm">📝</span>
+              {ALL_IDS.length} domande
+            </div>
+            <div className="flex items-center gap-1.5 bg-muted/60 border border-border/50 rounded-full px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              <Clock className="w-3.5 h-3.5" />
+              ~8 minuti
+            </div>
+            <div className="flex items-center gap-1.5 bg-muted/60 border border-border/50 rounded-full px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              <Layers className="w-3.5 h-3.5" />
+              3 fasi
+            </div>
+          </motion.div>
+
+          {/* CTA inline (visibile solo su sm+) */}
+          <motion.div variants={itemVariants} className="hidden sm:flex flex-col items-center gap-3 pt-2 w-full">
+            <Button
+              ref={startBtnRef}
+              size="lg"
+              onClick={onStart}
+              className="rounded-full px-8 h-14 text-base font-semibold w-full sm:w-auto gap-2"
             >
-              <ArrowRight className="w-5 h-5" />
-            </motion.span>
-          </Button>
-          <p className="text-xs text-muted-foreground/50">
-            Puoi interrompere e riprendere in qualsiasi momento
-          </p>
+              Inizia il percorso
+              <motion.span
+                className="inline-flex"
+                animate={reduced ? {} : { x: [0, 4, 0] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <ArrowRight className="w-5 h-5" />
+              </motion.span>
+            </Button>
+            <p className="text-xs text-muted-foreground/50">Puoi interrompere e riprendere in qualsiasi momento</p>
+          </motion.div>
         </motion.div>
-      </motion.div>
+
+        {/*
+         * CTA sticky al fondo — visibile solo su mobile (sm:hidden)
+         * backdrop-blur + border-top per separazione visiva
+         */}
+        <motion.div
+          className="sm:hidden mt-6 w-full flex flex-col items-center gap-2"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={reduced ? { duration: 0 } : { delay: 0.75, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        >
+          {/* Sfumatura di separazione */}
+          <div className="absolute bottom-0 left-0 right-0 h-28 pointer-events-none bg-gradient-to-t from-background to-transparent" />
+          <div className="relative w-full flex flex-col items-center gap-2 pt-4 border-t border-border/30">
+            <Button
+              ref={startBtnRef}
+              size="lg"
+              onClick={onStart}
+              className="rounded-full h-14 text-base font-semibold w-full gap-2"
+            >
+              Inizia il percorso
+              <motion.span
+                className="inline-flex"
+                animate={reduced ? {} : { x: [0, 4, 0] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <ArrowRight className="w-5 h-5" />
+              </motion.span>
+            </Button>
+            <p className="text-xs text-muted-foreground/50">Puoi interrompere e riprendere in qualsiasi momento</p>
+          </div>
+        </motion.div>
+
+      </div>
     </div>
   );
 }
@@ -338,11 +363,9 @@ export default function Test() {
   const [justSelected, setJustSelected] = useState<string | null>(null);
   const [activeDivider, setActiveDivider] = useState<"spirits" | "ctx" | null>(null);
 
-  // showWelcome: nascosto se c'è un draft da riprendere
   const hasDraft = !!draft && (draft.step > 0 || Object.keys(draft.answers).length > 0);
   const [showWelcome, setShowWelcome] = useState(!hasDraft);
 
-  // lyraHasEntered: false solo durante il vero primo ingresso al test
   const [lyraHasEntered, setLyraHasEntered] = useState(false);
   const assignedSessionRef = useRef<number | null>(null);
 
