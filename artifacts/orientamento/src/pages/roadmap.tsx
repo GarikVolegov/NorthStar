@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useGetSector } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -278,6 +278,26 @@ function ProsConsBlock({ pros, cons }: { pros: string[]; cons: string[] }) {
   );
 }
 
+const ROADMAP_WAITING_MESSAGES = [
+  "Sto analizzando il tuo profilo RIASEC…",
+  "Confronto laurea, ITS, bootcamp e autodidatta…",
+  "Calcolo i tempi e i costi per ogni percorso…",
+  "Valuto i pro e i contro su misura per te…",
+  "Identifico le certificazioni più utili…",
+  "Preparo la tua raccomandazione personalizzata…",
+  "Quasi pronto, ancora qualche secondo…",
+];
+
+function useRotatingMessage(messages: string[], intervalMs: number, active: boolean) {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    if (!active) { setIdx(0); return; }
+    const id = setInterval(() => setIdx((i) => (i + 1) % messages.length), intervalMs);
+    return () => clearInterval(id);
+  }, [active, messages.length, intervalMs]);
+  return messages[idx];
+}
+
 // ─── Page ───────────────────────────────────────────────────────────────────
 export default function Roadmap() {
   const params = useParams();
@@ -289,6 +309,7 @@ export default function Roadmap() {
   const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
+  const waitingMessage = useRotatingMessage(ROADMAP_WAITING_MESSAGES, 2200, isGenerating);
 
   const { data: sector, isLoading } = useGetSector(id, {
     query: { enabled: !!id, queryKey: ["sector", id] },
@@ -450,8 +471,8 @@ export default function Roadmap() {
             <Loader2 className="w-8 h-8 text-primary animate-spin" />
           </div>
           <h2 className="text-lg font-semibold mb-2">Esplorando i percorsi possibili…</h2>
-          <p className="text-muted-foreground text-sm mb-8">
-            L'AI sta confrontando laurea, ITS, bootcamp, apprendistato e autodidatta — su misura per te
+          <p key={waitingMessage} className="text-muted-foreground text-sm mb-8 animate-in fade-in duration-500 min-h-[20px]">
+            {waitingMessage}
           </p>
           <div className="max-w-xs mx-auto">
             <div className="h-1.5 bg-border rounded-full overflow-hidden">

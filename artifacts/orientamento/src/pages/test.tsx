@@ -1,16 +1,48 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Variants } from "framer-motion";
 import { useSubmitTest } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, ArrowRight, Check, Sparkles, Target } from "lucide-react";
+import { Loader2, ArrowLeft, ArrowRight, Check, Sparkles, Target, RotateCcw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useReducedMotion, easings } from "@/lib/motion";
 import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
+
+const DRAFT_KEY = "northstar_test_draft";
+const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+interface TestDraft {
+  step: number;
+  answers: Record<string, number>;
+  transition1Passed: boolean;
+  transition2Passed: boolean;
+  savedAt: number;
+}
+
+function loadDraft(): TestDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const draft: TestDraft = JSON.parse(raw);
+    if (Date.now() - draft.savedAt > DRAFT_TTL_MS) {
+      localStorage.removeItem(DRAFT_KEY);
+      return null;
+    }
+    return draft;
+  } catch { return null; }
+}
+
+function saveDraft(draft: TestDraft) {
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch {}
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch {}
+}
 
 const RIASEC_QUESTION_IDS = ["q1","q2","q3","q4","q5","q6","q7","q8","q9","q10","q11","q12"] as const;
 const SPIRIT_QUESTION_IDS = [
@@ -74,6 +106,10 @@ export default function Test() {
     autonomo: 5, azienda: 4, investitore: 4, dipendente: 1, indeciso: 3,
   };
 
+  const [draft] = useState<TestDraft | null>(() => loadDraft());
+  const [resumeBannerVisible, setResumeBannerVisible] = useState(true);
+  const [resumed, setResumed] = useState(false);
+
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>(() => {
     const jt = user?.journeyType;
@@ -83,6 +119,27 @@ export default function Test() {
   const [direction, setDirection] = useState<1 | -1>(1);
   const [transition1Passed, setTransition1Passed] = useState(false);
   const [transition2Passed, setTransition2Passed] = useState(false);
+
+  // Save draft to localStorage whenever state changes
+  useEffect(() => {
+    if (currentStep === 0 && Object.keys(answers).length === 0) return;
+    saveDraft({ step: currentStep, answers, transition1Passed, transition2Passed, savedAt: Date.now() });
+  }, [currentStep, answers, transition1Passed, transition2Passed]);
+
+  const handleResume = () => {
+    if (!draft) return;
+    setCurrentStep(draft.step);
+    setAnswers(draft.answers);
+    setTransition1Passed(draft.transition1Passed);
+    setTransition2Passed(draft.transition2Passed);
+    setResumeBannerVisible(false);
+    setResumed(true);
+  };
+
+  const handleDismissDraft = () => {
+    clearDraft();
+    setResumeBannerVisible(false);
+  };
 
   const showTransition1 = currentStep === ALL_RIASEC_IDS.length && !transition1Passed;
   const showTransition2 = currentStep === SPIRITS_END && !transition2Passed;
@@ -158,6 +215,7 @@ export default function Test() {
       { data: { answers } },
       {
         onSuccess: async (session) => {
+          clearDraft();
           if (user) await assignUserToSession(session.id, user.id);
           setLocation(`/risultati/${session.id}`);
         },
@@ -290,6 +348,10 @@ export default function Test() {
   }
 
   // ── Question screen ────────────────────────────────────────────────────────
+
+  // Resume banner (shown before user starts / resumes)
+  const showResumeBanner = !!draft && resumeBannerVisible && !resumed && currentStep === 0 && Object.keys(answers).length === 0;
+
   const currentPhase = isCtxQ ? 2 : isSpiritQ ? 1 : 0;
 
   const headerLabel = isCtxQ
@@ -302,6 +364,36 @@ export default function Test() {
 
   return (
     <div className="container max-w-2xl mx-auto px-4 py-12 min-h-[70vh]">
+
+      {/* Resume draft banner */}
+      <AnimatePresence>
+        {showResumeBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.3 }}
+            className="mb-6 flex items-center gap-3 bg-primary/10 border border-primary/25 rounded-2xl px-4 py-3"
+          >
+            <RotateCcw className="w-4 h-4 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground">Hai un test in corso</p>
+              <p className="text-xs text-muted-foreground">
+                Avevi risposto a {draft?.step ?? 0} domande su {ALL_IDS.length}. Vuoi riprendere da dove eri rimasto?
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button size="sm" variant="ghost" onClick={handleDismissDraft} className="rounded-full h-7 px-2">
+                <X className="w-3.5 h-3.5" />
+              </Button>
+              <Button size="sm" onClick={handleResume} className="rounded-full h-7 px-3 text-xs">
+                Riprendi
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Phase stepper */}
       <div className="flex items-center justify-center gap-1.5 mb-6">
         {PHASE_LABELS.map((label, i) => {

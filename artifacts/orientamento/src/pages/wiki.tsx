@@ -7,6 +7,24 @@ import { ArrowLeft, Send, Brain, Sparkles, MessageSquare, Loader2 } from "lucide
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "react-i18next";
 
+const WIKI_WAITING_MESSAGES = [
+  "Sto consultando la mia base di conoscenza…",
+  "Elaborando la risposta per te…",
+  "Analizzo il contesto del settore…",
+  "Preparo una risposta su misura…",
+  "Quasi pronto…",
+];
+
+function useRotatingMessage(messages: string[], intervalMs: number, active: boolean) {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    if (!active) { setIdx(0); return; }
+    const id = setInterval(() => setIdx((i) => (i + 1) % messages.length), intervalMs);
+    return () => clearInterval(id);
+  }, [active, messages.length, intervalMs]);
+  return messages[idx];
+}
+
 const BASE = import.meta.env.BASE_URL || "/";
 
 interface Message {
@@ -70,6 +88,10 @@ export default function Wiki() {
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const lastMsg = messages[messages.length - 1];
+  const isWaitingForFirstChunk = isStreaming && !!lastMsg && lastMsg.role === "assistant" && !lastMsg.content;
+  const waitingMessage = useRotatingMessage(WIKI_WAITING_MESSAGES, 2000, isWaitingForFirstChunk);
 
   const suggestedQuestions = t("wiki.suggestedQuestions", { returnObjects: true }) as string[];
 
@@ -262,14 +284,17 @@ export default function Wiki() {
                   }`}
                 >
                   {msg.role === "assistant" && !msg.content && isStreaming ? (
-                    <div className="flex gap-1 py-1 items-center">
-                      {[0, 150, 300].map((delay) => (
-                        <span
-                          key={delay}
-                          className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce"
-                          style={{ animationDelay: `${delay}ms` }}
-                        />
-                      ))}
+                    <div className="flex flex-col gap-2 py-1">
+                      <div className="flex gap-1 items-center">
+                        {[0, 150, 300].map((delay) => (
+                          <span
+                            key={delay}
+                            className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce"
+                            style={{ animationDelay: `${delay}ms` }}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-xs text-muted-foreground/70 animate-in fade-in duration-500">{waitingMessage}</span>
                     </div>
                   ) : msg.role === "user" ? (
                     <p className="text-sm leading-relaxed">{msg.content}</p>
