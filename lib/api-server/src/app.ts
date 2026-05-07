@@ -8,6 +8,9 @@ import { json } from "express";
 import { jwtMiddleware } from "./middleware/jwt";
 import "./jobs/cron";
 
+// OG Image (public — no auth)
+import { ogProfileRouter } from "./routes/og";
+
 // Growth Agent
 import ingestRouter        from "./routes/growth-agent/ingest";
 import chatRouter          from "./routes/growth-agent/chat";
@@ -42,6 +45,9 @@ export function createApp() {
   app.use(json({ limit: "20mb" }));
 
   app.get("/health", (_req, res) => res.json({ ok: true }));
+
+  // OG image route registered BEFORE jwtMiddleware so it is fully public
+  app.use(ogProfileRouter);   // GET /api/og/profile/:userId  (no auth)
 
   app.use("/api", jwtMiddleware);
 

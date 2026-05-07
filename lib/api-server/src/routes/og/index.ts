@@ -1,0 +1,1 @@
+export { ogProfileRouter } from "./profile";
