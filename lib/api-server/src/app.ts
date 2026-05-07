@@ -20,19 +20,19 @@ import cors from "cors";
 import { json } from "express";
 
 // ── Middleware ─────────────────────────────────────────────────────────────────
-import { jwtMiddleware } from "./middleware/jwt"; // your existing JWT middleware
+import { jwtMiddleware } from "./middleware/jwt";
 
 // ── Growth Agent routes ────────────────────────────────────────────────────────
 import ingestRouter    from "./routes/growth-agent/ingest";
 import chatRouter      from "./routes/growth-agent/chat";
 import knowledgeRouter from "./routes/growth-agent/knowledge";
-import memoryRouter    from "./routes/growth-agent/memory";  // ← NEW
+import memoryRouter    from "./routes/growth-agent/memory";
+import analyticsRouter from "./routes/growth-agent/analytics";  // ← NEW
 
 // ── (add your other existing route imports here) ──────────────────────────────
 // import authRouter     from "./routes/auth";
 // import userRouter     from "./routes/user";
 // import sectorsRouter  from "./routes/sectors";
-// ... etc.
 
 export function createApp() {
   const app = express();
@@ -42,7 +42,7 @@ export function createApp() {
     origin: process.env.FRONTEND_URL ?? "http://localhost:5173",
     credentials: true,
   }));
-  app.use(json({ limit: "20mb" }));  // 20mb per large document payloads
+  app.use(json({ limit: "20mb" }));
 
   // ── Health check (no auth) ───────────────────────────────────────────────────
   app.get("/health", (_req, res) => res.json({ ok: true }));
@@ -60,14 +60,16 @@ export function createApp() {
   //   GET    /api/growth-agent/knowledge       List ingested sources
   //   DELETE /api/growth-agent/knowledge/:id   Delete a chunk
   //   DELETE /api/growth-agent/knowledge       Bulk delete by sourceType
-  //   GET    /api/growth-agent/memory          Fatti + pattern dell'utente
+  //   GET    /api/growth-agent/memory          Fatti + pattern persistenti
+  //   GET    /api/growth-agent/analytics       Session analytics dashboard
   //
-  app.use("/api/growth-agent/ingest",    ingestRouter);
-  app.use("/api/growth-agent/chat",      chatRouter);
-  app.use("/api/growth-agent/knowledge", knowledgeRouter);
-  app.use("/api/growth-agent/memory",    memoryRouter);   // ← NEW
+  app.use("/api/growth-agent/ingest",     ingestRouter);
+  app.use("/api/growth-agent/chat",       chatRouter);
+  app.use("/api/growth-agent/knowledge",  knowledgeRouter);
+  app.use("/api/growth-agent/memory",     memoryRouter);
+  app.use("/api/growth-agent/analytics",  analyticsRouter);   // ← NEW
 
-  // ── Other protected routes (add yours below) ──────────────────────────────────
+  // ── Other protected routes ──────────────────────────────────────────────────────────
   // app.use("/api/user",     userRouter);
   // app.use("/api/sectors",  sectorsRouter);
 
