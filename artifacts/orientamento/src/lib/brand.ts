@@ -1,42 +1,42 @@
 export const BRAND = {
   colors: {
-    /* Dark charcoal backgrounds (warm-toned, like photo) */
-    background:     "#111009",
-    backgroundCard: "#1a1812",
-    backgroundMuted:"#22201a",
-    border:         "#2e2b22",
-    borderSubtle:   "#252218",
+    /* Deep navy-slate backgrounds */
+    background:     "#0d1120",
+    backgroundCard: "#131828",
+    backgroundMuted:"#181e2e",
+    border:         "#252e45",
+    borderSubtle:   "#1e2638",
 
-    foreground:     "#f0ede5",
-    foregroundMuted:"#8a8270",
-    foregroundDim:  "#5a5545",
+    foreground:     "#eaecf2",
+    foregroundMuted:"#7e8a9e",
+    foregroundDim:  "#4a5368",
 
-    /* Primary — Rich Gold #D4AF37 */
-    primary:        "#D4AF37",
-    primaryDark:    "#a8891c",
-    primaryLight:   "#e8cc6a",
-    primaryFg:      "#111009",
+    /* Primary — Champagne Gold (refined, desaturated) */
+    primary:        "#c19e4a",
+    primaryDark:    "#8f7230",
+    primaryLight:   "#d8bc7a",
+    primaryFg:      "#0d1120",
 
-    brand:          "#D4AF37",
-    brandDark:      "#a8891c",
-    brandLight:     "#f0d96a",
-    brandFg:        "#111009",
+    brand:          "#c19e4a",
+    brandDark:      "#8f7230",
+    brandLight:     "#d8bc7a",
+    brandFg:        "#0d1120",
 
     /* Growth accent — Sage Green */
-    growth:         "#8fbfa4",
-    growthDark:     "#5a8a6e",
-    growthLight:    "#c4dece",
-    growthFg:       "#111009",
+    growth:         "#7db89a",
+    growthDark:     "#4e8068",
+    growthLight:    "#b2d4c4",
+    growthFg:       "#0d1120",
 
     /* Hero dark surface */
-    heroDark:       "#0d0b08",
-    heroDark2:      "#151310",
+    heroDark:       "#0b0f1c",
+    heroDark2:      "#090d18",
 
     /* Neutral */
-    neutralGray:    "#E5E7EB",
+    neutralGray:    "#e2e8f0",
     white:          "#FFFFFF",
 
-    destructive:    "#ef4444",
+    destructive:    "#e05252",
     destructiveFg:  "#ffffff",
   },
 
@@ -55,11 +55,11 @@ export const BRAND = {
   },
 
   shadows: {
-    sm:  "0 1px 3px 0 rgba(0,0,0,0.6)",
-    md:  "0 4px 12px 0 rgba(0,0,0,0.5)",
-    lg:  "0 8px 24px 0 rgba(0,0,0,0.7)",
-    glow:"0 0 28px 0 rgba(212,175,55,0.32)",
-    growthGlow: "0 0 20px 0 rgba(143,191,164,0.25)",
+    sm:  "0 1px 3px 0 rgba(0,0,0,0.55)",
+    md:  "0 4px 12px 0 rgba(0,0,0,0.48)",
+    lg:  "0 8px 24px 0 rgba(0,0,0,0.62)",
+    glow:"0 0 24px 0 rgba(193,158,74,0.20)",
+    growthGlow: "0 0 18px 0 rgba(125,184,154,0.18)",
   },
 } as const;
 
