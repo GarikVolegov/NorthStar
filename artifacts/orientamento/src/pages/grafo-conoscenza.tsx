@@ -4,7 +4,7 @@ import {
   ArrowLeft, Plus, Save, Trash2, Link2, X, Search, Sparkles, Loader2,
   StickyNote, Lightbulb, FileText, Target, Briefcase, Wrench, Award,
   Network, Globe, MessageCircleQuestion, Send, ChevronRight,
-  Upload, Wand2, Check, ChevronDown, Maximize2, Copy,
+  Upload, Wand2, Check, ChevronDown, Maximize2, Copy, Map,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -68,11 +68,18 @@ interface AutoLinkSuggestion {
   score: number;
 }
 
-// ── Step 3: context menu state ────────────────────────────────────────────
 interface ContextMenu {
   nodeId: number;
-  x: number; // screen px
+  x: number;
   y: number;
+}
+
+// ── Step 4: stato inline edit edge label ─────────────────────────────────
+interface EdgeLabelEdit {
+  edgeId: number;
+  draft: string;
+  screenX: number; // px assoluti nella finestra
+  screenY: number;
 }
 
 const TYPE_META: Record<NodeType, { label: string; color: string; bg: string; border: string; Icon: React.ComponentType<{ className?: string }> }> = {
@@ -116,7 +123,6 @@ function splitTitle(title: string): [string, string | null] {
   return [line1, line2 || null];
 }
 
-// ── Step 2: calcola view per fit-to-screen ────────────────────────────────
 function computeFitView(
   nodes: KNode[],
   svgW: number,
@@ -136,6 +142,119 @@ function computeFitView(
   const x = svgW / 2 - ((minX + maxX) / 2) * k;
   const y = svgH / 2 - ((minY + maxY) / 2) * k;
   return { x, y, k };
+}
+
+// ── Step 5: Minimap component ────────────────────────────────────────────
+const MINI_W = 160;
+const MINI_H = 100;
+
+interface MinimapProps {
+  nodes: KNode[];
+  view: { x: number; y: number; k: number };
+  svgRef: React.RefObject<SVGSVGElement>;
+  onPan: (x: number, y: number) => void;
+}
+
+function Minimap({ nodes, view, svgRef, onPan }: MinimapProps) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  const { scale, offsetX, offsetY, vpRect } = useMemo(() => {
+    if (nodes.length === 0) return { scale: 1, offsetX: 0, offsetY: 0, vpRect: null };
+    const xs = nodes.map((n) => n.x);
+    const ys = nodes.map((n) => n.y);
+    const pad = 40;
+    const minX = Math.min(...xs) - pad;
+    const maxX = Math.max(...xs) + pad;
+    const minY = Math.min(...ys) - pad;
+    const maxY = Math.max(...ys) + pad;
+    const bw = maxX - minX;
+    const bh = maxY - minY;
+    const s = Math.min(MINI_W / bw, MINI_H / bh);
+    const ox = (MINI_W - bw * s) / 2 - minX * s;
+    const oy = (MINI_H - bh * s) / 2 - minY * s;
+
+    // viewport rect in minimap coords
+    const svg = svgRef.current;
+    const svgW = svg?.clientWidth ?? 800;
+    const svgH = svg?.clientHeight ?? 500;
+    // world coords di angolo top-left e bottom-right del viewport
+    const wx0 = (-view.x) / view.k;
+    const wy0 = (-view.y) / view.k;
+    const wx1 = (svgW - view.x) / view.k;
+    const wy1 = (svgH - view.y) / view.k;
+    const vx = wx0 * s + ox;
+    const vy = wy0 * s + oy;
+    const vw = (wx1 - wx0) * s;
+    const vh = (wy1 - wy0) * s;
+    return { scale: s, offsetX: ox, offsetY: oy, vpRect: { x: vx, y: vy, w: vw, h: vh } };
+  }, [nodes, view, svgRef]);
+
+  function handleMinimapClick(e: React.MouseEvent<SVGSVGElement>) {
+    if (!svgRef.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    // converti click minimap → world coords
+    const wx = (mx - offsetX) / scale;
+    const wy = (my - offsetY) / scale;
+    const svgW = svgRef.current.clientWidth;
+    const svgH = svgRef.current.clientHeight;
+    onPan(svgW / 2 - wx * view.k, svgH / 2 - wy * view.k);
+  }
+
+  if (nodes.length === 0) return null;
+
+  return (
+    <div className="absolute bottom-4 left-4 z-10">
+      <div className={cn(
+        "bg-card/95 backdrop-blur border rounded-xl shadow-sm overflow-hidden transition-all duration-200",
+        collapsed ? "w-8 h-8" : ""
+      )}>
+        {/* Toggle header */}
+        <button
+          onClick={() => setCollapsed((v) => !v)}
+          className={cn(
+            "flex items-center gap-1.5 px-2 py-1 hover:bg-muted transition-colors w-full",
+            collapsed ? "justify-center h-8" : "border-b"
+          )}
+          title={collapsed ? "Espandi minimap" : "Comprimi minimap"}
+        >
+          <Map className="w-3 h-3 text-muted-foreground shrink-0" />
+          {!collapsed && <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide">Mappa</span>}
+        </button>
+        {!collapsed && (
+          <svg
+            width={MINI_W}
+            height={MINI_H}
+            className="block cursor-crosshair"
+            onClick={handleMinimapClick}
+          >
+            {/* Sfondo */}
+            <rect width={MINI_W} height={MINI_H} fill="transparent" />
+            {/* Nodi */}
+            {nodes.map((n) => {
+              const meta = TYPE_META[n.type] ?? TYPE_META.note;
+              const mx = n.x * scale + offsetX;
+              const my = n.y * scale + offsetY;
+              return (
+                <circle key={n.id} cx={mx} cy={my} r={3.5}
+                  fill={meta.color} opacity={0.8} />
+              );
+            })}
+            {/* Viewport rect */}
+            {vpRect && (
+              <rect
+                x={vpRect.x} y={vpRect.y}
+                width={Math.max(4, vpRect.w)} height={Math.max(4, vpRect.h)}
+                fill="none" stroke="#6366f1" strokeWidth={1.5}
+                strokeDasharray="3 2" rx={2} opacity={0.7}
+              />
+            )}
+          </svg>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function Archivio() {
@@ -158,12 +277,10 @@ export default function Archivio() {
   const [autoLinkSuggestions, setAutoLinkSuggestions] = useState<AutoLinkSuggestion[]>([]);
   const [autoLinkSourceId, setAutoLinkSourceId] = useState<number | null>(null);
   const onSaveRef = useRef<(() => void) | null>(null);
-
-  // ── Step 2: animazione fit ────────────────────────────────────────────────
   const [fitAnimating, setFitAnimating] = useState(false);
-
-  // ── Step 3: context menu ─────────────────────────────────────────────────
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
+  // ── Step 4: edge label inline edit ──────────────────────────────────────
+  const [edgeLabelEdit, setEdgeLabelEdit] = useState<EdgeLabelEdit | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
@@ -189,7 +306,6 @@ export default function Archivio() {
 
   const panState = useRef<{ startX: number; startY: number; vx: number; vy: number } | null>(null);
 
-  // wheel non-passivo
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
@@ -210,12 +326,12 @@ export default function Archivio() {
     return () => svg.removeEventListener("wheel", handler);
   }, []);
 
-  // keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       const isEditing = tag === "input" || tag === "textarea" || (e.target as HTMLElement)?.isContentEditable;
       if (e.key === "Escape") {
+        if (edgeLabelEdit) { setEdgeLabelEdit(null); return; }
         if (contextMenu) { setContextMenu(null); return; }
         if (linkMode) { setLinkMode(null); return; }
         if (chatOpen) { setChatOpen(false); return; }
@@ -234,9 +350,8 @@ export default function Archivio() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, linkMode, chatOpen, contextMenu]);
+  }, [selectedId, linkMode, chatOpen, contextMenu, edgeLabelEdit]);
 
-  // ── Step 3: chiudi context menu su click esterno / scroll ────────────────
   useEffect(() => {
     if (!contextMenu) return;
     const close = () => setContextMenu(null);
@@ -253,7 +368,6 @@ export default function Archivio() {
     try {
       const g = await api<GraphData>("/graph");
       setData(g);
-      // ── Step 2: fit automatico dopo load ─────────────────────────────────
       if (g.nodes.length > 0 && svgRef.current) {
         const rect = svgRef.current.getBoundingClientRect();
         const fv = computeFitView(g.nodes, rect.width || window.innerWidth, rect.height || window.innerHeight - 64);
@@ -266,7 +380,6 @@ export default function Archivio() {
     finally { setLoading(false); }
   }, []);
 
-  // ── Step 2: fit manuale (pulsante Fit) ───────────────────────────────────
   const handleFit = useCallback(() => {
     if (!svgRef.current || data.nodes.length === 0) return;
     const rect = svgRef.current.getBoundingClientRect();
@@ -276,6 +389,13 @@ export default function Archivio() {
     viewRef.current = fv;
     setTimeout(() => setFitAnimating(false), 400);
   }, [data.nodes]);
+
+  // ── Step 5: pan da minimap ───────────────────────────────────────────────
+  const handleMinimapPan = useCallback((nx: number, ny: number) => {
+    const next = { x: nx, y: ny, k: viewRef.current.k };
+    setView(next);
+    viewRef.current = next;
+  }, []);
 
   useEffect(() => {
     if (!authReady) return;
@@ -348,7 +468,6 @@ export default function Archivio() {
     }
   }, [fetchAutoLinks, toast]);
 
-  // ── Mutations ──────────────────────────────────────────────────────────────
   async function handleAddNode(type: NodeType = creatingType) {
     if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
@@ -405,21 +524,24 @@ export default function Archivio() {
     } catch (err) { console.error("[archivio] edge delete failed", err); }
   }
 
-  // ── Step 3: duplica nodo ─────────────────────────────────────────────────
+  // ── Step 4: aggiorna label edge via PATCH ────────────────────────────────
+  async function handleUpdateEdgeLabel(id: number, label: string) {
+    try {
+      const updated = await api<KEdge>(`/edges/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ label: label.trim() || null }),
+      });
+      setData((d) => ({ ...d, edges: d.edges.map((e) => (e.id === id ? updated : e)) }));
+    } catch (err) { console.error("[archivio] edge label update failed", err); }
+  }
+
   async function handleDuplicateNode(id: number) {
     const src = data.nodes.find((n) => n.id === id);
     if (!src) return;
     try {
       const created = await api<KNode>("/nodes", {
         method: "POST",
-        body: JSON.stringify({
-          type: src.type,
-          title: src.title + " (copia)",
-          content: src.content,
-          url: src.url,
-          x: src.x + 50,
-          y: src.y + 50,
-        }),
+        body: JSON.stringify({ type: src.type, title: src.title + " (copia)", content: src.content, url: src.url, x: src.x + 50, y: src.y + 50 }),
       });
       setData((d) => ({ ...d, nodes: [...d.nodes, created] }));
       setSelectedId(created.id);
@@ -427,7 +549,6 @@ export default function Archivio() {
     } catch (err) { console.error("[archivio] duplicate failed", err); }
   }
 
-  // ── Drag ──────────────────────────────────────────────────────────────────
   function onNodePointerDown(e: React.PointerEvent, n: KNode) {
     e.stopPropagation();
     if (linkMode) {
@@ -444,11 +565,22 @@ export default function Archivio() {
     dragState.current = { id: n.id, offsetX: px - n.x, offsetY: py - n.y, moved: false, x: n.x, y: n.y, el: e.currentTarget as SVGGElement };
   }
 
-  // ── Step 3: context menu su right-click nodo ─────────────────────────────
   function onNodeContextMenu(e: React.MouseEvent, n: KNode) {
     e.preventDefault();
     e.stopPropagation();
     setContextMenu({ nodeId: n.id, x: e.clientX, y: e.clientY });
+  }
+
+  // ── Step 4: click su label edge → inline edit ────────────────────────────
+  function onEdgeLabelClick(e: React.MouseEvent, edge: KEdge, mx: number, my: number) {
+    e.stopPropagation();
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const v = viewRef.current;
+    // converti coordinate SVG world → screen
+    const screenX = mx * v.k + v.x + rect.left;
+    const screenY = my * v.k + v.y + rect.top;
+    setEdgeLabelEdit({ edgeId: edge.id, draft: edge.label ?? "", screenX, screenY });
   }
 
   function onSvgPointerMove(e: React.PointerEvent) {
@@ -566,7 +698,6 @@ export default function Archivio() {
     );
   }
 
-  // ── Step 3: nodo del context menu ────────────────────────────────────────
   const ctxNode = contextMenu ? data.nodes.find((n) => n.id === contextMenu.nodeId) : null;
 
   return (
@@ -576,6 +707,46 @@ export default function Archivio() {
         accept=".pdf,.txt,.md,.docx,.png,.jpg,.jpeg"
         onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFileImport(file); }}
       />
+
+      {/* ── Step 4: Inline edge label editor (position:fixed) ─────────── */}
+      {edgeLabelEdit && (
+        <div
+          className="fixed z-[70] flex items-center gap-1"
+          style={{ left: edgeLabelEdit.screenX - 70, top: edgeLabelEdit.screenY - 14 }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <input
+            autoFocus
+            type="text"
+            value={edgeLabelEdit.draft}
+            onChange={(e) => setEdgeLabelEdit((prev) => prev ? { ...prev, draft: e.target.value } : null)}
+            onKeyDown={async (e) => {
+              if (e.key === "Enter") {
+                await handleUpdateEdgeLabel(edgeLabelEdit.edgeId, edgeLabelEdit.draft);
+                setEdgeLabelEdit(null);
+              }
+              if (e.key === "Escape") setEdgeLabelEdit(null);
+            }}
+            onBlur={async () => {
+              // salva anche su blur per non perdere la modifica
+              await handleUpdateEdgeLabel(edgeLabelEdit.edgeId, edgeLabelEdit.draft);
+              setEdgeLabelEdit(null);
+            }}
+            placeholder="etichetta…"
+            className="w-36 h-6 px-2 text-[11px] rounded-lg border border-primary shadow-md bg-card outline-none focus:ring-1 focus:ring-primary"
+          />
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={async () => {
+              await handleUpdateEdgeLabel(edgeLabelEdit.edgeId, edgeLabelEdit.draft);
+              setEdgeLabelEdit(null);
+            }}
+            className="w-6 h-6 rounded-lg bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90"
+          >
+            <Check className="w-3 h-3" />
+          </button>
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-4 md:px-6 py-3 border-b bg-card/80 backdrop-blur-sm overflow-x-auto">
@@ -639,7 +810,6 @@ export default function Archivio() {
         </div>
       </div>
 
-      {/* Link mode hint */}
       {linkMode && (
         <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-900 flex items-center justify-between">
           <span><Link2 className="w-3.5 h-3.5 inline mr-1" />
@@ -650,7 +820,6 @@ export default function Archivio() {
         </div>
       )}
 
-      {/* Auto-link banner */}
       {autoLinkSuggestions.length > 0 && autoLinkSourceId !== null && (
         <div className="px-4 py-2.5 bg-violet-50 border-b border-violet-200 flex items-center gap-3 flex-wrap">
           <Wand2 className="w-4 h-4 text-violet-600 shrink-0" />
@@ -685,7 +854,6 @@ export default function Archivio() {
         </div>
       )}
 
-      {/* Pending edge dialog */}
       {pendingEdge && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={() => setPendingEdge(null)}>
           <div className="bg-card rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
@@ -707,14 +875,11 @@ export default function Archivio() {
         </div>
       )}
 
-      {/* ── Step 3: Context menu ─────────────────────────────────────────── */}
       {contextMenu && ctxNode && (
-        <div
-          className="fixed z-[60] bg-card border rounded-xl shadow-lg py-1 min-w-[170px] text-sm"
+        <div className="fixed z-[60] bg-card border rounded-xl shadow-lg py-1 min-w-[170px] text-sm"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          {/* Header */}
           <div className="px-3 py-1.5 border-b mb-1">
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{TYPE_META[ctxNode.type]?.label}</p>
             <p className="font-semibold text-xs truncate max-w-[150px]">{ctxNode.title}</p>
@@ -739,10 +904,7 @@ export default function Archivio() {
         </div>
       )}
 
-      {/* Main layout */}
       <div className="flex-1 flex overflow-hidden">
-
-        {/* Mobile list */}
         {isMobile && (
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-900 px-4 py-3 text-sm flex items-start gap-3 mb-2">
@@ -775,7 +937,6 @@ export default function Archivio() {
           </div>
         )}
 
-        {/* SVG canvas */}
         {!isMobile && (
           <div className="flex-1 relative bg-[radial-gradient(circle,#e5e7eb_1px,transparent_1px)] [background-size:24px_24px] overflow-hidden">
             {data.nodes.length === 0 && (
@@ -783,13 +944,9 @@ export default function Archivio() {
                 <EmptyState onAdd={handleAddNode} onImport={() => fileInputRef.current?.click()} />
               </div>
             )}
-            <svg
-              ref={svgRef}
-              className="w-full h-full touch-none select-none"
-              onPointerDown={onSvgPointerDown}
-              onPointerMove={onSvgPointerMove}
-              onPointerUp={onSvgPointerUp}
-              onPointerLeave={onSvgPointerUp}
+            <svg ref={svgRef} className="w-full h-full touch-none select-none"
+              onPointerDown={onSvgPointerDown} onPointerMove={onSvgPointerMove}
+              onPointerUp={onSvgPointerUp} onPointerLeave={onSvgPointerUp}
             >
               <defs>
                 <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
@@ -799,9 +956,7 @@ export default function Archivio() {
                   <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#00000015" />
                 </filter>
               </defs>
-              {/* ── Step 2: transizione CSS su transform per fit animato ── */}
-              <g
-                transform={`translate(${view.x},${view.y}) scale(${view.k})`}
+              <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}
                 style={fitAnimating ? { transition: "transform 0.35s cubic-bezier(0.4,0,0.2,1)" } : undefined}
               >
                 {/* Edges */}
@@ -810,20 +965,54 @@ export default function Archivio() {
                   const b = data.nodes.find((n) => n.id === edge.targetId);
                   if (!a || !b) return null;
                   const dimmed = selectedId != null && selectedId !== a.id && selectedId !== b.id;
-                  const mx = (a.x + b.x) / 2; const my = (a.y + b.y) / 2;
+                  const mx = (a.x + b.x) / 2;
+                  const my = (a.y + b.y) / 2;
                   return (
                     <g key={edge.id} opacity={dimmed ? 0.15 : 0.9}>
                       <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
                         stroke="#94a3b8" strokeWidth={1.4} markerEnd="url(#arrow)"
                         data-source={edge.sourceId} data-target={edge.targetId} />
-                      {edge.label && (
-                        <text x={mx} y={my - 4} textAnchor="middle" fontSize={9} fill="#64748b"
-                          style={{ pointerEvents: "none" }}
-                          data-edge-mid-source={edge.sourceId} data-edge-mid-target={edge.targetId}
-                          data-other-x={b.x} data-other-y={b.y}>
-                          {edge.label}
-                        </text>
-                      )}
+                      {/* ── Step 4: area click estesa + hover tooltip ── */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <g
+                            style={{ cursor: "text" }}
+                            onClick={(e) => onEdgeLabelClick(e, edge, mx, my)}
+                          >
+                            {/* rect trasparente per area click ampia */}
+                            <rect
+                              x={mx - 30} y={my - 10}
+                              width={60} height={16}
+                              fill="transparent"
+                              data-edge-mid-source={edge.sourceId}
+                              data-edge-mid-target={edge.targetId}
+                            />
+                            {edge.label ? (
+                              <text x={mx} y={my - 4} textAnchor="middle" fontSize={9} fill="#64748b"
+                                style={{ pointerEvents: "none" }}
+                                data-edge-mid-source={edge.sourceId}
+                                data-edge-mid-target={edge.targetId}
+                                data-other-x={b.x} data-other-y={b.y}
+                              >
+                                {edge.label}
+                              </text>
+                            ) : (
+                              // placeholder visibile solo al hover (via opacity nel group)
+                              <text x={mx} y={my - 4} textAnchor="middle" fontSize={8} fill="#94a3b8"
+                                style={{ pointerEvents: "none" }} opacity={0.4}
+                                data-edge-mid-source={edge.sourceId}
+                                data-edge-mid-target={edge.targetId}
+                                data-other-x={b.x} data-other-y={b.y}
+                              >
+                                +
+                              </text>
+                            )}
+                          </g>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-[10px]">
+                          {edge.label ? "Clicca per modificare" : "Clicca per aggiungere etichetta"}
+                        </TooltipContent>
+                      </Tooltip>
                     </g>
                   );
                 })}
@@ -863,7 +1052,15 @@ export default function Archivio() {
               </g>
             </svg>
 
-            {/* Zoom controls + Step 2: pulsante Fit */}
+            {/* ── Step 5: Minimap ───────────────────────────────────────── */}
+            <Minimap
+              nodes={data.nodes}
+              view={view}
+              svgRef={svgRef}
+              onPan={handleMinimapPan}
+            />
+
+            {/* Zoom controls */}
             <div className="absolute bottom-4 right-4 flex flex-col items-center gap-0.5 bg-card/90 backdrop-blur border rounded-xl shadow-sm p-1">
               <button onClick={() => setView((v) => ({ ...v, k: Math.min(2.5, v.k * 1.2) }))}
                 className="w-7 h-7 rounded-lg hover:bg-muted text-sm font-bold" title="Zoom in">+</button>
@@ -886,7 +1083,6 @@ export default function Archivio() {
                 className="w-7 h-7 rounded-lg hover:bg-muted text-[10px] font-semibold" title="Reset vista">⌂</button>
             </div>
 
-            {/* Stats + shortcut hint */}
             <div className="absolute top-3 left-3 flex gap-2 items-center">
               <Badge variant="outline" className="text-[10px] bg-card/80 backdrop-blur">{filteredNodes.length} elementi</Badge>
               <Badge variant="outline" className="text-[10px] bg-card/80 backdrop-blur">{visibleEdges.length} collegamenti</Badge>
@@ -899,10 +1095,8 @@ export default function Archivio() {
           </div>
         )}
 
-        {/* Side panel */}
         {selected && !chatOpen && (
-          <NodeEditor
-            key={selected.id} node={selected}
+          <NodeEditor key={selected.id} node={selected}
             edges={data.edges.filter((e) => e.sourceId === selected.id || e.targetId === selected.id)}
             allNodes={data.nodes} onClose={() => setSelectedId(null)}
             onSave={(patch) => handleUpdateNode(selected.id, patch)}
@@ -913,7 +1107,6 @@ export default function Archivio() {
           />
         )}
 
-        {/* RAG chat panel */}
         {chatOpen && (
           <ChatPanel nodes={data.nodes} onClose={() => setChatOpen(false)}
             onFocusNode={(id) => { setChatOpen(false); setSelectedId(id); }} />
@@ -923,7 +1116,6 @@ export default function Archivio() {
   );
 }
 
-// ── Empty state ──────────────────────────────────────────────────────────────
 function EmptyState({ onAdd, onImport }: { onAdd: (type?: NodeType) => void; onImport: () => void }) {
   return (
     <div className="flex flex-col items-center text-center px-6 py-16 max-w-lg mx-auto">
@@ -955,7 +1147,6 @@ function EmptyState({ onAdd, onImport }: { onAdd: (type?: NodeType) => void; onI
   );
 }
 
-// ── RAG chat panel ───────────────────────────────────────────────────────────
 interface Citation { id: number; title: string; type: NodeType; score?: number }
 interface ChatMessage {
   role: "user" | "assistant"; content: string;
@@ -1146,7 +1337,6 @@ function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
   );
 }
 
-// ── Node editor ──────────────────────────────────────────────────────────────
 interface NodeEditorProps {
   node: KNode; edges: KEdge[]; allNodes: KNode[];
   onClose: () => void;
@@ -1164,7 +1354,6 @@ function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartL
   const [url, setUrl] = useState(node.url ?? "");
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  // ── Step 1: autosave state ────────────────────────────────────────────────
   const [savedBadge, setSavedBadge] = useState(false);
   const autoSaveTimer = useRef<number | null>(null);
 
@@ -1180,26 +1369,17 @@ function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartL
     setSaving(true);
     await onSave({ title: title.trim() || "Senza titolo", content, type, url: url.trim() || null });
     setSaving(false);
-    if (silent) {
-      setSavedBadge(true);
-      setTimeout(() => setSavedBadge(false), 2000);
-    }
+    if (silent) { setSavedBadge(true); setTimeout(() => setSavedBadge(false), 2000); }
   }
 
-  // ── Step 1: debounce autosave a 1.5s ─────────────────────────────────────
   useEffect(() => {
     if (!dirty) return;
     if (autoSaveTimer.current) window.clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = window.setTimeout(() => {
-      void save(true);
-    }, 1500);
-    return () => {
-      if (autoSaveTimer.current) window.clearTimeout(autoSaveTimer.current);
-    };
+    autoSaveTimer.current = window.setTimeout(() => { void save(true); }, 1500);
+    return () => { if (autoSaveTimer.current) window.clearTimeout(autoSaveTimer.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, content, type, url]);
 
-  // ── Ctrl+S globale ────────────────────────────────────────────────────────
   useEffect(() => {
     onSaveRef.current = dirty ? () => void save(false) : null;
     return () => { onSaveRef.current = null; };
@@ -1219,7 +1399,6 @@ function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartL
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{meta.label}</p>
           <p className="text-sm font-semibold truncate">{node.title}</p>
         </div>
-        {/* ── Step 1: badge Salvato ✓ ────────────────────────────────────── */}
         {savedBadge && (
           <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-1 animate-in fade-in">
             <Check className="w-3 h-3" /> Salvato
