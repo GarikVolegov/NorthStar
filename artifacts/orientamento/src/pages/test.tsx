@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Variants } from "framer-motion";
@@ -9,13 +9,13 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useReducedMotion, easings } from "@/lib/motion";
 import { useTranslation } from "react-i18next";
+import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
 const DRAFT_KEY = "northstar_test_draft";
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-// Costanti statiche fuori dal componente
 const JOURNEY_CTX1_DEFAULTS: Record<string, number> = {
   autonomo: 5, azienda: 4, investitore: 4, dipendente: 1, indeciso: 3,
 };
@@ -61,6 +61,9 @@ interface TestDraft {
   transition1Passed: boolean;
   transition2Passed: boolean;
   savedAt: number;
+  // STEP 3: sessionId opzionale — salvato dopo il primo submit
+  // così possiamo ricollegare la sessione al mount senza aspettare
+  sessionId?: number;
 }
 
 function loadDraft(): TestDraft | null {
@@ -84,14 +87,16 @@ function clearDraft() {
   try { localStorage.removeItem(DRAFT_KEY); } catch {}
 }
 
+// STEP 3: ora usa apiFetch — Bearer token iniettato automaticamente
+// Il vecchio fetch raw non inviava il token, quindi l'endpoint poteva
+// rifiutare la richiesta o non associare correttamente la sessione.
 async function assignUserToSession(sessionId: number, userId: number): Promise<void> {
   try {
-    await fetch(`${BASE}api/test-sessions/${sessionId}/assign-user`, {
+    await apiFetch(`${BASE}api/test-sessions/${sessionId}/assign-user`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId }),
     });
-  } catch {}
+  } catch { /* non-critical — non bloccare il flusso se fallisce */ }
 }
 
 export default function Test() {
@@ -116,10 +121,44 @@ export default function Test() {
   const [transition2Passed, setTransition2Passed] = useState(false);
   const [justSelected, setJustSelected] = useState<string | null>(null);
 
+  // STEP 3: ref per tracciare l'ultimo sessionId già assegnato.
+  // Evita chiamate duplicate se l'utente effettua il logout/login
+  // mentre il test è aperto (assign è idempotente ma è inutile sprecare req).
+  const assignedSessionRef = useRef<number | null>(null);
+
+  // Salva draft
   useEffect(() => {
     if (currentStep === 0 && Object.keys(answers).length === 0) return;
     saveDraft({ step: currentStep, answers, transition1Passed, transition2Passed, savedAt: Date.now() });
   }, [currentStep, answers, transition1Passed, transition2Passed]);
+
+  // STEP 3: al mount, se l'utente è già loggato e il draft contiene un
+  // sessionId (cioè aveva già fatto submit in precedenza e il browser è
+  // stato chiuso prima del redirect), ricolleghiamo subito la sessione.
+  // Questo chiude il gap: prima era possibile perdere l'associazione
+  // utente-sessione se il browser veniva chiuso dopo il submit ma prima
+  // del redirect a /risultati.
+  useEffect(() => {
+    if (!user || !draft?.sessionId) return;
+    if (assignedSessionRef.current === draft.sessionId) return;
+    assignedSessionRef.current = draft.sessionId;
+    assignUserToSession(draft.sessionId, user.id);
+  }, [user, draft]);
+
+  const handleResume = () => {
+    if (!draft) return;
+    setCurrentStep(draft.step);
+    setAnswers(draft.answers);
+    setTransition1Passed(draft.transition1Passed);
+    setTransition2Passed(draft.transition2Passed);
+    setResumeBannerVisible(false);
+    setResumed(true);
+  };
+
+  const handleDismissDraft = () => {
+    clearDraft();
+    setResumeBannerVisible(false);
+  };
 
   // Derivate
   const showTransition1 = currentStep === ALL_RIASEC_IDS.length && !transition1Passed;
@@ -140,7 +179,6 @@ export default function Test() {
     ? t(`test.questions.spirits.${currentId}`)
     : t(`test.questions.riasec.${currentId}`);
 
-  // ── handleAnswer (identico allo step 1) ────────────────────────────────────
   const handleAnswer = useCallback((value: number) => {
     if (justSelected !== null) return;
     const id = currentId;
@@ -163,81 +201,56 @@ export default function Test() {
     if (currentStep > 0) setCurrentStep((prev) => prev - 1);
   }, [justSelected, showTransition1, showTransition2, currentStep, transition1Passed, transition2Passed]);
 
-  // ── STEP 2: Keyboard navigation ─────────────────────────────────────────
-  // Attivo SOLO sulla question screen (non su transitions, completion, banner).
-  // Regole:
-  //   1–5         → seleziona l'opzione corrispondente (stesso effetto di handleAnswer)
-  //   ArrowLeft / Backspace → torna indietro (stesso effetto di handleBack)
-  //   Enter / Space → conferma la selezione già presente (se answers[currentId] esiste)
-  // Tutti i tasti sono bloccati se justSelected !== null (advance in corso).
-  // L'handler viene rimosso quando il componente smonta o le dep cambiano.
+  // Keyboard navigation (step 2)
   useEffect(() => {
-    // Non attaccare il listener nelle schermate speciali
     if (showTransition1 || showTransition2 || isComplete) return;
-
     const onKeyDown = (e: KeyboardEvent) => {
-      // Non interferire con input/textarea in pagina
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-
-      // Blocca durante advance in corso
       if (justSelected !== null) return;
-
       switch (e.key) {
-        case "1": case "2": case "3": case "4": case "5": {
-          e.preventDefault();
-          handleAnswer(Number(e.key));
-          break;
-        }
-        case "ArrowLeft":
-        case "Backspace": {
-          e.preventDefault();
-          handleBack();
-          break;
-        }
-        case "Enter":
-        case " ": {
-          // Conferma solo se c'è già una selezione corrente
+        case "1": case "2": case "3": case "4": case "5":
+          e.preventDefault(); handleAnswer(Number(e.key)); break;
+        case "ArrowLeft": case "Backspace":
+          e.preventDefault(); handleBack(); break;
+        case "Enter": case " ": {
           const current = answers[currentId];
-          if (current !== undefined) {
-            e.preventDefault();
-            handleAnswer(current);
-          }
+          if (current !== undefined) { e.preventDefault(); handleAnswer(current); }
           break;
         }
       }
     };
-
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [
-    showTransition1, showTransition2, isComplete,
-    justSelected, currentId, answers,
-    handleAnswer, handleBack,
-  ]);
+  }, [showTransition1, showTransition2, isComplete, justSelected, currentId, answers, handleAnswer, handleBack]);
 
-  const handleResume = () => {
-    if (!draft) return;
-    setCurrentStep(draft.step);
-    setAnswers(draft.answers);
-    setTransition1Passed(draft.transition1Passed);
-    setTransition2Passed(draft.transition2Passed);
-    setResumeBannerVisible(false);
-    setResumed(true);
-  };
-
-  const handleDismissDraft = () => {
-    clearDraft();
-    setResumeBannerVisible(false);
-  };
-
+  // STEP 3: handleSubmit — onSuccess salva il sessionId nel draft prima
+  // del clearDraft, poi chiama assignUserToSession con apiFetch autenticata.
+  // Il sessionId nel draft funge da fallback se il redirect fallisce.
   const handleSubmit = () => {
     submitTest.mutate(
       { data: { answers } },
       {
         onSuccess: async (session) => {
+          // Salva sessionId nel draft come safety net pre-redirect
+          saveDraft({
+            step: currentStep,
+            answers,
+            transition1Passed,
+            transition2Passed,
+            savedAt: Date.now(),
+            sessionId: session.id,
+          });
+
+          if (user) {
+            // Assegna solo se non già fatto al mount
+            if (assignedSessionRef.current !== session.id) {
+              assignedSessionRef.current = session.id;
+              await assignUserToSession(session.id, user.id);
+            }
+          }
+
           clearDraft();
-          if (user) await assignUserToSession(session.id, user.id);
           setLocation(`/risultati/${session.id}`);
         },
       }
@@ -264,7 +277,7 @@ export default function Test() {
     { value: 5, label: t("test.options.5") },
   ];
 
-  // ── Transition 1 ──────────────────────────────────────────────────────────
+  // ── Transition 1 ───────────────────────────────────────────────────
   if (showTransition1) {
     const spiritsTransition = [
       { emoji: "✨", transKey: "presence" },
@@ -315,7 +328,7 @@ export default function Test() {
     );
   }
 
-  // ── Transition 2 ──────────────────────────────────────────────────────────
+  // ── Transition 2 ───────────────────────────────────────────────────
   if (showTransition2) {
     return (
       <div className="container max-w-2xl mx-auto px-4 py-20 flex flex-col items-center justify-center min-h-[70vh] text-center">
@@ -353,7 +366,7 @@ export default function Test() {
     );
   }
 
-  // ── Completion screen ───────────────────────────────────────────────────
+  // ── Completion screen ───────────────────────────────────────────────
   if (isComplete) {
     return (
       <div className="container max-w-2xl mx-auto px-4 py-24 flex flex-col items-center justify-center min-h-[70vh] text-center">
@@ -384,7 +397,7 @@ export default function Test() {
     );
   }
 
-  // ── Question screen ───────────────────────────────────────────────────────
+  // ── Question screen ──────────────────────────────────────────────────
   const showResumeBanner = !!draft && resumeBannerVisible && !resumed && currentStep === 0 && Object.keys(answers).length === 0;
   const currentPhase = isCtxQ ? 2 : isSpiritQ ? 1 : 0;
   const headerLabel = isCtxQ
@@ -521,7 +534,6 @@ export default function Test() {
             {OPTIONS.map((opt, optIdx) => {
               const selected = answers[currentId] === opt.value;
               const isJustSelected = justSelected === currentId && selected;
-
               return (
                 <motion.button
                   key={opt.value}
@@ -540,27 +552,19 @@ export default function Test() {
                     justSelected !== null && !selected && "opacity-50"
                   )}
                 >
-                  {/* STEP 2: hint tasto numerico — visibile solo su device non-touch
-                      (pointer:fine = mouse/trackpad, pointer:coarse = touchscreen)
-                      Il badge mostra il numero corrispondente (1–5) in basso a sinistra.
-                      opacity-0 di default, group-hover:opacity-100 sulle opzioni non selezionate. */}
                   <span className="flex items-center gap-3 flex-1 min-w-0">
-                    <span
-                      className={cn(
-                        "hidden pointer-fine:inline-flex items-center justify-center w-5 h-5 rounded-md text-[10px] font-bold border shrink-0 transition-opacity duration-150",
-                        selected
-                          ? "border-primary-foreground/40 text-primary-foreground/70 opacity-70"
-                          : justSelected !== null
-                            ? "opacity-0"
-                            : "border-muted-foreground/30 text-muted-foreground/60 opacity-60 group-hover:opacity-100"
-                      )}
-                    >
+                    <span className={cn(
+                      "hidden pointer-fine:inline-flex items-center justify-center w-5 h-5 rounded-md text-[10px] font-bold border shrink-0 transition-opacity duration-150",
+                      selected
+                        ? "border-primary-foreground/40 text-primary-foreground/70 opacity-70"
+                        : justSelected !== null
+                          ? "opacity-0"
+                          : "border-muted-foreground/30 text-muted-foreground/60 opacity-60"
+                    )}>
                       {opt.value}
                     </span>
                     {opt.label}
                   </span>
-
-                  {/* Icona destra: Check animato se appena selezionata, radio altrimenti */}
                   <motion.div
                     className={cn(
                       "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ml-3",
@@ -593,12 +597,7 @@ export default function Test() {
             })}
           </div>
 
-          {/* STEP 2: hint tastiera — visibile solo su pointer:fine (mouse/trackpad)
-              Compare con fade-in dopo 800ms (non distrae chi usa touch).
-              Mostra i tasti disponibili contestualmente:
-              - sempre: 1–5 per selezionare
-              - se c'è già una selezione: Enter per confermare
-              - se non è la prima domanda: ← per tornare indietro */}
+          {/* Keyboard hint (step 2) */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
