@@ -1,17 +1,19 @@
-import { pgTable, serial, text, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
-
-export const agentLogsTable = pgTable("agent_logs", {
-  id: serial("id").primaryKey(),
-  agentName: text("agent_name").notNull(),
-  userId: integer("user_id"),
-  taskType: text("task_type").notNull(),
-  inputSummary: jsonb("input_summary"),
-  outputSummary: jsonb("output_summary"),
-  durationMs: integer("duration_ms"),
-  error: text("error"),
-  retryCount: integer("retry_count").notNull().default(0),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-export type AgentLog = typeof agentLogsTable.$inferSelect;
-export type InsertAgentLog = typeof agentLogsTable.$inferInsert;
+/**
+ * DEPRECATED — this file now re-exports from agentReview.ts.
+ *
+ * agentLogsTable and agentRunsTable were nearly identical (both tracked
+ * agent executions with agentName, userId, durationMs, error).  Keeping
+ * two separate tables caused duplicated writes and confused queries.
+ *
+ * Migration plan:
+ *  1. Run: INSERT INTO agent_runs SELECT ... FROM agent_logs  (backfill)
+ *  2. Update all import sites to use agentRunsTable from agentReview.ts
+ *  3. DROP TABLE agent_logs after confirming no active consumers
+ *
+ * For now we keep the export alias to avoid breaking existing imports.
+ */
+export {
+  agentRunsTable as agentLogsTable,
+  type AgentRun as AgentLog,
+  type InsertAgentRun as InsertAgentLog,
+} from "./agentReview";

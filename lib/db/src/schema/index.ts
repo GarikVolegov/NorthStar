@@ -20,3 +20,7 @@ export * from "./certifications";
 export * from "./objectiveComments";
 export * from "./linkedinImports";
 export * from "./nftCertificates";
+// NEW exports from previous commit
+export * from "./conversations";
+export * from "./messages";
+export * from "./friendships";
