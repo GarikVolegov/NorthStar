@@ -19,3 +19,4 @@ export * from "./businessIdeas";
 export * from "./certifications";
 export * from "./objectiveComments";
 export * from "./linkedinImports";
+export * from "./nftCertificates";

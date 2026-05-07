@@ -1,7 +1,53 @@
 import { Router, type IRouter } from "express";
-import { db, userObjectivesTable, calendarEventsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, userObjectivesTable, calendarEventsTable, nftCertificatesTable, usersTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth-jwt";
+import { createHash } from "crypto";
+
+const HASH_SECRET = process.env.JWT_SECRET ?? "northstar-nft-secret-2025";
+
+function generateCertHash(userId: number, objectiveId: number, mintedAt: Date): string {
+  const payload = `${userId}:${objectiveId}:${mintedAt.getTime()}:${HASH_SECRET}`;
+  return createHash("sha256").update(payload).digest("hex");
+}
+
+async function autoMintNft(userId: number, obj: { id: number; text: string; category: string }): Promise<void> {
+  try {
+    const existing = await db.select({ id: nftCertificatesTable.id })
+      .from(nftCertificatesTable)
+      .where(and(
+        eq(nftCertificatesTable.userId, userId),
+        eq(nftCertificatesTable.objectiveId, obj.id),
+      ))
+      .limit(1);
+    if (existing.length > 0) return;
+
+    const [user] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, userId));
+    const mintedAt = new Date();
+    const hash = generateCertHash(userId, obj.id, mintedAt);
+
+    await db.insert(nftCertificatesTable).values({
+      userId,
+      objectiveId: obj.id,
+      objectiveText: obj.text,
+      userName: user?.name ?? "Utente NorthStar",
+      category: obj.category,
+      certificateHash: hash,
+      metadata: {
+        objectiveCategory: obj.category,
+        completedAt: mintedAt.toISOString(),
+        mintedAt: mintedAt.toISOString(),
+        chain: "northstar-chain",
+        version: "1.0",
+        autoMinted: true,
+      },
+      mintedAt,
+    });
+  } catch (err) {
+    /* non bloccante — non interrompiamo il completamento obiettivo */
+    console.warn("[nft-auto-mint] error:", err);
+  }
+}
 
 async function syncCalendarEvent(
   userId: number,
@@ -108,6 +154,12 @@ router.patch("/objectives/:id", async (req, res): Promise<void> => {
     .returning();
 
   if (!obj) { res.status(404).json({ error: "Obiettivo non trovato" }); return; }
+
+  // Auto-mint NFT certificate when objective is marked as completed
+  if (updates.completed === true && obj.userId) {
+    autoMintNft(obj.userId, { id: obj.id, text: obj.text, category: obj.category });
+  }
+
   res.json(obj);
 });
 

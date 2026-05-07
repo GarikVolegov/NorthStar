@@ -51,6 +51,7 @@ import calendarIcsRouter from "./calendar-ics";
 import jobsRouter from "./jobs";
 import objectiveCommentsRouter from "./objective-comments";
 import linkedinRouter from "./linkedin";
+import nftCertificatesRouter from "./nft-certificates";
 
 const router: IRouter = Router();
 
@@ -109,5 +110,6 @@ router.use(jobsRouter);
 router.use(objectiveCommentsRouter);
 router.use(certificationsRouter);
 router.use(linkedinRouter);
+router.use(nftCertificatesRouter);
 
 export default router;

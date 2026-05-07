@@ -23,6 +23,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { CertificationsSection } from "@/components/CertificationsSection";
 import { JourneyScoreWidget } from "@/components/JourneyScoreWidget";
 import { LinkedInImportWizard } from "@/components/LinkedInImportWizard";
+import { NftCertificateGallery } from "@/components/NftCertificateGallery";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -747,6 +748,7 @@ export default function Profilo() {
           <WorkModeCard userId={user.id} />
           <TestHistoryCard />
           <CertificationsSection userId={user.id} />
+          <NftCertificateGallery userId={user.id} />
           <SavedItems />
           <div>
             <h2 className="font-semibold text-base mb-3 flex items-center gap-2">

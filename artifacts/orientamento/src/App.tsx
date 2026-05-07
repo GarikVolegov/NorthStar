@@ -66,6 +66,7 @@ const AdminHome = lazy(() => import("@/pages/admin-home"));
 const AdminAgenti = lazy(() => import("@/pages/admin-agenti"));
 const AdminCataloghi = lazy(() => import("@/pages/admin-cataloghi"));
 const AdminCrescita = lazy(() => import("@/pages/admin-crescita"));
+const CertificatePage = lazy(() => import("@/pages/certificato"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -236,6 +237,15 @@ function Router() {
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <AdminHome />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+
+      {/* Certificate verification — standalone page (has its own nav) */}
+      <Route path="/certificato/:hash">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <CertificatePage />
           </Suspense>
         </ErrorBoundary>
       </Route>
