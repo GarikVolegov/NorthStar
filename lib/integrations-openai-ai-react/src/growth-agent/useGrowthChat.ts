@@ -1,10 +1,24 @@
 /**
- * useGrowthChat v2 — parses evalResult from 'done' SSE event.
- * Attaches { evalScore, evalLevel } to assistant ChatMessage.
+ * useGrowthChat v3 — aggiunge domain e supervisorResult al ChatMessage.
+ *
+ * NOVITÀ v3
+ * ─────────
+ * - ChatMessage ora include `domain` (agente specialista che ha risposto)
+ *   e `supervisorResult` (esito del SupervisorAgent: pass/fail/rewrite).
+ * - Il parser SSE legge i nuovi campi dall'evento `done`.
+ * - Retrocompatibile: i campi sono opzionali, il comportamento v2 è invariato.
  */
 import { useState, useRef, useCallback, useEffect } from "react";
 
 export type ConfidenceLevel = "high" | "medium" | "low";
+export type Domain = "career" | "habits" | "mindset" | "general";
+
+export interface SupervisorInfo {
+  pass: boolean;
+  score: number;      // 0-1
+  rewritten: boolean; // true se il supervisor ha riscritto la risposta
+  reasons: string[];  // motivazioni del fail (vuoto se pass)
+}
 
 export interface ChatMessage {
   id: string;
@@ -14,6 +28,9 @@ export interface ChatMessage {
   isStreaming?: boolean;
   evalScore?: number;
   evalLevel?: ConfidenceLevel;
+  // ── NUOVI CAMPI v3 ──
+  domain?: Domain;
+  supervisorResult?: SupervisorInfo;
 }
 
 export interface UseGrowthChatOptions {
@@ -59,7 +76,12 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
       const history = messages.map((m) => ({ role: m.role, content: m.content }));
       const userMsg: ChatMessage = { id: uid(), role: "user", content: text };
       const assistantId = uid();
-      const assistantMsg: ChatMessage = { id: assistantId, role: "assistant", content: "", isStreaming: true };
+      const assistantMsg: ChatMessage = {
+        id: assistantId,
+        role: "assistant",
+        content: "",
+        isStreaming: true,
+      };
 
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
       setIsStreaming(true);
@@ -70,7 +92,10 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
       try {
         const res = await fetch(`${apiBase}/growth-agent/chat`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({ message: text, sessionId, history, userContext }),
           signal: controller.signal,
         });
@@ -101,12 +126,22 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
                 message?: string;
                 sessionId?: number;
                 evalResult?: { score: number; level: ConfidenceLevel };
+                // ── NUOVI CAMPI v3 ──
+                routeDecision?: { domain: Domain; intent: string; confidence: number };
+                supervisorResult?: {
+                  pass: boolean;
+                  score: number;
+                  rewritten: boolean;
+                  reasons: string[];
+                };
               };
 
               if (event.type === "token" && event.value) {
                 setMessages((prev) =>
                   prev.map((m) =>
-                    m.id === assistantId ? { ...m, content: m.content + event.value } : m,
+                    m.id === assistantId
+                      ? { ...m, content: m.content + event.value }
+                      : m,
                   ),
                 );
               } else if (event.type === "done") {
@@ -120,6 +155,16 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
                           sources: event.sources ?? [],
                           evalScore: event.evalResult?.score,
                           evalLevel: event.evalResult?.level,
+                          // ── v3: domain e supervisorResult ──
+                          domain: event.routeDecision?.domain,
+                          supervisorResult: event.supervisorResult
+                            ? {
+                                pass: event.supervisorResult.pass,
+                                score: event.supervisorResult.score,
+                                rewritten: event.supervisorResult.rewritten,
+                                reasons: event.supervisorResult.reasons,
+                              }
+                            : undefined,
                         }
                       : m,
                   ),
@@ -132,18 +177,24 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
                   ),
                 );
               }
-            } catch { /* skip malformed */ }
+            } catch {
+              /* skip malformed SSE lines */
+            }
           }
         }
       } catch (err) {
         if ((err as Error).name === "AbortError") {
           setMessages((prev) =>
-            prev.map((m) => m.id === assistantId ? { ...m, isStreaming: false } : m),
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, isStreaming: false } : m,
+            ),
           );
         } else {
           setError(err instanceof Error ? err.message : String(err));
           setMessages((prev) =>
-            prev.map((m) => m.id === assistantId ? { ...m, isStreaming: false } : m),
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, isStreaming: false } : m,
+            ),
           );
         }
       } finally {
@@ -154,7 +205,9 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
     [apiBase, token, userContext, messages, isStreaming, sessionId],
   );
 
-  const abort = useCallback(() => { abortRef.current?.abort(); }, []);
+  const abort = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
 
   const resetSession = useCallback(() => {
     abort();
