@@ -21,36 +21,57 @@ interface EnvRule {
   forbiddenValues?: string[];
   /** If true, the check is only enforced when NODE_ENV === 'production' */
   productionOnly?: boolean;
+  /** Human-readable description shown in error messages */
+  description?: string;
 }
 
 const RULES: EnvRule[] = [
   // ─── Required in all environments ───────────────────────────────────────────
   {
-    key: "DATABASE_URL",
+    key:            "DATABASE_URL",
     forbiddenValues: [
       "postgresql://northstar:northstar_dev@localhost:5432/northstar",
     ],
     productionOnly: true, // local dev may use the default compose URL
+    description:    "PostgreSQL connection string",
   },
   {
-    key: "JWT_SECRET",
-    minLength: 32,
+    key:             "JWT_SECRET",
+    minLength:       32,
     forbiddenValues: [
       "change-me-jwt-secret-min-32-chars",
       "secret",
       "jwt-secret",
       "your-secret",
     ],
+    description: "HS256 signing secret for user JWTs (min 32 chars)",
   },
   {
-    key: "ADMIN_KEY",
-    minLength: 32,
+    key:             "ADMIN_KEY",
+    minLength:       32,
     forbiddenValues: [
       "change-me-admin-key-min-32-chars",
       "admin",
       "admin-key",
       "your-admin-key",
     ],
+    description: "Legacy admin key (kept for backwards compatibility)",
+  },
+
+  // ─── Phase 6 — Supervisor self-improvement ─────────────────────────────────
+  // Used by adminOnly middleware to protect POST /api/admin/analyze-supervisor.
+  // Generate with: openssl rand -hex 32
+  {
+    key:             "ADMIN_SECRET",
+    minLength:       32,
+    forbiddenValues: [
+      "change-me-admin-secret-min-32-chars",
+      "admin-secret",
+      "your-admin-secret",
+      "secret",
+    ],
+    description:    "x-admin-secret header value for /api/admin/* routes (min 32 chars)",
+    productionOnly: true, // dev without DB still boots; middleware warns instead of blocking
   },
 ];
 
@@ -72,7 +93,8 @@ export function assertEnv(): void {
     const value = process.env[rule.key];
 
     if (!value || value.trim() === "") {
-      errors.push(`  ✗ ${rule.key} is not set`);
+      const hint = rule.description ? ` (${rule.description})` : "";
+      errors.push(`  ✗ ${rule.key} is not set${hint}`);
       continue;
     }
 
