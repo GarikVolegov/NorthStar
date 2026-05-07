@@ -26,6 +26,7 @@ import { jwtMiddleware } from "./middleware/jwt"; // your existing JWT middlewar
 import ingestRouter    from "./routes/growth-agent/ingest";
 import chatRouter      from "./routes/growth-agent/chat";
 import knowledgeRouter from "./routes/growth-agent/knowledge";
+import memoryRouter    from "./routes/growth-agent/memory";  // ← NEW
 
 // ── (add your other existing route imports here) ──────────────────────────────
 // import authRouter     from "./routes/auth";
@@ -59,10 +60,12 @@ export function createApp() {
   //   GET    /api/growth-agent/knowledge       List ingested sources
   //   DELETE /api/growth-agent/knowledge/:id   Delete a chunk
   //   DELETE /api/growth-agent/knowledge       Bulk delete by sourceType
+  //   GET    /api/growth-agent/memory          Fatti + pattern dell'utente
   //
   app.use("/api/growth-agent/ingest",    ingestRouter);
   app.use("/api/growth-agent/chat",      chatRouter);
   app.use("/api/growth-agent/knowledge", knowledgeRouter);
+  app.use("/api/growth-agent/memory",    memoryRouter);   // ← NEW
 
   // ── Other protected routes (add yours below) ──────────────────────────────────
   // app.use("/api/user",     userRouter);
