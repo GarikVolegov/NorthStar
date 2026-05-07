@@ -1,175 +1,186 @@
 /**
- * DiscoveryFeedPage — pagina principale "Scopri".
+ * DiscoveryFeedPage — pagina principale del feed Discovery.
  *
  * LAYOUT:
  *   [Header: titolo + pulsante refresh]
- *   [Tab bar: Tutti | Notizie | Opportunità | Formazione | Crescita | Trend]
- *   [Grid 1-2-3 col responsive di DiscoveryItemCard]
- *   [Pulsante "Carica altri" / spinner]
+ *   [Filtri tipo: pill row orizzontale scrollabile]
+ *   [Filtri journey: pill row secondaria (collassabile su mobile)]
+ *   [Grid item cards: 1 col mobile, 2 col sm, 3 col lg]
+ *   [Load more button / skeleton]
  *
- * RESPONSIVE:
- *   Mobile:  1 colonna
- *   Tablet:  2 colonne (sm:)
- *   Desktop: 3 colonne (lg:)
- *
- * STATO VUOTO:
- *   Se items.length === 0 dopo il caricamento → empty state con call to action.
+ * USO:
+ *   <DiscoveryFeedPage />
  */
-import React, { useEffect, useRef } from "react";
-import { useDiscoveryFeed, type DiscoveryItemType } from "./useDiscoveryFeed";
-import { DiscoveryItemCard } from "./DiscoveryItemCard";
+import React, { useState } from "react";
+import { useDiscoveryFeed }     from "./useDiscoveryFeed";
+import type { DiscoveryItemType, DiscoveryJourneyType } from "./useDiscoveryFeed";
+import { DiscoveryItemCard }    from "./DiscoveryItemCard";
 import { DiscoveryItemSkeleton } from "./DiscoveryItemSkeleton";
 
-const TABS: Array<{ label: string; value: DiscoveryItemType }> = [
-  { label: "✨ Tutti",        value: "all" },
-  { label: "📰 Notizie",     value: "news" },
-  { label: "🚀 Opportunità", value: "opportunity" },
-  { label: "🎓 Formazione",  value: "formation" },
-  { label: "🌱 Crescita",    value: "growth" },
-  { label: "📈 Trend",       value: "sector_trend" },
+const TYPE_FILTERS: Array<{ id: DiscoveryItemType; label: string }> = [
+  { id: "all",          label: "✨ Tutto" },
+  { id: "opportunity",  label: "🚀 Opportunità" },
+  { id: "formation",    label: "🎓 Formazione" },
+  { id: "news",         label: "📰 Notizie" },
+  { id: "growth",       label: "🌱 Crescita" },
+  { id: "sector_trend", label: "📈 Trend" },
+];
+
+const JOURNEY_FILTERS: Array<{ id: DiscoveryJourneyType; label: string }> = [
+  { id: "all",            label: "Tutti" },
+  { id: "developer",      label: "👨‍💻 Dev" },
+  { id: "designer",       label: "🎨 Design" },
+  { id: "marketer",       label: "📣 Marketing" },
+  { id: "career_changer", label: "🔄 Career switch" },
+  { id: "entrepreneur",   label: "🚀 Imprenditore" },
+  { id: "student",        label: "🎓 Studente" },
 ];
 
 export const DiscoveryFeedPage: React.FC = () => {
   const {
-    items,
-    isLoading,
-    isLoadingMore,
-    error,
-    typeFilter,
-    setTypeFilter,
-    refresh,
-    loadMore,
-    hasMore,
-    savedIds,
-    toggleSaved,
-    markSeen,
-    seenIds,
+    items, isLoading, isLoadingMore, error,
+    typeFilter, setTypeFilter,
+    journeyFilter, setJourneyFilter,
+    refresh, loadMore, hasMore,
+    savedIds, toggleSaved, markSeen, seenIds,
   } = useDiscoveryFeed();
 
-  // Infinite scroll sentinel
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      (entries) => { if (entries[0]?.isIntersecting && hasMore && !isLoadingMore) loadMore(); },
-      { threshold: 0.1 },
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [hasMore, isLoadingMore, loadMore]);
+  const [showJourneyFilters, setShowJourneyFilters] = useState(false);
 
   return (
     <div className="min-h-screen bg-gray-50">
+
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold text-gray-900">🔭 Scopri</h1>
-            <p className="text-xs text-gray-500">Notizie, opportunità e formazione per te</p>
+            <h1 className="font-bold text-gray-900">🔭 Discovery</h1>
+            <p className="text-xs text-gray-400">Contenuti selezionati per te</p>
           </div>
           <button
             onClick={refresh}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-50 transition"
+            className="p-2 rounded-xl hover:bg-gray-100 transition text-gray-400 hover:text-gray-700"
+            title="Aggiorna feed"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              className={`w-4 h-4 stroke-current ${isLoading ? "animate-spin" : ""}`} strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+              className="w-5 h-5 stroke-current" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round"
+                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
             </svg>
-            Aggiorna
           </button>
         </div>
 
-        {/* Tab bar */}
-        <div className="max-w-5xl mx-auto mt-3 flex gap-1 overflow-x-auto scrollbar-hide pb-0.5">
-          {TABS.map((tab) => (
+        {/* Type filter pills */}
+        <div className="max-w-5xl mx-auto mt-2 -mx-4 px-4 overflow-x-auto scrollbar-hide">
+          <div className="flex gap-1.5 pb-1 min-w-max">
+            {TYPE_FILTERS.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setTypeFilter(f.id)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
+                  typeFilter === f.id
+                    ? "bg-indigo-600 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+
+            {/* Toggle journey filters */}
             <button
-              key={tab.value}
-              onClick={() => setTypeFilter(tab.value)}
-              className={`
-                flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all
-                ${typeFilter === tab.value
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }
-              `}
+              onClick={() => setShowJourneyFilters((v) => !v)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
+                showJourneyFilters || journeyFilter !== "all"
+                  ? "bg-purple-100 text-purple-700"
+                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+              }`}
             >
-              {tab.label}
+              🎯 Per chi
             </button>
-          ))}
+          </div>
         </div>
+
+        {/* Journey filter pills (collapsible) */}
+        {showJourneyFilters && (
+          <div className="max-w-5xl mx-auto mt-1.5 -mx-4 px-4 overflow-x-auto scrollbar-hide">
+            <div className="flex gap-1.5 pb-1 min-w-max">
+              {JOURNEY_FILTERS.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setJourneyFilter(f.id)}
+                  className={`px-3 py-1 rounded-full text-xs whitespace-nowrap transition ${
+                    journeyFilter === f.id
+                      ? "bg-purple-600 text-white"
+                      : "bg-purple-50 text-purple-600 hover:bg-purple-100"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Content */}
       <div className="max-w-5xl mx-auto px-4 py-5">
 
-        {/* Error */}
         {error && (
-          <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 mb-4">
-            {error}
+          <div className="mb-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3">
+            ⚠️ {error}
           </div>
         )}
 
-        {/* Loading skeletons */}
-        {isLoading && (
+        {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <DiscoveryItemSkeleton key={i} />
-            ))}
+            {Array.from({ length: 6 }).map((_, i) => <DiscoveryItemSkeleton key={i} />)}
           </div>
-        )}
-
-        {/* Feed grid */}
-        {!isLoading && items.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((item) => (
-              <DiscoveryItemCard
-                key={item.id}
-                item={item}
-                isSaved={savedIds.has(item.id)}
-                isSeen={seenIds.has(item.id)}
-                onSave={toggleSaved}
-                onSeen={markSeen}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!isLoading && items.length === 0 && !error && (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="text-5xl mb-4">🔍</div>
-            <h2 className="text-lg font-semibold text-gray-700 mb-1">Nessun contenuto trovato</h2>
-            <p className="text-sm text-gray-400 max-w-xs">
-              Il sistema sta raccogliendo nuovi contenuti. Torna tra qualche ora
-              o prova a cambiare filtro.
-            </p>
+        ) : items.length === 0 ? (
+          <div className="text-center py-16">
+            <p className="text-4xl mb-3">🔭</p>
+            <p className="text-gray-500 font-medium">Nessun contenuto disponibile</p>
+            <p className="text-gray-400 text-sm mt-1">Prova a cambiare filtro o aggiorna il feed</p>
             <button
               onClick={refresh}
-              className="mt-4 px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition"
+              className="mt-4 px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition"
             >
-              Riprova
+              Aggiorna
             </button>
           </div>
-        )}
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {items.map((item) => (
+                <DiscoveryItemCard
+                  key={item.id}
+                  item={item}
+                  isSaved={savedIds.has(item.id)}
+                  isSeen={seenIds.has(item.id)}
+                  onSave={toggleSaved}
+                  onSeen={markSeen}
+                />
+              ))}
+            </div>
 
-        {/* Load more sentinel (infinite scroll) */}
-        {!isLoading && items.length > 0 && (
-          <div ref={sentinelRef} className="py-6 flex justify-center">
-            {isLoadingMore && (
-              <div className="flex items-center gap-2 text-sm text-gray-400">
-                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                </svg>
-                Carico altri...
-              </div>
-            )}
-            {!hasMore && !isLoadingMore && (
-              <p className="text-xs text-gray-300">Hai visto tutto per oggi ✓</p>
-            )}
-          </div>
+            {/* Load more */}
+            <div className="mt-6 text-center">
+              {isLoadingMore ? (
+                <div className="flex justify-center gap-4">
+                  {Array.from({ length: 3 }).map((_, i) => <DiscoveryItemSkeleton key={i} />)}
+                </div>
+              ) : hasMore ? (
+                <button
+                  onClick={loadMore}
+                  className="px-6 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition"
+                >
+                  Carica altri
+                </button>
+              ) : (
+                <p className="text-xs text-gray-400">Hai visto tutto ✓</p>
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>
