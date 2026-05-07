@@ -1,28 +1,20 @@
 /**
- * SpecialistAgent v3 — persistent memory wired into specialist flow.
+ * SpecialistAgent v4 — SSE status events + memory wired.
  *
- * CHANGES v3
+ * CHANGES v4
  * ──────────
- * Memory is now loaded at the START of run() in parallel with RAG retrieval.
- * If the caller has already loaded memory (via agent.ts v5), the pre-loaded
- * memorySection in userContext is used directly — no double DB call.
- * If memorySection is missing (direct specialist invocation in tests/scripts),
- * memory is loaded here as a fallback.
+ * Adds 'status' SSE events at each meaningful pipeline step.
+ * The domain-aware messages tell the user EXACTLY what the agent is doing:
  *
- * After streaming 'done', extractMemory() + mergeMemory() are scheduled
- * fire-and-forget — non-blocking, never delays the user response.
+ *   "💼 Carico il tuo profilo carriera..."
+ *   "🔍 Cerco nella knowledge base..."
+ *   "🌐 Cerco fonti aggiornate..."
+ *   "🧠 Analizzando la situazione..."
+ *   "✨ Sto scrivendo la risposta..."
+ *   "🔄 Revisione qualità in corso..."
  *
- * FLOW (v3 — with memory)
- * ────
- *   0. [PARALLEL] load memory (if not pre-loaded) + RAG retrieval
- *   1. RAG retrieval (persona examples + domain docs)
- *   2. Web fallback if KB is thin
- *   3. [PARALLEL] CoT + self-eval
- *   4. Build system prompt (base + domain overrides + memory)
- *   5. Stream GPT-4o response → buffer tokens silently
- *   6. SupervisorAgent gate
- *   7. Yield 'done'
- *   8. [FIRE & FORGET] save memory from this exchange
+ * Domain icons are resolved from DOMAIN_STATUS_ICONS at runtime.
+ * Memory wiring from v3 is preserved unchanged.
  */
 import OpenAI from "openai";
 import { openai } from "../client";
@@ -32,12 +24,7 @@ import { runChainOfThought } from "./chain-of-thought";
 import { evaluateSelf } from "./self-evaluator";
 import { buildSystemPrompt } from "./prompt-builder";
 import { supervisorAgent } from "./supervisor-agent";
-import {
-  loadMemory,
-  buildMemorySection,
-  extractMemory,
-  mergeMemory,
-} from "./memory-manager";
+import { loadMemory, buildMemorySection, extractMemory, mergeMemory } from "./memory-manager";
 import type { SupervisorResult } from "./supervisor-agent";
 import type { UserContext } from "./prompt-builder";
 import type { ChatMessage } from "./agent";
@@ -47,6 +34,23 @@ import type { EvalResult } from "./self-evaluator";
 import type { Domain, RouteDecision } from "./router-agent";
 
 export const SPECIALIST_MODEL = "gpt-4o";
+
+// Domain-specific status icon for the first status message
+const DOMAIN_STATUS_ICONS: Record<Domain, string> = {
+  career:  "💼",
+  mindset: "🧠",
+  habits:  "🌱",
+  trading: "📈",
+  general: "✨",
+};
+
+const DOMAIN_LABELS: Record<Domain, string> = {
+  career:  "profilo carriera",
+  mindset: "profilo mindset",
+  habits:  "profilo abitudini",
+  trading: "profilo trading",
+  general: "profilo",
+};
 
 export interface SpecialistRunOptions {
   userId:           number;
@@ -60,6 +64,7 @@ export interface SpecialistRunOptions {
 
 export type SpecialistEvent =
   | { type: "token";  value: string }
+  | { type: "status"; value: string }           // ← NEW v4
   | { type: "done";   sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult; routeDecision: RouteDecision; supervisorResult?: SupervisorResult }
   | { type: "error";  message: string };
 
@@ -82,38 +87,37 @@ export abstract class SpecialistAgent {
 
   async *run(opts: SpecialistRunOptions): AsyncGenerator<SpecialistEvent> {
     const {
-      userId,
-      userContext,
-      history,
-      userMessage,
-      routeDecision,
-      maxHistory = 12,
+      userId, userContext, history, userMessage,
+      routeDecision, maxHistory = 12,
     } = opts;
+
+    const icon  = DOMAIN_STATUS_ICONS[this.DOMAIN] ?? "✨";
+    const label = DOMAIN_LABELS[this.DOMAIN] ?? "profilo";
+
+    // ── 0. Memory ───────────────────────────────────────────────────────────
+    yield { type: "status", value: `${icon} Carico il tuo ${label}...` };
+
+    let resolvedMemorySection = userContext.memorySection ?? "";
+    let memoryFactCount = opts.memoryFactCount ?? 0;
+
+    if (!resolvedMemorySection) {
+      try {
+        const userMemory    = await loadMemory(userId);
+        resolvedMemorySection = buildMemorySection(userMemory);
+        memoryFactCount     = userMemory.facts.length;
+      } catch (err) {
+        console.warn(`[specialist:${this.DOMAIN}] memory load failed:`, err instanceof Error ? err.message : err);
+      }
+    }
 
     const conversationSummary = history
       .slice(-4)
       .map((m) => `${m.role === "user" ? "Utente" : "Coach"}: ${m.content.slice(0, 200)}`)
       .join("\n");
 
-    // ── 0. Memory — use pre-loaded section or load from DB ─────────────────
-    // agent.ts v5 already loads memory before calling run(), so in the normal
-    // flow userContext.memorySection is already set. We only hit the DB here
-    // if the specialist is invoked directly (e.g. tests, scripts).
-    let resolvedMemorySection = userContext.memorySection ?? "";
-    let memoryFactCount = opts.memoryFactCount ?? 0;
-
-    if (!resolvedMemorySection) {
-      try {
-        const userMemory = await loadMemory(userId);
-        resolvedMemorySection = buildMemorySection(userMemory);
-        memoryFactCount = userMemory.facts.length;
-        console.log(`[specialist:${this.DOMAIN}] memory loaded from DB: ${userMemory.facts.length} facts`);
-      } catch (err) {
-        console.warn(`[specialist:${this.DOMAIN}] memory load failed (non-fatal):`, err instanceof Error ? err.message : err);
-      }
-    }
-
     // ── 1. RAG ────────────────────────────────────────────────────────────────
+    yield { type: "status", value: "🔍 Cerco nella knowledge base..." };
+
     const [personaExamples, documentChunks, cot] = await Promise.all([
       retrieve(userMessage, userId, { topK: 3, minScore: 0.30, sourceTypes: ["persona_example"] }),
       retrieve(userMessage, userId, { topK: 6, minScore: 0.35, sourceTypes: ["document", "user_note"] }),
@@ -123,15 +127,18 @@ export abstract class SpecialistAgent {
     // ── 2. Web fallback ───────────────────────────────────────────────────────
     let webResults: RetrievedChunk[] = [];
     if (documentChunks.length < MIN_LOCAL_CHUNKS) {
+      yield { type: "status", value: "🌐 Cerco fonti aggiornate sul web..." };
       webResults = await searchWeb(this.domainWebQuery(userMessage), 4);
     }
 
-    // ── 3. Self-eval ──────────────────────────────────────────────────────────
+    // ── 3. Self-eval + CoT result ───────────────────────────────────────────────
+    yield { type: "status", value: "🧠 Analizzando la situazione..." };
+
     const evalResult = evaluateSelf({ userMessage, documentChunks, webResults, cot, memoryFactCount });
 
     // ── 4. System prompt ──────────────────────────────────────────────────────
     const domainSection = this.buildDomainSection(userMessage, cot, routeDecision);
-    const domainHeader = [
+    const domainHeader  = [
       `## Specialista: ${this.DOMAIN.toUpperCase()}`,
       `**Persona**: ${this.PERSONA_CORE}`,
       `**Tono**: ${this.TONE_HINT}`,
@@ -140,40 +147,32 @@ export abstract class SpecialistAgent {
       domainSection,
     ].filter(Boolean).join("\n");
 
-    // Memory section + domain header both go into the prompt via memorySection slot
     const combinedMemory = [resolvedMemorySection, domainHeader].filter(Boolean).join("\n\n");
-
     const enrichedContext: UserContext & { memorySection?: string } = {
       ...userContext,
       memorySection: combinedMemory,
     };
 
     const systemPrompt = buildSystemPrompt({
-      userContext: enrichedContext,
-      personaExamples,
-      documentChunks,
-      webResults,
-      cot,
-      userMessage,
-      evalResult,
+      userContext: enrichedContext, personaExamples, documentChunks,
+      webResults, cot, userMessage, evalResult,
     });
 
     // ── 5. Stream + BUFFER ────────────────────────────────────────────────────
     const recentHistory = history.slice(-maxHistory);
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      { role: "system", content: systemPrompt },
+      { role: "system",    content: systemPrompt },
       ...recentHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-      { role: "user", content: userMessage },
+      { role: "user",      content: userMessage },
     ];
 
     const temperature = evalResult.level === "low" ? 0.45 : 0.72;
 
     try {
+      yield { type: "status", value: "✨ Sto scrivendo la risposta..." };
+
       const stream = await openai.chat.completions.create({
-        model: SPECIALIST_MODEL,
-        messages,
-        stream: true,
-        temperature,
+        model: SPECIALIST_MODEL, messages, stream: true, temperature,
         max_tokens: evalResult.level === "low" ? 300 : 700,
       });
 
@@ -186,21 +185,14 @@ export abstract class SpecialistAgent {
       const draft = tokenBuffer.join("");
 
       // ── 6. Supervisor gate ──────────────────────────────────────────────────
-      const supervisorInput = {
-        userMessage,
-        draft,
-        domain: routeDecision.domain,
-        intent: routeDecision.intent,
-      };
-
-      let supervisorResult = supervisorAgent.evaluate(supervisorInput);
-      let finalText = draft;
+      const supervisorInput = { userMessage, draft, domain: routeDecision.domain, intent: routeDecision.intent };
+      let supervisorResult  = supervisorAgent.evaluate(supervisorInput);
+      let finalText         = draft;
 
       if (!supervisorResult.pass) {
-        console.log(
-          `[supervisor] FAIL (score=${supervisorResult.score}) reasons: ${supervisorResult.reasons.join(" | ")}`,
-        );
-        finalText = await supervisorAgent.rewrite(supervisorInput, supervisorResult);
+        yield { type: "status", value: "🔄 Revisione qualità in corso..." };
+        console.log(`[supervisor] FAIL (score=${supervisorResult.score})`);
+        finalText        = await supervisorAgent.rewrite(supervisorInput, supervisorResult);
         supervisorResult = { ...supervisorResult, rewritten: true };
       } else {
         console.log(`[supervisor] PASS (score=${supervisorResult.score})`);
@@ -213,37 +205,26 @@ export abstract class SpecialistAgent {
       }
 
       yield {
-        type:            "done",
-        sources:         [...personaExamples, ...documentChunks, ...webResults],
-        cot,
-        evalResult,
-        routeDecision,
-        supervisorResult,
+        type: "done", sources: [...personaExamples, ...documentChunks, ...webResults],
+        cot, evalResult, routeDecision, supervisorResult,
       };
 
       // ── 8. Fire-and-forget memory save ──────────────────────────────────────
-      // Non-blocking — runs after the generator is done, user already has response.
       const sessionId = Date.now();
-      const turns: Array<{ role: string; content: string }> = [
+      const turns = [
         ...history.slice(-8),
         { role: "user",      content: userMessage },
         { role: "assistant", content: finalText },
       ];
-
       (async () => {
         try {
           const extracted = await extractMemory(turns);
           if (extracted && (extracted.facts.length > 0 || extracted.patterns.length > 0)) {
             await mergeMemory(userId, sessionId, extracted);
-            console.log(
-              `[memory:${this.DOMAIN}] saved ${extracted.facts.length} facts + ${extracted.patterns.length} patterns for user ${userId}`,
-            );
+            console.log(`[memory:${this.DOMAIN}] saved ${extracted.facts.length} facts + ${extracted.patterns.length} patterns`);
           }
         } catch (err) {
-          console.warn(
-            `[memory:${this.DOMAIN}] save failed (non-fatal):`,
-            err instanceof Error ? err.message : err,
-          );
+          console.warn(`[memory:${this.DOMAIN}] save failed:`, err instanceof Error ? err.message : err);
         }
       })();
 

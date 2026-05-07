@@ -1,12 +1,15 @@
 /**
- * useGrowthChat v3 — aggiunge domain e supervisorResult al ChatMessage.
+ * useGrowthChat v4 — handles 'status' SSE events.
  *
- * NOVITÀ v3
+ * NOVITÀ v4
  * ─────────
- * - ChatMessage ora include `domain` (agente specialista che ha risposto)
- *   e `supervisorResult` (esito del SupervisorAgent: pass/fail/rewrite).
- * - Il parser SSE legge i nuovi campi dall'evento `done`.
- * - Retrocompatibile: i campi sono opzionali, il comportamento v2 è invariato.
+ * - Nuovo state: `statusMessage` (string | null)
+ *   Contiene l'ultimo messaggio di stato ricevuto dal server durante
+ *   l'elaborazione (es. "🔍 Cerco nella knowledge base...").
+ * - Viene azzerato a null quando arriva il primo 'token' o 'done'.
+ *   In questo modo il frontend può mostrarlo SOLO mentre il buffer è vuoto
+ *   e nasconderlo non appena il testo inizia a comparire.
+ * - Retrocompatibile: tutto il comportamento v3 è invariato.
  */
 import { useState, useRef, useCallback, useEffect } from "react";
 
@@ -15,9 +18,9 @@ export type Domain = "career" | "habits" | "mindset" | "general";
 
 export interface SupervisorInfo {
   pass: boolean;
-  score: number;      // 0-1
-  rewritten: boolean; // true se il supervisor ha riscritto la risposta
-  reasons: string[];  // motivazioni del fail (vuoto se pass)
+  score: number;
+  rewritten: boolean;
+  reasons: string[];
 }
 
 export interface ChatMessage {
@@ -28,7 +31,6 @@ export interface ChatMessage {
   isStreaming?: boolean;
   evalScore?: number;
   evalLevel?: ConfidenceLevel;
-  // ── NUOVI CAMPI v3 ──
   domain?: Domain;
   supervisorResult?: SupervisorInfo;
 }
@@ -54,10 +56,11 @@ function uid(): string {
 export function useGrowthChat(opts: UseGrowthChatOptions) {
   const { apiBase = "/api", token, userContext = {} } = opts;
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<number | undefined>(() => {
+  const [messages,      setMessages]      = useState<ChatMessage[]>([]);
+  const [isStreaming,   setIsStreaming]   = useState(false);
+  const [error,         setError]         = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null); // ← NEW v4
+  const [sessionId,     setSessionId]     = useState<number | undefined>(() => {
     const stored = localStorage.getItem(SESSION_KEY);
     return stored ? Number(stored) : undefined;
   });
@@ -72,16 +75,12 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
     async (text: string) => {
       if (!text.trim() || isStreaming) return;
       setError(null);
+      setStatusMessage(null);
 
-      const history = messages.map((m) => ({ role: m.role, content: m.content }));
-      const userMsg: ChatMessage = { id: uid(), role: "user", content: text };
+      const history    = messages.map((m) => ({ role: m.role, content: m.content }));
+      const userMsg: ChatMessage    = { id: uid(), role: "user",      content: text };
       const assistantId = uid();
-      const assistantMsg: ChatMessage = {
-        id: assistantId,
-        role: "assistant",
-        content: "",
-        isStreaming: true,
-      };
+      const assistantMsg: ChatMessage = { id: assistantId, role: "assistant", content: "", isStreaming: true };
 
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
       setIsStreaming(true);
@@ -91,18 +90,15 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
 
       try {
         const res = await fetch(`${apiBase}/growth-agent/chat`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ message: text, sessionId, history, userContext }),
-          signal: controller.signal,
+          method:  "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body:    JSON.stringify({ message: text, sessionId, history, userContext }),
+          signal:  controller.signal,
         });
 
         if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
 
-        const reader = res.body!.getReader();
+        const reader  = res.body!.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
 
@@ -120,56 +116,56 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
 
             try {
               const event = JSON.parse(raw) as {
-                type: "token" | "done" | "error";
+                type: "token" | "status" | "done" | "error";   // ← status added
                 value?: string;
                 sources?: Array<{ source: string; score: number }>;
                 message?: string;
                 sessionId?: number;
                 evalResult?: { score: number; level: ConfidenceLevel };
-                // ── NUOVI CAMPI v3 ──
-                routeDecision?: { domain: Domain; intent: string; confidence: number };
-                supervisorResult?: {
-                  pass: boolean;
-                  score: number;
-                  rewritten: boolean;
-                  reasons: string[];
-                };
+                routeDecision?: { domain: Domain; intent: string; confidence: number; threshold: number };
+                supervisorResult?: SupervisorInfo;
               };
 
-              if (event.type === "token" && event.value) {
+              if (event.type === "status" && event.value) {
+                // Show status only while content is still empty
+                setStatusMessage(event.value);
+
+              } else if (event.type === "token" && event.value) {
+                setStatusMessage(null); // clear status as soon as tokens arrive
                 setMessages((prev) =>
                   prev.map((m) =>
-                    m.id === assistantId
-                      ? { ...m, content: m.content + event.value }
-                      : m,
+                    m.id === assistantId ? { ...m, content: m.content + event.value } : m,
                   ),
                 );
+
               } else if (event.type === "done") {
+                setStatusMessage(null);
                 if (event.sessionId) setSessionId(event.sessionId);
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantId
                       ? {
                           ...m,
-                          isStreaming: false,
-                          sources: event.sources ?? [],
-                          evalScore: event.evalResult?.score,
-                          evalLevel: event.evalResult?.level,
-                          // ── v3: domain e supervisorResult ──
-                          domain: event.routeDecision?.domain,
+                          isStreaming:     false,
+                          sources:         event.sources ?? [],
+                          evalScore:       event.evalResult?.score,
+                          evalLevel:       event.evalResult?.level,
+                          domain:          event.routeDecision?.domain,
                           supervisorResult: event.supervisorResult
                             ? {
-                                pass: event.supervisorResult.pass,
-                                score: event.supervisorResult.score,
+                                pass:      event.supervisorResult.pass,
+                                score:     event.supervisorResult.score,
                                 rewritten: event.supervisorResult.rewritten,
-                                reasons: event.supervisorResult.reasons,
+                                reasons:   event.supervisorResult.reasons,
                               }
                             : undefined,
                         }
                       : m,
                   ),
                 );
+
               } else if (event.type === "error") {
+                setStatusMessage(null);
                 setError(event.message ?? "Errore sconosciuto");
                 setMessages((prev) =>
                   prev.map((m) =>
@@ -177,24 +173,19 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
                   ),
                 );
               }
-            } catch {
-              /* skip malformed SSE lines */
-            }
+            } catch { /* skip malformed SSE lines */ }
           }
         }
       } catch (err) {
+        setStatusMessage(null);
         if ((err as Error).name === "AbortError") {
           setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, isStreaming: false } : m,
-            ),
+            prev.map((m) => m.id === assistantId ? { ...m, isStreaming: false } : m),
           );
         } else {
           setError(err instanceof Error ? err.message : String(err));
           setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, isStreaming: false } : m,
-            ),
+            prev.map((m) => m.id === assistantId ? { ...m, isStreaming: false } : m),
           );
         }
       } finally {
@@ -205,17 +196,17 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
     [apiBase, token, userContext, messages, isStreaming, sessionId],
   );
 
-  const abort = useCallback(() => {
-    abortRef.current?.abort();
-  }, []);
+  const abort = useCallback(() => { abortRef.current?.abort(); }, []);
 
   const resetSession = useCallback(() => {
     abort();
     setMessages([]);
     setError(null);
+    setStatusMessage(null);
     setSessionId(undefined);
     localStorage.removeItem(SESSION_KEY);
   }, [abort]);
 
-  return { messages, isStreaming, error, sessionId, sendMessage, abort, resetSession };
+  // statusMessage is exposed so the UI can show contextual loading text
+  return { messages, isStreaming, error, statusMessage, sessionId, sendMessage, abort, resetSession };
 }

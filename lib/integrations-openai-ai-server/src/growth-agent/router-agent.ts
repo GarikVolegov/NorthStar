@@ -1,44 +1,33 @@
 /**
- * RouterAgent — classifies user messages and routes to the right specialist.
+ * RouterAgent v2 — adaptive confidence threshold.
  *
- * WHAT IT DOES
- * ────────────
- * Reads the last user message + last 4 conversation turns, then uses
- * GPT-4o-mini (JSON mode, fast + cheap) to return:
+ * CHANGES v2
+ * ──────────
+ * The routing threshold is no longer a fixed 0.60.
+ * It adapts dynamically based on two signals:
  *
- *   domain      — which specialist should handle this
- *   intent      — what the user is trying to accomplish
- *   confidence  — 0-1, how certain the router is
- *   reasoning   — one-sentence explanation (used in dev logs)
- *   handoffContext — short summary to pass to the specialist
+ *   1. MESSAGE LENGTH — short messages (<8 words) are naturally ambiguous.
+ *      A short message like "non so cosa fare" deserves the specialist even
+ *      at confidence 0.52. Threshold lowered by 0.08 for short messages.
  *
- * ROUTING RULES
- * ─────────────
- *   confidence >= 0.60  → route to specialist
- *   confidence <  0.60  → fallback to general (monolithic) agent
- *   domain = 'general'  → always fallback
+ *   2. DOMAIN CONTINUITY — if the last 4 turns already established a domain
+ *      (e.g. we've been talking about career for 3 exchanges), a borderline
+ *      message should stay in that domain. Threshold lowered by 0.10 if
+ *      the same domain appears ≥2 times in recent assistant turns.
  *
- * DOMAINS
- * ───────
- *   career    Job search, CV, interviews, salary, career pivots, networking
- *   mindset   Limiting beliefs, mental models, cognitive patterns, growth
- *   habits    Habit formation, routines, productivity, energy, sleep
- *   trading   Market analysis, trading psychology, strategy (future specialist)
- *   general   Everything else, multi-domain, unclear
+ * FLOOR: threshold never goes below 0.40 to prevent routing garbage.
+ * CEILING: base threshold remains 0.60.
  *
- * INTENTS
- * ───────
- *   explore        User is exploring options, no clear goal yet
- *   problem_solve  User has a specific problem and wants solutions
- *   plan           User wants to create a plan / roadmap
- *   reflect        User wants to process emotions or past events
- *   vent           User needs to be heard first, then coached
- *   ask_info       User wants factual information
+ * RESULT:
+ *   Short + in-context message: threshold can reach 0.42 (0.60 - 0.08 - 0.10)
+ *   Short only:                  0.52
+ *   In-context only:             0.50
+ *   Normal (no signals):         0.60
  */
 import { openai } from "../client";
 import type { ChatMessage } from "./agent";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 export type Domain =
   | "career"
@@ -56,14 +45,15 @@ export type Intent =
   | "ask_info";
 
 export interface RouteDecision {
-  domain:         Domain;
-  intent:         Intent;
-  confidence:     number;   // 0-1
-  reasoning:      string;   // one sentence, dev-facing
-  handoffContext: string;   // short summary passed to specialist
+  domain:          Domain;
+  intent:          Intent;
+  confidence:      number;  // raw confidence from LLM (0-1)
+  threshold:       number;  // adaptive threshold used for routing decision
+  reasoning:       string;  // one sentence, dev-facing
+  handoffContext:  string;  // short summary passed to specialist
 }
 
-// ── System prompt ────────────────────────────────────────────────────────────
+// ── System prompt ──────────────────────────────────────────────────────────────
 
 const ROUTER_SYSTEM = `
 Sei un router intelligente per un sistema multi-agente di coaching.
@@ -94,7 +84,73 @@ Rispondi SOLO con JSON valido (nessun testo fuori dal JSON):
 }
 `.trim();
 
-// ── RouterAgent class ────────────────────────────────────────────────────────
+// ── Adaptive threshold ──────────────────────────────────────────────────────────
+
+const BASE_THRESHOLD = 0.60;
+const FLOOR_THRESHOLD = 0.40;
+
+/**
+ * Computes the routing confidence threshold dynamically.
+ *
+ * @param userMessage  The current user message
+ * @param domain       The domain returned by the LLM
+ * @param history      Recent conversation turns
+ * @returns            Threshold (0.40 – 0.60)
+ */
+function computeAdaptiveThreshold(
+  userMessage: string,
+  domain: Domain,
+  history: ChatMessage[],
+): number {
+  let threshold = BASE_THRESHOLD;
+
+  // Signal 1: Short messages are naturally ambiguous — lower the bar
+  const wordCount = userMessage.trim().split(/\s+/).length;
+  if (wordCount < 8) {
+    threshold -= 0.08;
+  }
+
+  // Signal 2: Domain continuity in recent assistant turns
+  // We store domain on messages when available (cast to extended type)
+  const recentHistory = history.slice(-6);
+  const domainMatchCount = recentHistory.filter(
+    (m) => m.role === "assistant" && (m as ChatMessage & { domain?: Domain }).domain === domain,
+  ).length;
+
+  // Also check if recent user messages contain domain keywords
+  const DOMAIN_KEYWORDS: Record<Domain, string[]> = {
+    career:  ["lavoro", "lavoro", "cv", "colloquio", "stipendio", "carriera", "job", "work", "offerta"],
+    mindset: ["credenza", "paura", "blocco", "mente", "pensiero", "psicolog", "belief", "mindset"],
+    habits:  ["abitudine", "routine", "produttiv", "sonno", "energia", "focus", "habit"],
+    trading: ["trading", "mercato", "xauusd", "forex", "macro", "trade", "borsa", "crypto"],
+    general: [],
+  };
+
+  const keywords = DOMAIN_KEYWORDS[domain] ?? [];
+  const recentUserText = recentHistory
+    .filter((m) => m.role === "user")
+    .map((m) => m.content.toLowerCase())
+    .join(" ");
+
+  const keywordMatches = keywords.filter((kw) => recentUserText.includes(kw)).length;
+
+  if (domainMatchCount >= 2 || keywordMatches >= 2) {
+    threshold -= 0.10;
+  }
+
+  const final = Math.max(FLOOR_THRESHOLD, threshold);
+
+  if (final < BASE_THRESHOLD) {
+    console.log(
+      `[router] adaptive threshold: ${BASE_THRESHOLD} → ${final.toFixed(2)} ` +
+      `(words=${wordCount}, domainMatch=${domainMatchCount}, kwMatch=${keywordMatches})`,
+    );
+  }
+
+  return final;
+}
+
+// ── RouterAgent class ───────────────────────────────────────────────────────────────
 
 export class RouterAgent {
   /**
@@ -106,7 +162,6 @@ export class RouterAgent {
     userMessage: string,
     history: ChatMessage[] = [],
   ): Promise<RouteDecision> {
-    // Build compact context (last 4 turns)
     const contextLines = history
       .slice(-4)
       .map((m) => `${m.role === "user" ? "Utente" : "Coach"}: ${m.content.slice(0, 200)}`)
@@ -131,10 +186,17 @@ export class RouterAgent {
       const raw    = res.choices[0]?.message?.content ?? "{}";
       const parsed = JSON.parse(raw) as Partial<RouteDecision>;
 
+      const domain: Domain    = (parsed.domain as Domain) ?? "general";
+      const confidence: number = typeof parsed.confidence === "number" ? parsed.confidence : 0;
+
+      // Compute adaptive threshold AFTER we know the domain
+      const threshold = computeAdaptiveThreshold(userMessage, domain, history);
+
       return {
-        domain:         (parsed.domain as Domain)         ?? "general",
-        intent:         (parsed.intent as Intent)         ?? "explore",
-        confidence:     typeof parsed.confidence === "number" ? parsed.confidence : 0,
+        domain,
+        intent:         (parsed.intent as Intent) ?? "explore",
+        confidence,
+        threshold,
         reasoning:      parsed.reasoning      ?? "",
         handoffContext: parsed.handoffContext  ?? userMessage,
       };
@@ -144,6 +206,7 @@ export class RouterAgent {
         domain:         "general",
         intent:         "explore",
         confidence:     0,
+        threshold:      BASE_THRESHOLD,
         reasoning:      "Router error — fallback to general agent",
         handoffContext: userMessage,
       };
