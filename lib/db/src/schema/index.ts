@@ -18,3 +18,4 @@ export * from "./coachSessions";
 export * from "./businessIdeas";
 export * from "./certifications";
 export * from "./objectiveComments";
+export * from "./linkedinImports";

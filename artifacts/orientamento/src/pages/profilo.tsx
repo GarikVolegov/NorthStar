@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, User, Mail, Calendar, CheckCircle2, KeyRound, Sparkles, ShieldCheck, Globe, Lock, Bookmark, X, Users, Briefcase, Trophy, Flame, Award, Compass, TrendingUp, Camera, Trash2 } from "lucide-react";
+import { Loader2, User, Mail, Calendar, CheckCircle2, KeyRound, Sparkles, ShieldCheck, Globe, Lock, Bookmark, X, Users, Briefcase, Trophy, Flame, Award, Compass, TrendingUp, Camera, Trash2, Linkedin } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -22,6 +22,7 @@ import { ProfileCompletionCard } from "@/components/ProfileCompletionCard";
 import { apiFetch } from "@/lib/api-fetch";
 import { CertificationsSection } from "@/components/CertificationsSection";
 import { JourneyScoreWidget } from "@/components/JourneyScoreWidget";
+import { LinkedInImportWizard } from "@/components/LinkedInImportWizard";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -583,6 +584,7 @@ export default function Profilo() {
   const { t } = useTranslation();
   const { user, logout, isLoggedIn, updateUser } = useAuth();
   const [avatarUrl, setAvatarUrl] = useState<string | null | undefined>(user?.avatarUrl);
+  const [linkedinWizardOpen, setLinkedinWizardOpen] = useState(false);
   const { data: profile } = useProfile(user?.id ?? 0);
 
   const { data: completionData } = useQuery<CompletionResponse | null>({
@@ -613,16 +615,24 @@ export default function Profilo() {
           <h1 className="text-3xl font-serif font-bold text-foreground">{t("profilo.title")}</h1>
           <p className="text-muted-foreground mt-1">{t("profilo.subtitle", { defaultValue: "Gestisci il tuo account e consulta la tua storia" })}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline" size="sm"
+            className="rounded-full gap-2 text-xs border-[#0077B5]/30 text-[#0077B5] hover:bg-[#0077B5]/10"
+            onClick={() => setLinkedinWizardOpen(true)}
+          >
+            <Linkedin className="w-3.5 h-3.5" /> Importa da LinkedIn
+          </Button>
           <Link href={`/score/${user.id}`}>
             <Button variant="outline" size="sm" className="rounded-full gap-2 text-xs border-primary/30 text-primary hover:bg-primary/10">
-              <TrendingUp className="w-3.5 h-3.5" /> Il tuo NorthStar Score
+              <TrendingUp className="w-3.5 h-3.5" /> Il tuo Score
             </Button>
           </Link>
           <Button variant="outline" size="sm" className="rounded-full w-fit" onClick={logout}>
             {t("profilo.logout", { defaultValue: "Esci dall'account" })}
           </Button>
         </div>
+        <LinkedInImportWizard open={linkedinWizardOpen} onClose={() => setLinkedinWizardOpen(false)} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">

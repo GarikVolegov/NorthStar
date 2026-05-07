@@ -50,6 +50,7 @@ import journeyScoreRouter from "./journey-score";
 import calendarIcsRouter from "./calendar-ics";
 import jobsRouter from "./jobs";
 import objectiveCommentsRouter from "./objective-comments";
+import linkedinRouter from "./linkedin";
 
 const router: IRouter = Router();
 
@@ -107,5 +108,6 @@ router.use(calendarIcsRouter);
 router.use(jobsRouter);
 router.use(objectiveCommentsRouter);
 router.use(certificationsRouter);
+router.use(linkedinRouter);
 
 export default router;

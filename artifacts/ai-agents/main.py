@@ -41,6 +41,7 @@ SUPPORTED_TASKS = [
     "affiliation_materials",
     "business_validator",
     "incubator_finder",
+    "linkedin_extractor",
 ]
 
 

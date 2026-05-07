@@ -12,6 +12,7 @@ from agents.work_mode import run_work_mode_advice
 from agents.affiliation import run_affiliation_materials
 from agents.business_validator import run_business_validator
 from agents.incubator_finder import run_incubator_finder
+from agents.linkedin_extractor import run_linkedin_extractor
 
 
 class AgentState(TypedDict):
@@ -29,6 +30,7 @@ TASK_HANDLERS = {
     "affiliation_materials": run_affiliation_materials,
     "business_validator": run_business_validator,
     "incubator_finder": run_incubator_finder,
+    "linkedin_extractor": run_linkedin_extractor,
 }
 
 
