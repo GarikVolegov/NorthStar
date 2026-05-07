@@ -1,86 +1,59 @@
 /**
- * SupervisorAgent — quality gate between specialist and client.
+ * SupervisorAgent v2 — quality gate + self-improvement logging.
  *
- * WHAT IT DOES
- * ────────────
- * After the specialist/general agent buffers its full response,
- * the Supervisor evaluates it on 4 quality dimensions.
- * If the composite score is below the pass threshold, it rewrites
- * the response using GPT-4o-mini with a targeted correction prompt.
- *
- * EVALUATION DIMENSIONS (all local, zero extra API calls)
- * ─────────────────────────────────────────────────────
- *
- *  actionability    At least one concrete action, step, or next move.
- *                   Heuristic: looks for numbered lists, action verbs,
- *                   time references ("questa settimana", "entro", "domani").
- *
- *  platitude_free   No generic motivational filler.
- *                   Heuristic: checks for banned phrases list.
- *
- *  length_ok        Response is neither too short nor too long.
- *                   Too short: < 60 words (superficial).
- *                   Too long:  > 380 words (unfocused).
- *
- *  on_topic         The response actually addresses the user's message.
- *                   Heuristic: keyword overlap between user message
- *                   and response (Jaccard-like, stemmed).
- *
- * COMPOSITE SCORE
+ * WHAT'S NEW (v2)
  * ───────────────
- *   actionability   × 0.35
- *   platitude_free  × 0.25
- *   length_ok       × 0.20
- *   on_topic        × 0.20
+ * When a rewrite is triggered (pass === false), the full context is logged
+ * to the `supervisor_logs` table:
+ *   { userId, sessionId, domain, intent, userMessage, draft, finalText,
+ *     scoreBefore, reasons }
  *
- *   pass threshold: >= 0.70
+ * This data feeds the weekly analysis job (supervisor-pattern-analyzer.ts)
+ * which proposes new PLATITUDE_PATTERNS / ACTION_PATTERNS to add.
  *
- * REWRITE
- * ───────
- * If evaluate() fails, rewrite() calls GPT-4o-mini with:
- *   - The original user message
- *   - The specialist domain + intent
- *   - The specific failure reasons
- *   - The original draft as a starting point
- * Temperature 0.50 (stable). Max 700 tokens.
+ * Logging is fire-and-forget (à la void) — never blocks the response stream.
+ * If DB is unavailable, the insert is silently skipped.
  *
- * COST ANALYSIS
- * ─────────────
- * evaluate() = 0 extra API calls (pure heuristics, < 1ms)
- * rewrite()  = 1 GPT-4o-mini call (~300 input + 300 output tokens = ~$0.0003)
- *              Fires only when quality is actually poor (estimated ~15-25% of responses)
+ * EVALUATION DIMENSIONS (unchanged from v1)
+ * ───────────────────────────────────────────
+ *  actionability × 0.35 | platitude_free × 0.25 | length_ok × 0.20 | on_topic × 0.20
+ *  pass threshold: >= 0.70
  */
 import { openai } from "../client";
+import { db } from "../db/client";
+import { supervisorLogs } from "../db/schema";
 import type { Domain, Intent } from "./router-agent";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface SupervisorDimensions {
-  actionability:  number;   // 0-1
-  platitudeFree:  number;   // 0-1
-  lengthOk:       number;   // 0-1
-  onTopic:        number;   // 0-1
+  actionability: number;
+  platitudeFree: number;
+  lengthOk:      number;
+  onTopic:       number;
 }
 
 export interface SupervisorResult {
-  pass:        boolean;
-  score:       number;           // 0-1 composite
-  dimensions:  SupervisorDimensions;
-  reasons:     string[];         // failure reasons, empty if pass
-  rewritten:   boolean;         // true if rewrite was triggered
+  pass:       boolean;
+  score:      number;
+  dimensions: SupervisorDimensions;
+  reasons:    string[];
+  rewritten:  boolean;
 }
 
 export interface SupervisorEvalInput {
-  userMessage:  string;
-  draft:        string;          // full buffered response
-  domain:       Domain;
-  intent:       Intent;
+  userMessage: string;
+  draft:       string;
+  domain:      Domain;
+  intent:      Intent;
+  // v2: optional context for logging
+  userId?:     string;
+  sessionId?:  number;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────
+// ── Constants ──────────────────────────────────────────────────────────────────
 
 const PASS_THRESHOLD = 0.70;
-
 const WEIGHTS = {
   actionability: 0.35,
   platitudeFree: 0.25,
@@ -88,40 +61,40 @@ const WEIGHTS = {
   onTopic:       0.20,
 };
 
-// Phrases that indicate generic/platitudinous content
+// Learned from DB + hard-coded initial set.
+// The weekly job (supervisor-pattern-analyzer.ts) proposes additions here.
 const PLATITUDE_PATTERNS = [
   /credi in te stesso/i,
-  /tutto è possibile/i,
+  /tutto \u00e8 possibile/i,
   /non mollare mai/i,
   /il successo arriva/i,
   /step by step/i,
   /un passo alla volta/i,
   /sei sulla strada giusta/i,
-  /hai tutto ciò che serve/i,
+  /hai tutto ci\u00f2 che serve/i,
   /ce la farai/i,
-  /il viaggio è lungo/i,
+  /il viaggio \u00e8 lungo/i,
   /ricorda che puoi farcela/i,
-  /ogni giorno è un nuovo inizio/i,
+  /ogni giorno \u00e8 un nuovo inizio/i,
   /il cambiamento inizia da dentro/i,
 ];
 
-// Action verb patterns (Italian + English mix)
 const ACTION_PATTERNS = [
   /\b(fai|scrivi|contatta|invia|apri|crea|prepara|definisci|identifica|misura|testa|inizia|completa|leggi|studia|pratica)\b/i,
-  /entro\s+(domani|questa settimana|lunedì|venerdì|\d+ giorni)/i,
+  /entro\s+(domani|questa settimana|luned\u00ec|venerd\u00ec|\d+ giorni)/i,
   /passo\s+\d+/i,
-  /\d+\.\ /,     // numbered list
-  /- \[\s*\]/,  // checkbox
+  /\d+\.\s/,
+  /- \[\s*\]/,
 ];
 
-// ── Dimension scorers (all local) ────────────────────────────────────────
+// ── Dimension scorers (local, ~0ms) ────────────────────────────────────────
 
 function scoreActionability(draft: string): number {
   const matches = ACTION_PATTERNS.filter((p) => p.test(draft)).length;
   if (matches >= 3) return 1.0;
   if (matches === 2) return 0.80;
   if (matches === 1) return 0.50;
-  return 0.10; // no actionable content
+  return 0.10;
 }
 
 function scorePlatitudeFree(draft: string): number {
@@ -129,62 +102,51 @@ function scorePlatitudeFree(draft: string): number {
   if (hits === 0) return 1.0;
   if (hits === 1) return 0.60;
   if (hits === 2) return 0.30;
-  return 0.0;  // response is mostly platitudes
+  return 0.0;
 }
 
 function scoreLengthOk(draft: string): number {
   const words = draft.trim().split(/\s+/).length;
-  if (words >= 80 && words <= 280)  return 1.0;   // ideal range
-  if (words >= 60 && words <= 380)  return 0.75;  // acceptable
-  if (words < 60)                    return 0.30;  // too short
-  return 0.50;                                     // too long (>380)
+  if (words >= 80 && words <= 280) return 1.0;
+  if (words >= 60 && words <= 380) return 0.75;
+  if (words < 60)                   return 0.30;
+  return 0.50;
 }
 
 function scoreOnTopic(userMessage: string, draft: string): number {
-  // Jaccard-like keyword overlap (lowercased, stop-words stripped)
-  const STOP = new Set(["il","la","lo","le","i","gli","un","una","uno","e","o","ma","che","di","a","in","con","su","per","tra","fra","da","del","della","dei","degli","delle","al","alla","ai","agli","alle","mi","ti","si","ci","vi","ho","hai","ha","ho","sono","sei","è","siamo","siete","non","come","cosa","perché","quando"]);
+  const STOP = new Set(["il","la","lo","le","i","gli","un","una","uno","e","o","ma","che","di","a","in","con","su","per","tra","fra","da","del","della","dei","degli","delle","al","alla","ai","agli","alle","mi","ti","si","ci","vi","ho","hai","ha","sono","sei","\u00e8","siamo","siete","non","come","cosa","perch\u00e9","quando"]);
   const tokenize = (s: string) =>
-    new Set(
-      s.toLowerCase().match(/[a-zà-ü]{4,}/g)?.filter((w) => !STOP.has(w)) ?? [],
-    );
+    new Set(s.toLowerCase().match(/[a-z\u00e0-\u00fc]{4,}/g)?.filter((w) => !STOP.has(w)) ?? []);
   const uTokens = tokenize(userMessage);
   const dTokens = tokenize(draft);
-  if (uTokens.size === 0) return 0.80; // can't measure, assume ok
+  if (uTokens.size === 0) return 0.80;
   const intersection = [...uTokens].filter((w) => dTokens.has(w)).length;
   const jaccard = intersection / (uTokens.size + dTokens.size - intersection);
-  // Jaccard on short texts is low by nature; calibrate thresholds
   if (jaccard >= 0.12) return 1.0;
   if (jaccard >= 0.07) return 0.75;
   if (jaccard >= 0.04) return 0.50;
   return 0.20;
 }
 
-// ── SupervisorAgent class ──────────────────────────────────────────────────────
+// ── SupervisorAgent ──────────────────────────────────────────────────────────────────
 
 export class SupervisorAgent {
-  /**
-   * Evaluates a buffered response. Pure local heuristics, ~0ms.
-   * Returns a SupervisorResult with pass/fail + reasons.
-   */
+  /** Pure heuristic evaluation. ~0ms, zero API calls. */
   evaluate(input: SupervisorEvalInput): SupervisorResult {
     const { userMessage, draft } = input;
-
     const dimensions: SupervisorDimensions = {
       actionability: scoreActionability(draft),
       platitudeFree: scorePlatitudeFree(draft),
       lengthOk:      scoreLengthOk(draft),
       onTopic:       scoreOnTopic(userMessage, draft),
     };
-
-    const score =
+    const score = Math.round((
       dimensions.actionability * WEIGHTS.actionability +
       dimensions.platitudeFree * WEIGHTS.platitudeFree +
       dimensions.lengthOk      * WEIGHTS.lengthOk      +
-      dimensions.onTopic       * WEIGHTS.onTopic;
-
-    const roundedScore = Math.round(score * 100) / 100;
-    const pass = roundedScore >= PASS_THRESHOLD;
-
+      dimensions.onTopic       * WEIGHTS.onTopic
+    ) * 100) / 100;
+    const pass = score >= PASS_THRESHOLD;
     const reasons: string[] = [];
     if (!pass) {
       if (dimensions.actionability < 0.50)
@@ -193,34 +155,30 @@ export class SupervisorAgent {
         reasons.push("La risposta contiene frasi generiche o motivazionali vuote.");
       if (dimensions.lengthOk < 0.60) {
         const words = draft.trim().split(/\s+/).length;
-        reasons.push(
-          words < 60
-            ? `Risposta troppo corta (${words} parole — minimo 60).`
-            : `Risposta troppo lunga (${words} parole — massimo 380).`,
-        );
+        reasons.push(words < 60
+          ? `Risposta troppo corta (${words} parole — minimo 60).`
+          : `Risposta troppo lunga (${words} parole — massimo 380).`);
       }
       if (dimensions.onTopic < 0.50)
         reasons.push("La risposta sembra non affrontare direttamente la domanda dell'utente.");
     }
-
-    return { pass, score: roundedScore, dimensions, reasons, rewritten: false };
+    return { pass, score, dimensions, reasons, rewritten: false };
   }
 
   /**
-   * Rewrites a failing draft using GPT-4o-mini.
-   * Includes the failure reasons in the prompt so the model knows
-   * exactly what to fix.
+   * Rewrites a failing draft via GPT-4o-mini.
+   * After rewrite, logs the full context to supervisor_logs (fire-and-forget).
    */
   async rewrite(
     input: SupervisorEvalInput,
     failResult: SupervisorResult,
+    finalText?: string,
   ): Promise<string> {
-    const { userMessage, draft, domain, intent } = input;
-
+    const { userMessage, draft, domain, intent, userId, sessionId } = input;
     const reasonsList = failResult.reasons.map((r) => `- ${r}`).join("\n");
 
     const systemPrompt = `
-Sei un editor di qualità per un sistema di coaching AI.
+Sei un editor di qualit\u00e0 per un sistema di coaching AI.
 Ricevi una risposta di bozza generata da uno specialista (dominio: ${domain}, intento: ${intent}) e devi migliorarla.
 
 PROBLEMI IDENTIFICATI:
@@ -233,28 +191,43 @@ REGOLE DI RISCRITTURA:
 4. Lunghezza target: 80-250 parole.
 5. Assicurati che la risposta risponda DIRETTAMENTE alla domanda dell'utente.
 6. Mantieni la lingua della bozza (italiano).
-7. Tono: diretto, specifico, rispettoso. Mai paternalistico.
-    `.trim();
+7. Tono: diretto, specifico, rispettoso. Mai paternalistico.`.trim();
 
-    const userPrompt = `DOMANDA UTENTE:\n${userMessage}\n\nBOZZA DA MIGLIORARE:\n${draft}`;
-
+    let rewritten = draft; // safe fallback
     try {
       const res = await openai.chat.completions.create({
         model:       "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user",   content: userPrompt },
+          { role: "user",   content: `DOMANDA UTENTE:\n${userMessage}\n\nBOZZA:\n${draft}` },
         ],
         temperature: 0.50,
         max_tokens:  700,
       });
-      return res.choices[0]?.message?.content?.trim() ?? draft;
+      rewritten = res.choices[0]?.message?.content?.trim() ?? draft;
     } catch (err) {
       console.warn("[supervisor] rewrite failed, using original draft:", err);
-      return draft;  // safe fallback: return original
     }
+
+    // ── Fire-and-forget DB log ───────────────────────────────────────
+    if (db) {
+      db.insert(supervisorLogs).values({
+        userId:      userId ?? null,
+        sessionId:   sessionId ?? null,
+        domain,
+        intent,
+        userMessage,
+        draft,
+        finalText:   finalText ?? rewritten,
+        scoreBefore: failResult.score,
+        reasons:     JSON.stringify(failResult.reasons),
+      }).catch((err: unknown) => {
+        console.warn("[supervisor] DB log failed (non-blocking):", err);
+      });
+    }
+
+    return rewritten;
   }
 }
 
-// Singleton
 export const supervisorAgent = new SupervisorAgent();
