@@ -1,30 +1,17 @@
 /**
  * SpecialistAgent — abstract base class for all domain specialists.
  *
- * WHAT IT DOES
- * ────────────
- * Provides the full RAG + CoT + eval pipeline as a reusable base.
- * Subclasses only need to override:
- *
- *   DOMAIN          string    e.g. 'career'
- *   PERSONA_CORE    string    domain-specific coach persona
- *   TONE_HINT       string    one-line tone instruction
- *   domainWebQuery  function  builds the web search query
- *   buildDomainSection (optional) — extra domain-specific prompt section
- *
- * FLOW
+ * FLOW (updated v2 — with SupervisorAgent)
  * ────
  *   1. RAG retrieval (persona examples + domain docs)
  *   2. Web fallback if KB is thin
  *   3. [PARALLEL] CoT + self-eval
  *   4. Build system prompt (base + domain overrides)
- *   5. Stream GPT-4o response
- *
- * REGISTRY
- * ────────
- *   SpecialistRegistry maps Domain → SpecialistAgent instance.
- *   registerSpecialist() adds a specialist.
- *   getSpecialist()      returns the right one (or null → fallback).
+ *   5. Stream GPT-4o response → buffer tokens silently
+ *   6. SupervisorAgent.evaluate(buffered response)
+ *      ─ pass  → re-yield buffered tokens
+ *      ─ fail  → supervisorAgent.rewrite() → stream corrected tokens
+ *   7. Yield 'done' (includes supervisorResult)
  */
 import OpenAI from "openai";
 import { openai } from "../client";
@@ -33,6 +20,8 @@ import { searchWeb, MIN_LOCAL_CHUNKS } from "./web-search";
 import { runChainOfThought } from "./chain-of-thought";
 import { evaluateSelf } from "./self-evaluator";
 import { buildSystemPrompt } from "./prompt-builder";
+import { supervisorAgent } from "./supervisor-agent";
+import type { SupervisorResult } from "./supervisor-agent";
 import type { UserContext } from "./prompt-builder";
 import type { ChatMessage } from "./agent";
 import type { RetrievedChunk } from "./retriever";
@@ -54,7 +43,7 @@ export interface SpecialistRunOptions {
 
 export type SpecialistEvent =
   | { type: "token";  value: string }
-  | { type: "done";   sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult; routeDecision: RouteDecision }
+  | { type: "done";   sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult; routeDecision: RouteDecision; supervisorResult?: SupervisorResult }
   | { type: "error";  message: string };
 
 // ── Abstract base ─────────────────────────────────────────────────────────────
@@ -64,10 +53,8 @@ export abstract class SpecialistAgent {
   abstract readonly PERSONA_CORE: string;
   abstract readonly TONE_HINT:    string;
 
-  /** Builds the web search query for this domain */
   abstract domainWebQuery(userMessage: string): string;
 
-  /** Optional: returns an extra domain-specific prompt section */
   buildDomainSection(
     _userMessage: string,
     _cot: CoTResult | null,
@@ -92,38 +79,23 @@ export abstract class SpecialistAgent {
       .map((m) => `${m.role === "user" ? "Utente" : "Coach"}: ${m.content.slice(0, 200)}`)
       .join("\n");
 
-    // ── 1. RAG retrieval ────────────────────────────────────────────────────
+    // ── 1. RAG ────────────────────────────────────────────────────────────────
     const [personaExamples, documentChunks, cot] = await Promise.all([
-      retrieve(userMessage, userId, {
-        topK: 3,
-        minScore: 0.30,
-        sourceTypes: ["persona_example"],
-      }),
-      retrieve(userMessage, userId, {
-        topK: 6,
-        minScore: 0.35,
-        sourceTypes: ["document", "user_note"],
-      }),
+      retrieve(userMessage, userId, { topK: 3, minScore: 0.30, sourceTypes: ["persona_example"] }),
+      retrieve(userMessage, userId, { topK: 6, minScore: 0.35, sourceTypes: ["document", "user_note"] }),
       runChainOfThought(userMessage, conversationSummary),
     ]);
 
-    // ── 2. Web fallback ──────────────────────────────────────────────────────
+    // ── 2. Web fallback ────────────────────────────────────────────────────
     let webResults: RetrievedChunk[] = [];
     if (documentChunks.length < MIN_LOCAL_CHUNKS) {
       webResults = await searchWeb(this.domainWebQuery(userMessage), 4);
     }
 
-    // ── 3. Self-evaluation ───────────────────────────────────────────────────
-    const evalResult = evaluateSelf({
-      userMessage,
-      documentChunks,
-      webResults,
-      cot,
-      memoryFactCount,
-    });
+    // ── 3. Self-eval ─────────────────────────────────────────────────────────
+    const evalResult = evaluateSelf({ userMessage, documentChunks, webResults, cot, memoryFactCount });
 
-    // ── 4. Build system prompt with domain overrides ──────────────────────────
-    // Inject PERSONA_CORE + TONE_HINT + domain section into memorySection slot
+    // ── 4. System prompt ───────────────────────────────────────────────────
     const domainSection = this.buildDomainSection(userMessage, cot, routeDecision);
     const domainHeader = [
       `## Specialista: ${this.DOMAIN.toUpperCase()}`,
@@ -136,13 +108,11 @@ export abstract class SpecialistAgent {
 
     const enrichedContext: UserContext & { memorySection?: string } = {
       ...userContext,
-      memorySection: [userContext.memorySection, domainHeader]
-        .filter(Boolean)
-        .join("\n\n"),
+      memorySection: [userContext.memorySection, domainHeader].filter(Boolean).join("\n\n"),
     };
 
     const systemPrompt = buildSystemPrompt({
-      userContext:    enrichedContext,
+      userContext: enrichedContext,
       personaExamples,
       documentChunks,
       webResults,
@@ -151,14 +121,11 @@ export abstract class SpecialistAgent {
       evalResult,
     });
 
-    // ── 5. Stream ───────────────────────────────────────────────────────────────
+    // ── 5. Stream + BUFFER ──────────────────────────────────────────────────
     const recentHistory = history.slice(-maxHistory);
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: "system", content: systemPrompt },
-      ...recentHistory.map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      })),
+      ...recentHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       { role: "user", content: userMessage },
     ];
 
@@ -166,24 +133,58 @@ export abstract class SpecialistAgent {
 
     try {
       const stream = await openai.chat.completions.create({
-        model:       SPECIALIST_MODEL,
+        model: SPECIALIST_MODEL,
         messages,
-        stream:      true,
+        stream: true,
         temperature,
-        max_tokens:  evalResult.level === "low" ? 300 : 700,
+        max_tokens: evalResult.level === "low" ? 300 : 700,
       });
 
+      // Buffer all tokens silently — client waits, but latency is acceptable
+      // because the supervisor only fires when needed and rewrites are fast.
+      const tokenBuffer: string[] = [];
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta?.content;
-        if (delta) yield { type: "token", value: delta };
+        if (delta) tokenBuffer.push(delta);
+      }
+
+      const draft = tokenBuffer.join("");
+
+      // ── 6. Supervisor evaluation ────────────────────────────────────────────
+      const supervisorInput = {
+        userMessage,
+        draft,
+        domain: routeDecision.domain,
+        intent: routeDecision.intent,
+      };
+
+      let supervisorResult = supervisorAgent.evaluate(supervisorInput);
+      let finalText = draft;
+
+      if (!supervisorResult.pass) {
+        console.log(
+          `[supervisor] FAIL (score=${supervisorResult.score}) reasons: ${supervisorResult.reasons.join(" | ")}`,
+        );
+        finalText = await supervisorAgent.rewrite(supervisorInput, supervisorResult);
+        supervisorResult = { ...supervisorResult, rewritten: true };
+      } else {
+        console.log(`[supervisor] PASS (score=${supervisorResult.score})`);
+      }
+
+      // ── 7. Stream final text to client (char by char for natural feel) ────────
+      // Chunk into ~4 char pieces to mimic streaming
+      const CHUNK_SIZE = 4;
+      for (let i = 0; i < finalText.length; i += CHUNK_SIZE) {
+        yield { type: "token", value: finalText.slice(i, i + CHUNK_SIZE) };
       }
 
       yield {
-        type:          "done",
-        sources:       [...personaExamples, ...documentChunks, ...webResults],
+        type:             "done",
+        sources:          [...personaExamples, ...documentChunks, ...webResults],
         cot,
         evalResult,
         routeDecision,
+        supervisorResult,
       };
     } catch (err) {
       yield { type: "error", message: err instanceof Error ? err.message : String(err) };
