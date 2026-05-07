@@ -29,3 +29,5 @@ export * from "./coachMemory";
 export * from "./responseFeedback";
 // Phase 10 — Session context window
 export * from "./sessionSummaries";
+// Discovery Agent System
+export * from "./discoveryItems";

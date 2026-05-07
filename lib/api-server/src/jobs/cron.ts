@@ -1,72 +1,56 @@
 /**
- * Cron job scheduler.
+ * Cron jobs — all scheduled background tasks for the API server.
  *
- * Imported ONCE in app.ts as a side-effect:
+ * SCHEDULE OVERVIEW:
+ *
+ *   Every 6 hours  — runCollector()   → collect news/opp/formation from all sources
+ *   Every 30 min   — runEnricher()    → enrich unenriched discovery items with GPT-4o-mini
+ *   Every Sunday   — analyzeSupervisorPatterns() → Phase 6 self-improvement
+ *
+ * WHY NODE-CRON:
+ *   Lightweight, no external dependencies. Works on single-process deployments
+ *   (Replit, Railway, Render). For multi-instance, migrate to BullMQ or pg-boss.
+ *
+ * NOTE: This file is imported as a SIDE EFFECT in app.ts:
  *   import "./jobs/cron";
- *
- * Schedules:
- *   - Weekly digest:              every Monday at 08:00 Europe/Rome
- *   - Supervisor pattern analysis: every Monday at 09:00 Europe/Rome
- *
- * Uses node-cron. Add to package.json if not present:
- *   pnpm add node-cron
- *   pnpm add -D @types/node-cron
- *
- * SUPERVISOR JOB (Phase 6 — self-improvement)
- * ───────────────────────────────────────────
- * Reads the last 7 days of supervisor_logs (rewrites), sends the batch
- * to GPT-4o-mini, and proposes new PLATITUDE_PATTERNS + ACTION_PATTERNS.
- * The proposal is logged to console and optionally posted to Slack
- * (set SLACK_SUPERVISOR_WEBHOOK in env). It does NOT auto-apply changes —
- * a human reviews and merges the suggested patterns.
- *
- * The job is skipped gracefully if DATABASE_URL is not set.
+ *   All schedules register on first import.
  */
 import cron from "node-cron";
-import { runWeeklyDigestForAllUsers } from "./weekly-digest";
-import { runPatternAnalysis } from "../../../integrations-openai-ai-server/src/growth-agent/supervisor-pattern-analyzer";
+import { runCollector }  from "@workspace/integrations-openai-ai-server/discovery-agent/collector-agent";
+import { runEnricher }   from "@workspace/integrations-openai-ai-server/discovery-agent/enricher-agent";
+import { analyzeSupervisorPatterns } from "@workspace/integrations-openai-ai-server/growth-agent/supervisor-pattern-analyzer";
 
-// ── Weekly Digest: every Monday at 08:00 (Europe/Rome) ─────────────────────
-cron.schedule(
-  "0 8 * * 1",
-  async () => {
-    console.log("[cron] weekly digest starting...");
-    try {
-      await runWeeklyDigestForAllUsers();
-      console.log("[cron] weekly digest complete");
-    } catch (err) {
-      console.error("[cron] weekly digest error:", err);
-    }
-  },
-  { timezone: "Europe/Rome" },
-);
+// ── Discovery: collect every 6 hours (at 00, 06, 12, 18) ────────────────────
+cron.schedule("0 */6 * * *", async () => {
+  console.log("[cron] discovery collector started");
+  try {
+    const result = await runCollector();
+    console.log("[cron] discovery collector done:", result);
+  } catch (err) {
+    console.error("[cron] discovery collector failed:", err);
+  }
+});
 
-// ── Supervisor Pattern Analysis: every Monday at 09:00 (Europe/Rome) ────────
-// Runs 1 hour after the digest to avoid concurrent DB + OpenAI pressure.
-cron.schedule(
-  "0 9 * * 1",
-  async () => {
-    console.log("[cron] supervisor pattern analysis starting...");
-    try {
-      const proposal = await runPatternAnalysis();
-      if (proposal) {
-        console.log(
-          `[cron] supervisor analysis complete — ${proposal.totalRewrites} rewrites analyzed,` +
-          ` ${proposal.newPlatitudePatterns.length} new platitude patterns,` +
-          ` ${proposal.newActionPatterns.length} new action patterns proposed`,
-        );
-      } else {
-        console.log("[cron] supervisor analysis: no rewrite logs found in last 7 days, skipped");
-      }
-    } catch (err) {
-      console.error("[cron] supervisor pattern analysis error:", err);
-    }
-  },
-  { timezone: "Europe/Rome" },
-);
+// ── Discovery: enrich every 30 minutes ──────────────────────────────────────
+cron.schedule("*/30 * * * *", async () => {
+  console.log("[cron] discovery enricher started");
+  try {
+    const result = await runEnricher(20);
+    console.log("[cron] discovery enricher done:", result);
+  } catch (err) {
+    console.error("[cron] discovery enricher failed:", err);
+  }
+});
 
-console.log(
-  "[cron] scheduler registered:\n" +
-  "  • weekly digest            — every Monday 08:00 Europe/Rome\n" +
-  "  • supervisor pattern job   — every Monday 09:00 Europe/Rome",
-);
+// ── Phase 6: supervisor pattern analysis — every Sunday at 02:00 ────────────
+cron.schedule("0 2 * * 0", async () => {
+  console.log("[cron] supervisor pattern analysis started");
+  try {
+    await analyzeSupervisorPatterns();
+    console.log("[cron] supervisor pattern analysis done");
+  } catch (err) {
+    console.error("[cron] supervisor pattern analysis failed:", err);
+  }
+});
+
+console.log("[cron] all schedules registered: collector(6h), enricher(30m), supervisor(Sun 02:00)");

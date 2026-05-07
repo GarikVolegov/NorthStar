@@ -1,20 +1,14 @@
 /**
  * Express application entrypoint.
- *
- * All routes are mounted here. Growth-agent routes sit behind JWT auth
- * middleware so every handler can safely read req.user.id.
  */
 import express from "express";
 import cors from "cors";
 import { json } from "express";
 
-// ── Middleware ───────────────────────────────────────────────────────────────────────────
 import { jwtMiddleware } from "./middleware/jwt";
-
-// ── Cron jobs (side-effect import) ─────────────────────────────────────────────────────
 import "./jobs/cron";
 
-// ── Growth Agent routes ──────────────────────────────────────────────────────────
+// Growth Agent
 import ingestRouter        from "./routes/growth-agent/ingest";
 import chatRouter          from "./routes/growth-agent/chat";
 import knowledgeRouter     from "./routes/growth-agent/knowledge";
@@ -23,9 +17,13 @@ import analyticsRouter     from "./routes/growth-agent/analytics";
 import notificationsRouter from "./routes/growth-agent/notifications";
 import feedbackRouter      from "./routes/growth-agent/feedback";      // Phase 7
 
-// ── Admin routes ───────────────────────────────────────────────────────────────────
-import analyzeSupervisorRouter from "./routes/admin/analyze-supervisor"; // Phase 6
-import agentHealthRouter       from "./routes/admin/agent-health";        // Phase 11
+// Discovery Agent System
+import discoveryFeedRouter from "./routes/discovery/feed";              // Phase D1-D4
+
+// Admin
+import analyzeSupervisorRouter  from "./routes/admin/analyze-supervisor"; // Phase 6
+import agentHealthRouter        from "./routes/admin/agent-health";        // Phase 11
+import discoveryCollectRouter   from "./routes/admin/discovery-collect";   // Discovery
 
 export function createApp() {
   const app = express();
@@ -41,15 +39,6 @@ export function createApp() {
   app.use("/api", jwtMiddleware);
 
   // Growth Agent
-  //   POST   /api/growth-agent/ingest
-  //   POST   /api/growth-agent/chat
-  //   GET    /api/growth-agent/knowledge
-  //   DELETE /api/growth-agent/knowledge/:id
-  //   GET    /api/growth-agent/memory
-  //   GET    /api/growth-agent/analytics
-  //   GET    /api/growth-agent/notifications
-  //   POST   /api/growth-agent/notifications/:id/read
-  //   POST   /api/growth-agent/feedback           (Phase 7)
   app.use("/api/growth-agent/ingest",         ingestRouter);
   app.use("/api/growth-agent/chat",           chatRouter);
   app.use("/api/growth-agent/knowledge",      knowledgeRouter);
@@ -58,11 +47,18 @@ export function createApp() {
   app.use("/api/growth-agent/notifications",  notificationsRouter);
   app.use("/api/growth-agent/feedback",       feedbackRouter);
 
+  // Discovery Agent System
+  //   GET  /api/discovery/feed                (feed personalizzato)
+  //   GET  /api/discovery/feed/:id            (item singolo)
+  app.use("/api/discovery/feed",              discoveryFeedRouter);
+
   // Admin
   //   POST /api/admin/analyze-supervisor      (Phase 6)
   //   GET  /api/admin/agent-health            (Phase 11)
+  //   POST /api/admin/discovery/collect       (Discovery manual trigger)
   app.use("/api/admin/analyze-supervisor",    analyzeSupervisorRouter);
   app.use("/api/admin/agent-health",          agentHealthRouter);
+  app.use("/api/admin/discovery/collect",     discoveryCollectRouter);
 
   app.use((_req, res) => res.status(404).json({ error: "Not found" }));
   app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
