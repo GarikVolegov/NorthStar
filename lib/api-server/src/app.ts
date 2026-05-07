@@ -22,17 +22,16 @@ import { json } from "express";
 // ── Middleware ─────────────────────────────────────────────────────────────────
 import { jwtMiddleware } from "./middleware/jwt";
 
-// ── Growth Agent routes ────────────────────────────────────────────────────────
-import ingestRouter    from "./routes/growth-agent/ingest";
-import chatRouter      from "./routes/growth-agent/chat";
-import knowledgeRouter from "./routes/growth-agent/knowledge";
-import memoryRouter    from "./routes/growth-agent/memory";
-import analyticsRouter from "./routes/growth-agent/analytics";  // ← NEW
+// ── Cron jobs (side-effect import — registers schedules on startup) ─────────────
+import "./jobs/cron";  // ← NEW: weekly digest scheduler
 
-// ── (add your other existing route imports here) ──────────────────────────────
-// import authRouter     from "./routes/auth";
-// import userRouter     from "./routes/user";
-// import sectorsRouter  from "./routes/sectors";
+// ── Growth Agent routes ────────────────────────────────────────────────────────
+import ingestRouter        from "./routes/growth-agent/ingest";
+import chatRouter          from "./routes/growth-agent/chat";
+import knowledgeRouter     from "./routes/growth-agent/knowledge";
+import memoryRouter        from "./routes/growth-agent/memory";
+import analyticsRouter     from "./routes/growth-agent/analytics";
+import notificationsRouter from "./routes/growth-agent/notifications";  // ← NEW
 
 export function createApp() {
   const app = express();
@@ -47,31 +46,26 @@ export function createApp() {
   // ── Health check (no auth) ───────────────────────────────────────────────────
   app.get("/health", (_req, res) => res.json({ ok: true }));
 
-  // ── Auth routes (no JWT required) ────────────────────────────────────────────
-  // app.use("/api/auth", authRouter);
-
   // ── Protected routes (JWT required for everything below) ─────────────────────
   app.use("/api", jwtMiddleware);
 
   // ── Growth Agent ─────────────────────────────────────────────────────────────
   //
-  //   POST   /api/growth-agent/ingest          Upload docs / persona examples
-  //   POST   /api/growth-agent/chat            SSE streaming chat
-  //   GET    /api/growth-agent/knowledge       List ingested sources
-  //   DELETE /api/growth-agent/knowledge/:id   Delete a chunk
-  //   DELETE /api/growth-agent/knowledge       Bulk delete by sourceType
-  //   GET    /api/growth-agent/memory          Fatti + pattern persistenti
-  //   GET    /api/growth-agent/analytics       Session analytics dashboard
+  //   POST   /api/growth-agent/ingest
+  //   POST   /api/growth-agent/chat
+  //   GET    /api/growth-agent/knowledge
+  //   DELETE /api/growth-agent/knowledge/:id
+  //   GET    /api/growth-agent/memory
+  //   GET    /api/growth-agent/analytics
+  //   GET    /api/growth-agent/notifications
+  //   POST   /api/growth-agent/notifications/:id/read
   //
-  app.use("/api/growth-agent/ingest",     ingestRouter);
-  app.use("/api/growth-agent/chat",       chatRouter);
-  app.use("/api/growth-agent/knowledge",  knowledgeRouter);
-  app.use("/api/growth-agent/memory",     memoryRouter);
-  app.use("/api/growth-agent/analytics",  analyticsRouter);   // ← NEW
-
-  // ── Other protected routes ──────────────────────────────────────────────────────────
-  // app.use("/api/user",     userRouter);
-  // app.use("/api/sectors",  sectorsRouter);
+  app.use("/api/growth-agent/ingest",         ingestRouter);
+  app.use("/api/growth-agent/chat",           chatRouter);
+  app.use("/api/growth-agent/knowledge",      knowledgeRouter);
+  app.use("/api/growth-agent/memory",         memoryRouter);
+  app.use("/api/growth-agent/analytics",      analyticsRouter);
+  app.use("/api/growth-agent/notifications",  notificationsRouter);  // ← NEW
 
   // ── 404 catch-all ─────────────────────────────────────────────────────────────
   app.use((_req, res) => res.status(404).json({ error: "Not found" }));

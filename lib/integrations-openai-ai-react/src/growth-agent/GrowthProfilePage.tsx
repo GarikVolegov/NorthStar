@@ -4,77 +4,82 @@
  * LAYOUT (desktop)
  * ────────────────
  *
+ *  DigestBanner (full width, appears when unread weekly digest exists)
  *  ┌────────────────────┬────────────────────────────────────┐
- *  │ Sidebar (w-80)    │  Main content area              │
- *  │                   │                                 │
- *  │ Coach card:       │  [active tab content]            │
- *  │  · Avatar         │                                 │
- *  │  · Name           │  💬  GrowthChatPanel           │
- *  │  · Online dot     │  🧠  GrowthMemoryPanel         │
- *  │  · Session count  │  📊  GrowthAnalyticsDashboard  │
- *  │                   │                                 │
- *  │ Tab nav:          │                                 │
- *  │  · Chat           │                                 │
- *  │  · Memoria        │                                 │
- *  │  · Analytics      │                                 │
+ *  │ Sidebar (w-72)    │  Main content area              │
+ *  │  Coach card       │  [active tab]                   │
+ *  │  Tab nav          │                                 │
  *  └────────────────────┴────────────────────────────────────┘
- *
- * LAYOUT (mobile)
- * ────────────────
- *  Top bar: coach card condensed + tab icons
- *  Content: active tab full-width below
  *
  * USAGE
  * ──────
- *  // In your router (React Router, Next.js page, etc.)
- *  import { GrowthProfilePage } from "@workspace/integrations-openai-ai-react";
- *
- *  export default function CoachPage() {
- *    const jwt = useAuthToken();   // your auth hook
- *    return (
- *      <GrowthProfilePage
- *        token={jwt}
- *        userName="Luca"
- *        journeyType="autonomo"
- *        userMode="esplorativo"
- *        className="h-screen"
- *      />
- *    );
- *  }
+ *  <GrowthProfilePage token={jwt} userName="Luca" journeyType="autonomo" />
  */
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { GrowthChatPanel }           from "./GrowthChatPanel";
 import { GrowthMemoryPanel }          from "./GrowthMemoryPanel";
 import { GrowthAnalyticsDashboard }   from "./GrowthAnalyticsDashboard";
 
-// ── Tab definitions ─────────────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────────
 
 type TabId = "chat" | "memory" | "analytics";
 
-const TABS: Array<{ id: TabId; label: string; icon: string; mobileIcon: string }> = [
-  { id: "chat",      label: "Chat",      icon: "💬", mobileIcon: "💬" },
-  { id: "memory",    label: "Memoria",   icon: "🧠", mobileIcon: "🧠" },
-  { id: "analytics", label: "Analytics", icon: "📊", mobileIcon: "📊" },
+const TABS: Array<{ id: TabId; label: string; icon: string }> = [
+  { id: "chat",      label: "Chat",      icon: "💬" },
+  { id: "memory",    label: "Memoria",   icon: "🧠" },
+  { id: "analytics", label: "Analytics", icon: "📊" },
 ];
 
-// ── Sidebar Coach Card ─────────────────────────────────────────────────────────
+interface AppNotification {
+  id: number;
+  type: string;
+  title: string;
+  body: string;
+  createdAt: string;
+}
+
+// ── DigestBanner ────────────────────────────────────────────────────────────
+
+function DigestBanner({
+  notification,
+  onDismiss,
+}: {
+  notification: AppNotification;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="flex items-start gap-3 px-5 py-3.5 bg-indigo-600 text-white">
+      <span className="text-xl flex-shrink-0 mt-0.5">🌟</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold leading-tight">{notification.title}</p>
+        <p className="text-xs text-indigo-200 mt-0.5 line-clamp-1">{notification.body}</p>
+      </div>
+      <button
+        onClick={onDismiss}
+        className="flex-shrink-0 text-indigo-200 hover:text-white transition-colors mt-0.5"
+        aria-label="Chiudi"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+// ── CoachCard ────────────────────────────────────────────────────────────────
 
 function CoachCard({ userName }: { userName: string }) {
   return (
     <div className="flex flex-col items-center py-8 px-4 border-b border-gray-100">
-      {/* Avatar */}
       <div className="relative">
         <div className="w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-md">
           <span className="text-white text-xl font-bold">N</span>
         </div>
-        {/* Online dot */}
         <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-400 border-2 border-white rounded-full" />
       </div>
-
       <h2 className="mt-3 text-sm font-semibold text-gray-800">Coach NorthStar</h2>
       <p className="text-xs text-gray-400">Crescita personale</p>
-
-      {/* User greeting */}
       {userName && (
         <div className="mt-4 w-full px-3 py-2.5 rounded-xl bg-indigo-50 text-center">
           <p className="text-xs text-indigo-500">Sessione di</p>
@@ -85,7 +90,7 @@ function CoachCard({ userName }: { userName: string }) {
   );
 }
 
-// ── Sidebar Tab Nav ───────────────────────────────────────────────────────────
+// ── SidebarNav ───────────────────────────────────────────────────────────────
 
 function SidebarNav({
   active,
@@ -110,9 +115,7 @@ function SidebarNav({
           >
             <span className="text-base">{tab.icon}</span>
             {tab.label}
-            {isActive && (
-              <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500" />
-            )}
+            {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500" />}
           </button>
         );
       })}
@@ -120,7 +123,7 @@ function SidebarNav({
   );
 }
 
-// ── Mobile Tab Bar ────────────────────────────────────────────────────────────
+// ── MobileTabBar ────────────────────────────────────────────────────────────
 
 function MobileTabBar({
   active,
@@ -143,7 +146,7 @@ function MobileTabBar({
                 : "text-gray-400 border-b-2 border-transparent"
             }`}
           >
-            <span className="text-lg">{tab.mobileIcon}</span>
+            <span className="text-lg">{tab.icon}</span>
             {tab.label}
           </button>
         );
@@ -162,7 +165,6 @@ export interface GrowthProfilePageProps {
   objectives?: string[];
   sectorName?: string;
   apiBase?: string;
-  /** Extra Tailwind classes on the root element */
   className?: string;
 }
 
@@ -176,73 +178,102 @@ export function GrowthProfilePage({
   apiBase = "/api",
   className = "",
 }: GrowthProfilePageProps) {
-  const [activeTab, setActiveTab] = useState<TabId>("chat");
+  const [activeTab, setActiveTab]           = useState<TabId>("chat");
+  const [notification, setNotification]     = useState<AppNotification | null>(null);
+
+  // ── Fetch unread notifications on mount ────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${apiBase}/growth-agent/notifications`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok || cancelled) return;
+        const data = await res.json() as { notifications: AppNotification[] };
+        const digest = data.notifications.find((n) => n.type === "weekly_digest");
+        if (digest && !cancelled) setNotification(digest);
+      } catch { /* silent */ }
+    })();
+    return () => { cancelled = true; };
+  }, [apiBase, token]);
+
+  // ── Dismiss banner + mark as read ─────────────────────────────────────
+  const dismissNotification = useCallback(async () => {
+    if (!notification) return;
+    setNotification(null);
+    try {
+      await fetch(`${apiBase}/growth-agent/notifications/${notification.id}/read`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch { /* silent */ }
+  }, [notification, apiBase, token]);
 
   const userContext = { name: userName, journeyType, userMode, objectives, sectorName };
   const sharedProps  = { token, apiBase };
 
   return (
-    <div className={`flex flex-col lg:flex-row bg-gray-50 ${className}`}>
+    <div className={`flex flex-col bg-gray-50 ${className}`}>
 
-      {/* ───── SIDEBAR (desktop only) ────────────────────────────────────────── */}
-      <aside className="hidden lg:flex flex-col w-72 flex-shrink-0 bg-white border-r border-gray-100 h-full">
-        <CoachCard userName={userName} />
-        <SidebarNav active={activeTab} onChange={setActiveTab} />
+      {/* ── Digest Banner (full width, above everything) ────────────────────── */}
+      {notification && (
+        <DigestBanner
+          notification={notification}
+          onDismiss={dismissNotification}
+        />
+      )}
 
-        {/* Bottom hint */}
-        <div className="mt-auto p-4">
-          <div className="rounded-xl bg-indigo-50 px-4 py-3">
-            <p className="text-xs text-indigo-600 font-medium">💡 Lo sapevi?</p>
-            <p className="text-xs text-indigo-500 mt-1">
-              Il coach ricorda le tue sessioni precedenti e adatta le risposte nel tempo.
-            </p>
+      {/* ── Main layout (sidebar + content) ─────────────────────────────────── */}
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
+
+        {/* Sidebar (desktop) */}
+        <aside className="hidden lg:flex flex-col w-72 flex-shrink-0 bg-white border-r border-gray-100 h-full">
+          <CoachCard userName={userName} />
+          <SidebarNav active={activeTab} onChange={setActiveTab} />
+          <div className="mt-auto p-4">
+            <div className="rounded-xl bg-indigo-50 px-4 py-3">
+              <p className="text-xs text-indigo-600 font-medium">💡 Lo sapevi?</p>
+              <p className="text-xs text-indigo-500 mt-1">
+                Il coach ricorda le tue sessioni precedenti e adatta le risposte nel tempo.
+              </p>
+            </div>
           </div>
-        </div>
-      </aside>
+        </aside>
 
-      {/* ───── MAIN CONTENT ─────────────────────────────────────────────────── */}
-      <main className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        {/* Main content */}
+        <main className="flex flex-col flex-1 min-h-0 overflow-hidden">
 
-        {/* Mobile tab bar */}
-        <div className="lg:hidden">
-          <MobileTabBar active={activeTab} onChange={setActiveTab} />
-        </div>
+          {/* Mobile tab bar */}
+          <div className="lg:hidden">
+            <MobileTabBar active={activeTab} onChange={setActiveTab} />
+          </div>
 
-        {/* ── TAB: CHAT ──────────────────────────────────────────────────── */}
-        {/* Keep mounted to preserve SSE state when switching tabs */}
-        <div
-          className={`flex-1 min-h-0 ${
-            activeTab === "chat" ? "flex" : "hidden"
-          }`}
-        >
-          <GrowthChatPanel
-            {...sharedProps}
-            userContext={userContext}
-            className="flex-1 rounded-none border-0 shadow-none"
-          />
-        </div>
-
-        {/* ── TAB: MEMORY ────────────────────────────────────────────────── */}
-        {activeTab === "memory" && (
-          <div className="flex-1 overflow-y-auto p-6">
-            <GrowthMemoryPanel
+          {/* Tab: Chat (kept mounted to preserve SSE) */}
+          <div className={`flex-1 min-h-0 ${activeTab === "chat" ? "flex" : "hidden"}`}>
+            <GrowthChatPanel
               {...sharedProps}
-              className="max-w-3xl mx-auto"
+              userContext={userContext}
+              className="flex-1 rounded-none border-0 shadow-none"
             />
           </div>
-        )}
 
-        {/* ── TAB: ANALYTICS ─────────────────────────────────────────────── */}
-        {activeTab === "analytics" && (
-          <div className="flex-1 overflow-y-auto p-6">
-            <GrowthAnalyticsDashboard
-              {...sharedProps}
-              className="max-w-4xl mx-auto"
-            />
-          </div>
-        )}
+          {/* Tab: Memory */}
+          {activeTab === "memory" && (
+            <div className="flex-1 overflow-y-auto p-6">
+              <GrowthMemoryPanel {...sharedProps} className="max-w-3xl mx-auto" />
+            </div>
+          )}
 
-      </main>
+          {/* Tab: Analytics */}
+          {activeTab === "analytics" && (
+            <div className="flex-1 overflow-y-auto p-6">
+              <GrowthAnalyticsDashboard {...sharedProps} className="max-w-4xl mx-auto" />
+            </div>
+          )}
+
+        </main>
+      </div>
     </div>
   );
 }
