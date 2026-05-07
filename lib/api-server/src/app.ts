@@ -18,13 +18,14 @@ import notificationsRouter from "./routes/growth-agent/notifications";
 import feedbackRouter      from "./routes/growth-agent/feedback";
 
 // Discovery Agent System
-import discoveryFeedRouter             from "./routes/discovery/feed";
-import discoverySavedRouter, { seenRouter } from "./routes/discovery/saved";
+import discoveryFeedRouter                     from "./routes/discovery/feed";
+import discoverySavedRouter, { seenRouter }    from "./routes/discovery/saved";
 
 // Admin
-import analyzeSupervisorRouter  from "./routes/admin/analyze-supervisor";
-import agentHealthRouter        from "./routes/admin/agent-health";
-import discoveryCollectRouter   from "./routes/admin/discovery-collect";
+import analyzeSupervisorRouter   from "./routes/admin/analyze-supervisor";
+import agentHealthRouter         from "./routes/admin/agent-health";
+import discoveryCollectRouter    from "./routes/admin/discovery-collect";
+import discoverySourcesRouter    from "./routes/admin/discovery-sources";
 
 export function createApp() {
   const app = express();
@@ -49,14 +50,15 @@ export function createApp() {
   app.use("/api/growth-agent/feedback",       feedbackRouter);
 
   // Discovery Agent System
-  app.use("/api/discovery/feed",    discoveryFeedRouter);   // GET /feed, GET /feed/:id
-  app.use("/api/discovery/saved",   discoverySavedRouter);  // GET /, GET /items, POST /:id  (D5)
-  app.use("/api/discovery/seen",    seenRouter);            // POST /:id  (D6)
+  app.use("/api/discovery/feed",    discoveryFeedRouter);
+  app.use("/api/discovery/saved",   discoverySavedRouter);
+  app.use("/api/discovery/seen",    seenRouter);
 
   // Admin
-  app.use("/api/admin/analyze-supervisor",   analyzeSupervisorRouter);
-  app.use("/api/admin/agent-health",         agentHealthRouter);
-  app.use("/api/admin/discovery/collect",    discoveryCollectRouter);
+  app.use("/api/admin/analyze-supervisor",    analyzeSupervisorRouter);
+  app.use("/api/admin/agent-health",          agentHealthRouter);
+  app.use("/api/admin/discovery/collect",     discoveryCollectRouter);
+  app.use("/api/admin/discovery/sources",     discoverySourcesRouter);  // ← D7+: gestione fonti
 
   app.use((_req, res) => res.status(404).json({ error: "Not found" }));
   app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

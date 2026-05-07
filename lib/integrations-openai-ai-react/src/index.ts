@@ -15,3 +15,6 @@ export * from "./discovery/DiscoveryFeedPage";
 export * from "./discovery/DiscoveryItemCard";
 export * from "./discovery/DiscoveryItemSkeleton";
 export * from "./discovery/useDiscoveryFeed";
+
+// Admin
+export * from "./admin/DiscoverySourcesManager";
