@@ -229,6 +229,55 @@ router.patch("/profile/:id/journey-type", authMiddleware, async (req, res): Prom
   res.json({ journeyType: parsed.data.journeyType });
 });
 
+// PATCH /profile/:userId/avatar — store base64 data URL as avatarUrl
+const AvatarBody = z.object({
+  avatarDataUrl: z.string().max(500_000).refine(
+    (v) => v.startsWith("data:image/"),
+    { message: "Formato immagine non valido" },
+  ),
+});
+
+router.patch("/profile/:userId/avatar", authMiddleware, async (req, res): Promise<void> => {
+  const paramId = parseInt(String(req.params.userId), 10);
+  if (isNaN(paramId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+  const authenticatedUserId = res.locals.userId as number;
+  if (paramId !== authenticatedUserId) {
+    res.status(403).json({ error: "Non autorizzato a modificare questo profilo" });
+    return;
+  }
+
+  const parsed = AvatarBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Dati non validi" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(usersTable)
+    .set({ avatarUrl: parsed.data.avatarDataUrl })
+    .where(eq(usersTable.id, authenticatedUserId))
+    .returning({ avatarUrl: usersTable.avatarUrl });
+
+  if (!updated) { res.status(404).json({ error: "Utente non trovato" }); return; }
+  res.json({ avatarUrl: updated.avatarUrl });
+});
+
+// DELETE /profile/:userId/avatar — remove avatar
+router.delete("/profile/:userId/avatar", authMiddleware, async (req, res): Promise<void> => {
+  const paramId = parseInt(String(req.params.userId), 10);
+  if (isNaN(paramId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+  const authenticatedUserId = res.locals.userId as number;
+  if (paramId !== authenticatedUserId) {
+    res.status(403).json({ error: "Non autorizzato" });
+    return;
+  }
+
+  await db.update(usersTable).set({ avatarUrl: null }).where(eq(usersTable.id, authenticatedUserId));
+  res.json({ avatarUrl: null });
+});
+
 router.post("/profile/change-password", authMiddleware, async (req, res): Promise<void> => {
   const parsed = ChangePasswordBody.safeParse(req.body);
   if (!parsed.success) {

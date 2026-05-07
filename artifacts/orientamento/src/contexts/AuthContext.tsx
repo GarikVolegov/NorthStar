@@ -15,6 +15,7 @@ export interface AuthUser {
   timezone?: string | null;
   userMode?: string | null;
   journeyType?: string | null;
+  avatarUrl?: string | null;
 }
 
 interface AuthContextValue {
