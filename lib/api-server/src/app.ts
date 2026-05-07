@@ -27,7 +27,10 @@ import agentHealthRouter        from "./routes/admin/agent-health";
 import discoveryCollectRouter   from "./routes/admin/discovery-collect";
 import discoverySourcesRouter   from "./routes/admin/discovery-sources";
 import discoveryItemsRouter     from "./routes/admin/discovery-items";
-import discoveryEnrichRouter    from "./routes/admin/discovery-enrich";   // ← nuovo
+import discoveryEnrichRouter    from "./routes/admin/discovery-enrich";
+import adminStatsRouter         from "./routes/admin/stats";       // ← nuovo
+import adminUsersRouter         from "./routes/admin/users";       // ← nuovo
+import adminRevenueRouter       from "./routes/admin/revenue";     // ← nuovo
 
 export function createApp() {
   const app = express();
@@ -56,13 +59,20 @@ export function createApp() {
   app.use("/api/discovery/saved",  discoverySavedRouter);
   app.use("/api/discovery/seen",   seenRouter);
 
-  // Admin
-  app.use("/api/admin/analyze-supervisor",   analyzeSupervisorRouter);
-  app.use("/api/admin/agent-health",         agentHealthRouter);
+  // Admin — Discovery
   app.use("/api/admin/discovery/collect",    discoveryCollectRouter);
   app.use("/api/admin/discovery/sources",    discoverySourcesRouter);
   app.use("/api/admin/discovery/items",      discoveryItemsRouter);
-  app.use("/api/admin/discovery/enrich",     discoveryEnrichRouter);   // ← nuovo
+  app.use("/api/admin/discovery/enrich",     discoveryEnrichRouter);
+
+  // Admin — System
+  app.use("/api/admin/analyze-supervisor",   analyzeSupervisorRouter);
+  app.use("/api/admin/agent-health",         agentHealthRouter);
+
+  // Admin — Dashboard KPI + Users + Revenue
+  app.use("/api/admin/stats",   adminStatsRouter);
+  app.use("/api/admin/users",   adminUsersRouter);
+  app.use("/api/admin/revenue", adminRevenueRouter);
 
   app.use((_req, res) => res.status(404).json({ error: "Not found" }));
   app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
