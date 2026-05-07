@@ -1,25 +1,23 @@
 /**
- * GrowthAgent v6 — SSE status events + adaptive threshold routing.
+ * GrowthAgent v7 — parallel multi-agent handoff.
  *
- * CHANGES v6
+ * CHANGES v7
  * ──────────
- * - Routing now uses routeDecision.threshold (adaptive) instead of fixed 0.60.
- * - Yields 'status' SSE events at each pipeline stage so the frontend can
- *   show contextual loading messages instead of a generic spinner.
+ * Adds a third routing path: ParallelHandoff.
+ * When the RouterAgent detects a multi-domain message (secondaryRoute present),
+ * instead of sending to one specialist we fork to BOTH concurrently.
  *
- * STATUS EVENTS emitted in general fallback path:
- *   "🔍 Analizzando il tuo profilo..."
- *   "🧠 Ragionamento in corso..."
- *   "✍️ Generando risposta..."
- *
- * (Specialist path emits its own status events from specialist-agent.ts v4)
- *
- * FULL FLOW:
- *   1. [PARALLEL] RouterAgent.route() + loadMemory()
- *   2a. confidence >= threshold → SpecialistAgent (emits own status)
- *   2b. fallback → general pipeline with status events
- *   3. yield 'done'
- *   4. [FIRE & FORGET] memory save
+ * ROUTING DECISION (in order):
+ * ┌─────────────────────────────────────────────────────────────┐
+ * | Multi-domain: primaryConf >= threshold AND secondaryRoute present          |
+ * |   → runParallelHandoff(primary, secondary)                                 |
+ * ├─────────────────────────────────────────────────────────────┤
+ * | Single-domain: primaryConf >= threshold AND domain != 'general'            |
+ * |   → specialist.run(primary)                                                |
+ * ├─────────────────────────────────────────────────────────────┤
+ * | Fallback: confidence < threshold OR domain = 'general'                     |
+ * |   → general pipeline (RAG + CoT + supervisor)                              |
+ * └─────────────────────────────────────────────────────────────┘
  */
 import OpenAI from "openai";
 import { openai } from "../client";
@@ -32,6 +30,7 @@ import { routerAgent } from "./router-agent";
 import { getSpecialist } from "./specialist-agent";
 import { supervisorAgent } from "./supervisor-agent";
 import { loadMemory, buildMemorySection, extractMemory, mergeMemory } from "./memory-manager";
+import { runParallelHandoff } from "./parallel-handoff";
 import type { RetrievedChunk } from "./retriever";
 import type { CoTResult } from "./chain-of-thought";
 import type { RouteDecision } from "./router-agent";
@@ -46,14 +45,15 @@ export const GROWTH_AGENT_MODEL = "gpt-4o";
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
+  domain?: RouteDecision["domain"]; // optional — used by adaptive threshold
 }
 
 export interface GrowthAgentOptions {
-  userId: number;
-  userContext: UserContext & { memorySection?: string };
-  history: ChatMessage[];
-  userMessage: string;
-  maxHistory?: number;
+  userId:          number;
+  userContext:     UserContext & { memorySection?: string };
+  history:         ChatMessage[];
+  userMessage:     string;
+  maxHistory?:     number;
   memoryFactCount?: number;
 }
 
@@ -68,7 +68,7 @@ export async function* runGrowthAgent(
   opts: GrowthAgentOptions,
 ): AsyncGenerator<
   | { type: "token";  value: string }
-  | { type: "status"; value: string }           // ← NEW v6
+  | { type: "status"; value: string; domain?: RouteDecision["domain"] }
   | { type: "done";   sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult; routeDecision?: RouteDecision; supervisorResult?: SupervisorResult }
   | { type: "error";  message: string }
 > {
@@ -83,12 +83,6 @@ export async function* runGrowthAgent(
     }),
   ]);
 
-  console.log(
-    `[agent] domain=${routeDecision.domain} intent=${routeDecision.intent} ` +
-    `conf=${routeDecision.confidence.toFixed(2)} threshold=${routeDecision.threshold.toFixed(2)} ` +
-    `| memory: ${userMemory.facts.length} facts, ${userMemory.patterns.length} patterns`,
-  );
-
   const memorySection   = buildMemorySection(userMemory);
   const memoryFactCount = userMemory.facts.length;
 
@@ -96,6 +90,14 @@ export async function* runGrowthAgent(
     ...userContext,
     memorySection: memorySection || userContext.memorySection,
   };
+
+  console.log(
+    `[agent] domain=${routeDecision.domain}(${routeDecision.confidence.toFixed(2)}) threshold=${routeDecision.threshold.toFixed(2)}` +
+    (routeDecision.secondaryRoute
+      ? ` + secondary=${routeDecision.secondaryRoute.domain}(${routeDecision.secondaryRoute.confidence.toFixed(2)})`
+      : "") +
+    ` | memory: ${userMemory.facts.length} facts`,
+  );
 
   function scheduleMemorySave(assistantResponse: string, sessionId: number): void {
     const turns = [
@@ -116,8 +118,32 @@ export async function* runGrowthAgent(
     })();
   }
 
-  // ── 2a. Specialist path (uses adaptive threshold) ──────────────────────────
-  if (routeDecision.confidence >= routeDecision.threshold && routeDecision.domain !== "general") {
+  const primaryConfident =
+    routeDecision.confidence >= routeDecision.threshold &&
+    routeDecision.domain !== "general";
+
+  // ── 2a. PARALLEL HANDOFF ──────────────────────────────────────────────────────
+  if (primaryConfident && routeDecision.secondaryRoute) {
+    let fullResponse = "";
+    for await (const event of runParallelHandoff({
+      userId,
+      userContext:     enrichedContext,
+      history,
+      userMessage,
+      primaryRoute:   routeDecision,
+      secondaryRoute: routeDecision.secondaryRoute,
+      memoryFactCount,
+      maxHistory,
+    })) {
+      if (event.type === "token") fullResponse += event.value;
+      yield event;
+      if (event.type === "done") scheduleMemorySave(fullResponse, Date.now());
+    }
+    return;
+  }
+
+  // ── 2b. SINGLE SPECIALIST ───────────────────────────────────────────────────────
+  if (primaryConfident) {
     const specialist = getSpecialist(routeDecision.domain);
     if (specialist) {
       let fullResponse = "";
@@ -133,7 +159,7 @@ export async function* runGrowthAgent(
     }
   }
 
-  // ── 2b. General fallback with status events ─────────────────────────────────
+  // ── 2c. GENERAL FALLBACK ───────────────────────────────────────────────────────
   yield { type: "status", value: "🔍 Analizzando il tuo profilo..." };
 
   const conversationSummary = buildConversationSummary(history);
@@ -179,14 +205,14 @@ export async function* runGrowthAgent(
       if (delta) tokenBuffer.push(delta);
     }
 
-    const draft = tokenBuffer.join("");
+    const draft         = tokenBuffer.join("");
     const supervisorInput = { userMessage, draft, domain: routeDecision.domain, intent: routeDecision.intent };
     let supervisorResult  = supervisorAgent.evaluate(supervisorInput);
     let finalText         = draft;
 
     if (!supervisorResult.pass) {
       console.log(`[supervisor] FAIL (score=${supervisorResult.score})`);
-      finalText = await supervisorAgent.rewrite(supervisorInput, supervisorResult);
+      finalText        = await supervisorAgent.rewrite(supervisorInput, supervisorResult);
       supervisorResult = { ...supervisorResult, rewritten: true };
     } else {
       console.log(`[supervisor] PASS (score=${supervisorResult.score})`);

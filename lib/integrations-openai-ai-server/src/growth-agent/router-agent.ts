@@ -1,28 +1,28 @@
 /**
- * RouterAgent v2 — adaptive confidence threshold.
+ * RouterAgent v3 — multi-domain detection + adaptive threshold.
  *
- * CHANGES v2
+ * CHANGES v3
  * ──────────
- * The routing threshold is no longer a fixed 0.60.
- * It adapts dynamically based on two signals:
+ * Adds multi-domain routing: when a message spans two domains (e.g. career +
+ * mindset: "non riesco a mandare CV per paura del rifiuto"), the router now
+ * returns a second RouteDecision in the `secondaryRoute` field.
  *
- *   1. MESSAGE LENGTH — short messages (<8 words) are naturally ambiguous.
- *      A short message like "non so cosa fare" deserves the specialist even
- *      at confidence 0.52. Threshold lowered by 0.08 for short messages.
+ * The LLM is asked to optionally identify a secondary domain.
+ * If `secondaryDomain` is present in the JSON and its confidence is >= 0.45,
+ * agent.ts v7 will fork to ParallelHandoff instead of a single specialist.
  *
- *   2. DOMAIN CONTINUITY — if the last 4 turns already established a domain
- *      (e.g. we've been talking about career for 3 exchanges), a borderline
- *      message should stay in that domain. Threshold lowered by 0.10 if
- *      the same domain appears ≥2 times in recent assistant turns.
- *
- * FLOOR: threshold never goes below 0.40 to prevent routing garbage.
- * CEILING: base threshold remains 0.60.
- *
- * RESULT:
- *   Short + in-context message: threshold can reach 0.42 (0.60 - 0.08 - 0.10)
- *   Short only:                  0.52
- *   In-context only:             0.50
- *   Normal (no signals):         0.60
+ * ROUTING DECISION TABLE:
+ * ┌────────────────────────────────────────────────────────────────────────────┐
+ * | primary.confidence >= threshold                                            |
+ * |   AND secondaryRoute present AND secondaryRoute.confidence >= 0.45        |
+ * |   → ParallelHandoff(primary, secondary)                                   |
+ * ├────────────────────────────────────────────────────────────────────────────┤
+ * | primary.confidence >= threshold AND domain != 'general' (single domain)   |
+ * |   → SpecialistAgent(primary)                                               |
+ * ├────────────────────────────────────────────────────────────────────────────┤
+ * | primary.confidence < threshold OR domain = 'general'                      |
+ * |   → GrowthAgent general fallback                                           |
+ * └────────────────────────────────────────────────────────────────────────────┘
  */
 import { openai } from "../client";
 import type { ChatMessage } from "./agent";
@@ -47,17 +47,18 @@ export type Intent =
 export interface RouteDecision {
   domain:          Domain;
   intent:          Intent;
-  confidence:      number;  // raw confidence from LLM (0-1)
-  threshold:       number;  // adaptive threshold used for routing decision
-  reasoning:       string;  // one sentence, dev-facing
-  handoffContext:  string;  // short summary passed to specialist
+  confidence:      number;    // raw confidence from LLM (0-1)
+  threshold:       number;    // adaptive threshold used for routing decision
+  reasoning:       string;    // one sentence, dev-facing
+  handoffContext:  string;    // short summary passed to specialist
+  secondaryRoute?: RouteDecision;  // NEW v3 — optional second domain
 }
 
 // ── System prompt ──────────────────────────────────────────────────────────────
 
 const ROUTER_SYSTEM = `
 Sei un router intelligente per un sistema multi-agente di coaching.
-Il tuo unico compito è classificare il messaggio dell'utente.
+Il tuo compito è classificare il messaggio dell'utente.
 
 DOMAINS disponibili:
 - career:   lavoro, CV, colloqui, stipendio, cambio carriera, networking
@@ -74,29 +75,39 @@ INTENTS disponibili:
 - vent:          l'utente ha bisogno di essere ascoltato prima di essere guidato
 - ask_info:      l'utente vuole informazioni fattuali
 
-Rispondi SOLO con JSON valido (nessun testo fuori dal JSON):
+IMPORTANTE: se il messaggio tocca CHIARAMENTE due domini distinti, compila anche
+i campi secondaryDomain, secondaryConfidence, secondaryIntent, secondaryHandoffContext.
+Non forzare un secondo dominio se non è evidente.
+
+Rispondi SOLO con JSON valido:
 {
   "domain": "career",
   "intent": "problem_solve",
   "confidence": 0.85,
-  "reasoning": "L'utente chiede consigli specifici su come negoziare lo stipendio in un colloquio.",
-  "handoffContext": "L'utente affronta un colloquio e vuole strategie concrete per la negoziazione salariale."
+  "reasoning": "L'utente chiede come negoziare lo stipendio.",
+  "handoffContext": "Vuole strategie concrete per la negoziazione salariale.",
+  "secondaryDomain": "mindset",
+  "secondaryConfidence": 0.60,
+  "secondaryIntent": "reflect",
+  "secondaryHandoffContext": "Mostra ansia e blocco emotivo legato al chiedere uno stipendio più alto."
 }
+I campi secondary* sono OPZIONALI. Omettili se il messaggio è chiaramente mono-dominio.
 `.trim();
 
-// ── Adaptive threshold ──────────────────────────────────────────────────────────
+// ── Adaptive threshold (unchanged from v2) ───────────────────────────────────
 
-const BASE_THRESHOLD = 0.60;
+const BASE_THRESHOLD  = 0.60;
 const FLOOR_THRESHOLD = 0.40;
+const SECONDARY_MIN_CONFIDENCE = 0.45;
 
-/**
- * Computes the routing confidence threshold dynamically.
- *
- * @param userMessage  The current user message
- * @param domain       The domain returned by the LLM
- * @param history      Recent conversation turns
- * @returns            Threshold (0.40 – 0.60)
- */
+const DOMAIN_KEYWORDS: Record<Domain, string[]> = {
+  career:  ["lavoro", "cv", "colloquio", "stipendio", "carriera", "job", "work", "offerta"],
+  mindset: ["credenza", "paura", "blocco", "mente", "pensiero", "psicolog", "belief", "mindset"],
+  habits:  ["abitudine", "routine", "produttiv", "sonno", "energia", "focus", "habit"],
+  trading: ["trading", "mercato", "xauusd", "forex", "macro", "trade", "borsa", "crypto"],
+  general: [],
+};
+
 function computeAdaptiveThreshold(
   userMessage: string,
   domain: Domain,
@@ -104,60 +115,45 @@ function computeAdaptiveThreshold(
 ): number {
   let threshold = BASE_THRESHOLD;
 
-  // Signal 1: Short messages are naturally ambiguous — lower the bar
   const wordCount = userMessage.trim().split(/\s+/).length;
-  if (wordCount < 8) {
-    threshold -= 0.08;
-  }
+  if (wordCount < 8) threshold -= 0.08;
 
-  // Signal 2: Domain continuity in recent assistant turns
-  // We store domain on messages when available (cast to extended type)
-  const recentHistory = history.slice(-6);
+  const recentHistory  = history.slice(-6);
   const domainMatchCount = recentHistory.filter(
     (m) => m.role === "assistant" && (m as ChatMessage & { domain?: Domain }).domain === domain,
   ).length;
-
-  // Also check if recent user messages contain domain keywords
-  const DOMAIN_KEYWORDS: Record<Domain, string[]> = {
-    career:  ["lavoro", "lavoro", "cv", "colloquio", "stipendio", "carriera", "job", "work", "offerta"],
-    mindset: ["credenza", "paura", "blocco", "mente", "pensiero", "psicolog", "belief", "mindset"],
-    habits:  ["abitudine", "routine", "produttiv", "sonno", "energia", "focus", "habit"],
-    trading: ["trading", "mercato", "xauusd", "forex", "macro", "trade", "borsa", "crypto"],
-    general: [],
-  };
 
   const keywords = DOMAIN_KEYWORDS[domain] ?? [];
   const recentUserText = recentHistory
     .filter((m) => m.role === "user")
     .map((m) => m.content.toLowerCase())
     .join(" ");
-
   const keywordMatches = keywords.filter((kw) => recentUserText.includes(kw)).length;
 
-  if (domainMatchCount >= 2 || keywordMatches >= 2) {
-    threshold -= 0.10;
-  }
+  if (domainMatchCount >= 2 || keywordMatches >= 2) threshold -= 0.10;
 
   const final = Math.max(FLOOR_THRESHOLD, threshold);
-
   if (final < BASE_THRESHOLD) {
-    console.log(
-      `[router] adaptive threshold: ${BASE_THRESHOLD} → ${final.toFixed(2)} ` +
-      `(words=${wordCount}, domainMatch=${domainMatchCount}, kwMatch=${keywordMatches})`,
-    );
+    console.log(`[router] adaptive threshold: ${BASE_THRESHOLD} → ${final.toFixed(2)} (words=${wordCount}, dm=${domainMatchCount}, kw=${keywordMatches})`);
   }
-
   return final;
 }
 
-// ── RouterAgent class ───────────────────────────────────────────────────────────────
+// ── RouterAgent v3 ──────────────────────────────────────────────────────────────────
+
+interface RawRouteResponse {
+  domain?:               string;
+  intent?:               string;
+  confidence?:           number;
+  reasoning?:            string;
+  handoffContext?:       string;
+  secondaryDomain?:      string;
+  secondaryConfidence?:  number;
+  secondaryIntent?:      string;
+  secondaryHandoffContext?: string;
+}
 
 export class RouterAgent {
-  /**
-   * Classifies the user message and returns a RouteDecision.
-   * Uses last 4 turns of history for context.
-   * Falls back to { domain: 'general', confidence: 0 } on any error.
-   */
   async route(
     userMessage: string,
     history: ChatMessage[] = [],
@@ -179,18 +175,41 @@ export class RouterAgent {
           { role: "user",   content: userContent },
         ],
         temperature:     0.1,
-        max_tokens:      200,
+        max_tokens:      300,
         response_format: { type: "json_object" },
       });
 
       const raw    = res.choices[0]?.message?.content ?? "{}";
-      const parsed = JSON.parse(raw) as Partial<RouteDecision>;
+      const parsed = JSON.parse(raw) as RawRouteResponse;
 
-      const domain: Domain    = (parsed.domain as Domain) ?? "general";
-      const confidence: number = typeof parsed.confidence === "number" ? parsed.confidence : 0;
+      const domain: Domain     = (parsed.domain as Domain) ?? "general";
+      const confidence: number  = typeof parsed.confidence === "number" ? parsed.confidence : 0;
+      const threshold           = computeAdaptiveThreshold(userMessage, domain, history);
 
-      // Compute adaptive threshold AFTER we know the domain
-      const threshold = computeAdaptiveThreshold(userMessage, domain, history);
+      // Build optional secondary route
+      let secondaryRoute: RouteDecision | undefined;
+      if (
+        parsed.secondaryDomain &&
+        parsed.secondaryDomain !== domain &&
+        parsed.secondaryDomain !== "general" &&
+        typeof parsed.secondaryConfidence === "number" &&
+        parsed.secondaryConfidence >= SECONDARY_MIN_CONFIDENCE
+      ) {
+        const secDomain     = parsed.secondaryDomain as Domain;
+        const secConfidence = parsed.secondaryConfidence;
+        const secThreshold  = computeAdaptiveThreshold(userMessage, secDomain, history);
+
+        secondaryRoute = {
+          domain:         secDomain,
+          intent:         (parsed.secondaryIntent as Intent) ?? "explore",
+          confidence:     secConfidence,
+          threshold:      secThreshold,
+          reasoning:      "",
+          handoffContext: parsed.secondaryHandoffContext ?? userMessage,
+        };
+
+        console.log(`[router] multi-domain detected: ${domain}(${confidence.toFixed(2)}) + ${secDomain}(${secConfidence.toFixed(2)})`);
+      }
 
       return {
         domain,
@@ -199,6 +218,7 @@ export class RouterAgent {
         threshold,
         reasoning:      parsed.reasoning      ?? "",
         handoffContext: parsed.handoffContext  ?? userMessage,
+        secondaryRoute,
       };
     } catch (err) {
       console.warn("[router] classification failed, falling back to general:", err);
@@ -214,5 +234,4 @@ export class RouterAgent {
   }
 }
 
-// Singleton
 export const routerAgent = new RouterAgent();
