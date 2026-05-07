@@ -10,8 +10,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useReducedMotion, easings } from "@/lib/motion";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "@/lib/api-fetch";
-import { LyraAvatar } from "@/components/lyra-avatar";
+import { WendyAvatar } from "@/components/wendy-avatar";
 import { SCENARIOS } from "@/lib/test-scenarios";
+import { speak, stopSpeech, startAmbientPad, stopAmbientPad } from "@/lib/wendy-voice";
 
 const BASE = import.meta.env.BASE_URL || "/";
 const DRAFT_KEY = "northstar_test_draft";
@@ -74,12 +75,10 @@ const PHASE_BG = [
   "bg-amber-50 dark:bg-amber-950/40",
 ] as const;
 
-// Durata e easing della transizione welcome → test
-// Usati sia nell'exit della welcome che nell'enter del test per sincronizzarli
-const WELCOME_EXIT_DURATION = 0.42;  // welcome sale via
-const TEST_ENTER_DURATION   = 0.38;  // test entra dal basso
-const SLIDE_EASE_IN  = [0.4, 0, 1, 1] as const;   // accelera all'uscita
-const SLIDE_EASE_OUT = [0.16, 1, 0.3, 1] as const; // rallenta all'entrata
+const WELCOME_EXIT_DURATION = 0.42;
+const TEST_ENTER_DURATION   = 0.38;
+const SLIDE_EASE_IN  = [0.4, 0, 1, 1] as const;
+const SLIDE_EASE_OUT = [0.16, 1, 0.3, 1] as const;
 
 interface TestDraft {
   step: number;
@@ -197,6 +196,21 @@ interface WelcomeScreenProps { userName?: string; reduced: boolean; onStart: () 
 function WelcomeScreen({ userName, reduced, onStart }: WelcomeScreenProps) {
   const startBtnRef = useRef<HTMLButtonElement>(null);
   useEffect(() => { startBtnRef.current?.focus(); }, []);
+
+  // Wendy si presenta a voce dopo 800ms (attende l'animazione d'entrata)
+  useEffect(() => {
+    if (reduced) return;
+    const firstName = userName?.split(" ")[0];
+    const greeting = firstName ? `Ciao ${firstName},` : "Ciao,";
+    const id = setTimeout(() => {
+      speak(
+        `${greeting} sono Wendy, la tua guida all’orientamento professionale. È un piacere conoscerti. Quando sei pronta, inizia il percorso.`,
+        { interrupt: true },
+      );
+    }, 800);
+    return () => { clearTimeout(id); stopSpeech(); };
+  }, [reduced, userName]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onStart(); }
@@ -221,7 +235,6 @@ function WelcomeScreen({ userName, reduced, onStart }: WelcomeScreenProps) {
           className="flex flex-col items-center text-center gap-5 w-full max-w-lg mx-auto sm:gap-6"
           variants={containerVariants} initial="hidden" animate="show"
         >
-          {/* Avatar + halo */}
           <motion.div variants={itemVariants} className="relative">
             {!reduced && (
               <motion.div
@@ -232,22 +245,20 @@ function WelcomeScreen({ userName, reduced, onStart }: WelcomeScreenProps) {
                 style={{ background: "var(--primary)", filter: "blur(28px)", width: "100%", height: "100%" }}
               />
             )}
-            <LyraAvatar state="curious" phase={0} reduced={reduced} size={140}
+            <WendyAvatar state="curious" phase={0} reduced={reduced} size={140}
               className="shadow-lg relative z-10 sm:w-[170px] sm:h-[170px]" />
           </motion.div>
 
-          {/* Greeting + titolo */}
           <motion.div variants={itemVariants} className="space-y-1 sm:space-y-2">
             <p className="text-sm sm:text-base text-muted-foreground font-medium">{greeting}</p>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold text-foreground leading-tight">
-              Sono Lyra, la tua guida
+              Sono Wendy, la tua guida
             </h1>
             <p className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold text-primary leading-tight">
               all’orientamento professionale.
             </p>
           </motion.div>
 
-          {/* Sottotitolo */}
           <motion.p variants={itemVariants}
             className="text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed max-w-sm sm:max-w-md"
           >
@@ -255,7 +266,6 @@ function WelcomeScreen({ userName, reduced, onStart }: WelcomeScreenProps) {
             pensi e vuoi crescere — e costruisco il tuo profilo professionale su misura.
           </motion.p>
 
-          {/* Pillole */}
           <motion.div variants={itemVariants} className="flex flex-wrap items-center justify-center gap-2">
             <div className="flex items-center gap-1.5 bg-muted/60 border border-border/50 rounded-full px-3 py-1.5 text-xs font-medium text-muted-foreground">
               <span className="text-sm">📝</span>{ALL_IDS.length} domande
@@ -268,7 +278,6 @@ function WelcomeScreen({ userName, reduced, onStart }: WelcomeScreenProps) {
             </div>
           </motion.div>
 
-          {/* CTA inline sm+ */}
           <motion.div variants={itemVariants} className="hidden sm:flex flex-col items-center gap-3 pt-2 w-full">
             <Button ref={startBtnRef} size="lg" onClick={onStart}
               className="rounded-full px-8 h-14 text-base font-semibold w-full sm:w-auto gap-2"
@@ -283,7 +292,6 @@ function WelcomeScreen({ userName, reduced, onStart }: WelcomeScreenProps) {
           </motion.div>
         </motion.div>
 
-        {/* CTA sticky mobile */}
         <motion.div
           className="sm:hidden mt-6 w-full flex flex-col items-center gap-2"
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
@@ -334,6 +342,39 @@ export default function Test() {
 
   const [lyraHasEntered, setLyraHasEntered] = useState(false);
   const assignedSessionRef = useRef<number | null>(null);
+  const speakTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup speech e pad all'unmount
+  useEffect(() => {
+    return () => {
+      stopSpeech();
+      stopAmbientPad(0.5);
+      if (speakTimerRef.current) clearTimeout(speakTimerRef.current);
+    };
+  }, []);
+
+  // Avvia pad ambientale quando il test inizia (non durante la welcome)
+  useEffect(() => {
+    if (showWelcome || prefersReduced) return;
+    startAmbientPad();
+    return () => stopAmbientPad();
+  }, [showWelcome, prefersReduced]);
+
+  // Legge il testo della domanda ad ogni cambio step
+  useEffect(() => {
+    if (showWelcome || prefersReduced) return;
+    const id = ALL_IDS[currentStep];
+    if (!id) return;
+    const text = currentStep < SPIRITS_START
+      ? t(`test.questions.riasec.${id}`)
+      : currentStep < SPIRITS_END
+      ? t(`test.questions.spirits.${id}`)
+      : t(`test.questions.ctx.${id}`);
+    if (speakTimerRef.current) clearTimeout(speakTimerRef.current);
+    speakTimerRef.current = setTimeout(() => speak(text, { interrupt: true }), 350);
+    return () => { if (speakTimerRef.current) clearTimeout(speakTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, showWelcome, prefersReduced]);
 
   useEffect(() => {
     if (resumed || prefersReduced || currentStep !== 0) { setLyraHasEntered(true); return; }
@@ -438,6 +479,8 @@ export default function Test() {
   const handleDismissDraft = () => { clearDraft(); setResumeBannerVisible(false); };
 
   const handleSubmit = () => {
+    stopSpeech();
+    stopAmbientPad();
     submitTest.mutate({ data: { answers } }, {
       onSuccess: async (session) => {
         saveDraft({ step: currentStep, answers, savedAt: Date.now(), sessionId: session.id });
@@ -464,30 +507,9 @@ export default function Test() {
     ctx:     { label: "Obiettivi",          emoji: "🎯", description: "Ultime domande: allineiamo il percorso ai tuoi obiettivi" },
   } as const;
 
-  // ──────────────────────────────────────────────────────────────────────────────
-  //
-  // AnimatePresence TOP-LEVEL: gestisce la transizione welcome → test.
-  //
-  // Struttura:
-  //   <AnimatePresence mode="wait">
-  //     {showWelcome
-  //       ? <motion.div key="welcome" ...> ← welcome sale via
-  //       : <motion.div key="test">     ← test entra dal basso
-  //     }
-  //   </AnimatePresence>
-  //
-  // Perché non basta l'AnimatePresence dentro il return condizionale:
-  // React smonta il componente prima che exit possa girare se il return
-  // cambia branch. Con chiave esplicita sullo stesso AnimatePresence,
-  // Framer anima prima l'exit di "welcome", poi monta "test".
-  //
-  // ──────────────────────────────────────────────────────────────────────────────
-
   return (
     <AnimatePresence mode="wait">
       {showWelcome ? (
-
-        // ── Welcome ──────────────────────────────────────────────────────
         <motion.div
           key="welcome"
           initial={prefersReduced ? { opacity: 0 } : { opacity: 0 }}
@@ -495,12 +517,7 @@ export default function Test() {
           exit={
             prefersReduced
               ? { opacity: 0, transition: { duration: 0.15 } }
-              : {
-                  opacity: 0,
-                  y: -60,
-                  scale: 0.97,
-                  transition: { duration: WELCOME_EXIT_DURATION, ease: SLIDE_EASE_IN },
-                }
+              : { opacity: 0, y: -60, scale: 0.97, transition: { duration: WELCOME_EXIT_DURATION, ease: SLIDE_EASE_IN } }
           }
           transition={{ duration: 0.25 }}
           style={{ willChange: "transform, opacity" }}
@@ -508,34 +525,22 @@ export default function Test() {
           <WelcomeScreen
             userName={user?.name ?? user?.email}
             reduced={prefersReduced}
-            onStart={() => setShowWelcome(false)}
+            onStart={() => { stopSpeech(); setShowWelcome(false); }}
           />
         </motion.div>
 
       ) : (
-
-        // ── Test + Completion ───────────────────────────────────────────────
         <motion.div
           key="test"
-          initial={
-            prefersReduced
-              ? { opacity: 0 }
-              : { opacity: 0, y: 32 }
-          }
+          initial={prefersReduced ? { opacity: 0 } : { opacity: 0, y: 32 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, transition: { duration: 0.15 } }}
-          transition={
-            prefersReduced
-              ? { duration: 0.15 }
-              : { duration: TEST_ENTER_DURATION, ease: SLIDE_EASE_OUT }
-          }
+          transition={prefersReduced ? { duration: 0.15 } : { duration: TEST_ENTER_DURATION, ease: SLIDE_EASE_OUT }}
           style={{ willChange: "transform, opacity" }}
         >
-
-          {/* Completion */}
           {isComplete ? (
             <div className="container max-w-2xl mx-auto px-4 py-24 flex flex-col items-center justify-center min-h-[70vh] text-center">
-              <LyraAvatar state="celebrating" phase={2} size={140} className="mb-8 shadow-lg" />
+              <WendyAvatar state="celebrating" phase={2} size={140} className="mb-8 shadow-lg" />
               <h1 className="text-3xl md:text-4xl font-serif font-bold mb-4">{t("test.complete.title")}</h1>
               <p className="text-lg text-muted-foreground mb-2 leading-relaxed">{t("test.complete.subtitle")}</p>
               {user && <p className="text-sm text-primary font-medium mb-6">{t("test.complete.savedAccount")}</p>}
@@ -546,13 +551,9 @@ export default function Test() {
               </Button>
               {submitTest.isError && <p className="mt-4 text-sm text-destructive">{t("test.complete.submitError")}</p>}
             </div>
-
           ) : (
-
-            /* Question screen */
             <div className="container max-w-5xl mx-auto px-4 py-10 min-h-[80vh]">
 
-              {/* Resume banner */}
               {(() => {
                 const showResumeBanner = !!draft && resumeBannerVisible && !resumed
                   && currentStep === 0 && Object.keys(answers).length === 0;
@@ -580,7 +581,6 @@ export default function Test() {
                 );
               })()}
 
-              {/* Phase stepper */}
               <div className="flex items-center justify-center gap-1.5 mb-4">
                 {PHASE_LABELS.map((label, i) => {
                   const isActive = currentPhase === i;
@@ -610,7 +610,6 @@ export default function Test() {
                 })}
               </div>
 
-              {/* Header back + counter */}
               <div className="flex items-center justify-between mb-3">
                 <motion.button onClick={handleBack} disabled={currentStep === 0 || justSelected !== null}
                   className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
@@ -621,13 +620,11 @@ export default function Test() {
                 <span className="text-sm text-muted-foreground">{headerLabel}</span>
               </div>
 
-              {/* Progress bar */}
               <motion.div initial={false} animate={{ scaleX: progress / 100 }}
                 transition={prefersReduced ? { duration: 0 } : { duration: 0.4, ease: easings.easeOut }}
                 style={{ transformOrigin: "left" }} className="h-1 bg-primary rounded-full mb-8"
               />
 
-              {/* Section divider */}
               <AnimatePresence>
                 {activeDivider && (
                   <SectionDivider key={activeDivider}
@@ -639,10 +636,8 @@ export default function Test() {
                 )}
               </AnimatePresence>
 
-              {/* Layout due colonne */}
               <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8 items-start">
 
-                {/* Avatar + bubble */}
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={`avatar-col-${currentPhase}`}
@@ -674,10 +669,10 @@ export default function Test() {
                         style={{ background: "var(--primary)", filter: "blur(28px)" }}
                       />
                     )}
-                    <LyraAvatar state={scenario?.avatarState ?? "focused"} phase={currentPhase}
+                    <WendyAvatar state={scenario?.avatarState ?? "focused"} phase={currentPhase}
                       reduced={prefersReduced} size={140} className="shadow-sm relative z-10" />
                     <div className="text-center">
-                      <p className="text-xs font-semibold tracking-widest uppercase text-muted-foreground/60">Lyra</p>
+                      <p className="text-xs font-semibold tracking-widest uppercase text-muted-foreground/60">Wendy</p>
                       <p className="text-xs text-muted-foreground/50">Orientamento AI</p>
                     </div>
                     <AnimatePresence>
@@ -700,7 +695,6 @@ export default function Test() {
                   </motion.div>
                 </AnimatePresence>
 
-                {/* Domanda + opzioni */}
                 <AnimatePresence mode="wait" custom={direction}>
                   <motion.div key={currentStep} custom={direction} variants={questionVariants} initial="enter" animate="center" exit="exit">
 
