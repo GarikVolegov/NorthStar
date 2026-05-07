@@ -1,16 +1,17 @@
 /**
- * GrowthAgent v2 — orchestrates the full RAG + CoT + tone pipeline.
+ * GrowthAgent v3 — adds self-evaluation layer.
  *
- * Flow per ogni messaggio:
- *   1. Retrieve persona examples  (chi è il coach)
- *   2. Retrieve document chunks   (cosa sa il coach)
- *   3. Web search fallback        (se kb locale è scarsa)
- *   4. [NEW] Hidden CoT pass      (cosa sta DAVVERO succedendo)
- *   5. Build system prompt        (tutto assemblato con tono + Socratica)
- *   6. Stream GPT-4o response     (la risposta finale all'utente)
+ * Flow per messaggio:
+ *   1. Retrieve persona examples     (chi è il coach)
+ *   2. Retrieve document chunks      (cosa sa il coach)
+ *   3. Web search fallback           (se kb locale è scarsa)
+ *   4. [PARALLEL] Hidden CoT         (cosa sta davvero succedendo)
+ *   5. [PARALLEL] Self-evaluation    (ho abbastanza contesto per rispondere bene?)
+ *   6. Build system prompt           (con tono + memoria + incertezza + Socratica)
+ *   7. Stream GPT-4o response
  *
- * The CoT pass (step 4) runs in PARALLEL with steps 1-3 to save latency.
- * Total added latency: ~0ms (parallel) + 300ms CoT if not cached.
+ * Steps 4 and 5 run in parallel AFTER retrieval — zero extra latency.
+ * evalResult is returned in the 'done' SSE event for the frontend badge.
  */
 import OpenAI from "openai";
 import { openai } from "../client";
@@ -18,6 +19,7 @@ import { retrieve } from "./retriever";
 import { searchWeb, MIN_LOCAL_CHUNKS } from "./web-search";
 import { buildSystemPrompt, type UserContext } from "./prompt-builder";
 import { runChainOfThought } from "./chain-of-thought";
+import { evaluateSelf, type EvalResult } from "./self-evaluator";
 import type { RetrievedChunk } from "./retriever";
 import type { CoTResult } from "./chain-of-thought";
 
@@ -30,17 +32,17 @@ export interface ChatMessage {
 
 export interface GrowthAgentOptions {
   userId: number;
-  userContext: UserContext;
+  userContext: UserContext & { memorySection?: string };
   history: ChatMessage[];
   userMessage: string;
   maxHistory?: number;
+  /** Number of memory facts loaded — used by self-evaluator */
+  memoryFactCount?: number;
 }
 
-/** Builds a short conversation summary for CoT context (last 2 exchanges) */
 function buildConversationSummary(history: ChatMessage[]): string {
-  const last4 = history.slice(-4);
-  if (last4.length === 0) return "";
-  return last4
+  return history
+    .slice(-4)
     .map((m) => `${m.role === "user" ? "Utente" : "Coach"}: ${m.content.slice(0, 200)}`)
     .join("\n");
 }
@@ -49,52 +51,54 @@ export async function* runGrowthAgent(
   opts: GrowthAgentOptions,
 ): AsyncGenerator<
   | { type: "token"; value: string }
-  | { type: "done"; sources: RetrievedChunk[]; cot?: CoTResult | null }
+  | { type: "done"; sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult }
   | { type: "error"; message: string }
 > {
-  const { userId, userContext, history, userMessage, maxHistory = 12 } = opts;
+  const {
+    userId,
+    userContext,
+    history,
+    userMessage,
+    maxHistory = 12,
+    memoryFactCount = 0,
+  } = opts;
 
-  // ── Steps 1-4: Run RAG retrieval + CoT in parallel ─────────────────────────
   const conversationSummary = buildConversationSummary(history);
 
-  const [
-    personaExamples,
-    documentChunks,
-    cot,
-  ] = await Promise.all([
-    // 1. Persona examples
-    retrieve(userMessage, userId, {
-      topK: 3,
-      minScore: 0.30,
-      sourceTypes: ["persona_example"],
-    }),
-    // 2. Document knowledge
-    retrieve(userMessage, userId, {
-      topK: 5,
-      minScore: 0.35,
-      sourceTypes: ["document", "user_note"],
-    }),
-    // 4. Hidden CoT (parallel with retrieval — adds ~0ms to latency)
+  // ── Steps 1-2: RAG retrieval ────────────────────────────────────────────────
+  const [personaExamples, documentChunks, cot] = await Promise.all([
+    retrieve(userMessage, userId, { topK: 3, minScore: 0.30, sourceTypes: ["persona_example"] }),
+    retrieve(userMessage, userId, { topK: 5, minScore: 0.35, sourceTypes: ["document", "user_note"] }),
     runChainOfThought(userMessage, conversationSummary),
   ]);
 
-  // ── Step 3: Web fallback (sequential, only if needed) ─────────────────────
+  // ── Step 3: Web fallback ────────────────────────────────────────────────────
   let webResults: RetrievedChunk[] = [];
   if (documentChunks.length < MIN_LOCAL_CHUNKS) {
     webResults = await searchWeb(`crescita personale ${userMessage}`, 4);
   }
 
-  // ── Step 5: Build full system prompt ──────────────────────────────────────
+  // ── Step 5: Self-evaluation (pure local — no extra API call) ────────────────
+  const evalResult = evaluateSelf({
+    userMessage,
+    documentChunks,
+    webResults,
+    cot,
+    memoryFactCount,
+  });
+
+  // ── Step 6: Build system prompt ────────────────────────────────────────────
   const systemPrompt = buildSystemPrompt({
     userContext,
     personaExamples,
     documentChunks,
     webResults,
-    cot,                  // NEW: hidden CoT injected
-    userMessage,          // NEW: needed for Socratic directive
+    cot,
+    userMessage,
+    evalResult,
   });
 
-  // ── Step 6: Build messages + stream ───────────────────────────────────────
+  // ── Step 7: Stream ───────────────────────────────────────────────────────────
   const recentHistory = history.slice(-maxHistory);
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
@@ -105,13 +109,16 @@ export async function* runGrowthAgent(
     { role: "user", content: userMessage },
   ];
 
+  // Temperature slightly lower when uncertain — less hallucination risk
+  const temperature = evalResult.level === "low" ? 0.45 : 0.72;
+
   try {
     const stream = await openai.chat.completions.create({
       model: GROWTH_AGENT_MODEL,
       messages,
       stream: true,
-      temperature: 0.72,  // slightly raised for more natural tone variation
-      max_tokens: 600,    // tighter limit — responses should be dense not long
+      temperature,
+      max_tokens: evalResult.level === "low" ? 300 : 600, // shorter when uncertain
     });
 
     for await (const chunk of stream) {
@@ -122,10 +129,10 @@ export async function* runGrowthAgent(
     yield {
       type: "done",
       sources: [...personaExamples, ...documentChunks, ...webResults],
-      cot,  // returned to caller (can be logged/displayed in debug mode)
+      cot,
+      evalResult,   // returned to frontend for badge
     };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    yield { type: "error", message: msg };
+    yield { type: "error", message: err instanceof Error ? err.message : String(err) };
   }
 }

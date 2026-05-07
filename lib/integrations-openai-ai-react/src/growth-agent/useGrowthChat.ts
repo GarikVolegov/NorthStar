@@ -1,36 +1,10 @@
 /**
- * useGrowthChat — custom hook for the growth coach SSE chat.
- *
- * STATE
- * ─────
- *  messages     Full conversation (user + assistant turns)
- *  isStreaming   True while the SSE connection is open
- *  sessionId     Persisted in localStorage — survives page refresh
- *  error         Last error string (null if no error)
- *
- * FLOW
- * ─────
- *  sendMessage(text)
- *    → appends user message immediately (optimistic)
- *    → appends empty assistant message (will fill with tokens)
- *    → opens SSE via fetch() + ReadableStream
- *    → appends each token to last assistant message
- *    → on 'done' event: attaches sources to last assistant message
- *    → on 'error' event: sets error state
- *
- * ABORT
- * ─────
- *  abort() cancels mid-stream via AbortController.
- *  The partial assistant message is kept in history.
- *
- * SESSION PERSISTENCE
- * ────────────────────
- *  sessionId is stored in localStorage under 'growth_session_id'.
- *  On first load, if no sessionId exists, the server creates one and
- *  returns it in the 'done' event (future improvement: return from API).
- *  resetSession() clears both messages and the stored sessionId.
+ * useGrowthChat v2 — parses evalResult from 'done' SSE event.
+ * Attaches { evalScore, evalLevel } to assistant ChatMessage.
  */
 import { useState, useRef, useCallback, useEffect } from "react";
+
+export type ConfidenceLevel = "high" | "medium" | "low";
 
 export interface ChatMessage {
   id: string;
@@ -38,14 +12,13 @@ export interface ChatMessage {
   content: string;
   sources?: Array<{ source: string; score: number }>;
   isStreaming?: boolean;
+  evalScore?: number;
+  evalLevel?: ConfidenceLevel;
 }
 
 export interface UseGrowthChatOptions {
-  /** API base URL, defaults to '/api' */
   apiBase?: string;
-  /** JWT token for Authorization header */
   token: string;
-  /** User context passed to the agent */
   userContext?: {
     name?: string;
     journeyType?: string;
@@ -74,62 +47,35 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
 
   const abortRef = useRef<AbortController | null>(null);
 
-  // Persist sessionId to localStorage whenever it changes
   useEffect(() => {
-    if (sessionId !== undefined) {
-      localStorage.setItem(SESSION_KEY, String(sessionId));
-    }
+    if (sessionId !== undefined) localStorage.setItem(SESSION_KEY, String(sessionId));
   }, [sessionId]);
 
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim() || isStreaming) return;
-
       setError(null);
 
-      // Build history for the API (exclude streaming flag)
-      const history = messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
-
-      // Optimistic: append user message immediately
+      const history = messages.map((m) => ({ role: m.role, content: m.content }));
       const userMsg: ChatMessage = { id: uid(), role: "user", content: text };
-      // Reserve slot for assistant response
       const assistantId = uid();
-      const assistantMsg: ChatMessage = {
-        id: assistantId,
-        role: "assistant",
-        content: "",
-        isStreaming: true,
-      };
+      const assistantMsg: ChatMessage = { id: assistantId, role: "assistant", content: "", isStreaming: true };
 
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
       setIsStreaming(true);
 
-      // ── Open SSE stream ──────────────────────────────────────────────────
       const controller = new AbortController();
       abortRef.current = controller;
 
       try {
         const res = await fetch(`${apiBase}/growth-agent/chat`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            message: text,
-            sessionId,
-            history,
-            userContext,
-          }),
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ message: text, sessionId, history, userContext }),
           signal: controller.signal,
         });
 
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
 
         const reader = res.body!.getReader();
         const decoder = new TextDecoder();
@@ -138,7 +84,6 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
           buffer = lines.pop() ?? "";
@@ -155,14 +100,13 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
                 sources?: Array<{ source: string; score: number }>;
                 message?: string;
                 sessionId?: number;
+                evalResult?: { score: number; level: ConfidenceLevel };
               };
 
               if (event.type === "token" && event.value) {
                 setMessages((prev) =>
                   prev.map((m) =>
-                    m.id === assistantId
-                      ? { ...m, content: m.content + event.value }
-                      : m,
+                    m.id === assistantId ? { ...m, content: m.content + event.value } : m,
                   ),
                 );
               } else if (event.type === "done") {
@@ -170,7 +114,13 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantId
-                      ? { ...m, isStreaming: false, sources: event.sources ?? [] }
+                      ? {
+                          ...m,
+                          isStreaming: false,
+                          sources: event.sources ?? [],
+                          evalScore: event.evalResult?.score,
+                          evalLevel: event.evalResult?.level,
+                        }
                       : m,
                   ),
                 );
@@ -182,26 +132,18 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
                   ),
                 );
               }
-            } catch {
-              // Malformed JSON line — skip
-            }
+            } catch { /* skip malformed */ }
           }
         }
       } catch (err) {
         if ((err as Error).name === "AbortError") {
-          // User aborted — mark message as done
           setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, isStreaming: false } : m,
-            ),
+            prev.map((m) => m.id === assistantId ? { ...m, isStreaming: false } : m),
           );
         } else {
-          const msg = err instanceof Error ? err.message : String(err);
-          setError(msg);
+          setError(err instanceof Error ? err.message : String(err));
           setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, isStreaming: false } : m,
-            ),
+            prev.map((m) => m.id === assistantId ? { ...m, isStreaming: false } : m),
           );
         }
       } finally {
@@ -212,9 +154,7 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
     [apiBase, token, userContext, messages, isStreaming, sessionId],
   );
 
-  const abort = useCallback(() => {
-    abortRef.current?.abort();
-  }, []);
+  const abort = useCallback(() => { abortRef.current?.abort(); }, []);
 
   const resetSession = useCallback(() => {
     abort();
@@ -224,13 +164,5 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
     localStorage.removeItem(SESSION_KEY);
   }, [abort]);
 
-  return {
-    messages,
-    isStreaming,
-    error,
-    sessionId,
-    sendMessage,
-    abort,
-    resetSession,
-  };
+  return { messages, isStreaming, error, sessionId, sendMessage, abort, resetSession };
 }
