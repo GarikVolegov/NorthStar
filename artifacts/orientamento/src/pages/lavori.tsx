@@ -120,7 +120,7 @@ export default function Lavori() {
                 <Briefcase className="h-5 w-5 text-primary" />
                 <span className="text-xs font-semibold text-primary uppercase tracking-wide">Job Board</span>
               </div>
-              <h1 className="text-3xl font-black text-foreground mb-2">Opportunità per te</h1>
+              <h1 className="text-2xl sm:text-3xl font-black text-foreground mb-2">Opportunità per te</h1>
               <p className="text-muted-foreground text-sm">
                 {data?.basedOnSector
                   ? <>Ordinate per match con il tuo settore: <span className="text-foreground font-medium">{data.basedOnSector}</span></>
@@ -140,27 +140,29 @@ export default function Lavori() {
 
       <div className="container mx-auto px-4 max-w-5xl py-8">
         {/* Filters */}
-        <div className="flex items-center gap-2 mb-6">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          {[
-            { key: "all", label: "Tutti" },
-            { key: "full-time", label: "Tempo pieno" },
-            { key: "freelance", label: "Freelance" },
-          ].map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setFilterType(key)}
-              className={cn(
-                "text-xs px-3 py-1.5 rounded-full border font-medium transition-all",
-                filterType === key
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "border-border text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {label}
-            </button>
-          ))}
-          <span className="ml-auto text-xs text-muted-foreground">{jobs.length} offerte</span>
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+            {[
+              { key: "all", label: "Tutti" },
+              { key: "full-time", label: "Tempo pieno" },
+              { key: "freelance", label: "Freelance" },
+            ].map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setFilterType(key)}
+                className={cn(
+                  "text-xs px-3 py-1.5 rounded-full border font-medium transition-all whitespace-nowrap",
+                  filterType === key
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <span className="text-xs text-muted-foreground shrink-0">{jobs.length} offerte</span>
         </div>
 
         {isLoading ? (

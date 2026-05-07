@@ -11,6 +11,7 @@ import { PageLoader } from "@/components/PageLoader";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { BackButton } from "@/components/layout/back-button";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
 const Home = lazy(() => import("@/pages/home"));
@@ -254,11 +255,12 @@ function Router() {
       <Route>
         <div className="flex flex-col min-h-[100dvh]">
           <Navbar />
-          <main className="flex-1">
+          <main className="flex-1 pb-16 md:pb-0">
             <BackButton />
             <AnimatedRoutes />
           </main>
-          <Footer />
+          <div className="hidden md:block"><Footer /></div>
+          <MobileBottomNav />
         </div>
       </Route>
     </Switch>

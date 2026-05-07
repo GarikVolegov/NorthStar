@@ -198,11 +198,11 @@ export default function Test() {
           ))}
         </div>
 
-        <div className="flex gap-3">
-          <Button variant="ghost" onClick={handleBack} className="rounded-full px-6">
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <Button variant="ghost" onClick={handleBack} className="rounded-full px-6 order-2 sm:order-1">
             <ArrowLeft className="mr-2 w-4 h-4" /> {t("test.back")}
           </Button>
-          <Button size="lg" onClick={() => setTransition1Passed(true)} className="rounded-full px-10 h-13">
+          <Button size="lg" onClick={() => setTransition1Passed(true)} className="rounded-full px-10 h-13 order-1 sm:order-2">
             {t("test.transition.startCompass")} <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
         </div>
@@ -238,11 +238,11 @@ export default function Test() {
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <Button variant="ghost" onClick={handleBack} className="rounded-full px-6">
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <Button variant="ghost" onClick={handleBack} className="rounded-full px-6 order-2 sm:order-1">
             <ArrowLeft className="mr-2 w-4 h-4" /> {t("test.back")}
           </Button>
-          <Button size="lg" onClick={() => setTransition2Passed(true)} className="rounded-full px-10 h-13">
+          <Button size="lg" onClick={() => setTransition2Passed(true)} className="rounded-full px-10 h-13 order-1 sm:order-2">
             {t("test.transition2.start")} <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
         </div>
@@ -349,7 +349,7 @@ export default function Test() {
             </div>
           )}
 
-          <h2 className="text-2xl md:text-3xl font-serif font-semibold text-foreground mb-10 leading-snug">
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-serif font-semibold text-foreground mb-8 md:mb-10 leading-snug">
             {questionText}
           </h2>
 
@@ -366,7 +366,7 @@ export default function Test() {
                   whileHover={prefersReduced ? undefined : { scale: 1.01 }}
                   whileTap={prefersReduced ? undefined : { scale: 0.98 }}
                   className={cn(
-                    "w-full flex items-center justify-between px-5 py-4 rounded-xl border text-left text-base font-medium transition-colors duration-150",
+                    "w-full flex items-center justify-between px-4 sm:px-5 py-4 min-h-[56px] rounded-xl border text-left text-sm sm:text-base font-medium transition-colors duration-150",
                     selected
                       ? "bg-primary text-primary-foreground border-primary shadow-md"
                       : "bg-card border-border hover:border-primary/40 hover:bg-primary/5 text-foreground"

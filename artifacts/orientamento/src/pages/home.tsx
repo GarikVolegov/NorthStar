@@ -455,7 +455,7 @@ function GuestPersonaHero({ onLoginClick }: { onLoginClick: () => void }) {
             <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-full px-3.5 py-1.5 text-xs font-semibold text-primary mb-4">
               <Star className="w-3 h-3" /> Orientamento professionale personalizzato
             </div>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-tight mb-3">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-white leading-tight mb-3">
               Qual è il tuo{" "}
               <span className="text-italic-serif text-primary">obiettivo?</span>
             </h1>

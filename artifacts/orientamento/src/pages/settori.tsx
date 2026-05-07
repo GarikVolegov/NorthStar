@@ -95,7 +95,7 @@ export default function Settori() {
             <Zap className="w-4 h-4" />
             {t("sectors.badge", { count: sectors.length })}
           </div>
-          <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground mb-4">
+          <h1 className="text-3xl md:text-5xl font-serif font-bold text-foreground mb-4">
             {t("sectors.title")}
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">
