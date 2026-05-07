@@ -99,13 +99,14 @@ export function useAgentAnalysis({
     primaryTypes.length > 0;
 
   return useQuery<AgentAnalysisResponse>({
-    queryKey: ["agent-full-profile", sessionId, planHint],
+    // §6.2 FRONTEND_RULES — queryKey gerarchico: ['entità', id, filtro]
+    // Precedente: ["agent-full-profile", ...] → stringa non standard
+    queryKey: ["agent-analysis", sessionId, planHint],
     enabled: enabled && !!sessionId && hasData,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 10 * 60 * 1000, // §6.3 — dati AI costosi: 10 min
     gcTime: 30 * 60 * 1000,
     retry: 1,
-    // Keeps the previous data visible while a background revalidation is
-    // in flight — eliminates skeleton flash when the cache is warm.
+    // §6.4 — mantiene dati precedenti durante revalidazione: elimina skeleton flash
     placeholderData: keepPreviousData,
     queryFn: async () => {
       const res = await apiFetch(`${BASE}api/agent`, {
@@ -121,7 +122,7 @@ export function useAgentAnalysis({
         }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as Record<string, string>;
+        const err = (await res.json().catch(() => ({}))) as Record<string, string>;
         throw new Error(err?.error ?? `HTTP ${res.status}`);
       }
       return res.json() as Promise<AgentAnalysisResponse>;
