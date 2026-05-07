@@ -13,9 +13,9 @@ import { useTranslation } from "react-i18next";
 const BASE = import.meta.env.BASE_URL || "/";
 
 const DRAFT_KEY = "northstar_test_draft";
-const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-// ── Costanti statiche fuori dal componente (non ricreate ad ogni render) ─────
+// Costanti statiche fuori dal componente
 const JOURNEY_CTX1_DEFAULTS: Record<string, number> = {
   autonomo: 5, azienda: 4, investitore: 4, dipendente: 1, indeciso: 3,
 };
@@ -30,13 +30,7 @@ const SPIRIT_QUESTION_IDS = [
 ] as const;
 const CTX_QUESTION_IDS = ["ctx_1","ctx_2"] as const;
 
-const RIASEC_TYPES: Record<string, string> = {
-  q1:"R",q2:"I",q3:"A",q4:"S",q5:"E",q6:"C",
-  q7:"R",q8:"I",q9:"A",q10:"S",q11:"E",q12:"C",
-};
-
-type SpiritKey = "shen"|"hun"|"po"|"yi"|"zhi";
-const SPIRIT_META: Record<string, { key: SpiritKey; emoji: string; transKey: string }> = {
+const SPIRIT_META: Record<string, { key: string; emoji: string; transKey: string }> = {
   shen_1:{ key:"shen", emoji:"✨", transKey:"presence" },
   shen_2:{ key:"shen", emoji:"✨", transKey:"presence" },
   shen_3:{ key:"shen", emoji:"✨", transKey:"presence" },
@@ -58,10 +52,7 @@ const ALL_RIASEC_IDS = [...RIASEC_QUESTION_IDS];
 const ALL_SPIRIT_IDS = [...SPIRIT_QUESTION_IDS];
 const ALL_CTX_IDS = [...CTX_QUESTION_IDS];
 const ALL_IDS = [...ALL_RIASEC_IDS, ...ALL_SPIRIT_IDS, ...ALL_CTX_IDS];
-
 const SPIRITS_END = ALL_RIASEC_IDS.length + ALL_SPIRIT_IDS.length;
-
-// Tempo di attesa (ms) tra click e advance — lascia spazio all'animazione
 const ADVANCE_DELAY_MS = 320;
 
 interface TestDraft {
@@ -100,7 +91,7 @@ async function assignUserToSession(sessionId: number, userId: number): Promise<v
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId }),
     });
-  } catch { /* non-critical */ }
+  } catch {}
 }
 
 export default function Test() {
@@ -123,17 +114,107 @@ export default function Test() {
   const [direction, setDirection] = useState<1 | -1>(1);
   const [transition1Passed, setTransition1Passed] = useState(false);
   const [transition2Passed, setTransition2Passed] = useState(false);
-
-  // ── STEP 1: stato per il feedback visivo prima dell'auto-advance ───────────
-  // Contiene l'id della domanda corrente se l'utente ha appena cliccato
-  // un'opzione e stiamo aspettando l'advance. null = nessun click in corso.
   const [justSelected, setJustSelected] = useState<string | null>(null);
 
-  // Save draft to localStorage whenever state changes
   useEffect(() => {
     if (currentStep === 0 && Object.keys(answers).length === 0) return;
     saveDraft({ step: currentStep, answers, transition1Passed, transition2Passed, savedAt: Date.now() });
   }, [currentStep, answers, transition1Passed, transition2Passed]);
+
+  // Derivate
+  const showTransition1 = currentStep === ALL_RIASEC_IDS.length && !transition1Passed;
+  const showTransition2 = currentStep === SPIRITS_END && !transition2Passed;
+  const isComplete = currentStep >= ALL_IDS.length;
+  const isCtxQ = currentStep >= SPIRITS_END && !showTransition2;
+  const isSpiritQ = currentStep >= ALL_RIASEC_IDS.length && currentStep < SPIRITS_END;
+  const ctxOffset = currentStep - SPIRITS_END + 1;
+  const spiritOffset = currentStep - ALL_RIASEC_IDS.length;
+  const questionInGroup = (spiritOffset % 3) + 1;
+  const currentId = ALL_IDS[currentStep];
+  const spiritInfo = isSpiritQ ? SPIRIT_META[currentId] : null;
+  const progress = (currentStep / ALL_IDS.length) * 100;
+
+  const questionText = isCtxQ
+    ? t(`test.questions.ctx.${currentId}`)
+    : isSpiritQ
+    ? t(`test.questions.spirits.${currentId}`)
+    : t(`test.questions.riasec.${currentId}`);
+
+  // ── handleAnswer (identico allo step 1) ────────────────────────────────────
+  const handleAnswer = useCallback((value: number) => {
+    if (justSelected !== null) return;
+    const id = currentId;
+    setDirection(1);
+    setAnswers((prev) => ({ ...prev, [id]: value }));
+    setJustSelected(id);
+    setTimeout(() => {
+      setJustSelected(null);
+      setCurrentStep((prev) => prev + 1);
+    }, ADVANCE_DELAY_MS);
+  }, [justSelected, currentId]);
+
+  const handleBack = useCallback(() => {
+    if (justSelected !== null) return;
+    setDirection(-1);
+    if (showTransition1) { setCurrentStep(ALL_RIASEC_IDS.length - 1); return; }
+    if (showTransition2) { setCurrentStep(SPIRITS_END - 1); return; }
+    if (currentStep === ALL_RIASEC_IDS.length && transition1Passed) { setTransition1Passed(false); return; }
+    if (currentStep === SPIRITS_END && transition2Passed) { setTransition2Passed(false); return; }
+    if (currentStep > 0) setCurrentStep((prev) => prev - 1);
+  }, [justSelected, showTransition1, showTransition2, currentStep, transition1Passed, transition2Passed]);
+
+  // ── STEP 2: Keyboard navigation ─────────────────────────────────────────
+  // Attivo SOLO sulla question screen (non su transitions, completion, banner).
+  // Regole:
+  //   1–5         → seleziona l'opzione corrispondente (stesso effetto di handleAnswer)
+  //   ArrowLeft / Backspace → torna indietro (stesso effetto di handleBack)
+  //   Enter / Space → conferma la selezione già presente (se answers[currentId] esiste)
+  // Tutti i tasti sono bloccati se justSelected !== null (advance in corso).
+  // L'handler viene rimosso quando il componente smonta o le dep cambiano.
+  useEffect(() => {
+    // Non attaccare il listener nelle schermate speciali
+    if (showTransition1 || showTransition2 || isComplete) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      // Non interferire con input/textarea in pagina
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      // Blocca durante advance in corso
+      if (justSelected !== null) return;
+
+      switch (e.key) {
+        case "1": case "2": case "3": case "4": case "5": {
+          e.preventDefault();
+          handleAnswer(Number(e.key));
+          break;
+        }
+        case "ArrowLeft":
+        case "Backspace": {
+          e.preventDefault();
+          handleBack();
+          break;
+        }
+        case "Enter":
+        case " ": {
+          // Conferma solo se c'è già una selezione corrente
+          const current = answers[currentId];
+          if (current !== undefined) {
+            e.preventDefault();
+            handleAnswer(current);
+          }
+          break;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    showTransition1, showTransition2, isComplete,
+    justSelected, currentId, answers,
+    handleAnswer, handleBack,
+  ]);
 
   const handleResume = () => {
     if (!draft) return;
@@ -150,27 +231,18 @@ export default function Test() {
     setResumeBannerVisible(false);
   };
 
-  const showTransition1 = currentStep === ALL_RIASEC_IDS.length && !transition1Passed;
-  const showTransition2 = currentStep === SPIRITS_END && !transition2Passed;
-  const isComplete = currentStep >= ALL_IDS.length;
-
-  const isCtxQ = currentStep >= SPIRITS_END && !showTransition2;
-  const isSpiritQ = currentStep >= ALL_RIASEC_IDS.length && currentStep < SPIRITS_END;
-
-  const ctxOffset = currentStep - SPIRITS_END + 1;
-  const spiritOffset = currentStep - ALL_RIASEC_IDS.length;
-  const questionInGroup = (spiritOffset % 3) + 1;
-
-  const currentId = ALL_IDS[currentStep];
-  const spiritInfo = isSpiritQ ? SPIRIT_META[currentId] : null;
-
-  const progress = (currentStep / ALL_IDS.length) * 100;
-
-  const questionText = isCtxQ
-    ? t(`test.questions.ctx.${currentId}`)
-    : isSpiritQ
-    ? t(`test.questions.spirits.${currentId}`)
-    : t(`test.questions.riasec.${currentId}`);
+  const handleSubmit = () => {
+    submitTest.mutate(
+      { data: { answers } },
+      {
+        onSuccess: async (session) => {
+          clearDraft();
+          if (user) await assignUserToSession(session.id, user.id);
+          setLocation(`/risultati/${session.id}`);
+        },
+      }
+    );
+  };
 
   const questionVariants: Variants = prefersReduced
     ? {
@@ -192,62 +264,7 @@ export default function Test() {
     { value: 5, label: t("test.options.5") },
   ];
 
-  // ── handleAnswer con feedback visivo ─────────────────────────────────────
-  // 1. Salva la risposta nell'answers map
-  // 2. Setta justSelected = currentId → il pulsante mostra il Check animato
-  // 3. Dopo ADVANCE_DELAY_MS avanza allo step successivo e resetta justSelected
-  const handleAnswer = useCallback((value: number) => {
-    // Blocca double-click: se stiamo già aspettando un advance, ignora
-    if (justSelected !== null) return;
-
-    const id = currentId;
-    setDirection(1);
-    setAnswers((prev) => ({ ...prev, [id]: value }));
-    setJustSelected(id);
-
-    setTimeout(() => {
-      setJustSelected(null);
-      setCurrentStep((prev) => prev + 1);
-    }, ADVANCE_DELAY_MS);
-  }, [justSelected, currentId]);
-
-  const handleBack = () => {
-    // Non permettere navigazione indietro durante il feedback visivo
-    if (justSelected !== null) return;
-    setDirection(-1);
-    if (showTransition1) {
-      setCurrentStep(ALL_RIASEC_IDS.length - 1);
-      return;
-    }
-    if (showTransition2) {
-      setCurrentStep(SPIRITS_END - 1);
-      return;
-    }
-    if (currentStep === ALL_RIASEC_IDS.length && transition1Passed) {
-      setTransition1Passed(false);
-      return;
-    }
-    if (currentStep === SPIRITS_END && transition2Passed) {
-      setTransition2Passed(false);
-      return;
-    }
-    if (currentStep > 0) setCurrentStep((prev) => prev - 1);
-  };
-
-  const handleSubmit = () => {
-    submitTest.mutate(
-      { data: { answers } },
-      {
-        onSuccess: async (session) => {
-          clearDraft();
-          if (user) await assignUserToSession(session.id, user.id);
-          setLocation(`/risultati/${session.id}`);
-        },
-      }
-    );
-  };
-
-  // ── Transition 1: RIASEC → Spirits ────────────────────────────────────────
+  // ── Transition 1 ──────────────────────────────────────────────────────────
   if (showTransition1) {
     const spiritsTransition = [
       { emoji: "✨", transKey: "presence" },
@@ -274,7 +291,6 @@ export default function Test() {
           className="text-base text-muted-foreground mb-10 leading-relaxed max-w-xl"
           dangerouslySetInnerHTML={{ __html: t("test.transition.details") }}
         />
-
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 w-full mb-10">
           {spiritsTransition.map((s) => (
             <div key={s.transKey} className="flex flex-col items-center gap-1.5 bg-card border rounded-2xl px-3 py-4 text-center">
@@ -287,7 +303,6 @@ export default function Test() {
             </div>
           ))}
         </div>
-
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
           <Button variant="ghost" onClick={handleBack} className="rounded-full px-6 order-2 sm:order-1">
             <ArrowLeft className="mr-2 w-4 h-4" /> {t("test.back")}
@@ -300,7 +315,7 @@ export default function Test() {
     );
   }
 
-  // ── Transition 2: Spirits → Context calibration ────────────────────────────
+  // ── Transition 2 ──────────────────────────────────────────────────────────
   if (showTransition2) {
     return (
       <div className="container max-w-2xl mx-auto px-4 py-20 flex flex-col items-center justify-center min-h-[70vh] text-center">
@@ -314,7 +329,6 @@ export default function Test() {
         <p className="text-lg text-muted-foreground mb-10 leading-relaxed max-w-xl">
           {t("test.transition2.subtitle")}
         </p>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full mb-10 text-left">
           <div className="flex flex-col gap-2 bg-card border rounded-2xl px-5 py-4">
             <span className="text-2xl">💼</span>
@@ -327,7 +341,6 @@ export default function Test() {
             <div className="text-xs text-muted-foreground">{t("test.transition2.card2Desc")}</div>
           </div>
         </div>
-
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
           <Button variant="ghost" onClick={handleBack} className="rounded-full px-6 order-2 sm:order-1">
             <ArrowLeft className="mr-2 w-4 h-4" /> {t("test.back")}
@@ -340,7 +353,7 @@ export default function Test() {
     );
   }
 
-  // ── Completion screen ──────────────────────────────────────────────────────
+  // ── Completion screen ───────────────────────────────────────────────────
   if (isComplete) {
     return (
       <div className="container max-w-2xl mx-auto px-4 py-24 flex flex-col items-center justify-center min-h-[70vh] text-center">
@@ -371,17 +384,14 @@ export default function Test() {
     );
   }
 
-  // ── Question screen ────────────────────────────────────────────────────────
-
+  // ── Question screen ───────────────────────────────────────────────────────
   const showResumeBanner = !!draft && resumeBannerVisible && !resumed && currentStep === 0 && Object.keys(answers).length === 0;
   const currentPhase = isCtxQ ? 2 : isSpiritQ ? 1 : 0;
-
   const headerLabel = isCtxQ
     ? t("test.ctxCount", { current: ctxOffset, total: ALL_CTX_IDS.length })
     : isSpiritQ
     ? t("test.innerCompassCount", { current: spiritOffset + 1, total: ALL_SPIRIT_IDS.length })
     : t("test.questionOf", { current: currentStep + 1, total: ALL_RIASEC_IDS.length });
-
   const PHASE_LABELS = ["Inclinazioni", "Bussola", "Obiettivi"];
 
   return (
@@ -458,6 +468,7 @@ export default function Test() {
         </motion.button>
         <span className="text-sm text-muted-foreground">{headerLabel}</span>
       </div>
+
       <motion.div
         initial={false}
         animate={{ scaleX: progress / 100 }}
@@ -485,10 +496,7 @@ export default function Test() {
               </div>
               <div className="flex gap-1.5 ml-auto">
                 {[1, 2, 3].map((n) => (
-                  <span
-                    key={n}
-                    className={cn("w-2 h-2 rounded-full", n <= questionInGroup ? "bg-primary" : "bg-muted")}
-                  />
+                  <span key={n} className={cn("w-2 h-2 rounded-full", n <= questionInGroup ? "bg-primary" : "bg-muted")} />
                 ))}
               </div>
             </div>
@@ -512,15 +520,12 @@ export default function Test() {
           <div className="space-y-3">
             {OPTIONS.map((opt, optIdx) => {
               const selected = answers[currentId] === opt.value;
-              // STEP 1: isJustSelected — vero solo sull'opzione appena cliccata
-              // mentre stiamo aspettando il timeout di advance
               const isJustSelected = justSelected === currentId && selected;
 
               return (
                 <motion.button
                   key={opt.value}
                   onClick={() => handleAnswer(opt.value)}
-                  // Disabilitato durante l'attesa di advance (anti double-click)
                   disabled={justSelected !== null}
                   initial={prefersReduced ? false : { opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -532,36 +537,45 @@ export default function Test() {
                     selected
                       ? "bg-primary text-primary-foreground border-primary shadow-md"
                       : "bg-card border-border hover:border-primary/40 hover:bg-primary/5 text-foreground",
-                    // Leggero abbassamento dell'opacità sulle non-selezionate durante il feedback
                     justSelected !== null && !selected && "opacity-50"
                   )}
                 >
-                  {opt.label}
+                  {/* STEP 2: hint tasto numerico — visibile solo su device non-touch
+                      (pointer:fine = mouse/trackpad, pointer:coarse = touchscreen)
+                      Il badge mostra il numero corrispondente (1–5) in basso a sinistra.
+                      opacity-0 di default, group-hover:opacity-100 sulle opzioni non selezionate. */}
+                  <span className="flex items-center gap-3 flex-1 min-w-0">
+                    <span
+                      className={cn(
+                        "hidden pointer-fine:inline-flex items-center justify-center w-5 h-5 rounded-md text-[10px] font-bold border shrink-0 transition-opacity duration-150",
+                        selected
+                          ? "border-primary-foreground/40 text-primary-foreground/70 opacity-70"
+                          : justSelected !== null
+                            ? "opacity-0"
+                            : "border-muted-foreground/30 text-muted-foreground/60 opacity-60 group-hover:opacity-100"
+                      )}
+                    >
+                      {opt.value}
+                    </span>
+                    {opt.label}
+                  </span>
 
-                  {/* STEP 1: icona destra — Check animato se appena selezionata, radio altrimenti */}
+                  {/* Icona destra: Check animato se appena selezionata, radio altrimenti */}
                   <motion.div
                     className={cn(
-                      "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0",
+                      "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ml-3",
                       selected ? "border-primary-foreground bg-primary-foreground/20" : "border-muted-foreground"
                     )}
                     animate={
-                      prefersReduced
-                        ? {}
-                        : isJustSelected
-                          // Spring più espressivo solo sull'opzione appena scelta
-                          ? { scale: [1, 1.35, 0.95, 1.1, 1] }
-                          : selected
-                            ? { scale: [1, 1.2, 1] }
-                            : { scale: 1 }
+                      prefersReduced ? {} :
+                      isJustSelected ? { scale: [1, 1.35, 0.95, 1.1, 1] } :
+                      selected       ? { scale: [1, 1.2, 1] } :
+                                       { scale: 1 }
                     }
-                    transition={isJustSelected
-                      ? { duration: 0.4, ease: "easeOut" }
-                      : { duration: 0.25 }
-                    }
+                    transition={isJustSelected ? { duration: 0.4, ease: "easeOut" } : { duration: 0.25 }}
                   >
                     {selected && (
                       isJustSelected ? (
-                        // Check icon con fade-in quando l'utente ha appena cliccato
                         <motion.div
                           initial={{ opacity: 0, scale: 0.5 }}
                           animate={{ opacity: 1, scale: 1 }}
@@ -578,6 +592,38 @@ export default function Test() {
               );
             })}
           </div>
+
+          {/* STEP 2: hint tastiera — visibile solo su pointer:fine (mouse/trackpad)
+              Compare con fade-in dopo 800ms (non distrae chi usa touch).
+              Mostra i tasti disponibili contestualmente:
+              - sempre: 1–5 per selezionare
+              - se c'è già una selezione: Enter per confermare
+              - se non è la prima domanda: ← per tornare indietro */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8, duration: 0.4 }}
+            className="hidden pointer-fine:flex items-center gap-3 mt-8 text-xs text-muted-foreground/50 justify-center flex-wrap"
+          >
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-muted/40 font-mono text-[10px]">1</kbd>
+              <span>–</span>
+              <kbd className="px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-muted/40 font-mono text-[10px]">5</kbd>
+              <span className="ml-1">seleziona</span>
+            </span>
+            {answers[currentId] !== undefined && (
+              <span className="flex items-center gap-1">
+                <kbd className="px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-muted/40 font-mono text-[10px]">Enter</kbd>
+                <span className="ml-1">conferma</span>
+              </span>
+            )}
+            {currentStep > 0 && (
+              <span className="flex items-center gap-1">
+                <kbd className="px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-muted/40 font-mono text-[10px]">←</kbd>
+                <span className="ml-1">indietro</span>
+              </span>
+            )}
+          </motion.div>
         </motion.div>
       </AnimatePresence>
     </div>
