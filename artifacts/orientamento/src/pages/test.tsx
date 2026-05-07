@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Variants } from "framer-motion";
 import { useSubmitTest } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, ArrowRight, Check, Sparkles, Target, RotateCcw, X } from "lucide-react";
+import { Loader2, ArrowLeft, Check, Sparkles, RotateCcw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useReducedMotion, easings } from "@/lib/motion";
@@ -16,6 +16,18 @@ const DRAFT_KEY = "northstar_test_draft";
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const ADVANCE_DELAY_MS = 320;
 const SPIRIT_TIMER_SEC = 12;
+
+// ── Nomi fasi visibili all'utente ─────────────────────────────────────────
+const PHASE_LABELS = ["Attitudini", "Profilo Interiore", "Obiettivi"] as const;
+
+// Nomi professionali degli spiriti mostrati nei badge delle domande
+const SPIRIT_DISPLAY: Record<string, { emoji: string; name: string; desc: string }> = {
+  presence:    { emoji: "✨", name: "Consapevolezza", desc: "Come percepisci te stesso" },
+  vision:      { emoji: "🌙", name: "Visione",         desc: "Come proietti il futuro" },
+  instinct:    { emoji: "⚡", name: "Energia",         desc: "Come agisci sotto pressione" },
+  focus:       { emoji: "🔮", name: "Focus",           desc: "Come gestisci le priorità" },
+  tenacity:    { emoji: "🔥", name: "Determinazione", desc: "Come perseveri negli ostacoli" },
+};
 
 const JOURNEY_CTX1_DEFAULTS: Record<string, number> = {
   autonomo: 5, azienda: 4, investitore: 4, dipendente: 1, indeciso: 3,
@@ -53,18 +65,12 @@ const ALL_RIASEC_IDS = [...RIASEC_QUESTION_IDS];
 const ALL_SPIRIT_IDS = [...SPIRIT_QUESTION_IDS];
 const ALL_CTX_IDS = [...CTX_QUESTION_IDS];
 const ALL_IDS = [...ALL_RIASEC_IDS, ...ALL_SPIRIT_IDS, ...ALL_CTX_IDS];
-const SPIRITS_END = ALL_RIASEC_IDS.length + ALL_SPIRIT_IDS.length;
-
-// STEP 5: PHASE_LABELS era dentro il componente, ricreato ad ogni render.
-// È un array statico che non dipende da nessun stato o prop — va fuori.
-// Nota: se in futuro vuoi traduzioni dinamiche, spostalo dentro con useMemo([t]).
-const PHASE_LABELS = ["Inclinazioni", "Bussola", "Obiettivi"] as const;
+const SPIRITS_START = ALL_RIASEC_IDS.length;                          // 12
+const SPIRITS_END   = ALL_RIASEC_IDS.length + ALL_SPIRIT_IDS.length; // 27
 
 interface TestDraft {
   step: number;
   answers: Record<string, number>;
-  transition1Passed: boolean;
-  transition2Passed: boolean;
   savedAt: number;
   sessionId?: number;
 }
@@ -73,16 +79,13 @@ function loadDraft(): TestDraft | null {
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
     if (!raw) return null;
-    const draft: TestDraft = JSON.parse(raw);
-    if (Date.now() - draft.savedAt > DRAFT_TTL_MS) {
-      localStorage.removeItem(DRAFT_KEY);
-      return null;
-    }
-    return draft;
+    const d: TestDraft = JSON.parse(raw);
+    if (Date.now() - d.savedAt > DRAFT_TTL_MS) { localStorage.removeItem(DRAFT_KEY); return null; }
+    return d;
   } catch { return null; }
 }
-function saveDraft(draft: TestDraft) {
-  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch {}
+function saveDraft(d: TestDraft) {
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch {}
 }
 function clearDraft() {
   try { localStorage.removeItem(DRAFT_KEY); } catch {}
@@ -96,69 +99,37 @@ async function assignUserToSession(sessionId: number, userId: number): Promise<v
   } catch {}
 }
 
+// ── SpiritTimer (invariato dallo step 4) ─────────────────────────────────
 const CIRC = 2 * Math.PI * 20;
-
-interface SpiritTimerProps {
-  totalSec: number;
-  paused: boolean;
-  reduced: boolean;
-}
-
+interface SpiritTimerProps { totalSec: number; paused: boolean; reduced: boolean; }
 function SpiritTimer({ totalSec, paused, reduced }: SpiritTimerProps) {
   const [remaining, setRemaining] = useState(totalSec);
-
   useEffect(() => {
     if (reduced || paused || remaining <= 0) return;
-    const id = setInterval(() => {
-      setRemaining((r) => {
-        if (r <= 1) { clearInterval(id); return 0; }
-        return r - 1;
-      });
-    }, 1000);
+    const id = setInterval(() => setRemaining((r) => { if (r <= 1) { clearInterval(id); return 0; } return r - 1; }), 1000);
     return () => clearInterval(id);
   }, [paused, reduced, remaining]);
-
-  const fraction = remaining / totalSec;
-  const offset = CIRC * (1 - fraction);
-  const strokeColor =
-    remaining <= 1 ? "var(--destructive)" :
-    remaining <= 4 ? "#f59e0b" :
-                     "var(--primary)";
-
-  if (reduced) {
-    return <span className="text-xs text-muted-foreground/60 italic">Prenditi il tuo tempo</span>;
-  }
-
+  const offset = CIRC * (1 - remaining / totalSec);
+  const strokeColor = remaining <= 1 ? "var(--destructive)" : remaining <= 4 ? "#f59e0b" : "var(--primary)";
+  if (reduced) return <span className="text-xs text-muted-foreground/60 italic">Prenditi il tuo tempo</span>;
   return (
     <div className="flex items-center gap-2" aria-hidden="true">
       <svg width="32" height="32" viewBox="0 0 48 48" className="-rotate-90">
         <circle cx="24" cy="24" r="20" fill="none" strokeWidth="3" className="stroke-muted" />
-        <motion.circle
-          cx="24" cy="24" r="20" fill="none" strokeWidth="3" strokeLinecap="round"
-          style={{ stroke: strokeColor }}
-          strokeDasharray={CIRC}
-          animate={{ strokeDashoffset: offset }}
-          transition={{ duration: 0.9, ease: "linear" }}
+        <motion.circle cx="24" cy="24" r="20" fill="none" strokeWidth="3" strokeLinecap="round"
+          style={{ stroke: strokeColor }} strokeDasharray={CIRC}
+          animate={{ strokeDashoffset: offset }} transition={{ duration: 0.9, ease: "linear" }}
         />
       </svg>
       <AnimatePresence mode="wait">
         {remaining > 0 ? (
-          <motion.span
-            key={remaining}
-            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+          <motion.span key={remaining} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }} transition={{ duration: 0.2 }}
-            className="text-xs font-mono tabular-nums"
-            style={{ color: strokeColor }}
-          >
-            {remaining}s
+            className="text-xs font-mono tabular-nums" style={{ color: strokeColor }}>{remaining}s
           </motion.span>
         ) : (
-          <motion.span
-            key="done"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="text-xs text-muted-foreground/50"
-          >
-            Rispondi quando sei pronto
+          <motion.span key="done" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className="text-xs text-muted-foreground/50">Rispondi quando sei pronto
           </motion.span>
         )}
       </AnimatePresence>
@@ -166,7 +137,49 @@ function SpiritTimer({ totalSec, paused, reduced }: SpiritTimerProps) {
   );
 }
 
-// ── Componente principale ─────────────────────────────────────────────────
+// ── SectionDivider: banner sottile che appare al cambio sezione ──────────────
+// Non blocca il flusso — è puramente informativo.
+// Sparisce da solo dopo DIVIDER_MS ms (o con reduced motion: non appare).
+const DIVIDER_MS = 1800;
+interface SectionDividerProps {
+  label: string;
+  emoji: string;
+  description: string;
+  onDone: () => void;
+  reduced: boolean;
+}
+function SectionDivider({ label, emoji, description, onDone, reduced }: SectionDividerProps) {
+  useEffect(() => {
+    const id = setTimeout(onDone, reduced ? 0 : DIVIDER_MS);
+    return () => clearTimeout(id);
+  }, [onDone, reduced]);
+
+  if (reduced) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.35 }}
+      className="mb-8 flex items-center gap-3 bg-primary/8 border border-primary/20 rounded-2xl px-5 py-3.5"
+    >
+      <span className="text-xl">{emoji}</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <motion.div
+        className="h-0.5 w-12 bg-primary/30 rounded-full origin-left"
+        initial={{ scaleX: 0 }}
+        animate={{ scaleX: 1 }}
+        transition={{ duration: DIVIDER_MS / 1000, ease: "linear" }}
+      />
+    </motion.div>
+  );
+}
+
+// ── Componente principale ────────────────────────────────────────────────
 export default function Test() {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
@@ -184,15 +197,16 @@ export default function Test() {
     return { ctx_1: JOURNEY_CTX1_DEFAULTS[jt] };
   });
   const [direction, setDirection] = useState<1 | -1>(1);
-  const [transition1Passed, setTransition1Passed] = useState(false);
-  const [transition2Passed, setTransition2Passed] = useState(false);
   const [justSelected, setJustSelected] = useState<string | null>(null);
   const assignedSessionRef = useRef<number | null>(null);
 
+  // SectionDivider state: quale divider mostrare ('spirits' | 'ctx' | null)
+  const [activeDivider, setActiveDivider] = useState<"spirits" | "ctx" | null>(null);
+
   useEffect(() => {
     if (currentStep === 0 && Object.keys(answers).length === 0) return;
-    saveDraft({ step: currentStep, answers, transition1Passed, transition2Passed, savedAt: Date.now() });
-  }, [currentStep, answers, transition1Passed, transition2Passed]);
+    saveDraft({ step: currentStep, answers, savedAt: Date.now() });
+  }, [currentStep, answers]);
 
   useEffect(() => {
     if (!user || !draft?.sessionId) return;
@@ -201,17 +215,21 @@ export default function Test() {
     assignUserToSession(draft.sessionId, user.id);
   }, [user, draft]);
 
-  const showTransition1 = currentStep === ALL_RIASEC_IDS.length && !transition1Passed;
-  const showTransition2 = currentStep === SPIRITS_END && !transition2Passed;
-  const isComplete = currentStep >= ALL_IDS.length;
-  const isCtxQ = currentStep >= SPIRITS_END && !showTransition2;
-  const isSpiritQ = currentStep >= ALL_RIASEC_IDS.length && currentStep < SPIRITS_END;
-  const ctxOffset = currentStep - SPIRITS_END + 1;
-  const spiritOffset = currentStep - ALL_RIASEC_IDS.length;
+  // Derivate di fase
+  const isComplete  = currentStep >= ALL_IDS.length;
+  const isCtxQ      = currentStep >= SPIRITS_END;
+  const isSpiritQ   = currentStep >= SPIRITS_START && currentStep < SPIRITS_END;
+  const isRiasecQ   = currentStep < SPIRITS_START;
+
+  const ctxOffset     = currentStep - SPIRITS_END + 1;
+  const spiritOffset  = currentStep - SPIRITS_START;
   const questionInGroup = (spiritOffset % 3) + 1;
-  const currentId = ALL_IDS[currentStep];
+
+  const currentId  = ALL_IDS[currentStep];
   const spiritInfo = isSpiritQ ? SPIRIT_META[currentId] : null;
-  const progress = (currentStep / ALL_IDS.length) * 100;
+  const progress   = (currentStep / ALL_IDS.length) * 100;
+
+  const currentPhase = isCtxQ ? 2 : isSpiritQ ? 1 : 0;
 
   const questionText = isCtxQ
     ? t(`test.questions.ctx.${currentId}`)
@@ -219,9 +237,12 @@ export default function Test() {
     ? t(`test.questions.spirits.${currentId}`)
     : t(`test.questions.riasec.${currentId}`);
 
-  // STEP 5: OPTIONS memoizzato — ricreato solo se cambia la funzione t()
-  // cioè solo al cambio lingua. Prima veniva ricreato ad ogni singolo render
-  // del componente (ogni risposta, ogni step, ogni keystroke).
+  const headerLabel = isCtxQ
+    ? t("test.ctxCount", { current: ctxOffset, total: ALL_CTX_IDS.length })
+    : isSpiritQ
+    ? t("test.innerCompassCount", { current: spiritOffset + 1, total: ALL_SPIRIT_IDS.length })
+    : t("test.questionOf", { current: currentStep + 1, total: ALL_RIASEC_IDS.length });
+
   const OPTIONS = useMemo(() => [
     { value: 1, label: t("test.options.1") },
     { value: 2, label: t("test.options.2") },
@@ -230,30 +251,50 @@ export default function Test() {
     { value: 5, label: t("test.options.5") },
   ], [t]);
 
+  // ── handleAnswer ──────────────────────────────────────────────────────
+  // Flusso lineare: dopo l'ultima domanda RIASEC mostra il divider 'spirits',
+  // dopo l'ultima domanda Spirit mostra il divider 'ctx', poi avanza.
+  // Il SectionDivider chiama onDone() che triggera il vero advance.
   const handleAnswer = useCallback((value: number) => {
     if (justSelected !== null) return;
     const id = currentId;
+    const nextStep = (prev: number) => prev + 1;
+
     setDirection(1);
     setAnswers((prev) => ({ ...prev, [id]: value }));
     setJustSelected(id);
+
     setTimeout(() => {
       setJustSelected(null);
-      setCurrentStep((prev) => prev + 1);
+      const next = currentStep + 1;
+
+      // Ultima domanda RIASEC -> mostra divider 'spirits' prima di avanzare
+      if (next === SPIRITS_START) {
+        setCurrentStep(next);
+        setActiveDivider("spirits");
+        return;
+      }
+      // Ultima domanda Spirit -> mostra divider 'ctx' prima di avanzare
+      if (next === SPIRITS_END) {
+        setCurrentStep(next);
+        setActiveDivider("ctx");
+        return;
+      }
+
+      setCurrentStep(nextStep);
     }, ADVANCE_DELAY_MS);
-  }, [justSelected, currentId]);
+  }, [justSelected, currentId, currentStep]);
 
   const handleBack = useCallback(() => {
     if (justSelected !== null) return;
+    setActiveDivider(null); // chiude eventuale divider aperto
     setDirection(-1);
-    if (showTransition1) { setCurrentStep(ALL_RIASEC_IDS.length - 1); return; }
-    if (showTransition2) { setCurrentStep(SPIRITS_END - 1); return; }
-    if (currentStep === ALL_RIASEC_IDS.length && transition1Passed) { setTransition1Passed(false); return; }
-    if (currentStep === SPIRITS_END && transition2Passed) { setTransition2Passed(false); return; }
     if (currentStep > 0) setCurrentStep((prev) => prev - 1);
-  }, [justSelected, showTransition1, showTransition2, currentStep, transition1Passed, transition2Passed]);
+  }, [justSelected, currentStep]);
 
+  // Keyboard navigation
   useEffect(() => {
-    if (showTransition1 || showTransition2 || isComplete) return;
+    if (isComplete) return;
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
@@ -264,22 +305,20 @@ export default function Test() {
         case "ArrowLeft": case "Backspace":
           e.preventDefault(); handleBack(); break;
         case "Enter": case " ": {
-          const current = answers[currentId];
-          if (current !== undefined) { e.preventDefault(); handleAnswer(current); }
+          const cur = answers[currentId];
+          if (cur !== undefined) { e.preventDefault(); handleAnswer(cur); }
           break;
         }
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [showTransition1, showTransition2, isComplete, justSelected, currentId, answers, handleAnswer, handleBack]);
+  }, [isComplete, justSelected, currentId, answers, handleAnswer, handleBack]);
 
   const handleResume = () => {
     if (!draft) return;
     setCurrentStep(draft.step);
     setAnswers(draft.answers);
-    setTransition1Passed(draft.transition1Passed);
-    setTransition2Passed(draft.transition2Passed);
     setResumeBannerVisible(false);
     setResumed(true);
   };
@@ -290,12 +329,10 @@ export default function Test() {
       { data: { answers } },
       {
         onSuccess: async (session) => {
-          saveDraft({ step: currentStep, answers, transition1Passed, transition2Passed, savedAt: Date.now(), sessionId: session.id });
-          if (user) {
-            if (assignedSessionRef.current !== session.id) {
-              assignedSessionRef.current = session.id;
-              await assignUserToSession(session.id, user.id);
-            }
+          saveDraft({ step: currentStep, answers, savedAt: Date.now(), sessionId: session.id });
+          if (user && assignedSessionRef.current !== session.id) {
+            assignedSessionRef.current = session.id;
+            await assignUserToSession(session.id, user.id);
           }
           clearDraft();
           setLocation(`/risultati/${session.id}`);
@@ -305,100 +342,12 @@ export default function Test() {
   };
 
   const questionVariants: Variants = prefersReduced
-    ? {
-        enter: { opacity: 0 },
-        center: { opacity: 1, transition: { duration: 0.15 } },
-        exit: { opacity: 0, transition: { duration: 0.1 } },
-      }
+    ? { enter: { opacity: 0 }, center: { opacity: 1, transition: { duration: 0.15 } }, exit: { opacity: 0, transition: { duration: 0.1 } } }
     : {
         enter: (dir: number) => ({ opacity: 0, x: dir > 0 ? 60 : -60 }),
         center: { opacity: 1, x: 0, transition: { duration: 0.38, ease: easings.easeOut } },
         exit: (dir: number) => ({ opacity: 0, x: dir > 0 ? -40 : 40, transition: { duration: 0.2, ease: easings.easeIn } }),
       };
-
-  // ── Transition 1 ───────────────────────────────────────────────────
-  if (showTransition1) {
-    const spiritsTransition = [
-      { emoji: "✨", transKey: "presence" },
-      { emoji: "🌙", transKey: "vision" },
-      { emoji: "⚡", transKey: "instinct" },
-      { emoji: "🔮", transKey: "focus" },
-      { emoji: "🔥", transKey: "tenacity" },
-    ];
-    return (
-      <div className="container max-w-2xl mx-auto px-4 py-20 flex flex-col items-center justify-center min-h-[70vh] text-center">
-        <div className="w-20 h-20 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-8 animate-in zoom-in duration-500">
-          <Sparkles className="w-10 h-10" />
-        </div>
-        <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-full px-4 py-1.5 mb-6 text-sm font-medium text-primary">
-          <Sparkles className="w-3.5 h-3.5" /> {t("test.transition.badge")}
-        </div>
-        <h1 className="text-3xl md:text-4xl font-serif font-bold mb-4">{t("test.transition.title")}</h1>
-        <p className="text-lg text-muted-foreground mb-4 leading-relaxed max-w-xl">
-          {t("test.transition.intro")}{" "}
-          <strong>{t("test.transition.fiveSpirits")}</strong>{" "}
-          {t("test.transition.tradition")}
-        </p>
-        <p className="text-base text-muted-foreground mb-10 leading-relaxed max-w-xl"
-          dangerouslySetInnerHTML={{ __html: t("test.transition.details") }}
-        />
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 w-full mb-10">
-          {spiritsTransition.map((s) => (
-            <div key={s.transKey} className="flex flex-col items-center gap-1.5 bg-card border rounded-2xl px-3 py-4 text-center">
-              <span className="text-2xl">{s.emoji}</span>
-              <div className="font-semibold text-sm text-foreground">{t(`test.transition.spirits.${s.transKey}.name`)}</div>
-              <div className="text-xs text-muted-foreground">{t(`test.transition.spirits.${s.transKey}.desc`)}</div>
-              <div className="flex gap-1 mt-1">{[1,2,3].map((i) => <span key={i} className="w-1.5 h-1.5 rounded-full bg-primary/30" />)}</div>
-            </div>
-          ))}
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          <Button variant="ghost" onClick={handleBack} className="rounded-full px-6 order-2 sm:order-1">
-            <ArrowLeft className="mr-2 w-4 h-4" /> {t("test.back")}
-          </Button>
-          <Button size="lg" onClick={() => setTransition1Passed(true)} className="rounded-full px-10 h-13 order-1 sm:order-2">
-            {t("test.transition.startCompass")} <ArrowRight className="ml-2 w-5 h-5" />
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Transition 2 ───────────────────────────────────────────────────
-  if (showTransition2) {
-    return (
-      <div className="container max-w-2xl mx-auto px-4 py-20 flex flex-col items-center justify-center min-h-[70vh] text-center">
-        <div className="w-20 h-20 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-8 animate-in zoom-in duration-500">
-          <Target className="w-10 h-10" />
-        </div>
-        <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-full px-4 py-1.5 mb-6 text-sm font-medium text-primary">
-          <Target className="w-3.5 h-3.5" /> {t("test.transition2.badge")}
-        </div>
-        <h1 className="text-3xl md:text-4xl font-serif font-bold mb-4">{t("test.transition2.title")}</h1>
-        <p className="text-lg text-muted-foreground mb-10 leading-relaxed max-w-xl">{t("test.transition2.subtitle")}</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full mb-10 text-left">
-          <div className="flex flex-col gap-2 bg-card border rounded-2xl px-5 py-4">
-            <span className="text-2xl">💼</span>
-            <div className="font-semibold text-sm text-foreground">{t("test.transition2.card1Title")}</div>
-            <div className="text-xs text-muted-foreground">{t("test.transition2.card1Desc")}</div>
-          </div>
-          <div className="flex flex-col gap-2 bg-card border rounded-2xl px-5 py-4">
-            <span className="text-2xl">🧭</span>
-            <div className="font-semibold text-sm text-foreground">{t("test.transition2.card2Title")}</div>
-            <div className="text-xs text-muted-foreground">{t("test.transition2.card2Desc")}</div>
-          </div>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          <Button variant="ghost" onClick={handleBack} className="rounded-full px-6 order-2 sm:order-1">
-            <ArrowLeft className="mr-2 w-4 h-4" /> {t("test.back")}
-          </Button>
-          <Button size="lg" onClick={() => setTransition2Passed(true)} className="rounded-full px-10 h-13 order-1 sm:order-2">
-            {t("test.transition2.start")} <ArrowRight className="ml-2 w-5 h-5" />
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   // ── Completion screen ───────────────────────────────────────────────
   if (isComplete) {
@@ -420,18 +369,28 @@ export default function Test() {
     );
   }
 
-  // ── Question screen ──────────────────────────────────────────────────
-  const showResumeBanner = !!draft && resumeBannerVisible && !resumed && currentStep === 0 && Object.keys(answers).length === 0;
-  const currentPhase = isCtxQ ? 2 : isSpiritQ ? 1 : 0;
-  const headerLabel = isCtxQ
-    ? t("test.ctxCount", { current: ctxOffset, total: ALL_CTX_IDS.length })
-    : isSpiritQ
-    ? t("test.innerCompassCount", { current: spiritOffset + 1, total: ALL_SPIRIT_IDS.length })
-    : t("test.questionOf", { current: currentStep + 1, total: ALL_RIASEC_IDS.length });
+  // ── Question screen ────────────────────────────────────────────────
+  const showResumeBanner = !!draft && resumeBannerVisible && !resumed
+    && currentStep === 0 && Object.keys(answers).length === 0;
+
+  // Config SectionDivider per ogni cambio sezione
+  const DIVIDER_CONFIG = {
+    spirits: {
+      label: "Profilo Interiore",
+      emoji: "🧠",
+      description: "Le prossime domande esplorano le tue dimensioni personali",
+    },
+    ctx: {
+      label: "Obiettivi",
+      emoji: "🎯",
+      description: "Ultime domande: allineiamo il percorso ai tuoi obiettivi",
+    },
+  } as const;
 
   return (
     <div className="container max-w-2xl mx-auto px-4 py-12 min-h-[70vh]">
 
+      {/* Resume banner */}
       <AnimatePresence>
         {showResumeBanner && (
           <motion.div
@@ -460,21 +419,26 @@ export default function Test() {
       <div className="flex items-center justify-center gap-1.5 mb-6">
         {PHASE_LABELS.map((label, i) => {
           const isActive = currentPhase === i;
-          const isDone = currentPhase > i;
+          const isDone   = currentPhase > i;
           return (
             <React.Fragment key={i}>
-              <div className={cn(
-                "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all duration-300",
-                isActive ? "bg-primary text-primary-foreground shadow-sm" :
-                isDone   ? "bg-primary/15 text-primary" : "text-muted-foreground"
-              )}>
+              <motion.div
+                layout
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold",
+                  isActive ? "bg-primary text-primary-foreground shadow-sm" :
+                  isDone   ? "bg-primary/15 text-primary" : "text-muted-foreground"
+                )}
+                animate={{ scale: isActive ? 1.05 : 1 }}
+                transition={{ duration: 0.25 }}
+              >
                 {isDone
                   ? <Check className="w-3 h-3" />
                   : <span className={cn("w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold border shrink-0",
                       isActive ? "border-primary-foreground/50" : "border-current opacity-60")}>{i + 1}</span>
                 }
                 <span>{label}</span>
-              </div>
+              </motion.div>
               {i < PHASE_LABELS.length - 1 && (
                 <div className={cn("h-px w-3 rounded-full shrink-0", isDone ? "bg-primary/40" : "bg-border")} />
               )}
@@ -483,6 +447,7 @@ export default function Test() {
         })}
       </div>
 
+      {/* Header: back + counter */}
       <div className="flex items-center justify-between mb-4">
         <motion.button
           onClick={handleBack}
@@ -496,6 +461,7 @@ export default function Test() {
         <span className="text-sm text-muted-foreground">{headerLabel}</span>
       </div>
 
+      {/* Progress bar */}
       <motion.div
         initial={false}
         animate={{ scaleX: progress / 100 }}
@@ -504,6 +470,21 @@ export default function Test() {
         className="h-1.5 bg-primary rounded-full mb-10"
       />
 
+      {/* Section divider (non-blocking) */}
+      <AnimatePresence>
+        {activeDivider && (
+          <SectionDivider
+            key={activeDivider}
+            label={DIVIDER_CONFIG[activeDivider].label}
+            emoji={DIVIDER_CONFIG[activeDivider].emoji}
+            description={DIVIDER_CONFIG[activeDivider].description}
+            reduced={prefersReduced}
+            onDone={() => setActiveDivider(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Question */}
       <AnimatePresence mode="wait" custom={direction}>
         <motion.div
           key={currentStep}
@@ -513,30 +494,30 @@ export default function Test() {
           animate="center"
           exit="exit"
         >
-          {spiritInfo && (
-            <div className="flex items-center gap-3 mb-6">
-              <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-full px-4 py-1.5">
-                <span>{spiritInfo.emoji}</span>
-                <span className="text-sm font-medium text-primary">
-                  {t(`test.transition.spirits.${spiritInfo.transKey}.name`)} · {t(`test.transition.spirits.${spiritInfo.transKey}.desc`)}
-                </span>
+          {/* Badge Profilo Interiore con timer */}
+          {spiritInfo && (() => {
+            const display = SPIRIT_DISPLAY[spiritInfo.transKey];
+            return (
+              <div className="flex items-center gap-3 mb-6">
+                <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-full px-4 py-1.5">
+                  <span>{display.emoji}</span>
+                  <span className="text-sm font-medium text-primary">
+                    {display.name} · <span className="font-normal text-muted-foreground">{display.desc}</span>
+                  </span>
+                </div>
+                <div className="flex gap-1.5">
+                  {[1,2,3].map((n) => (
+                    <span key={n} className={cn("w-2 h-2 rounded-full", n <= questionInGroup ? "bg-primary" : "bg-muted")} />
+                  ))}
+                </div>
+                <div className="ml-auto">
+                  <SpiritTimer key={currentStep} totalSec={SPIRIT_TIMER_SEC} paused={justSelected !== null} reduced={prefersReduced} />
+                </div>
               </div>
-              <div className="flex gap-1.5">
-                {[1,2,3].map((n) => (
-                  <span key={n} className={cn("w-2 h-2 rounded-full", n <= questionInGroup ? "bg-primary" : "bg-muted")} />
-                ))}
-              </div>
-              <div className="ml-auto">
-                <SpiritTimer
-                  key={currentStep}
-                  totalSec={SPIRIT_TIMER_SEC}
-                  paused={justSelected !== null}
-                  reduced={prefersReduced}
-                />
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
+          {/* Badge Obiettivi */}
           {isCtxQ && (
             <div className="flex items-center gap-3 mb-6">
               <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-full px-4 py-1.5">
@@ -552,6 +533,7 @@ export default function Test() {
             {questionText}
           </h2>
 
+          {/* Opzioni */}
           <div className="space-y-3">
             {OPTIONS.map((opt, optIdx) => {
               const selected = answers[currentId] === opt.value;
@@ -568,9 +550,8 @@ export default function Test() {
                   whileTap={prefersReduced || justSelected !== null ? undefined : { scale: 0.98 }}
                   className={cn(
                     "w-full flex items-center justify-between px-4 sm:px-5 py-4 min-h-[56px] rounded-xl border text-left text-sm sm:text-base font-medium transition-colors duration-150",
-                    selected
-                      ? "bg-primary text-primary-foreground border-primary shadow-md"
-                      : "bg-card border-border hover:border-primary/40 hover:bg-primary/5 text-foreground",
+                    selected ? "bg-primary text-primary-foreground border-primary shadow-md"
+                             : "bg-card border-border hover:border-primary/40 hover:bg-primary/5 text-foreground",
                     justSelected !== null && !selected && "opacity-50"
                   )}
                 >
@@ -580,9 +561,7 @@ export default function Test() {
                       selected ? "border-primary-foreground/40 text-primary-foreground/70 opacity-70"
                         : justSelected !== null ? "opacity-0"
                         : "border-muted-foreground/30 text-muted-foreground/60 opacity-60"
-                    )}>
-                      {opt.value}
-                    </span>
+                    )}>{opt.value}</span>
                     {opt.label}
                   </span>
                   <motion.div
@@ -612,6 +591,7 @@ export default function Test() {
             })}
           </div>
 
+          {/* Keyboard hint */}
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8, duration: 0.4 }}
             className="hidden pointer-fine:flex items-center gap-3 mt-8 text-xs text-muted-foreground/50 justify-center flex-wrap"
