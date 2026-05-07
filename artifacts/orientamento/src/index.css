@@ -251,9 +251,9 @@
 
   /* ── Navbar pill — deep navy ── */
   .pill-nav {
-    background: hsl(224 24% 8% / 0.95);
+    background: hsl(224 20% 15% / 0.97);
     backdrop-filter: blur(20px);
-    border: 1px solid hsl(224 18% 20%);
+    border: 1px solid hsl(224 16% 26%);
     border-radius: 9999px;
   }
 

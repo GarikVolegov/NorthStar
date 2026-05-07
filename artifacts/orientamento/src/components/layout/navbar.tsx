@@ -216,7 +216,7 @@ export function Navbar() {
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger asChild>
                 <motion.button
-                  className="flex items-center justify-center w-8 h-8 rounded-full border border-white/10 hover:border-white/20 hover:bg-white/5 transition-all"
+                  className="flex items-center justify-center w-8 h-8 rounded-full border border-border hover:border-primary/40 hover:bg-primary/5 transition-all"
                   whileTap={prefersReduced ? {} : { scale: 0.9 }}
                 >
                   <AnimatePresence mode="wait" initial={false}>
