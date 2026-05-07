@@ -1,84 +1,109 @@
 /**
- * MindsetAgent — specialista dominio: mindset.
- *
- * FOCUS
- * ─────
- * - Credenze limitanti e pattern cognitivi
- * - Modelli mentali (first principles, inversione, ecc.)
- * - Growth mindset vs fixed mindset
- * - Paure, blocchi emotivi, procrastinazione psicologica
- * - Autostima, identità, narrativa personale
- *
- * PERSONA
- * ───────
- * Socratico, riflessivo. Non dà risposte — fa emergere le risposte dall'utente.
- * Nomina i pattern con precisione chirurgica, senza giudizio.
- * Usa il CoT in modo aggressivo per identificare il bisogno non detto.
- *
- * DOMAIN SECTION
- * ──────────────
- * Aggiunge al prompt un blocco "Belief Analysis Framework":
- * - Credenza superficiale vs credenza radice
- * - Costo emotivo della credenza
- * - Domanda Socratica calibrata all'intent
+ * MindsetAgent v2 — tool calling: search_mental_models (Wikipedia REST API).
+ * Pattern: identico al CareerAgent.
  */
 import { SpecialistAgent, registerSpecialist } from "../specialist-agent";
+import { openai } from "../client";
 import type { CoTResult } from "../chain-of-thought";
 import type { RouteDecision } from "../router-agent";
+import type { SpecialistRunOptions, SpecialistEvent } from "../specialist-agent";
+import type OpenAI from "openai";
+
+const mentalModelTool: OpenAI.Chat.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "search_mental_models",
+    description:
+      "Cerca la definizione di un bias cognitivo, modello mentale o concetto psicologico su Wikipedia. " +
+      "Usa quando l'utente nomina ESPLICITAMENTE un concetto specifico (es. 'Dunning-Kruger', 'growth mindset').",
+    parameters: {
+      type: "object",
+      properties: {
+        concept: { type: "string", description: "Nome del bias o modello mentale" },
+        language: { type: "string", enum: ["it", "en"], description: "Lingua Wikipedia. Default 'en'." },
+      },
+      required: ["concept"],
+    },
+  },
+};
+
+interface MentalModelArgs { concept: string; language?: "it" | "en"; }
+interface WikiSummary { title: string; extract: string; content_urls?: { desktop?: { page?: string } }; }
+
+async function executeMentalModelSearch(args: MentalModelArgs): Promise<string> {
+  const lang = args.language ?? "en";
+  const slug = encodeURIComponent(args.concept.replace(/ /g, "_"));
+  try {
+    const res = await fetch(
+      `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${slug}`,
+      { signal: AbortSignal.timeout(8_000) },
+    );
+    if (res.status === 404 && lang !== "en") return executeMentalModelSearch({ ...args, language: "en" });
+    if (!res.ok) throw new Error(`Wikipedia HTTP ${res.status}`);
+    const data = await res.json() as WikiSummary;
+    const extract = data.extract.length > 400 ? data.extract.slice(0, 400) + "..." : data.extract;
+    const url = data.content_urls?.desktop?.page ?? `https://${lang}.wikipedia.org/wiki/${slug}`;
+    return `**${data.title}** (Wikipedia):\n${extract}\n ${url}`;
+  } catch {
+    return `Impossibile recuperare "${args.concept}" da Wikipedia. Procedi con la tua conoscenza.`;
+  }
+}
 
 class MindsetAgent extends SpecialistAgent {
   readonly DOMAIN = "mindset" as const;
-
   readonly PERSONA_CORE = `
 Sei uno specialista di psicologia della crescita personale e modelli mentali.
-Regole non negoziabili:
-1. Non dare MAI consigli diretti prima di aver identificato la credenza radice.
-2. Ogni risposta deve nominare ESPLICITAMENTE il pattern cognitivo osservato (con nome tecnico se applicabile: es. "effetto Dunning-Kruger", "bias della conferma", "sindrome dell'impostore").
-3. Usa domande Socratiche calibrate: non più di UNA domanda per risposta, ma che colpisca nel punto cieco.
-4. Distingui tra: ciò che l'utente DICE di pensare, ciò che probabilmente CREDE davvero, ciò di cui ha realmente BISOGNO.
-5. Non normalizzare mai un pattern limitante. Puoi essere empatico e diretto allo stesso tempo.
-  `.trim();
+1. Non dare consigli diretti prima di aver identificato la credenza radice.
+2. Nomina ESPLICITAMENTE il pattern cognitivo osservato (nome tecnico).
+3. Una sola domanda Socratica per risposta, calibrata sul punto cieco.
+4. Distingui: cio che DICE, cio che CREDE, cio di cui ha BISOGNO.
+5. Non normalizzare pattern limitanti. Empatico e diretto.`.trim();
+  readonly TONE_HINT = "Socratico, riflessivo, preciso. Psicologo cognitivo.";
 
-  readonly TONE_HINT = "Socratico, riflessivo, preciso. Parla come uno psicologo cognitivo che rispetta profondamente l'autonomia dell'utente.";
+  domainWebQuery(userMessage: string) { return `psicologia crescita personale modelli mentali ${userMessage}`; }
 
-  domainWebQuery(userMessage: string): string {
-    return `psicologia crescita personale modelli mentali ${userMessage}`;
+  async *run(opts: SpecialistRunOptions): AsyncGenerator<SpecialistEvent> {
+    const { userMessage } = opts;
+    let enrichedMessage = userMessage;
+    try {
+      const check = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "Sei il MindsetAgent. Usa search_mental_models solo se l'utente nomina ESPLICITAMENTE un bias cognitivo o modello mentale specifico. Se il messaggio e generico o emotivo NON chiamare il tool." },
+          { role: "user", content: userMessage },
+        ],
+        tools: [mentalModelTool], tool_choice: "auto", max_tokens: 150, temperature: 0,
+      });
+      const choice = check.choices[0];
+      if (choice.finish_reason === "tool_calls" && choice.message.tool_calls?.length) {
+        for (const tc of choice.message.tool_calls) {
+          if (tc.function.name === "search_mental_models") {
+            const args = JSON.parse(tc.function.arguments) as MentalModelArgs;
+            console.log("[mindset-agent] tool call search_mental_models:", args);
+            const result = await executeMentalModelSearch(args);
+            enrichedMessage = userMessage + `\n\n---\n[DEFINIZIONE PRECISA DA WIKIPEDIA]\n${result}\n---`;
+            console.log("[mindset-agent] tool result injected");
+          }
+        }
+      }
+    } catch (err) { console.warn("[mindset-agent] tool pre-check failed:", err); }
+    yield* super.run({ ...opts, userMessage: enrichedMessage });
   }
 
-  buildDomainSection(
-    _userMessage: string,
-    cot: CoTResult | null,
-    routeDecision: RouteDecision,
-  ): string {
-    const hiddenNeed = cot?.hiddenNeed ?? "Non identificato";
-    const dominantTheme = cot?.dominantTheme ?? "";
-
+  buildDomainSection(_userMessage: string, cot: CoTResult | null, routeDecision: RouteDecision): string {
     const intentGuide: Record<string, string> = {
-      explore:
-        "L'utente sta esplorando. Non spingerlo verso una risposta. Aiutalo a vedere le sue assunzioni non dette.",
-      problem_solve:
-        "C'è un problema psicologico concreto. Identifica la credenza radice PRIMA di proporre soluzioni.",
-      plan:
-        "L'utente vuole un piano di sviluppo mindset. Struttura: credenza da trasformare → evidenza contraria → esperimento comportamentale a basso rischio.",
-      reflect:
-        "L'utente vuole elaborare qualcosa. Crea spazio. Rispecchia senza giudicare. Una domanda al momento giusto vale più di dieci consigli.",
-      vent:
-        "L'utente ha bisogno di essere visto. Prima valida completamente (senza bypassare), poi — solo se naturale — introduci una prospettiva alternativa.",
-      ask_info:
-        "L'utente chiede informazioni su un concetto psicologico. Spiega con precisione, poi aggancia alla sua situazione specifica.",
+      explore: "Non spingere verso una risposta. Aiuta a vedere le assunzioni non dette.",
+      problem_solve: "Identifica la credenza radice PRIMA di proporre soluzioni.",
+      plan: "credenza da trasformare → evidenza contraria → esperimento comportamentale a basso rischio.",
+      reflect: "Crea spazio. Rispecchia senza giudicare. Una domanda giusta vale dieci consigli.",
+      vent: "Prima valida completamente. Poi, solo se naturale, introduci una prospettiva alternativa.",
+      ask_info: "Spiega con precisione, poi aggancia alla situazione specifica.",
     };
-
-    const guide = intentGuide[routeDecision.intent] ?? intentGuide["reflect"];
-
     return [
       "## Belief Analysis Framework",
-      guide,
-      hiddenNeed !== "Non identificato"
-        ? `\n**Bisogno non detto rilevato dal CoT**: ${hiddenNeed}`
-        : "",
-      dominantTheme
-        ? `**Tema dominante**: ${dominantTheme}`
-        : "",
+      intentGuide[routeDecision.intent] ?? intentGuide["reflect"],
+      cot?.hiddenNeed && cot.hiddenNeed !== "Non identificato" ? `\n**Bisogno non detto (CoT)**: ${cot.hiddenNeed}` : "",
+      cot?.dominantTheme ? `**Tema dominante**: ${cot.dominantTheme}` : "",
     ].filter(Boolean).join("\n");
   }
 }
