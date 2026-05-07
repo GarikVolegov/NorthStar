@@ -12,9 +12,12 @@ import { useTranslation } from "react-i18next";
 import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
-
 const DRAFT_KEY = "northstar_test_draft";
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const ADVANCE_DELAY_MS = 320;
+
+// Secondi consigliati per riflettere su ogni domanda Spirit
+const SPIRIT_TIMER_SEC = 12;
 
 const JOURNEY_CTX1_DEFAULTS: Record<string, number> = {
   autonomo: 5, azienda: 4, investitore: 4, dipendente: 1, indeciso: 3,
@@ -53,7 +56,6 @@ const ALL_SPIRIT_IDS = [...SPIRIT_QUESTION_IDS];
 const ALL_CTX_IDS = [...CTX_QUESTION_IDS];
 const ALL_IDS = [...ALL_RIASEC_IDS, ...ALL_SPIRIT_IDS, ...ALL_CTX_IDS];
 const SPIRITS_END = ALL_RIASEC_IDS.length + ALL_SPIRIT_IDS.length;
-const ADVANCE_DELAY_MS = 320;
 
 interface TestDraft {
   step: number;
@@ -61,8 +63,6 @@ interface TestDraft {
   transition1Passed: boolean;
   transition2Passed: boolean;
   savedAt: number;
-  // STEP 3: sessionId opzionale — salvato dopo il primo submit
-  // così possiamo ricollegare la sessione al mount senza aspettare
   sessionId?: number;
 }
 
@@ -78,27 +78,144 @@ function loadDraft(): TestDraft | null {
     return draft;
   } catch { return null; }
 }
-
 function saveDraft(draft: TestDraft) {
   try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch {}
 }
-
 function clearDraft() {
   try { localStorage.removeItem(DRAFT_KEY); } catch {}
 }
-
-// STEP 3: ora usa apiFetch — Bearer token iniettato automaticamente
-// Il vecchio fetch raw non inviava il token, quindi l'endpoint poteva
-// rifiutare la richiesta o non associare correttamente la sessione.
 async function assignUserToSession(sessionId: number, userId: number): Promise<void> {
   try {
     await apiFetch(`${BASE}api/test-sessions/${sessionId}/assign-user`, {
       method: "POST",
       body: JSON.stringify({ userId }),
     });
-  } catch { /* non-critical — non bloccare il flusso se fallisce */ }
+  } catch {}
 }
 
+// ── STEP 4: SpiritTimer ────────────────────────────────────────────────
+// Componente SVG auto-contenuto. Riceve:
+//   totalSec    — durata totale in secondi
+//   paused      — se true il tick si ferma (es. durante justSelected)
+//   reduced     — se true mostra solo testo statico (prefers-reduced-motion)
+//
+// Geometria arco:
+//   SVG 48x48, cerchio centrato r=20, circonferenza = 2πr ≈ 125.66
+//   strokeDasharray = circonferenza
+//   strokeDashoffset animato da 0 (pieno) a circonferenza (vuoto)
+//   L'arco parte dalle ore 12 (rotate -90deg sul cerchio)
+//
+// Colori:
+//   > 4s rimasti  — var(--primary)  — normale
+//   2–4s rimasti  — #f59e0b (amber)  — attenzione
+//   ≤1s rimasto   — var(--destructive) — scaduto
+
+const CIRC = 2 * Math.PI * 20; // 125.66
+
+interface SpiritTimerProps {
+  totalSec: number;
+  paused: boolean;
+  reduced: boolean;
+}
+
+function SpiritTimer({ totalSec, paused, reduced }: SpiritTimerProps) {
+  const [remaining, setRemaining] = useState(totalSec);
+
+  useEffect(() => {
+    if (reduced) return; // nessun tick in reduced-motion
+    if (paused) return;  // fermo durante feedback visivo
+    if (remaining <= 0) return;
+
+    const id = setInterval(() => {
+      setRemaining((r) => {
+        if (r <= 1) { clearInterval(id); return 0; }
+        return r - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(id);
+  }, [paused, reduced, remaining]);
+
+  // Frazione rimasta [0, 1]
+  const fraction = remaining / totalSec;
+  // dashoffset: 0 = cerchio pieno, CIRC = cerchio vuoto
+  const offset = CIRC * (1 - fraction);
+
+  // Colore progressivo in base ai secondi rimasti
+  const strokeColor =
+    remaining <= 1  ? "var(--destructive)" :
+    remaining <= 4  ? "#f59e0b" :
+                     "var(--primary)";
+
+  if (reduced) {
+    // Reduced motion: nessuna animazione, solo label testuale
+    return (
+      <span className="text-xs text-muted-foreground/60 italic">
+        Prenditi il tuo tempo
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2" aria-hidden="true">
+      {/* Arco SVG */}
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 48 48"
+        className="-rotate-90" // ruota per far partire l'arco da ore 12
+      >
+        {/* Traccia di sfondo */}
+        <circle
+          cx="24" cy="24" r="20"
+          fill="none"
+          strokeWidth="3"
+          className="stroke-muted"
+        />
+        {/* Arco animato */}
+        <motion.circle
+          cx="24" cy="24" r="20"
+          fill="none"
+          strokeWidth="3"
+          strokeLinecap="round"
+          style={{ stroke: strokeColor }}
+          strokeDasharray={CIRC}
+          animate={{ strokeDashoffset: offset }}
+          transition={{ duration: 0.9, ease: "linear" }}
+        />
+      </svg>
+
+      {/* Secondi rimasti — sparisce quando arriva a 0 */}
+      <AnimatePresence mode="wait">
+        {remaining > 0 && (
+          <motion.span
+            key={remaining}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.2 }}
+            className="text-xs font-mono tabular-nums"
+            style={{ color: strokeColor }}
+          >
+            {remaining}s
+          </motion.span>
+        )}
+        {remaining === 0 && (
+          <motion.span
+            key="done"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-xs text-muted-foreground/50"
+          >
+            Rispondi quando sei pronto
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Componente principale ─────────────────────────────────────────────────
 export default function Test() {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
@@ -120,24 +237,13 @@ export default function Test() {
   const [transition1Passed, setTransition1Passed] = useState(false);
   const [transition2Passed, setTransition2Passed] = useState(false);
   const [justSelected, setJustSelected] = useState<string | null>(null);
-
-  // STEP 3: ref per tracciare l'ultimo sessionId già assegnato.
-  // Evita chiamate duplicate se l'utente effettua il logout/login
-  // mentre il test è aperto (assign è idempotente ma è inutile sprecare req).
   const assignedSessionRef = useRef<number | null>(null);
 
-  // Salva draft
   useEffect(() => {
     if (currentStep === 0 && Object.keys(answers).length === 0) return;
     saveDraft({ step: currentStep, answers, transition1Passed, transition2Passed, savedAt: Date.now() });
   }, [currentStep, answers, transition1Passed, transition2Passed]);
 
-  // STEP 3: al mount, se l'utente è già loggato e il draft contiene un
-  // sessionId (cioè aveva già fatto submit in precedenza e il browser è
-  // stato chiuso prima del redirect), ricolleghiamo subito la sessione.
-  // Questo chiude il gap: prima era possibile perdere l'associazione
-  // utente-sessione se il browser veniva chiuso dopo il submit ma prima
-  // del redirect a /risultati.
   useEffect(() => {
     if (!user || !draft?.sessionId) return;
     if (assignedSessionRef.current === draft.sessionId) return;
@@ -145,22 +251,6 @@ export default function Test() {
     assignUserToSession(draft.sessionId, user.id);
   }, [user, draft]);
 
-  const handleResume = () => {
-    if (!draft) return;
-    setCurrentStep(draft.step);
-    setAnswers(draft.answers);
-    setTransition1Passed(draft.transition1Passed);
-    setTransition2Passed(draft.transition2Passed);
-    setResumeBannerVisible(false);
-    setResumed(true);
-  };
-
-  const handleDismissDraft = () => {
-    clearDraft();
-    setResumeBannerVisible(false);
-  };
-
-  // Derivate
   const showTransition1 = currentStep === ALL_RIASEC_IDS.length && !transition1Passed;
   const showTransition2 = currentStep === SPIRITS_END && !transition2Passed;
   const isComplete = currentStep >= ALL_IDS.length;
@@ -201,7 +291,6 @@ export default function Test() {
     if (currentStep > 0) setCurrentStep((prev) => prev - 1);
   }, [justSelected, showTransition1, showTransition2, currentStep, transition1Passed, transition2Passed]);
 
-  // Keyboard navigation (step 2)
   useEffect(() => {
     if (showTransition1 || showTransition2 || isComplete) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -224,32 +313,29 @@ export default function Test() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [showTransition1, showTransition2, isComplete, justSelected, currentId, answers, handleAnswer, handleBack]);
 
-  // STEP 3: handleSubmit — onSuccess salva il sessionId nel draft prima
-  // del clearDraft, poi chiama assignUserToSession con apiFetch autenticata.
-  // Il sessionId nel draft funge da fallback se il redirect fallisce.
+  const handleResume = () => {
+    if (!draft) return;
+    setCurrentStep(draft.step);
+    setAnswers(draft.answers);
+    setTransition1Passed(draft.transition1Passed);
+    setTransition2Passed(draft.transition2Passed);
+    setResumeBannerVisible(false);
+    setResumed(true);
+  };
+  const handleDismissDraft = () => { clearDraft(); setResumeBannerVisible(false); };
+
   const handleSubmit = () => {
     submitTest.mutate(
       { data: { answers } },
       {
         onSuccess: async (session) => {
-          // Salva sessionId nel draft come safety net pre-redirect
-          saveDraft({
-            step: currentStep,
-            answers,
-            transition1Passed,
-            transition2Passed,
-            savedAt: Date.now(),
-            sessionId: session.id,
-          });
-
+          saveDraft({ step: currentStep, answers, transition1Passed, transition2Passed, savedAt: Date.now(), sessionId: session.id });
           if (user) {
-            // Assegna solo se non già fatto al mount
             if (assignedSessionRef.current !== session.id) {
               assignedSessionRef.current = session.id;
               await assignUserToSession(session.id, user.id);
             }
           }
-
           clearDraft();
           setLocation(`/risultati/${session.id}`);
         },
@@ -300,8 +386,7 @@ export default function Test() {
           <strong>{t("test.transition.fiveSpirits")}</strong>{" "}
           {t("test.transition.tradition")}
         </p>
-        <p
-          className="text-base text-muted-foreground mb-10 leading-relaxed max-w-xl"
+        <p className="text-base text-muted-foreground mb-10 leading-relaxed max-w-xl"
           dangerouslySetInnerHTML={{ __html: t("test.transition.details") }}
         />
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 w-full mb-10">
@@ -310,9 +395,7 @@ export default function Test() {
               <span className="text-2xl">{s.emoji}</span>
               <div className="font-semibold text-sm text-foreground">{t(`test.transition.spirits.${s.transKey}.name`)}</div>
               <div className="text-xs text-muted-foreground">{t(`test.transition.spirits.${s.transKey}.desc`)}</div>
-              <div className="flex gap-1 mt-1">
-                {[1, 2, 3].map((i) => <span key={i} className="w-1.5 h-1.5 rounded-full bg-primary/30" />)}
-              </div>
+              <div className="flex gap-1 mt-1">{[1,2,3].map((i) => <span key={i} className="w-1.5 h-1.5 rounded-full bg-primary/30" />)}</div>
             </div>
           ))}
         </div>
@@ -339,9 +422,7 @@ export default function Test() {
           <Target className="w-3.5 h-3.5" /> {t("test.transition2.badge")}
         </div>
         <h1 className="text-3xl md:text-4xl font-serif font-bold mb-4">{t("test.transition2.title")}</h1>
-        <p className="text-lg text-muted-foreground mb-10 leading-relaxed max-w-xl">
-          {t("test.transition2.subtitle")}
-        </p>
+        <p className="text-lg text-muted-foreground mb-10 leading-relaxed max-w-xl">{t("test.transition2.subtitle")}</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full mb-10 text-left">
           <div className="flex flex-col gap-2 bg-card border rounded-2xl px-5 py-4">
             <span className="text-2xl">💼</span>
@@ -375,24 +456,13 @@ export default function Test() {
         </div>
         <h1 className="text-3xl md:text-4xl font-serif font-bold mb-4">{t("test.complete.title")}</h1>
         <p className="text-lg text-muted-foreground mb-2 leading-relaxed">{t("test.complete.subtitle")}</p>
-        {user && (
-          <p className="text-sm text-primary font-medium mb-6">{t("test.complete.savedAccount")}</p>
-        )}
-        <Button
-          size="lg"
-          onClick={handleSubmit}
-          disabled={submitTest.isPending}
-          className="rounded-full px-8 h-14 text-lg w-full sm:w-auto"
-        >
-          {submitTest.isPending ? (
-            <><Loader2 className="mr-2 w-5 h-5 animate-spin" /> {t("test.complete.processing")}</>
-          ) : (
-            <><Sparkles className="mr-2 w-5 h-5" /> {t("test.complete.discoverResults")}</>
-          )}
+        {user && <p className="text-sm text-primary font-medium mb-6">{t("test.complete.savedAccount")}</p>}
+        <Button size="lg" onClick={handleSubmit} disabled={submitTest.isPending} className="rounded-full px-8 h-14 text-lg w-full sm:w-auto">
+          {submitTest.isPending
+            ? <><Loader2 className="mr-2 w-5 h-5 animate-spin" /> {t("test.complete.processing")}</>
+            : <><Sparkles className="mr-2 w-5 h-5" /> {t("test.complete.discoverResults")}</>}
         </Button>
-        {submitTest.isError && (
-          <p className="mt-4 text-sm text-destructive">{t("test.complete.submitError")}</p>
-        )}
+        {submitTest.isError && <p className="mt-4 text-sm text-destructive">{t("test.complete.submitError")}</p>}
       </div>
     );
   }
@@ -410,14 +480,11 @@ export default function Test() {
   return (
     <div className="container max-w-2xl mx-auto px-4 py-12 min-h-[70vh]">
 
-      {/* Resume draft banner */}
       <AnimatePresence>
         {showResumeBanner && (
           <motion.div
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.3 }}
+            initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.3 }}
             className="mb-6 flex items-center gap-3 bg-primary/10 border border-primary/25 rounded-2xl px-4 py-3"
           >
             <RotateCcw className="w-4 h-4 text-primary shrink-0" />
@@ -431,9 +498,7 @@ export default function Test() {
               <Button size="sm" variant="ghost" onClick={handleDismissDraft} className="rounded-full h-7 px-2">
                 <X className="w-3.5 h-3.5" />
               </Button>
-              <Button size="sm" onClick={handleResume} className="rounded-full h-7 px-3 text-xs">
-                Riprendi
-              </Button>
+              <Button size="sm" onClick={handleResume} className="rounded-full h-7 px-3 text-xs">Riprendi</Button>
             </div>
           </motion.div>
         )}
@@ -449,15 +514,12 @@ export default function Test() {
               <div className={cn(
                 "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all duration-300",
                 isActive ? "bg-primary text-primary-foreground shadow-sm" :
-                isDone   ? "bg-primary/15 text-primary" :
-                           "text-muted-foreground"
+                isDone   ? "bg-primary/15 text-primary" : "text-muted-foreground"
               )}>
                 {isDone
                   ? <Check className="w-3 h-3" />
-                  : <span className={cn(
-                      "w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold border shrink-0",
-                      isActive ? "border-primary-foreground/50" : "border-current opacity-60"
-                    )}>{i + 1}</span>
+                  : <span className={cn("w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold border shrink-0",
+                      isActive ? "border-primary-foreground/50" : "border-current opacity-60")}>{i + 1}</span>
                 }
                 <span>{label}</span>
               </div>
@@ -499,6 +561,7 @@ export default function Test() {
           animate="center"
           exit="exit"
         >
+          {/* STEP 4: badge Spirit + timer SVG nella stessa riga */}
           {spiritInfo && (
             <div className="flex items-center gap-3 mb-6">
               <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-full px-4 py-1.5">
@@ -507,10 +570,20 @@ export default function Test() {
                   {t(`test.transition.spirits.${spiritInfo.transKey}.name`)} · {t(`test.transition.spirits.${spiritInfo.transKey}.desc`)}
                 </span>
               </div>
-              <div className="flex gap-1.5 ml-auto">
-                {[1, 2, 3].map((n) => (
+              <div className="flex gap-1.5">
+                {[1,2,3].map((n) => (
                   <span key={n} className={cn("w-2 h-2 rounded-full", n <= questionInGroup ? "bg-primary" : "bg-muted")} />
                 ))}
+              </div>
+              {/* Timer: key={currentStep} forza il re-mount ad ogni nuova domanda
+                  così il countdown repartì sempre da SPIRIT_TIMER_SEC */}
+              <div className="ml-auto">
+                <SpiritTimer
+                  key={currentStep}
+                  totalSec={SPIRIT_TIMER_SEC}
+                  paused={justSelected !== null}
+                  reduced={prefersReduced}
+                />
               </div>
             </div>
           )}
@@ -557,9 +630,8 @@ export default function Test() {
                       "hidden pointer-fine:inline-flex items-center justify-center w-5 h-5 rounded-md text-[10px] font-bold border shrink-0 transition-opacity duration-150",
                       selected
                         ? "border-primary-foreground/40 text-primary-foreground/70 opacity-70"
-                        : justSelected !== null
-                          ? "opacity-0"
-                          : "border-muted-foreground/30 text-muted-foreground/60 opacity-60"
+                        : justSelected !== null ? "opacity-0"
+                        : "border-muted-foreground/30 text-muted-foreground/60 opacity-60"
                     )}>
                       {opt.value}
                     </span>
@@ -573,18 +645,13 @@ export default function Test() {
                     animate={
                       prefersReduced ? {} :
                       isJustSelected ? { scale: [1, 1.35, 0.95, 1.1, 1] } :
-                      selected       ? { scale: [1, 1.2, 1] } :
-                                       { scale: 1 }
+                      selected       ? { scale: [1, 1.2, 1] } : { scale: 1 }
                     }
                     transition={isJustSelected ? { duration: 0.4, ease: "easeOut" } : { duration: 0.25 }}
                   >
                     {selected && (
                       isJustSelected ? (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.5 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ duration: 0.18, ease: "easeOut" }}
-                        >
+                        <motion.div initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.18, ease: "easeOut" }}>
                           <Check className="w-3 h-3 text-primary-foreground" />
                         </motion.div>
                       ) : (
@@ -599,9 +666,7 @@ export default function Test() {
 
           {/* Keyboard hint (step 2) */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.8, duration: 0.4 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8, duration: 0.4 }}
             className="hidden pointer-fine:flex items-center gap-3 mt-8 text-xs text-muted-foreground/50 justify-center flex-wrap"
           >
             <span className="flex items-center gap-1">
