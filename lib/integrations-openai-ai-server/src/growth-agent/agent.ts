@@ -1,17 +1,20 @@
 /**
- * GrowthAgent v3 — adds self-evaluation layer.
+ * GrowthAgent v4 — multi-agent orchestrator.
  *
- * Flow per messaggio:
- *   1. Retrieve persona examples     (chi è il coach)
- *   2. Retrieve document chunks      (cosa sa il coach)
- *   3. Web search fallback           (se kb locale è scarsa)
- *   4. [PARALLEL] Hidden CoT         (cosa sta davvero succedendo)
- *   5. [PARALLEL] Self-evaluation    (ho abbastanza contesto per rispondere bene?)
- *   6. Build system prompt           (con tono + memoria + incertezza + Socratica)
- *   7. Stream GPT-4o response
+ * FLOW PER MESSAGGIO:
+ *   1. RouterAgent classifies the message → { domain, intent, confidence }
+ *   2a. confidence >= 0.60 AND domain != 'general'
+ *       → SpecialistAgent.run()  (Career | Mindset | Habits | Trading)
+ *   2b. fallback
+ *       → original monolithic pipeline (retrieve + CoT + eval + stream)
  *
- * Steps 4 and 5 run in parallel AFTER retrieval — zero extra latency.
- * evalResult is returned in the 'done' SSE event for the frontend badge.
+ * BACKWARD COMPATIBILITY:
+ *   runGrowthAgent() signature unchanged — chat.ts doesn't need updates.
+ *   'done' event now includes routeDecision for frontend badge.
+ *
+ * SPECIALIST REGISTRATION:
+ *   Specialists register themselves on import (side-effect).
+ *   Import them here so the registry is populated when agent.ts loads.
  */
 import OpenAI from "openai";
 import { openai } from "../client";
@@ -20,8 +23,16 @@ import { searchWeb, MIN_LOCAL_CHUNKS } from "./web-search";
 import { buildSystemPrompt, type UserContext } from "./prompt-builder";
 import { runChainOfThought } from "./chain-of-thought";
 import { evaluateSelf, type EvalResult } from "./self-evaluator";
+import { routerAgent } from "./router-agent";
+import { getSpecialist } from "./specialist-agent";
 import type { RetrievedChunk } from "./retriever";
 import type { CoTResult } from "./chain-of-thought";
+import type { RouteDecision } from "./router-agent";
+
+// ── Register all specialists (side-effect imports) ─────────────────────────────
+import "./specialists/career-agent";
+import "./specialists/mindset-agent";
+import "./specialists/habits-agent";
 
 export const GROWTH_AGENT_MODEL = "gpt-4o";
 
@@ -36,7 +47,6 @@ export interface GrowthAgentOptions {
   history: ChatMessage[];
   userMessage: string;
   maxHistory?: number;
-  /** Number of memory facts loaded — used by self-evaluator */
   memoryFactCount?: number;
 }
 
@@ -51,7 +61,7 @@ export async function* runGrowthAgent(
   opts: GrowthAgentOptions,
 ): AsyncGenerator<
   | { type: "token"; value: string }
-  | { type: "done"; sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult }
+  | { type: "done"; sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult; routeDecision?: RouteDecision }
   | { type: "error"; message: string }
 > {
   const {
@@ -63,22 +73,43 @@ export async function* runGrowthAgent(
     memoryFactCount = 0,
   } = opts;
 
+  // ── STEP 1: Route the message ─────────────────────────────────────────────────
+  const routeDecision = await routerAgent.route(userMessage, history);
+  console.log(
+    `[agent] routed to=${routeDecision.domain} intent=${routeDecision.intent} conf=${routeDecision.confidence.toFixed(2)}`,
+  );
+
+  // ── STEP 2a: Specialist path ─────────────────────────────────────────────────
+  if (routeDecision.confidence >= 0.60 && routeDecision.domain !== "general") {
+    const specialist = getSpecialist(routeDecision.domain);
+    if (specialist) {
+      yield* specialist.run({
+        userId,
+        userContext,
+        history,
+        userMessage,
+        routeDecision,
+        memoryFactCount,
+        maxHistory,
+      });
+      return;
+    }
+  }
+
+  // ── STEP 2b: General fallback (original monolithic pipeline) ─────────────────
   const conversationSummary = buildConversationSummary(history);
 
-  // ── Steps 1-2: RAG retrieval ────────────────────────────────────────────────
   const [personaExamples, documentChunks, cot] = await Promise.all([
     retrieve(userMessage, userId, { topK: 3, minScore: 0.30, sourceTypes: ["persona_example"] }),
     retrieve(userMessage, userId, { topK: 5, minScore: 0.35, sourceTypes: ["document", "user_note"] }),
     runChainOfThought(userMessage, conversationSummary),
   ]);
 
-  // ── Step 3: Web fallback ────────────────────────────────────────────────────
   let webResults: RetrievedChunk[] = [];
   if (documentChunks.length < MIN_LOCAL_CHUNKS) {
     webResults = await searchWeb(`crescita personale ${userMessage}`, 4);
   }
 
-  // ── Step 5: Self-evaluation (pure local — no extra API call) ────────────────
   const evalResult = evaluateSelf({
     userMessage,
     documentChunks,
@@ -87,7 +118,6 @@ export async function* runGrowthAgent(
     memoryFactCount,
   });
 
-  // ── Step 6: Build system prompt ────────────────────────────────────────────
   const systemPrompt = buildSystemPrompt({
     userContext,
     personaExamples,
@@ -98,7 +128,6 @@ export async function* runGrowthAgent(
     evalResult,
   });
 
-  // ── Step 7: Stream ───────────────────────────────────────────────────────────
   const recentHistory = history.slice(-maxHistory);
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
@@ -109,7 +138,6 @@ export async function* runGrowthAgent(
     { role: "user", content: userMessage },
   ];
 
-  // Temperature slightly lower when uncertain — less hallucination risk
   const temperature = evalResult.level === "low" ? 0.45 : 0.72;
 
   try {
@@ -118,7 +146,7 @@ export async function* runGrowthAgent(
       messages,
       stream: true,
       temperature,
-      max_tokens: evalResult.level === "low" ? 300 : 600, // shorter when uncertain
+      max_tokens: evalResult.level === "low" ? 300 : 600,
     });
 
     for await (const chunk of stream) {
@@ -130,7 +158,8 @@ export async function* runGrowthAgent(
       type: "done",
       sources: [...personaExamples, ...documentChunks, ...webResults],
       cot,
-      evalResult,   // returned to frontend for badge
+      evalResult,
+      routeDecision,  // included even in fallback
     };
   } catch (err) {
     yield { type: "error", message: err instanceof Error ? err.message : String(err) };
