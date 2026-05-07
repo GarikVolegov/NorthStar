@@ -18,6 +18,11 @@
  * | Fallback: confidence < threshold OR domain = 'general'                     |
  * |   → general pipeline (RAG + CoT + supervisor)                              |
  * └─────────────────────────────────────────────────────────────┘
+ *
+ * CHANGES v7.1
+ * ────────────
+ * SupervisorEvalInput now includes userId + sessionId so that rewrite()
+ * can fire-and-forget the log to supervisor_logs for the self-improvement job.
  */
 import OpenAI from "openai";
 import { openai } from "../client";
@@ -45,15 +50,16 @@ export const GROWTH_AGENT_MODEL = "gpt-4o";
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
-  domain?: RouteDecision["domain"]; // optional — used by adaptive threshold
+  domain?: RouteDecision["domain"];
 }
 
 export interface GrowthAgentOptions {
-  userId:          number;
-  userContext:     UserContext & { memorySection?: string };
-  history:         ChatMessage[];
-  userMessage:     string;
-  maxHistory?:     number;
+  userId:           number;
+  sessionId?:       number;   // ← v7.1: forwarded to supervisor for DB logging
+  userContext:      UserContext & { memorySection?: string };
+  history:          ChatMessage[];
+  userMessage:      string;
+  maxHistory?:      number;
   memoryFactCount?: number;
 }
 
@@ -72,7 +78,7 @@ export async function* runGrowthAgent(
   | { type: "done";   sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult; routeDecision?: RouteDecision; supervisorResult?: SupervisorResult }
   | { type: "error";  message: string }
 > {
-  const { userId, userContext, history, userMessage, maxHistory = 12 } = opts;
+  const { userId, sessionId, userContext, history, userMessage, maxHistory = 12 } = opts;
 
   // ── 1. Route + Load memory IN PARALLEL ─────────────────────────────────────
   const [routeDecision, userMemory] = await Promise.all([
@@ -96,10 +102,11 @@ export async function* runGrowthAgent(
     (routeDecision.secondaryRoute
       ? ` + secondary=${routeDecision.secondaryRoute.domain}(${routeDecision.secondaryRoute.confidence.toFixed(2)})`
       : "") +
-    ` | memory: ${userMemory.facts.length} facts`,
+    ` | memory: ${userMemory.facts.length} facts` +
+    (sessionId ? ` | session: ${sessionId}` : ""),
   );
 
-  function scheduleMemorySave(assistantResponse: string, sessionId: number): void {
+  function scheduleMemorySave(assistantResponse: string, sid: number): void {
     const turns = [
       ...history.slice(-8),
       { role: "user",      content: userMessage },
@@ -109,7 +116,7 @@ export async function* runGrowthAgent(
       try {
         const extracted = await extractMemory(turns);
         if (extracted && (extracted.facts.length > 0 || extracted.patterns.length > 0)) {
-          await mergeMemory(userId, sessionId, extracted);
+          await mergeMemory(userId, sid, extracted);
           console.log(`[memory] saved ${extracted.facts.length} facts + ${extracted.patterns.length} patterns`);
         }
       } catch (err) {
@@ -137,7 +144,7 @@ export async function* runGrowthAgent(
     })) {
       if (event.type === "token") fullResponse += event.value;
       yield event;
-      if (event.type === "done") scheduleMemorySave(fullResponse, Date.now());
+      if (event.type === "done") scheduleMemorySave(fullResponse, sessionId ?? Date.now());
     }
     return;
   }
@@ -153,7 +160,7 @@ export async function* runGrowthAgent(
       })) {
         if (event.type === "token") fullResponse += event.value;
         yield event;
-        if (event.type === "done") scheduleMemorySave(fullResponse, Date.now());
+        if (event.type === "done") scheduleMemorySave(fullResponse, sessionId ?? Date.now());
       }
       return;
     }
@@ -205,13 +212,23 @@ export async function* runGrowthAgent(
       if (delta) tokenBuffer.push(delta);
     }
 
-    const draft         = tokenBuffer.join("");
-    const supervisorInput = { userMessage, draft, domain: routeDecision.domain, intent: routeDecision.intent };
-    let supervisorResult  = supervisorAgent.evaluate(supervisorInput);
-    let finalText         = draft;
+    const draft = tokenBuffer.join("");
+
+    // v7.1: include userId + sessionId so supervisor.rewrite() can log to DB
+    const supervisorInput = {
+      userMessage,
+      draft,
+      domain:    routeDecision.domain,
+      intent:    routeDecision.intent,
+      userId:    String(userId),
+      sessionId: sessionId,
+    };
+
+    let supervisorResult = supervisorAgent.evaluate(supervisorInput);
+    let finalText        = draft;
 
     if (!supervisorResult.pass) {
-      console.log(`[supervisor] FAIL (score=${supervisorResult.score})`);
+      console.log(`[supervisor] FAIL (score=${supervisorResult.score}) — rewriting + logging`);
       finalText        = await supervisorAgent.rewrite(supervisorInput, supervisorResult);
       supervisorResult = { ...supervisorResult, rewritten: true };
     } else {
@@ -223,10 +240,13 @@ export async function* runGrowthAgent(
       yield { type: "token", value: finalText.slice(i, i + CHUNK_SIZE) };
     }
 
-    yield { type: "done", sources: [...personaExamples, ...documentChunks, ...webResults],
-      cot, evalResult, routeDecision, supervisorResult };
+    yield {
+      type: "done",
+      sources: [...personaExamples, ...documentChunks, ...webResults],
+      cot, evalResult, routeDecision, supervisorResult,
+    };
 
-    scheduleMemorySave(finalText, Date.now());
+    scheduleMemorySave(finalText, sessionId ?? Date.now());
   } catch (err) {
     yield { type: "error", message: err instanceof Error ? err.message : String(err) };
   }
