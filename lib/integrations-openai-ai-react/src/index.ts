@@ -17,3 +17,7 @@ export { GrowthMemoryPanel }  from "./growth-agent/GrowthMemoryPanel";
 export { useGrowthAnalytics }       from "./growth-agent/useGrowthAnalytics";
 export type { AnalyticsData, TopicEntry, TrendEntry, LevelBreakdown, UseGrowthAnalyticsOptions } from "./growth-agent/useGrowthAnalytics";
 export { GrowthAnalyticsDashboard } from "./growth-agent/GrowthAnalyticsDashboard";
+
+// Growth Coach Profile Page (unified layout)
+export { GrowthProfilePage }        from "./growth-agent/GrowthProfilePage";
+export type { GrowthProfilePageProps } from "./growth-agent/GrowthProfilePage";
