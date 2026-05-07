@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Variants } from "framer-motion";
@@ -15,8 +15,6 @@ const BASE = import.meta.env.BASE_URL || "/";
 const DRAFT_KEY = "northstar_test_draft";
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const ADVANCE_DELAY_MS = 320;
-
-// Secondi consigliati per riflettere su ogni domanda Spirit
 const SPIRIT_TIMER_SEC = 12;
 
 const JOURNEY_CTX1_DEFAULTS: Record<string, number> = {
@@ -57,6 +55,11 @@ const ALL_CTX_IDS = [...CTX_QUESTION_IDS];
 const ALL_IDS = [...ALL_RIASEC_IDS, ...ALL_SPIRIT_IDS, ...ALL_CTX_IDS];
 const SPIRITS_END = ALL_RIASEC_IDS.length + ALL_SPIRIT_IDS.length;
 
+// STEP 5: PHASE_LABELS era dentro il componente, ricreato ad ogni render.
+// È un array statico che non dipende da nessun stato o prop — va fuori.
+// Nota: se in futuro vuoi traduzioni dinamiche, spostalo dentro con useMemo([t]).
+const PHASE_LABELS = ["Inclinazioni", "Bussola", "Obiettivi"] as const;
+
 interface TestDraft {
   step: number;
   answers: Record<string, number>;
@@ -93,24 +96,7 @@ async function assignUserToSession(sessionId: number, userId: number): Promise<v
   } catch {}
 }
 
-// ── STEP 4: SpiritTimer ────────────────────────────────────────────────
-// Componente SVG auto-contenuto. Riceve:
-//   totalSec    — durata totale in secondi
-//   paused      — se true il tick si ferma (es. durante justSelected)
-//   reduced     — se true mostra solo testo statico (prefers-reduced-motion)
-//
-// Geometria arco:
-//   SVG 48x48, cerchio centrato r=20, circonferenza = 2πr ≈ 125.66
-//   strokeDasharray = circonferenza
-//   strokeDashoffset animato da 0 (pieno) a circonferenza (vuoto)
-//   L'arco parte dalle ore 12 (rotate -90deg sul cerchio)
-//
-// Colori:
-//   > 4s rimasti  — var(--primary)  — normale
-//   2–4s rimasti  — #f59e0b (amber)  — attenzione
-//   ≤1s rimasto   — var(--destructive) — scaduto
-
-const CIRC = 2 * Math.PI * 20; // 125.66
+const CIRC = 2 * Math.PI * 20;
 
 interface SpiritTimerProps {
   totalSec: number;
@@ -122,89 +108,54 @@ function SpiritTimer({ totalSec, paused, reduced }: SpiritTimerProps) {
   const [remaining, setRemaining] = useState(totalSec);
 
   useEffect(() => {
-    if (reduced) return; // nessun tick in reduced-motion
-    if (paused) return;  // fermo durante feedback visivo
-    if (remaining <= 0) return;
-
+    if (reduced || paused || remaining <= 0) return;
     const id = setInterval(() => {
       setRemaining((r) => {
         if (r <= 1) { clearInterval(id); return 0; }
         return r - 1;
       });
     }, 1000);
-
     return () => clearInterval(id);
   }, [paused, reduced, remaining]);
 
-  // Frazione rimasta [0, 1]
   const fraction = remaining / totalSec;
-  // dashoffset: 0 = cerchio pieno, CIRC = cerchio vuoto
   const offset = CIRC * (1 - fraction);
-
-  // Colore progressivo in base ai secondi rimasti
   const strokeColor =
-    remaining <= 1  ? "var(--destructive)" :
-    remaining <= 4  ? "#f59e0b" :
+    remaining <= 1 ? "var(--destructive)" :
+    remaining <= 4 ? "#f59e0b" :
                      "var(--primary)";
 
   if (reduced) {
-    // Reduced motion: nessuna animazione, solo label testuale
-    return (
-      <span className="text-xs text-muted-foreground/60 italic">
-        Prenditi il tuo tempo
-      </span>
-    );
+    return <span className="text-xs text-muted-foreground/60 italic">Prenditi il tuo tempo</span>;
   }
 
   return (
     <div className="flex items-center gap-2" aria-hidden="true">
-      {/* Arco SVG */}
-      <svg
-        width="32"
-        height="32"
-        viewBox="0 0 48 48"
-        className="-rotate-90" // ruota per far partire l'arco da ore 12
-      >
-        {/* Traccia di sfondo */}
-        <circle
-          cx="24" cy="24" r="20"
-          fill="none"
-          strokeWidth="3"
-          className="stroke-muted"
-        />
-        {/* Arco animato */}
+      <svg width="32" height="32" viewBox="0 0 48 48" className="-rotate-90">
+        <circle cx="24" cy="24" r="20" fill="none" strokeWidth="3" className="stroke-muted" />
         <motion.circle
-          cx="24" cy="24" r="20"
-          fill="none"
-          strokeWidth="3"
-          strokeLinecap="round"
+          cx="24" cy="24" r="20" fill="none" strokeWidth="3" strokeLinecap="round"
           style={{ stroke: strokeColor }}
           strokeDasharray={CIRC}
           animate={{ strokeDashoffset: offset }}
           transition={{ duration: 0.9, ease: "linear" }}
         />
       </svg>
-
-      {/* Secondi rimasti — sparisce quando arriva a 0 */}
       <AnimatePresence mode="wait">
-        {remaining > 0 && (
+        {remaining > 0 ? (
           <motion.span
             key={remaining}
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            transition={{ duration: 0.2 }}
+            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }} transition={{ duration: 0.2 }}
             className="text-xs font-mono tabular-nums"
             style={{ color: strokeColor }}
           >
             {remaining}s
           </motion.span>
-        )}
-        {remaining === 0 && (
+        ) : (
           <motion.span
             key="done"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             className="text-xs text-muted-foreground/50"
           >
             Rispondi quando sei pronto
@@ -226,7 +177,6 @@ export default function Test() {
   const [draft] = useState<TestDraft | null>(() => loadDraft());
   const [resumeBannerVisible, setResumeBannerVisible] = useState(true);
   const [resumed, setResumed] = useState(false);
-
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>(() => {
     const jt = user?.journeyType;
@@ -268,6 +218,17 @@ export default function Test() {
     : isSpiritQ
     ? t(`test.questions.spirits.${currentId}`)
     : t(`test.questions.riasec.${currentId}`);
+
+  // STEP 5: OPTIONS memoizzato — ricreato solo se cambia la funzione t()
+  // cioè solo al cambio lingua. Prima veniva ricreato ad ogni singolo render
+  // del componente (ogni risposta, ogni step, ogni keystroke).
+  const OPTIONS = useMemo(() => [
+    { value: 1, label: t("test.options.1") },
+    { value: 2, label: t("test.options.2") },
+    { value: 3, label: t("test.options.3") },
+    { value: 4, label: t("test.options.4") },
+    { value: 5, label: t("test.options.5") },
+  ], [t]);
 
   const handleAnswer = useCallback((value: number) => {
     if (justSelected !== null) return;
@@ -354,14 +315,6 @@ export default function Test() {
         center: { opacity: 1, x: 0, transition: { duration: 0.38, ease: easings.easeOut } },
         exit: (dir: number) => ({ opacity: 0, x: dir > 0 ? -40 : 40, transition: { duration: 0.2, ease: easings.easeIn } }),
       };
-
-  const OPTIONS = [
-    { value: 1, label: t("test.options.1") },
-    { value: 2, label: t("test.options.2") },
-    { value: 3, label: t("test.options.3") },
-    { value: 4, label: t("test.options.4") },
-    { value: 5, label: t("test.options.5") },
-  ];
 
   // ── Transition 1 ───────────────────────────────────────────────────
   if (showTransition1) {
@@ -475,7 +428,6 @@ export default function Test() {
     : isSpiritQ
     ? t("test.innerCompassCount", { current: spiritOffset + 1, total: ALL_SPIRIT_IDS.length })
     : t("test.questionOf", { current: currentStep + 1, total: ALL_RIASEC_IDS.length });
-  const PHASE_LABELS = ["Inclinazioni", "Bussola", "Obiettivi"];
 
   return (
     <div className="container max-w-2xl mx-auto px-4 py-12 min-h-[70vh]">
@@ -561,7 +513,6 @@ export default function Test() {
           animate="center"
           exit="exit"
         >
-          {/* STEP 4: badge Spirit + timer SVG nella stessa riga */}
           {spiritInfo && (
             <div className="flex items-center gap-3 mb-6">
               <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-full px-4 py-1.5">
@@ -575,8 +526,6 @@ export default function Test() {
                   <span key={n} className={cn("w-2 h-2 rounded-full", n <= questionInGroup ? "bg-primary" : "bg-muted")} />
                 ))}
               </div>
-              {/* Timer: key={currentStep} forza il re-mount ad ogni nuova domanda
-                  così il countdown repartì sempre da SPIRIT_TIMER_SEC */}
               <div className="ml-auto">
                 <SpiritTimer
                   key={currentStep}
@@ -628,8 +577,7 @@ export default function Test() {
                   <span className="flex items-center gap-3 flex-1 min-w-0">
                     <span className={cn(
                       "hidden pointer-fine:inline-flex items-center justify-center w-5 h-5 rounded-md text-[10px] font-bold border shrink-0 transition-opacity duration-150",
-                      selected
-                        ? "border-primary-foreground/40 text-primary-foreground/70 opacity-70"
+                      selected ? "border-primary-foreground/40 text-primary-foreground/70 opacity-70"
                         : justSelected !== null ? "opacity-0"
                         : "border-muted-foreground/30 text-muted-foreground/60 opacity-60"
                     )}>
@@ -664,7 +612,6 @@ export default function Test() {
             })}
           </div>
 
-          {/* Keyboard hint (step 2) */}
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8, duration: 0.4 }}
             className="hidden pointer-fine:flex items-center gap-3 mt-8 text-xs text-muted-foreground/50 justify-center flex-wrap"
