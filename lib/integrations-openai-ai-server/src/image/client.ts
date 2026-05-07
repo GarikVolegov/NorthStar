@@ -25,12 +25,22 @@ function getOpenAI(): OpenAI {
   return _openai;
 }
 
+/**
+ * Lazily-initialized OpenAI client — resolves the singleton on first property access
+ * so that env vars are only required at call-time, not at module load time.
+ */
+export const openai: OpenAI = new Proxy({} as OpenAI, {
+  get(_target, prop) {
+    return Reflect.get(getOpenAI(), prop);
+  },
+});
+
 export async function generateImageBuffer(
   prompt: string,
   size: "1024x1024" | "512x512" | "256x256" = "1024x1024"
 ): Promise<Buffer> {
-  const openai = getOpenAI();
-  const response = await openai.images.generate({
+  const client = getOpenAI();
+  const response = await client.images.generate({
     model: "gpt-image-1",
     prompt,
     size,
@@ -44,7 +54,7 @@ export async function editImages(
   prompt: string,
   outputPath?: string
 ): Promise<Buffer> {
-  const openai = getOpenAI();
+  const client = getOpenAI();
   const images = await Promise.all(
     imageFiles.map((file) =>
       toFile(fs.createReadStream(file), file, {
@@ -53,7 +63,7 @@ export async function editImages(
     )
   );
 
-  const response = await openai.images.edit({
+  const response = await client.images.edit({
     model: "gpt-image-1",
     image: images,
     prompt,

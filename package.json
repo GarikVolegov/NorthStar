@@ -17,6 +17,10 @@
     "test:e2e:all": "playwright test"
   },
   "private": true,
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
+  },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "prettier": "^3.8.1",
