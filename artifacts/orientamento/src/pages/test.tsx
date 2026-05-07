@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Variants } from "framer-motion";
@@ -15,34 +15,10 @@ const BASE = import.meta.env.BASE_URL || "/";
 const DRAFT_KEY = "northstar_test_draft";
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-interface TestDraft {
-  step: number;
-  answers: Record<string, number>;
-  transition1Passed: boolean;
-  transition2Passed: boolean;
-  savedAt: number;
-}
-
-function loadDraft(): TestDraft | null {
-  try {
-    const raw = localStorage.getItem(DRAFT_KEY);
-    if (!raw) return null;
-    const draft: TestDraft = JSON.parse(raw);
-    if (Date.now() - draft.savedAt > DRAFT_TTL_MS) {
-      localStorage.removeItem(DRAFT_KEY);
-      return null;
-    }
-    return draft;
-  } catch { return null; }
-}
-
-function saveDraft(draft: TestDraft) {
-  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch {}
-}
-
-function clearDraft() {
-  try { localStorage.removeItem(DRAFT_KEY); } catch {}
-}
+// ── Costanti statiche fuori dal componente (non ricreate ad ogni render) ─────
+const JOURNEY_CTX1_DEFAULTS: Record<string, number> = {
+  autonomo: 5, azienda: 4, investitore: 4, dipendente: 1, indeciso: 3,
+};
 
 const RIASEC_QUESTION_IDS = ["q1","q2","q3","q4","q5","q6","q7","q8","q9","q10","q11","q12"] as const;
 const SPIRIT_QUESTION_IDS = [
@@ -85,6 +61,38 @@ const ALL_IDS = [...ALL_RIASEC_IDS, ...ALL_SPIRIT_IDS, ...ALL_CTX_IDS];
 
 const SPIRITS_END = ALL_RIASEC_IDS.length + ALL_SPIRIT_IDS.length;
 
+// Tempo di attesa (ms) tra click e advance — lascia spazio all'animazione
+const ADVANCE_DELAY_MS = 320;
+
+interface TestDraft {
+  step: number;
+  answers: Record<string, number>;
+  transition1Passed: boolean;
+  transition2Passed: boolean;
+  savedAt: number;
+}
+
+function loadDraft(): TestDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const draft: TestDraft = JSON.parse(raw);
+    if (Date.now() - draft.savedAt > DRAFT_TTL_MS) {
+      localStorage.removeItem(DRAFT_KEY);
+      return null;
+    }
+    return draft;
+  } catch { return null; }
+}
+
+function saveDraft(draft: TestDraft) {
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch {}
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch {}
+}
+
 async function assignUserToSession(sessionId: number, userId: number): Promise<void> {
   try {
     await fetch(`${BASE}api/test-sessions/${sessionId}/assign-user`, {
@@ -102,10 +110,6 @@ export default function Test() {
   const { user } = useAuth();
   const prefersReduced = useReducedMotion();
 
-  const JOURNEY_CTX1_DEFAULTS: Record<string, number> = {
-    autonomo: 5, azienda: 4, investitore: 4, dipendente: 1, indeciso: 3,
-  };
-
   const [draft] = useState<TestDraft | null>(() => loadDraft());
   const [resumeBannerVisible, setResumeBannerVisible] = useState(true);
   const [resumed, setResumed] = useState(false);
@@ -119,6 +123,11 @@ export default function Test() {
   const [direction, setDirection] = useState<1 | -1>(1);
   const [transition1Passed, setTransition1Passed] = useState(false);
   const [transition2Passed, setTransition2Passed] = useState(false);
+
+  // ── STEP 1: stato per il feedback visivo prima dell'auto-advance ───────────
+  // Contiene l'id della domanda corrente se l'utente ha appena cliccato
+  // un'opzione e stiamo aspettando l'advance. null = nessun click in corso.
+  const [justSelected, setJustSelected] = useState<string | null>(null);
 
   // Save draft to localStorage whenever state changes
   useEffect(() => {
@@ -183,13 +192,28 @@ export default function Test() {
     { value: 5, label: t("test.options.5") },
   ];
 
-  const handleAnswer = (value: number) => {
+  // ── handleAnswer con feedback visivo ─────────────────────────────────────
+  // 1. Salva la risposta nell'answers map
+  // 2. Setta justSelected = currentId → il pulsante mostra il Check animato
+  // 3. Dopo ADVANCE_DELAY_MS avanza allo step successivo e resetta justSelected
+  const handleAnswer = useCallback((value: number) => {
+    // Blocca double-click: se stiamo già aspettando un advance, ignora
+    if (justSelected !== null) return;
+
+    const id = currentId;
     setDirection(1);
-    setAnswers((prev) => ({ ...prev, [currentId]: value }));
-    setTimeout(() => setCurrentStep((prev) => prev + 1), 250);
-  };
+    setAnswers((prev) => ({ ...prev, [id]: value }));
+    setJustSelected(id);
+
+    setTimeout(() => {
+      setJustSelected(null);
+      setCurrentStep((prev) => prev + 1);
+    }, ADVANCE_DELAY_MS);
+  }, [justSelected, currentId]);
 
   const handleBack = () => {
+    // Non permettere navigazione indietro durante il feedback visivo
+    if (justSelected !== null) return;
     setDirection(-1);
     if (showTransition1) {
       setCurrentStep(ALL_RIASEC_IDS.length - 1);
@@ -349,9 +373,7 @@ export default function Test() {
 
   // ── Question screen ────────────────────────────────────────────────────────
 
-  // Resume banner (shown before user starts / resumes)
   const showResumeBanner = !!draft && resumeBannerVisible && !resumed && currentStep === 0 && Object.keys(answers).length === 0;
-
   const currentPhase = isCtxQ ? 2 : isSpiritQ ? 1 : 0;
 
   const headerLabel = isCtxQ
@@ -427,7 +449,7 @@ export default function Test() {
       <div className="flex items-center justify-between mb-4">
         <motion.button
           onClick={handleBack}
-          disabled={currentStep === 0}
+          disabled={currentStep === 0 || justSelected !== null}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
           whileHover={prefersReduced ? {} : { x: -2 }}
           whileTap={prefersReduced ? {} : { scale: 0.97 }}
@@ -490,32 +512,67 @@ export default function Test() {
           <div className="space-y-3">
             {OPTIONS.map((opt, optIdx) => {
               const selected = answers[currentId] === opt.value;
+              // STEP 1: isJustSelected — vero solo sull'opzione appena cliccata
+              // mentre stiamo aspettando il timeout di advance
+              const isJustSelected = justSelected === currentId && selected;
+
               return (
                 <motion.button
                   key={opt.value}
                   onClick={() => handleAnswer(opt.value)}
+                  // Disabilitato durante l'attesa di advance (anti double-click)
+                  disabled={justSelected !== null}
                   initial={prefersReduced ? false : { opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={prefersReduced ? { duration: 0 } : { delay: optIdx * 0.04, duration: 0.3, ease: easings.easeOut }}
-                  whileHover={prefersReduced ? undefined : { scale: 1.01 }}
-                  whileTap={prefersReduced ? undefined : { scale: 0.98 }}
+                  whileHover={prefersReduced || justSelected !== null ? undefined : { scale: 1.01 }}
+                  whileTap={prefersReduced || justSelected !== null ? undefined : { scale: 0.98 }}
                   className={cn(
                     "w-full flex items-center justify-between px-4 sm:px-5 py-4 min-h-[56px] rounded-xl border text-left text-sm sm:text-base font-medium transition-colors duration-150",
                     selected
                       ? "bg-primary text-primary-foreground border-primary shadow-md"
-                      : "bg-card border-border hover:border-primary/40 hover:bg-primary/5 text-foreground"
+                      : "bg-card border-border hover:border-primary/40 hover:bg-primary/5 text-foreground",
+                    // Leggero abbassamento dell'opacità sulle non-selezionate durante il feedback
+                    justSelected !== null && !selected && "opacity-50"
                   )}
                 >
                   {opt.label}
+
+                  {/* STEP 1: icona destra — Check animato se appena selezionata, radio altrimenti */}
                   <motion.div
                     className={cn(
-                      "w-5 h-5 rounded-full border-2 flex items-center justify-center",
+                      "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0",
                       selected ? "border-primary-foreground bg-primary-foreground/20" : "border-muted-foreground"
                     )}
-                    animate={prefersReduced ? {} : { scale: selected ? [1, 1.2, 1] : 1 }}
-                    transition={{ duration: 0.25 }}
+                    animate={
+                      prefersReduced
+                        ? {}
+                        : isJustSelected
+                          // Spring più espressivo solo sull'opzione appena scelta
+                          ? { scale: [1, 1.35, 0.95, 1.1, 1] }
+                          : selected
+                            ? { scale: [1, 1.2, 1] }
+                            : { scale: 1 }
+                    }
+                    transition={isJustSelected
+                      ? { duration: 0.4, ease: "easeOut" }
+                      : { duration: 0.25 }
+                    }
                   >
-                    {selected && <div className="w-2.5 h-2.5 rounded-full bg-primary-foreground" />}
+                    {selected && (
+                      isJustSelected ? (
+                        // Check icon con fade-in quando l'utente ha appena cliccato
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.5 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ duration: 0.18, ease: "easeOut" }}
+                        >
+                          <Check className="w-3 h-3 text-primary-foreground" />
+                        </motion.div>
+                      ) : (
+                        <div className="w-2.5 h-2.5 rounded-full bg-primary-foreground" />
+                      )
+                    )}
                   </motion.div>
                 </motion.button>
               );
