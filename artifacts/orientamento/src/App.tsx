@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -28,7 +28,7 @@ const Profilo = lazy(() => import("@/pages/profilo"));
 const Wiki = lazy(() => import("@/pages/wiki"));
 const Roadmap = lazy(() => import("@/pages/roadmap"));
 const Grafo = lazy(() => import("@/pages/grafo"));
-const GrafoConoscenza = lazy(() => import("@/pages/grafo-conoscenza"));
+const Archivio = lazy(() => import("@/pages/grafo-conoscenza"));
 const Settori = lazy(() => import("@/pages/settori"));
 const Confronta = lazy(() => import("@/pages/confronta"));
 const Contatti = lazy(() => import("@/pages/contatti"));
@@ -73,8 +73,8 @@ const CertificatePage = lazy(() => import("@/pages/certificato"));
 /**
  * QueryClient ottimizzato:
  * - staleTime 5 min: non refetcha se i dati sono freschi
- * - gcTime 30 min: mantiene in cache anche le query non montate (navigazione back istantanea)
- * - refetchOnWindowFocus false: evita refetch inutili quando l'utente torna sulla tab
+ * - gcTime 30 min: mantiene in cache anche le query non montate
+ * - refetchOnWindowFocus false: evita refetch inutili al cambio tab
  */
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -85,10 +85,10 @@ const queryClient = new QueryClient({
         return failureCount < 2;
       },
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
-      staleTime: 5 * 60 * 1000,       // 5 minuti
-      gcTime: 30 * 60 * 1000,         // 30 minuti in cache dopo unmount
-      refetchOnWindowFocus: false,    // no refetch al cambio tab
-      refetchOnReconnect: "always",   // ma sì alla riconnessione rete
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: "always",
     },
   },
 });
@@ -104,7 +104,6 @@ function AnimatedRoutes() {
       <Route path="/risultati/:id" component={Results} />
       <Route path="/settore/:id" component={Sector} />
       <Route path="/ruolo/:id" component={Ruolo} />
-      {/* Auth routes — redirect to /dashboard if already logged in */}
       <Route path="/registra">
         <PublicOnlyRoute component={Register} />
       </Route>
@@ -116,7 +115,6 @@ function AnimatedRoutes() {
         <ProtectedRoute component={PremiumSuccess} />
       </Route>
       <Route path="/news" component={News} />
-      {/* Protected routes — redirect to /registra if not logged in */}
       <Route path="/profilo">
         <ProtectedRoute component={Profilo} />
       </Route>
@@ -136,11 +134,19 @@ function AnimatedRoutes() {
       <Route path="/roadmap/:id">
         <ProtectedRoute component={Roadmap} />
       </Route>
+      {/* Archivio — new canonical routes */}
+      <Route path="/archivio">
+        <ProtectedRoute component={Archivio} />
+      </Route>
+      <Route path="/archivio/:id">
+        <ProtectedRoute component={Grafo} />
+      </Route>
+      {/* Legacy /grafo routes — permanent redirect to /archivio */}
       <Route path="/grafo">
-        <ProtectedRoute component={GrafoConoscenza} />
+        <Redirect to="/archivio" />
       </Route>
       <Route path="/grafo/:id">
-        <ProtectedRoute component={Grafo} />
+        {(params) => <Redirect to={`/archivio/${params.id}`} />}
       </Route>
       <Route path="/settori" component={Settori} />
       <Route path="/ruoli" component={Ruoli} />
@@ -193,26 +199,12 @@ function AnimatedRoutes() {
 
   return (
     <ErrorBoundary>
-      {/*
-       * mode="sync" invece di "wait":
-       * la nuova pagina entra MENTRE la vecchia esce — nessuna latenza aggiuntiva
-       * tra fine exit e inizio enter.
-       * Durations ridotte: enter 120ms, exit 80ms — snappy ma non brusco.
-       */}
       <AnimatePresence mode="sync" initial={false}>
         <motion.div
           key={location}
           initial={{ opacity: 0, y: 8 }}
-          animate={{
-            opacity: 1,
-            y: 0,
-            transition: { duration: 0.12, ease: easings.easeOut },
-          }}
-          exit={{
-            opacity: 0,
-            y: -4,
-            transition: { duration: 0.08, ease: easings.easeIn },
-          }}
+          animate={{ opacity: 1, y: 0, transition: { duration: 0.12, ease: easings.easeOut } }}
+          exit={{ opacity: 0, y: -4, transition: { duration: 0.08, ease: easings.easeIn } }}
         >
           <Suspense fallback={<PageLoader />}>
             {routes(location)}
@@ -226,81 +218,36 @@ function AnimatedRoutes() {
 function Router() {
   return (
     <Switch>
-      {/* Admin — no navbar/footer */}
       <Route path="/admin/messaggi">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminMessaggi />
-          </Suspense>
-        </ErrorBoundary>
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminMessaggi /></Suspense></ErrorBoundary>
       </Route>
       <Route path="/admin/affiliazione">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminAffiliazione />
-          </Suspense>
-        </ErrorBoundary>
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminAffiliazione /></Suspense></ErrorBoundary>
       </Route>
       <Route path="/admin/review">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminReview />
-          </Suspense>
-        </ErrorBoundary>
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminReview /></Suspense></ErrorBoundary>
       </Route>
       <Route path="/admin/metriche">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminMetriche />
-          </Suspense>
-        </ErrorBoundary>
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminMetriche /></Suspense></ErrorBoundary>
       </Route>
       <Route path="/admin/status">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminStatus />
-          </Suspense>
-        </ErrorBoundary>
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminStatus /></Suspense></ErrorBoundary>
       </Route>
       <Route path="/admin/agenti">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminAgenti />
-          </Suspense>
-        </ErrorBoundary>
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminAgenti /></Suspense></ErrorBoundary>
       </Route>
       <Route path="/admin/cataloghi">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminCataloghi />
-          </Suspense>
-        </ErrorBoundary>
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminCataloghi /></Suspense></ErrorBoundary>
       </Route>
       <Route path="/admin/crescita">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminCrescita />
-          </Suspense>
-        </ErrorBoundary>
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminCrescita /></Suspense></ErrorBoundary>
       </Route>
       <Route path="/admin">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminHome />
-          </Suspense>
-        </ErrorBoundary>
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminHome /></Suspense></ErrorBoundary>
       </Route>
-
-      {/* Certificate verification — standalone page (has its own nav) */}
       <Route path="/certificato/:hash">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <CertificatePage />
-          </Suspense>
-        </ErrorBoundary>
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><CertificatePage /></Suspense></ErrorBoundary>
       </Route>
-
-      {/* Public layout */}
       <Route>
         <div className="flex flex-col min-h-[100dvh]">
           <Navbar />
