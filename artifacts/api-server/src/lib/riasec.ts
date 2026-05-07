@@ -134,7 +134,72 @@ export function computeMatchScore(
 
   const maxPossible = sectorRiasecTypes.length * 10;
   const rawMatch = maxPossible > 0 ? (matchSum / maxPossible) * 100 : 0;
-  return Math.min(99, Math.max(55, Math.round(rawMatch)));
+  return Math.min(99, Math.max(45, Math.round(rawMatch)));
+}
+
+// ─── Journey-type & career-goal scoring ──────────────────────────────────────
+
+export type JourneyType = "indeciso" | "dipendente" | "autonomo" | "azienda" | "investitore";
+
+/** RIASEC types that naturally align with each journey persona */
+export const JOURNEY_RIASEC_AFFINITY: Record<JourneyType, RiasecType[]> = {
+  indeciso:    [],
+  dipendente:  ["S", "C", "R"],
+  autonomo:    ["E", "A", "I"],
+  azienda:     ["E", "C", "I"],
+  investitore: ["E", "I", "C"],
+};
+
+/** Sector-name keywords strongly associated with each journey persona */
+export const JOURNEY_SECTOR_KEYWORDS: Record<JourneyType, string[]> = {
+  indeciso:    [],
+  dipendente:  ["salute", "istruzione", "sanità", "risorse umane", "logistica", "agroalimentare"],
+  autonomo:    ["business", "imprenditoria", "creatività", "design", "marketing", "gaming", "turismo"],
+  azienda:     ["business", "consulenza", "marketing", "e-commerce", "logistica", "legal"],
+  investitore: ["finanza", "fintech", "immobiliare", "data", "biotech", "green"],
+};
+
+/**
+ * Applies a small boost (max +5 pts) based on how well the sector matches
+ * the user's declared journey persona via RIASEC affinity + keyword overlap.
+ */
+export function applyJourneyTypeBoost(
+  baseScore: number,
+  journeyType: JourneyType | null | undefined,
+  sectorName: string,
+  sectorRiasecTypes: string[],
+): number {
+  if (!journeyType || journeyType === "indeciso") return baseScore;
+  const affinity = JOURNEY_RIASEC_AFFINITY[journeyType] ?? [];
+  const riasecOverlap = sectorRiasecTypes.filter((t) => affinity.includes(t as RiasecType)).length;
+  const keywords = JOURNEY_SECTOR_KEYWORDS[journeyType] ?? [];
+  const nameLC = sectorName.toLowerCase();
+  const keywordMatch = keywords.some((kw) => nameLC.includes(kw));
+  let boost = 0;
+  if (riasecOverlap >= 2) boost += 3;
+  else if (riasecOverlap === 1) boost += 1;
+  if (keywordMatch) boost += 2;
+  return Math.min(99, baseScore + boost);
+}
+
+/**
+ * Boosts sectors whose trend matches the user's career-goal intent.
+ * "nuovo_percorso" users favour booming/growing sectors (+2 pts).
+ * "scala_esistente" users favour stable/growing sectors (+2 pts).
+ */
+export function applyCareerGoalBoost(
+  baseScore: number,
+  careerGoal: "nuovo_percorso" | "scala_esistente" | "aperto",
+  trend: string | null | undefined,
+): number {
+  if (careerGoal === "aperto" || !trend) return baseScore;
+  if (careerGoal === "nuovo_percorso" && (trend === "booming" || trend === "growing")) {
+    return Math.min(99, baseScore + 2);
+  }
+  if (careerGoal === "scala_esistente" && (trend === "stable" || trend === "growing")) {
+    return Math.min(99, baseScore + 2);
+  }
+  return baseScore;
 }
 
 export function buildMatchReason(

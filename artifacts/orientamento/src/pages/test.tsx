@@ -70,8 +70,16 @@ export default function Test() {
   const { user } = useAuth();
   const prefersReduced = useReducedMotion();
 
+  const JOURNEY_CTX1_DEFAULTS: Record<string, number> = {
+    autonomo: 5, azienda: 4, investitore: 4, dipendente: 1, indeciso: 3,
+  };
+
   const [currentStep, setCurrentStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [answers, setAnswers] = useState<Record<string, number>>(() => {
+    const jt = user?.journeyType;
+    if (!jt || !JOURNEY_CTX1_DEFAULTS[jt]) return {};
+    return { ctx_1: JOURNEY_CTX1_DEFAULTS[jt] };
+  });
   const [direction, setDirection] = useState<1 | -1>(1);
   const [transition1Passed, setTransition1Passed] = useState(false);
   const [transition2Passed, setTransition2Passed] = useState(false);
@@ -282,14 +290,48 @@ export default function Test() {
   }
 
   // ── Question screen ────────────────────────────────────────────────────────
+  const currentPhase = isCtxQ ? 2 : isSpiritQ ? 1 : 0;
+
   const headerLabel = isCtxQ
     ? t("test.ctxCount", { current: ctxOffset, total: ALL_CTX_IDS.length })
     : isSpiritQ
     ? t("test.innerCompassCount", { current: spiritOffset + 1, total: ALL_SPIRIT_IDS.length })
-    : t("test.questionOf", { current: currentStep + 1, total: ALL_IDS.length });
+    : t("test.questionOf", { current: currentStep + 1, total: ALL_RIASEC_IDS.length });
+
+  const PHASE_LABELS = ["Inclinazioni", "Bussola", "Obiettivi"];
 
   return (
     <div className="container max-w-2xl mx-auto px-4 py-12 min-h-[70vh]">
+      {/* Phase stepper */}
+      <div className="flex items-center justify-center gap-1.5 mb-6">
+        {PHASE_LABELS.map((label, i) => {
+          const isActive = currentPhase === i;
+          const isDone = currentPhase > i;
+          return (
+            <React.Fragment key={i}>
+              <div className={cn(
+                "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all duration-300",
+                isActive ? "bg-primary text-primary-foreground shadow-sm" :
+                isDone   ? "bg-primary/15 text-primary" :
+                           "text-muted-foreground"
+              )}>
+                {isDone
+                  ? <Check className="w-3 h-3" />
+                  : <span className={cn(
+                      "w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold border shrink-0",
+                      isActive ? "border-primary-foreground/50" : "border-current opacity-60"
+                    )}>{i + 1}</span>
+                }
+                <span>{label}</span>
+              </div>
+              {i < PHASE_LABELS.length - 1 && (
+                <div className={cn("h-px w-3 rounded-full shrink-0", isDone ? "bg-primary/40" : "bg-border")} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+
       <div className="flex items-center justify-between mb-4">
         <motion.button
           onClick={handleBack}

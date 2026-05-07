@@ -14,8 +14,11 @@ import {
   computeMatchScore,
   buildMatchReason,
   applyWorkModeBoost,
+  applyJourneyTypeBoost,
+  applyCareerGoalBoost,
   RIASEC_SUGGESTED_WORK_MODE,
   type WorkMode,
+  type JourneyType,
 } from "../lib/riasec";
 import {
   extractSpiritAnswers,
@@ -89,13 +92,17 @@ router.post("/test-sessions", async (req, res): Promise<void> => {
   const plan = authenticatedUserId ? await getUserPlan(authenticatedUserId) : "free";
 
   let userWorkMode: WorkMode = "unknown";
+  let userJourneyType: JourneyType | null = null;
   if (authenticatedUserId) {
     const [userRow] = await db
-      .select({ workPreference: usersTable.workPreference })
+      .select({ workPreference: usersTable.workPreference, journeyType: usersTable.journeyType })
       .from(usersTable)
       .where(eq(usersTable.id, authenticatedUserId));
     if (userRow?.workPreference) {
       userWorkMode = userRow.workPreference as WorkMode;
+    }
+    if (userRow?.journeyType) {
+      userJourneyType = userRow.journeyType as JourneyType;
     }
   }
 
@@ -151,8 +158,9 @@ router.post("/test-sessions", async (req, res): Promise<void> => {
   const allScored = allSectors
     .map((sector) => {
       const baseScore = computeMatchScore(riasecScores, sector.riasecTypes as string[]);
-      const spiritBoost = computeSpiritBoost(spiritScores, sector.name);
-      const matchScore = Math.min(99, baseScore + spiritBoost);
+      const withSpirit = Math.min(99, baseScore + computeSpiritBoost(spiritScores, sector.name));
+      const withJourney = applyJourneyTypeBoost(withSpirit, userJourneyType, sector.name, sector.riasecTypes as string[]);
+      const matchScore = applyCareerGoalBoost(withJourney, careerGoal, sector.trend);
       const matchReason = agentReasonMap[sector.id] ?? buildMatchReason(primaryTypes, sector.name, sector.riasecTypes as string[]);
       return {
         sectorId: sector.id,

@@ -37,11 +37,11 @@ import { CareerChat } from "@/components/ai/CareerChat";
 const BASE = import.meta.env.BASE_URL || "/";
 
 const SPIRIT_META: Record<string, { emoji: string; label: string; color: string }> = {
-  shen: { emoji: "✨", label: "Presenza", color: "bg-violet-100 text-violet-700 border-violet-200" },
-  hun:  { emoji: "🌙", label: "Visione",  color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
-  po:   { emoji: "⚡", label: "Istinto",  color: "bg-amber-100 text-amber-700 border-amber-200" },
-  yi:   { emoji: "🔮", label: "Focus",    color: "bg-cyan-100 text-cyan-700 border-cyan-200" },
-  zhi:  { emoji: "🔥", label: "Tenacia",  color: "bg-rose-100 text-rose-700 border-rose-200" },
+  shen: { emoji: "✨", label: "Presenza", color: "bg-violet-500/10 text-violet-400 border-violet-500/20" },
+  hun:  { emoji: "🌙", label: "Visione",  color: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" },
+  po:   { emoji: "⚡", label: "Istinto",  color: "bg-amber-500/10 text-amber-400 border-amber-500/20" },
+  yi:   { emoji: "🔮", label: "Focus",    color: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20" },
+  zhi:  { emoji: "🔥", label: "Tenacia",  color: "bg-rose-500/10 text-rose-400 border-rose-500/20" },
 };
 
 const SPIRIT_DESCRIPTIONS: Record<string, string> = {
@@ -162,9 +162,9 @@ const TREND_LABEL: Record<string, { label: string; score: number }> = {
   declining:{ label: "In calo",           score: 1 },
 };
 const RISK_LABEL: Record<string, { label: string; score: number; color: string }> = {
-  low:    { label: "Basso",  score: 3, color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
-  medium: { label: "Medio",  score: 2, color: "text-amber-700 bg-amber-50 border-amber-200" },
-  high:   { label: "Alto",   score: 1, color: "text-rose-700 bg-rose-50 border-rose-200" },
+  low:    { label: "Basso",  score: 3, color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+  medium: { label: "Medio",  score: 2, color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
+  high:   { label: "Alto",   score: 1, color: "text-rose-400 bg-rose-500/10 border-rose-500/20" },
 };
 
 type Rec = {
@@ -202,15 +202,15 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
   const ACCENT = ["hsl(var(--primary))", "#7c3aed", "#0891b2"];
   const ACCENT_CLS = [
     "bg-primary/10 text-primary border-primary/20",
-    "bg-violet-100 text-violet-700 border-violet-200",
-    "bg-cyan-100 text-cyan-700 border-cyan-200",
+    "bg-violet-500/10 text-violet-400 border-violet-500/20",
+    "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
   ];
 
   function Cell({ val, isWinner, className }: { val: string; isWinner: boolean; className?: string }) {
     return (
       <td className={cn(
         "px-4 py-3 text-sm text-center font-medium transition-colors",
-        isWinner ? "text-emerald-700 font-bold" : "text-foreground",
+        isWinner ? "text-emerald-400 font-bold" : "text-foreground",
         className,
       )}>
         {isWinner && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 mb-0.5 align-middle" />}
@@ -490,8 +490,8 @@ export default function Results() {
 
       {/* Saved banner — shown when logged in */}
       {user && (
-        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-5 py-3 mb-8 animate-in slide-in-from-top-2 fade-in duration-500">
-          <UserCheck className="w-5 h-5 shrink-0 text-emerald-600" />
+        <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 rounded-xl px-5 py-3 mb-8 animate-in slide-in-from-top-2 fade-in duration-500">
+          <UserCheck className="w-5 h-5 shrink-0 text-emerald-400" />
           <p className="text-sm font-medium">
             {t("results.savedBanner", { name: user.name })}
           </p>
@@ -646,9 +646,9 @@ export default function Results() {
                             {currentWorkMode && currentWorkMode !== "unknown" && heroAlignment.tooltipKey && (
                               <span className={cn(
                                 "inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full border",
-                                heroAlignment.type === "aligned" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                                heroAlignment.type === "partial" ? "bg-amber-50 text-amber-700 border-amber-200" :
-                                "bg-rose-50 text-rose-700 border-rose-200"
+                                heroAlignment.type === "aligned" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                                heroAlignment.type === "partial" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                                "bg-rose-500/10 text-rose-400 border-rose-500/20"
                               )}>
                                 <span className="inline-block w-1.5 h-1.5 rounded-full mr-0.5" style={{
                                   backgroundColor: heroAlignment.type === "aligned" ? "rgb(16 185 129)" : heroAlignment.type === "partial" ? "rgb(217 119 6)" : "rgb(220 38 38)"
@@ -682,7 +682,7 @@ export default function Results() {
                           <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                             <TrendingUp className="w-3.5 h-3.5" /> {t("common.growth")}
                           </div>
-                          <div className="font-semibold text-sm text-emerald-600">+{hero.sector?.growthRate ?? 0}%</div>
+                          <div className="font-semibold text-sm text-emerald-400">+{hero.sector?.growthRate ?? 0}%</div>
                         </div>
                         <div className="bg-muted/50 rounded-xl p-3">
                           <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
@@ -758,9 +758,9 @@ export default function Results() {
                               {currentWorkMode && currentWorkMode !== "unknown" && alignment.tooltipKey && (
                                 <div className={cn(
                                   "mt-2 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border w-fit",
-                                  alignment.type === "aligned" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                                  alignment.type === "partial" ? "bg-amber-50 text-amber-700 border-amber-200" :
-                                  "bg-rose-50 text-rose-700 border-rose-200"
+                                  alignment.type === "aligned" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                                  alignment.type === "partial" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                                  "bg-rose-500/10 text-rose-400 border-rose-500/20"
                                 )}>
                                   <span className="inline-block w-1.5 h-1.5 rounded-full" style={{
                                     backgroundColor: alignment.type === "aligned" ? "rgb(16 185 129)" : alignment.type === "partial" ? "rgb(217 119 6)" : "rgb(220 38 38)"
@@ -777,7 +777,7 @@ export default function Results() {
                                   <DollarSign className="w-3 h-3" />
                                   €{(rec.sector?.avgSalaryMin ?? 0) / 1000}k–€{(rec.sector?.avgSalaryMax ?? 0) / 1000}k
                                 </span>
-                                <span className="flex items-center gap-1 text-emerald-600 font-medium">
+                                <span className="flex items-center gap-1 text-emerald-400 font-medium">
                                   <TrendingUp className="w-3 h-3" /> +{rec.sector?.growthRate ?? 0}%
                                 </span>
                               </div>
@@ -826,6 +826,65 @@ export default function Results() {
         );
       })()}
 
+      {/* ── Journey Type Next Step ─────────────────────────────────────────── */}
+      {user?.journeyType && user.journeyType !== "indeciso" && (() => {
+        const topSectorId = (effectiveSession?.recommendations as Rec[])?.[0]?.sectorId ?? null;
+        const jt = user.journeyType as string;
+        const NEXT_STEP_CONFIG: Record<string, { emoji: string; title: string; desc: string; cta: string; href: string }> = {
+          dipendente: {
+            emoji: "💼",
+            title: "Trova offerte nel tuo settore",
+            desc: "Esplora le posizioni aperte che corrispondono al tuo profilo RIASEC e al settore scelto.",
+            cta: "Vai ai Lavori",
+            href: "/lavori",
+          },
+          autonomo: {
+            emoji: "🚀",
+            title: "Valida la tua idea di business",
+            desc: "Il validatore AI analizza il potenziale della tua idea nel settore che hai scoperto.",
+            cta: "Valida l'idea",
+            href: "/validatore-idea",
+          },
+          azienda: {
+            emoji: "📊",
+            title: "Analisi del settore per la tua azienda",
+            desc: "Approfondisci crescita, trend e opportunità del settore con i dati di mercato.",
+            cta: "Analisi settore",
+            href: topSectorId ? `/settore/${topSectorId}` : "/settori",
+          },
+          investitore: {
+            emoji: "📈",
+            title: "Opportunità d'investimento nel settore",
+            desc: "Analizza rischio automazione, crescita e prospettive del settore con gli occhi dell'investitore.",
+            cta: "Vedi trend",
+            href: topSectorId ? `/settore/${topSectorId}` : "/settori",
+          },
+        };
+        const cfg = NEXT_STEP_CONFIG[jt];
+        if (!cfg) return null;
+        return (
+          <div className="mt-10 mb-2 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/3 p-5 md:p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-card border border-border flex items-center justify-center text-2xl shrink-0">
+                {cfg.emoji}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">
+                  Prossimo passo consigliato
+                </div>
+                <h3 className="font-semibold text-foreground text-base leading-snug">{cfg.title}</h3>
+                <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">{cfg.desc}</p>
+              </div>
+              <Button asChild className="rounded-xl shrink-0">
+                <Link href={cfg.href}>
+                  {cfg.cta} <ArrowRight className="w-4 h-4 ml-1.5" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* AI Analysis Section */}
       <div className="mt-16">
         <div className="flex items-center gap-3 mb-6">
@@ -847,7 +906,7 @@ export default function Results() {
             </p>
           </div>
           {isPremiumAgent && (
-            <div className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">
+            <div className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-full px-3 py-1">
               <Crown className="w-3 h-3" /> Premium
             </div>
           )}
@@ -918,7 +977,7 @@ export default function Results() {
                           <p className="text-xs text-muted-foreground">{p.sector}</p>
                         </div>
                         {p.growthOutlook && (
-                          <span className="shrink-0 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 flex items-center gap-1">
+                          <span className="shrink-0 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-0.5 flex items-center gap-1">
                             <TrendingUp className="w-3 h-3" /> {p.growthOutlook}
                           </span>
                         )}
@@ -954,7 +1013,7 @@ export default function Results() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground">{t("results.aiSection.workModeTitle")}</h3>
-                    {isPremiumAgent && <span className="text-xs text-amber-700">{t("results.aiSection.premiumBadge")}</span>}
+                    {isPremiumAgent && <span className="text-xs text-amber-400">{t("results.aiSection.premiumBadge")}</span>}
                   </div>
                   <span className="ml-auto text-sm font-semibold text-primary border border-primary/20 bg-primary/5 rounded-full px-3 py-1">
                     {agentWorkMode.recommendedLabel ?? agentWorkMode.recommended}
@@ -972,7 +1031,7 @@ export default function Results() {
             {/* Premium upsell */}
             {!isPremiumAgent && (
               <div className="rounded-2xl border border-dashed p-5 flex items-center gap-4">
-                <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 shrink-0">
                   <Lock className="w-4 h-4" />
                 </div>
                 <div className="flex-1">
@@ -981,7 +1040,7 @@ export default function Results() {
                     {t("results.aiSection.upsellDesc")}
                   </p>
                 </div>
-                <Button asChild size="sm" variant="outline" className="shrink-0 rounded-full border-amber-300 text-amber-700 hover:bg-amber-50">
+                <Button asChild size="sm" variant="outline" className="shrink-0 rounded-full border-amber-500/30 text-amber-400 hover:bg-amber-500/10">
                   <Link href="/premium"><Crown className="w-3.5 h-3.5 mr-1.5" />{t("results.aiSection.upsellBtn")}</Link>
                 </Button>
               </div>
@@ -991,7 +1050,7 @@ export default function Results() {
             {isPremiumAgent && agentEducation.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <GraduationCap className="w-4 h-4 text-emerald-600" />
+                  <GraduationCap className="w-4 h-4 text-emerald-400" />
                   <h3 className="font-semibold text-foreground">{t("results.aiSection.educationTitle")}</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1040,8 +1099,8 @@ export default function Results() {
       {user && (
         <div className="mt-14 mb-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center">
-              <Bot className="w-4 h-4 text-violet-600" />
+            <div className="w-8 h-8 rounded-xl bg-violet-500/10 flex items-center justify-center">
+              <Bot className="w-4 h-4 text-violet-400" />
             </div>
             <div>
               <h2 className="font-serif text-lg font-bold text-foreground">Chatta con NorthStar AI</h2>
