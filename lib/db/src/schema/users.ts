@@ -1,16 +1,6 @@
-/**
- * FIXED:
- * - friendshipsTable: added uniqueIndex on (requesterId, receiverId)
- *   to prevent duplicate friendship requests
- * - friendshipsTable: status uses enum constraint
- * - friendshipsTable moved here remains canonical (friendships.ts re-exports)
- * - Added usersRelations for Drizzle relational queries
- * - Added updatedAt to usersTable for last-profile-update tracking
- * - jobApplicationsTable: added index on userId
- */
 import {
   pgTable, text, serial, timestamp, integer, boolean, jsonb,
-  uniqueIndex, index,
+  index,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -53,41 +43,6 @@ export const usersTable = pgTable("users", {
     .notNull()
     .defaultNow(),
 });
-
-// FIXED: added uniqueIndex + enum status
-export const friendshipsTable = pgTable(
-  "friendships",
-  {
-    id: serial("id").primaryKey(),
-    requesterId: integer("requester_id")
-      .notNull()
-      .references(() => usersTable.id, { onDelete: "cascade" }),
-    receiverId: integer("receiver_id")
-      .notNull()
-      .references(() => usersTable.id, { onDelete: "cascade" }),
-    // FIXED: enum constraint instead of free text
-    status: text("status", {
-      enum: ["pending", "accepted", "rejected", "blocked"],
-    })
-      .notNull()
-      .default("pending"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (t) => ({
-    // FIXED: prevents duplicate friendship requests between same pair
-    uniquePair: uniqueIndex("friendships_unique_pair").on(
-      t.requesterId,
-      t.receiverId,
-    ),
-  }),
-);
-
-export type Friendship = typeof friendshipsTable.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({
   id: true,
@@ -134,27 +89,5 @@ export type JobApplication = typeof jobApplicationsTable.$inferSelect;
 
 // Drizzle relational query support
 export const usersRelations = relations(usersTable, ({ many }) => ({
-  friendshipsAsSender: many(friendshipsTable, {
-    relationName: "friendships_requester",
-  }),
-  friendshipsAsReceiver: many(friendshipsTable, {
-    relationName: "friendships_receiver",
-  }),
   jobApplications: many(jobApplicationsTable),
 }));
-
-export const friendshipsRelations = relations(
-  friendshipsTable,
-  ({ one }) => ({
-    requester: one(usersTable, {
-      fields: [friendshipsTable.requesterId],
-      references: [usersTable.id],
-      relationName: "friendships_requester",
-    }),
-    receiver: one(usersTable, {
-      fields: [friendshipsTable.receiverId],
-      references: [usersTable.id],
-      relationName: "friendships_receiver",
-    }),
-  }),
-);

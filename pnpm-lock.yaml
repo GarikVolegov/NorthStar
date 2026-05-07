@@ -740,6 +740,8 @@ importers:
         specifier: ^0.31.9
         version: 0.31.9
 
+  lib/design-tokens: {}
+
   lib/integrations-openai-ai-react: {}
 
   lib/integrations-openai-ai-server:
@@ -757,6 +759,25 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 25.3.5
+
+  lib/ws-server:
+    dependencies:
+      '@workspace/api-zod':
+        specifier: workspace:*
+        version: link:../api-zod
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
+      ws:
+        specifier: ^8.18.0
+        version: 8.20.0
+    devDependencies:
+      '@types/ws':
+        specifier: ^8.5.13
+        version: 8.18.1
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
 
   scripts:
     dependencies:
@@ -2673,6 +2694,9 @@ packages:
 
   '@types/web-push@3.6.4':
     resolution: {integrity: sha512-GnJmSr40H3RAnj0s34FNTcJi1hmWFV5KXugE0mYWnYhgTAHLJ/dJKAwDmvPJYMke0RplY2XE9LnM4hqSqKIjhQ==}
+
+  '@types/ws@8.18.1':
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
 
   '@vitejs/plugin-react@5.1.4':
     resolution: {integrity: sha512-VIcFLdRi/VYRU8OL/puL7QXMYafHmqOnwTZY50U1JPlCNj30PxCMx65c494b1K9be9hX83KVt0+gTEwTWLqToA==}
@@ -7630,6 +7654,10 @@ snapshots:
   '@types/unist@3.0.3': {}
 
   '@types/web-push@3.6.4':
+    dependencies:
+      '@types/node': 25.3.5
+
+  '@types/ws@8.18.1':
     dependencies:
       '@types/node': 25.3.5
 

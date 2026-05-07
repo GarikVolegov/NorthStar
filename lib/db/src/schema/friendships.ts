@@ -1,11 +1,7 @@
-/**
- * Extracted friendships table from users.ts into its own file.
- * FIXED: added unique constraint on (requesterId, receiverId)
- * to prevent duplicate friendship requests.
- */
 import {
   pgTable, serial, integer, text, timestamp, uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { usersTable } from "./users";
 
 export const friendshipsTable = pgTable(
@@ -34,3 +30,19 @@ export const friendshipsTable = pgTable(
 );
 
 export type Friendship = typeof friendshipsTable.$inferSelect;
+
+export const friendshipsRelations = relations(
+  friendshipsTable,
+  ({ one }) => ({
+    requester: one(usersTable, {
+      fields: [friendshipsTable.requesterId],
+      references: [usersTable.id],
+      relationName: "friendships_requester",
+    }),
+    receiver: one(usersTable, {
+      fields: [friendshipsTable.receiverId],
+      references: [usersTable.id],
+      relationName: "friendships_receiver",
+    }),
+  }),
+);
