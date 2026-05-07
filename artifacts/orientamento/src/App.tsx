@@ -12,6 +12,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { BackButton } from "@/components/layout/back-button";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { ProtectedRoute, PublicOnlyRoute } from "@/components/ProtectedRoute";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
 const Home = lazy(() => import("@/pages/home"));
@@ -103,20 +104,44 @@ function AnimatedRoutes() {
       <Route path="/risultati/:id" component={Results} />
       <Route path="/settore/:id" component={Sector} />
       <Route path="/ruolo/:id" component={Ruolo} />
-      <Route path="/registra" component={Register} />
+      {/* Auth routes — redirect to /dashboard if already logged in */}
+      <Route path="/registra">
+        <PublicOnlyRoute component={Register} />
+      </Route>
+      <Route path="/reset-password">
+        <PublicOnlyRoute component={ResetPassword} />
+      </Route>
       <Route path="/premium" component={Premium} />
-      <Route path="/premium/successo" component={PremiumSuccess} />
+      <Route path="/premium/successo">
+        <ProtectedRoute component={PremiumSuccess} />
+      </Route>
       <Route path="/news" component={News} />
-      <Route path="/reset-password" component={ResetPassword} />
-      <Route path="/profilo" component={Profilo} />
-      <Route path="/candidature" component={Candidature} />
-      <Route path="/calendario" component={Calendario} />
-      <Route path="/amici" component={Amici} />
+      {/* Protected routes — redirect to /registra if not logged in */}
+      <Route path="/profilo">
+        <ProtectedRoute component={Profilo} />
+      </Route>
+      <Route path="/candidature">
+        <ProtectedRoute component={Candidature} />
+      </Route>
+      <Route path="/calendario">
+        <ProtectedRoute component={Calendario} />
+      </Route>
+      <Route path="/amici">
+        <ProtectedRoute component={Amici} />
+      </Route>
       <Route path="/utente/:id" component={Utente} />
-      <Route path="/wiki/:id" component={Wiki} />
-      <Route path="/roadmap/:id" component={Roadmap} />
-      <Route path="/grafo" component={GrafoConoscenza} />
-      <Route path="/grafo/:id" component={Grafo} />
+      <Route path="/wiki/:id">
+        <ProtectedRoute component={Wiki} />
+      </Route>
+      <Route path="/roadmap/:id">
+        <ProtectedRoute component={Roadmap} />
+      </Route>
+      <Route path="/grafo">
+        <ProtectedRoute component={GrafoConoscenza} />
+      </Route>
+      <Route path="/grafo/:id">
+        <ProtectedRoute component={Grafo} />
+      </Route>
       <Route path="/settori" component={Settori} />
       <Route path="/ruoli" component={Ruoli} />
       <Route path="/confronta" component={Confronta} />
@@ -129,17 +154,27 @@ function AnimatedRoutes() {
       <Route path="/crescita" component={Crescita} />
       <Route path="/crescita/categoria/:cat" component={CrescitaCategoria} />
       <Route path="/crescita/articolo/:slug" component={CrescitaArticolo} />
-      <Route path="/dashboard" component={Dashboard} />
+      <Route path="/dashboard">
+        <ProtectedRoute component={Dashboard} />
+      </Route>
       <Route path="/affiliazione" component={Affiliazione} />
       <Route path="/affiliazione/scuole" component={AffiliazioneScuole} />
       <Route path="/affiliazione/universita" component={AffiliazioneUniversita} />
       <Route path="/affiliazione/agenzie-lavoro" component={AffiliazioneAgenzie} />
       <Route path="/affiliazione/centri-formazione" component={AffiliazioneFormazione} />
-      <Route path="/colloquio/:id" component={Colloquio} />
-      <Route path="/skills-gap/:id" component={SkillsGap} />
+      <Route path="/colloquio/:id">
+        <ProtectedRoute component={Colloquio} />
+      </Route>
+      <Route path="/skills-gap/:id">
+        <ProtectedRoute component={SkillsGap} />
+      </Route>
       <Route path="/coach" component={Coach} />
-      <Route path="/validatore-idea" component={ValidatoreIdea} />
-      <Route path="/percorso" component={Percorso} />
+      <Route path="/validatore-idea">
+        <ProtectedRoute component={ValidatoreIdea} />
+      </Route>
+      <Route path="/percorso">
+        <ProtectedRoute component={Percorso} />
+      </Route>
       <Route path="/score/:userId" component={ScoreCard} />
       <Route path="/lavori" component={Lavori} />
       <Route component={NotFound} />

@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { usePageMeta } from "@/lib/seo";
 import { NewsGridSkeleton } from "@/components/skeletons/NewsCardSkeleton";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { Newspaper, ExternalLink, Clock, Tag, Sparkles, RefreshCw, Bookmark, BookmarkCheck, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,8 @@ const FREE_CATEGORIES = [
   { id: "finance",    emoji: "💰" },
   { id: "education",  emoji: "🎓" },
 ] as const;
+
+const NEWS_STALE_MS = 15 * 60_000; // 15 minutes
 
 function timeAgoLabel(dateStr: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -154,6 +156,7 @@ function UpgradeCTA() {
 
 export default function News() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
 
   usePageMeta({
     title: t("seo.news.title"),
@@ -177,6 +180,41 @@ export default function News() {
 
   const confirmedSector = profile?.exploredSectors?.find((s) => s.confirmed) ?? null;
 
+  /**
+   * Prefetch all free categories in the background at page mount.
+   * This means every tab click after the first is instant — the data is
+   * already in the TanStack Query cache and keepPreviousData below ensures
+   * the current tab stays visible during any background revalidation.
+   */
+  useEffect(() => {
+    FREE_CATEGORIES.forEach(({ id }) => {
+      queryClient.prefetchQuery({
+        queryKey: ["news", id],
+        queryFn: async () => {
+          const res = await fetch(`${BASE}api/news?category=${id}&limit=6`);
+          if (!res.ok) throw new Error("error");
+          return res.json() as Promise<{ news: NewsItem[]; source: "live" | "static" }>;
+        },
+        staleTime: NEWS_STALE_MS,
+      });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Prefetch sector news as soon as the confirmed sector is known
+  useEffect(() => {
+    if (!confirmedSector) return;
+    queryClient.prefetchQuery({
+      queryKey: ["news", "sector", confirmedSector.name],
+      queryFn: async () => {
+        const res = await fetch(`${BASE}api/news/sector/${encodeURIComponent(confirmedSector.name)}?limit=6`);
+        if (!res.ok) throw new Error();
+        return res.json() as Promise<{ news: NewsItem[]; source: "live" | "static" }>;
+      },
+      staleTime: NEWS_STALE_MS,
+    });
+  }, [confirmedSector?.name, queryClient]);
+
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["news", activeTab],
     queryFn: async () => {
@@ -185,7 +223,10 @@ export default function News() {
       return res.json() as Promise<{ news: NewsItem[]; source: "live" | "static" }>;
     },
     enabled: activeTab !== "__sector__",
-    staleTime: 15 * 60_000,
+    staleTime: NEWS_STALE_MS,
+    // keepPreviousData: the current category's articles stay visible
+    // while the next category's data loads — no skeleton flash on tab switch.
+    placeholderData: keepPreviousData,
   });
 
   const { data: sectorNewsData, isLoading: sectorLoading } = useQuery({
@@ -196,7 +237,8 @@ export default function News() {
       return res.json() as Promise<{ news: NewsItem[]; source: "live" | "static" }>;
     },
     enabled: !!confirmedSector,
-    staleTime: 15 * 60_000,
+    staleTime: NEWS_STALE_MS,
+    placeholderData: keepPreviousData,
   });
 
   const displayNews = activeTab === "__sector__" ? (sectorNewsData?.news ?? []) : (data?.news ?? []);
