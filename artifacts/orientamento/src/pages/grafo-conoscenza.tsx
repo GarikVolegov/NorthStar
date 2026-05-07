@@ -4,7 +4,7 @@ import {
   ArrowLeft, Plus, Save, Trash2, Link2, X, Search, Sparkles, Loader2,
   StickyNote, Lightbulb, FileText, Target, Briefcase, Wrench, Award,
   Network, Globe, MessageCircleQuestion, Send, ChevronRight,
-  Upload, Wand2, Check, ChevronDown,
+  Upload, Wand2, Check, ChevronDown, Maximize2, Copy,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -68,6 +68,13 @@ interface AutoLinkSuggestion {
   score: number;
 }
 
+// ── Step 3: context menu state ────────────────────────────────────────────
+interface ContextMenu {
+  nodeId: number;
+  x: number; // screen px
+  y: number;
+}
+
 const TYPE_META: Record<NodeType, { label: string; color: string; bg: string; border: string; Icon: React.ComponentType<{ className?: string }> }> = {
   note:          { label: "Nota",          color: "#0891b2", bg: "#ecfeff", border: "#67e8f9", Icon: StickyNote },
   skill:         { label: "Competenza",    color: "#10b981", bg: "#ecfdf5", border: "#6ee7b7", Icon: Lightbulb },
@@ -89,19 +96,14 @@ function api<T>(path: string, init?: RequestInit): Promise<T> {
   });
 }
 
-// ── UX #6: calcolo raggio nodo più preciso ─────────────────────────────────
 function nodeRadius(title: string) {
   return Math.max(28, Math.min(52, 10 + title.length * 3.2));
 }
 
-// ── UX #6: split titolo in max 2 righe per tspan ──────────────────────────
 function splitTitle(title: string): [string, string | null] {
   if (title.length <= 12) return [title, null];
-  // Prova a spezzare alla parola più vicina a metà
   const words = title.split(" ");
-  if (words.length === 1) {
-    return [title.slice(0, 11) + "…", null];
-  }
+  if (words.length === 1) return [title.slice(0, 11) + "…", null];
   let line1 = "";
   let i = 0;
   while (i < words.length && (line1 + words[i]).length <= 12) {
@@ -112,6 +114,28 @@ function splitTitle(title: string): [string, string | null] {
   const rest = words.slice(i).join(" ");
   const line2 = rest.length > 11 ? rest.slice(0, 10) + "…" : rest;
   return [line1, line2 || null];
+}
+
+// ── Step 2: calcola view per fit-to-screen ────────────────────────────────
+function computeFitView(
+  nodes: KNode[],
+  svgW: number,
+  svgH: number,
+  padding = 60,
+): { x: number; y: number; k: number } {
+  if (nodes.length === 0) return { x: 0, y: 0, k: 1 };
+  const xs = nodes.map((n) => n.x);
+  const ys = nodes.map((n) => n.y);
+  const minX = Math.min(...xs) - padding;
+  const maxX = Math.max(...xs) + padding;
+  const minY = Math.min(...ys) - padding;
+  const maxY = Math.max(...ys) + padding;
+  const bw = maxX - minX;
+  const bh = maxY - minY;
+  const k = Math.max(0.3, Math.min(2, Math.min(svgW / bw, svgH / bh)));
+  const x = svgW / 2 - ((minX + maxX) / 2) * k;
+  const y = svgH / 2 - ((minY + maxY) / 2) * k;
+  return { x, y, k };
 }
 
 export default function Archivio() {
@@ -129,15 +153,17 @@ export default function Archivio() {
   const [creatingType, setCreatingType] = useState<NodeType>("note");
   const [chatOpen, setChatOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
-
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const [autoLinkSuggestions, setAutoLinkSuggestions] = useState<AutoLinkSuggestion[]>([]);
   const [autoLinkSourceId, setAutoLinkSourceId] = useState<number | null>(null);
-
-  // ── UX #5: ref per delegare Ctrl+S al NodeEditor ──────────────────────────
   const onSaveRef = useRef<(() => void) | null>(null);
+
+  // ── Step 2: animazione fit ────────────────────────────────────────────────
+  const [fitAnimating, setFitAnimating] = useState(false);
+
+  // ── Step 3: context menu ─────────────────────────────────────────────────
+  const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
@@ -149,13 +175,8 @@ export default function Archivio() {
   const svgRef = useRef<SVGSVGElement>(null);
 
   const dragState = useRef<{
-    id: number;
-    offsetX: number;
-    offsetY: number;
-    moved: boolean;
-    x: number;
-    y: number;
-    el: SVGGElement | null;
+    id: number; offsetX: number; offsetY: number;
+    moved: boolean; x: number; y: number; el: SVGGElement | null;
   } | null>(null);
 
   const rafId = useRef<number | null>(null);
@@ -168,7 +189,7 @@ export default function Archivio() {
 
   const panState = useRef<{ startX: number; startY: number; vx: number; vy: number } | null>(null);
 
-  // ── wheel listener non-passivo ─────────────────────────────────────────────
+  // wheel non-passivo
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
@@ -189,27 +210,22 @@ export default function Archivio() {
     return () => svg.removeEventListener("wheel", handler);
   }, []);
 
-  // ── UX #5: keyboard shortcuts globali ────────────────────────────────────
+  // keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       const isEditing = tag === "input" || tag === "textarea" || (e.target as HTMLElement)?.isContentEditable;
-
-      // Escape: chiudi pannello / annulla link mode / chiudi chat
       if (e.key === "Escape") {
+        if (contextMenu) { setContextMenu(null); return; }
         if (linkMode) { setLinkMode(null); return; }
         if (chatOpen) { setChatOpen(false); return; }
         if (selectedId !== null) { setSelectedId(null); return; }
       }
-
-      // Delete / Backspace: elimina nodo selezionato (solo fuori da input)
       if ((e.key === "Delete" || e.key === "Backspace") && !isEditing && selectedId !== null) {
         e.preventDefault();
         void handleDeleteNode(selectedId);
         return;
       }
-
-      // Ctrl+S / Cmd+S: salva nodo corrente
       if ((e.ctrlKey || e.metaKey) && e.key === "s" && selectedId !== null) {
         e.preventDefault();
         onSaveRef.current?.();
@@ -218,16 +234,48 @@ export default function Archivio() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, linkMode, chatOpen]);
+  }, [selectedId, linkMode, chatOpen, contextMenu]);
+
+  // ── Step 3: chiudi context menu su click esterno / scroll ────────────────
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    window.addEventListener("pointerdown", close, { capture: true });
+    window.addEventListener("scroll", close, { capture: true });
+    return () => {
+      window.removeEventListener("pointerdown", close, { capture: true });
+      window.removeEventListener("scroll", close, { capture: true });
+    };
+  }, [contextMenu]);
 
   const loadGraph = useCallback(async () => {
     setLoading(true);
     try {
       const g = await api<GraphData>("/graph");
       setData(g);
+      // ── Step 2: fit automatico dopo load ─────────────────────────────────
+      if (g.nodes.length > 0 && svgRef.current) {
+        const rect = svgRef.current.getBoundingClientRect();
+        const fv = computeFitView(g.nodes, rect.width || window.innerWidth, rect.height || window.innerHeight - 64);
+        setFitAnimating(true);
+        setView(fv);
+        viewRef.current = fv;
+        setTimeout(() => setFitAnimating(false), 400);
+      }
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, []);
+
+  // ── Step 2: fit manuale (pulsante Fit) ───────────────────────────────────
+  const handleFit = useCallback(() => {
+    if (!svgRef.current || data.nodes.length === 0) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const fv = computeFitView(data.nodes, rect.width, rect.height);
+    setFitAnimating(true);
+    setView(fv);
+    viewRef.current = fv;
+    setTimeout(() => setFitAnimating(false), 400);
+  }, [data.nodes]);
 
   useEffect(() => {
     if (!authReady) return;
@@ -276,16 +324,9 @@ export default function Archivio() {
 
   const fetchAutoLinks = useCallback(async (nodeId: number) => {
     try {
-      const suggestions = await api<AutoLinkSuggestion[]>(`/nodes/${nodeId}/auto-link`, {
-        method: "POST",
-      });
-      if (suggestions.length > 0) {
-        setAutoLinkSuggestions(suggestions);
-        setAutoLinkSourceId(nodeId);
-      }
-    } catch {
-      // best-effort, silent
-    }
+      const suggestions = await api<AutoLinkSuggestion[]>(`/nodes/${nodeId}/auto-link`, { method: "POST" });
+      if (suggestions.length > 0) { setAutoLinkSuggestions(suggestions); setAutoLinkSourceId(nodeId); }
+    } catch { /* silent */ }
   }, []);
 
   const handleFileImport = useCallback(async (file: File) => {
@@ -293,21 +334,14 @@ export default function Archivio() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await apiFetch(`${BASE}api/knowledge/import`, {
-        method: "POST",
-        body: form,
-      });
+      const res = await apiFetch(`${BASE}api/knowledge/import`, { method: "POST", body: form });
       if (!res.ok) throw new Error(await res.text());
       const created = await res.json() as KNode;
       setData((d) => ({ ...d, nodes: [...d.nodes, created] }));
       setSelectedId(created.id);
       void fetchAutoLinks(created.id);
     } catch (err) {
-      toast({
-        title: "Importazione fallita",
-        description: err instanceof Error ? err.message : "Formato non supportato o errore di rete.",
-        variant: "destructive",
-      });
+      toast({ title: "Importazione fallita", description: err instanceof Error ? err.message : "Errore di rete.", variant: "destructive" });
     } finally {
       setImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -330,24 +364,15 @@ export default function Archivio() {
       });
       setData((d) => ({ ...d, nodes: [...d.nodes, created] }));
       setSelectedId(created.id);
-    } catch (err) {
-      console.error("[archivio] create node failed", err);
-    }
+    } catch (err) { console.error("[archivio] create node failed", err); }
   }
 
   async function handleUpdateNode(id: number, patch: Partial<KNode>) {
     try {
-      const updated = await api<KNode>(`/nodes/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(patch),
-      });
+      const updated = await api<KNode>(`/nodes/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
       setData((d) => ({ ...d, nodes: d.nodes.map((n) => (n.id === id ? updated : n)) }));
-      if (patch.content && patch.content.length > 20) {
-        void fetchAutoLinks(id);
-      }
-    } catch (err) {
-      console.error("[archivio] update node failed", err);
-    }
+      if (patch.content && patch.content.length > 20) void fetchAutoLinks(id);
+    } catch (err) { console.error("[archivio] update node failed", err); }
   }
 
   async function handleDeleteNode(id: number) {
@@ -358,9 +383,7 @@ export default function Archivio() {
         edges: d.edges.filter((e) => e.sourceId !== id && e.targetId !== id),
       }));
       if (selectedId === id) setSelectedId(null);
-    } catch (err) {
-      console.error("[archivio] delete failed", err);
-    }
+    } catch (err) { console.error("[archivio] delete failed", err); }
   }
 
   async function handleCreateEdge(sourceId: number, targetId: number, label?: string) {
@@ -372,28 +395,45 @@ export default function Archivio() {
         body: JSON.stringify({ sourceId, targetId, label: label?.trim() || undefined }),
       });
       setData((d) => ({ ...d, edges: [...d.edges, created] }));
-    } catch (err) {
-      console.error("[archivio] edge failed", err);
-    }
+    } catch (err) { console.error("[archivio] edge failed", err); }
   }
 
   async function handleDeleteEdge(id: number) {
     try {
       await api(`/edges/${id}`, { method: "DELETE" });
       setData((d) => ({ ...d, edges: d.edges.filter((e) => e.id !== id) }));
-    } catch (err) {
-      console.error("[archivio] edge delete failed", err);
-    }
+    } catch (err) { console.error("[archivio] edge delete failed", err); }
   }
 
-  // ── Drag ───────────────────────────────────────────────────────────────────
+  // ── Step 3: duplica nodo ─────────────────────────────────────────────────
+  async function handleDuplicateNode(id: number) {
+    const src = data.nodes.find((n) => n.id === id);
+    if (!src) return;
+    try {
+      const created = await api<KNode>("/nodes", {
+        method: "POST",
+        body: JSON.stringify({
+          type: src.type,
+          title: src.title + " (copia)",
+          content: src.content,
+          url: src.url,
+          x: src.x + 50,
+          y: src.y + 50,
+        }),
+      });
+      setData((d) => ({ ...d, nodes: [...d.nodes, created] }));
+      setSelectedId(created.id);
+      toast({ title: "Nodo duplicato", description: `«${src.title}» copiato con successo.` });
+    } catch (err) { console.error("[archivio] duplicate failed", err); }
+  }
+
+  // ── Drag ──────────────────────────────────────────────────────────────────
   function onNodePointerDown(e: React.PointerEvent, n: KNode) {
     e.stopPropagation();
     if (linkMode) {
       if (linkMode.sourceId === n.id) { setLinkMode(null); return; }
       setPendingEdge({ sourceId: linkMode.sourceId, targetId: n.id });
-      setLinkMode(null);
-      setEdgeLabelDraft("");
+      setLinkMode(null); setEdgeLabelDraft("");
       return;
     }
     (e.target as Element).setPointerCapture?.(e.pointerId);
@@ -401,11 +441,14 @@ export default function Archivio() {
     const v = viewRef.current;
     const px = (e.clientX - svgRect.left - v.x) / v.k;
     const py = (e.clientY - svgRect.top - v.y) / v.k;
-    dragState.current = {
-      id: n.id, offsetX: px - n.x, offsetY: py - n.y,
-      moved: false, x: n.x, y: n.y,
-      el: e.currentTarget as SVGGElement,
-    };
+    dragState.current = { id: n.id, offsetX: px - n.x, offsetY: py - n.y, moved: false, x: n.x, y: n.y, el: e.currentTarget as SVGGElement };
+  }
+
+  // ── Step 3: context menu su right-click nodo ─────────────────────────────
+  function onNodeContextMenu(e: React.MouseEvent, n: KNode) {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ nodeId: n.id, x: e.clientX, y: e.clientY });
   }
 
   function onSvgPointerMove(e: React.PointerEvent) {
@@ -426,13 +469,10 @@ export default function Archivio() {
           drag.el.setAttribute("data-x", String(newX));
           drag.el.setAttribute("data-y", String(newY));
         }
-
         svgRef.current.querySelectorAll<SVGLineElement>(`line[data-source="${drag.id}"]`)
           .forEach((l) => { l.setAttribute("x1", String(newX)); l.setAttribute("y1", String(newY)); });
         svgRef.current.querySelectorAll<SVGLineElement>(`line[data-target="${drag.id}"]`)
           .forEach((l) => { l.setAttribute("x2", String(newX)); l.setAttribute("y2", String(newY)); });
-
-        // Caso A: nodo draggato è source
         svgRef.current.querySelectorAll<SVGTextElement>(`text[data-edge-mid-source="${drag.id}"]`)
           .forEach((txt) => {
             const ox = parseFloat(txt.getAttribute("data-other-x") ?? "0");
@@ -440,7 +480,6 @@ export default function Archivio() {
             txt.setAttribute("x", String((newX + ox) / 2));
             txt.setAttribute("y", String((newY + oy) / 2 - 4));
           });
-        // Caso B: nodo draggato è target
         svgRef.current.querySelectorAll<SVGTextElement>(`text[data-edge-mid-target="${drag.id}"]`)
           .forEach((txt) => {
             const ox = parseFloat(txt.getAttribute("data-other-x") ?? "0");
@@ -448,7 +487,6 @@ export default function Archivio() {
             txt.setAttribute("x", String((newX + ox) / 2));
             txt.setAttribute("y", String((newY + oy) / 2 - 4));
           });
-        // Caso C: il nodo draggato è "other" per altri text label
         svgRef.current.querySelectorAll<SVGTextElement>(
           `text[data-edge-mid-source]:not([data-edge-mid-source="${drag.id}"]),` +
           `text[data-edge-mid-target]:not([data-edge-mid-target="${drag.id}"])`
@@ -485,10 +523,7 @@ export default function Archivio() {
     if (!drag.moved) {
       setSelectedId(n.id);
     } else {
-      setData((d) => ({
-        ...d,
-        nodes: d.nodes.map((nd) => (nd.id === drag.id ? { ...nd, x: drag.x, y: drag.y } : nd)),
-      }));
+      setData((d) => ({ ...d, nodes: d.nodes.map((nd) => (nd.id === drag.id ? { ...nd, x: drag.x, y: drag.y } : nd)) }));
       queuePosition(drag.id, drag.x, drag.y);
     }
     e.stopPropagation();
@@ -497,8 +532,7 @@ export default function Archivio() {
   function onSvgPointerDown(e: React.PointerEvent) {
     if (e.target !== e.currentTarget) return;
     panState.current = { startX: e.clientX, startY: e.clientY, vx: viewRef.current.x, vy: viewRef.current.y };
-    setSelectedId(null);
-    setLinkMode(null);
+    setSelectedId(null); setLinkMode(null);
   }
 
   function onSvgPointerUp() { panState.current = null; }
@@ -515,101 +549,68 @@ export default function Archivio() {
       setData((d) => ({ ...d, nodes: next }));
       next.forEach((n) => queuePosition(n.id, n.x, n.y));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.nodes.length]);
 
   if (!authReady || (user && loading)) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary/30" />
-      </div>
-    );
+    return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="w-8 h-8 animate-spin text-primary/30" /></div>;
   }
   if (!user) {
     return (
       <div className="container mx-auto px-4 py-24 max-w-lg text-center">
         <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6 text-3xl">📚</div>
         <h2 className="text-2xl font-serif font-bold mb-3">Accesso richiesto</h2>
-        <p className="text-muted-foreground mb-8">
-          Registrati per costruire il tuo Archivio personale: note, competenze, documenti e tutto quello che impari, connesso e sempre a portata di mano.
-        </p>
+        <p className="text-muted-foreground mb-8">Registrati per costruire il tuo Archivio personale.</p>
         <Button asChild><Link href="/registra">Registrati gratis</Link></Button>
       </div>
     );
   }
 
+  // ── Step 3: nodo del context menu ────────────────────────────────────────
+  const ctxNode = contextMenu ? data.nodes.find((n) => n.id === contextMenu.nodeId) : null;
+
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col bg-background">
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
+      <input ref={fileInputRef} type="file" className="hidden"
         accept=".pdf,.txt,.md,.docx,.png,.jpg,.jpeg"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) void handleFileImport(file);
-        }}
+        onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFileImport(file); }}
       />
 
-      {/* ── Toolbar ── UX #4: controlli creazione collassati in DropdownMenu ── */}
+      {/* Toolbar */}
       <div className="flex items-center gap-2 px-4 md:px-6 py-3 border-b bg-card/80 backdrop-blur-sm overflow-x-auto">
         <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 shrink-0" asChild>
           <Link href="/"><ArrowLeft className="w-4 h-4" /></Link>
         </Button>
-
         <div className="flex items-center gap-2 mr-2 shrink-0">
           <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
             <Network className="w-3.5 h-3.5 text-primary" />
           </div>
           <h1 className="font-serif font-bold text-lg whitespace-nowrap">Il tuo Archivio</h1>
         </div>
-
         <div className="relative flex-1 min-w-[140px] max-w-[220px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cerca…"
-            className="h-8 pl-8 text-sm rounded-xl"
-          />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cerca…" className="h-8 pl-8 text-sm rounded-xl" />
         </div>
-
-        {/* Filtro tipo — rimane inline per discovery */}
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value as NodeType | "all")}
-          className="h-8 rounded-xl border border-border bg-background px-2 text-xs shrink-0"
-        >
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as NodeType | "all")}
+          className="h-8 rounded-xl border border-border bg-background px-2 text-xs shrink-0">
           <option value="all">Tutti</option>
-          {ALL_TYPES.map((t) => (
-            <option key={t} value={t}>{TYPE_META[t].label}</option>
-          ))}
+          {ALL_TYPES.map((t) => <option key={t} value={t}>{TYPE_META[t].label}</option>)}
         </select>
-
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
-          {/* Chat */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant={chatOpen ? "default" : "outline"}
-                className="rounded-xl h-8 w-8"
-                onClick={() => { setChatOpen((v) => !v); if (!chatOpen) setSelectedId(null); }}
-              >
+              <Button size="icon" variant={chatOpen ? "default" : "outline"} className="rounded-xl h-8 w-8"
+                onClick={() => { setChatOpen((v) => !v); if (!chatOpen) setSelectedId(null); }}>
                 <MessageCircleQuestion className="w-4 h-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Chiedi all'Archivio</TooltipContent>
           </Tooltip>
-
-          {/* UX #4: DropdownMenu unifica Importa + Nuovo tipo ───────────────── */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" className="rounded-xl h-8 gap-1" disabled={importing}>
-                {importing
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <Plus className="w-3.5 h-3.5" />}
+                {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                 <span className="hidden sm:inline">Aggiungi</span>
                 <ChevronDown className="w-3 h-3 opacity-60" />
               </Button>
@@ -617,18 +618,10 @@ export default function Archivio() {
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuLabel className="text-xs text-muted-foreground">Crea elemento</DropdownMenuLabel>
               {ALL_TYPES.map((t) => {
-                const m = TYPE_META[t];
-                const Icon = m.Icon;
+                const m = TYPE_META[t]; const Icon = m.Icon;
                 return (
-                  <DropdownMenuItem
-                    key={t}
-                    onClick={() => handleAddNode(t)}
-                    className="gap-2 cursor-pointer"
-                  >
-                    <span
-                      className="w-5 h-5 rounded flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: m.bg, color: m.color }}
-                    >
+                  <DropdownMenuItem key={t} onClick={() => handleAddNode(t)} className="gap-2 cursor-pointer">
+                    <span className="w-5 h-5 rounded flex items-center justify-center shrink-0" style={{ backgroundColor: m.bg, color: m.color }}>
                       <Icon className="w-3 h-3" />
                     </span>
                     {m.label}
@@ -636,14 +629,8 @@ export default function Archivio() {
                 );
               })}
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => fileInputRef.current?.click()}
-                className="gap-2 cursor-pointer"
-                disabled={importing}
-              >
-                <span className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-muted text-muted-foreground">
-                  <Upload className="w-3 h-3" />
-                </span>
+              <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="gap-2 cursor-pointer" disabled={importing}>
+                <span className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-muted text-muted-foreground"><Upload className="w-3 h-3" /></span>
                 {importing ? "Importando…" : "Importa file…"}
                 <span className="ml-auto text-[10px] text-muted-foreground">PDF, MD, TXT</span>
               </DropdownMenuItem>
@@ -655,19 +642,15 @@ export default function Archivio() {
       {/* Link mode hint */}
       {linkMode && (
         <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-900 flex items-center justify-between">
-          <span>
-            <Link2 className="w-3.5 h-3.5 inline mr-1" />
-            Modalità collegamento — clicca un altro elemento per collegarlo a «
-            {data.nodes.find((n) => n.id === linkMode.sourceId)?.title}»
+          <span><Link2 className="w-3.5 h-3.5 inline mr-1" />
+            Modalità collegamento — clicca un altro elemento per collegarlo a «{data.nodes.find((n) => n.id === linkMode.sourceId)?.title}»
             <span className="ml-2 opacity-60">(Esc per annullare)</span>
           </span>
-          <button onClick={() => setLinkMode(null)} className="text-amber-900 hover:opacity-70">
-            <X className="w-3.5 h-3.5" />
-          </button>
+          <button onClick={() => setLinkMode(null)} className="text-amber-900 hover:opacity-70"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
 
-      {/* Auto-link suggestions banner */}
+      {/* Auto-link banner */}
       {autoLinkSuggestions.length > 0 && autoLinkSourceId !== null && (
         <div className="px-4 py-2.5 bg-violet-50 border-b border-violet-200 flex items-center gap-3 flex-wrap">
           <Wand2 className="w-4 h-4 text-violet-600 shrink-0" />
@@ -679,73 +662,80 @@ export default function Archivio() {
               const meta = TYPE_META[s.type] ?? TYPE_META.note;
               return (
                 <div key={s.id} className="flex items-center gap-1">
-                  <button
-                    onClick={async () => {
-                      await handleCreateEdge(autoLinkSourceId, s.id);
-                      setAutoLinkSuggestions((prev) => prev.filter((x) => x.id !== s.id));
-                      if (autoLinkSuggestions.length === 1) setAutoLinkSourceId(null);
-                    }}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] hover:opacity-90 transition-opacity"
+                  <button onClick={async () => {
+                    await handleCreateEdge(autoLinkSourceId, s.id);
+                    setAutoLinkSuggestions((prev) => prev.filter((x) => x.id !== s.id));
+                    if (autoLinkSuggestions.length === 1) setAutoLinkSourceId(null);
+                  }} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] hover:opacity-90 transition-opacity"
                     style={{ backgroundColor: meta.bg, color: meta.color, borderColor: meta.border }}
-                    title={`Affinità ${Math.round(s.score * 100)}%`}
-                  >
-                    <Check className="w-2.5 h-2.5" />
-                    {s.title}
+                    title={`Affinità ${Math.round(s.score * 100)}%`}>
+                    <Check className="w-2.5 h-2.5" />{s.title}
                     <span className="opacity-60">{Math.round(s.score * 100)}%</span>
                   </button>
-                  <button
-                    onClick={() => {
-                      setAutoLinkSuggestions((prev) => prev.filter((x) => x.id !== s.id));
-                      if (autoLinkSuggestions.length === 1) setAutoLinkSourceId(null);
-                    }}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
+                  <button onClick={() => {
+                    setAutoLinkSuggestions((prev) => prev.filter((x) => x.id !== s.id));
+                    if (autoLinkSuggestions.length === 1) setAutoLinkSourceId(null);
+                  }} className="text-muted-foreground hover:text-foreground"><X className="w-3 h-3" /></button>
                 </div>
               );
             })}
           </div>
-          <button
-            className="ml-auto text-xs text-violet-600 hover:text-violet-900"
-            onClick={() => { setAutoLinkSuggestions([]); setAutoLinkSourceId(null); }}
-          >
-            Ignora tutti
-          </button>
+          <button className="ml-auto text-xs text-violet-600 hover:text-violet-900"
+            onClick={() => { setAutoLinkSuggestions([]); setAutoLinkSourceId(null); }}>Ignora tutti</button>
         </div>
       )}
 
-      {/* Pending edge label dialog */}
+      {/* Pending edge dialog */}
       {pendingEdge && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={() => setPendingEdge(null)}>
           <div className="bg-card rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-semibold mb-2">Etichetta collegamento</h3>
             <p className="text-xs text-muted-foreground mb-3">
-              {data.nodes.find((n) => n.id === pendingEdge.sourceId)?.title} →{" "}
-              {data.nodes.find((n) => n.id === pendingEdge.targetId)?.title}
+              {data.nodes.find((n) => n.id === pendingEdge.sourceId)?.title} → {data.nodes.find((n) => n.id === pendingEdge.targetId)?.title}
             </p>
-            <Input
-              autoFocus
-              placeholder="es. richiede, usa, simile a…"
-              value={edgeLabelDraft}
+            <Input autoFocus placeholder="es. richiede, usa, simile a…" value={edgeLabelDraft}
               onChange={(e) => setEdgeLabelDraft(e.target.value)}
               onKeyDown={async (e) => {
-                if (e.key === "Enter") {
-                  await handleCreateEdge(pendingEdge.sourceId, pendingEdge.targetId, edgeLabelDraft);
-                  setPendingEdge(null); setEdgeLabelDraft("");
-                }
+                if (e.key === "Enter") { await handleCreateEdge(pendingEdge.sourceId, pendingEdge.targetId, edgeLabelDraft); setPendingEdge(null); setEdgeLabelDraft(""); }
                 if (e.key === "Escape") { setPendingEdge(null); setEdgeLabelDraft(""); }
-              }}
-              className="rounded-xl"
-            />
+              }} className="rounded-xl" />
             <div className="flex justify-end gap-2 mt-3">
               <Button variant="ghost" size="sm" onClick={() => setPendingEdge(null)}>Annulla</Button>
-              <Button size="sm" onClick={async () => {
-                await handleCreateEdge(pendingEdge.sourceId, pendingEdge.targetId, edgeLabelDraft);
-                setPendingEdge(null); setEdgeLabelDraft("");
-              }}>Collega</Button>
+              <Button size="sm" onClick={async () => { await handleCreateEdge(pendingEdge.sourceId, pendingEdge.targetId, edgeLabelDraft); setPendingEdge(null); setEdgeLabelDraft(""); }}>Collega</Button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Step 3: Context menu ─────────────────────────────────────────── */}
+      {contextMenu && ctxNode && (
+        <div
+          className="fixed z-[60] bg-card border rounded-xl shadow-lg py-1 min-w-[170px] text-sm"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="px-3 py-1.5 border-b mb-1">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{TYPE_META[ctxNode.type]?.label}</p>
+            <p className="font-semibold text-xs truncate max-w-[150px]">{ctxNode.title}</p>
+          </div>
+          <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2 text-xs"
+            onClick={() => { setSelectedId(contextMenu.nodeId); setContextMenu(null); }}>
+            <FileText className="w-3.5 h-3.5 text-muted-foreground" /> Apri dettaglio
+          </button>
+          <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2 text-xs"
+            onClick={() => { setLinkMode({ sourceId: contextMenu.nodeId }); setContextMenu(null); setSelectedId(null); }}>
+            <Link2 className="w-3.5 h-3.5 text-muted-foreground" /> Collega…
+          </button>
+          <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2 text-xs"
+            onClick={() => { void handleDuplicateNode(contextMenu.nodeId); setContextMenu(null); }}>
+            <Copy className="w-3.5 h-3.5 text-muted-foreground" /> Duplica
+          </button>
+          <div className="border-t my-1" />
+          <button className="w-full text-left px-3 py-1.5 hover:bg-destructive/10 flex items-center gap-2 text-xs text-destructive"
+            onClick={() => { void handleDeleteNode(contextMenu.nodeId); setContextMenu(null); }}>
+            <Trash2 className="w-3.5 h-3.5" /> Elimina
+          </button>
         </div>
       )}
 
@@ -763,8 +753,7 @@ export default function Archivio() {
               <EmptyState onAdd={handleAddNode} onImport={() => fileInputRef.current?.click()} />
             ) : (
               filteredNodes.map((n) => {
-                const meta = TYPE_META[n.type];
-                const Icon = meta.Icon;
+                const meta = TYPE_META[n.type]; const Icon = meta.Icon;
                 const connections = data.edges.filter((e) => e.sourceId === n.id || e.targetId === n.id).length;
                 return (
                   <div key={n.id} className="rounded-xl border bg-card p-4 flex items-start gap-3" onClick={() => setSelectedId(n.id)}>
@@ -786,7 +775,7 @@ export default function Archivio() {
           </div>
         )}
 
-        {/* SVG canvas — desktop */}
+        {/* SVG canvas */}
         {!isMobile && (
           <div className="flex-1 relative bg-[radial-gradient(circle,#e5e7eb_1px,transparent_1px)] [background-size:24px_24px] overflow-hidden">
             {data.nodes.length === 0 && (
@@ -794,7 +783,6 @@ export default function Archivio() {
                 <EmptyState onAdd={handleAddNode} onImport={() => fileInputRef.current?.click()} />
               </div>
             )}
-
             <svg
               ref={svgRef}
               className="w-full h-full touch-none select-none"
@@ -811,42 +799,35 @@ export default function Archivio() {
                   <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#00000015" />
                 </filter>
               </defs>
-              <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}>
+              {/* ── Step 2: transizione CSS su transform per fit animato ── */}
+              <g
+                transform={`translate(${view.x},${view.y}) scale(${view.k})`}
+                style={fitAnimating ? { transition: "transform 0.35s cubic-bezier(0.4,0,0.2,1)" } : undefined}
+              >
                 {/* Edges */}
                 {visibleEdges.map((edge) => {
                   const a = data.nodes.find((n) => n.id === edge.sourceId);
                   const b = data.nodes.find((n) => n.id === edge.targetId);
                   if (!a || !b) return null;
                   const dimmed = selectedId != null && selectedId !== a.id && selectedId !== b.id;
-                  const mx = (a.x + b.x) / 2;
-                  const my = (a.y + b.y) / 2;
+                  const mx = (a.x + b.x) / 2; const my = (a.y + b.y) / 2;
                   return (
                     <g key={edge.id} opacity={dimmed ? 0.15 : 0.9}>
-                      <line
-                        x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                        stroke="#94a3b8" strokeWidth={1.4}
-                        markerEnd="url(#arrow)"
-                        data-source={edge.sourceId}
-                        data-target={edge.targetId}
-                      />
+                      <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                        stroke="#94a3b8" strokeWidth={1.4} markerEnd="url(#arrow)"
+                        data-source={edge.sourceId} data-target={edge.targetId} />
                       {edge.label && (
-                        <text
-                          x={mx} y={my - 4}
-                          textAnchor="middle" fontSize={9} fill="#64748b"
+                        <text x={mx} y={my - 4} textAnchor="middle" fontSize={9} fill="#64748b"
                           style={{ pointerEvents: "none" }}
-                          data-edge-mid-source={edge.sourceId}
-                          data-edge-mid-target={edge.targetId}
-                          data-other-x={b.x}
-                          data-other-y={b.y}
-                        >
+                          data-edge-mid-source={edge.sourceId} data-edge-mid-target={edge.targetId}
+                          data-other-x={b.x} data-other-y={b.y}>
                           {edge.label}
                         </text>
                       )}
                     </g>
                   );
                 })}
-
-                {/* ── UX #6: Nodes con tspan multiline e raggio dinamico ──── */}
+                {/* Nodes */}
                 {filteredNodes.map((n) => {
                   const meta = TYPE_META[n.type] ?? TYPE_META.note;
                   const r = nodeRadius(n.title);
@@ -856,82 +837,59 @@ export default function Archivio() {
                   const labelW = Math.min(80, 16 + meta.label.length * 5.5);
                   const textY = line2 ? -3 : 4;
                   return (
-                    <g
-                      key={n.id}
-                      transform={`translate(${n.x},${n.y})`}
+                    <g key={n.id} transform={`translate(${n.x},${n.y})`}
                       style={{ cursor: linkMode ? "crosshair" : "grab" }}
                       onPointerDown={(e) => onNodePointerDown(e, n)}
                       onPointerUp={(e) => onNodePointerUp(e, n)}
-                      data-node-id={n.id}
-                      data-x={n.x}
-                      data-y={n.y}
+                      onContextMenu={(e) => onNodeContextMenu(e, n)}
+                      data-node-id={n.id} data-x={n.x} data-y={n.y}
                     >
-                      <circle
-                        r={r}
-                        fill={n.color || meta.bg}
+                      <circle r={r} fill={n.color || meta.bg}
                         stroke={isSelected || isLinkSrc ? meta.color : meta.border}
                         strokeWidth={isSelected || isLinkSrc ? 2.5 : 1.5}
-                        filter="url(#node-shadow)"
-                      />
-                      {/* UX #6: tspan a 2 righe se il titolo è lungo */}
-                      <text
-                        textAnchor="middle" y={textY}
-                        fontSize={10} fontWeight={600} fill={meta.color}
-                        style={{ pointerEvents: "none" }}
-                      >
+                        filter="url(#node-shadow)" />
+                      <text textAnchor="middle" y={textY} fontSize={10} fontWeight={600} fill={meta.color}
+                        style={{ pointerEvents: "none" }}>
                         <tspan x="0" dy="0">{line1}</tspan>
                         {line2 && <tspan x="0" dy="12">{line2}</tspan>}
                       </text>
-                      {/* Type pill */}
-                      <rect
-                        x={-labelW / 2} y={r + 5}
-                        width={labelW} height={14}
-                        rx={7} fill={meta.bg}
-                        stroke={meta.border} strokeWidth={1}
-                      />
-                      <text
-                        textAnchor="middle" y={r + 15}
-                        fontSize={8} fontWeight={500} fill={meta.color}
-                        style={{ pointerEvents: "none" }}
-                      >
-                        {meta.label}
-                      </text>
+                      <rect x={-Math.min(80, 16 + meta.label.length * 5.5) / 2} y={r + 5}
+                        width={labelW} height={14} rx={7} fill={meta.bg} stroke={meta.border} strokeWidth={1} />
+                      <text textAnchor="middle" y={r + 15} fontSize={8} fontWeight={500} fill={meta.color}
+                        style={{ pointerEvents: "none" }}>{meta.label}</text>
                     </g>
                   );
                 })}
               </g>
             </svg>
 
-            {/* ── UX #7: Zoom controls con percentuale corrente ─────────── */}
+            {/* Zoom controls + Step 2: pulsante Fit */}
             <div className="absolute bottom-4 right-4 flex flex-col items-center gap-0.5 bg-card/90 backdrop-blur border rounded-xl shadow-sm p-1">
-              <button
-                onClick={() => setView((v) => ({ ...v, k: Math.min(2.5, v.k * 1.2) }))}
-                className="w-7 h-7 rounded-lg hover:bg-muted text-sm font-bold"
-                title="Zoom in (+)"
-              >+</button>
+              <button onClick={() => setView((v) => ({ ...v, k: Math.min(2.5, v.k * 1.2) }))}
+                className="w-7 h-7 rounded-lg hover:bg-muted text-sm font-bold" title="Zoom in">+</button>
               <span className="text-[9px] font-semibold text-muted-foreground tabular-nums w-7 text-center leading-5">
                 {Math.round(view.k * 100)}%
               </span>
-              <button
-                onClick={() => setView((v) => ({ ...v, k: Math.max(0.3, v.k / 1.2) }))}
-                className="w-7 h-7 rounded-lg hover:bg-muted text-sm font-bold"
-                title="Zoom out (−)"
-              >−</button>
-              <button
-                onClick={() => setView({ x: 0, y: 0, k: 1 })}
-                className="w-7 h-7 rounded-lg hover:bg-muted text-[10px] font-semibold mt-0.5"
-                title="Reset vista (100%)"
-              >⌂</button>
+              <button onClick={() => setView((v) => ({ ...v, k: Math.max(0.3, v.k / 1.2) }))}
+                className="w-7 h-7 rounded-lg hover:bg-muted text-sm font-bold" title="Zoom out">−</button>
+              <div className="w-full h-px bg-border my-0.5" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button onClick={handleFit}
+                    className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center" title="Fit to screen">
+                    <Maximize2 className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left">Adatta alla schermata</TooltipContent>
+              </Tooltip>
+              <button onClick={() => setView({ x: 0, y: 0, k: 1 })}
+                className="w-7 h-7 rounded-lg hover:bg-muted text-[10px] font-semibold" title="Reset vista">⌂</button>
             </div>
 
-            {/* Stats badge + hint shortcut */}
+            {/* Stats + shortcut hint */}
             <div className="absolute top-3 left-3 flex gap-2 items-center">
-              <Badge variant="outline" className="text-[10px] bg-card/80 backdrop-blur">
-                {filteredNodes.length} elementi
-              </Badge>
-              <Badge variant="outline" className="text-[10px] bg-card/80 backdrop-blur">
-                {visibleEdges.length} collegamenti
-              </Badge>
+              <Badge variant="outline" className="text-[10px] bg-card/80 backdrop-blur">{filteredNodes.length} elementi</Badge>
+              <Badge variant="outline" className="text-[10px] bg-card/80 backdrop-blur">{visibleEdges.length} collegamenti</Badge>
               {selectedId !== null && (
                 <Badge variant="outline" className="text-[10px] bg-card/80 backdrop-blur text-muted-foreground">
                   Del = elimina · Esc = chiudi · ⌘S = salva
@@ -944,11 +902,9 @@ export default function Archivio() {
         {/* Side panel */}
         {selected && !chatOpen && (
           <NodeEditor
-            key={selected.id}
-            node={selected}
+            key={selected.id} node={selected}
             edges={data.edges.filter((e) => e.sourceId === selected.id || e.targetId === selected.id)}
-            allNodes={data.nodes}
-            onClose={() => setSelectedId(null)}
+            allNodes={data.nodes} onClose={() => setSelectedId(null)}
             onSave={(patch) => handleUpdateNode(selected.id, patch)}
             onDelete={() => handleDeleteNode(selected.id)}
             onStartLink={() => setLinkMode({ sourceId: selected.id })}
@@ -959,11 +915,8 @@ export default function Archivio() {
 
         {/* RAG chat panel */}
         {chatOpen && (
-          <ChatPanel
-            nodes={data.nodes}
-            onClose={() => setChatOpen(false)}
-            onFocusNode={(id) => { setChatOpen(false); setSelectedId(id); }}
-          />
+          <ChatPanel nodes={data.nodes} onClose={() => setChatOpen(false)}
+            onFocusNode={(id) => { setChatOpen(false); setSelectedId(id); }} />
         )}
       </div>
     </div>
@@ -982,14 +935,10 @@ function EmptyState({ onAdd, onImport }: { onAdd: (type?: NodeType) => void; onI
       </p>
       <div className="grid grid-cols-3 gap-3 w-full max-w-sm mb-6">
         {(["note", "skill", "document"] as NodeType[]).map((t) => {
-          const m = TYPE_META[t];
-          const Icon = m.Icon;
+          const m = TYPE_META[t]; const Icon = m.Icon;
           return (
-            <button
-              key={t}
-              onClick={() => onAdd(t)}
-              className="flex flex-col items-center gap-2 p-4 rounded-xl border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
-            >
+            <button key={t} onClick={() => onAdd(t)}
+              className="flex flex-col items-center gap-2 p-4 rounded-xl border bg-card hover:border-primary/40 hover:shadow-sm transition-all">
               <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: m.bg }}>
                 <Icon className="w-4 h-4" style={{ color: m.color }} />
               </div>
@@ -998,10 +947,8 @@ function EmptyState({ onAdd, onImport }: { onAdd: (type?: NodeType) => void; onI
           );
         })}
       </div>
-      <button
-        onClick={onImport}
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground border rounded-xl px-4 py-2 hover:border-primary/40 transition-colors"
-      >
+      <button onClick={onImport}
+        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground border rounded-xl px-4 py-2 hover:border-primary/40 transition-colors">
         <Upload className="w-4 h-4" /> Oppure importa un file esistente
       </button>
     </div>
@@ -1011,12 +958,9 @@ function EmptyState({ onAdd, onImport }: { onAdd: (type?: NodeType) => void; onI
 // ── RAG chat panel ───────────────────────────────────────────────────────────
 interface Citation { id: number; title: string; type: NodeType; score?: number }
 interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-  citations?: Citation[];
-  neighbors?: Citation[];
-  status?: string;
-  error?: string;
+  role: "user" | "assistant"; content: string;
+  citations?: Citation[]; neighbors?: Citation[];
+  status?: string; error?: string;
 }
 interface ChatPanelProps { nodes: KNode[]; onClose: () => void; onFocusNode: (id: number) => void }
 
@@ -1033,8 +977,7 @@ function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
   async function ask() {
     const q = question.trim();
     if (!q || busy) return;
-    setQuestion("");
-    setBusy(true);
+    setQuestion(""); setBusy(true);
     const userMsg: ChatMessage = { role: "user", content: q };
     const assistantMsg: ChatMessage = { role: "assistant", content: "", status: "starting" };
     setMessages((m) => [...m, userMsg, assistantMsg]);
@@ -1091,7 +1034,7 @@ function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
       parts.push(
         <button key={`c-${key++}`} onClick={() => onFocusNode(id)}
           className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded bg-primary/10 text-primary text-[11px] font-medium hover:bg-primary/20 align-baseline"
-          title={`Vai all'elemento ${label}`}>{label}</button>,
+          title={`Vai all'elemento ${label}`}>{label}</button>
       );
       lastIndex = match.index + match[0].length;
     }
@@ -1135,8 +1078,7 @@ function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
               {suggestions.map((s) => (
                 <button key={s} onClick={() => setQuestion(s)}
                   className="w-full text-left px-3 py-2 rounded-lg border bg-background hover:border-primary/40 hover:bg-primary/5 text-xs transition-colors flex items-center gap-2">
-                  <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
-                  <span>{s}</span>
+                  <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" /><span>{s}</span>
                 </button>
               ))}
             </div>
@@ -1171,11 +1113,9 @@ function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
                   </div>
                 )}
                 <div className="bg-muted/40 border rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap">
-                  {m.error ? (
-                    <span className="text-destructive">{m.error}</span>
-                  ) : m.content ? (
-                    renderAnswer(m.content, m.citations)
-                  ) : m.status ? (
+                  {m.error ? <span className="text-destructive">{m.error}</span>
+                  : m.content ? renderAnswer(m.content, m.citations)
+                  : m.status ? (
                     <span className="text-muted-foreground italic flex items-center gap-2">
                       <Loader2 className="w-3 h-3 animate-spin" />
                       {m.status === "embedding" && "Analizzo il contenuto…"}
@@ -1192,15 +1132,10 @@ function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
       </div>
       <div className="border-t p-3">
         <div className="flex items-end gap-2">
-          <Textarea
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
+          <Textarea value={question} onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void ask(); } }}
-            placeholder="Chiedimi qualcosa sul tuo percorso…"
-            rows={2}
-            className="rounded-xl text-sm resize-none flex-1"
-            disabled={busy}
-          />
+            placeholder="Chiedimi qualcosa sul tuo percorso…" rows={2}
+            className="rounded-xl text-sm resize-none flex-1" disabled={busy} />
           <Button size="icon" className="rounded-xl h-9 w-9 shrink-0" disabled={busy || !question.trim()} onClick={() => void ask()}>
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </Button>
@@ -1211,7 +1146,7 @@ function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
   );
 }
 
-// ── Node editor side panel ───────────────────────────────────────────────────
+// ── Node editor ──────────────────────────────────────────────────────────────
 interface NodeEditorProps {
   node: KNode; edges: KEdge[]; allNodes: KNode[];
   onClose: () => void;
@@ -1229,6 +1164,9 @@ function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartL
   const [url, setUrl] = useState(node.url ?? "");
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  // ── Step 1: autosave state ────────────────────────────────────────────────
+  const [savedBadge, setSavedBadge] = useState(false);
+  const autoSaveTimer = useRef<number | null>(null);
 
   useEffect(() => {
     setTitle(node.title); setContent(node.content);
@@ -1237,16 +1175,33 @@ function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartL
 
   const dirty = title !== node.title || content !== node.content || type !== node.type || (url || "") !== (node.url || "");
 
-  async function save() {
+  async function save(silent = false) {
     if (!dirty) return;
     setSaving(true);
     await onSave({ title: title.trim() || "Senza titolo", content, type, url: url.trim() || null });
     setSaving(false);
+    if (silent) {
+      setSavedBadge(true);
+      setTimeout(() => setSavedBadge(false), 2000);
+    }
   }
 
-  // ── UX #5: esponi save tramite ref per Ctrl+S globale ────────────────────
+  // ── Step 1: debounce autosave a 1.5s ─────────────────────────────────────
   useEffect(() => {
-    onSaveRef.current = dirty ? save : null;
+    if (!dirty) return;
+    if (autoSaveTimer.current) window.clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = window.setTimeout(() => {
+      void save(true);
+    }, 1500);
+    return () => {
+      if (autoSaveTimer.current) window.clearTimeout(autoSaveTimer.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, content, type, url]);
+
+  // ── Ctrl+S globale ────────────────────────────────────────────────────────
+  useEffect(() => {
+    onSaveRef.current = dirty ? () => void save(false) : null;
     return () => { onSaveRef.current = null; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dirty, title, content, type, url]);
@@ -1264,6 +1219,12 @@ function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartL
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{meta.label}</p>
           <p className="text-sm font-semibold truncate">{node.title}</p>
         </div>
+        {/* ── Step 1: badge Salvato ✓ ────────────────────────────────────── */}
+        {savedBadge && (
+          <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-1 animate-in fade-in">
+            <Check className="w-3 h-3" /> Salvato
+          </span>
+        )}
         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onClose}>
           <X className="w-4 h-4" />
         </Button>
@@ -1277,15 +1238,13 @@ function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartL
           <label className="text-[11px] font-medium text-muted-foreground block mb-1">Tipo</label>
           <div className="flex flex-wrap gap-1.5">
             {ALL_TYPES.map((t) => {
-              const m = TYPE_META[t];
-              const TI = m.Icon;
+              const m = TYPE_META[t]; const TI = m.Icon;
               return (
                 <button key={t} onClick={() => setType(t)}
                   className={cn(
                     "flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-colors",
                     type === t ? "border-primary text-primary bg-primary/5" : "border-border text-muted-foreground hover:border-primary/40",
-                  )}>
-                  <TI className="w-3 h-3" />{m.label}
+                  )}><TI className="w-3 h-3" />{m.label}
                 </button>
               );
             })}
@@ -1299,14 +1258,10 @@ function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartL
         )}
         <div>
           <label className="text-[11px] font-medium text-muted-foreground block mb-1">Contenuto</label>
-          <Textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Appunti, descrizione, riferimenti…"
-            rows={6}
-            className="rounded-xl text-sm font-mono resize-y"
-          />
-          <p className="text-[10px] text-muted-foreground mt-1">Markdown supportato</p>
+          <Textarea value={content} onChange={(e) => setContent(e.target.value)}
+            placeholder="Appunti, descrizione, riferimenti…" rows={6}
+            className="rounded-xl text-sm font-mono resize-y" />
+          <p className="text-[10px] text-muted-foreground mt-1">Markdown supportato · autosalvataggio ogni 1.5s</p>
         </div>
         <div className="pt-2">
           <div className="flex items-center justify-between mb-1.5">
@@ -1348,7 +1303,7 @@ function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartL
             <Trash2 className="w-3.5 h-3.5 mr-1" /> Elimina
           </Button>
         )}
-        <Button size="sm" className="rounded-xl ml-auto" disabled={!dirty || saving} onClick={save}>
+        <Button size="sm" className="rounded-xl ml-auto" disabled={!dirty || saving} onClick={() => void save(false)}>
           {saving ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
           Salva
           {dirty && <span className="ml-1.5 text-[9px] opacity-60">⌘S</span>}
