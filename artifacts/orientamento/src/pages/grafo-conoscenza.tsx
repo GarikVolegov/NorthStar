@@ -90,12 +90,35 @@ export default function GrafoConoscenza() {
   }, []);
 
   const svgRef = useRef<SVGSVGElement>(null);
-  const dragState = useRef<{ id: number; offsetX: number; offsetY: number; moved: boolean } | null>(null);
+
+  /**
+   * dragState: tracks the active drag operation.
+   * We deliberately keep live x/y OUT of React state to avoid re-rendering
+   * the entire node list on every pointermove. Instead we mutate the SVG DOM
+   * directly via setAttribute inside a requestAnimationFrame loop.
+   */
+  const dragState = useRef<{
+    id: number;
+    offsetX: number;
+    offsetY: number;
+    moved: boolean;
+    x: number;      // live position during drag
+    y: number;
+    el: SVGGElement | null; // reference to the <g> being dragged
+  } | null>(null);
+
+  /** Pending rAF id — cancelled on pointerup to avoid stale frames. */
+  const rafId = useRef<number | null>(null);
+
+  /** Node positions waiting to be flushed to the server. */
   const pendingPositions = useRef<Map<number, { x: number; y: number }>>(new Map());
   const flushTimer = useRef<number | null>(null);
 
   // ── Pan / zoom ──────────────────────────────────────────────────────────
   const [view, setView] = useState({ x: 0, y: 0, k: 1 });
+  const viewRef = useRef(view);
+  useEffect(() => { viewRef.current = view; }, [view]);
+
   const panState = useRef<{ startX: number; startY: number; vx: number; vy: number } | null>(null);
 
   // ── Load graph on mount ─────────────────────────────────────────────────
@@ -168,10 +191,9 @@ export default function GrafoConoscenza() {
   async function handleAddNode(type: NodeType = creatingType) {
     if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
-    // Place new node near current viewport center, in graph coords
-    const cx = (rect.width / 2 - view.x) / view.k;
-    const cy = (rect.height / 2 - view.y) / view.k;
-    // small jitter
+    const v = viewRef.current;
+    const cx = (rect.width / 2 - v.x) / v.k;
+    const cy = (rect.height / 2 - v.y) / v.k;
     const x = cx + (Math.random() - 0.5) * 60;
     const y = cy + (Math.random() - 0.5) * 60;
     try {
@@ -235,10 +257,21 @@ export default function GrafoConoscenza() {
   }
 
   // ── Drag handling (graph nodes) ─────────────────────────────────────────
+  //
+  // Strategy: DOM-direct mutation during drag, single React state commit on up.
+  //
+  // Why: setData() on every pointermove rebuilds the full nodes array (O(n))
+  // and triggers a React diff + SVG repaint at 60fps — catastrophic for large
+  // graphs. Instead:
+  //   1. onPointerDown: capture the dragged <g> element + compute offset
+  //   2. onPointerMove: schedule RAF; inside RAF mutate ONLY the <g>.transform
+  //      and update edge endpoints via querySelectorAll — zero React overhead
+  //   3. onPointerUp: write the final coords to React state (1 render total)
+  //      and queue the server persist
+
   function onNodePointerDown(e: React.PointerEvent, n: KNode) {
     e.stopPropagation();
     if (linkMode) {
-      // Second click → create edge
       if (linkMode.sourceId === n.id) {
         setLinkMode(null);
         return;
@@ -249,46 +282,119 @@ export default function GrafoConoscenza() {
       return;
     }
     (e.target as Element).setPointerCapture?.(e.pointerId);
+
     const svgRect = svgRef.current!.getBoundingClientRect();
-    const px = (e.clientX - svgRect.left - view.x) / view.k;
-    const py = (e.clientY - svgRect.top - view.y) / view.k;
-    dragState.current = { id: n.id, offsetX: px - n.x, offsetY: py - n.y, moved: false };
+    const v = viewRef.current;
+    const px = (e.clientX - svgRect.left - v.x) / v.k;
+    const py = (e.clientY - svgRect.top - v.y) / v.k;
+
+    // Find the <g> element that owns this node
+    const gEl = (e.currentTarget as SVGGElement);
+
+    dragState.current = {
+      id: n.id,
+      offsetX: px - n.x,
+      offsetY: py - n.y,
+      moved: false,
+      x: n.x,
+      y: n.y,
+      el: gEl,
+    };
   }
 
   function onSvgPointerMove(e: React.PointerEvent) {
-    const drag = dragState.current;
     const pan = panState.current;
-    const svgRect = svgRef.current!.getBoundingClientRect();
+    const drag = dragState.current;
+
     if (drag) {
-      const px = (e.clientX - svgRect.left - view.x) / view.k;
-      const py = (e.clientY - svgRect.top - view.y) / view.k;
-      const newX = px - drag.offsetX;
-      const newY = py - drag.offsetY;
-      drag.moved = true;
-      setData((d) => ({
-        ...d,
-        nodes: d.nodes.map((n) => (n.id === drag.id ? { ...n, x: newX, y: newY } : n)),
-      }));
-      queuePosition(drag.id, newX, newY);
+      // Cancel any pending RAF — we'll schedule a fresh one
+      if (rafId.current !== null) {
+        cancelAnimationFrame(rafId.current);
+      }
+
+      // Capture clientX/Y before the async RAF callback
+      const cx = e.clientX;
+      const cy = e.clientY;
+
+      rafId.current = requestAnimationFrame(() => {
+        if (!drag || !svgRef.current) return;
+        const svgRect = svgRef.current.getBoundingClientRect();
+        const v = viewRef.current;
+        const newX = (cx - svgRect.left - v.x) / v.k - drag.offsetX;
+        const newY = (cy - svgRect.top - v.y) / v.k - drag.offsetY;
+
+        drag.moved = true;
+        drag.x = newX;
+        drag.y = newY;
+
+        // Mutate the dragged node's SVG <g> transform directly — no React render
+        if (drag.el) {
+          drag.el.setAttribute("transform", `translate(${newX},${newY})`);
+        }
+
+        // Update connected edge endpoints in the DOM directly.
+        // Edges are <line> elements with data-source / data-target attributes.
+        if (svgRef.current) {
+          svgRef.current
+            .querySelectorAll<SVGLineElement>(`line[data-source="${drag.id}"]`)
+            .forEach((line) => {
+              line.setAttribute("x1", String(newX));
+              line.setAttribute("y1", String(newY));
+            });
+          svgRef.current
+            .querySelectorAll<SVGLineElement>(`line[data-target="${drag.id}"]`)
+            .forEach((line) => {
+              line.setAttribute("x2", String(newX));
+              line.setAttribute("y2", String(newY));
+            });
+          // Update midpoint label positions for edges connected to this node
+          svgRef.current
+            .querySelectorAll<SVGTextElement>(`text[data-edge-mid-source="${drag.id}"],text[data-edge-mid-target="${drag.id}"]`)
+            .forEach((txt) => {
+              const otherX = parseFloat(txt.getAttribute("data-other-x") ?? "0");
+              const otherY = parseFloat(txt.getAttribute("data-other-y") ?? "0");
+              txt.setAttribute("x", String((newX + otherX) / 2));
+              txt.setAttribute("y", String((newY + otherY) / 2 - 4));
+            });
+        }
+      });
     } else if (pan) {
-      setView({ x: pan.vx + (e.clientX - pan.startX), y: pan.vy + (e.clientY - pan.startY), k: view.k });
+      setView({ x: pan.vx + (e.clientX - pan.startX), y: pan.vy + (e.clientY - pan.startY), k: viewRef.current.k });
     }
   }
 
   function onNodePointerUp(e: React.PointerEvent, n: KNode) {
     const drag = dragState.current;
     dragState.current = null;
+
+    // Cancel any pending rAF
+    if (rafId.current !== null) {
+      cancelAnimationFrame(rafId.current);
+      rafId.current = null;
+    }
+
     if (!drag) return;
+
     if (!drag.moved) {
-      // simple click → select
+      // Plain click (no movement) → select the node
       setSelectedId(n.id);
+    } else {
+      // Drag ended — commit final position to React state (single render)
+      // and queue the server persist.
+      const finalX = drag.x;
+      const finalY = drag.y;
+      setData((d) => ({
+        ...d,
+        nodes: d.nodes.map((nd) => (nd.id === drag.id ? { ...nd, x: finalX, y: finalY } : nd)),
+      }));
+      queuePosition(drag.id, finalX, finalY);
     }
     e.stopPropagation();
   }
 
   function onSvgPointerDown(e: React.PointerEvent) {
     if (e.target !== e.currentTarget) return;
-    panState.current = { startX: e.clientX, startY: e.clientY, vx: view.x, vy: view.y };
+    panState.current = { startX: e.clientX, startY: e.clientY, vx: viewRef.current.x, vy: viewRef.current.y };
     setSelectedId(null);
     setLinkMode(null);
   }
@@ -300,12 +406,13 @@ export default function GrafoConoscenza() {
   function onWheel(e: React.WheelEvent) {
     e.preventDefault();
     const delta = -e.deltaY * 0.001;
-    const newK = Math.max(0.3, Math.min(2.5, view.k * (1 + delta)));
+    const v = viewRef.current;
+    const newK = Math.max(0.3, Math.min(2.5, v.k * (1 + delta)));
     const svgRect = svgRef.current!.getBoundingClientRect();
     const mx = e.clientX - svgRect.left;
     const my = e.clientY - svgRect.top;
-    const ratio = newK / view.k;
-    setView({ x: mx - (mx - view.x) * ratio, y: my - (my - view.y) * ratio, k: newK });
+    const ratio = newK / v.k;
+    setView({ x: mx - (mx - v.x) * ratio, y: my - (my - v.y) * ratio, k: newK });
   }
 
   // ── Auto-layout when nodes have no positions yet ────────────────────────
@@ -313,7 +420,6 @@ export default function GrafoConoscenza() {
     const zeros = data.nodes.filter((n) => n.x === 0 && n.y === 0);
     if (zeros.length === 0) return;
     if (zeros.length === data.nodes.length && data.nodes.length > 0) {
-      // all unpositioned → place on a circle
       const r = 200 + Math.min(220, data.nodes.length * 14);
       const next = data.nodes.map((n, i) => {
         const angle = (i * 2 * Math.PI) / data.nodes.length;
@@ -336,7 +442,7 @@ export default function GrafoConoscenza() {
   if (!user) {
     return (
       <div className="container mx-auto px-4 py-24 max-w-lg text-center">
-        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6 text-3xl">🕸️</div>
+        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6 text-3xl">🖧️</div>
         <h2 className="text-2xl font-serif font-bold mb-3">Accesso richiesto</h2>
         <p className="text-muted-foreground mb-8">
           Registrati per costruire il tuo grafo personale di note, competenze e documenti.
@@ -426,7 +532,7 @@ export default function GrafoConoscenza() {
           <div className="bg-card rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-semibold mb-2">Etichetta collegamento</h3>
             <p className="text-xs text-muted-foreground mb-3">
-              {data.nodes.find((n) => n.id === pendingEdge.sourceId)?.title} →{" "}
+              {data.nodes.find((n) => n.id === pendingEdge.sourceId)?.title} {"→"}{" "}
               {data.nodes.find((n) => n.id === pendingEdge.targetId)?.title}
             </p>
             <Input
@@ -467,7 +573,7 @@ export default function GrafoConoscenza() {
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-900 px-4 py-3 text-sm flex items-start gap-3 mb-2">
               <span className="text-lg leading-none shrink-0">🖥️</span>
-              <p>Per l'esperienza completa con drag & drop, apri da desktop.</p>
+              <p>Per l’esperienza completa con drag & drop, apri da desktop.</p>
             </div>
             {data.nodes.length === 0 ? (
               <div className="flex flex-col items-center justify-center text-center py-16 gap-4 px-6">
@@ -550,7 +656,7 @@ export default function GrafoConoscenza() {
               </marker>
             </defs>
             <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}>
-              {/* edges */}
+              {/* Edges — data-source/data-target attrs enable direct DOM update during drag */}
               {visibleEdges.map((edge) => {
                 const a = data.nodes.find((n) => n.id === edge.sourceId);
                 const b = data.nodes.find((n) => n.id === edge.targetId);
@@ -569,6 +675,8 @@ export default function GrafoConoscenza() {
                       stroke="#94a3b8"
                       strokeWidth={1.4}
                       markerEnd="url(#arrow)"
+                      data-source={edge.sourceId}
+                      data-target={edge.targetId}
                     />
                     {edge.label && (
                       <text
@@ -578,6 +686,10 @@ export default function GrafoConoscenza() {
                         fontSize={10}
                         fill="#64748b"
                         style={{ pointerEvents: "none" }}
+                        data-edge-mid-source={edge.sourceId}
+                        data-edge-mid-target={edge.targetId}
+                        data-other-x={b.x}
+                        data-other-y={b.y}
                       >
                         {edge.label}
                       </text>
@@ -586,7 +698,7 @@ export default function GrafoConoscenza() {
                 );
               })}
 
-              {/* nodes */}
+              {/* Nodes */}
               {filteredNodes.map((n) => {
                 const meta = TYPE_META[n.type] ?? TYPE_META.note;
                 const r = Math.max(28, Math.min(54, 24 + n.title.length * 0.6));
@@ -692,7 +804,7 @@ export default function GrafoConoscenza() {
   );
 }
 
-// ─── RAG chat panel ─────────────────────────────────────────────────────────
+// ─── RAG chat panel ────────────────────────────────────────────
 
 interface Citation {
   id: number;
@@ -809,7 +921,6 @@ function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
   }
 
   function renderAnswer(content: string, citations?: Citation[]) {
-    // Replace [#NN] tokens with clickable badges
     const parts: React.ReactNode[] = [];
     const regex = /\[#(\d+)\]/g;
     let lastIndex = 0;
@@ -869,7 +980,7 @@ function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
             </div>
             <p className="text-sm font-semibold mb-1">Interroga il tuo grafo</p>
             <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
-              L'AI cerca i nodi più rilevanti, considera i loro collegamenti e risponde solo
+              L’AI cerca i nodi più rilevanti, considera i loro collegamenti e risponde solo
               in base ai tuoi appunti. {nodes.length} nodi disponibili.
             </p>
             <div className="space-y-1.5 text-left">
@@ -978,7 +1089,7 @@ function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
   );
 }
 
-// ── Side panel ──────────────────────────────────────────────────────────────
+// ── Side panel ────────────────────────────────────────────────────────────────────
 
 interface NodeEditorProps {
   node: KNode;
