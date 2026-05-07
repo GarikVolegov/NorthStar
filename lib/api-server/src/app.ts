@@ -19,37 +19,40 @@ import express from "express";
 import cors from "cors";
 import { json } from "express";
 
-// ── Middleware ─────────────────────────────────────────────────────────────────
-import { jwtMiddleware } from "./middleware/jwt";
+// ── Middleware ───────────────────────────────────────────────────────────────────────────
+ import { jwtMiddleware } from "./middleware/jwt";
 
-// ── Cron jobs (side-effect import — registers schedules on startup) ─────────────
-import "./jobs/cron";  // ← NEW: weekly digest scheduler
+// ── Cron jobs (side-effect import — registers schedules on startup) ─────────────────
+ import "./jobs/cron";
 
-// ── Growth Agent routes ────────────────────────────────────────────────────────
-import ingestRouter        from "./routes/growth-agent/ingest";
+// ── Growth Agent routes ──────────────────────────────────────────────────────────
+ import ingestRouter        from "./routes/growth-agent/ingest";
 import chatRouter          from "./routes/growth-agent/chat";
 import knowledgeRouter     from "./routes/growth-agent/knowledge";
 import memoryRouter        from "./routes/growth-agent/memory";
 import analyticsRouter     from "./routes/growth-agent/analytics";
-import notificationsRouter from "./routes/growth-agent/notifications";  // ← NEW
+import notificationsRouter from "./routes/growth-agent/notifications";
+
+// ── Admin routes ───────────────────────────────────────────────────────────────────
+ import analyzeSupervisorRouter from "./routes/admin/analyze-supervisor";
 
 export function createApp() {
   const app = express();
 
-  // ── Global middleware ────────────────────────────────────────────────────────
+  // ── Global middleware ─────────────────────────────────────────────────────────
   app.use(cors({
     origin: process.env.FRONTEND_URL ?? "http://localhost:5173",
     credentials: true,
   }));
   app.use(json({ limit: "20mb" }));
 
-  // ── Health check (no auth) ───────────────────────────────────────────────────
+  // ── Health check (no auth) ─────────────────────────────────────────────────────
   app.get("/health", (_req, res) => res.json({ ok: true }));
 
-  // ── Protected routes (JWT required for everything below) ─────────────────────
+  // ── Protected routes (JWT required for everything below) ───────────────────────
   app.use("/api", jwtMiddleware);
 
-  // ── Growth Agent ─────────────────────────────────────────────────────────────
+  // ── Growth Agent ───────────────────────────────────────────────────────────��─
   //
   //   POST   /api/growth-agent/ingest
   //   POST   /api/growth-agent/chat
@@ -65,12 +68,18 @@ export function createApp() {
   app.use("/api/growth-agent/knowledge",      knowledgeRouter);
   app.use("/api/growth-agent/memory",         memoryRouter);
   app.use("/api/growth-agent/analytics",      analyticsRouter);
-  app.use("/api/growth-agent/notifications",  notificationsRouter);  // ← NEW
+  app.use("/api/growth-agent/notifications",  notificationsRouter);
 
-  // ── 404 catch-all ─────────────────────────────────────────────────────────────
+  // ── Admin ──────────────────────────────────────────────────────────────────────────
+  //
+  //   POST /api/admin/analyze-supervisor   ← Fase 6 self-improvement
+  //
+  app.use("/api/admin/analyze-supervisor", analyzeSupervisorRouter);
+
+  // ── 404 catch-all ─────────────────────────────────────────────────────────────────
   app.use((_req, res) => res.status(404).json({ error: "Not found" }));
 
-  // ── Error handler ─────────────────────────────────────────────────────────────
+  // ── Error handler ─────────────────────────────────────────────────────────────────
   app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     console.error("[api] unhandled error:", err);
     res.status(500).json({ error: err.message ?? "Internal server error" });
