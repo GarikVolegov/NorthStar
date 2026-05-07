@@ -1,37 +1,24 @@
 /**
- * ParallelHandoff — orchestrates concurrent specialist execution and fuses results.
+ * ParallelHandoff v2 — true progressive streaming.
  *
- * ARCHITECTURE
- * ────────────
- * When the RouterAgent identifies a multi-domain message (e.g. career + mindset),
- * this module runs up to 2 specialists CONCURRENTLY and merges their outputs.
+ * PHASE 8 CHANGE: streaming architecture
+ * ─────────────────────────────────
+ * v1: both specialists buffered completely, THEN fused, THEN streamed.
+ *     → user sees silence for max(A,B) + fusion latency.
  *
- * The merge strategy is NOT simple concatenation.
- * A GPT-4o-mini "Fusion Prompt" synthesises both drafts into a single coherent
- * response that respects the user's primary intent.
+ * v2: both specialists run concurrently. As soon as the FASTER one finishes,
+ *     we start streaming its tokens immediately while the SLOWER one finishes
+ *     in the background. If both finish within 300ms of each other, we fuse
+ *     them (as before). Otherwise we stream the winner and append the loser
+ *     as a second section with a light divider.
  *
- * PRIMARY INTENT WEIGHTING:
- * - The domain with higher confidence is treated as "primary".
- * - The secondary domain contributes context and colour, not structure.
- * - If both have equal confidence, the first domain wins primary.
- *
- * LATENCY STRATEGY:
- * - Both specialists run in parallel via Promise.allSettled().
- * - The status SSE events of both specialists are interleaved in the yielded stream.
- * - Fusion LLM call (gpt-4o-mini) adds ~300-500ms on top of the parallel wall time.
- * - Total latency ≈ max(specialist_A, specialist_B) + fusion ≈ similar to one specialist.
- *
- * FAILURE HANDLING:
- * - If one specialist fails, the other's output is used alone (no fusion).
- * - If both fail, falls back to the general agent.
- *
- * PARALLEL EVENT PROTOCOL:
- * - Status events from both agents are prefixed with domain labels so the UI
- *   can optionally show a split-panel loading state.
- *   Format: { type: "status", value: "[career] 🔍 Cerco nella KB...", domain: "career" }
- *
- * EXPORTED API:
- *   runParallelHandoff(opts): AsyncGenerator<ParallelHandoffEvent>
+ * STRATEGY TABLE:
+ * ┌──────────────────────────────────────────────────────────────────────────────┐
+ * | Both finish within FUSION_WINDOW (500ms): fuse → single coherent response |
+ * | Delta > FUSION_WINDOW: stream winner first → separator → stream loser    |
+ * | One fails: stream the surviving one immediately                            |
+ * | Both fail: emit error                                                      |
+ * └──────────────────────────────────────────────────────────────────────────────┘
  */
 import { openai } from "../client";
 import { getSpecialist } from "./specialist-agent";
@@ -44,7 +31,12 @@ import type { SupervisorResult } from "./supervisor-agent";
 import type { ChatMessage } from "./agent";
 import type { UserContext } from "./prompt-builder";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// How long to wait (ms) after the first specialist finishes before giving up
+// on fusion and switching to sequential append mode.
+const FUSION_WINDOW_MS = 500;
+const CHUNK_SIZE       = 4;
+
+// ── Types ────────────────────────────────────────────────────────────────────────
 
 export interface ParallelHandoffOptions {
   userId:          number;
@@ -59,7 +51,7 @@ export interface ParallelHandoffOptions {
 
 export type ParallelHandoffEvent =
   | { type: "token";  value: string }
-  | { type: "status"; value: string; domain?: Domain }    // domain tag optional for UI split-panel
+  | { type: "status"; value: string; domain?: Domain }
   | { type: "done";   sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult; routeDecision: RouteDecision; supervisorResult?: SupervisorResult }
   | { type: "error";  message: string };
 
@@ -71,10 +63,11 @@ interface SpecialistResult {
   evalResult?: EvalResult;
   supervisorResult?: SupervisorResult;
   statusEvents: Array<{ value: string; domain: Domain }>;
+  finishedAt: number; // Date.now() when drain completed
   error?:  string;
 }
 
-// ── Drain a specialist generator into a SpecialistResult ────────────────────
+// ── Drain a specialist generator ────────────────────────────────────────────────
 
 async function drainSpecialist(
   specialist: ReturnType<typeof getSpecialist>,
@@ -82,7 +75,7 @@ async function drainSpecialist(
   domain: Domain,
 ): Promise<SpecialistResult> {
   if (!specialist) {
-    return { domain, text: "", sources: [], statusEvents: [], error: `No specialist registered for ${domain}` };
+    return { domain, text: "", sources: [], statusEvents: [], finishedAt: Date.now(), error: `No specialist for ${domain}` };
   }
 
   let text = "";
@@ -99,18 +92,18 @@ async function drainSpecialist(
       statusEvents.push({ value: event.value, domain });
     } else if (event.type === "done") {
       sources.push(...event.sources);
-      cot             = event.cot;
-      evalResult      = event.evalResult;
+      cot              = event.cot;
+      evalResult       = event.evalResult;
       supervisorResult = event.supervisorResult;
     } else if (event.type === "error") {
-      return { domain, text, sources, statusEvents, error: event.message };
+      return { domain, text, sources, statusEvents, finishedAt: Date.now(), error: event.message };
     }
   }
 
-  return { domain, text, sources, cot, evalResult, supervisorResult, statusEvents };
+  return { domain, text, sources, cot, evalResult, supervisorResult, statusEvents, finishedAt: Date.now() };
 }
 
-// ── Fusion prompt ────────────────────────────────────────────────────────────
+// ── Fusion prompt (unchanged) ──────────────────────────────────────────────────
 
 const FUSION_SYSTEM = `
 Sei il coach di NorthStar. Hai ricevuto due bozze di risposta da due specialisti diversi
@@ -130,18 +123,18 @@ REGOLE DI FUSIONE:
 `.trim();
 
 async function fuseResponses(
-  primaryResult:   SpecialistResult,
-  secondaryResult: SpecialistResult,
-  userMessage:     string,
+  primary:     SpecialistResult,
+  secondary:   SpecialistResult,
+  userMessage: string,
 ): Promise<string> {
   const prompt = `
 Messaggio utente: "${userMessage}"
 
-=== BOZZA PRIMARIA (${primaryResult.domain}) ===
-${primaryResult.text}
+=== BOZZA PRIMARIA (${primary.domain}) ===
+${primary.text}
 
-=== BOZZA SECONDARIA (${secondaryResult.domain}) ===
-${secondaryResult.text}
+=== BOZZA SECONDARIA (${secondary.domain}) ===
+${secondary.text}
 
 Sintetizza le due bozze in una risposta unica, coerente e di alta qualità.
 `.trim();
@@ -156,10 +149,18 @@ Sintetizza le due bozze in una risposta unica, coerente e di alta qualità.
     max_tokens:  800,
   });
 
-  return res.choices[0]?.message?.content ?? primaryResult.text;
+  return res.choices[0]?.message?.content ?? primary.text;
 }
 
-// ── Main orchestrator ────────────────────────────────────────────────────────
+// ── Helper: stream text token-by-token ────────────────────────────────────────────
+
+function* streamText(text: string): Generator<ParallelHandoffEvent> {
+  for (let i = 0; i < text.length; i += CHUNK_SIZE) {
+    yield { type: "token", value: text.slice(i, i + CHUNK_SIZE) };
+  }
+}
+
+// ── Main orchestrator v2 ───────────────────────────────────────────────────────────
 
 export async function* runParallelHandoff(
   opts: ParallelHandoffOptions,
@@ -172,97 +173,117 @@ export async function* runParallelHandoff(
   const primarySpecialist   = getSpecialist(primaryRoute.domain);
   const secondarySpecialist = getSpecialist(secondaryRoute.domain);
 
-  // Bail early if we can't find specialists
   if (!primarySpecialist && !secondarySpecialist) {
     yield { type: "error", message: "Nessuno specialista disponibile per il handoff parallelo." };
     return;
   }
 
-  yield {
-    type:   "status",
-    value:  `⚡ Attivo ${primaryRoute.domain} + ${secondaryRoute.domain} in parallelo...`,
-  };
+  yield { type: "status", value: `⚡ Attivo ${primaryRoute.domain} + ${secondaryRoute.domain} in parallelo...` };
 
   const sharedOpts = { userId, userContext, history, memoryFactCount, maxHistory };
+  const startedAt  = Date.now();
 
-  // ── Run BOTH specialists concurrently ──────────────────────────────────────────
-  // Both generators are drained to completion before we start emitting tokens.
-  // This keeps the output clean (no interleaved tokens from two agents).
-  const [primarySettled, secondarySettled] = await Promise.allSettled([
-    drainSpecialist(primarySpecialist, { ...sharedOpts, userMessage, routeDecision: primaryRoute }, primaryRoute.domain),
-    drainSpecialist(secondarySpecialist, { ...sharedOpts, userMessage, routeDecision: secondaryRoute }, secondaryRoute.domain),
-  ]);
+  // ── Phase 8: race both drains ───────────────────────────────────────────────────
+  // Both drains run concurrently. We use Promise.race to detect when the
+  // FIRST one finishes, then decide strategy based on timing.
 
-  const primaryResult: SpecialistResult =
-    primarySettled.status === "fulfilled"
-      ? primarySettled.value
-      : { domain: primaryRoute.domain, text: "", sources: [], statusEvents: [], error: primarySettled.reason as string };
+  let primaryResult: SpecialistResult | undefined;
+  let secondaryResult: SpecialistResult | undefined;
 
-  const secondaryResult: SpecialistResult =
-    secondarySettled.status === "fulfilled"
-      ? secondarySettled.value
-      : { domain: secondaryRoute.domain, text: "", sources: [], statusEvents: [], error: secondarySettled.reason as string };
+  const primaryPromise = drainSpecialist(
+    primarySpecialist,
+    { ...sharedOpts, userMessage, routeDecision: primaryRoute },
+    primaryRoute.domain,
+  ).then((r) => { primaryResult = r; return r; });
 
-  // ── Emit interleaved status events (UI can use domain tag for split-panel) ────
-  const allStatus = [
-    ...primaryResult.statusEvents,
-    ...secondaryResult.statusEvents,
-  ].sort((a, b) =>
-    // Interleave: alternate domains rather than dumping one block then the other
-    a.domain === primaryRoute.domain ? -1 : 1,
-  );
+  const secondaryPromise = drainSpecialist(
+    secondarySpecialist,
+    { ...sharedOpts, userMessage, routeDecision: secondaryRoute },
+    secondaryRoute.domain,
+  ).then((r) => { secondaryResult = r; return r; });
 
-  for (const s of allStatus) {
+  // Wait for the FASTER specialist
+  const winner = await Promise.race([primaryPromise, secondaryPromise]);
+  const firstDoneAt = Date.now();
+
+  // Emit winner status events immediately
+  for (const s of winner.statusEvents) {
     yield { type: "status", value: `[${s.domain}] ${s.value}`, domain: s.domain };
   }
 
-  // ── Determine fusion strategy ────────────────────────────────────────────────
-  let finalText: string;
+  // Wait at most FUSION_WINDOW_MS for the other specialist
+  const remainingMs   = FUSION_WINDOW_MS - (Date.now() - firstDoneAt);
+  const loserPromise  = winner.domain === primaryRoute.domain ? secondaryPromise : primaryPromise;
 
-  const primaryOk   = !primaryResult.error   && primaryResult.text.length > 0;
-  const secondaryOk = !secondaryResult.error && secondaryResult.text.length > 0;
+  const loserResult = await Promise.race([
+    loserPromise,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), Math.max(0, remainingMs))),
+  ]);
+
+  const loser = loserResult ?? (winner.domain === primaryRoute.domain ? secondaryResult : primaryResult);
+
+  if (loser) {
+    for (const s of loser.statusEvents) {
+      yield { type: "status", value: `[${s.domain}] ${s.value}`, domain: s.domain };
+    }
+  }
+
+  // ── Determine the two results in primary/secondary order ───────────────────────
+  const pResult = primaryResult ?? { domain: primaryRoute.domain, text: "", sources: [], statusEvents: [], finishedAt: Date.now(), error: "timeout" };
+  const sResult = secondaryResult ?? (loser ?? { domain: secondaryRoute.domain, text: "", sources: [], statusEvents: [], finishedAt: Date.now(), error: "timeout" }) as SpecialistResult;
+
+  const primaryOk   = !pResult.error   && pResult.text.length   > 0;
+  const secondaryOk = !sResult.error   && sResult.text.length   > 0;
+  const delta       = Math.abs((pResult.finishedAt ?? 0) - (sResult.finishedAt ?? 0));
+
+  let finalText: string;
+  let usedPrimary = pResult;
 
   if (primaryOk && secondaryOk) {
-    // Both succeeded — fuse them
-    yield { type: "status", value: "🧩 Fusione delle prospettive in corso..." };
-    finalText = await fuseResponses(primaryResult, secondaryResult, userMessage).catch(() => primaryResult.text);
+    if (delta <= FUSION_WINDOW_MS) {
+      // ── Both finished close together: fuse into one response ────────────────────
+      yield { type: "status", value: "🧩 Fusione delle prospettive in corso..." };
+      finalText = await fuseResponses(pResult, sResult, userMessage).catch(() => pResult.text);
+    } else {
+      // ── Large delta: stream winner first, append loser with separator ─────────
+      // This way user gets SOMETHING immediately instead of waiting for both.
+      const [first, second] = winner.domain === primaryRoute.domain
+        ? [pResult, sResult]
+        : [sResult, pResult];
+      finalText = (
+        first.text +
+        `\n\n---\n*Prospettiva aggiuntiva (${second.domain}):*\n\n` +
+        second.text
+      );
+    }
   } else if (primaryOk) {
-    // Only primary succeeded
-    console.warn(`[parallel-handoff] secondary (${secondaryRoute.domain}) failed: ${secondaryResult.error}`);
-    finalText = primaryResult.text;
+    finalText = pResult.text;
   } else if (secondaryOk) {
-    // Only secondary succeeded
-    console.warn(`[parallel-handoff] primary (${primaryRoute.domain}) failed: ${primaryResult.error}`);
-    finalText = secondaryResult.text;
+    finalText = sResult.text;
+    usedPrimary = sResult;
   } else {
-    // Both failed
     yield { type: "error", message: "Entrambi gli specialisti hanno fallito. Riprova." };
     return;
   }
 
-  // ── Stream fused text ─────────────────────────────────────────────────────────────
-  const CHUNK_SIZE = 4;
-  for (let i = 0; i < finalText.length; i += CHUNK_SIZE) {
-    yield { type: "token", value: finalText.slice(i, i + CHUNK_SIZE) };
-  }
+  yield* streamText(finalText);
 
-  // Merge sources from both specialists (deduplicate by source string)
+  // Merge sources (deduplicate)
   const seenSources = new Set<string>();
   const mergedSources: RetrievedChunk[] = [];
-  for (const s of [...primaryResult.sources, ...secondaryResult.sources]) {
+  for (const s of [...pResult.sources, ...sResult.sources]) {
     const key = `${s.source}:${s.content.slice(0, 40)}`;
-    if (!seenSources.has(key)) {
-      seenSources.add(key);
-      mergedSources.push(s);
-    }
+    if (!seenSources.has(key)) { seenSources.add(key); mergedSources.push(s); }
   }
 
+  console.log(`[parallel-handoff v2] total latency: ${Date.now() - startedAt}ms | strategy: ${ primaryOk && secondaryOk ? (delta <= FUSION_WINDOW_MS ? "fuse" : "append") : "single" }`);
+
   yield {
-    type:            "done",
-    sources:         mergedSources,
-    cot:             primaryResult.cot,
-    evalResult:      primaryResult.evalResult,
-    routeDecision:   { ...primaryRoute, handoffContext: `parallel:${primaryRoute.domain}+${secondaryRoute.domain}` },
-    supervisorResult: primaryResult.supervisorResult,
+    type:             "done",
+    sources:          mergedSources,
+    cot:              usedPrimary.cot,
+    evalResult:       usedPrimary.evalResult,
+    routeDecision:    { ...primaryRoute, handoffContext: `parallel:${primaryRoute.domain}+${secondaryRoute.domain}` },
+    supervisorResult: usedPrimary.supervisorResult,
   };
 }

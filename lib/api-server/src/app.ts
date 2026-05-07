@@ -3,17 +3,6 @@
  *
  * All routes are mounted here. Growth-agent routes sit behind JWT auth
  * middleware so every handler can safely read req.user.id.
- *
- * Usage (in your server entrypoint / index.ts):
- *
- *   import { assertEnv } from "./startup-env-check";
- *   import { createApp } from "./app";
- *
- *   assertEnv();
- *   const app = createApp();
- *   app.listen(Number(process.env.PORT ?? 3000), () =>
- *     console.log("[api] listening on", process.env.PORT ?? 3000)
- *   );
  */
 import express from "express";
 import cors from "cors";
@@ -22,7 +11,7 @@ import { json } from "express";
 // ── Middleware ───────────────────────────────────────────────────────────────────────────
 import { jwtMiddleware } from "./middleware/jwt";
 
-// ── Cron jobs (side-effect import — registers schedules on startup) ─────────────────
+// ── Cron jobs (side-effect import) ─────────────────────────────────────────────────────
 import "./jobs/cron";
 
 // ── Growth Agent routes ──────────────────────────────────────────────────────────
@@ -32,29 +21,26 @@ import knowledgeRouter     from "./routes/growth-agent/knowledge";
 import memoryRouter        from "./routes/growth-agent/memory";
 import analyticsRouter     from "./routes/growth-agent/analytics";
 import notificationsRouter from "./routes/growth-agent/notifications";
-import feedbackRouter      from "./routes/growth-agent/feedback";  // ← Phase 7
+import feedbackRouter      from "./routes/growth-agent/feedback";      // Phase 7
 
 // ── Admin routes ───────────────────────────────────────────────────────────────────
-import analyzeSupervisorRouter from "./routes/admin/analyze-supervisor";
+import analyzeSupervisorRouter from "./routes/admin/analyze-supervisor"; // Phase 6
+import agentHealthRouter       from "./routes/admin/agent-health";        // Phase 11
 
 export function createApp() {
   const app = express();
 
-  // ── Global middleware ─────────────────────────────────────────────────────────
   app.use(cors({
     origin: process.env.FRONTEND_URL ?? "http://localhost:5173",
     credentials: true,
   }));
   app.use(json({ limit: "20mb" }));
 
-  // ── Health check (no auth) ─────────────────────────────────────────────────────
   app.get("/health", (_req, res) => res.json({ ok: true }));
 
-  // ── Protected routes (JWT required for everything below) ───────────────────────
   app.use("/api", jwtMiddleware);
 
-  // ── Growth Agent ───────────────────────────────────────────────────────────
-  //
+  // Growth Agent
   //   POST   /api/growth-agent/ingest
   //   POST   /api/growth-agent/chat
   //   GET    /api/growth-agent/knowledge
@@ -63,26 +49,22 @@ export function createApp() {
   //   GET    /api/growth-agent/analytics
   //   GET    /api/growth-agent/notifications
   //   POST   /api/growth-agent/notifications/:id/read
-  //   POST   /api/growth-agent/feedback        ← Phase 7
-  //
+  //   POST   /api/growth-agent/feedback           (Phase 7)
   app.use("/api/growth-agent/ingest",         ingestRouter);
   app.use("/api/growth-agent/chat",           chatRouter);
   app.use("/api/growth-agent/knowledge",      knowledgeRouter);
   app.use("/api/growth-agent/memory",         memoryRouter);
   app.use("/api/growth-agent/analytics",      analyticsRouter);
   app.use("/api/growth-agent/notifications",  notificationsRouter);
-  app.use("/api/growth-agent/feedback",       feedbackRouter);   // ← Phase 7
+  app.use("/api/growth-agent/feedback",       feedbackRouter);
 
-  // ── Admin ──────────────────────────────────────────────────────────────────────────
-  //
-  //   POST /api/admin/analyze-supervisor   ← Phase 6 self-improvement
-  //
-  app.use("/api/admin/analyze-supervisor", analyzeSupervisorRouter);
+  // Admin
+  //   POST /api/admin/analyze-supervisor      (Phase 6)
+  //   GET  /api/admin/agent-health            (Phase 11)
+  app.use("/api/admin/analyze-supervisor",    analyzeSupervisorRouter);
+  app.use("/api/admin/agent-health",          agentHealthRouter);
 
-  // ── 404 catch-all ─────────────────────────────────────────────────────────────────
   app.use((_req, res) => res.status(404).json({ error: "Not found" }));
-
-  // ── Error handler ─────────────────────────────────────────────────────────────────
   app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     console.error("[api] unhandled error:", err);
     res.status(500).json({ error: err.message ?? "Internal server error" });

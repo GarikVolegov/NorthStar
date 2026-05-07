@@ -27,3 +27,5 @@ export * from "./friendships";
 export * from "./coachMemory";
 // Phase 7 — User feedback loop
 export * from "./responseFeedback";
+// Phase 10 — Session context window
+export * from "./sessionSummaries";
