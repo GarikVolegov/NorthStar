@@ -1,56 +1,64 @@
 /**
- * Cron jobs — all scheduled background tasks for the API server.
+ * Cron jobs del server.
  *
- * SCHEDULE OVERVIEW:
+ * SCHEDULE:
+ *   Collector  → ogni 6 ore  (0 * /6 * * *)
+ *   Enricher   → ogni 2 ore  (0 * /2 * * *)  — subito dopo il collector
+ *   Personalizer → ogni 3 ore
  *
- *   Every 6 hours  — runCollector()   → collect news/opp/formation from all sources
- *   Every 30 min   — runEnricher()    → enrich unenriched discovery items with GPT-4o-mini
- *   Every Sunday   — analyzeSupervisorPatterns() → Phase 6 self-improvement
+ * L'enricher gira sfasato di 10 minuti rispetto al collector:
+ *   Collector:    00:00, 06:00, 12:00, 18:00
+ *   Enricher:     00:10, 02:10, 04:10 … (ogni 2h)
  *
- * WHY NODE-CRON:
- *   Lightweight, no external dependencies. Works on single-process deployments
- *   (Replit, Railway, Render). For multi-instance, migrate to BullMQ or pg-boss.
- *
- * NOTE: This file is imported as a SIDE EFFECT in app.ts:
- *   import "./jobs/cron";
- *   All schedules register on first import.
+ * In questo modo quando il collector ha appena depositato nuovi item,
+ * l'enricher successivo li trova già pronti.
  */
 import cron from "node-cron";
-import { runCollector }  from "@workspace/integrations-openai-ai-server/discovery-agent/collector-agent";
-import { runEnricher }   from "@workspace/integrations-openai-ai-server/discovery-agent/enricher-agent";
-import { analyzeSupervisorPatterns } from "@workspace/integrations-openai-ai-server/growth-agent/supervisor-pattern-analyzer";
+import { runCollector }   from "@workspace/integrations-openai-ai-server";
+import { runEnricher }    from "@workspace/integrations-openai-ai-server";
+import { runPersonalizer } from "@workspace/integrations-openai-ai-server";
 
-// ── Discovery: collect every 6 hours (at 00, 06, 12, 18) ────────────────────
+// ── Collector: ogni 6 ore ─────────────────────────────────────────────────────
 cron.schedule("0 */6 * * *", async () => {
-  console.log("[cron] discovery collector started");
+  console.log("[cron] collector start");
   try {
     const result = await runCollector();
-    console.log("[cron] discovery collector done:", result);
+    console.log(`[cron] collector done — inserted ${result.totalInserted}`);
+
+    // Dopo ogni collect, lancia subito l'enricher sui nuovi item
+    // (piccolo delay per non sovraccaricare il DB)
+    setTimeout(async () => {
+      console.log("[cron] enricher post-collect start");
+      try {
+        const er = await runEnricher(30, 5);
+        console.log(`[cron] enricher post-collect done — enriched ${er.enriched}`);
+      } catch (err) {
+        console.error("[cron] enricher post-collect error:", err);
+      }
+    }, 60_000); // 1 minuto dopo il collect
   } catch (err) {
-    console.error("[cron] discovery collector failed:", err);
+    console.error("[cron] collector error:", err);
   }
 });
 
-// ── Discovery: enrich every 30 minutes ──────────────────────────────────────
-cron.schedule("*/30 * * * *", async () => {
-  console.log("[cron] discovery enricher started");
+// ── Enricher: ogni 2 ore (al minuto 10) ──────────────────────────────────────
+cron.schedule("10 */2 * * *", async () => {
+  console.log("[cron] enricher scheduled start");
   try {
-    const result = await runEnricher(20);
-    console.log("[cron] discovery enricher done:", result);
+    const result = await runEnricher(20, 5);
+    console.log(`[cron] enricher done — enriched ${result.enriched}, filtered ${result.filtered}`);
   } catch (err) {
-    console.error("[cron] discovery enricher failed:", err);
+    console.error("[cron] enricher error:", err);
   }
 });
 
-// ── Phase 6: supervisor pattern analysis — every Sunday at 02:00 ────────────
-cron.schedule("0 2 * * 0", async () => {
-  console.log("[cron] supervisor pattern analysis started");
+// ── Personalizer: ogni 3 ore ──────────────────────────────────────────────────
+cron.schedule("0 */3 * * *", async () => {
+  console.log("[cron] personalizer start");
   try {
-    await analyzeSupervisorPatterns();
-    console.log("[cron] supervisor pattern analysis done");
+    await runPersonalizer();
+    console.log("[cron] personalizer done");
   } catch (err) {
-    console.error("[cron] supervisor pattern analysis failed:", err);
+    console.error("[cron] personalizer error:", err);
   }
 });
-
-console.log("[cron] all schedules registered: collector(6h), enricher(30m), supervisor(Sun 02:00)");

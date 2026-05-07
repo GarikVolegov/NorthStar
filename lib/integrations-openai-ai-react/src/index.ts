@@ -20,6 +20,7 @@ export * from "./discovery/useDiscoveryFeed";
 export * from "./admin/AdminDashboard";
 export * from "./admin/AdminOverviewCards";
 export * from "./admin/AdminCollectorPanel";
+export * from "./admin/AdminEnricherPanel";
 export * from "./admin/AdminAgentHealth";
 export * from "./admin/AdminRecentItems";
 export * from "./admin/DiscoverySourcesManager";
