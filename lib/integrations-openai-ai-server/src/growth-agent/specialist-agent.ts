@@ -1,17 +1,28 @@
 /**
- * SpecialistAgent — abstract base class for all domain specialists.
+ * SpecialistAgent v3 — persistent memory wired into specialist flow.
  *
- * FLOW (updated v2 — with SupervisorAgent)
+ * CHANGES v3
+ * ──────────
+ * Memory is now loaded at the START of run() in parallel with RAG retrieval.
+ * If the caller has already loaded memory (via agent.ts v5), the pre-loaded
+ * memorySection in userContext is used directly — no double DB call.
+ * If memorySection is missing (direct specialist invocation in tests/scripts),
+ * memory is loaded here as a fallback.
+ *
+ * After streaming 'done', extractMemory() + mergeMemory() are scheduled
+ * fire-and-forget — non-blocking, never delays the user response.
+ *
+ * FLOW (v3 — with memory)
  * ────
+ *   0. [PARALLEL] load memory (if not pre-loaded) + RAG retrieval
  *   1. RAG retrieval (persona examples + domain docs)
  *   2. Web fallback if KB is thin
  *   3. [PARALLEL] CoT + self-eval
- *   4. Build system prompt (base + domain overrides)
+ *   4. Build system prompt (base + domain overrides + memory)
  *   5. Stream GPT-4o response → buffer tokens silently
- *   6. SupervisorAgent.evaluate(buffered response)
- *      ─ pass  → re-yield buffered tokens
- *      ─ fail  → supervisorAgent.rewrite() → stream corrected tokens
- *   7. Yield 'done' (includes supervisorResult)
+ *   6. SupervisorAgent gate
+ *   7. Yield 'done'
+ *   8. [FIRE & FORGET] save memory from this exchange
  */
 import OpenAI from "openai";
 import { openai } from "../client";
@@ -21,6 +32,12 @@ import { runChainOfThought } from "./chain-of-thought";
 import { evaluateSelf } from "./self-evaluator";
 import { buildSystemPrompt } from "./prompt-builder";
 import { supervisorAgent } from "./supervisor-agent";
+import {
+  loadMemory,
+  buildMemorySection,
+  extractMemory,
+  mergeMemory,
+} from "./memory-manager";
 import type { SupervisorResult } from "./supervisor-agent";
 import type { UserContext } from "./prompt-builder";
 import type { ChatMessage } from "./agent";
@@ -32,13 +49,13 @@ import type { Domain, RouteDecision } from "./router-agent";
 export const SPECIALIST_MODEL = "gpt-4o";
 
 export interface SpecialistRunOptions {
-  userId:          number;
-  userContext:     UserContext & { memorySection?: string };
-  history:         ChatMessage[];
-  userMessage:     string;
-  routeDecision:   RouteDecision;
+  userId:           number;
+  userContext:      UserContext & { memorySection?: string };
+  history:          ChatMessage[];
+  userMessage:      string;
+  routeDecision:    RouteDecision;
   memoryFactCount?: number;
-  maxHistory?:     number;
+  maxHistory?:      number;
 }
 
 export type SpecialistEvent =
@@ -70,7 +87,6 @@ export abstract class SpecialistAgent {
       history,
       userMessage,
       routeDecision,
-      memoryFactCount = 0,
       maxHistory = 12,
     } = opts;
 
@@ -79,6 +95,24 @@ export abstract class SpecialistAgent {
       .map((m) => `${m.role === "user" ? "Utente" : "Coach"}: ${m.content.slice(0, 200)}`)
       .join("\n");
 
+    // ── 0. Memory — use pre-loaded section or load from DB ─────────────────
+    // agent.ts v5 already loads memory before calling run(), so in the normal
+    // flow userContext.memorySection is already set. We only hit the DB here
+    // if the specialist is invoked directly (e.g. tests, scripts).
+    let resolvedMemorySection = userContext.memorySection ?? "";
+    let memoryFactCount = opts.memoryFactCount ?? 0;
+
+    if (!resolvedMemorySection) {
+      try {
+        const userMemory = await loadMemory(userId);
+        resolvedMemorySection = buildMemorySection(userMemory);
+        memoryFactCount = userMemory.facts.length;
+        console.log(`[specialist:${this.DOMAIN}] memory loaded from DB: ${userMemory.facts.length} facts`);
+      } catch (err) {
+        console.warn(`[specialist:${this.DOMAIN}] memory load failed (non-fatal):`, err instanceof Error ? err.message : err);
+      }
+    }
+
     // ── 1. RAG ────────────────────────────────────────────────────────────────
     const [personaExamples, documentChunks, cot] = await Promise.all([
       retrieve(userMessage, userId, { topK: 3, minScore: 0.30, sourceTypes: ["persona_example"] }),
@@ -86,16 +120,16 @@ export abstract class SpecialistAgent {
       runChainOfThought(userMessage, conversationSummary),
     ]);
 
-    // ── 2. Web fallback ────────────────────────────────────────────────────
+    // ── 2. Web fallback ───────────────────────────────────────────────────────
     let webResults: RetrievedChunk[] = [];
     if (documentChunks.length < MIN_LOCAL_CHUNKS) {
       webResults = await searchWeb(this.domainWebQuery(userMessage), 4);
     }
 
-    // ── 3. Self-eval ─────────────────────────────────────────────────────────
+    // ── 3. Self-eval ──────────────────────────────────────────────────────────
     const evalResult = evaluateSelf({ userMessage, documentChunks, webResults, cot, memoryFactCount });
 
-    // ── 4. System prompt ───────────────────────────────────────────────────
+    // ── 4. System prompt ──────────────────────────────────────────────────────
     const domainSection = this.buildDomainSection(userMessage, cot, routeDecision);
     const domainHeader = [
       `## Specialista: ${this.DOMAIN.toUpperCase()}`,
@@ -106,9 +140,12 @@ export abstract class SpecialistAgent {
       domainSection,
     ].filter(Boolean).join("\n");
 
+    // Memory section + domain header both go into the prompt via memorySection slot
+    const combinedMemory = [resolvedMemorySection, domainHeader].filter(Boolean).join("\n\n");
+
     const enrichedContext: UserContext & { memorySection?: string } = {
       ...userContext,
-      memorySection: [userContext.memorySection, domainHeader].filter(Boolean).join("\n\n"),
+      memorySection: combinedMemory,
     };
 
     const systemPrompt = buildSystemPrompt({
@@ -121,7 +158,7 @@ export abstract class SpecialistAgent {
       evalResult,
     });
 
-    // ── 5. Stream + BUFFER ──────────────────────────────────────────────────
+    // ── 5. Stream + BUFFER ────────────────────────────────────────────────────
     const recentHistory = history.slice(-maxHistory);
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: "system", content: systemPrompt },
@@ -140,8 +177,6 @@ export abstract class SpecialistAgent {
         max_tokens: evalResult.level === "low" ? 300 : 700,
       });
 
-      // Buffer all tokens silently — client waits, but latency is acceptable
-      // because the supervisor only fires when needed and rewrites are fast.
       const tokenBuffer: string[] = [];
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta?.content;
@@ -150,7 +185,7 @@ export abstract class SpecialistAgent {
 
       const draft = tokenBuffer.join("");
 
-      // ── 6. Supervisor evaluation ────────────────────────────────────────────
+      // ── 6. Supervisor gate ──────────────────────────────────────────────────
       const supervisorInput = {
         userMessage,
         draft,
@@ -171,21 +206,47 @@ export abstract class SpecialistAgent {
         console.log(`[supervisor] PASS (score=${supervisorResult.score})`);
       }
 
-      // ── 7. Stream final text to client (char by char for natural feel) ────────
-      // Chunk into ~4 char pieces to mimic streaming
+      // ── 7. Stream final text ────────────────────────────────────────────────
       const CHUNK_SIZE = 4;
       for (let i = 0; i < finalText.length; i += CHUNK_SIZE) {
         yield { type: "token", value: finalText.slice(i, i + CHUNK_SIZE) };
       }
 
       yield {
-        type:             "done",
-        sources:          [...personaExamples, ...documentChunks, ...webResults],
+        type:            "done",
+        sources:         [...personaExamples, ...documentChunks, ...webResults],
         cot,
         evalResult,
         routeDecision,
         supervisorResult,
       };
+
+      // ── 8. Fire-and-forget memory save ──────────────────────────────────────
+      // Non-blocking — runs after the generator is done, user already has response.
+      const sessionId = Date.now();
+      const turns: Array<{ role: string; content: string }> = [
+        ...history.slice(-8),
+        { role: "user",      content: userMessage },
+        { role: "assistant", content: finalText },
+      ];
+
+      (async () => {
+        try {
+          const extracted = await extractMemory(turns);
+          if (extracted && (extracted.facts.length > 0 || extracted.patterns.length > 0)) {
+            await mergeMemory(userId, sessionId, extracted);
+            console.log(
+              `[memory:${this.DOMAIN}] saved ${extracted.facts.length} facts + ${extracted.patterns.length} patterns for user ${userId}`,
+            );
+          }
+        } catch (err) {
+          console.warn(
+            `[memory:${this.DOMAIN}] save failed (non-fatal):`,
+            err instanceof Error ? err.message : err,
+          );
+        }
+      })();
+
     } catch (err) {
       yield { type: "error", message: err instanceof Error ? err.message : String(err) };
     }

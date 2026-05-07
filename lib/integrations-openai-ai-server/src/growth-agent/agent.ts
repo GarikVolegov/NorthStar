@@ -1,10 +1,22 @@
 /**
- * GrowthAgent v4 — multi-agent orchestrator with SupervisorAgent.
+ * GrowthAgent v5 — persistent memory fully wired.
+ *
+ * CHANGES v5
+ * ──────────
+ * - LOAD: loadMemory(userId) is now called in parallel with routerAgent.route()
+ *   to avoid adding latency. buildMemorySection() result is injected into
+ *   userContext.memorySection before the specialist or fallback runs.
+ * - SAVE: after yielding 'done', extractMemory() + mergeMemory() run
+ *   fire-and-forget (non-blocking) so the user never waits for it.
+ * - memoryFactCount is passed to evaluateSelf so confidence score benefits
+ *   from memory-backed context.
  *
  * FLOW PER MESSAGGIO:
- *   1. RouterAgent → { domain, intent, confidence }
- *   2a. confidence >= 0.60 → SpecialistAgent.run() (includes supervisor)
- *   2b. fallback  → original pipeline + supervisor gate
+ *   1. [PARALLEL] RouterAgent.route()  +  loadMemory(userId)
+ *   2a. confidence >= 0.60 → SpecialistAgent.run() (memory injected)
+ *   2b. fallback  → general pipeline (memory injected)
+ *   3. yield 'done'
+ *   4. [FIRE & FORGET] extractMemory() → mergeMemory() (non-blocking)
  */
 import OpenAI from "openai";
 import { openai } from "../client";
@@ -16,6 +28,7 @@ import { evaluateSelf, type EvalResult } from "./self-evaluator";
 import { routerAgent } from "./router-agent";
 import { getSpecialist } from "./specialist-agent";
 import { supervisorAgent } from "./supervisor-agent";
+import { loadMemory, buildMemorySection, extractMemory, mergeMemory } from "./memory-manager";
 import type { RetrievedChunk } from "./retriever";
 import type { CoTResult } from "./chain-of-thought";
 import type { RouteDecision } from "./router-agent";
@@ -56,17 +69,84 @@ export async function* runGrowthAgent(
   | { type: "done"; sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult; routeDecision?: RouteDecision; supervisorResult?: SupervisorResult }
   | { type: "error"; message: string }
 > {
-  const { userId, userContext, history, userMessage, maxHistory = 12, memoryFactCount = 0 } = opts;
+  const { userId, userContext, history, userMessage, maxHistory = 12 } = opts;
 
-  // ── 1. Route ───────────────────────────────────────────────────────────────────
-  const routeDecision = await routerAgent.route(userMessage, history);
-  console.log(`[agent] routed to=${routeDecision.domain} intent=${routeDecision.intent} conf=${routeDecision.confidence.toFixed(2)}`);
+  // ── 1. Route + Load memory IN PARALLEL ─────────────────────────────────────
+  // Running both simultaneously avoids the DB latency being sequential.
+  const [routeDecision, userMemory] = await Promise.all([
+    routerAgent.route(userMessage, history),
+    loadMemory(userId).catch((err) => {
+      // Memory load failure is non-fatal — agent continues without memory
+      console.warn("[agent] memory load failed (non-fatal):", err instanceof Error ? err.message : err);
+      return { facts: [], patterns: [] };
+    }),
+  ]);
+
+  console.log(
+    `[agent] routed to=${routeDecision.domain} intent=${routeDecision.intent} conf=${routeDecision.confidence.toFixed(2)} | memory: ${userMemory.facts.length} facts, ${userMemory.patterns.length} patterns`,
+  );
+
+  // Build memory section and inject into userContext
+  const memorySection = buildMemorySection(userMemory);
+  const memoryFactCount = userMemory.facts.length;
+
+  const enrichedContext: UserContext & { memorySection?: string } = {
+    ...userContext,
+    memorySection: memorySection || userContext.memorySection,
+  };
+
+  // ── Helper: fire-and-forget memory save after a full exchange ──────────────
+  // We pass the current turn (user + assistant response) so the extractor
+  // has a meaningful conversation snippet to analyze.
+  function schedulMemorySave(assistantResponse: string, sessionId: number): void {
+    const turns: Array<{ role: string; content: string }> = [
+      ...history.slice(-8),
+      { role: "user", content: userMessage },
+      { role: "assistant", content: assistantResponse },
+    ];
+
+    // Fire and forget — intentionally not awaited
+    (async () => {
+      try {
+        const extracted = await extractMemory(turns);
+        if (extracted && (extracted.facts.length > 0 || extracted.patterns.length > 0)) {
+          await mergeMemory(userId, sessionId, extracted);
+          console.log(
+            `[memory] saved ${extracted.facts.length} facts + ${extracted.patterns.length} patterns for user ${userId}`,
+          );
+        }
+      } catch (err) {
+        console.warn("[memory] save failed (non-fatal):", err instanceof Error ? err.message : err);
+      }
+    })();
+  }
 
   // ── 2a. Specialist path ────────────────────────────────────────────────────
   if (routeDecision.confidence >= 0.60 && routeDecision.domain !== "general") {
     const specialist = getSpecialist(routeDecision.domain);
     if (specialist) {
-      yield* specialist.run({ userId, userContext, history, userMessage, routeDecision, memoryFactCount, maxHistory });
+      // Buffer the final assistant response to save memory after done
+      let fullResponse = "";
+      let sessionId = 0;
+
+      for await (const event of specialist.run({
+        userId,
+        userContext: enrichedContext,
+        history,
+        userMessage,
+        routeDecision,
+        memoryFactCount,
+        maxHistory,
+      })) {
+        if (event.type === "token") fullResponse += event.value;
+        yield event;
+
+        if (event.type === "done") {
+          // Use routeDecision confidence*1000 as pseudo-sessionId if no real one
+          sessionId = Date.now();
+          schedulMemorySave(fullResponse, sessionId);
+        }
+      }
       return;
     }
   }
@@ -85,7 +165,15 @@ export async function* runGrowthAgent(
   }
 
   const evalResult = evaluateSelf({ userMessage, documentChunks, webResults, cot, memoryFactCount });
-  const systemPrompt = buildSystemPrompt({ userContext, personaExamples, documentChunks, webResults, cot, userMessage, evalResult });
+  const systemPrompt = buildSystemPrompt({
+    userContext: enrichedContext,
+    personaExamples,
+    documentChunks,
+    webResults,
+    cot,
+    userMessage,
+    evalResult,
+  });
 
   const recentHistory = history.slice(-maxHistory);
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -105,7 +193,6 @@ export async function* runGrowthAgent(
       max_tokens: evalResult.level === "low" ? 300 : 600,
     });
 
-    // Buffer
     const tokenBuffer: string[] = [];
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content;
@@ -114,7 +201,6 @@ export async function* runGrowthAgent(
 
     const draft = tokenBuffer.join("");
 
-    // Supervisor
     const supervisorInput = { userMessage, draft, domain: routeDecision.domain, intent: routeDecision.intent };
     let supervisorResult = supervisorAgent.evaluate(supervisorInput);
     let finalText = draft;
@@ -127,7 +213,6 @@ export async function* runGrowthAgent(
       console.log(`[supervisor] PASS (score=${supervisorResult.score})`);
     }
 
-    // Stream final text
     const CHUNK_SIZE = 4;
     for (let i = 0; i < finalText.length; i += CHUNK_SIZE) {
       yield { type: "token", value: finalText.slice(i, i + CHUNK_SIZE) };
@@ -141,6 +226,10 @@ export async function* runGrowthAgent(
       routeDecision,
       supervisorResult,
     };
+
+    // Fire-and-forget memory save
+    schedulMemorySave(finalText, Date.now());
+
   } catch (err) {
     yield { type: "error", message: err instanceof Error ? err.message : String(err) };
   }
