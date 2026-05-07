@@ -35,39 +35,61 @@ export function useSSEStream(): UseSSEStreamReturn {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error ?? `Errore ${res.status}`);
+        throw new Error((errData as { error?: string }).error ?? `Errore ${res.status}`);
       }
 
       const reader = res.body?.getReader();
       if (!reader) throw new Error("Stream non disponibile");
 
+      // FIX #4: single decoder instance, flushed after stream ends
       const decoder = new TextDecoder();
       let buffer = "";
 
+      const processLine = (line: string) => {
+        if (!line.startsWith("data: ")) return;
+        const raw = line.slice(6).trim();
+        if (raw === "[DONE]") return;
+        try {
+          const parsed = JSON.parse(raw) as {
+            choices?: Array<{ delta?: { content?: string } }>;
+            content?: string;
+            text?: string;
+          };
+          const chunk =
+            parsed.choices?.[0]?.delta?.content ??
+            parsed.content ??
+            parsed.text ??
+            "";
+          if (chunk) setContent((prev) => prev + chunk);
+        } catch {
+          if (raw) setContent((prev) => prev + raw);
+        }
+      };
+
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+
+        if (done) {
+          // FIX #4: flush remaining bytes in the decoder buffer
+          const tail = decoder.decode(undefined, { stream: false });
+          if (tail) {
+            buffer += tail;
+          }
+          // Process any remaining lines in the buffer
+          if (buffer.trim()) {
+            for (const line of buffer.split("\n")) {
+              processLine(line);
+            }
+          }
+          break;
+        }
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
 
         for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const raw = line.slice(6).trim();
-            if (raw === "[DONE]") continue;
-            try {
-              const parsed = JSON.parse(raw);
-              const chunk =
-                parsed.choices?.[0]?.delta?.content ??
-                parsed.content ??
-                parsed.text ??
-                "";
-              if (chunk) setContent((prev) => prev + chunk);
-            } catch {
-              if (raw) setContent((prev) => prev + raw);
-            }
-          }
+          processLine(line);
         }
       }
     } catch (err) {

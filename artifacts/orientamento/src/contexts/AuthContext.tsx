@@ -1,6 +1,15 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type ReactNode,
+} from "react";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { AUTH_EXPIRED_EVENT } from "@/lib/api-fetch";
+import { useQueryClient } from "@tanstack/react-query";
 
 export interface AuthUser {
   id: number;
@@ -16,6 +25,7 @@ export interface AuthUser {
   userMode?: string | null;
   journeyType?: string | null;
   avatarUrl?: string | null;
+  isPublic?: boolean;
 }
 
 interface AuthContextValue {
@@ -36,6 +46,8 @@ const TOKEN_STORAGE_KEY = "northstar_token";
 const BASE = import.meta.env.BASE_URL || "/";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
+
   const [user, setUser] = useState<AuthUser | null>(() => {
     try {
       const raw = localStorage.getItem(USER_STORAGE_KEY);
@@ -55,16 +67,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const [authReady, setAuthReady] = useState<boolean>(false);
 
+  // FIX #2: clear ALL React Query cache on logout to prevent data leaks
   const logout = useCallback(() => {
     setUser(null);
     setToken(null);
-  }, []);
+    queryClient.clear();
+  }, [queryClient]);
 
+  // FIX #6: updateUser persists to localStorage immediately (synchronously)
   const updateUser = useCallback((updates: Partial<AuthUser>) => {
-    setUser((prev) => (prev ? { ...prev, ...updates } : prev));
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...updates };
+      // Write immediately — don't wait for the useEffect flush
+      try {
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(next));
+      } catch { /* storage full or private mode */ }
+      return next;
+    });
   }, []);
 
-  // Persist + register token getter on every change
+  // Persist token + register token getter on every change
   useEffect(() => {
     if (user && token) {
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
@@ -106,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else if (res.status === 401) {
           setUser(null);
           setToken(null);
+          queryClient.clear();
         }
       })
       .catch(() => {})
@@ -117,22 +141,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const login = useCallback((u: AuthUser, t: string) => {
-    setUser(u);
-    setToken(t);
-    setAuthReady(true);
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (tz) {
-      fetch(`${BASE}api/me`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${t}` },
-        body: JSON.stringify({ timezone: tz }),
-      }).catch(() => {});
-    }
-  }, []);
+  // FIX #3: write token to localStorage synchronously BEFORE setting state
+  // so apiFetch can read it immediately in any useEffect triggered by login
+  const login = useCallback(
+    (u: AuthUser, t: string) => {
+      // Persist synchronously first — avoids race where apiFetch reads stale token
+      try {
+        localStorage.setItem(TOKEN_STORAGE_KEY, t);
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(u));
+      } catch { /* ignore */ }
+
+      setAuthTokenGetter(() => t);
+      setUser(u);
+      setToken(t);
+      setAuthReady(true);
+
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz) {
+        fetch(`${BASE}api/me`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${t}`,
+          },
+          body: JSON.stringify({ timezone: tz }),
+        }).catch(() => {});
+      }
+    },
+    [],
+  );
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateUser, isLoggedIn: !!user, token, authReady }}>
+    <AuthContext.Provider
+      value={{ user, login, logout, updateUser, isLoggedIn: !!user, token, authReady }}
+    >
       {children}
     </AuthContext.Provider>
   );

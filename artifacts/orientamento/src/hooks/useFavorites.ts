@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -40,14 +41,17 @@ export interface AddNewsFavorite {
 
 export type AddFavoriteData = AddSectorFavorite | AddNewsFavorite;
 
+const QUERY_KEY = (userId: number | undefined) => ["favorites", userId];
+
 export function useFavorites() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  // FIX #1: use apiFetch (adds Bearer token automatically)
   const { data: favorites = [] } = useQuery<Favorite[]>({
-    queryKey: ["favorites", user?.id],
+    queryKey: QUERY_KEY(user?.id),
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/favorites/${user!.id}`);
+      const res = await apiFetch(`${BASE}api/favorites/${user!.id}`);
       if (!res.ok) return [];
       return res.json();
     },
@@ -55,23 +59,74 @@ export function useFavorites() {
     staleTime: 60_000,
   });
 
+  // FIX #5: optimistic add with rollback
   const addMutation = useMutation({
     mutationFn: async (data: AddFavoriteData) => {
-      const res = await fetch(`${BASE}api/favorites`, {
+      const res = await apiFetch(`${BASE}api/favorites`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user!.id, ...data }),
       });
-      return res.json();
+      if (!res.ok) throw new Error("Errore aggiunta preferito");
+      return res.json() as Promise<Favorite>;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["favorites", user?.id] }),
+    onMutate: async (data: AddFavoriteData) => {
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY(user?.id) });
+      const previous = queryClient.getQueryData<Favorite[]>(QUERY_KEY(user?.id)) ?? [];
+
+      // Optimistic placeholder
+      const optimistic: Favorite = {
+        id: -Date.now(), // temp negative id
+        userId: user!.id,
+        type: data.type,
+        sectorId: data.type === "sector" ? data.sectorId : null,
+        articleUrl: data.type === "news" ? data.articleUrl : null,
+        articleTitle: data.type === "news" ? data.articleTitle : null,
+        articleDescription: data.type === "news" ? (data.articleDescription ?? null) : null,
+        articleSource: data.type === "news" ? (data.articleSource ?? null) : null,
+        articleImage: data.type === "news" ? (data.articleImage ?? null) : null,
+        articleCategory: data.type === "news" ? (data.articleCategory ?? null) : null,
+        createdAt: new Date().toISOString(),
+        sector: null,
+      };
+
+      queryClient.setQueryData<Favorite[]>(QUERY_KEY(user?.id), [...previous, optimistic]);
+      return { previous };
+    },
+    onError: (_err, _data, ctx) => {
+      // Rollback on failure
+      if (ctx?.previous) {
+        queryClient.setQueryData(QUERY_KEY(user?.id), ctx.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY(user?.id) });
+    },
   });
 
+  // FIX #5: optimistic remove with rollback
   const removeMutation = useMutation({
     mutationFn: async (id: number) => {
-      await fetch(`${BASE}api/favorites/${id}`, { method: "DELETE" });
+      const res = await apiFetch(`${BASE}api/favorites/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Errore rimozione preferito");
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["favorites", user?.id] }),
+    onMutate: async (id: number) => {
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY(user?.id) });
+      const previous = queryClient.getQueryData<Favorite[]>(QUERY_KEY(user?.id)) ?? [];
+      queryClient.setQueryData<Favorite[]>(
+        QUERY_KEY(user?.id),
+        previous.filter((f) => f.id !== id),
+      );
+      return { previous };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(QUERY_KEY(user?.id), ctx.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY(user?.id) });
+    },
   });
 
   function isSectorFavorite(sectorId: number) {
