@@ -1,23 +1,17 @@
-// Audio utilities (pre-existing)
-export * from "./audio";
+// Growth Agent
+export * from "./growth-agent/GrowthAnalyticsDashboard";
+export * from "./growth-agent/GrowthChatInput";
+export * from "./growth-agent/GrowthChatMessage";
+export * from "./growth-agent/GrowthChatPanel";
+export * from "./growth-agent/GrowthMemoryPanel";
+export * from "./growth-agent/GrowthProfilePage";
+export * from "./growth-agent/ParallelStatusPanel";
+export * from "./growth-agent/useGrowthAnalytics";
+export * from "./growth-agent/useGrowthChat";
+export * from "./growth-agent/useGrowthMemory";
 
-// Growth Coach Chat
-export { useGrowthChat }      from "./growth-agent/useGrowthChat";
-export type { ChatMessage, UseGrowthChatOptions } from "./growth-agent/useGrowthChat";
-export { GrowthChatMessage }  from "./growth-agent/GrowthChatMessage";
-export { GrowthChatInput }    from "./growth-agent/GrowthChatInput";
-export { GrowthChatPanel }    from "./growth-agent/GrowthChatPanel";
-
-// Growth Coach Memory
-export { useGrowthMemory }    from "./growth-agent/useGrowthMemory";
-export type { MemoryFact, MemoryPattern, UseGrowthMemoryOptions } from "./growth-agent/useGrowthMemory";
-export { GrowthMemoryPanel }  from "./growth-agent/GrowthMemoryPanel";
-
-// Growth Coach Analytics
-export { useGrowthAnalytics }       from "./growth-agent/useGrowthAnalytics";
-export type { AnalyticsData, TopicEntry, TrendEntry, LevelBreakdown, UseGrowthAnalyticsOptions } from "./growth-agent/useGrowthAnalytics";
-export { GrowthAnalyticsDashboard } from "./growth-agent/GrowthAnalyticsDashboard";
-
-// Growth Coach Profile Page (unified layout)
-export { GrowthProfilePage }        from "./growth-agent/GrowthProfilePage";
-export type { GrowthProfilePageProps } from "./growth-agent/GrowthProfilePage";
+// Discovery Agent System
+export * from "./discovery/DiscoveryFeedPage";
+export * from "./discovery/DiscoveryItemCard";
+export * from "./discovery/DiscoveryItemSkeleton";
+export * from "./discovery/useDiscoveryFeed";

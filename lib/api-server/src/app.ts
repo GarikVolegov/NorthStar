@@ -15,15 +15,16 @@ import knowledgeRouter     from "./routes/growth-agent/knowledge";
 import memoryRouter        from "./routes/growth-agent/memory";
 import analyticsRouter     from "./routes/growth-agent/analytics";
 import notificationsRouter from "./routes/growth-agent/notifications";
-import feedbackRouter      from "./routes/growth-agent/feedback";      // Phase 7
+import feedbackRouter      from "./routes/growth-agent/feedback";
 
 // Discovery Agent System
-import discoveryFeedRouter from "./routes/discovery/feed";              // Phase D1-D4
+import discoveryFeedRouter             from "./routes/discovery/feed";
+import discoverySavedRouter, { seenRouter } from "./routes/discovery/saved";
 
 // Admin
-import analyzeSupervisorRouter  from "./routes/admin/analyze-supervisor"; // Phase 6
-import agentHealthRouter        from "./routes/admin/agent-health";        // Phase 11
-import discoveryCollectRouter   from "./routes/admin/discovery-collect";   // Discovery
+import analyzeSupervisorRouter  from "./routes/admin/analyze-supervisor";
+import agentHealthRouter        from "./routes/admin/agent-health";
+import discoveryCollectRouter   from "./routes/admin/discovery-collect";
 
 export function createApp() {
   const app = express();
@@ -48,17 +49,14 @@ export function createApp() {
   app.use("/api/growth-agent/feedback",       feedbackRouter);
 
   // Discovery Agent System
-  //   GET  /api/discovery/feed                (feed personalizzato)
-  //   GET  /api/discovery/feed/:id            (item singolo)
-  app.use("/api/discovery/feed",              discoveryFeedRouter);
+  app.use("/api/discovery/feed",    discoveryFeedRouter);   // GET /feed, GET /feed/:id
+  app.use("/api/discovery/saved",   discoverySavedRouter);  // GET /, GET /items, POST /:id  (D5)
+  app.use("/api/discovery/seen",    seenRouter);            // POST /:id  (D6)
 
   // Admin
-  //   POST /api/admin/analyze-supervisor      (Phase 6)
-  //   GET  /api/admin/agent-health            (Phase 11)
-  //   POST /api/admin/discovery/collect       (Discovery manual trigger)
-  app.use("/api/admin/analyze-supervisor",    analyzeSupervisorRouter);
-  app.use("/api/admin/agent-health",          agentHealthRouter);
-  app.use("/api/admin/discovery/collect",     discoveryCollectRouter);
+  app.use("/api/admin/analyze-supervisor",   analyzeSupervisorRouter);
+  app.use("/api/admin/agent-health",         agentHealthRouter);
+  app.use("/api/admin/discovery/collect",    discoveryCollectRouter);
 
   app.use((_req, res) => res.status(404).json({ error: "Not found" }));
   app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
