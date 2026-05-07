@@ -18,14 +18,15 @@ import notificationsRouter from "./routes/growth-agent/notifications";
 import feedbackRouter      from "./routes/growth-agent/feedback";
 
 // Discovery Agent System
-import discoveryFeedRouter                     from "./routes/discovery/feed";
-import discoverySavedRouter, { seenRouter }    from "./routes/discovery/saved";
+import discoveryFeedRouter                  from "./routes/discovery/feed";
+import discoverySavedRouter, { seenRouter } from "./routes/discovery/saved";
 
 // Admin
-import analyzeSupervisorRouter   from "./routes/admin/analyze-supervisor";
-import agentHealthRouter         from "./routes/admin/agent-health";
-import discoveryCollectRouter    from "./routes/admin/discovery-collect";
-import discoverySourcesRouter    from "./routes/admin/discovery-sources";
+import analyzeSupervisorRouter  from "./routes/admin/analyze-supervisor";
+import agentHealthRouter        from "./routes/admin/agent-health";
+import discoveryCollectRouter   from "./routes/admin/discovery-collect";
+import discoverySourcesRouter   from "./routes/admin/discovery-sources";
+import discoveryItemsRouter     from "./routes/admin/discovery-items";   // ← nuovo
 
 export function createApp() {
   const app = express();
@@ -58,7 +59,8 @@ export function createApp() {
   app.use("/api/admin/analyze-supervisor",    analyzeSupervisorRouter);
   app.use("/api/admin/agent-health",          agentHealthRouter);
   app.use("/api/admin/discovery/collect",     discoveryCollectRouter);
-  app.use("/api/admin/discovery/sources",     discoverySourcesRouter);  // ← D7+: gestione fonti
+  app.use("/api/admin/discovery/sources",     discoverySourcesRouter);
+  app.use("/api/admin/discovery/items",       discoveryItemsRouter);    // ← nuovo
 
   app.use((_req, res) => res.status(404).json({ error: "Not found" }));
   app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
