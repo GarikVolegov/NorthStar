@@ -4,7 +4,7 @@ import {
   ArrowLeft, Plus, Save, Trash2, Link2, X, Search, Sparkles, Loader2,
   StickyNote, Lightbulb, FileText, Target, Briefcase, Wrench, Award,
   Network, Globe, MessageCircleQuestion, Send, ChevronRight,
-  Upload, Wand2, Check, AlertCircle,
+  Upload, Wand2, Check,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
 
@@ -82,6 +83,7 @@ function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 export default function Archivio() {
   const { user, authReady } = useAuth();
+  const { toast } = useToast();
 
   const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
   const [loading, setLoading] = useState(true);
@@ -95,11 +97,9 @@ export default function Archivio() {
   const [chatOpen, setChatOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
 
-  // File import state
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-link suggestions
   const [autoLinkSuggestions, setAutoLinkSuggestions] = useState<AutoLinkSuggestion[]>([]);
   const [autoLinkSourceId, setAutoLinkSourceId] = useState<number | null>(null);
 
@@ -131,6 +131,30 @@ export default function Archivio() {
   useEffect(() => { viewRef.current = view; }, [view]);
 
   const panState = useRef<{ startX: number; startY: number; vx: number; vy: number } | null>(null);
+
+  // ── Bug #1 fix: wheel listener non-passivo diretto su svgRef ───────────────
+  // React 17+ attacca i synthetic listeners come passive:true in Chrome,
+  // rendendo e.preventDefault() inoperante sul wheel event.
+  // Registriamo direttamente sul DOM con { passive: false }.
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = -e.deltaY * 0.001;
+      const v = viewRef.current;
+      const newK = Math.max(0.3, Math.min(2.5, v.k * (1 + delta)));
+      const rect = svg.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const ratio = newK / v.k;
+      const next = { x: mx - (mx - v.x) * ratio, y: my - (my - v.y) * ratio, k: newK };
+      viewRef.current = next;
+      setView(next);
+    };
+    svg.addEventListener("wheel", handler, { passive: false });
+    return () => svg.removeEventListener("wheel", handler);
+  }, []);
 
   const loadGraph = useCallback(async () => {
     setLoading(true);
@@ -186,7 +210,10 @@ export default function Archivio() {
     [data.nodes, selectedId],
   );
 
-  // ── Fetch auto-link suggestions after node create/import ────────────────
+  // ── Bug #3 fix: auto-link solo con contenuto reale ─────────────────────────
+  // Non chiamiamo più fetchAutoLinks al momento della creazione (nodo vuoto).
+  // Viene chiamato solo dopo import (contenuto già estratto dal file)
+  // oppure dopo il primo handleUpdateNode con content.length > 20.
   const fetchAutoLinks = useCallback(async (nodeId: number) => {
     try {
       const suggestions = await api<AutoLinkSuggestion[]>(`/nodes/${nodeId}/auto-link`, {
@@ -197,11 +224,11 @@ export default function Archivio() {
         setAutoLinkSourceId(nodeId);
       }
     } catch {
-      // auto-link is best-effort, silent on failure
+      // best-effort, silent
     }
   }, []);
 
-  // ── File import ─────────────────────────────────────────────────────────
+  // ── File import — con toast di errore visibile ─────────────────────────────
   const handleFileImport = useCallback(async (file: File) => {
     setImporting(true);
     try {
@@ -215,17 +242,21 @@ export default function Archivio() {
       const created = await res.json() as KNode;
       setData((d) => ({ ...d, nodes: [...d.nodes, created] }));
       setSelectedId(created.id);
-      // Trigger auto-link suggestions for the imported node
+      // Import ha già contenuto estratto — auto-link ha senso
       void fetchAutoLinks(created.id);
     } catch (err) {
-      console.error("[archivio] import failed", err);
+      toast({
+        title: "Importazione fallita",
+        description: err instanceof Error ? err.message : "Formato non supportato o errore di rete.",
+        variant: "destructive",
+      });
     } finally {
       setImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  }, [fetchAutoLinks]);
+  }, [fetchAutoLinks, toast]);
 
-  // ── Mutations ───────────────────────────────────────────────────────────
+  // ── Mutations ───────────────────────────────────────────────────────────────
   async function handleAddNode(type: NodeType = creatingType) {
     if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
@@ -241,7 +272,7 @@ export default function Archivio() {
       });
       setData((d) => ({ ...d, nodes: [...d.nodes, created] }));
       setSelectedId(created.id);
-      void fetchAutoLinks(created.id);
+      // Bug #3: NON chiamiamo fetchAutoLinks qui — il nodo è vuoto
     } catch (err) {
       console.error("[archivio] create node failed", err);
     }
@@ -254,6 +285,10 @@ export default function Archivio() {
         body: JSON.stringify(patch),
       });
       setData((d) => ({ ...d, nodes: d.nodes.map((n) => (n.id === id ? updated : n)) }));
+      // Bug #3: auto-link solo al primo salvataggio con contenuto reale
+      if (patch.content && patch.content.length > 20) {
+        void fetchAutoLinks(id);
+      }
     } catch (err) {
       console.error("[archivio] update node failed", err);
     }
@@ -295,7 +330,7 @@ export default function Archivio() {
     }
   }
 
-  // ── Drag (zero-rerender DOM mutation strategy) ──────────────────────────
+  // ── Drag (zero-rerender DOM mutation strategy) ──────────────────────────────
   function onNodePointerDown(e: React.PointerEvent, n: KNode) {
     e.stopPropagation();
     if (linkMode) {
@@ -331,20 +366,69 @@ export default function Archivio() {
         const newY = (cy - svgRect.top - v.y) / v.k - drag.offsetY;
         drag.moved = true; drag.x = newX; drag.y = newY;
         if (drag.el) drag.el.setAttribute("transform", `translate(${newX},${newY})`);
-        if (svgRef.current) {
-          svgRef.current.querySelectorAll<SVGLineElement>(`line[data-source="${drag.id}"]`)
-            .forEach((l) => { l.setAttribute("x1", String(newX)); l.setAttribute("y1", String(newY)); });
-          svgRef.current.querySelectorAll<SVGLineElement>(`line[data-target="${drag.id}"]`)
-            .forEach((l) => { l.setAttribute("x2", String(newX)); l.setAttribute("y2", String(newY)); });
-          svgRef.current.querySelectorAll<SVGTextElement>(
-            `text[data-edge-mid-source="${drag.id}"],text[data-edge-mid-target="${drag.id}"]`
-          ).forEach((txt) => {
+
+        // Aggiorna linee degli edge
+        svgRef.current.querySelectorAll<SVGLineElement>(`line[data-source="${drag.id}"]`)
+          .forEach((l) => { l.setAttribute("x1", String(newX)); l.setAttribute("y1", String(newY)); });
+        svgRef.current.querySelectorAll<SVGLineElement>(`line[data-target="${drag.id}"]`)
+          .forEach((l) => { l.setAttribute("x2", String(newX)); l.setAttribute("y2", String(newY)); });
+
+        // ── Bug #2 fix: aggiorna midpoint dei text label ─────────────────────
+        // Caso A: il nodo draggato è la SOURCE dell'edge → data-other-x/y è il target (stabile)
+        svgRef.current.querySelectorAll<SVGTextElement>(`text[data-edge-mid-source="${drag.id}"]`)
+          .forEach((txt) => {
             const ox = parseFloat(txt.getAttribute("data-other-x") ?? "0");
             const oy = parseFloat(txt.getAttribute("data-other-y") ?? "0");
             txt.setAttribute("x", String((newX + ox) / 2));
             txt.setAttribute("y", String((newY + oy) / 2 - 4));
           });
-        }
+        // Caso B: il nodo draggato è il TARGET dell'edge → data-other-x/y è la source (stabile)
+        svgRef.current.querySelectorAll<SVGTextElement>(`text[data-edge-mid-target="${drag.id}"]`)
+          .forEach((txt) => {
+            const ox = parseFloat(txt.getAttribute("data-other-x") ?? "0");
+            const oy = parseFloat(txt.getAttribute("data-other-y") ?? "0");
+            txt.setAttribute("x", String((newX + ox) / 2));
+            txt.setAttribute("y", String((newY + oy) / 2 - 4));
+            // Aggiorniamo data-other-x/y SOLO quando il nodo draggato è quello target,
+            // così i text label degli ALTRI nodi che usano il draggato come "other"
+            // ricevono coordinate aggiornate nel loro prossimo drag.
+            txt.setAttribute("data-dragged-x", String(newX));
+            txt.setAttribute("data-dragged-y", String(newY));
+          });
+        // Caso C: il nodo draggato è "other" rispetto ad altri edge label ────
+        // (es. sto trascinando B, e un text ha data-other-x/y=B.x,B.y)
+        // Aggiorniamo data-other-x/y su tutti i text che lo referenziano.
+        svgRef.current.querySelectorAll<SVGTextElement>(
+          `text[data-edge-mid-source]:not([data-edge-mid-source="${drag.id}"]),` +
+          `text[data-edge-mid-target]:not([data-edge-mid-target="${drag.id}"])`
+        ).forEach((txt) => {
+          // Identifica se questo text ha il nodo draggato come "other"
+          const srcId = txt.getAttribute("data-edge-mid-source");
+          const tgtId = txt.getAttribute("data-edge-mid-target");
+          const isDragOther =
+            (srcId && srcId !== String(drag.id) && tgtId === String(drag.id)) ||
+            (tgtId && tgtId !== String(drag.id) && srcId === String(drag.id));
+          if (!isDragOther) return;
+          // Aggiorna data-other-x/y e ricalcola midpoint
+          txt.setAttribute("data-other-x", String(newX));
+          txt.setAttribute("data-other-y", String(newY));
+          const myX = parseFloat(
+            (srcId && srcId !== String(drag.id))
+              ? (svgRef.current!.querySelector<SVGGElement>(`g[data-node-id="${srcId}"]`)
+                  ?.getAttribute("data-x") ?? "0")
+              : String(newX)
+          );
+          // Recupera le coordinate del nodo "non draggato" dal suo <g data-node-id>
+          const otherG = svgRef.current!.querySelector<SVGGElement>(
+            `g[data-node-id="${srcId !== String(drag.id) ? srcId : tgtId}"]`
+          );
+          if (otherG) {
+            const otherX = parseFloat(otherG.getAttribute("data-x") ?? "0");
+            const otherY = parseFloat(otherG.getAttribute("data-y") ?? "0");
+            txt.setAttribute("x", String((newX + otherX) / 2));
+            txt.setAttribute("y", String((newY + otherY) / 2 - 4));
+          }
+        });
       });
     } else if (pan) {
       setView({ x: pan.vx + (e.clientX - pan.startX), y: pan.vy + (e.clientY - pan.startY), k: viewRef.current.k });
@@ -376,18 +460,6 @@ export default function Archivio() {
   }
 
   function onSvgPointerUp() { panState.current = null; }
-
-  function onWheel(e: React.WheelEvent) {
-    e.preventDefault();
-    const delta = -e.deltaY * 0.001;
-    const v = viewRef.current;
-    const newK = Math.max(0.3, Math.min(2.5, v.k * (1 + delta)));
-    const svgRect = svgRef.current!.getBoundingClientRect();
-    const mx = e.clientX - svgRect.left;
-    const my = e.clientY - svgRect.top;
-    const ratio = newK / v.k;
-    setView({ x: mx - (mx - v.x) * ratio, y: my - (my - v.y) * ratio, k: newK });
-  }
 
   useEffect(() => {
     const zeros = data.nodes.filter((n) => n.x === 0 && n.y === 0);
@@ -427,7 +499,6 @@ export default function Archivio() {
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col bg-background">
 
-      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -474,7 +545,6 @@ export default function Archivio() {
         </select>
 
         <div className="ml-auto flex items-center gap-1.5">
-          {/* Chat toggle — icon only */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -489,7 +559,6 @@ export default function Archivio() {
             <TooltipContent>Chiedi all'Archivio</TooltipContent>
           </Tooltip>
 
-          {/* Import file */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -508,7 +577,6 @@ export default function Archivio() {
             <TooltipContent>Importa PDF, testo, immagine</TooltipContent>
           </Tooltip>
 
-          {/* New node — type picker + button */}
           <select
             value={creatingType}
             onChange={(e) => setCreatingType(e.target.value as NodeType)}
@@ -665,6 +733,7 @@ export default function Archivio() {
               </div>
             )}
 
+            {/* Bug #1: rimosso onWheel dal JSX — gestito dal useEffect con { passive: false } */}
             <svg
               ref={svgRef}
               className="w-full h-full touch-none select-none"
@@ -672,13 +741,11 @@ export default function Archivio() {
               onPointerMove={onSvgPointerMove}
               onPointerUp={onSvgPointerUp}
               onPointerLeave={onSvgPointerUp}
-              onWheel={onWheel}
             >
               <defs>
                 <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
                   <path d="M0,0 L10,5 L0,10 Z" fill="#94a3b8" />
                 </marker>
-                {/* Subtle drop-shadow filter for nodes */}
                 <filter id="node-shadow" x="-20%" y="-20%" width="140%" height="140%">
                   <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#00000015" />
                 </filter>
@@ -708,6 +775,9 @@ export default function Archivio() {
                           style={{ pointerEvents: "none" }}
                           data-edge-mid-source={edge.sourceId}
                           data-edge-mid-target={edge.targetId}
+                          // Bug #2: data-other-x/y = coordinate dell'ALTRO nodo rispetto alla source
+                          // Per il text, "source" drags → other = target coords
+                          // Vengono aggiornati in onSvgPointerMove caso C
                           data-other-x={b.x}
                           data-other-y={b.y}
                         >
@@ -718,7 +788,7 @@ export default function Archivio() {
                   );
                 })}
 
-                {/* Nodes */}
+                {/* Nodes — aggiunto data-node-id, data-x, data-y per il caso C del drag */}
                 {filteredNodes.map((n) => {
                   const meta = TYPE_META[n.type] ?? TYPE_META.note;
                   const r = Math.max(28, Math.min(52, 22 + n.title.length * 0.55));
@@ -732,8 +802,10 @@ export default function Archivio() {
                       style={{ cursor: linkMode ? "crosshair" : "grab" }}
                       onPointerDown={(e) => onNodePointerDown(e, n)}
                       onPointerUp={(e) => onNodePointerUp(e, n)}
+                      data-node-id={n.id}
+                      data-x={n.x}
+                      data-y={n.y}
                     >
-                      {/* Drop shadow circle */}
                       <circle
                         r={r}
                         fill={n.color || meta.bg}
@@ -741,7 +813,6 @@ export default function Archivio() {
                         strokeWidth={isSelected || isLinkSrc ? 2.5 : 1.5}
                         filter="url(#node-shadow)"
                       />
-                      {/* Title */}
                       <text
                         textAnchor="middle" y={4}
                         fontSize={11} fontWeight={600} fill={meta.color}
@@ -749,7 +820,6 @@ export default function Archivio() {
                       >
                         {n.title.length > 20 ? n.title.slice(0, 19) + "…" : n.title}
                       </text>
-                      {/* Type pill */}
                       <rect
                         x={-labelW / 2} y={r + 5}
                         width={labelW} height={14}
@@ -1141,8 +1211,8 @@ function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartL
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Appunti, descrizione, riferimenti…"
-            rows={10}
-            className="rounded-xl text-sm font-mono"
+            rows={6}
+            className="rounded-xl text-sm font-mono resize-y"
           />
           <p className="text-[10px] text-muted-foreground mt-1">Markdown supportato</p>
         </div>
