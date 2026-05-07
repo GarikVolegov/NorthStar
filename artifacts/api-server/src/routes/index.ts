@@ -45,6 +45,11 @@ import adminGrowthRouter from "./admin-growth";
 import coverLetterRouter from "./cover-letter";
 import completionRouter from "./completion";
 import businessIdeasRouter from "./business-ideas";
+import certificationsRouter from "./certifications";
+import journeyScoreRouter from "./journey-score";
+import calendarIcsRouter from "./calendar-ics";
+import jobsRouter from "./jobs";
+import objectiveCommentsRouter from "./objective-comments";
 
 const router: IRouter = Router();
 
@@ -97,5 +102,10 @@ router.use(coachRouter);
 router.use(coverLetterRouter);
 router.use(completionRouter);
 router.use(businessIdeasRouter);
+router.use(journeyScoreRouter);
+router.use(calendarIcsRouter);
+router.use(jobsRouter);
+router.use(objectiveCommentsRouter);
+router.use(certificationsRouter);
 
 export default router;

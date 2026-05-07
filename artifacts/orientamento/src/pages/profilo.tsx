@@ -20,6 +20,8 @@ import { useTranslation } from "react-i18next";
 import { TestHistoryCard } from "@/components/TestHistoryCard";
 import { ProfileCompletionCard } from "@/components/ProfileCompletionCard";
 import { apiFetch } from "@/lib/api-fetch";
+import { CertificationsSection } from "@/components/CertificationsSection";
+import { JourneyScoreWidget } from "@/components/JourneyScoreWidget";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -611,9 +613,16 @@ export default function Profilo() {
           <h1 className="text-3xl font-serif font-bold text-foreground">{t("profilo.title")}</h1>
           <p className="text-muted-foreground mt-1">{t("profilo.subtitle", { defaultValue: "Gestisci il tuo account e consulta la tua storia" })}</p>
         </div>
-        <Button variant="outline" size="sm" className="rounded-full w-fit" onClick={logout}>
-          {t("profilo.logout", { defaultValue: "Esci dall'account" })}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link href={`/score/${user.id}`}>
+            <Button variant="outline" size="sm" className="rounded-full gap-2 text-xs border-primary/30 text-primary hover:bg-primary/10">
+              <TrendingUp className="w-3.5 h-3.5" /> Il tuo NorthStar Score
+            </Button>
+          </Link>
+          <Button variant="outline" size="sm" className="rounded-full w-fit" onClick={logout}>
+            {t("profilo.logout", { defaultValue: "Esci dall'account" })}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -723,9 +732,11 @@ export default function Profilo() {
               }}
             />
           )}
+          <JourneyScoreWidget userId={user.id} />
           <UserModeCard userId={user.id} />
           <WorkModeCard userId={user.id} />
           <TestHistoryCard />
+          <CertificationsSection userId={user.id} />
           <SavedItems />
           <div>
             <h2 className="font-semibold text-base mb-3 flex items-center gap-2">

@@ -50,6 +50,7 @@ export function Navbar() {
     { href: "/test",     label: t("nav.test"),     icon: FlaskConical },
     { href: "/settori",  label: t("nav.sectors"),  icon: Layers },
     { href: "/ruoli",    label: "Ruoli",            icon: Briefcase },
+    { href: "/lavori",   label: "Lavori",           icon: MapPin },
     { href: "/crescita", label: t("nav.growth"),   icon: BookOpenText },
     { href: "/news",     label: t("nav.news"),     icon: Newspaper },
     { href: "/premium",  label: t("nav.premium"),  icon: Crown },

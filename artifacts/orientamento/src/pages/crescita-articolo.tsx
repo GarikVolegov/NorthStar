@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "react-i18next";
+import { TTSButton } from "@/components/ui/tts-button";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -210,9 +211,12 @@ export default function CrescitaArticolo() {
               </p>
 
               <div className="flex items-center justify-between mt-6 pt-4 border-t flex-wrap gap-3">
-                <span className="text-xs text-muted-foreground">
-                  Aggiornato il {fmtDate(article.updatedAt)}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground">
+                    Aggiornato il {fmtDate(article.updatedAt)}
+                  </span>
+                  <TTSButton text={`${article.title}. ${article.description}. ${article.content.replace(/#{1,6}\s|[*_~`]/g, "")}`} />
+                </div>
                 <Button
                   variant={saved ? "default" : "outline"}
                   size="sm"

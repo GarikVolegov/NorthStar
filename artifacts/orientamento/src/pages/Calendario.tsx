@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   ChevronLeft, ChevronRight, Plus, Calendar, Clock,
-  AlertCircle, CheckCircle2, Circle, PauseCircle, Loader2,
+  AlertCircle, CheckCircle2, Circle, PauseCircle, Loader2, Download,
 } from "lucide-react";
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
@@ -179,6 +179,13 @@ export default function Calendario() {
               </button>
             ))}
           </div>
+          <a
+            href={`${BASE}api/calendar/export.ics`}
+            title="Esporta in Google Calendar / iCal"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary border border-border hover:border-primary/30 rounded-full px-3 py-1.5 transition-all"
+          >
+            <Download className="h-3.5 w-3.5" /> Esporta .ics
+          </a>
           <Button size="sm" className="rounded-full gap-1" onClick={() => { setEditingEvent(null); setSelectedDate(new Date()); setModalOpen(true); }}>
             <Plus className="h-4 w-4" /> Nuovo evento
           </Button>

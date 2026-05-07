@@ -76,6 +76,15 @@ playwright.config.ts # Playwright config (baseURL port 5000, API port 8080)
 - **P9** Growth Queue: `GET/POST /api/admin/growth-queue` + approve/reject/delete → `admin-crescita.tsx`
 - **P10** Admin Discovery vs Execution: `admin-home.tsx` — visual map of all admin sections
 - **P11** Business Idea Validator: `POST /api/business-ideas` → async AI validation → `GET /api/business-ideas/:id`; `POST /api/business-ideas/:id/find-incubators` → incubator/grant report. DB: `business_ideas` table. Python agents: `business_validator.py` (score 0-10, 12 structured fields) + `incubator_finder.py` (5-7 Italian/EU funding opportunities + pitch + canvas). Frontend: `/validatore-idea` (split-pane: sidebar list + detail view with tabs Validazione / Incubatori). Accessible from navbar user dropdown → "Validatore Idea".
+- **P12** User Journey Types: `journey_type` col on users (indeciso/dipendente/autonomo/azienda/investitore), `PATCH /api/profile/:id/journey-type`, PersonaSelector page at `/percorso`, journey badge in navbar dropdown.
+- **Fase 2+ Features** (implemented):
+  - **Job Board con match score**: `GET /api/jobs` → 12 curated job listings scored against RIASEC sector; page `/lavori` with filter bar + AI match bar per job. Navbar link added.
+  - **Certificazioni trackabili**: DB `certifications` table, CRUD API `/api/certifications`, `CertificationsSection` component in `/profilo`. Add name/issuer/date/skills/URL.
+  - **NorthStar Score pubblico condivisibile**: `GET /api/journey-score/:userId` (score 0-100, level, steps breakdown); public page `/score/:userId` with animated ring + share/copy button; "Il tuo NorthStar Score" button in profilo header.
+  - **Orientamento Score salute percorso**: `JourneyScoreWidget` component shown in `/profilo` — arc gauge + step checklist (test, settore, obiettivi, completamenti, certificazioni, profilo pubblico).
+  - **Audio TTS articoli**: `useTTS` hook (Web Speech API) + `TTSButton` component; "Ascolta" button in crescita-articolo header.
+  - **Calendario esterno (.ics export)**: `GET /api/calendar/export.ics` — exports all events as RFC-5545 iCal file; "Esporta .ics" button in calendario header for Google Calendar / Apple Calendar / Outlook import.
+  - **Peer Review obiettivi**: DB `objective_comments` table, CRUD API `/api/objectives/:id/comments` — any user can post comments/reactions on public objectives.
 
 ## UI/UX System — Dark Navy Brand
 

@@ -16,3 +16,5 @@ export * from "./newsArticles";
 export * from "./agentReview";
 export * from "./coachSessions";
 export * from "./businessIdeas";
+export * from "./certifications";
+export * from "./objectiveComments";
