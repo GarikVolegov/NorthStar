@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-fetch";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -104,6 +104,9 @@ export function useAgentAnalysis({
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     retry: 1,
+    // Keeps the previous data visible while a background revalidation is
+    // in flight — eliminates skeleton flash when the cache is warm.
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       const res = await apiFetch(`${BASE}api/agent`, {
         method: "POST",

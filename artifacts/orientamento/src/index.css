@@ -243,18 +243,48 @@
   }
 
   /* ── Glass surface — deep navy ── */
+  /*
+   * Optimization: blur reduced from 16px → 8px (GPU cost ~75% lower).
+   * contain:layout paint prevents this element's compositing from
+   * triggering reflows in sibling elements.
+   * will-change intentionally omitted — it forces a new compositor layer
+   * even for static elements, wasting GPU memory.
+   */
   .glass {
     background: hsl(224 22% 11% / 0.82);
-    backdrop-filter: blur(16px);
+    backdrop-filter: blur(8px);
     border: 1px solid hsl(224 18% 22%);
+    contain: layout paint;
+  }
+
+  /* Disable backdrop-filter on mobile — most mobile GPUs handle blur
+   * poorly; the opaque fallback preserves visual hierarchy without jank. */
+  @media (max-width: 768px) {
+    .glass {
+      backdrop-filter: none;
+      background: hsl(224 22% 11% / 0.96);
+      contain: strict;
+    }
   }
 
   /* ── Navbar pill — deep navy ── */
+  /*
+   * Optimization: blur reduced from 20px → 10px.
+   * The navbar is repainted on every scroll tick when backdrop-filter is
+   * active — keeping the blur value low significantly reduces paint time.
+   */
   .pill-nav {
     background: hsl(224 20% 15% / 0.97);
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(10px);
     border: 1px solid hsl(224 16% 26%);
     border-radius: 9999px;
+  }
+
+  @media (max-width: 768px) {
+    .pill-nav {
+      backdrop-filter: none;
+      background: hsl(224 20% 15% / 0.99);
+    }
   }
 
   /* ── Hero dark section ── */
