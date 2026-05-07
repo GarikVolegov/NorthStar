@@ -53,9 +53,9 @@ const GNEWS_CATEGORY_MAP: Record<FreeCategory, string> = {
 const STATIC_NEWS: NewsItem[] = [
   {
     id: "static-1",
-    title: "Il mercato del lavoro italiano cresce nel digitale: +18% di assunzioni tech",
+    title: "Il mercato del lavoro europeo cresce nel digitale: +18% di assunzioni tech",
     description:
-      "Le aziende italiane accelerano la ricerca di profili digitali. Sviluppatori, data analyst e cybersecurity specialist tra i ruoli più richiesti nel 2025.",
+      "Le aziende europee accelerano la ricerca di profili digitali. Sviluppatori, data analyst e cybersecurity specialist tra i ruoli più richiesti.",
     source: "Il Sole 24 Ore",
     url: "https://www.ilsole24ore.com",
     publishedAt: new Date(Date.now() - 2 * 3600000).toISOString(),
@@ -68,9 +68,9 @@ const STATIC_NEWS: NewsItem[] = [
   },
   {
     id: "static-2",
-    title: "Green economy: l'Italia punta su 200mila nuovi posti di lavoro verdi entro il 2027",
+    title: "Green economy: l'Europa punta su 500mila nuovi posti di lavoro verdi entro il 2027",
     description:
-      "Il Piano Nazionale per la Transizione Ecologica prevede investimenti massicci che genereranno occupazione nei settori rinnovabili, efficienza energetica e mobilità sostenibile.",
+      "Il Green Deal europeo prevede investimenti massicci che genereranno occupazione nei settori rinnovabili, efficienza energetica e mobilità sostenibile.",
     source: "La Repubblica",
     url: "https://www.repubblica.it",
     publishedAt: new Date(Date.now() - 5 * 3600000).toISOString(),
@@ -83,9 +83,9 @@ const STATIC_NEWS: NewsItem[] = [
   },
   {
     id: "static-3",
-    title: "Startup italiane: raccolta fondi record a 1,2 miliardi nel primo semestre",
+    title: "Startup europee: raccolta fondi record a 45 miliardi nel primo semestre",
     description:
-      "Ecosistema startup in forte crescita. Fintech, healthtech e deep tech trainano gli investimenti. Milano si conferma hub principale.",
+      "Ecosistema startup in forte crescita. Fintech, healthtech e deep tech trainano gli investimenti. Berlino, Londra e Milano i principali hub.",
     source: "StartupItalia",
     url: "https://startupitalia.eu",
     publishedAt: new Date(Date.now() - 8 * 3600000).toISOString(),
@@ -98,7 +98,7 @@ const STATIC_NEWS: NewsItem[] = [
   },
   {
     id: "static-4",
-    title: "Università italiane: il 70% degli studenti teme di scegliere la facoltà sbagliata",
+    title: "Università europee: il 70% degli studenti teme di scegliere la facoltà sbagliata",
     description:
       "Una ricerca dell'Istituto Cattaneo rivela come la mancanza di orientamento professionale influenzi negativamente le scelte formative. L'orientamento precoce diventa priorità.",
     source: "Corriere della Sera",
@@ -113,7 +113,7 @@ const STATIC_NEWS: NewsItem[] = [
   },
   {
     id: "static-5",
-    title: "Salute mentale e lavoro: burnout in aumento tra i giovani professionisti",
+    title: "Salute mentale e lavoro: burnout in aumento tra i giovani professionisti europei",
     description:
       "Il 38% dei lavoratori under 35 dichiara di soffrire di stress cronico. Le aziende rispondono con nuove politiche di welfare e flessibilità.",
     source: "Vanity Fair",
@@ -143,7 +143,7 @@ const STATIC_NEWS: NewsItem[] = [
   },
   {
     id: "static-7",
-    title: "PNRR e formazione: 4 miliardi per aggiornare le competenze degli italiani",
+    title: "Fondi europei e formazione: miliardi per aggiornare le competenze dei lavoratori UE",
     description:
       "I fondi europei finanziano corsi di upskilling e reskilling. Priorità a digitale, sostenibilità e soft skill. Come accedere ai bandi.",
     source: "Il Messaggero",
@@ -152,7 +152,7 @@ const STATIC_NEWS: NewsItem[] = [
     image: null,
     category: "finance",
     sector: null,
-    tags: ["PNRR", "formazione", "competenze"],
+    tags: ["UE", "formazione", "competenze"],
     relevance: 82,
     plan: "free",
   },
@@ -163,6 +163,8 @@ interface CacheEntry {
   fetchedAt: number;
 }
 
+// LRU-style cache: capped at MAX_CACHE_ENTRIES to prevent unbounded memory growth
+const MAX_CACHE_ENTRIES = 100;
 const cache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -173,10 +175,18 @@ function getCached(key: string): NewsItem[] | null {
     cache.delete(key);
     return null;
   }
+  // Move to end (LRU: most recently accessed)
+  cache.delete(key);
+  cache.set(key, entry);
   return entry.data;
 }
 
 function setCache(key: string, data: NewsItem[]): void {
+  // Evict oldest entry when cap reached
+  if (cache.size >= MAX_CACHE_ENTRIES) {
+    const firstKey = cache.keys().next().value;
+    if (firstKey !== undefined) cache.delete(firstKey);
+  }
   cache.set(key, { data, fetchedAt: Date.now() });
 }
 

@@ -87,7 +87,8 @@ export function usePageMeta({
     setMeta("property", "og:image:alt", imgAlt);
     setMeta("property", "og:image:width", "1200");
     setMeta("property", "og:image:height", "630");
-    setMeta("property", "og:locale", LANG_TO_OG_LOCALE[i18n.language] ?? "it_IT");
+    // Resolve OG locale from current i18n language; default to English for non-IT locales
+    setMeta("property", "og:locale", LANG_TO_OG_LOCALE[i18n.language] ?? "en_US");
     setMeta("property", "og:site_name", "NorthStar");
 
     setMeta("name", "twitter:card", "summary_large_image");
@@ -135,9 +136,10 @@ export function buildSectorMeta(sector: {
     "@id": `${SITE_URL}/settore/${sector.id}`,
     name: sector.name,
     description: sector.description,
+    // NorthStar serves European users — occupationLocation broadened to Europe
     occupationLocation: {
-      "@type": "Country",
-      name: "Italy",
+      "@type": "Continent",
+      name: "Europe",
     },
     estimatedSalary: {
       "@type": "MonetaryAmountDistribution",

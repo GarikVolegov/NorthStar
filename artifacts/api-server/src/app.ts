@@ -29,7 +29,12 @@ app.use(
 );
 
 // ─── 3. Body parsing (1mb limit prevents DoS via large payloads) ──────────────
-app.use(cors());
+// CORS: restrict to frontend origin in production via CORS_ORIGIN env var
+const allowedOrigin = process.env.CORS_ORIGIN ?? "http://localhost:5000";
+app.use(cors({
+  origin: allowedOrigin,
+  credentials: true,
+}));
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 

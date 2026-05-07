@@ -1,11 +1,13 @@
+// Chart colors aligned to NorthStar brand design tokens
 export const CHART_COLORS = {
-  primary: "hsl(160 20% 30%)",
-  secondary: "hsl(160 20% 50%)",
-  muted: "hsl(160 15% 70%)",
-  accent: "hsl(35 35% 65%)",
-  neutral: "hsl(200 10% 60%)",
-  brand: "hsl(258 60% 55%)",
-  brandLight: "hsl(258 60% 75%)",
+  primary:     "#c19e4a", // Champagne Gold — main brand
+  primaryLight:"#d8bc7a", // Gold light — secondary series
+  growth:      "#7db89a", // Sage Green — positive/growth
+  growthLight: "#b2d4c4", // Sage Green light
+  blue:        "#5a9fd4", // Cool Blue — informational / data
+  muted:       "#4a5368", // Foreground dim — neutral/background series
+  destructive: "#d94f45", // Soft Red — negative/error series
+  neutral:     "#7e8a9e", // Foreground muted
 };
 
 export const CHART_DEFAULTS = {

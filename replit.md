@@ -1,4 +1,4 @@
-# NorthStar — Career Orientation SaaS per utenti italiani
+# NorthStar — Career Orientation SaaS per utenti europei
 
 > Piattaforma di coaching per carriera, crescita personale e formazione. Test RIASEC + AI agents + feed Discovery personalizzato.
 
@@ -28,7 +28,7 @@ pnpm test:e2e
 
 ### Variabili d'ambiente
 
-**Obbligatorie:** `DATABASE_URL`, `ADMIN_KEY`, `AI_AGENTS_URL`
+**Obbligatorie:** `DATABASE_URL`, `ADMIN_KEY`, `AI_AGENTS_URL`, `JWT_SECRET`
 
 **Opzionali:**
 ```
@@ -36,10 +36,13 @@ JWT_SECRET
 STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
 GNEWS_API_KEY, TAVILY_API_KEY
 RESEND_API_KEY
+EMAIL_FROM                  # mittente email verificato (es. noreply@tuodominio.eu) — OBBLIGATORIO per email a utenti reali
 VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
 GOOGLE_CLIENT_ID
 AI_INTEGRATIONS_OPENAI_BASE_URL   # Replit proxy OpenAI
 AI_INTEGRATIONS_OPENAI_API_KEY
+AI_MODEL                    # modello OpenAI per agenti orchestratore (default: gpt-4o-mini). Valori validi: gpt-4o-mini, gpt-4.1, gpt-4o
+CORS_ORIGIN                 # origin frontend in produzione (es. https://northstar.app) — senza questo CORS è limitato a localhost:5000
 ```
 
 ---
@@ -51,7 +54,7 @@ AI_INTEGRATIONS_OPENAI_API_KEY
 | **Frontend** | React 19, Vite 7, Tailwind CSS v4, Radix UI, Wouter, TanStack React Query, Recharts, Framer Motion, i18next |
 | **Backend** | Express 5, TypeScript, Drizzle ORM, Pino logging, esbuild (custom `build.mjs`) |
 | **AI** | Python 3.11, FastAPI, LangChain, LangGraph — microservizio su porta 8000 |
-| **LLM** | GPT-4o-mini via Replit proxy (`AI_INTEGRATIONS_OPENAI_BASE_URL`) |
+| **LLM** | `gpt-4o-mini` via Replit proxy (`AI_INTEGRATIONS_OPENAI_BASE_URL`) per Discovery enricher e agenti orchestratore. Modello configurabile via env `AI_MODEL` (default `gpt-4o-mini`). |
 | **Database** | PostgreSQL (Replit managed), Drizzle ORM |
 | **Auth** | JWT custom (bcryptjs + `JWT_SECRET` persistente) |
 | **Monorepo** | pnpm workspaces + catalog |
@@ -111,7 +114,7 @@ Pipeline a 3 stadi che raccoglie, arricchisce e personalizza contenuti per ogni 
 - Admin route: `POST /api/admin/discovery/collect`
 
 ### 2. Enricher Agent — `enricher-agent.ts`
-- Arricchisce i raw items con **GPT-4o-mini** (JSON mode)
+- Arricchisce i raw items con **gpt-4o-mini** (JSON mode) — modello fisso, non configurabile via AI_MODEL
 - **Priority queue:** opportunity (5) > formation (4) > sector_trend (3) > news (2) > growth (1)
 - **Concorrenza:** 5 chiamate GPT parallele (`pLimit` interno)
 - **Retry:** 2 tentativi con backoff esponenziale; dopo 3 fallimenti totali → skip definitivo
@@ -217,17 +220,19 @@ Layout: sidebar sticky su desktop, bottom tab bar su mobile.
 ### Moduli feed & research
 - **News module:** GNews API o curated
 - **Research Scheduler:** Tavily
-- **Email notifications:** Resend
+- **Email notifications:** Resend (richiede `EMAIL_FROM` con dominio verificato per utenti reali)
 - **Web Push:** VAPID
 
 ---
 
-## Design System — Dark Navy Brand
+## Design System — Deep Navy Brand
 
-- **Background:** `hsl(213 62% 8%)` ≈ `#08192e` — mai usare `bg-white` o `bg-gray-*`
-- **Foreground:** `hsl(0 0% 96%)`
-- **Accent Gold:** `hsl(46 65% 52%)` = `#D4AF37` — CTA, nav attivo, highlights, glow
-- **Brand tokens:** `src/lib/brand.ts`
+- **Background:** `hsl(224 24% 8%)` = `#0e1018` — mai usare `bg-white` o `bg-gray-*`
+- **Foreground:** `hsl(220 14% 93%)` = `#e6e8ed`
+- **Accent Gold:** `hsl(43 44% 57%)` = `#c19e4a` — CTA, nav attivo, highlights, glow
+- **Growth Green:** `hsl(152 26% 62%)` = `#7db89a`
+- **Destructive:** `#d94f45`
+- **Brand tokens:** `src/lib/brand.ts` + `lib/design-tokens/northstar-theme.css`
 - **CSS vars:** `src/index.css` — `.glass`, `.pill-nav`, `.glow-primary`, `.text-display`, `.text-italic-serif`, `.text-label`
 - **Logo:** `/public/logo.svg` (stella Polaris 4 punte + anello bussola + marker N) + `/public/favicon.svg`
 - **Typography:** Inter (bold display) + Playfair Display italic per accent in hero
@@ -245,6 +250,8 @@ Layout: sidebar sticky su desktop, bottom tab bar su mobile.
 - **Startup check:** `startup-check.ts` valida le env vars obbligatorie prima del bind alla porta — fail fast con messaggi chiari
 - **Replit AI Integration:** OpenAI via `AI_INTEGRATIONS_OPENAI_BASE_URL` + `AI_INTEGRATIONS_OPENAI_API_KEY`
 - **SSE streaming:** `hooks/useSSEStream.ts` + `components/ui/streaming-indicator.tsx`
+- **CORS:** ristretto a `CORS_ORIGIN` env var in produzione (default: `http://localhost:5000`)
+- **Auth rate limiting:** `/auth/*` ha rate limiter dedicato (5 req/15min per IP) via `authRateLimiter`
 
 ---
 
@@ -259,6 +266,9 @@ Layout: sidebar sticky su desktop, bottom tab bar su mobile.
 - **Playwright:** `PLAYWRIGHT_BROWSERS_PATH` default `.cache/ms-playwright`; impostare `BASE_URL`/`API_URL` per staging
 - **Discovery feed cache:** in-memory LRU 5min server-side + sessionStorage 10min client-side; passare `?refresh=1` per bypassare
 - **Enricher retry cap:** dopo 3 fallimenti GPT, item marcato `isEnriched=true` con `score=0` — non riprocessato, non appare nel feed
+- **News cache:** LRU in-memory cap 100 entries — evita crescita illimitata in RAM
+- **Email prod:** impostare `EMAIL_FROM` con dominio Resend verificato; senza di esso le email arrivano solo all'owner account
+- **AI_MODEL:** configura il modello OpenAI per gli agenti orchestratore. L'enricher usa sempre `gpt-4o-mini` direttamente.
 
 ---
 
@@ -276,3 +286,5 @@ Layout: sidebar sticky su desktop, bottom tab bar su mobile.
 | OpenAI client | `lib/integrations-openai-ai-server/src/client.ts` |
 | OpenAI docs | `.local/skills/integrations/SKILL.md` |
 | Brand tokens | `artifacts/orientamento/src/lib/brand.ts` |
+| Design tokens CSS | `lib/design-tokens/northstar-theme.css` |
+| Design tokens TS | `lib/design-tokens/tokens.ts` |

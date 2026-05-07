@@ -1,7 +1,7 @@
 export const BRAND = {
   colors: {
     /* Deep navy-slate backgrounds */
-    background:     "#0d1120",
+    background:     "#0e1018",
     backgroundCard: "#131828",
     backgroundMuted:"#181e2e",
     border:         "#252e45",
@@ -15,18 +15,18 @@ export const BRAND = {
     primary:        "#c19e4a",
     primaryDark:    "#8f7230",
     primaryLight:   "#d8bc7a",
-    primaryFg:      "#0d1120",
+    primaryFg:      "#0e1018",
 
     brand:          "#c19e4a",
     brandDark:      "#8f7230",
     brandLight:     "#d8bc7a",
-    brandFg:        "#0d1120",
+    brandFg:        "#0e1018",
 
     /* Growth accent — Sage Green */
     growth:         "#7db89a",
     growthDark:     "#4e8068",
     growthLight:    "#b2d4c4",
-    growthFg:       "#0d1120",
+    growthFg:       "#0e1018",
 
     /* Hero dark surface */
     heroDark:       "#0b0f1c",
@@ -36,7 +36,7 @@ export const BRAND = {
     neutralGray:    "#e2e8f0",
     white:          "#FFFFFF",
 
-    destructive:    "#e05252",
+    destructive:    "#d94f45",
     destructiveFg:  "#ffffff",
   },
 

@@ -41,7 +41,7 @@ export function createRateLimiter(options: RateLimitOptions) {
       const retryAfterSec = Math.ceil((bucket.resetAt - now) / 1000);
       res.setHeader("Retry-After", String(retryAfterSec));
       res.status(429).json({
-        error: "Limite richieste AI raggiunto. Riprova tra poco.",
+        error: "Limite richieste raggiunto. Riprova tra poco.",
         retryAfter: retryAfterSec,
         isPremiumFeature: !isPremium,
         message: isPremium
@@ -71,3 +71,33 @@ export const aiGenerationRateLimiter = createRateLimiter({
   premiumLimit: 50,
   group: "ai-generation",
 });
+
+/**
+ * Strict rate limiter for auth endpoints (/auth/register, /auth/login, /auth/forgot-password).
+ * 5 attempts per 15 minutes per IP — brute force / credential stuffing protection.
+ */
+export function authRateLimiter(req: Request, res: Response, next: NextFunction): void {
+  const windowMs = 15 * 60 * 1000; // 15 minutes
+  const limit = 5;
+  const key = `ip:${req.ip}:auth`;
+  const now = Date.now();
+
+  let bucket = buckets.get(key);
+  if (!bucket || now > bucket.resetAt) {
+    bucket = { count: 0, resetAt: now + windowMs };
+    buckets.set(key, bucket);
+  }
+
+  if (bucket.count >= limit) {
+    const retryAfterSec = Math.ceil((bucket.resetAt - now) / 1000);
+    res.setHeader("Retry-After", String(retryAfterSec));
+    res.status(429).json({
+      error: "Troppi tentativi. Riprova tra poco.",
+      retryAfter: retryAfterSec,
+    });
+    return;
+  }
+
+  bucket.count++;
+  next();
+}

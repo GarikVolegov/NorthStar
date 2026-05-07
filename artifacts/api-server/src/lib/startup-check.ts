@@ -17,7 +17,6 @@ const REQUIRED: EnvEntry[] = [
   { key: "DATABASE_URL",  description: "Connessione PostgreSQL — necessaria per tutto" },
   { key: "ADMIN_KEY",     description: "Chiave di accesso alle route /admin/*" },
   { key: "AI_AGENTS_URL", description: "Python AI Service — Wiki, Roadmap e Grafo RAG non funzionano senza" },
-  // FIX: JWT_SECRET must be required — without it every restart invalidates all user sessions
   { key: "JWT_SECRET",    description: "Secret JWT — senza questo tutti i token vengono invalidati ad ogni restart" },
 ];
 
@@ -27,12 +26,15 @@ const OPTIONAL: EnvEntry[] = [
   { key: "GNEWS_API_KEY",                   description: "GNews — scheduler notizie disabilitato" },
   { key: "TAVILY_API_KEY",                  description: "Tavily — scheduler ricerca disabilitato" },
   { key: "RESEND_API_KEY",                  description: "Resend — email reminder e digest settimanale disabilitati" },
+  { key: "EMAIL_FROM",                      description: "Email mittente verificato (es. noreply@tuodominio.eu) — senza questo le email vanno solo all'owner Resend" },
   { key: "VAPID_PUBLIC_KEY",                description: "Web Push — notifiche push disabilitate" },
   { key: "VAPID_PRIVATE_KEY",               description: "Web Push — notifiche push disabilitate" },
   { key: "VAPID_EMAIL",                     description: "Web Push — notifiche push disabilitate" },
   { key: "GOOGLE_CLIENT_ID",                description: "Google OAuth — login con Google disabilitato" },
   { key: "AI_INTEGRATIONS_OPENAI_BASE_URL", description: "Integrazione Replit OpenAI — Wiki AI, Roadmap, Growth Research disabilitati" },
   { key: "AI_INTEGRATIONS_OPENAI_API_KEY",  description: "Integrazione Replit OpenAI — necessaria insieme a AI_INTEGRATIONS_OPENAI_BASE_URL" },
+  { key: "AI_MODEL",                        description: "Modello OpenAI per agenti orchestratore (default: gpt-4o-mini). Usare un modello esistente (gpt-4o-mini, gpt-4.1, gpt-4o)" },
+  { key: "CORS_ORIGIN",                     description: "Origin frontend in produzione (es. https://northstar.app) — senza questo CORS è aperto solo a localhost:5000" },
 ];
 
 export interface StartupCheckResult {
