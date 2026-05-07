@@ -100,6 +100,7 @@ async function assignUserToSession(sessionId: number, userId: number): Promise<v
   } catch {}
 }
 
+// ── SpiritTimer ───────────────────────────────────────────────────────────────
 const CIRC = 2 * Math.PI * 20;
 function SpiritTimer({ totalSec, paused, reduced }: { totalSec: number; paused: boolean; reduced: boolean }) {
   const [remaining, setRemaining] = useState(totalSec);
@@ -132,6 +133,7 @@ function SpiritTimer({ totalSec, paused, reduced }: { totalSec: number; paused: 
   );
 }
 
+// ── SectionDivider ────────────────────────────────────────────────────────────
 const DIVIDER_MS = 1800;
 function SectionDivider({ label, emoji, description, onDone, reduced }: {
   label: string; emoji: string; description: string; onDone: () => void; reduced: boolean;
@@ -156,6 +158,49 @@ function SectionDivider({ label, emoji, description, onDone, reduced }: {
   );
 }
 
+// ── TypewriterText ────────────────────────────────────────────────────────────
+// Scrive il testo carattere per carattere a CHAR_DELAY_MS ms/char.
+// Mostra un cursore lampeggiante | che sparisce quando la scrittura finisce.
+// Se reduced=true mostra il testo intero immediatamente senza animazione.
+const CHAR_DELAY_MS = 28;
+interface TypewriterTextProps {
+  text: string;
+  reduced: boolean;
+  className?: string;
+}
+function TypewriterText({ text, reduced, className }: TypewriterTextProps) {
+  const [displayed, setDisplayed] = useState(reduced ? text : "");
+  const [done, setDone] = useState(reduced);
+
+  // Reset quando cambia il testo (cambio domanda)
+  useEffect(() => {
+    if (reduced) { setDisplayed(text); setDone(true); return; }
+    setDisplayed("");
+    setDone(false);
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setDisplayed(text.slice(0, i));
+      if (i >= text.length) { clearInterval(id); setDone(true); }
+    }, CHAR_DELAY_MS);
+    return () => clearInterval(id);
+  }, [text, reduced]);
+
+  return (
+    <span className={className}>
+      {displayed}
+      {!done && (
+        <motion.span
+          animate={{ opacity: [1, 0, 1] }}
+          transition={{ duration: 0.7, repeat: Infinity, ease: "linear" }}
+          className="inline-block w-px h-[1em] bg-current align-middle ml-0.5"
+        />
+      )}
+    </span>
+  );
+}
+
+// ── Componente principale ─────────────────────────────────────────────────────
 export default function Test() {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
@@ -175,20 +220,23 @@ export default function Test() {
   const [direction, setDirection] = useState<1 | -1>(1);
   const [justSelected, setJustSelected] = useState<string | null>(null);
   const [activeDivider, setActiveDivider] = useState<"spirits" | "ctx" | null>(null);
-  const [lyraHasEntered, setLyraHasEntered] = useState(false);
+
+  // lyraHasEntered: false solo durante il primo ingresso (step 0, non resumed)
+  // diventa true dopo 850ms — sincronizzato con la durata dell'animazione avatar
+  const [lyraHasEntered, setLyraHasEntered] = useState(() => false);
   const assignedSessionRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (currentStep === 0 && !resumed) setLyraHasEntered(false);
-  }, [currentStep, resumed]);
-
-  useEffect(() => {
-    if (prefersReduced) { setLyraHasEntered(true); return; }
-    if (currentStep !== 0) { setLyraHasEntered(true); return; }
-    if (resumed) { setLyraHasEntered(true); return; }
-    const id = setTimeout(() => setLyraHasEntered(true), 850);
+    // Se resumed o reduced o non siamo allo step 0 → nessun delay
+    if (resumed || prefersReduced || currentStep !== 0) {
+      setLyraHasEntered(true);
+      return;
+    }
+    // Primo caricamento: aspetta che l'avatar atterre prima di mostrare il bubble
+    const id = setTimeout(() => setLyraHasEntered(true), 880);
     return () => clearTimeout(id);
-  }, [currentStep, resumed, prefersReduced]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (currentStep === 0 && Object.keys(answers).length === 0) return;
@@ -213,6 +261,9 @@ export default function Test() {
   const progress    = (currentStep / ALL_IDS.length) * 100;
   const currentPhase: 0 | 1 | 2 = isCtxQ ? 2 : isSpiritQ ? 1 : 0;
   const scenario = SCENARIOS[currentId];
+
+  // true solo per il vero primo ingresso (non resumed, step 0, non reduced)
+  const isIntroEntry = currentStep === 0 && !resumed && !prefersReduced;
 
   const questionText = isCtxQ
     ? t(`test.questions.ctx.${currentId}`)
@@ -280,8 +331,11 @@ export default function Test() {
 
   const handleResume = () => {
     if (!draft) return;
-    setCurrentStep(draft.step); setAnswers(draft.answers);
-    setResumeBannerVisible(false); setResumed(true); setLyraHasEntered(true);
+    setCurrentStep(draft.step);
+    setAnswers(draft.answers);
+    setResumeBannerVisible(false);
+    setResumed(true);
+    setLyraHasEntered(true);
   };
   const handleDismissDraft = () => { clearDraft(); setResumeBannerVisible(false); };
 
@@ -307,6 +361,7 @@ export default function Test() {
         exit:  (dir: number) => ({ opacity: 0, x: dir > 0 ? -32 : 32, transition: { duration: 0.18, ease: easings.easeIn } }),
       };
 
+  // ── Completion screen ──────────────────────────────────────────────────────
   if (isComplete) {
     return (
       <div className="container max-w-2xl mx-auto px-4 py-24 flex flex-col items-center justify-center min-h-[70vh] text-center">
@@ -324,6 +379,7 @@ export default function Test() {
     );
   }
 
+  // ── Question screen ────────────────────────────────────────────────────────
   const showResumeBanner = !!draft && resumeBannerVisible && !resumed
     && currentStep === 0 && Object.keys(answers).length === 0;
 
@@ -334,6 +390,8 @@ export default function Test() {
 
   return (
     <div className="container max-w-5xl mx-auto px-4 py-10 min-h-[80vh]">
+
+      {/* Resume banner */}
       <AnimatePresence>
         {showResumeBanner && (
           <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
@@ -355,6 +413,7 @@ export default function Test() {
         )}
       </AnimatePresence>
 
+      {/* Phase stepper */}
       <div className="flex items-center justify-center gap-1.5 mb-4">
         {PHASE_LABELS.map((label, i) => {
           const isActive = currentPhase === i;
@@ -384,6 +443,7 @@ export default function Test() {
         })}
       </div>
 
+      {/* Header back + counter */}
       <div className="flex items-center justify-between mb-3">
         <motion.button onClick={handleBack} disabled={currentStep === 0 || justSelected !== null}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
@@ -394,11 +454,13 @@ export default function Test() {
         <span className="text-sm text-muted-foreground">{headerLabel}</span>
       </div>
 
+      {/* Progress bar */}
       <motion.div initial={false} animate={{ scaleX: progress / 100 }}
         transition={prefersReduced ? { duration: 0 } : { duration: 0.4, ease: easings.easeOut }}
         style={{ transformOrigin: "left" }} className="h-1 bg-primary rounded-full mb-8"
       />
 
+      {/* Section divider */}
       <AnimatePresence>
         {activeDivider && (
           <SectionDivider key={activeDivider}
@@ -410,75 +472,88 @@ export default function Test() {
         )}
       </AnimatePresence>
 
+      {/* ── Layout due colonne ── */}
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8 items-start">
+
+        {/* Colonna sinistra: Avatar + bubble */}
         <AnimatePresence mode="wait">
           <motion.div
-            key={`avatar-${currentPhase}-${scenario?.avatarState}-${lyraHasEntered ? 'ready' : 'intro'}`}
+            key={`avatar-col-${currentPhase}`}
+            // Ingresso Lyra: solo prima domanda, slide da sx + blur dissolve + spring
             initial={
-              prefersReduced
-                ? { opacity: 0 }
-                : currentStep === 0 && !resumed && !lyraHasEntered
-                ? { opacity: 0, x: -56, scale: 0.92, filter: "blur(6px)" }
-                : { opacity: 0, scale: 0.96 }
+              prefersReduced ? { opacity: 0 } :
+              isIntroEntry   ? { opacity: 0, x: -52, scale: 0.9, filter: "blur(8px)" } :
+                               { opacity: 0, scale: 0.96 }
             }
             animate={
-              prefersReduced
-                ? { opacity: 1 }
-                : currentStep === 0 && !resumed && !lyraHasEntered
-                ? { opacity: 1, x: 0, scale: 1, filter: "blur(0px)" }
-                : { opacity: 1, scale: 1 }
+              prefersReduced ? { opacity: 1 } :
+              isIntroEntry   ? { opacity: 1, x: 0, scale: 1, filter: "blur(0px)" } :
+                               { opacity: 1, scale: 1 }
             }
-            exit={prefersReduced ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+            exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.25 } }}
             transition={
-              currentStep === 0 && !resumed && !lyraHasEntered
-                ? { duration: 0.7, ease: [0.16, 1, 0.3, 1] }
+              isIntroEntry
+                ? { duration: 0.72, ease: [0.16, 1, 0.3, 1] }   // expo-out custom
                 : { duration: 0.35 }
             }
             className={cn(
-              "flex flex-col items-center gap-4 rounded-3xl p-6 transition-colors duration-500",
+              "relative flex flex-col items-center gap-4 rounded-3xl p-6 transition-colors duration-500",
               PHASE_BG[currentPhase]
             )}
           >
-            {currentStep === 0 && !resumed && !prefersReduced && !lyraHasEntered && (
+            {/* Halo glow: appare solo durante il primo ingresso */}
+            {isIntroEntry && !prefersReduced && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.85 }}
-                animate={{ opacity: [0, 1, 0.4], scale: [0.85, 1.08, 1.2] }}
-                transition={{ duration: 0.9, ease: "easeOut" }}
-                className="absolute inset-0 m-auto w-28 h-28 rounded-full bg-primary/12 blur-2xl pointer-events-none"
+                initial={{ opacity: 0, scale: 0.6 }}
+                animate={{ opacity: [0, 0.55, 0], scale: [0.6, 1.3, 1.6] }}
+                transition={{ duration: 1.1, ease: "easeOut", delay: 0.15 }}
+                className="absolute top-6 left-1/2 -translate-x-1/2 w-36 h-36 rounded-full pointer-events-none"
+                style={{ background: "var(--primary)", filter: "blur(28px)" }}
               />
             )}
 
+            {/* Avatar */}
             <LyraAvatar
               state={scenario?.avatarState ?? "focused"}
               phase={currentPhase}
               reduced={prefersReduced}
               size={140}
-              className="shadow-sm"
+              className="shadow-sm relative z-10"
             />
 
+            {/* Label */}
             <div className="text-center">
               <p className="text-xs font-semibold tracking-widest uppercase text-muted-foreground/60">Lyra</p>
               <p className="text-xs text-muted-foreground/50">Orientamento AI</p>
             </div>
 
-            {scenario?.avatarIntro && lyraHasEntered && (
-              <AnimatePresence mode="wait">
+            {/* Bubble con typewriter — appare solo dopo lyraHasEntered */}
+            <AnimatePresence>
+              {lyraHasEntered && scenario?.avatarIntro && (
                 <motion.div
-                  key={currentStep}
-                  initial={currentStep === 0 && !resumed ? { opacity: 0, y: 10 } : { opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.35, delay: currentStep === 0 && !resumed ? 0.15 : 0.1 }}
-                  className="relative w-full bg-white/80 dark:bg-white/5 border border-border/60 rounded-2xl px-4 py-3 text-sm text-foreground/80 leading-relaxed"
+                  key={`bubble-${currentStep}`}
+                  initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.97, transition: { duration: 0.15 } }}
+                  transition={{ duration: 0.3, delay: isIntroEntry ? 0.12 : 0.08 }}
+                  className="relative w-full bg-white/80 dark:bg-white/5 border border-border/60 rounded-2xl px-4 py-3 text-sm leading-relaxed"
                 >
+                  {/* Freccia bubble */}
                   <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 rotate-45 bg-white/80 dark:bg-white/5 border-l border-t border-border/60" />
-                  <span className="italic">&ldquo;{scenario.avatarIntro}&rdquo;</span>
+                  <span className="text-muted-foreground/60 italic mr-1">&ldquo;</span>
+                  <TypewriterText
+                    text={scenario.avatarIntro}
+                    reduced={prefersReduced}
+                    className="italic text-foreground/80"
+                  />
+                  <span className="text-muted-foreground/60 italic ml-0.5">&rdquo;</span>
                 </motion.div>
-              </AnimatePresence>
-            )}
+              )}
+            </AnimatePresence>
           </motion.div>
         </AnimatePresence>
 
+        {/* Colonna destra: scenario + domanda + opzioni */}
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={currentStep}
@@ -488,6 +563,7 @@ export default function Test() {
             animate="center"
             exit="exit"
           >
+            {/* Badge dimensione Spirit */}
             {spiritInfo && (() => {
               const display = SPIRIT_DISPLAY[spiritInfo.transKey];
               return (
@@ -510,6 +586,7 @@ export default function Test() {
               );
             })()}
 
+            {/* Badge Obiettivi */}
             {isCtxQ && (
               <div className="flex items-center gap-3 mb-4">
                 <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-full px-4 py-1.5">
@@ -521,6 +598,7 @@ export default function Test() {
               </div>
             )}
 
+            {/* Box scenario narrativo */}
             {scenario?.scenario && (
               <motion.div
                 initial={{ opacity: 0, y: 4 }}
@@ -532,10 +610,12 @@ export default function Test() {
               </motion.div>
             )}
 
+            {/* Domanda */}
             <h2 className="text-xl sm:text-2xl md:text-[1.6rem] font-serif font-semibold text-foreground mb-7 leading-snug">
               {questionText}
             </h2>
 
+            {/* Opzioni */}
             <div className="space-y-3">
               {OPTIONS.map((opt, optIdx) => {
                 const selected = answers[currentId] === opt.value;
@@ -591,6 +671,7 @@ export default function Test() {
               })}
             </div>
 
+            {/* Keyboard hint */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8, duration: 0.4 }}
               className="hidden pointer-fine:flex items-center gap-3 mt-8 text-xs text-muted-foreground/50 justify-center flex-wrap"
             >
