@@ -25,3 +25,5 @@ export * from "./messages";
 export * from "./friendships";
 // Growth agent memory
 export * from "./coachMemory";
+// Phase 7 — User feedback loop
+export * from "./responseFeedback";
