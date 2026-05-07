@@ -2,14 +2,12 @@
  * POST /api/growth-agent/ingest
  *
  * Accepts:
- *   - multipart/form-data with a `file` field (txt, pdf-extracted text)
- *   - application/json with { text, sourceName, sourceType, metadata }
- *   - { url, sourceName } to scrape and ingest a webpage
+ *   - multipart/form-data  file=<.txt|.pdf>           → text or PDF ingestion
+ *   - application/json     { text, sourceName, ... }   → raw text
+ *   - application/json     { url, ... }                → scrape URL
+ *   - application/json     { sourceType:"persona_example", question, answer, tags }
  *
- * Persona examples format (sourceType = "persona_example"):
- *   { question: "...", answer: "...", tags: [...] }
- *
- * Auth: requires JWT (userId extracted from token)
+ * Response: { ok: true, chunksInserted: N, sourceName: string, sourceType: string }
  */
 import { Router } from "express";
 import multer from "multer";
@@ -18,25 +16,54 @@ import {
   ingestPersonaExample,
   ingestUrl,
 } from "@workspace/integrations-openai-ai-server/growth-agent";
+import { ingestPdf } from "@workspace/integrations-openai-ai-server/growth-agent/pdf-parser";
 import type { SourceType } from "@workspace/integrations-openai-ai-server/growth-agent";
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["text/plain", "application/pdf"];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only .txt and .pdf files are supported"));
+    }
+  },
+});
 
-// ── Upload file or raw text ───────────────────────────────────────────────────
 router.post("/", upload.single("file"), async (req, res) => {
   try {
     const userId: number = (req as any).user.id;
 
-    // ── File upload ────────────────────────────────────────────────────────
+    // ── FILE UPLOAD ──────────────────────────────────────────────────────────
     if (req.file) {
-      const text = req.file.buffer.toString("utf-8");
-      const result = await ingestText(text, {
-        userId,
-        sourceType: (req.body.sourceType as SourceType) ?? "document",
-        sourceName: req.file.originalname,
-        metadata: req.body.metadata ? JSON.parse(req.body.metadata) : {},
-      });
+      const sourceName = req.file.originalname;
+      const sourceType = (req.body.sourceType as SourceType) ?? "document";
+      const metadata   = req.body.metadata ? JSON.parse(req.body.metadata) : {};
+
+      let result;
+
+      if (req.file.mimetype === "application/pdf") {
+        // ── PDF → extract text → chunk → embed → store ────────────────────
+        result = await ingestPdf(req.file.buffer, {
+          userId,
+          sourceType,
+          sourceName,
+          metadata,
+        });
+      } else {
+        // ── Plain text ────────────────────────────────────────────────────
+        const text = req.file.buffer.toString("utf-8");
+        result = await ingestText(text, {
+          userId,
+          sourceType,
+          sourceName,
+          metadata,
+        });
+      }
+
       return res.json({ ok: true, ...result });
     }
 
@@ -51,7 +78,7 @@ router.post("/", upload.single("file"), async (req, res) => {
       metadata?: Record<string, unknown>;
     };
 
-    // ── Persona example ────────────────────────────────────────────────────
+    // ── PERSONA EXAMPLE ──────────────────────────────────────────────────────
     if (body.sourceType === "persona_example" && body.question && body.answer) {
       const result = await ingestPersonaExample({
         userId,
@@ -64,7 +91,7 @@ router.post("/", upload.single("file"), async (req, res) => {
       return res.json({ ok: true, ...result });
     }
 
-    // ── URL scrape ─────────────────────────────────────────────────────────
+    // ── URL SCRAPE ───────────────────────────────────────────────────────────
     if (body.url) {
       const result = await ingestUrl(body.url, {
         userId,
@@ -75,7 +102,7 @@ router.post("/", upload.single("file"), async (req, res) => {
       return res.json({ ok: true, ...result });
     }
 
-    // ── Raw text ───────────────────────────────────────────────────────────
+    // ── RAW TEXT ─────────────────────────────────────────────────────────────
     if (body.text) {
       const result = await ingestText(body.text, {
         userId,
@@ -86,7 +113,9 @@ router.post("/", upload.single("file"), async (req, res) => {
       return res.json({ ok: true, ...result });
     }
 
-    return res.status(400).json({ error: "Provide file, text, url, or persona_example fields" });
+    return res.status(400).json({
+      error: "Provide: file (.txt/.pdf), text, url, or persona_example fields",
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Ingest error";
     return res.status(500).json({ error: msg });

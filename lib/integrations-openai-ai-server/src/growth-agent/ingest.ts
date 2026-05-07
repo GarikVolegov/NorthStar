@@ -1,12 +1,13 @@
 /**
- * Ingest pipeline — takes raw content (text, PDF-extracted text, URL)
- * and stores it in the knowledge graph as embedded chunks.
+ * Ingest pipeline — stores text chunks as embedded knowledge nodes.
  *
- * Flow:
- *   raw text → chunkText() → embedBatch() → knowledgeNodesTable INSERT
+ * FIX: knowledgeNodesTable uses 'type' as the column name, not 'nodeType'.
+ * The retriever reads '.nodeType' which maps to the Drizzle field name
+ * (Drizzle camelCases 'node_type' → 'nodeType' if the column were named that,
+ * but here the column is just 'type'). Fixed: we insert into 'type' and
+ * the retriever now reads 'type' as well.
  *
- * For PDF support, parse with pdf-parse before calling ingestText.
- * For URLs, scrape with cheerio/node-fetch before calling ingestText.
+ * Also fixed: 'title' is NOT NULL in the schema — always set a fallback.
  */
 import { db } from "@workspace/db";
 import { knowledgeNodesTable } from "@workspace/db";
@@ -17,9 +18,7 @@ export type SourceType = "document" | "persona_example" | "user_note" | "web";
 export interface IngestOptions {
   userId: number;
   sourceType: SourceType;
-  /** Display name for citations, e.g. file name or URL */
   sourceName: string;
-  /** Optional free-form metadata (author, date, tags…) */
   metadata?: Record<string, unknown>;
 }
 
@@ -29,10 +28,6 @@ export interface IngestResult {
   sourceName: string;
 }
 
-/**
- * Ingest a plain text string.
- * Call this after extracting text from PDF / URL / user input.
- */
 export async function ingestText(
   text: string,
   opts: IngestOptions,
@@ -44,10 +39,14 @@ export async function ingestText(
 
   const rows = chunks.map((chunk, i) => ({
     userId: opts.userId,
-    // nodeType is the sourceType column (renamed for clarity internally)
-    nodeType: opts.sourceType,
+    // FIX: 'type' is the actual DB column (maps to Drizzle field 'type')
+    // The retriever checks n.type for sourceType filtering.
+    type: opts.sourceType,
+    // title is NOT NULL — use sourceName + chunk index as fallback
+    title: `${opts.sourceName} [${i + 1}/${chunks.length}]`,
     content: chunk,
     embedding: embeddings[i],
+    embeddedText: chunk,
     metadata: {
       source: opts.sourceName,
       chunkIndex: i,
@@ -55,9 +54,15 @@ export async function ingestText(
       ...opts.metadata,
     },
     sectorId: null,
+    x: 0,
+    y: 0,
   }));
 
-  await db.insert(knowledgeNodesTable).values(rows);
+  // Insert in batches of 50 to avoid max parameter limits
+  const BATCH = 50;
+  for (let i = 0; i < rows.length; i += BATCH) {
+    await db.insert(knowledgeNodesTable).values(rows.slice(i, i + BATCH));
+  }
 
   return {
     chunksInserted: chunks.length,
@@ -66,16 +71,6 @@ export async function ingestText(
   };
 }
 
-/**
- * Ingest a persona example (a Q&A pair that teaches the agent how to reason).
- *
- * Example:
- *   question: "Come esco da un momento di stagnazione?"
- *   answer:   "Prima osservo cosa mi sta dicendo questa fase..."
- *
- * These are stored with sourceType=persona_example and retrieved with
- * a higher weight in the prompt builder.
- */
 export async function ingestPersonaExample(
   opts: IngestOptions & {
     question: string;
@@ -96,10 +91,6 @@ export async function ingestPersonaExample(
   });
 }
 
-/**
- * Scrape a URL and ingest its text content.
- * Strips HTML tags for clean ingestion.
- */
 export async function ingestUrl(
   url: string,
   opts: Omit<IngestOptions, "sourceName"> & { sourceName?: string },
@@ -110,7 +101,6 @@ export async function ingestUrl(
   if (!res.ok) throw new Error(`[ingest] Failed to fetch ${url}: ${res.status}`);
 
   const html = await res.text();
-  // Minimal HTML stripping — for production use cheerio or readability
   const text = html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
