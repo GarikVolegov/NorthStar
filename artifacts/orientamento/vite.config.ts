@@ -48,11 +48,32 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,jpg,woff2}"],
+        // Aumentato staleWhileRevalidate a 7 giorni per asset statici
         runtimeCaching: [
           {
             urlPattern: /\/api\/(sectors|stats)/,
             handler: "StaleWhileRevalidate",
-            options: { cacheName: "api-cache", expiration: { maxAgeSeconds: 3600 } },
+            options: {
+              cacheName: "api-cache",
+              expiration: { maxAgeSeconds: 3600, maxEntries: 50 },
+            },
+          },
+          {
+            urlPattern: /\/api\/(user|notifications)/,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "user-cache",
+              networkTimeoutSeconds: 4,
+              expiration: { maxAgeSeconds: 300, maxEntries: 20 },
+            },
+          },
+          {
+            urlPattern: /\.(?:woff2|woff|ttf|eot)$/,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "font-cache",
+              expiration: { maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
           },
         ],
       },
@@ -82,23 +103,51 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // Target ES2020: usa native async/await, evita transpilazione pesante
+    target: "es2020",
+    // Split CSS per chunk: carica solo il CSS della pagina attiva
+    cssCodeSplit: true,
+    // Warn solo sopra 800kb
+    chunkSizeWarningLimit: 800,
+    // Minifica con esbuild (molto più veloce di terser, output quasi identico)
+    minify: "esbuild",
     rollupOptions: {
       output: {
-        manualChunks: {
-          "vendor-react": ["react", "react-dom", "wouter"],
-          "vendor-ui": ["lucide-react"],
-          "vendor-radix": [
-            "@radix-ui/react-accordion",
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-select",
-            "@radix-ui/react-tabs",
-            "@radix-ui/react-tooltip",
-          ],
-          "vendor-charts": ["recharts"],
-          "vendor-query": ["@tanstack/react-query"],
-          "vendor-motion": ["framer-motion"],
-          "vendor-forms": ["react-hook-form", "@hookform/resolvers", "zod"],
+        // Hash brevi per URL più corti
+        hashCharacters: "base36",
+        manualChunks: (id) => {
+          // React core
+          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/") || id.includes("node_modules/wouter/")) {
+            return "vendor-react";
+          }
+          // Animazioni — chunk separato: non serve su tutte le pagine
+          if (id.includes("node_modules/framer-motion/")) {
+            return "vendor-motion";
+          }
+          // Charts — pesante, lazy separato
+          if (id.includes("node_modules/recharts/") || id.includes("node_modules/d3")) {
+            return "vendor-charts";
+          }
+          // Radix UI
+          if (id.includes("node_modules/@radix-ui/")) {
+            return "vendor-radix";
+          }
+          // Tanstack Query
+          if (id.includes("node_modules/@tanstack/")) {
+            return "vendor-query";
+          }
+          // Forms
+          if (id.includes("node_modules/react-hook-form/") || id.includes("node_modules/@hookform/") || id.includes("node_modules/zod/")) {
+            return "vendor-forms";
+          }
+          // Icone
+          if (id.includes("node_modules/lucide-react/")) {
+            return "vendor-ui";
+          }
+          // i18n
+          if (id.includes("node_modules/i18next") || id.includes("node_modules/react-i18next")) {
+            return "vendor-i18n";
+          }
         },
       },
     },
@@ -111,16 +160,36 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    // In dev non bloccare la cache degli asset statici (solo HTML)
     headers: {
-      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-      "Pragma": "no-cache",
-      "Expires": "0",
-      "Surrogate-Control": "no-store",
+      "Cache-Control": "no-cache",
+    },
+    // Warm-up delle pagine più visitate al primo avvio del dev server
+    warmup: {
+      clientFiles: [
+        "./src/pages/home.tsx",
+        "./src/pages/test.tsx",
+        "./src/pages/results.tsx",
+        "./src/components/layout/navbar.tsx",
+      ],
     },
   },
   preview: {
     port,
     host: "0.0.0.0",
     allowedHosts: true,
+  },
+  // Ottimizza dipendenze pre-bundle in dev
+  optimizeDeps: {
+    include: [
+      "react",
+      "react-dom",
+      "wouter",
+      "@tanstack/react-query",
+      "framer-motion",
+      "lucide-react",
+    ],
+    // Esclude dipendenze grandi che non servono in dev
+    exclude: ["recharts"],
   },
 });

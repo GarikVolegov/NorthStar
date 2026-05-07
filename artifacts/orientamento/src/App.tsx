@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
-import { useReducedMotion, easings, durations } from "@/lib/motion";
+import { useReducedMotion, easings } from "@/lib/motion";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageLoader } from "@/components/PageLoader";
 import { Navbar } from "@/components/layout/navbar";
@@ -69,6 +69,12 @@ const AdminCataloghi = lazy(() => import("@/pages/admin-cataloghi"));
 const AdminCrescita = lazy(() => import("@/pages/admin-crescita"));
 const CertificatePage = lazy(() => import("@/pages/certificato"));
 
+/**
+ * QueryClient ottimizzato:
+ * - staleTime 5 min: non refetcha se i dati sono freschi
+ * - gcTime 30 min: mantiene in cache anche le query non montate (navigazione back istantanea)
+ * - refetchOnWindowFocus false: evita refetch inutili quando l'utente torna sulla tab
+ */
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -78,7 +84,10 @@ const queryClient = new QueryClient({
         return failureCount < 2;
       },
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
-      staleTime: 30_000,
+      staleTime: 5 * 60 * 1000,       // 5 minuti
+      gcTime: 30 * 60 * 1000,         // 30 minuti in cache dopo unmount
+      refetchOnWindowFocus: false,    // no refetch al cambio tab
+      refetchOnReconnect: "always",   // ma sì alla riconnessione rete
     },
   },
 });
@@ -149,21 +158,26 @@ function AnimatedRoutes() {
 
   return (
     <ErrorBoundary>
-      <AnimatePresence mode="wait" initial={false}>
+      {/*
+       * mode="sync" invece di "wait":
+       * la nuova pagina entra MENTRE la vecchia esce — nessuna latenza aggiuntiva
+       * tra fine exit e inizio enter.
+       * Durations ridotte: enter 120ms, exit 80ms — snappy ma non brusco.
+       */}
+      <AnimatePresence mode="sync" initial={false}>
         <motion.div
           key={location}
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{
             opacity: 1,
             y: 0,
-            transition: { duration: durations.slow, ease: easings.easeOut },
+            transition: { duration: 0.12, ease: easings.easeOut },
           }}
           exit={{
             opacity: 0,
-            y: -6,
-            transition: { duration: durations.normal, ease: easings.easeIn },
+            y: -4,
+            transition: { duration: 0.08, ease: easings.easeIn },
           }}
-          style={{ willChange: "opacity, transform" }}
         >
           <Suspense fallback={<PageLoader />}>
             {routes(location)}
