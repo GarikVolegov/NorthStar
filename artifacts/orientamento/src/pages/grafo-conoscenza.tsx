@@ -4,7 +4,7 @@ import {
   ArrowLeft, Plus, Save, Trash2, Link2, X, Search, Sparkles, Loader2,
   StickyNote, Lightbulb, FileText, Target, Briefcase, Wrench, Award,
   Network, Globe, MessageCircleQuestion, Send, ChevronRight,
-  Upload, Wand2, Check,
+  Upload, Wand2, Check, ChevronDown,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
@@ -81,6 +89,31 @@ function api<T>(path: string, init?: RequestInit): Promise<T> {
   });
 }
 
+// ── UX #6: calcolo raggio nodo più preciso ─────────────────────────────────
+function nodeRadius(title: string) {
+  return Math.max(28, Math.min(52, 10 + title.length * 3.2));
+}
+
+// ── UX #6: split titolo in max 2 righe per tspan ──────────────────────────
+function splitTitle(title: string): [string, string | null] {
+  if (title.length <= 12) return [title, null];
+  // Prova a spezzare alla parola più vicina a metà
+  const words = title.split(" ");
+  if (words.length === 1) {
+    return [title.slice(0, 11) + "…", null];
+  }
+  let line1 = "";
+  let i = 0;
+  while (i < words.length && (line1 + words[i]).length <= 12) {
+    line1 += (line1 ? " " : "") + words[i];
+    i++;
+  }
+  if (!line1) line1 = words[0].slice(0, 11) + "…";
+  const rest = words.slice(i).join(" ");
+  const line2 = rest.length > 11 ? rest.slice(0, 10) + "…" : rest;
+  return [line1, line2 || null];
+}
+
 export default function Archivio() {
   const { user, authReady } = useAuth();
   const { toast } = useToast();
@@ -102,6 +135,9 @@ export default function Archivio() {
 
   const [autoLinkSuggestions, setAutoLinkSuggestions] = useState<AutoLinkSuggestion[]>([]);
   const [autoLinkSourceId, setAutoLinkSourceId] = useState<number | null>(null);
+
+  // ── UX #5: ref per delegare Ctrl+S al NodeEditor ──────────────────────────
+  const onSaveRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
@@ -132,10 +168,7 @@ export default function Archivio() {
 
   const panState = useRef<{ startX: number; startY: number; vx: number; vy: number } | null>(null);
 
-  // ── Bug #1 fix: wheel listener non-passivo diretto su svgRef ───────────────
-  // React 17+ attacca i synthetic listeners come passive:true in Chrome,
-  // rendendo e.preventDefault() inoperante sul wheel event.
-  // Registriamo direttamente sul DOM con { passive: false }.
+  // ── wheel listener non-passivo ─────────────────────────────────────────────
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
@@ -155,6 +188,37 @@ export default function Archivio() {
     svg.addEventListener("wheel", handler, { passive: false });
     return () => svg.removeEventListener("wheel", handler);
   }, []);
+
+  // ── UX #5: keyboard shortcuts globali ────────────────────────────────────
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      const isEditing = tag === "input" || tag === "textarea" || (e.target as HTMLElement)?.isContentEditable;
+
+      // Escape: chiudi pannello / annulla link mode / chiudi chat
+      if (e.key === "Escape") {
+        if (linkMode) { setLinkMode(null); return; }
+        if (chatOpen) { setChatOpen(false); return; }
+        if (selectedId !== null) { setSelectedId(null); return; }
+      }
+
+      // Delete / Backspace: elimina nodo selezionato (solo fuori da input)
+      if ((e.key === "Delete" || e.key === "Backspace") && !isEditing && selectedId !== null) {
+        e.preventDefault();
+        void handleDeleteNode(selectedId);
+        return;
+      }
+
+      // Ctrl+S / Cmd+S: salva nodo corrente
+      if ((e.ctrlKey || e.metaKey) && e.key === "s" && selectedId !== null) {
+        e.preventDefault();
+        onSaveRef.current?.();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, linkMode, chatOpen]);
 
   const loadGraph = useCallback(async () => {
     setLoading(true);
@@ -210,10 +274,6 @@ export default function Archivio() {
     [data.nodes, selectedId],
   );
 
-  // ── Bug #3 fix: auto-link solo con contenuto reale ─────────────────────────
-  // Non chiamiamo più fetchAutoLinks al momento della creazione (nodo vuoto).
-  // Viene chiamato solo dopo import (contenuto già estratto dal file)
-  // oppure dopo il primo handleUpdateNode con content.length > 20.
   const fetchAutoLinks = useCallback(async (nodeId: number) => {
     try {
       const suggestions = await api<AutoLinkSuggestion[]>(`/nodes/${nodeId}/auto-link`, {
@@ -228,7 +288,6 @@ export default function Archivio() {
     }
   }, []);
 
-  // ── File import — con toast di errore visibile ─────────────────────────────
   const handleFileImport = useCallback(async (file: File) => {
     setImporting(true);
     try {
@@ -242,7 +301,6 @@ export default function Archivio() {
       const created = await res.json() as KNode;
       setData((d) => ({ ...d, nodes: [...d.nodes, created] }));
       setSelectedId(created.id);
-      // Import ha già contenuto estratto — auto-link ha senso
       void fetchAutoLinks(created.id);
     } catch (err) {
       toast({
@@ -256,7 +314,7 @@ export default function Archivio() {
     }
   }, [fetchAutoLinks, toast]);
 
-  // ── Mutations ───────────────────────────────────────────────────────────────
+  // ── Mutations ──────────────────────────────────────────────────────────────
   async function handleAddNode(type: NodeType = creatingType) {
     if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
@@ -272,7 +330,6 @@ export default function Archivio() {
       });
       setData((d) => ({ ...d, nodes: [...d.nodes, created] }));
       setSelectedId(created.id);
-      // Bug #3: NON chiamiamo fetchAutoLinks qui — il nodo è vuoto
     } catch (err) {
       console.error("[archivio] create node failed", err);
     }
@@ -285,7 +342,6 @@ export default function Archivio() {
         body: JSON.stringify(patch),
       });
       setData((d) => ({ ...d, nodes: d.nodes.map((n) => (n.id === id ? updated : n)) }));
-      // Bug #3: auto-link solo al primo salvataggio con contenuto reale
       if (patch.content && patch.content.length > 20) {
         void fetchAutoLinks(id);
       }
@@ -330,7 +386,7 @@ export default function Archivio() {
     }
   }
 
-  // ── Drag (zero-rerender DOM mutation strategy) ──────────────────────────────
+  // ── Drag ───────────────────────────────────────────────────────────────────
   function onNodePointerDown(e: React.PointerEvent, n: KNode) {
     e.stopPropagation();
     if (linkMode) {
@@ -365,16 +421,18 @@ export default function Archivio() {
         const newX = (cx - svgRect.left - v.x) / v.k - drag.offsetX;
         const newY = (cy - svgRect.top - v.y) / v.k - drag.offsetY;
         drag.moved = true; drag.x = newX; drag.y = newY;
-        if (drag.el) drag.el.setAttribute("transform", `translate(${newX},${newY})`);
+        if (drag.el) {
+          drag.el.setAttribute("transform", `translate(${newX},${newY})`);
+          drag.el.setAttribute("data-x", String(newX));
+          drag.el.setAttribute("data-y", String(newY));
+        }
 
-        // Aggiorna linee degli edge
         svgRef.current.querySelectorAll<SVGLineElement>(`line[data-source="${drag.id}"]`)
           .forEach((l) => { l.setAttribute("x1", String(newX)); l.setAttribute("y1", String(newY)); });
         svgRef.current.querySelectorAll<SVGLineElement>(`line[data-target="${drag.id}"]`)
           .forEach((l) => { l.setAttribute("x2", String(newX)); l.setAttribute("y2", String(newY)); });
 
-        // ── Bug #2 fix: aggiorna midpoint dei text label ─────────────────────
-        // Caso A: il nodo draggato è la SOURCE dell'edge → data-other-x/y è il target (stabile)
+        // Caso A: nodo draggato è source
         svgRef.current.querySelectorAll<SVGTextElement>(`text[data-edge-mid-source="${drag.id}"]`)
           .forEach((txt) => {
             const ox = parseFloat(txt.getAttribute("data-other-x") ?? "0");
@@ -382,43 +440,27 @@ export default function Archivio() {
             txt.setAttribute("x", String((newX + ox) / 2));
             txt.setAttribute("y", String((newY + oy) / 2 - 4));
           });
-        // Caso B: il nodo draggato è il TARGET dell'edge → data-other-x/y è la source (stabile)
+        // Caso B: nodo draggato è target
         svgRef.current.querySelectorAll<SVGTextElement>(`text[data-edge-mid-target="${drag.id}"]`)
           .forEach((txt) => {
             const ox = parseFloat(txt.getAttribute("data-other-x") ?? "0");
             const oy = parseFloat(txt.getAttribute("data-other-y") ?? "0");
             txt.setAttribute("x", String((newX + ox) / 2));
             txt.setAttribute("y", String((newY + oy) / 2 - 4));
-            // Aggiorniamo data-other-x/y SOLO quando il nodo draggato è quello target,
-            // così i text label degli ALTRI nodi che usano il draggato come "other"
-            // ricevono coordinate aggiornate nel loro prossimo drag.
-            txt.setAttribute("data-dragged-x", String(newX));
-            txt.setAttribute("data-dragged-y", String(newY));
           });
-        // Caso C: il nodo draggato è "other" rispetto ad altri edge label ────
-        // (es. sto trascinando B, e un text ha data-other-x/y=B.x,B.y)
-        // Aggiorniamo data-other-x/y su tutti i text che lo referenziano.
+        // Caso C: il nodo draggato è "other" per altri text label
         svgRef.current.querySelectorAll<SVGTextElement>(
           `text[data-edge-mid-source]:not([data-edge-mid-source="${drag.id}"]),` +
           `text[data-edge-mid-target]:not([data-edge-mid-target="${drag.id}"])`
         ).forEach((txt) => {
-          // Identifica se questo text ha il nodo draggato come "other"
           const srcId = txt.getAttribute("data-edge-mid-source");
           const tgtId = txt.getAttribute("data-edge-mid-target");
           const isDragOther =
             (srcId && srcId !== String(drag.id) && tgtId === String(drag.id)) ||
             (tgtId && tgtId !== String(drag.id) && srcId === String(drag.id));
           if (!isDragOther) return;
-          // Aggiorna data-other-x/y e ricalcola midpoint
           txt.setAttribute("data-other-x", String(newX));
           txt.setAttribute("data-other-y", String(newY));
-          const myX = parseFloat(
-            (srcId && srcId !== String(drag.id))
-              ? (svgRef.current!.querySelector<SVGGElement>(`g[data-node-id="${srcId}"]`)
-                  ?.getAttribute("data-x") ?? "0")
-              : String(newX)
-          );
-          // Recupera le coordinate del nodo "non draggato" dal suo <g data-node-id>
           const otherG = svgRef.current!.querySelector<SVGGElement>(
             `g[data-node-id="${srcId !== String(drag.id) ? srcId : tgtId}"]`
           );
@@ -510,20 +552,20 @@ export default function Archivio() {
         }}
       />
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 px-4 md:px-6 py-3 border-b bg-card/80 backdrop-blur-sm">
-        <Button variant="ghost" size="icon" className="rounded-full h-8 w-8" asChild>
+      {/* ── Toolbar ── UX #4: controlli creazione collassati in DropdownMenu ── */}
+      <div className="flex items-center gap-2 px-4 md:px-6 py-3 border-b bg-card/80 backdrop-blur-sm overflow-x-auto">
+        <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 shrink-0" asChild>
           <Link href="/"><ArrowLeft className="w-4 h-4" /></Link>
         </Button>
 
-        <div className="flex items-center gap-2 mr-2">
+        <div className="flex items-center gap-2 mr-2 shrink-0">
           <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
             <Network className="w-3.5 h-3.5 text-primary" />
           </div>
-          <h1 className="font-serif font-bold text-lg">Il tuo Archivio</h1>
+          <h1 className="font-serif font-bold text-lg whitespace-nowrap">Il tuo Archivio</h1>
         </div>
 
-        <div className="relative flex-1 min-w-[160px] max-w-[240px]">
+        <div className="relative flex-1 min-w-[140px] max-w-[220px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
             value={search}
@@ -533,10 +575,11 @@ export default function Archivio() {
           />
         </div>
 
+        {/* Filtro tipo — rimane inline per discovery */}
         <select
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value as NodeType | "all")}
-          className="h-8 rounded-xl border border-border bg-background px-2 text-xs"
+          className="h-8 rounded-xl border border-border bg-background px-2 text-xs shrink-0"
         >
           <option value="all">Tutti</option>
           {ALL_TYPES.map((t) => (
@@ -544,7 +587,8 @@ export default function Archivio() {
           ))}
         </select>
 
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex items-center gap-1.5 shrink-0">
+          {/* Chat */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -559,36 +603,52 @@ export default function Archivio() {
             <TooltipContent>Chiedi all'Archivio</TooltipContent>
           </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-xl h-8 gap-1.5"
-                disabled={importing}
-                onClick={() => fileInputRef.current?.click()}
-              >
+          {/* UX #4: DropdownMenu unifica Importa + Nuovo tipo ───────────────── */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" className="rounded-xl h-8 gap-1" disabled={importing}>
                 {importing
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <Upload className="w-3.5 h-3.5" />}
-                <span className="hidden sm:inline">{importing ? "Importando…" : "Importa"}</span>
+                  : <Plus className="w-3.5 h-3.5" />}
+                <span className="hidden sm:inline">Aggiungi</span>
+                <ChevronDown className="w-3 h-3 opacity-60" />
               </Button>
-            </TooltipTrigger>
-            <TooltipContent>Importa PDF, testo, immagine</TooltipContent>
-          </Tooltip>
-
-          <select
-            value={creatingType}
-            onChange={(e) => setCreatingType(e.target.value as NodeType)}
-            className="h-8 rounded-xl border border-border bg-background px-2 text-xs"
-          >
-            {ALL_TYPES.map((t) => (
-              <option key={t} value={t}>{TYPE_META[t].label}</option>
-            ))}
-          </select>
-          <Button size="sm" className="rounded-xl h-8" onClick={() => handleAddNode()}>
-            <Plus className="w-3.5 h-3.5 mr-1" /> Nuovo
-          </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Crea elemento</DropdownMenuLabel>
+              {ALL_TYPES.map((t) => {
+                const m = TYPE_META[t];
+                const Icon = m.Icon;
+                return (
+                  <DropdownMenuItem
+                    key={t}
+                    onClick={() => handleAddNode(t)}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <span
+                      className="w-5 h-5 rounded flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: m.bg, color: m.color }}
+                    >
+                      <Icon className="w-3 h-3" />
+                    </span>
+                    {m.label}
+                  </DropdownMenuItem>
+                );
+              })}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => fileInputRef.current?.click()}
+                className="gap-2 cursor-pointer"
+                disabled={importing}
+              >
+                <span className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-muted text-muted-foreground">
+                  <Upload className="w-3 h-3" />
+                </span>
+                {importing ? "Importando…" : "Importa file…"}
+                <span className="ml-auto text-[10px] text-muted-foreground">PDF, MD, TXT</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -599,6 +659,7 @@ export default function Archivio() {
             <Link2 className="w-3.5 h-3.5 inline mr-1" />
             Modalità collegamento — clicca un altro elemento per collegarlo a «
             {data.nodes.find((n) => n.id === linkMode.sourceId)?.title}»
+            <span className="ml-2 opacity-60">(Esc per annullare)</span>
           </span>
           <button onClick={() => setLinkMode(null)} className="text-amber-900 hover:opacity-70">
             <X className="w-3.5 h-3.5" />
@@ -673,6 +734,7 @@ export default function Archivio() {
                   await handleCreateEdge(pendingEdge.sourceId, pendingEdge.targetId, edgeLabelDraft);
                   setPendingEdge(null); setEdgeLabelDraft("");
                 }
+                if (e.key === "Escape") { setPendingEdge(null); setEdgeLabelDraft(""); }
               }}
               className="rounded-xl"
             />
@@ -733,7 +795,6 @@ export default function Archivio() {
               </div>
             )}
 
-            {/* Bug #1: rimosso onWheel dal JSX — gestito dal useEffect con { passive: false } */}
             <svg
               ref={svgRef}
               className="w-full h-full touch-none select-none"
@@ -775,9 +836,6 @@ export default function Archivio() {
                           style={{ pointerEvents: "none" }}
                           data-edge-mid-source={edge.sourceId}
                           data-edge-mid-target={edge.targetId}
-                          // Bug #2: data-other-x/y = coordinate dell'ALTRO nodo rispetto alla source
-                          // Per il text, "source" drags → other = target coords
-                          // Vengono aggiornati in onSvgPointerMove caso C
                           data-other-x={b.x}
                           data-other-y={b.y}
                         >
@@ -788,13 +846,15 @@ export default function Archivio() {
                   );
                 })}
 
-                {/* Nodes — aggiunto data-node-id, data-x, data-y per il caso C del drag */}
+                {/* ── UX #6: Nodes con tspan multiline e raggio dinamico ──── */}
                 {filteredNodes.map((n) => {
                   const meta = TYPE_META[n.type] ?? TYPE_META.note;
-                  const r = Math.max(28, Math.min(52, 22 + n.title.length * 0.55));
+                  const r = nodeRadius(n.title);
+                  const [line1, line2] = splitTitle(n.title);
                   const isSelected = selectedId === n.id;
                   const isLinkSrc = linkMode?.sourceId === n.id;
                   const labelW = Math.min(80, 16 + meta.label.length * 5.5);
+                  const textY = line2 ? -3 : 4;
                   return (
                     <g
                       key={n.id}
@@ -813,13 +873,16 @@ export default function Archivio() {
                         strokeWidth={isSelected || isLinkSrc ? 2.5 : 1.5}
                         filter="url(#node-shadow)"
                       />
+                      {/* UX #6: tspan a 2 righe se il titolo è lungo */}
                       <text
-                        textAnchor="middle" y={4}
-                        fontSize={11} fontWeight={600} fill={meta.color}
+                        textAnchor="middle" y={textY}
+                        fontSize={10} fontWeight={600} fill={meta.color}
                         style={{ pointerEvents: "none" }}
                       >
-                        {n.title.length > 20 ? n.title.slice(0, 19) + "…" : n.title}
+                        <tspan x="0" dy="0">{line1}</tspan>
+                        {line2 && <tspan x="0" dy="12">{line2}</tspan>}
                       </text>
+                      {/* Type pill */}
                       <rect
                         x={-labelW / 2} y={r + 5}
                         width={labelW} height={14}
@@ -839,21 +902,41 @@ export default function Archivio() {
               </g>
             </svg>
 
-            {/* Zoom controls */}
-            <div className="absolute bottom-4 right-4 flex flex-col gap-1 bg-card/90 backdrop-blur border rounded-xl shadow-sm p-1">
-              <button onClick={() => setView((v) => ({ ...v, k: Math.min(2.5, v.k * 1.2) }))} className="w-7 h-7 rounded-lg hover:bg-muted text-sm font-bold">+</button>
-              <button onClick={() => setView((v) => ({ ...v, k: Math.max(0.3, v.k / 1.2) }))} className="w-7 h-7 rounded-lg hover:bg-muted text-sm font-bold">−</button>
-              <button onClick={() => setView({ x: 0, y: 0, k: 1 })} className="w-7 h-7 rounded-lg hover:bg-muted text-[10px] font-semibold" title="Reset vista">⌂</button>
+            {/* ── UX #7: Zoom controls con percentuale corrente ─────────── */}
+            <div className="absolute bottom-4 right-4 flex flex-col items-center gap-0.5 bg-card/90 backdrop-blur border rounded-xl shadow-sm p-1">
+              <button
+                onClick={() => setView((v) => ({ ...v, k: Math.min(2.5, v.k * 1.2) }))}
+                className="w-7 h-7 rounded-lg hover:bg-muted text-sm font-bold"
+                title="Zoom in (+)"
+              >+</button>
+              <span className="text-[9px] font-semibold text-muted-foreground tabular-nums w-7 text-center leading-5">
+                {Math.round(view.k * 100)}%
+              </span>
+              <button
+                onClick={() => setView((v) => ({ ...v, k: Math.max(0.3, v.k / 1.2) }))}
+                className="w-7 h-7 rounded-lg hover:bg-muted text-sm font-bold"
+                title="Zoom out (−)"
+              >−</button>
+              <button
+                onClick={() => setView({ x: 0, y: 0, k: 1 })}
+                className="w-7 h-7 rounded-lg hover:bg-muted text-[10px] font-semibold mt-0.5"
+                title="Reset vista (100%)"
+              >⌂</button>
             </div>
 
-            {/* Stats badge */}
-            <div className="absolute top-3 left-3 flex gap-2">
+            {/* Stats badge + hint shortcut */}
+            <div className="absolute top-3 left-3 flex gap-2 items-center">
               <Badge variant="outline" className="text-[10px] bg-card/80 backdrop-blur">
                 {filteredNodes.length} elementi
               </Badge>
               <Badge variant="outline" className="text-[10px] bg-card/80 backdrop-blur">
                 {visibleEdges.length} collegamenti
               </Badge>
+              {selectedId !== null && (
+                <Badge variant="outline" className="text-[10px] bg-card/80 backdrop-blur text-muted-foreground">
+                  Del = elimina · Esc = chiudi · ⌘S = salva
+                </Badge>
+              )}
             </div>
           </div>
         )}
@@ -870,6 +953,7 @@ export default function Archivio() {
             onDelete={() => handleDeleteNode(selected.id)}
             onStartLink={() => setLinkMode({ sourceId: selected.id })}
             onDeleteEdge={(id) => handleDeleteEdge(id)}
+            onSaveRef={onSaveRef}
           />
         )}
 
@@ -1135,9 +1219,10 @@ interface NodeEditorProps {
   onDelete: () => Promise<void> | void;
   onStartLink: () => void;
   onDeleteEdge: (id: number) => Promise<void> | void;
+  onSaveRef: React.MutableRefObject<(() => void) | null>;
 }
 
-function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartLink, onDeleteEdge }: NodeEditorProps) {
+function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartLink, onDeleteEdge, onSaveRef }: NodeEditorProps) {
   const [title, setTitle] = useState(node.title);
   const [content, setContent] = useState(node.content);
   const [type, setType] = useState<NodeType>(node.type);
@@ -1158,6 +1243,13 @@ function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartL
     await onSave({ title: title.trim() || "Senza titolo", content, type, url: url.trim() || null });
     setSaving(false);
   }
+
+  // ── UX #5: esponi save tramite ref per Ctrl+S globale ────────────────────
+  useEffect(() => {
+    onSaveRef.current = dirty ? save : null;
+    return () => { onSaveRef.current = null; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, title, content, type, url]);
 
   const meta = TYPE_META[type] ?? TYPE_META.note;
   const Icon = meta.Icon;
@@ -1259,6 +1351,7 @@ function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartL
         <Button size="sm" className="rounded-xl ml-auto" disabled={!dirty || saving} onClick={save}>
           {saving ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
           Salva
+          {dirty && <span className="ml-1.5 text-[9px] opacity-60">⌘S</span>}
         </Button>
       </div>
     </aside>
