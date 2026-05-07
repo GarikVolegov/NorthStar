@@ -1,36 +1,39 @@
 /**
- * GrowthChatPanel — main chat container.
+ * GrowthChatPanel v2 — integrates ParallelStatusPanel + statusMessage.
  *
- * LAYOUT
- * ──────
- *  ┌─────────────────────────────────────┐
- *  │  Header: "Coach NorthStar"  [Reset] │
- *  ├─────────────────────────────────────┤
- *  │                                     │
- *  │   Message list (scrollable)         │
- *  │   · Empty state with suggestions    │
- *  │   · Error banner                    │
- *  │                                     │
- *  ├─────────────────────────────────────┤
- *  │  GrowthChatInput                    │
- *  └─────────────────────────────────────┘
+ * CHANGES v2
+ * ──────────
+ * - Imports `statusMessage` from useGrowthChat (added in v4 of the hook).
+ * - Maintains a `statusHistory` ref that accumulates every status event
+ *   received during the current streaming turn. It is reset when a new
+ *   user message is sent (isStreaming flips from false → true).
+ * - When statusMessage contains a "[domain]" prefix, renders
+ *   `<ParallelStatusPanel>` ABOVE the input area (inside the message list).
+ * - For non-parallel status (single specialist / fallback), renders a
+ *   compact pill below the last message.
+ * - ParallelStatusPanel is hidden as soon as isStreaming = false.
  *
- * USAGE
- * ──────
- * import { GrowthChatPanel } from "@workspace/integrations-openai-ai-react";
- *
- * <GrowthChatPanel
- *   token={jwt}
- *   userContext={{ name: "Luca", journeyType: "autonomo" }}
- * />
- *
- * The panel manages its own state via useGrowthChat — no external state needed.
- * Drop it inside any layout: page, sidebar, modal, drawer.
+ * LAYOUT (updated)
+ * ────────────────
+ *  ┌──────────────────────────────────────┐
+ *  │  Header: "Coach NorthStar"  [Reset]  │
+ *  ├──────────────────────────────────────┤
+ *  │                                      │
+ *  │   Message list (scrollable)          │
+ *  │   · Empty state / messages           │
+ *  │                                      │
+ *  │   [ParallelStatusPanel] ← if parallel│
+ *  │   [status pill]         ← if single  │
+ *  │                                      │
+ *  ├──────────────────────────────────────┤
+ *  │  GrowthChatInput                     │
+ *  └──────────────────────────────────────┘
  */
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useGrowthChat, type UseGrowthChatOptions } from "./useGrowthChat";
 import { GrowthChatMessage } from "./GrowthChatMessage";
 import { GrowthChatInput } from "./GrowthChatInput";
+import { ParallelStatusPanel } from "./ParallelStatusPanel";
 
 const SUGGESTED_PROMPTS = [
   "Sono bloccato su una decisione importante — come inizio a chiarirmi?",
@@ -44,24 +47,51 @@ interface GrowthChatPanelProps extends UseGrowthChatOptions {
 }
 
 export function GrowthChatPanel({ className = "", ...hookOpts }: GrowthChatPanelProps) {
-  const { messages, isStreaming, error, sendMessage, abort, resetSession } =
+  const { messages, isStreaming, error, statusMessage, sendMessage, abort, resetSession } =
     useGrowthChat(hookOpts);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef  = useRef<HTMLDivElement>(null);
+  const scrollRef  = useRef<HTMLDivElement>(null);
+  const prevStreaming = useRef(false);
+
+  // Accumulate ALL status values for the current streaming turn.
+  // Reset each time a new turn starts (isStreaming flips false → true).
+  const [statusHistory, setStatusHistory] = useState<string[]>([]);
+
+  useEffect(() => {
+    // New turn starting — clear history
+    if (isStreaming && !prevStreaming.current) {
+      setStatusHistory([]);
+    }
+    prevStreaming.current = isStreaming;
+  }, [isStreaming]);
+
+  useEffect(() => {
+    if (statusMessage) {
+      setStatusHistory((prev) => [...prev, statusMessage]);
+    }
+  }, [statusMessage]);
 
   // Auto-scroll to bottom on new content
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, statusMessage]);
 
   const isEmpty = messages.length === 0;
 
-  // Find last assistant message index for streaming cursor
   const lastAssistantIdx = messages.reduce(
     (last, m, i) => (m.role === "assistant" ? i : last),
     -1,
   );
+
+  // Is the current status from a parallel handoff?
+  const isParallelStatus = statusMessage
+    ? /^\[[a-z]+\]/.test(statusMessage) || statusMessage.includes("parallelo") || statusMessage.includes("Fusione")
+    : statusHistory.some((s) => /^\[[a-z]+\]/.test(s));
+
+  // Non-parallel single-line status
+  const showSingleStatus = isStreaming && statusMessage && !isParallelStatus;
+  const showParallelPanel = isStreaming && isParallelStatus && statusHistory.some((s) => /^\[[a-z]+\]/.test(s));
 
   return (
     <div
@@ -79,7 +109,9 @@ export function GrowthChatPanel({ className = "", ...hookOpts }: GrowthChatPanel
             <p className="text-sm font-semibold text-gray-800">Coach NorthStar</p>
             <p className="text-xs text-gray-400">
               {isStreaming ? (
-                <span className="text-indigo-500 animate-pulse">Sta scrivendo…</span>
+                <span className="text-indigo-500 animate-pulse">
+                  {isParallelStatus ? "⚡ Multi-agente attivo" : "Sta elaborando…"}
+                </span>
               ) : (
                 "Crescita personale"
               )}
@@ -87,7 +119,6 @@ export function GrowthChatPanel({ className = "", ...hookOpts }: GrowthChatPanel
           </div>
         </div>
 
-        {/* Reset session button */}
         {!isEmpty && (
           <button
             onClick={resetSession}
@@ -106,7 +137,6 @@ export function GrowthChatPanel({ className = "", ...hookOpts }: GrowthChatPanel
         className="flex-1 overflow-y-auto px-4 py-4 space-y-1"
       >
         {isEmpty ? (
-          /* Empty state */
           <div className="flex flex-col items-center justify-center h-full text-center px-6">
             <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mb-4">
               <span className="text-2xl">🧭</span>
@@ -118,8 +148,6 @@ export function GrowthChatPanel({ className = "", ...hookOpts }: GrowthChatPanel
               Condividi dove sei bloccato o cosa vuoi esplorare. Il coach ricorda
               le sessioni precedenti.
             </p>
-
-            {/* Suggested prompts */}
             <div className="flex flex-col gap-2 w-full max-w-sm">
               {SUGGESTED_PROMPTS.map((prompt, i) => (
                 <button
@@ -133,7 +161,6 @@ export function GrowthChatPanel({ className = "", ...hookOpts }: GrowthChatPanel
             </div>
           </div>
         ) : (
-          /* Message list */
           messages.map((msg, i) => (
             <GrowthChatMessage
               key={msg.id}
@@ -141,6 +168,30 @@ export function GrowthChatPanel({ className = "", ...hookOpts }: GrowthChatPanel
               isLastAssistant={i === lastAssistantIdx}
             />
           ))
+        )}
+
+        {/* ── Single-specialist status pill ──────────────────────── */}
+        {showSingleStatus && (
+          <div className="flex items-center gap-2 px-4 py-2.5 mx-2 rounded-xl bg-white border border-gray-100 shadow-sm">
+            <div className="flex gap-0.5">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce"
+                  style={{ animationDelay: `${i * 150}ms` }}
+                />
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 animate-pulse">{statusMessage}</p>
+          </div>
+        )}
+
+        {/* ── Parallel split panel ───────────────────────────────── */}
+        {showParallelPanel && (
+          <ParallelStatusPanel
+            statusMessage={statusMessage}
+            statusHistory={statusHistory}
+          />
         )}
 
         {/* Error banner */}
@@ -154,7 +205,6 @@ export function GrowthChatPanel({ className = "", ...hookOpts }: GrowthChatPanel
           </div>
         )}
 
-        {/* Auto-scroll anchor */}
         <div ref={bottomRef} />
       </div>
 
