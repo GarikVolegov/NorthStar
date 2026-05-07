@@ -80,7 +80,7 @@ export function Navbar() {
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       >
-        <div className="pill-nav flex items-center h-12 md:h-13 px-2 gap-1 w-full max-w-3xl">
+        <div className="pill-nav flex items-center h-11 md:h-13 px-1.5 md:px-2 gap-0.5 md:gap-1 w-full max-w-3xl">
 
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 shrink-0 px-2 mr-1">

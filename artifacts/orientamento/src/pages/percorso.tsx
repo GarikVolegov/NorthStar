@@ -34,7 +34,7 @@ const PERSONAS: Persona[] = [
     description:
       "Stai cercando la tua strada. Hai curiosità, idee confuse o semplicemente vuoi capire cosa ti appassiona davvero e dove potresti eccellere.",
     tools: ["Test RIASEC", "Esplora settori", "Coach AI", "Confronta carriere"],
-    color: "from-[#002855] to-[#003d7a]",
+    color: "from-[#1c1810] to-[#2a2418]",
     accent: "text-[#D4AF37]",
     border: "border-[#D4AF37]/40",
   },
@@ -46,7 +46,7 @@ const PERSONAS: Persona[] = [
     description:
       "Sei impiegato e vuoi fare carriera, cambiare ruolo o passare a un settore migliore. Hai bisogno di strumenti concreti per crescere.",
     tools: ["Analisi skill gap", "Simulatore colloquio", "Roadmap di carriera", "Candidature"],
-    color: "from-[#003d7a] to-[#002855]",
+    color: "from-[#0f1f18] to-[#162914]",
     accent: "text-[#A8D5BA]",
     border: "border-[#A8D5BA]/40",
   },
@@ -58,7 +58,7 @@ const PERSONAS: Persona[] = [
     description:
       "Sei freelance, imprenditore o professionista autonomo. Vuoi scalare il tuo business, trovare nuovi clienti o validare un'idea.",
     tools: ["Validatore Idea", "Analisi mercato", "Roadmap business", "Coach AI"],
-    color: "from-[#1a3660] to-[#002855]",
+    color: "from-[#1c1810] to-[#201c0f]",
     accent: "text-[#D4AF37]",
     border: "border-[#D4AF37]/40",
   },
@@ -70,7 +70,7 @@ const PERSONAS: Persona[] = [
     description:
       "Sei HR, recruiter o manager. Stai cercando i profili giusti per il tuo team e vuoi capire il mercato dei talenti italiano.",
     tools: ["Profili RIASEC", "Settori in crescita", "Analisi competenze", "Affilazione"],
-    color: "from-[#002855] to-[#1a3660]",
+    color: "from-[#0f1f18] to-[#1c1810]",
     accent: "text-[#A8D5BA]",
     border: "border-[#A8D5BA]/40",
   },
@@ -82,7 +82,7 @@ const PERSONAS: Persona[] = [
     description:
       "Sei un investitore, business angel o VC. Vuoi capire i settori in crescita, i trend del mercato del lavoro italiano e le opportunità.",
     tools: ["Settori in crescita", "Analisi trend", "Report mercato", "Knowledge Graph"],
-    color: "from-[#003d7a] to-[#1a3660]",
+    color: "from-[#201c0f] to-[#2a2418]",
     accent: "text-[#D4AF37]",
     border: "border-[#D4AF37]/40",
   },
@@ -132,22 +132,22 @@ export default function Percorso() {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero */}
-      <div className="hero-navy py-16 px-4 text-center">
+      <div className="hero-navy py-10 md:py-16 px-4 text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="max-w-2xl mx-auto"
         >
-          <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-4 py-1.5 mb-6 text-sm font-semibold text-[#D4AF37] border border-[#D4AF37]/30">
-            <Star className="w-3.5 h-3.5" />
+          <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-full px-3.5 py-1.5 mb-4 text-xs font-semibold text-primary">
+            <Star className="w-3 h-3" />
             Il tuo percorso personale
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-3 leading-tight">
             Chi sei e cosa
-            <span className="text-italic-serif text-[#D4AF37]"> vuoi raggiungere?</span>
+            <span className="text-italic-serif text-primary"> vuoi raggiungere?</span>
           </h1>
-          <p className="text-lg text-white/70 max-w-xl mx-auto">
+          <p className="text-sm sm:text-base text-white/65 max-w-xl mx-auto">
             Seleziona il profilo che ti rappresenta di più. NorthStar personalizzerà gli strumenti
             e i consigli in base al tuo percorso.
           </p>

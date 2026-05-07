@@ -239,17 +239,22 @@ export function OnboardingWizard({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 24 }}
+        initial={{ opacity: 0, scale: 0.97, y: 32 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        exit={{ opacity: 0, scale: 0.97, y: 20 }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-lg"
+        className="w-full sm:max-w-lg max-h-[92dvh] sm:max-h-[90vh] flex flex-col"
       >
-        <div className="rounded-2xl border border-white/10 bg-card shadow-2xl overflow-hidden">
+        <div className="rounded-t-3xl sm:rounded-2xl border border-white/10 border-b-0 sm:border-b bg-card shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90vh]">
+          {/* Drag handle — mobile only */}
+          <div className="flex justify-center pt-2.5 pb-0 sm:hidden">
+            <div className="w-10 h-1 rounded-full bg-white/15" />
+          </div>
+
           {/* Header */}
-          <div className="hero-navy px-6 pt-6 pb-5">
+          <div className="hero-navy px-5 sm:px-6 pt-4 sm:pt-6 pb-4 sm:pb-5 shrink-0">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-xs font-semibold text-white/50 uppercase tracking-wide mb-0.5">
@@ -267,8 +272,8 @@ export function OnboardingWizard({
             <ProgressBar step={step} total={STEPS.length} />
           </div>
 
-          {/* Body */}
-          <div className="px-6 py-5">
+          {/* Body — scrollable */}
+          <div className="px-5 sm:px-6 py-4 sm:py-5 overflow-y-auto flex-1">
             <AnimatePresence mode="wait">
 
               {/* ── Step 0: Journey type ────────────────── */}

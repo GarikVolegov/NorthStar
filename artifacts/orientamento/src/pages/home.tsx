@@ -337,26 +337,25 @@ function GuestPersonaHero({ onLoginClick }: { onLoginClick: () => void }) {
 
   return (
     <section className="relative w-full overflow-hidden">
-      {/* Background */}
-      <div className="hero-navy py-16 md:py-20 px-4 relative">
+      {/* Background hero */}
+      <div className="hero-navy py-10 md:py-18 px-4 relative">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] rounded-full bg-primary/6 blur-[100px]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[320px] rounded-full bg-primary/5 blur-[90px]" />
         </div>
-        <div className="relative z-10 max-w-4xl mx-auto text-center">
+        <div className="relative z-10 max-w-3xl mx-auto text-center">
           <motion.div
-            initial={prefersReduced ? {} : { scale: 0.9, opacity: 0 }}
+            initial={prefersReduced ? {} : { scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="mb-6"
           >
-            <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-4 py-1.5 text-sm font-semibold text-primary border border-primary/30 mb-5">
-              <Star className="w-3.5 h-3.5" /> Orientamento professionale personalizzato
+            <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-full px-3.5 py-1.5 text-xs font-semibold text-primary mb-4">
+              <Star className="w-3 h-3" /> Orientamento professionale personalizzato
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight mb-4">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-tight mb-3">
               Qual è il tuo{" "}
               <span className="text-italic-serif text-primary">obiettivo?</span>
             </h1>
-            <p className="text-lg text-white/70 max-w-2xl mx-auto">
+            <p className="text-sm sm:text-base text-white/65 max-w-xl mx-auto">
               NorthStar si adatta al tuo percorso. Scegli il profilo che ti rappresenta e ricevi
               strumenti e consigli su misura per te.
             </p>
@@ -364,41 +363,52 @@ function GuestPersonaHero({ onLoginClick }: { onLoginClick: () => void }) {
         </div>
       </div>
 
-      {/* Persona cards — slightly below the hero */}
-      <div className="bg-background relative -mt-2 pb-2">
-        <div className="max-w-6xl mx-auto px-4 pt-8 pb-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      {/* Persona cards */}
+      <div className="bg-background relative pb-2">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 pt-6 pb-4">
+
+          {/* Mobile: vertical list with icon+text rows. Desktop: 5-col grid */}
+          <div className="flex flex-col sm:grid sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
             {PERSONAS.map((persona, i) => {
               const Icon = persona.icon;
               return (
                 <motion.div
                   key={persona.id}
-                  initial={prefersReduced ? {} : { opacity: 0, y: 20 }}
+                  initial={prefersReduced ? {} : { opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 + i * 0.07, duration: 0.4 }}
+                  transition={{ delay: 0.08 + i * 0.06, duration: 0.35 }}
                   onClick={() => setLocation(persona.ctaHref)}
                   className={cn(
-                    "group cursor-pointer rounded-2xl border border-border bg-card p-5 flex flex-col gap-3 transition-all duration-200",
+                    "group cursor-pointer rounded-2xl border border-border bg-card transition-all duration-200 active:scale-[0.98]",
                     persona.borderClass,
-                    "hover:bg-card/80 hover:shadow-lg hover:shadow-black/20 hover:-translate-y-0.5"
+                    "hover:border-primary/40 hover:bg-card/80 hover:shadow-lg hover:shadow-black/25",
+                    /* mobile: horizontal row | lg: vertical card */
+                    "flex flex-row lg:flex-col items-center lg:items-start gap-3 px-4 py-3.5 lg:p-5"
                   )}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:bg-primary/15 transition-colors">
-                    <Icon className={cn("w-5 h-5", persona.accentClass)} />
+                  {/* Icon */}
+                  <div className="shrink-0 w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:bg-primary/15 transition-colors">
+                    <Icon className={cn("w-4 h-4 lg:w-5 lg:h-5", persona.accentClass)} />
                   </div>
-                  <div>
-                    <p className="font-bold text-foreground text-sm">{persona.label}</p>
-                    <p className={cn("text-xs font-semibold mt-0.5", persona.accentClass)}>{persona.tagline}</p>
+
+                  {/* Text */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-foreground text-sm leading-tight">{persona.label}</p>
+                    <p className={cn("text-xs font-medium mt-0.5 leading-snug", persona.accentClass)}>{persona.tagline}</p>
+                    {/* Tools - hidden on mobile, shown on desktop */}
+                    <div className="hidden lg:flex flex-wrap gap-1 mt-2">
+                      {persona.tools.slice(0, 2).map((tool) => (
+                        <span key={tool} className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5">
+                          {tool}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-1 mt-auto">
-                    {persona.tools.slice(0, 2).map((tool) => (
-                      <span key={tool} className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5">
-                        {tool}
-                      </span>
-                    ))}
-                  </div>
-                  <div className={cn("flex items-center gap-1 text-xs font-semibold", persona.accentClass, "group-hover:gap-1.5 transition-all")}>
-                    {persona.ctaLabel} <ChevronRight className="w-3.5 h-3.5" />
+
+                  {/* CTA arrow - mobile compact, desktop label */}
+                  <div className={cn("shrink-0 flex items-center gap-1 text-xs font-semibold", persona.accentClass)}>
+                    <span className="hidden lg:inline">{persona.ctaLabel}</span>
+                    <ChevronRight className="w-4 h-4 lg:w-3.5 lg:h-3.5 group-hover:translate-x-0.5 transition-transform" />
                   </div>
                 </motion.div>
               );
@@ -406,15 +416,15 @@ function GuestPersonaHero({ onLoginClick }: { onLoginClick: () => void }) {
           </div>
 
           {/* Sub-CTAs */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8 pb-4">
-            <Link href="/test">
-              <div className="flex items-center gap-2 bg-primary text-primary-foreground font-bold text-sm rounded-full px-7 py-3 hover:bg-primary/90 transition-all shadow-lg hover:shadow-primary/20">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5 mt-6 pb-2">
+            <Link href="/test" className="flex-1 sm:flex-initial">
+              <div className="w-full sm:w-auto flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold text-sm rounded-full px-7 py-3 hover:bg-primary/90 transition-all shadow-lg hover:shadow-primary/25">
                 {t("home.startTest")} <ArrowRight className="w-4 h-4" />
               </div>
             </Link>
             <button
               onClick={onLoginClick}
-              className="flex items-center gap-2 border border-border text-muted-foreground font-semibold text-sm rounded-full px-7 py-3 hover:border-white/20 hover:text-foreground hover:bg-white/5 transition-all"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 border border-border text-muted-foreground font-semibold text-sm rounded-full px-7 py-3 hover:border-white/20 hover:text-foreground hover:bg-white/5 transition-all"
             >
               <LogIn className="w-4 h-4" />
               {t("home.alreadyAccount")}
@@ -453,42 +463,42 @@ function LoggedInHero({
   const NextIcon = nextStep?.icon;
 
   return (
-    <section className="hero-navy py-10 px-4">
+    <section className="hero-navy py-8 md:py-12 px-4">
       <div className="max-w-5xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
           {/* Greeting */}
           <div>
-            <p className="text-white/60 text-sm font-medium mb-1">Bentornato,</p>
-            <h1 className="text-3xl md:text-4xl font-bold text-white mb-3">
+            <p className="text-white/55 text-xs font-medium mb-1 uppercase tracking-wider">Bentornato,</p>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2.5">
               {userName.split(" ")[0]} 👋
             </h1>
             {journey && JourneyIcon ? (
               <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-3 py-1.5">
-                <JourneyIcon className={cn("w-4 h-4", journey.accentClass)} />
-                <span className={cn("text-sm font-semibold", journey.accentClass)}>{journey.label}</span>
+                <JourneyIcon className={cn("w-3.5 h-3.5", journey.accentClass)} />
+                <span className={cn("text-xs font-semibold", journey.accentClass)}>{journey.label}</span>
               </div>
             ) : (
               <Link href="/percorso">
-                <div className="inline-flex items-center gap-2 bg-primary/20 border border-primary/30 rounded-full px-3 py-1.5 text-sm font-semibold text-primary hover:bg-primary/30 transition-colors cursor-pointer">
-                  <MapPin className="w-4 h-4" /> Scegli il tuo percorso <ChevronRight className="w-3.5 h-3.5" />
+                <div className="inline-flex items-center gap-2 bg-primary/20 border border-primary/30 rounded-full px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/30 transition-colors cursor-pointer">
+                  <MapPin className="w-3.5 h-3.5" /> Scegli il tuo percorso <ChevronRight className="w-3 h-3" />
                 </div>
               </Link>
             )}
           </div>
 
-          {/* Next step card */}
+          {/* Next step card — full width on mobile */}
           {nextStep && NextIcon && (
-            <Link href={nextStep.href}>
-              <div className="group flex items-center gap-4 bg-white/10 border border-white/15 rounded-2xl px-5 py-4 hover:bg-white/15 hover:border-white/25 transition-all cursor-pointer min-w-[280px]">
-                <div className="w-11 h-11 rounded-xl bg-primary/20 flex items-center justify-center shrink-0 border border-primary/30 group-hover:bg-primary/30 transition-colors">
+            <Link href={nextStep.href} className="w-full md:w-auto md:max-w-xs">
+              <div className="group flex items-center gap-3 bg-white/10 border border-white/15 rounded-2xl px-4 py-3.5 hover:bg-white/15 hover:border-white/25 transition-all cursor-pointer w-full">
+                <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center shrink-0 border border-primary/30 group-hover:bg-primary/30 transition-colors">
                   <NextIcon className="w-5 h-5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-white/50 uppercase tracking-wide mb-0.5">Prossimo passo</p>
+                  <p className="text-[10px] font-semibold text-white/45 uppercase tracking-wide mb-0.5">Prossimo passo</p>
                   <p className="text-sm font-bold text-white leading-snug">{nextStep.label}</p>
-                  <p className="text-xs text-white/60 mt-0.5">{nextStep.desc}</p>
+                  <p className="text-xs text-white/55 mt-0.5 leading-snug">{nextStep.desc}</p>
                 </div>
-                <ArrowRight className="w-4 h-4 text-white/40 group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0" />
+                <ArrowRight className="w-4 h-4 text-white/35 group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0" />
               </div>
             </Link>
           )}
@@ -496,12 +506,12 @@ function LoggedInHero({
 
         {/* Quick stats row */}
         {hasTest && latestResult && (
-          <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {latestResult.recommendations.slice(0, 4).map((rec, i) => (
               <Link key={rec.sectorId} href={`/settore/${rec.sectorId}`}>
-                <div className="group bg-white/8 border border-white/12 rounded-xl px-4 py-3 hover:bg-white/14 hover:border-white/20 transition-all cursor-pointer">
-                  <p className="text-xs text-white/50 font-medium mb-1">#{i + 1} match</p>
-                  <p className="text-sm font-semibold text-white leading-snug truncate group-hover:text-primary transition-colors">{rec.sectorName}</p>
+                <div className="group bg-white/8 border border-white/10 rounded-xl px-3 py-2.5 hover:bg-white/14 hover:border-white/18 transition-all cursor-pointer">
+                  <p className="text-[10px] text-white/45 font-medium mb-0.5">#{i + 1}</p>
+                  <p className="text-xs font-semibold text-white leading-snug truncate group-hover:text-primary transition-colors">{rec.sectorName}</p>
                   <p className="text-xs text-primary font-bold mt-0.5">{rec.matchScore}%</p>
                 </div>
               </Link>
@@ -509,14 +519,14 @@ function LoggedInHero({
           </div>
         )}
         {!hasTest && (
-          <div className="mt-5 bg-white/8 border border-white/12 rounded-2xl px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
-            <Bot className="w-8 h-8 text-white/30 shrink-0" />
-            <div className="flex-1">
+          <div className="mt-4 bg-white/8 border border-white/10 rounded-2xl px-4 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3">
+            <Bot className="w-7 h-7 text-white/25 shrink-0" />
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-white">Non hai ancora completato il test</p>
-              <p className="text-xs text-white/60">Fai il test RIASEC gratuito per sbloccare l'analisi AI e le raccomandazioni personalizzate.</p>
+              <p className="text-xs text-white/55 leading-relaxed">Fai il test RIASEC gratuito per sbloccare l'analisi AI e le raccomandazioni personalizzate.</p>
             </div>
-            <Link href="/test">
-              <div className="shrink-0 inline-flex items-center gap-2 bg-primary text-primary-foreground font-bold text-xs rounded-full px-5 py-2.5 hover:bg-primary/90 transition-all">
+            <Link href="/test" className="shrink-0">
+              <div className="inline-flex items-center gap-2 bg-primary text-primary-foreground font-bold text-xs rounded-full px-5 py-2.5 hover:bg-primary/90 transition-all">
                 Inizia ora <ArrowRight className="w-3.5 h-3.5" />
               </div>
             </Link>
@@ -958,13 +968,13 @@ export default function Home() {
                     Il test è gratuito, nessuna carta di credito richiesta. Ottieni la tua analisi in 5 minuti.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <Link href="/test">
-                      <div className="flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold text-base rounded-full px-8 py-3.5 hover:bg-primary/90 transition-all shadow-lg hover:shadow-primary/20">
+                    <Link href="/test" className="w-full sm:w-auto">
+                      <div className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold text-sm rounded-full px-8 py-3.5 hover:bg-primary/90 transition-all shadow-lg hover:shadow-primary/20">
                         {t("home.startTest")} <ArrowRight className="w-4 h-4" />
                       </div>
                     </Link>
-                    <Link href="/percorso">
-                      <div className="flex items-center justify-center gap-2 border border-white/20 text-white font-semibold text-base rounded-full px-8 py-3.5 hover:border-white/30 hover:bg-white/8 transition-all">
+                    <Link href="/percorso" className="w-full sm:w-auto">
+                      <div className="w-full flex items-center justify-center gap-2 border border-white/20 text-white font-semibold text-sm rounded-full px-8 py-3.5 hover:border-white/30 hover:bg-white/8 transition-all">
                         <MapPin className="w-4 h-4" />
                         Scegli il tuo percorso
                       </div>
