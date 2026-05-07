@@ -1,21 +1,30 @@
 /**
- * Prompt builder — assembles the final system prompt for the growth agent.
+ * Prompt Builder v2 — assembles the full system prompt for the growth agent.
  *
- * Architecture:
- *   1. PERSONA CORE — who the agent is and how it thinks
- *   2. PERSONA EXAMPLES — retrieved Q&A examples (the agent's "voice")
- *   3. DOCUMENT KNOWLEDGE — chunks from ingested documents
- *   4. WEB CONTEXT — live web search results (optional)
- *   5. USER CONTEXT — the user's profile, objectives, journey type
+ * ARCHITECTURE (in order of injection)
+ * ──────────────────────────────────────
+ * 1. PERSONA CORE        — who the coach is, its non-negotiable principles
+ * 2. TONE PROFILE        — HOW to speak (adapted to journeyType)
+ * 3. CHAIN OF THOUGHT    — hidden reasoning summary (what the coach figured out)
+ * 4. SOCRATIC DIRECTIVE  — how to close the response (which question type)
+ * 5. PERSONA EXAMPLES    — retrieved Q&A showing the coach's voice
+ * 6. DOCUMENT KNOWLEDGE  — chunks from ingested documents
+ * 7. WEB CONTEXT         — live search results (fallback)
+ * 8. USER CONTEXT        — profile, objectives, sector
  *
- * Persona examples get a higher priority window than raw documents
- * because they teach reasoning style, not just facts.
+ * Sections 2-4 are NEW in v2 and implement:
+ *   A) Tone adaptation per journeyType
+ *   B) Chain-of-Thought hidden reasoning
+ *   C) Socratic question engineering
  */
 import type { RetrievedChunk } from "./retriever";
+import { buildToneSection } from "./tone-adapter";
+import { buildCoTSection, type CoTResult } from "./chain-of-thought";
+import { buildSocraticSection } from "./socratic-engine";
 
 export interface UserContext {
   name: string;
-  journeyType: string; // "indeciso" | "dipendente" | "autonomo" | "investitore"
+  journeyType: string;
   userMode: string;
   objectives?: string[];
   sectorName?: string;
@@ -26,82 +35,97 @@ export interface PromptContext {
   personaExamples: RetrievedChunk[];
   documentChunks: RetrievedChunk[];
   webResults: RetrievedChunk[];
+  /** Result of the hidden CoT reasoning pass (may be null) */
+  cot?: CoTResult | null;
+  /** The original user message (needed for Socratic directive) */
+  userMessage?: string;
 }
 
+// ── PERSONA CORE ──────────────────────────────────────────────────────────────
+// This section is FIXED — it defines who the coach IS, regardless of user.
+// Tone, style adjustments happen in the TONE section below.
 const PERSONA_CORE = `
 Sei il Coach di Crescita Personale di NorthStar.
 
-Il tuo stile di ragionamento:
-- Parli in modo diretto, mai generico o motivazionale vuoto.
-- Usi domande Socratiche per far emergere la risposta dall'utente, non per 
-  darti aria di saggio.
-- Distingui sempre tra ciò che l'utente CONTROLLA (azioni, abitudini, focus) 
-  e ciò che NON controlla (mercato, opinioni altrui, tempi esterni).
-- Quando citi un concetto da un documento o da un autore, lo dici esplicitamente.
-- Non incoraggi passivamente. Se vedi un pattern limitante, lo nomini con chiarezza
-  e proponi un'alternativa concreta.
-- Usi il linguaggio dell'utente: se è informale, sei informale. Se è preciso, 
-  sei preciso.
-- Rispondi in italiano a meno che l'utente non scriva in inglese.
+Principi non negoziabili:
+1. MAI rispondere con platitudini, luoghi comuni o motivazione vuota.
+   ("Credi in te stesso", "Sei capace" → VIETATO)
+2. Ogni risposta deve contenere almeno una cosa CONCRETA e SPECIFICA.
+3. Distingui SEMPRE tra ciò che l'utente controlla e ciò che non controlla.
+4. Se vedi un pattern limitante, NOMINALO — con rispetto ma senza ammorbidire.
+5. Cita la fonte quando usi un concetto da un documento ingested.
+6. Rispondi nella lingua dell'utente (italiano default).
+7. Lunghezza: risposte dense ma non lunghe. Max 250 parole salvo richiesta esplicita.
 `.trim();
+
+// ── FORMATTER HELPERS ─────────────────────────────────────────────────────────
 
 function formatPersonaExamples(examples: RetrievedChunk[]): string {
   if (examples.length === 0) return "";
   const lines = examples.map(
-    (e, i) =>
-      `### Esempio ${i + 1} (fonte: ${e.source})\n${e.content}`,
+    (e, i) => `### Esempio ${i + 1} — ${e.source}\n${e.content}`,
   );
-  return `
-## Come ragiona il coach (esempi dal tuo corpus personale)
-${lines.join("\n\n")}
-`.trim();
+  return [
+    "## Esempi di ragionamento del coach",
+    "(Questi mostrano lo STILE, non le risposte giuste — adattali al contesto attuale)",
+    lines.join("\n\n"),
+  ].join("\n");
 }
 
 function formatDocumentChunks(chunks: RetrievedChunk[]): string {
   if (chunks.length === 0) return "";
-  const lines = chunks.map(
-    (c) => `- [${c.source}] ${c.content}`,
-  );
-  return `
-## Conoscenza dai documenti ingested
-${lines.join("\n")}
-`.trim();
+  const lines = chunks.map((c) => `- [${c.source}, score: ${c.score.toFixed(2)}] ${c.content}`);
+  return `## Conoscenza dai documenti\n${lines.join("\n")}`;
 }
 
 function formatWebResults(results: RetrievedChunk[]): string {
   if (results.length === 0) return "";
   const lines = results.map(
-    (r) => `- [Web: ${r.metadata["title"] ?? r.source}] ${r.content}`,
+    (r) => `- [${r.metadata["title"] ?? r.source}](${r.source}) ${r.content}`,
   );
-  return `
-## Informazioni trovate online (da usare se rilevanti, cita la fonte)
-${lines.join("\n")}
-`.trim();
+  return `## Fonti online (cita la fonte se usi questo contenuto)\n${lines.join("\n")}`;
 }
 
 function formatUserContext(ctx: UserContext): string {
-  const objectives =
-    ctx.objectives && ctx.objectives.length > 0
-      ? `Obiettivi attuali: ${ctx.objectives.join(", ")}`
-      : "";
-  return `
-## Profilo utente
-- Nome: ${ctx.name}
-- Percorso: ${ctx.journeyType}
-- Modalità: ${ctx.userMode}
-${ctx.sectorName ? `- Settore di interesse: ${ctx.sectorName}` : ""}
-${objectives}
-`.trim();
+  const parts = [
+    `## Profilo utente`,
+    `- Nome: ${ctx.name}`,
+    `- Percorso: ${ctx.journeyType}`,
+    `- Modalità: ${ctx.userMode}`,
+    ctx.sectorName ? `- Settore: ${ctx.sectorName}` : null,
+    ctx.objectives?.length
+      ? `- Obiettivi: ${ctx.objectives.join(", ")}`
+      : null,
+  ];
+  return parts.filter(Boolean).join("\n");
 }
 
+// ── MAIN BUILDER ──────────────────────────────────────────────────────────────
+
 export function buildSystemPrompt(ctx: PromptContext): string {
-  const sections = [
+  const sections: string[] = [
+    // Fixed identity
     PERSONA_CORE,
+
+    // NEW A: Tone adapted to user's journey
+    buildToneSection(ctx.userContext.journeyType),
+
+    // NEW B: Hidden CoT reasoning
+    buildCoTSection(ctx.cot ?? null),
+
+    // NEW C: Socratic question directive
+    ctx.userMessage ? buildSocraticSection(ctx.userMessage) : "",
+
+    // Retrieved context
     formatPersonaExamples(ctx.personaExamples),
     formatDocumentChunks(ctx.documentChunks),
     formatWebResults(ctx.webResults),
-    formatUserContext(ctx.userContext),
-  ].filter(Boolean);
 
-  return sections.join("\n\n---\n\n");
+    // User profile
+    formatUserContext(ctx.userContext),
+  ];
+
+  return sections
+    .filter((s) => s.trim().length > 0)
+    .join("\n\n---\n\n");
 }
