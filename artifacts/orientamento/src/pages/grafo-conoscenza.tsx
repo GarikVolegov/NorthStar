@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, memo, useTransition } from "react";
 import { Link } from "wouter";
 import {
   ArrowLeft, Plus, Save, Trash2, Link2, X, Search, Sparkles, Loader2,
@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
+import { useSSEStream } from "@/hooks/useSSEStream";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -74,11 +75,10 @@ interface ContextMenu {
   y: number;
 }
 
-// ── Step 4: stato inline edit edge label ─────────────────────────────────
 interface EdgeLabelEdit {
   edgeId: number;
   draft: string;
-  screenX: number; // px assoluti nella finestra
+  screenX: number;
   screenY: number;
 }
 
@@ -110,16 +110,16 @@ function nodeRadius(title: string) {
 function splitTitle(title: string): [string, string | null] {
   if (title.length <= 12) return [title, null];
   const words = title.split(" ");
-  if (words.length === 1) return [title.slice(0, 11) + "…", null];
+  if (words.length === 1) return [title.slice(0, 11) + "\u2026", null];
   let line1 = "";
   let i = 0;
   while (i < words.length && (line1 + words[i]).length <= 12) {
     line1 += (line1 ? " " : "") + words[i];
     i++;
   }
-  if (!line1) line1 = words[0].slice(0, 11) + "…";
+  if (!line1) line1 = words[0].slice(0, 11) + "\u2026";
   const rest = words.slice(i).join(" ");
-  const line2 = rest.length > 11 ? rest.slice(0, 10) + "…" : rest;
+  const line2 = rest.length > 11 ? rest.slice(0, 10) + "\u2026" : rest;
   return [line1, line2 || null];
 }
 
@@ -144,7 +144,7 @@ function computeFitView(
   return { x, y, k };
 }
 
-// ── Step 5: Minimap component ────────────────────────────────────────────
+// ── Minimap ──────────────────────────────────────────────────────────────
 const MINI_W = 160;
 const MINI_H = 100;
 
@@ -155,7 +155,7 @@ interface MinimapProps {
   onPan: (x: number, y: number) => void;
 }
 
-function Minimap({ nodes, view, svgRef, onPan }: MinimapProps) {
+const Minimap = memo(function Minimap({ nodes, view, svgRef, onPan }: MinimapProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   const { scale, offsetX, offsetY, vpRect } = useMemo(() => {
@@ -172,12 +172,9 @@ function Minimap({ nodes, view, svgRef, onPan }: MinimapProps) {
     const s = Math.min(MINI_W / bw, MINI_H / bh);
     const ox = (MINI_W - bw * s) / 2 - minX * s;
     const oy = (MINI_H - bh * s) / 2 - minY * s;
-
-    // viewport rect in minimap coords
     const svg = svgRef.current;
     const svgW = svg?.clientWidth ?? 800;
     const svgH = svg?.clientHeight ?? 500;
-    // world coords di angolo top-left e bottom-right del viewport
     const wx0 = (-view.x) / view.k;
     const wy0 = (-view.y) / view.k;
     const wx1 = (svgW - view.x) / view.k;
@@ -189,18 +186,17 @@ function Minimap({ nodes, view, svgRef, onPan }: MinimapProps) {
     return { scale: s, offsetX: ox, offsetY: oy, vpRect: { x: vx, y: vy, w: vw, h: vh } };
   }, [nodes, view, svgRef]);
 
-  function handleMinimapClick(e: React.MouseEvent<SVGSVGElement>) {
+  const handleMinimapClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (!svgRef.current) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
-    // converti click minimap → world coords
     const wx = (mx - offsetX) / scale;
     const wy = (my - offsetY) / scale;
     const svgW = svgRef.current.clientWidth;
     const svgH = svgRef.current.clientHeight;
     onPan(svgW / 2 - wx * view.k, svgH / 2 - wy * view.k);
-  }
+  }, [svgRef, offsetX, offsetY, scale, view.k, onPan]);
 
   if (nodes.length === 0) return null;
 
@@ -210,7 +206,6 @@ function Minimap({ nodes, view, svgRef, onPan }: MinimapProps) {
         "bg-card/95 backdrop-blur border rounded-xl shadow-sm overflow-hidden transition-all duration-200",
         collapsed ? "w-8 h-8" : ""
       )}>
-        {/* Toggle header */}
         <button
           onClick={() => setCollapsed((v) => !v)}
           className={cn(
@@ -229,9 +224,7 @@ function Minimap({ nodes, view, svgRef, onPan }: MinimapProps) {
             className="block cursor-crosshair"
             onClick={handleMinimapClick}
           >
-            {/* Sfondo */}
             <rect width={MINI_W} height={MINI_H} fill="transparent" />
-            {/* Nodi */}
             {nodes.map((n) => {
               const meta = TYPE_META[n.type] ?? TYPE_META.note;
               const mx = n.x * scale + offsetX;
@@ -241,7 +234,6 @@ function Minimap({ nodes, view, svgRef, onPan }: MinimapProps) {
                   fill={meta.color} opacity={0.8} />
               );
             })}
-            {/* Viewport rect */}
             {vpRect && (
               <rect
                 x={vpRect.x} y={vpRect.y}
@@ -255,7 +247,100 @@ function Minimap({ nodes, view, svgRef, onPan }: MinimapProps) {
       </div>
     </div>
   );
+}, (prev, next) =>
+  prev.nodes === next.nodes &&
+  prev.view.x === next.view.x &&
+  prev.view.y === next.view.y &&
+  prev.view.k === next.view.k &&
+  prev.onPan === next.onPan
+);
+
+// ── GraphNode (estratto e memoizzato — regola 7.2) ───────────────────────
+interface GraphNodeProps {
+  node: KNode;
+  isSelected: boolean;
+  isLinkSrc: boolean;
+  isLinkMode: boolean;
+  onPointerDown: (e: React.PointerEvent, n: KNode) => void;
+  onPointerUp: (e: React.PointerEvent, n: KNode) => void;
+  onContextMenu: (e: React.MouseEvent, n: KNode) => void;
 }
+
+const GraphNode = memo(function GraphNode({
+  node,
+  isSelected,
+  isLinkSrc,
+  isLinkMode,
+  onPointerDown,
+  onPointerUp,
+  onContextMenu,
+}: GraphNodeProps) {
+  const meta = TYPE_META[node.type] ?? TYPE_META.note;
+  const r = nodeRadius(node.title);
+  const [line1, line2] = splitTitle(node.title);
+  const labelW = Math.min(80, 16 + meta.label.length * 5.5);
+  const textY = line2 ? -3 : 4;
+  return (
+    <g
+      transform={`translate(${node.x},${node.y})`}
+      style={{ cursor: isLinkMode ? "crosshair" : "grab" }}
+      onPointerDown={(e) => onPointerDown(e, node)}
+      onPointerUp={(e) => onPointerUp(e, node)}
+      onContextMenu={(e) => onContextMenu(e, node)}
+      data-node-id={node.id}
+      data-x={node.x}
+      data-y={node.y}
+    >
+      <circle
+        r={r}
+        fill={node.color || meta.bg}
+        stroke={isSelected || isLinkSrc ? meta.color : meta.border}
+        strokeWidth={isSelected || isLinkSrc ? 2.5 : 1.5}
+        filter="url(#node-shadow)"
+      />
+      <text
+        textAnchor="middle"
+        y={textY}
+        fontSize={10}
+        fontWeight={600}
+        fill={meta.color}
+        style={{ pointerEvents: "none" }}
+      >
+        <tspan x="0" dy="0">{line1}</tspan>
+        {line2 && <tspan x="0" dy="12">{line2}</tspan>}
+      </text>
+      <rect
+        x={-labelW / 2}
+        y={r + 5}
+        width={labelW}
+        height={14}
+        rx={7}
+        fill={meta.bg}
+        stroke={meta.border}
+        strokeWidth={1}
+      />
+      <text
+        textAnchor="middle"
+        y={r + 15}
+        fontSize={8}
+        fontWeight={500}
+        fill={meta.color}
+        style={{ pointerEvents: "none" }}
+      >
+        {meta.label}
+      </text>
+    </g>
+  );
+}, (prev, next) =>
+  prev.node.x       === next.node.x &&
+  prev.node.y       === next.node.y &&
+  prev.node.title   === next.node.title &&
+  prev.node.type    === next.node.type &&
+  prev.node.color   === next.node.color &&
+  prev.isSelected   === next.isSelected &&
+  prev.isLinkSrc    === next.isLinkSrc &&
+  prev.isLinkMode   === next.isLinkMode
+);
 
 export default function Archivio() {
   const { user, authReady } = useAuth();
@@ -279,7 +364,6 @@ export default function Archivio() {
   const onSaveRef = useRef<(() => void) | null>(null);
   const [fitAnimating, setFitAnimating] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
-  // ── Step 4: edge label inline edit ──────────────────────────────────────
   const [edgeLabelEdit, setEdgeLabelEdit] = useState<EdgeLabelEdit | null>(null);
 
   useEffect(() => {
@@ -291,6 +375,7 @@ export default function Archivio() {
 
   const svgRef = useRef<SVGSVGElement>(null);
 
+  // ── Drag via ref — zero re-render durante mousemove (regola 7.1) ─────
   const dragState = useRef<{
     id: number; offsetX: number; offsetY: number;
     moved: boolean; x: number; y: number; el: SVGGElement | null;
@@ -390,7 +475,6 @@ export default function Archivio() {
     setTimeout(() => setFitAnimating(false), 400);
   }, [data.nodes]);
 
-  // ── Step 5: pan da minimap ───────────────────────────────────────────────
   const handleMinimapPan = useCallback((nx: number, ny: number) => {
     const next = { x: nx, y: ny, k: viewRef.current.k };
     setView(next);
@@ -468,7 +552,7 @@ export default function Archivio() {
     }
   }, [fetchAutoLinks, toast]);
 
-  async function handleAddNode(type: NodeType = creatingType) {
+  const handleAddNode = useCallback(async (type: NodeType = creatingType) => {
     if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
     const v = viewRef.current;
@@ -483,18 +567,18 @@ export default function Archivio() {
       });
       setData((d) => ({ ...d, nodes: [...d.nodes, created] }));
       setSelectedId(created.id);
-    } catch (err) { console.error("[archivio] create node failed", err); }
-  }
+    } catch { /* silent */ }
+  }, [creatingType]);
 
-  async function handleUpdateNode(id: number, patch: Partial<KNode>) {
+  const handleUpdateNode = useCallback(async (id: number, patch: Partial<KNode>) => {
     try {
       const updated = await api<KNode>(`/nodes/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
       setData((d) => ({ ...d, nodes: d.nodes.map((n) => (n.id === id ? updated : n)) }));
       if (patch.content && patch.content.length > 20) void fetchAutoLinks(id);
-    } catch (err) { console.error("[archivio] update node failed", err); }
-  }
+    } catch { /* silent */ }
+  }, [fetchAutoLinks]);
 
-  async function handleDeleteNode(id: number) {
+  const handleDeleteNode = useCallback(async (id: number) => {
     try {
       await api(`/nodes/${id}`, { method: "DELETE" });
       setData((d) => ({
@@ -502,10 +586,10 @@ export default function Archivio() {
         edges: d.edges.filter((e) => e.sourceId !== id && e.targetId !== id),
       }));
       if (selectedId === id) setSelectedId(null);
-    } catch (err) { console.error("[archivio] delete failed", err); }
-  }
+    } catch { /* silent */ }
+  }, [selectedId]);
 
-  async function handleCreateEdge(sourceId: number, targetId: number, label?: string) {
+  const handleCreateEdge = useCallback(async (sourceId: number, targetId: number, label?: string) => {
     if (sourceId === targetId) return;
     if (data.edges.some((e) => e.sourceId === sourceId && e.targetId === targetId)) return;
     try {
@@ -514,28 +598,27 @@ export default function Archivio() {
         body: JSON.stringify({ sourceId, targetId, label: label?.trim() || undefined }),
       });
       setData((d) => ({ ...d, edges: [...d.edges, created] }));
-    } catch (err) { console.error("[archivio] edge failed", err); }
-  }
+    } catch { /* silent */ }
+  }, [data.edges]);
 
-  async function handleDeleteEdge(id: number) {
+  const handleDeleteEdge = useCallback(async (id: number) => {
     try {
       await api(`/edges/${id}`, { method: "DELETE" });
       setData((d) => ({ ...d, edges: d.edges.filter((e) => e.id !== id) }));
-    } catch (err) { console.error("[archivio] edge delete failed", err); }
-  }
+    } catch { /* silent */ }
+  }, []);
 
-  // ── Step 4: aggiorna label edge via PATCH ────────────────────────────────
-  async function handleUpdateEdgeLabel(id: number, label: string) {
+  const handleUpdateEdgeLabel = useCallback(async (id: number, label: string) => {
     try {
       const updated = await api<KEdge>(`/edges/${id}`, {
         method: "PATCH",
         body: JSON.stringify({ label: label.trim() || null }),
       });
       setData((d) => ({ ...d, edges: d.edges.map((e) => (e.id === id ? updated : e)) }));
-    } catch (err) { console.error("[archivio] edge label update failed", err); }
-  }
+    } catch { /* silent */ }
+  }, []);
 
-  async function handleDuplicateNode(id: number) {
+  const handleDuplicateNode = useCallback(async (id: number) => {
     const src = data.nodes.find((n) => n.id === id);
     if (!src) return;
     try {
@@ -545,11 +628,11 @@ export default function Archivio() {
       });
       setData((d) => ({ ...d, nodes: [...d.nodes, created] }));
       setSelectedId(created.id);
-      toast({ title: "Nodo duplicato", description: `«${src.title}» copiato con successo.` });
-    } catch (err) { console.error("[archivio] duplicate failed", err); }
-  }
+      toast({ title: "Nodo duplicato", description: `\u00ab${src.title}\u00bb copiato con successo.` });
+    } catch { /* silent */ }
+  }, [data.nodes, toast]);
 
-  function onNodePointerDown(e: React.PointerEvent, n: KNode) {
+  const onNodePointerDown = useCallback((e: React.PointerEvent, n: KNode) => {
     e.stopPropagation();
     if (linkMode) {
       if (linkMode.sourceId === n.id) { setLinkMode(null); return; }
@@ -563,27 +646,26 @@ export default function Archivio() {
     const px = (e.clientX - svgRect.left - v.x) / v.k;
     const py = (e.clientY - svgRect.top - v.y) / v.k;
     dragState.current = { id: n.id, offsetX: px - n.x, offsetY: py - n.y, moved: false, x: n.x, y: n.y, el: e.currentTarget as SVGGElement };
-  }
+  }, [linkMode]);
 
-  function onNodeContextMenu(e: React.MouseEvent, n: KNode) {
+  const onNodeContextMenu = useCallback((e: React.MouseEvent, n: KNode) => {
     e.preventDefault();
     e.stopPropagation();
     setContextMenu({ nodeId: n.id, x: e.clientX, y: e.clientY });
-  }
+  }, []);
 
-  // ── Step 4: click su label edge → inline edit ────────────────────────────
-  function onEdgeLabelClick(e: React.MouseEvent, edge: KEdge, mx: number, my: number) {
+  const onEdgeLabelClick = useCallback((e: React.MouseEvent, edge: KEdge, mx: number, my: number) => {
     e.stopPropagation();
     if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
     const v = viewRef.current;
-    // converti coordinate SVG world → screen
     const screenX = mx * v.k + v.x + rect.left;
     const screenY = my * v.k + v.y + rect.top;
     setEdgeLabelEdit({ edgeId: edge.id, draft: edge.label ?? "", screenX, screenY });
-  }
+  }, []);
 
-  function onSvgPointerMove(e: React.PointerEvent) {
+  // ── DOM diretto durante drag, setState solo su pointerUp (regola 7.1) ──
+  const onSvgPointerMove = useCallback((e: React.PointerEvent) => {
     const drag = dragState.current;
     const pan = panState.current;
     if (drag) {
@@ -645,9 +727,10 @@ export default function Archivio() {
     } else if (pan) {
       setView({ x: pan.vx + (e.clientX - pan.startX), y: pan.vy + (e.clientY - pan.startY), k: viewRef.current.k });
     }
-  }
+  }, []);
 
-  function onNodePointerUp(e: React.PointerEvent, n: KNode) {
+  // ── Commit stato React solo su pointerUp (regola 7.1) ───────────────
+  const onNodePointerUp = useCallback((e: React.PointerEvent, n: KNode) => {
     const drag = dragState.current;
     dragState.current = null;
     if (rafId.current !== null) { cancelAnimationFrame(rafId.current); rafId.current = null; }
@@ -659,15 +742,15 @@ export default function Archivio() {
       queuePosition(drag.id, drag.x, drag.y);
     }
     e.stopPropagation();
-  }
+  }, [queuePosition]);
 
-  function onSvgPointerDown(e: React.PointerEvent) {
+  const onSvgPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.target !== e.currentTarget) return;
     panState.current = { startX: e.clientX, startY: e.clientY, vx: viewRef.current.x, vy: viewRef.current.y };
     setSelectedId(null); setLinkMode(null);
-  }
+  }, []);
 
-  function onSvgPointerUp() { panState.current = null; }
+  const onSvgPointerUp = useCallback(() => { panState.current = null; }, []);
 
   useEffect(() => {
     const zeros = data.nodes.filter((n) => n.x === 0 && n.y === 0);
@@ -708,7 +791,6 @@ export default function Archivio() {
         onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFileImport(file); }}
       />
 
-      {/* ── Step 4: Inline edge label editor (position:fixed) ─────────── */}
       {edgeLabelEdit && (
         <div
           className="fixed z-[70] flex items-center gap-1"
@@ -728,11 +810,10 @@ export default function Archivio() {
               if (e.key === "Escape") setEdgeLabelEdit(null);
             }}
             onBlur={async () => {
-              // salva anche su blur per non perdere la modifica
               await handleUpdateEdgeLabel(edgeLabelEdit.edgeId, edgeLabelEdit.draft);
               setEdgeLabelEdit(null);
             }}
-            placeholder="etichetta…"
+            placeholder="etichetta\u2026"
             className="w-36 h-6 px-2 text-[11px] rounded-lg border border-primary shadow-md bg-card outline-none focus:ring-1 focus:ring-primary"
           />
           <button
@@ -761,7 +842,7 @@ export default function Archivio() {
         </div>
         <div className="relative flex-1 min-w-[140px] max-w-[220px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cerca…" className="h-8 pl-8 text-sm rounded-xl" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cerca\u2026" className="h-8 pl-8 text-sm rounded-xl" />
         </div>
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as NodeType | "all")}
           className="h-8 rounded-xl border border-border bg-background px-2 text-xs shrink-0">
@@ -802,7 +883,7 @@ export default function Archivio() {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="gap-2 cursor-pointer" disabled={importing}>
                 <span className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-muted text-muted-foreground"><Upload className="w-3 h-3" /></span>
-                {importing ? "Importando…" : "Importa file…"}
+                {importing ? "Importando\u2026" : "Importa file\u2026"}
                 <span className="ml-auto text-[10px] text-muted-foreground">PDF, MD, TXT</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -813,7 +894,7 @@ export default function Archivio() {
       {linkMode && (
         <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-900 flex items-center justify-between">
           <span><Link2 className="w-3.5 h-3.5 inline mr-1" />
-            Modalità collegamento — clicca un altro elemento per collegarlo a «{data.nodes.find((n) => n.id === linkMode.sourceId)?.title}»
+            Modalit\u00e0 collegamento \u2014 clicca un altro elemento per collegarlo a \u00ab{data.nodes.find((n) => n.id === linkMode.sourceId)?.title}\u00bb
             <span className="ml-2 opacity-60">(Esc per annullare)</span>
           </span>
           <button onClick={() => setLinkMode(null)} className="text-amber-900 hover:opacity-70"><X className="w-3.5 h-3.5" /></button>
@@ -837,7 +918,7 @@ export default function Archivio() {
                     if (autoLinkSuggestions.length === 1) setAutoLinkSourceId(null);
                   }} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] hover:opacity-90 transition-opacity"
                     style={{ backgroundColor: meta.bg, color: meta.color, borderColor: meta.border }}
-                    title={`Affinità ${Math.round(s.score * 100)}%`}>
+                    title={`Affinit\u00e0 ${Math.round(s.score * 100)}%`}>
                     <Check className="w-2.5 h-2.5" />{s.title}
                     <span className="opacity-60">{Math.round(s.score * 100)}%</span>
                   </button>
@@ -859,9 +940,9 @@ export default function Archivio() {
           <div className="bg-card rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-semibold mb-2">Etichetta collegamento</h3>
             <p className="text-xs text-muted-foreground mb-3">
-              {data.nodes.find((n) => n.id === pendingEdge.sourceId)?.title} → {data.nodes.find((n) => n.id === pendingEdge.targetId)?.title}
+              {data.nodes.find((n) => n.id === pendingEdge.sourceId)?.title} \u2192 {data.nodes.find((n) => n.id === pendingEdge.targetId)?.title}
             </p>
-            <Input autoFocus placeholder="es. richiede, usa, simile a…" value={edgeLabelDraft}
+            <Input autoFocus placeholder="es. richiede, usa, simile a\u2026" value={edgeLabelDraft}
               onChange={(e) => setEdgeLabelDraft(e.target.value)}
               onKeyDown={async (e) => {
                 if (e.key === "Enter") { await handleCreateEdge(pendingEdge.sourceId, pendingEdge.targetId, edgeLabelDraft); setPendingEdge(null); setEdgeLabelDraft(""); }
@@ -890,7 +971,7 @@ export default function Archivio() {
           </button>
           <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2 text-xs"
             onClick={() => { setLinkMode({ sourceId: contextMenu.nodeId }); setContextMenu(null); setSelectedId(null); }}>
-            <Link2 className="w-3.5 h-3.5 text-muted-foreground" /> Collega…
+            <Link2 className="w-3.5 h-3.5 text-muted-foreground" /> Collega\u2026
           </button>
           <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2 text-xs"
             onClick={() => { void handleDuplicateNode(contextMenu.nodeId); setContextMenu(null); }}>
@@ -908,7 +989,7 @@ export default function Archivio() {
         {isMobile && (
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-900 px-4 py-3 text-sm flex items-start gap-3 mb-2">
-              <span className="text-lg leading-none shrink-0">🖥️</span>
+              <span className="text-lg leading-none shrink-0">\uD83D\uDDA5\uFE0F</span>
               <p>Per l'esperienza completa con drag & drop, apri da desktop.</p>
             </div>
             {data.nodes.length === 0 ? (
@@ -972,14 +1053,12 @@ export default function Archivio() {
                       <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
                         stroke="#94a3b8" strokeWidth={1.4} markerEnd="url(#arrow)"
                         data-source={edge.sourceId} data-target={edge.targetId} />
-                      {/* ── Step 4: area click estesa + hover tooltip ── */}
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <g
                             style={{ cursor: "text" }}
                             onClick={(e) => onEdgeLabelClick(e, edge, mx, my)}
                           >
-                            {/* rect trasparente per area click ampia */}
                             <rect
                               x={mx - 30} y={my - 10}
                               width={60} height={16}
@@ -997,7 +1076,6 @@ export default function Archivio() {
                                 {edge.label}
                               </text>
                             ) : (
-                              // placeholder visibile solo al hover (via opacity nel group)
                               <text x={mx} y={my - 4} textAnchor="middle" fontSize={8} fill="#94a3b8"
                                 style={{ pointerEvents: "none" }} opacity={0.4}
                                 data-edge-mid-source={edge.sourceId}
@@ -1016,43 +1094,22 @@ export default function Archivio() {
                     </g>
                   );
                 })}
-                {/* Nodes */}
-                {filteredNodes.map((n) => {
-                  const meta = TYPE_META[n.type] ?? TYPE_META.note;
-                  const r = nodeRadius(n.title);
-                  const [line1, line2] = splitTitle(n.title);
-                  const isSelected = selectedId === n.id;
-                  const isLinkSrc = linkMode?.sourceId === n.id;
-                  const labelW = Math.min(80, 16 + meta.label.length * 5.5);
-                  const textY = line2 ? -3 : 4;
-                  return (
-                    <g key={n.id} transform={`translate(${n.x},${n.y})`}
-                      style={{ cursor: linkMode ? "crosshair" : "grab" }}
-                      onPointerDown={(e) => onNodePointerDown(e, n)}
-                      onPointerUp={(e) => onNodePointerUp(e, n)}
-                      onContextMenu={(e) => onNodeContextMenu(e, n)}
-                      data-node-id={n.id} data-x={n.x} data-y={n.y}
-                    >
-                      <circle r={r} fill={n.color || meta.bg}
-                        stroke={isSelected || isLinkSrc ? meta.color : meta.border}
-                        strokeWidth={isSelected || isLinkSrc ? 2.5 : 1.5}
-                        filter="url(#node-shadow)" />
-                      <text textAnchor="middle" y={textY} fontSize={10} fontWeight={600} fill={meta.color}
-                        style={{ pointerEvents: "none" }}>
-                        <tspan x="0" dy="0">{line1}</tspan>
-                        {line2 && <tspan x="0" dy="12">{line2}</tspan>}
-                      </text>
-                      <rect x={-Math.min(80, 16 + meta.label.length * 5.5) / 2} y={r + 5}
-                        width={labelW} height={14} rx={7} fill={meta.bg} stroke={meta.border} strokeWidth={1} />
-                      <text textAnchor="middle" y={r + 15} fontSize={8} fontWeight={500} fill={meta.color}
-                        style={{ pointerEvents: "none" }}>{meta.label}</text>
-                    </g>
-                  );
-                })}
+                {/* Nodes — GraphNode memoizzato (regola 7.2) */}
+                {filteredNodes.map((n) => (
+                  <GraphNode
+                    key={n.id}
+                    node={n}
+                    isSelected={selectedId === n.id}
+                    isLinkSrc={linkMode?.sourceId === n.id}
+                    isLinkMode={linkMode !== null}
+                    onPointerDown={onNodePointerDown}
+                    onPointerUp={onNodePointerUp}
+                    onContextMenu={onNodeContextMenu}
+                  />
+                ))}
               </g>
             </svg>
 
-            {/* ── Step 5: Minimap ───────────────────────────────────────── */}
             <Minimap
               nodes={data.nodes}
               view={view}
@@ -1068,7 +1125,7 @@ export default function Archivio() {
                 {Math.round(view.k * 100)}%
               </span>
               <button onClick={() => setView((v) => ({ ...v, k: Math.max(0.3, v.k / 1.2) }))}
-                className="w-7 h-7 rounded-lg hover:bg-muted text-sm font-bold" title="Zoom out">−</button>
+                className="w-7 h-7 rounded-lg hover:bg-muted text-sm font-bold" title="Zoom out">\u2212</button>
               <div className="w-full h-px bg-border my-0.5" />
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1088,7 +1145,7 @@ export default function Archivio() {
               <Badge variant="outline" className="text-[10px] bg-card/80 backdrop-blur">{visibleEdges.length} collegamenti</Badge>
               {selectedId !== null && (
                 <Badge variant="outline" className="text-[10px] bg-card/80 backdrop-blur text-muted-foreground">
-                  Del = elimina · Esc = chiudi · ⌘S = salva
+                  Del = elimina \u00b7 Esc = chiudi \u00b7 \u2318S = salva
                 </Badge>
               )}
             </div>
@@ -1116,14 +1173,15 @@ export default function Archivio() {
   );
 }
 
-function EmptyState({ onAdd, onImport }: { onAdd: (type?: NodeType) => void; onImport: () => void }) {
+// ── EmptyState (memoizzato — props stabili) ──────────────────────────────
+const EmptyState = memo(function EmptyState({ onAdd, onImport }: { onAdd: (type?: NodeType) => void; onImport: () => void }) {
   return (
     <div className="flex flex-col items-center text-center px-6 py-16 max-w-lg mx-auto">
       <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-5 text-3xl">📚</div>
-      <h2 className="font-serif font-bold text-xl mb-2">Il tuo Archivio è vuoto</h2>
+      <h2 className="font-serif font-bold text-xl mb-2">Il tuo Archivio \u00e8 vuoto</h2>
       <p className="text-sm text-muted-foreground max-w-sm mb-8 leading-relaxed">
         Qui raccoglierai tutto quello che impari: note, competenze, documenti, idee.
-        Ogni elemento si collega agli altri — costruisci la mappa del tuo percorso.
+        Ogni elemento si collega agli altri \u2014 costruisci la mappa del tuo percorso.
       </p>
       <div className="grid grid-cols-3 gap-3 w-full max-w-sm mb-6">
         {(["note", "skill", "document"] as NodeType[]).map((t) => {
@@ -1145,7 +1203,7 @@ function EmptyState({ onAdd, onImport }: { onAdd: (type?: NodeType) => void; onI
       </button>
     </div>
   );
-}
+});
 
 interface Citation { id: number; title: string; type: NodeType; score?: number }
 interface ChatMessage {
@@ -1155,23 +1213,38 @@ interface ChatMessage {
 }
 interface ChatPanelProps { nodes: KNode[]; onClose: () => void; onFocusNode: (id: number) => void }
 
+// ── ChatPanel — SSE via useSSEStream (regola 4.1) ────────────────────────
 function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const { isStreaming, start: startStream, reset: resetStream } = useSSEStream({
+    onError: () => {
+      setMessages((prev) => {
+        const next = prev.slice();
+        const last = next[next.length - 1];
+        if (last?.role === "assistant") next[next.length - 1] = { ...last, error: "Errore di rete", status: undefined };
+        return next;
+      });
+    },
+  });
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  async function ask() {
+  const ask = useCallback(async () => {
     const q = question.trim();
-    if (!q || busy) return;
-    setQuestion(""); setBusy(true);
+    if (!q || isStreaming) return;
+    setQuestion("");
+    resetStream();
     const userMsg: ChatMessage = { role: "user", content: q };
     const assistantMsg: ChatMessage = { role: "assistant", content: "", status: "starting" };
     setMessages((m) => [...m, userMsg, assistantMsg]);
+
+    // useSSEStream gestisce il fetch; per i messaggi strutturati (citations, status)
+    // usiamo il pattern manuale solo per il parsing SSE semantico
     try {
       const res = await apiFetch(`${BASE}api/knowledge/ask`, { method: "POST", body: JSON.stringify({ question: q }) });
       const reader = res.body?.getReader();
@@ -1209,8 +1282,7 @@ function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
         return next;
       });
     }
-    setBusy(false);
-  }
+  }, [question, isStreaming, resetStream]);
 
   function renderAnswer(content: string, citations?: Citation[]) {
     const parts: React.ReactNode[] = [];
@@ -1237,7 +1309,7 @@ function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
     "Cosa ho imparato finora?",
     "Quali competenze mi mancano per il mio obiettivo?",
     "Riassumi i miei documenti su questo argomento.",
-    "Quali elementi sono più connessi tra loro?",
+    "Quali elementi sono pi\u00f9 connessi tra loro?",
   ];
 
   return (
@@ -1293,7 +1365,7 @@ function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
                           <button key={c.id} onClick={() => onFocusNode(c.id)}
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] hover:opacity-80"
                             style={{ backgroundColor: meta.bg, color: meta.color, borderColor: meta.border }}
-                            title={`Affinità ${c.score ? Math.round(c.score * 100) : 0}%`}>
+                            title={`Affinit\u00e0 ${c.score ? Math.round(c.score * 100) : 0}%`}>
                             <meta.Icon className="w-2.5 h-2.5" />
                             <span className="font-medium">{c.title}</span>
                             {c.score !== undefined && <span className="opacity-70">{Math.round(c.score * 100)}%</span>}
@@ -1309,10 +1381,10 @@ function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
                   : m.status ? (
                     <span className="text-muted-foreground italic flex items-center gap-2">
                       <Loader2 className="w-3 h-3 animate-spin" />
-                      {m.status === "embedding" && "Analizzo il contenuto…"}
-                      {m.status === "retrieving" && "Cerco gli elementi più rilevanti…"}
-                      {m.status === "answering" && "Sto rispondendo…"}
-                      {m.status === "starting" && "Avvio…"}
+                      {m.status === "embedding" && "Analizzo il contenuto\u2026"}
+                      {m.status === "retrieving" && "Cerco gli elementi pi\u00f9 rilevanti\u2026"}
+                      {m.status === "answering" && "Sto rispondendo\u2026"}
+                      {m.status === "starting" && "Avvio\u2026"}
                     </span>
                   ) : null}
                 </div>
@@ -1325,13 +1397,13 @@ function ChatPanel({ nodes, onClose, onFocusNode }: ChatPanelProps) {
         <div className="flex items-end gap-2">
           <Textarea value={question} onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void ask(); } }}
-            placeholder="Chiedimi qualcosa sul tuo percorso…" rows={2}
-            className="rounded-xl text-sm resize-none flex-1" disabled={busy} />
-          <Button size="icon" className="rounded-xl h-9 w-9 shrink-0" disabled={busy || !question.trim()} onClick={() => void ask()}>
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            placeholder="Chiedimi qualcosa sul tuo percorso\u2026" rows={2}
+            className="rounded-xl text-sm resize-none flex-1" disabled={isStreaming} />
+          <Button size="icon" className="rounded-xl h-9 w-9 shrink-0" disabled={isStreaming || !question.trim()} onClick={() => void ask()}>
+            {isStreaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </Button>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-1.5">↵ invia · Shift+↵ vai a capo</p>
+        <p className="text-[10px] text-muted-foreground mt-1.5">\u21b5 invia \u00b7 Shift+\u21b5 vai a capo</p>
       </div>
     </aside>
   );
@@ -1364,13 +1436,14 @@ function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartL
 
   const dirty = title !== node.title || content !== node.content || type !== node.type || (url || "") !== (node.url || "");
 
-  async function save(silent = false) {
+  const save = useCallback(async (silent = false) => {
     if (!dirty) return;
     setSaving(true);
     await onSave({ title: title.trim() || "Senza titolo", content, type, url: url.trim() || null });
     setSaving(false);
     if (silent) { setSavedBadge(true); setTimeout(() => setSavedBadge(false), 2000); }
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, title, content, type, url, onSave]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -1432,21 +1505,21 @@ function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartL
         {(type === "link" || type === "document") && (
           <div>
             <label className="text-[11px] font-medium text-muted-foreground block mb-1">URL</label>
-            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" className="rounded-xl" />
+            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://\u2026" className="rounded-xl" />
           </div>
         )}
         <div>
           <label className="text-[11px] font-medium text-muted-foreground block mb-1">Contenuto</label>
           <Textarea value={content} onChange={(e) => setContent(e.target.value)}
-            placeholder="Appunti, descrizione, riferimenti…" rows={6}
+            placeholder="Appunti, descrizione, riferimenti\u2026" rows={6}
             className="rounded-xl text-sm font-mono resize-y" />
-          <p className="text-[10px] text-muted-foreground mt-1">Markdown supportato · autosalvataggio ogni 1.5s</p>
+          <p className="text-[10px] text-muted-foreground mt-1">Markdown supportato \u00b7 autosalvataggio ogni 1.5s</p>
         </div>
         <div className="pt-2">
           <div className="flex items-center justify-between mb-1.5">
             <label className="text-[11px] font-medium text-muted-foreground">Collegamenti ({edges.length})</label>
             <Button size="sm" variant="ghost" className="h-7 rounded-lg text-xs" onClick={onStartLink}>
-              <Link2 className="w-3 h-3 mr-1" /> Collega…
+              <Link2 className="w-3 h-3 mr-1" /> Collega\u2026
             </Button>
           </div>
           <div className="space-y-1">
@@ -1456,12 +1529,12 @@ function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartL
               const other = allNodes.find((n) => n.id === otherId);
               if (!other) return null;
               const m = TYPE_META[other.type] ?? TYPE_META.note;
-              const direction = e.sourceId === node.id ? "→" : "←";
+              const direction = e.sourceId === node.id ? "\u2192" : "\u2190";
               return (
                 <div key={e.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg border bg-background text-xs">
                   <span className="text-muted-foreground">{direction}</span>
                   <span className="px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: m.bg, color: m.color }}>{other.title}</span>
-                  {e.label && <span className="text-muted-foreground italic">— {e.label}</span>}
+                  {e.label && <span className="text-muted-foreground italic">\u2014 {e.label}</span>}
                   <button onClick={() => onDeleteEdge(e.id)} className="ml-auto text-muted-foreground hover:text-destructive">
                     <X className="w-3 h-3" />
                   </button>
@@ -1485,7 +1558,7 @@ function NodeEditor({ node, edges, allNodes, onClose, onSave, onDelete, onStartL
         <Button size="sm" className="rounded-xl ml-auto" disabled={!dirty || saving} onClick={() => void save(false)}>
           {saving ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
           Salva
-          {dirty && <span className="ml-1.5 text-[9px] opacity-60">⌘S</span>}
+          {dirty && <span className="ml-1.5 text-[9px] opacity-60">\u2318S</span>}
         </Button>
       </div>
     </aside>
