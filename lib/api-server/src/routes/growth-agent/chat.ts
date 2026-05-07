@@ -3,15 +3,23 @@
  *
  * FLOW PER REQUEST:
  *   1. Load user profile from DB
- *   2. Load persistent memory (facts + patterns) — parallel with RAG inside agent
- *   3. Pass memory to prompt builder via userContext extension
+ *   2. Load persistent memory (facts + patterns) AND recent session summaries — parallel
+ *   3. Build userContext with memory + session history injected
  *   4. Stream GPT-4o response token by token
  *   5. [NON-BLOCKING] After stream ends:
  *        a. Save/update coach_sessions (messages, topics, avgConfidence, evalBreakdown)
  *        b. Extract + merge memory (facts + patterns)
+ *        c. [NEW Phase 10] Summarize this session via GPT-4o-mini → session_summaries table
  *
- * Memory extraction and analytics save are FIRE-AND-FORGET after the SSE
- * stream closes — the user doesn't wait for them.
+ * Phase 10 additions:
+ *   - loadRecentSummaries(userId, 3) runs in parallel with loadMemory at step 2.
+ *     Zero extra latency for the user: both fetches happen concurrently.
+ *   - buildSessionHistorySection() formats the last 3 summaries and appends them
+ *     to the system prompt so the coach always has cross-session context.
+ *   - summarizeSession() fires after the session is saved (step 5c).
+ *     It is FIRE-AND-FORGET — user never waits for it.
+ *   - Summarization is SKIPPED for very short sessions (< 4 messages total)
+ *     to avoid noisy one-liner summaries.
  *
  * Body: {
  *   message: string,
@@ -37,10 +45,20 @@ import {
   mergeMemory,
   buildMemorySection,
 } from "@workspace/integrations-openai-ai-server/growth-agent/memory-manager";
+import {
+  summarizeSession,
+  loadRecentSummaries,
+  buildSessionHistorySection,
+} from "@workspace/integrations-openai-ai-server/growth-agent/session-summarizer";
 import { db } from "@workspace/db";
 import { usersTable, coachSessionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import type { EvalResult } from "@workspace/integrations-openai-ai-server/growth-agent/self-evaluator";
+
+// Minimum number of messages in a session before we bother summarizing.
+// A session shorter than this (e.g. a single hello-world exchange) produces
+// noise rather than useful context.
+const MIN_MESSAGES_TO_SUMMARIZE = 4;
 
 const router = Router();
 
@@ -72,20 +90,46 @@ router.post("/", async (req, res) => {
 
   if (!user) return res.status(401).json({ error: "User not found" });
 
-  // ── 2. Load persistent memory ───────────────────────────────────────────
-  const memory = await loadMemory(userId);
-  const memorySection = buildMemorySection(memory);
+  // ── 2. Load persistent memory + recent session summaries (PARALLEL) ─────
+  //
+  // Both DB reads run concurrently via Promise.all — zero extra latency
+  // compared to the previous version which only loaded memory.
+  //
+  const [memory, recentSummaries] = await Promise.all([
+    loadMemory(userId),
+    loadRecentSummaries(userId, 3),   // Phase 10: last 3 session summaries
+  ]);
 
-  // ── 3. Build userContext with memory injected ────────────────────────────
+  const memorySection       = buildMemorySection(memory);
+  const sessionHistorySection = buildSessionHistorySection(recentSummaries); // "" if no prior sessions
+
+  // ── 3. Build userContext with memory + session history injected ──────────
+  //
+  // sessionHistorySection is appended to memorySection so the prompt builder
+  // receives a single enriched context string. Format:
+  //
+  //   ## Memoria utente
+  //   …facts and patterns…
+  //
+  //   ## Contesto sessioni recenti
+  //   Sessione precedente 1:
+  //     L'utente ha lavorato su…
+  //     Temi: cambio carriera, ansia
+  //     Tono: neutral
+  //
   const userContext: UserContext & { memorySection?: string } = {
     name:        user.name,
     journeyType: user.journeyType,
     userMode:    user.userMode,
-    memorySection,
+    memorySection: memorySection + sessionHistorySection,
     ...ctxOverride,
   };
 
-  // ── 4. SSE setup ─────────────────────────────────────────────────────
+  if (recentSummaries.length > 0) {
+    console.log(`[chat] injected ${recentSummaries.length} session summaries for user ${userId}`);
+  }
+
+  // ── 4. SSE setup ──────────────────────────────────────────────────────────
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
@@ -103,12 +147,11 @@ router.post("/", async (req, res) => {
       userContext,
       history,
       userMessage: message,
-      memoryFactCount: memory.facts.length,  // ← NEW: self-evaluator uses this
+      memoryFactCount: memory.facts.length,
     })) {
       if (event.type === "token") {
         assistantTokens.push(event.value);
       }
-      // Capture evalResult from done event
       if (event.type === "done" && event.evalResult) {
         lastEvalResult = event.evalResult;
       }
@@ -121,7 +164,7 @@ router.post("/", async (req, res) => {
     res.end();
   }
 
-  // ── 5. Post-stream: save session + extract memory (non-blocking) ──────────
+  // ── 5. Post-stream: save session + extract memory + summarize (non-blocking)
   setImmediate(async () => {
     try {
       const assistantContent = assistantTokens.join("");
@@ -131,17 +174,14 @@ router.post("/", async (req, res) => {
         { role: "assistant", content: assistantContent },
       ];
 
-      // Build eval breakdown increment for this message
       const evalBreakdownIncrement = lastEvalResult
-        ? {
-            [lastEvalResult.level]: 1,
-          }
+        ? { [lastEvalResult.level]: 1 }
         : {};
 
       let targetSessionId = sessionId;
 
+      // ── 5a. Create or update coach_sessions ──────────────────────────────
       if (!targetSessionId) {
-        // ── CREATE new session ──────────────────────────────────────────────
         const [newSession] = await db
           .insert(coachSessionsTable)
           .values({
@@ -149,7 +189,6 @@ router.post("/", async (req, res) => {
             title:          message.slice(0, 80),
             messages:       fullHistory as any,
             messageCount:   fullHistory.length,
-            // Analytics fields
             topics:         [],
             avgConfidence:  lastEvalResult?.score ?? null,
             evalBreakdown:  evalBreakdownIncrement,
@@ -157,8 +196,6 @@ router.post("/", async (req, res) => {
           .returning({ id: coachSessionsTable.id });
         targetSessionId = newSession.id;
       } else {
-        // ── UPDATE existing session ───────────────────────────────────────────
-        // Fetch current session to merge analytics fields
         const [existing] = await db
           .select()
           .from(coachSessionsTable)
@@ -166,16 +203,14 @@ router.post("/", async (req, res) => {
           .limit(1);
 
         if (existing) {
-          // Rolling average for confidence
-          const prevAvg    = existing.avgConfidence ?? lastEvalResult?.score ?? null;
-          const prevCount  = (existing.messageCount ?? 0);
-          const newScore   = lastEvalResult?.score;
-          const newAvg     = (prevAvg != null && newScore != null)
+          const prevAvg   = existing.avgConfidence ?? lastEvalResult?.score ?? null;
+          const prevCount = (existing.messageCount ?? 0);
+          const newScore  = lastEvalResult?.score;
+          const newAvg    = (prevAvg != null && newScore != null)
             ? (prevAvg * prevCount + newScore) / (prevCount + 1)
             : (prevAvg ?? newScore ?? null);
 
-          // Merge eval breakdown
-          const prevBreakdown = (existing.evalBreakdown as Record<string, number>) ?? {};
+          const prevBreakdown  = (existing.evalBreakdown as Record<string, number>) ?? {};
           const mergedBreakdown: Record<string, number> = { ...prevBreakdown };
           if (lastEvalResult) {
             mergedBreakdown[lastEvalResult.level] =
@@ -196,15 +231,11 @@ router.post("/", async (req, res) => {
         }
       }
 
-      // ── Topics: extract from CoT themes via extractMemory ──────────────────
-      // Topics are populated separately after memory extraction:
-      // memory-manager extractMemory already identifies themes via GPT.
-      // We append those themes to coach_sessions.topics[].
+      // ── 5b. Extract + merge memory ────────────────────────────────────────
       const extracted = await extractMemory(fullHistory);
       if (extracted && targetSessionId) {
         await mergeMemory(userId, targetSessionId, extracted);
 
-        // Append recurring_theme patterns as topics on the session
         const newTopics = extracted.patterns
           .filter((p) => p.patternType === "recurring_theme")
           .map((p) => p.description.slice(0, 60));
@@ -213,20 +244,38 @@ router.post("/", async (req, res) => {
           const [sess] = await db
             .select({ topics: coachSessionsTable.topics })
             .from(coachSessionsTable)
-            .where(eq(coachSessionsTable.id, targetSessionId))
+            .where(eq(coachSessionsTable.id, targetSessionId!))
             .limit(1);
 
           const combined = [...new Set([
             ...((sess?.topics as string[]) ?? []),
             ...newTopics,
-          ])].slice(0, 20); // max 20 topics per session
+          ])].slice(0, 20);
 
           await db
             .update(coachSessionsTable)
             .set({ topics: combined })
-            .where(eq(coachSessionsTable.id, targetSessionId));
+            .where(eq(coachSessionsTable.id, targetSessionId!));
         }
       }
+
+      // ── 5c. Phase 10 — Summarize session (fire-and-forget) ────────────────
+      //
+      // Only summarize once the session has enough messages to be meaningful.
+      // We summarize on EVERY message update (not just session end) so that
+      // even long multi-day sessions have an up-to-date summary available
+      // for the NEXT conversation the user starts.
+      //
+      // summarizeSession() does an INSERT with ON CONFLICT DO UPDATE keyed on
+      // (userId, sessionId), so calling it multiple times is safe — it simply
+      // overwrites the previous summary with a fresher one.
+      //
+      if (targetSessionId && fullHistory.length >= MIN_MESSAGES_TO_SUMMARIZE) {
+        summarizeSession(userId, targetSessionId, fullHistory).catch((err) => {
+          console.warn("[chat] session summarization failed (non-critical):", err);
+        });
+      }
+
     } catch (err) {
       console.error("[chat] post-stream analytics+memory save failed:", err);
     }
