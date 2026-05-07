@@ -1,8 +1,14 @@
+/**
+ * Added FK on userId for proper cascading deletes.
+ */
 import { pgTable, serial, integer, text, timestamp, jsonb, real } from "drizzle-orm/pg-core";
+import { usersTable } from "./users";
 
 export const businessIdeasTable = pgTable("business_ideas", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
   title: text("title").notNull().default("Nuova idea"),
   ideaText: text("idea_text").notNull(),
   sector: text("sector"),

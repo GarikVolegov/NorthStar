@@ -1,9 +1,17 @@
-import { pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+/**
+ * FIXED: added userId FK — conversations must belong to a user.
+ * Without this, conversations were anonymous and unqueryable by owner.
+ */
+import { pgTable, serial, text, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { usersTable } from "./users";
 
 export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

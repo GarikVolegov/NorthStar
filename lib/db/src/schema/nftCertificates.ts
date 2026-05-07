@@ -1,9 +1,21 @@
-import { pgTable, serial, integer, text, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
+/**
+ * FIXED: added FK references on userId and objectiveId.
+ * Previously these were bare integers with no referential integrity.
+ */
+import {
+  pgTable, serial, integer, text, timestamp, jsonb, boolean,
+} from "drizzle-orm/pg-core";
+import { usersTable } from "./users";
+import { userObjectivesTable } from "./userObjectives";
 
 export const nftCertificatesTable = pgTable("nft_certificates", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  objectiveId: integer("objective_id").notNull(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
+  objectiveId: integer("objective_id")
+    .notNull()
+    .references(() => userObjectivesTable.id, { onDelete: "cascade" }),
   objectiveText: text("objective_text").notNull(),
   userName: text("user_name").notNull(),
   category: text("category").notNull().default("altro"),

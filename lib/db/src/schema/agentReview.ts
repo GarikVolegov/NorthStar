@@ -1,3 +1,7 @@
+/**
+ * FIXED: auditLogsTable.userId changed from text → integer to match
+ * the rest of the codebase. This enables typed JOINs with usersTable.
+ */
 import {
   pgTable, serial, integer, text, timestamp, jsonb, real,
 } from "drizzle-orm/pg-core";
@@ -44,7 +48,8 @@ export const reviewQueueTable = pgTable("review_queue", {
 
 export const auditLogsTable = pgTable("audit_logs", {
   id: serial("id").primaryKey(),
-  userId: text("user_id"),
+  // FIXED: was text — now integer to match usersTable.id
+  userId: integer("user_id").references(() => usersTable.id, { onDelete: "set null" }),
   action: text("action").notNull(),
   targetType: text("target_type").notNull(),
   targetId: integer("target_id"),

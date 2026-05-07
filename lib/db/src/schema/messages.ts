@@ -1,7 +1,10 @@
+/**
+ * FIXED: role field now uses an enum constraint instead of free text.
+ * Valid values: "user" | "assistant" | "system"
+ */
 import { integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-
 import { conversations } from "./conversations";
 
 export const messages = pgTable("messages", {
@@ -9,7 +12,8 @@ export const messages = pgTable("messages", {
   conversationId: integer("conversation_id")
     .notNull()
     .references(() => conversations.id, { onDelete: "cascade" }),
-  role: text("role").notNull(),
+  // FIXED: enum constraint prevents invalid role values
+  role: text("role", { enum: ["user", "assistant", "system"] }).notNull(),
   content: text("content").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
