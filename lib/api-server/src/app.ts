@@ -8,6 +8,13 @@ import requestID from "express-request-id";
 
 import { loggingMiddleware, logger } from "./middleware/loggingMiddleware";
 import { jwtMiddleware } from "./middleware/jwt";
+import {
+  loginLimiter,
+  aiChatLimiter,
+  apiLimiter,
+  publicLimiter,
+  adminLimiter,
+} from "./middleware/rate-limiters";
 import "./jobs/cron";
 
 // OG Image (public — no auth)
@@ -21,6 +28,7 @@ import memoryRouter        from "./routes/growth-agent/memory";
 import analyticsRouter     from "./routes/growth-agent/analytics";
 import notificationsRouter from "./routes/growth-agent/notifications";
 import feedbackRouter      from "./routes/growth-agent/feedback";
+import pageContextRouter   from "./routes/growth-agent/page-context";
 
 // Discovery Agent System
 import discoveryFeedRouter                  from "./routes/discovery/feed";
@@ -44,12 +52,9 @@ import leaderboardRouter from "./routes/leaderboard";
 export function createApp() {
   const app = express();
 
-  // ── Observability ──────────────────────────────────────────────────────────
-  // 1. Assign X-Request-Id UUID to req.id (or propagate from incoming header).
+  // ── Observability ───────────────────────────────────────────────────────────
   app.use(requestID({ headerName: "X-Request-Id" }));
-  // 2. Mount pino child logger on req.log and set X-Request-Id response header.
   app.use(loggingMiddleware);
-  // ───────────────────────────────────────────────────────────────────────────
 
   app.use(cors({
     origin: process.env.FRONTEND_URL ?? "http://localhost:5173",
@@ -57,48 +62,52 @@ export function createApp() {
   }));
   app.use(json({ limit: "20mb" }));
 
-  app.get("/health", (_req, res) => res.json({ ok: true }));
+  // ── Public routes (no auth, IP-keyed rate limit) ────────────────────────────
+  app.get("/health", publicLimiter, (_req, res) => res.json({ ok: true }));
+  app.use(publicLimiter, ogProfileRouter);
 
-  app.use(ogProfileRouter);
+  // ── Auth routes (brute-force protected) ─────────────────────────────────────
+  // loginLimiter is applied before jwtMiddleware so it runs pre-authentication.
+  // Mount any future /api/auth/* routes here with loginLimiter prepended.
+  app.use("/api/auth", loginLimiter);
 
+  // ── JWT authentication — all /api/* routes require a valid token ────────────
   app.use("/api", jwtMiddleware);
 
-  // Growth Agent
-  app.use("/api/growth-agent/ingest",        ingestRouter);
-  app.use("/api/growth-agent/chat",          chatRouter);
-  app.use("/api/growth-agent/knowledge",     knowledgeRouter);
-  app.use("/api/growth-agent/memory",        memoryRouter);
-  app.use("/api/growth-agent/analytics",     analyticsRouter);
-  app.use("/api/growth-agent/notifications", notificationsRouter);
-  app.use("/api/growth-agent/feedback",      feedbackRouter);
+  // ── Growth Agent ─────────────────────────────────────────────────
+  // SSE chat gets its own strict limiter (OpenAI cost guard)
+  app.use("/api/growth-agent/chat",          aiChatLimiter, chatRouter);
+  // All other growth-agent routes share the generic api limiter
+  app.use("/api/growth-agent/ingest",        apiLimiter, ingestRouter);
+  app.use("/api/growth-agent/knowledge",     apiLimiter, knowledgeRouter);
+  app.use("/api/growth-agent/memory",        apiLimiter, memoryRouter);
+  app.use("/api/growth-agent/analytics",     apiLimiter, analyticsRouter);
+  app.use("/api/growth-agent/notifications", apiLimiter, notificationsRouter);
+  app.use("/api/growth-agent/feedback",      apiLimiter, feedbackRouter);
+  app.use("/api/growth-agent/page-context",  apiLimiter, pageContextRouter);
 
-  // Discovery Agent System
-  app.use("/api/discovery/feed",   discoveryFeedRouter);
-  app.use("/api/discovery/saved",  discoverySavedRouter);
-  app.use("/api/discovery/seen",   seenRouter);
+  // ── Discovery Agent ───────────────────────────────────────────────
+  app.use("/api/discovery/feed",   apiLimiter, discoveryFeedRouter);
+  app.use("/api/discovery/saved",  apiLimiter, discoverySavedRouter);
+  app.use("/api/discovery/seen",   apiLimiter, seenRouter);
 
-  // Admin — Discovery
-  app.use("/api/admin/discovery/collect",    discoveryCollectRouter);
-  app.use("/api/admin/discovery/sources",    discoverySourcesRouter);
-  app.use("/api/admin/discovery/items",      discoveryItemsRouter);
-  app.use("/api/admin/discovery/enrich",     discoveryEnrichRouter);
+  // ── Admin (dedicated limiter protects expensive DB queries) ─────────────────
+  app.use("/api/admin/discovery/collect",    adminLimiter, discoveryCollectRouter);
+  app.use("/api/admin/discovery/sources",    adminLimiter, discoverySourcesRouter);
+  app.use("/api/admin/discovery/items",      adminLimiter, discoveryItemsRouter);
+  app.use("/api/admin/discovery/enrich",     adminLimiter, discoveryEnrichRouter);
+  app.use("/api/admin/analyze-supervisor",   adminLimiter, analyzeSupervisorRouter);
+  app.use("/api/admin/agent-health",         adminLimiter, agentHealthRouter);
+  app.use("/api/admin/stats",                adminLimiter, adminStatsRouter);
+  app.use("/api/admin/users",                adminLimiter, adminUsersRouter);
+  app.use("/api/admin/revenue",              adminLimiter, adminRevenueRouter);
 
-  // Admin — System
-  app.use("/api/admin/analyze-supervisor",   analyzeSupervisorRouter);
-  app.use("/api/admin/agent-health",         agentHealthRouter);
-
-  // Admin — Dashboard KPI + Users + Revenue
-  app.use("/api/admin/stats",   adminStatsRouter);
-  app.use("/api/admin/users",   adminUsersRouter);
-  app.use("/api/admin/revenue", adminRevenueRouter);
-
-  // Phase 3 — Gamification
-  app.use("/api/voice",       voiceRouter);
-  app.use("/api/leaderboard", leaderboardRouter);
+  // ── Gamification ─────────────────────────────────────────────────────
+  app.use("/api/voice",       apiLimiter, voiceRouter);
+  app.use("/api/leaderboard", apiLimiter, leaderboardRouter);
 
   app.use((_req, res) => res.status(404).json({ error: "Not found" }));
 
-  // Global error handler — uses req.log for structured output with requestId.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const log = (req as any).log ?? logger;
     log.error({ err }, "unhandled error");
