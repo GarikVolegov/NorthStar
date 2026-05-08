@@ -1,31 +1,21 @@
 /**
- * GrowthAgent v8 — voice mode fast path.
+ * GrowthAgent v9 — RAG platform_content + Generative UI.
  *
- * CHANGES v8
+ * CHANGES v9
  * ──────────
- * Adds voiceMode support to GrowthAgentOptions.
- * When voiceMode === true:
- *   - Skip router, RAG, CoT, self-evaluator, supervisor
- *   - Use buildVoiceSystemPrompt() (breve, TTS-friendly)
- *   - Use a lighter model (gpt-4o-mini) for lower latency
- *   - max_tokens capped at 120 (max ~2-3 frasi)
- *   - temperature 0.80 (tono più naturale/conversazionale)
+ * Point 7 — RAG platform content:
+ *   In the general pipeline, retrieve() now pulls 'platform_content' chunks
+ *   (topK=3, minScore=0.30) in parallel with document/persona retrieval.
+ *   Platform chunks are passed separately to buildSystemPrompt() so
+ *   prompt-builder can inject them in a dedicated [PIATTAFORMA] section.
  *
- * All other paths unchanged from v7.1.
+ * Point 8 — Generative UI:
+ *   The standard OpenAI stream now includes UI_TOOLS in the 'tools' array
+ *   and tool_choice='auto'. If finish_reason==='tool_calls', agent extracts
+ *   the function call and yields { type: 'ui_tool', name, args } instead
+ *   of plain tokens. Supervisor is skipped for UI tool responses.
  *
- * ROUTING DECISION (in order):
- * ┌─────────────────────────────────────────────────────────────┐
- * | voiceMode === true → Wendy fast path (no RAG, no CoT)                      |
- * ├─────────────────────────────────────────────────────────────┤
- * | Multi-domain: primaryConf >= threshold AND secondaryRoute present          |
- * |   → runParallelHandoff(primary, secondary)                                 |
- * ├─────────────────────────────────────────────────────────────┤
- * | Single-domain: primaryConf >= threshold AND domain != 'general'            |
- * |   → specialist.run(primary)                                                |
- * ├─────────────────────────────────────────────────────────────┤
- * | Fallback: confidence < threshold OR domain = 'general'                     |
- * |   → general pipeline (RAG + CoT + supervisor)                              |
- * └─────────────────────────────────────────────────────────────┘
+ * Voice fast-path and specialist/parallel routing unchanged from v8.
  */
 import OpenAI from "openai";
 import { openai } from "../client";
@@ -39,6 +29,7 @@ import { getSpecialist } from "./specialist-agent";
 import { supervisorAgent } from "./supervisor-agent";
 import { loadMemory, buildMemorySection, extractMemory, mergeMemory } from "./memory-manager";
 import { runParallelHandoff } from "./parallel-handoff";
+import { UI_TOOLS, type UiToolName, type UiToolArgs } from "./ui-tools";
 import type { RetrievedChunk } from "./retriever";
 import type { CoTResult } from "./chain-of-thought";
 import type { RouteDecision } from "./router-agent";
@@ -49,7 +40,7 @@ import "./specialists/mindset-agent";
 import "./specialists/habits-agent";
 
 export const GROWTH_AGENT_MODEL       = "gpt-4o";
-export const GROWTH_AGENT_VOICE_MODEL = "gpt-4o-mini"; // modello leggero per voice mode
+export const GROWTH_AGENT_VOICE_MODEL = "gpt-4o-mini";
 
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -65,7 +56,6 @@ export interface GrowthAgentOptions {
   userMessage:      string;
   maxHistory?:      number;
   memoryFactCount?: number;
-  /** Se true: bypassa RAG/CoT/supervisor, usa WENDY_SYSTEM_PROMPT ottimizzato TTS */
   voiceMode?:       boolean;
 }
 
@@ -79,57 +69,42 @@ function buildConversationSummary(history: ChatMessage[]): string {
 export async function* runGrowthAgent(
   opts: GrowthAgentOptions,
 ): AsyncGenerator<
-  | { type: "token";  value: string }
-  | { type: "status"; value: string; domain?: RouteDecision["domain"] }
-  | { type: "done";   sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult; routeDecision?: RouteDecision; supervisorResult?: SupervisorResult }
-  | { type: "error";  message: string }
+  | { type: "token";    value: string }
+  | { type: "status";   value: string; domain?: RouteDecision["domain"] }
+  | { type: "ui_tool";  name: UiToolName; args: UiToolArgs }   // ← v9: Generative UI
+  | { type: "done";     sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult; routeDecision?: RouteDecision; supervisorResult?: SupervisorResult }
+  | { type: "error";    message: string }
 > {
   const {
     userId, sessionId, userContext, history, userMessage,
     maxHistory = 12, voiceMode = false,
   } = opts;
 
-  // ── VOICE FAST PATH ──────────────────────────────────────────────────────────
-  //
-  // Bypassa completamente RAG, CoT, router, supervisor.
-  // Priorità: latenza < 600ms (TTS non può aspettare).
-  //
+  // ── VOICE FAST PATH (unchanged) ───────────────────────────────────────────
   if (voiceMode) {
-    const systemPrompt = buildVoiceSystemPrompt(userContext.name);
-    const recentHistory = history.slice(-6); // finestra corta: meno token, meno latenza
-
+    const systemPrompt  = buildVoiceSystemPrompt(userContext.name);
+    const recentHistory = history.slice(-6);
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: "system", content: systemPrompt },
       ...recentHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       { role: "user", content: userMessage },
     ];
-
     try {
       const stream = await openai.chat.completions.create({
-        model:       GROWTH_AGENT_VOICE_MODEL,
-        messages,
-        stream:      true,
-        temperature: 0.80,
-        max_tokens:  120, // ~2-3 frasi vocali
+        model: GROWTH_AGENT_VOICE_MODEL, messages, stream: true,
+        temperature: 0.80, max_tokens: 120,
       });
-
       const tokenBuffer: string[] = [];
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta?.content;
-        if (delta) {
-          tokenBuffer.push(delta);
-          yield { type: "token", value: delta };
-        }
+        if (delta) { tokenBuffer.push(delta); yield { type: "token", value: delta }; }
       }
-
       yield { type: "done", sources: [] };
-
-      // Salva memoria in background anche in voice mode
       const assistantContent = tokenBuffer.join("");
       if (sessionId) {
         const turns = [
           ...history.slice(-4),
-          { role: "user" as const,      content: userMessage },
+          { role: "user" as const, content: userMessage },
           { role: "assistant" as const, content: assistantContent },
         ];
         (async () => {
@@ -147,8 +122,7 @@ export async function* runGrowthAgent(
     return;
   }
 
-  // ── STANDARD PATH (v7.1 unchanged) ───────────────────────────────────────────
-
+  // ── STANDARD PATH ─────────────────────────────────────────────────────────
   const [routeDecision, userMemory] = await Promise.all([
     routerAgent.route(userMessage, history),
     loadMemory(userId).catch((err) => {
@@ -166,10 +140,8 @@ export async function* runGrowthAgent(
   };
 
   console.log(
-    `[agent] domain=${routeDecision.domain}(${routeDecision.confidence.toFixed(2)}) threshold=${routeDecision.threshold.toFixed(2)}` +
-    (routeDecision.secondaryRoute
-      ? ` + secondary=${routeDecision.secondaryRoute.domain}(${routeDecision.secondaryRoute.confidence.toFixed(2)})`
-      : "") +
+    `[agent] domain=${routeDecision.domain}(${routeDecision.confidence.toFixed(2)})` +
+    (routeDecision.secondaryRoute ? ` + secondary=${routeDecision.secondaryRoute.domain}` : "") +
     ` | memory: ${userMemory.facts.length} facts` +
     (sessionId ? ` | session: ${sessionId}` : ""),
   );
@@ -231,9 +203,12 @@ export async function* runGrowthAgent(
   yield { type: "status", value: "🔍 Analizzando il tuo profilo..." };
 
   const conversationSummary = buildConversationSummary(history);
-  const [personaExamples, documentChunks, cot] = await Promise.all([
+
+  // v9: retrieve platform_content in parallel with other chunks
+  const [personaExamples, documentChunks, platformChunks, cot] = await Promise.all([
     retrieve(userMessage, userId, { topK: 3, minScore: 0.30, sourceTypes: ["persona_example"] }),
     retrieve(userMessage, userId, { topK: 5, minScore: 0.35, sourceTypes: ["document", "user_note"] }),
+    retrieve(userMessage, userId, { topK: 3, minScore: 0.30, sourceTypes: ["platform_content"] }),
     runChainOfThought(userMessage, conversationSummary),
   ]);
 
@@ -248,6 +223,7 @@ export async function* runGrowthAgent(
   const systemPrompt = buildSystemPrompt({
     userContext: enrichedContext, personaExamples, documentChunks,
     webResults, cot, userMessage, evalResult,
+    platformChunks, // ← v9
   });
 
   const recentHistory = history.slice(-maxHistory);
@@ -262,17 +238,65 @@ export async function* runGrowthAgent(
   try {
     yield { type: "status", value: "✍️ Generando risposta..." };
 
+    // v9: include UI_TOOLS for Generative UI
     const stream = await openai.chat.completions.create({
-      model: GROWTH_AGENT_MODEL, messages, stream: true, temperature,
+      model: GROWTH_AGENT_MODEL,
+      messages,
+      stream: true,
+      temperature,
       max_tokens: evalResult.level === "low" ? 300 : 600,
+      tools: UI_TOOLS,
+      tool_choice: "auto",
+      stream_options: { include_usage: false },
     });
 
-    const tokenBuffer: string[] = [];
+    const tokenBuffer:   string[] = [];
+    let   toolCallName:  string   = "";
+    let   toolCallArgs:  string   = "";
+    let   finishReason:  string   = "stop";
+
     for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content;
-      if (delta) tokenBuffer.push(delta);
+      const choice = chunk.choices[0];
+      if (!choice) continue;
+      finishReason = choice.finish_reason ?? finishReason;
+
+      // Regular text token
+      if (choice.delta?.content) {
+        tokenBuffer.push(choice.delta.content);
+      }
+
+      // Tool call accumulation
+      if (choice.delta?.tool_calls) {
+        for (const tc of choice.delta.tool_calls) {
+          if (tc.function?.name)      toolCallName += tc.function.name;
+          if (tc.function?.arguments) toolCallArgs += tc.function.arguments;
+        }
+      }
     }
 
+    // ── GENERATIVE UI branch ──────────────────────────────────────────────
+    if (finishReason === "tool_calls" && toolCallName) {
+      let args: UiToolArgs;
+      try {
+        args = JSON.parse(toolCallArgs) as UiToolArgs;
+      } catch {
+        // Malformed args: fall back to text error
+        yield { type: "error", message: `UI tool args parse error: ${toolCallArgs}` };
+        yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], evalResult, routeDecision };
+        return;
+      }
+
+      yield { type: "ui_tool", name: toolCallName as UiToolName, args };
+      yield {
+        type: "done",
+        sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults],
+        evalResult, routeDecision,
+      };
+      scheduleMemorySave(`[UI: ${toolCallName}]`, sessionId ?? Date.now());
+      return;
+    }
+
+    // ── Regular text branch ───────────────────────────────────────────────
     const draft = tokenBuffer.join("");
 
     const supervisorInput = {
@@ -287,7 +311,7 @@ export async function* runGrowthAgent(
     let finalText        = draft;
 
     if (!supervisorResult.pass) {
-      console.log(`[supervisor] FAIL (score=${supervisorResult.score}) — rewriting + logging`);
+      console.log(`[supervisor] FAIL (score=${supervisorResult.score}) — rewriting`);
       finalText        = await supervisorAgent.rewrite(supervisorInput, supervisorResult);
       supervisorResult = { ...supervisorResult, rewritten: true };
     } else {
@@ -301,7 +325,7 @@ export async function* runGrowthAgent(
 
     yield {
       type: "done",
-      sources: [...personaExamples, ...documentChunks, ...webResults],
+      sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults],
       cot, evalResult, routeDecision, supervisorResult,
     };
 

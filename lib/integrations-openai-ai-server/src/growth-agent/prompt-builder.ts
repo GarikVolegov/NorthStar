@@ -1,181 +1,144 @@
 /**
- * Prompt Builder v5 — voice mode support.
+ * prompt-builder v2 — platform content section.
  *
- * NEW v5:
- *   - buildVoiceSystemPrompt(userName) → prompt compatto per TTS (Wendy voice mode)
- *     Usato quando GrowthAgentOptions.voiceMode === true.
- *     Bypassa tutte le sezioni RAG/CoT/memory per massimizzare la velocità.
- *
- * SECTIONS standard (in order):
- *   1. PERSONA CORE        — principi fissi del coach
- *   2. TONE PROFILE        — come parla (adattato a journeyType)
- *   3. PERSISTENT MEMORY   — fatti biografici + pattern osservati
- *   4. UNCERTAINTY GUIDE   — istruzioni basate su confidence level
- *   5. CHAIN OF THOUGHT    — ragionamento interno nascosto
- *   6. SOCRATIC DIRECTIVE  — come chiudere la risposta
- *   7. PERSONA EXAMPLES    — esempi di stile dal RAG
- *   8. DOCUMENT KNOWLEDGE  — chunk dai documenti
- *   9. WEB CONTEXT         — risultati web (fallback)
- *  10. USER CONTEXT        — profilo, obiettivi, settore
+ * CHANGES:
+ * - buildSystemPrompt() accepts optional platformChunks.
+ *   If present and non-empty, injects a dedicated '## Contenuti NorthStar'
+ *   section BEFORE the RAG documents section.
+ *   This makes platform content authoritative and easily distinguishable
+ *   from user documents and web results in the model's context.
  */
 import type { RetrievedChunk } from "./retriever";
-import { buildToneSection } from "./tone-adapter";
-import { buildCoTSection, type CoTResult } from "./chain-of-thought";
-import { buildSocraticSection } from "./socratic-engine";
-import type { EvalResult } from "./self-evaluator";
+import type { CoTResult }      from "./chain-of-thought";
+import type { EvalResult }     from "./self-evaluator";
 
 export interface UserContext {
-  name: string;
-  journeyType: string;
-  userMode: string;
-  objectives?: string[];
-  sectorName?: string;
+  name?:         string;
+  journeyType?:  string;
+  userMode?:     string;
+  objectives?:   string[];
+  sectorName?:   string;
+  pageContext?:  Record<string, unknown>;
   memorySection?: string;
 }
 
-export interface PromptContext {
-  userContext: UserContext;
-  personaExamples: RetrievedChunk[];
-  documentChunks: RetrievedChunk[];
-  webResults: RetrievedChunk[];
-  cot?: CoTResult | null;
-  userMessage?: string;
-  evalResult?: EvalResult | null;
+export interface BuildSystemPromptOptions {
+  userContext:      UserContext & { memorySection?: string };
+  personaExamples:  RetrievedChunk[];
+  documentChunks:   RetrievedChunk[];
+  webResults:       RetrievedChunk[];
+  cot:              CoTResult | null;
+  userMessage:      string;
+  evalResult:       EvalResult;
+  platformChunks?:  RetrievedChunk[]; // ← v2: optional platform content
 }
 
-// ── PERSONA CORE ──────────────────────────────────────────────────────────────
-const PERSONA_CORE = `
-Sei il Coach di Crescita Personale di NorthStar.
+const BASE_SYSTEM = `Sei Wendy, coach di crescita personale e orientamento professionale di NorthStar.
+Sei empatica, diretta, competente. Rispondi sempre in italiano.
+Usa un tono caldo ma concreto — mai vago o generico.
+Se non sei sicura, dillo esplicitamente piuttosto che inventare.`;
 
-Principi non negoziabili:
-1. MAI rispondere con platitudini, luoghi comuni o motivazione vuota.
-2. Ogni risposta deve contenere almeno una cosa CONCRETA e SPECIFICA.
-3. Distingui SEMPRE tra ciò che l'utente controlla e ciò che non controlla.
-4. Se vedi un pattern limitante, NOMINALO — con rispetto ma senza ammorbidire.
-5. Cita la fonte quando usi un concetto da un documento ingested.
-6. Rispondi nella lingua dell'utente (italiano default).
-7. Lunghezza: risposte dense ma non lunghe. Max 250 parole salvo richiesta esplicita.
-`.trim();
+export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {
+  const {
+    userContext, personaExamples, documentChunks, webResults,
+    cot, userMessage, evalResult, platformChunks = [],
+  } = opts;
 
-// ── VOICE SYSTEM PROMPT (v5 NEW) ──────────────────────────────────────────────
-//
-// Prompt compatto per modalità vocale (voiceMode: true).
-// NON include RAG, CoT, memoria — il client vocale non ha bisogno di queste
-// sezioni e la latenza extra non è accettabile in una conversazione a voce.
-//
-// Regole:
-//   • Max 2-3 frasi per risposta
-//   • Zero markdown / elenchi
-//   • Tono caldo, come una persona reale
-//   • Usa il nome utente se disponibile
-//   • Termina sempre con domanda aperta
-//
-export function buildVoiceSystemPrompt(userName?: string): string {
-  const greeting = userName
-    ? `Stai parlando con ${userName}. Inizia le risposte con il suo nome quando è naturale.`
-    : "Non conosci ancora il nome dell'utente — non inventarne uno.";
+  const sections: string[] = [BASE_SYSTEM];
 
-  return [
-    "Sei Wendy, il coach personale di NorthStar.",
-    "Parli SEMPRE in italiano, con tono caldo e diretto.",
-    "Le tue risposte sono BREVI (max 2-3 frasi) perché vengono lette ad alta voce.",
-    "Non usare elenchi puntati, asterischi o markdown — parla come se fossi umana.",
-    greeting,
-    "Esempio: \"Ottimo Dionis! Questo obiettivo è solido. Vuoi approfondire la strategia?\"",
-    "Termina SEMPRE con una domanda aperta per mantenere il dialogo.",
-  ].join("\n");
-}
-
-// ── UNCERTAINTY GUIDE (v4) ────────────────────────────────────────────────────
-
-function buildUncertaintySection(eval_: EvalResult | null | undefined): string {
-  if (!eval_ || eval_.level === "high") return "";
-
-  if (eval_.level === "low") {
-    const reasons = eval_.reasons.map((r) => `  - ${r}`).join("\n");
-    return `
-## ⚠️  Attenzione: contesto insufficiente per rispondere con certezza
-Score: ${eval_.score.toFixed(2)} / 1.00  (soglia: 0.45)
-
-Motivi:
-${reasons}
-
-COMPORTAMENTO RICHIESTO:
-- Inizia la risposta con una frase onesta di incertezza.
-  Esempio: "Non ho abbastanza contesto per risponderti con precisione — posso condividere
-  alcune considerazioni generali, ma sarebbe più utile capire meglio la tua situazione."
-- Fai UNA domanda di chiarimento specifica (usa la tecnica Socratica).
-- NON inventare conoscenza. NON fingere certezza.
-- Se la KB non ha dati rilevanti, dillo esplicitamente e suggerisci di caricare documenti.
-`.trim();
+  // ── User context ────────────────────────────────────────────────────────
+  if (userContext.name || userContext.journeyType || userContext.userMode) {
+    const ctx: string[] = [];
+    if (userContext.name)        ctx.push(`Nome: ${userContext.name}`);
+    if (userContext.journeyType) ctx.push(`Percorso: ${userContext.journeyType}`);
+    if (userContext.userMode)    ctx.push(`Modalità: ${userContext.userMode}`);
+    if (userContext.objectives?.length) ctx.push(`Obiettivi: ${userContext.objectives.join(", ")}`);
+    if (userContext.sectorName)  ctx.push(`Settore: ${userContext.sectorName}`);
+    sections.push(`## Profilo utente\n${ctx.join("\n")}`);
   }
 
-  return `
-## 🔶 Contesto parziale — rispondi con linguaggio moderato
-Score: ${eval_.score.toFixed(2)} / 1.00
+  // ── Page context (Wendy copilot) ─────────────────────────────────────────
+  if (userContext.pageContext && Object.keys(userContext.pageContext).length > 0) {
+    sections.push(
+      `## Contesto pagina corrente\n` +
+      JSON.stringify(userContext.pageContext, null, 2)
+    );
+  }
 
-COMPORTAMENTO RICHIESTO:
-- Usa linguaggio che segnala assunzioni: "se ho capito bene...", "basandomi su quello che
-  mi hai detto...", "potrebbe essere che..."
-- Segnala quando stai ragionando senza dati certi: "non ho abbastanza informazioni
-  su [X], ma un'ipotesi ragionevole è..."
-- Concludi con una domanda che raccoglie il contesto mancante.
-- NON esagerare l'incertezza: hai ancora abbastanza per essere utile.
-`.trim();
-}
+  // ── Memory ───────────────────────────────────────────────────────────────
+  if (userContext.memorySection) {
+    sections.push(userContext.memorySection);
+  }
 
-// ── FORMATTER HELPERS ─────────────────────────────────────────────────────────
+  // ── Platform content (authoritative NorthStar content) — v2 ─────────────
+  if (platformChunks.length > 0) {
+    const platformText = platformChunks
+      .map((c, i) => `[PIATTAFORMA ${i + 1}] (${c.source})\n${c.content}`)
+      .join("\n\n");
+    sections.push(`## Contenuti NorthStar (usa questi come riferimento autorevole)\n${platformText}`);
+  }
 
-function formatPersonaExamples(examples: RetrievedChunk[]): string {
-  if (examples.length === 0) return "";
-  const lines = examples.map(
-    (e, i) => `### Esempio ${i + 1} — ${e.source}\n${e.content}`,
+  // ── Persona examples ─────────────────────────────────────────────────────
+  if (personaExamples.length > 0) {
+    const examples = personaExamples
+      .map((c, i) => `[ESEMPIO ${i + 1}]\n${c.content}`)
+      .join("\n\n");
+    sections.push(`## Esempi di coaching\n${examples}`);
+  }
+
+  // ── User documents ────────────────────────────────────────────────────────
+  if (documentChunks.length > 0) {
+    const docs = documentChunks
+      .map((c, i) => `[DOC ${i + 1}] (score: ${c.score.toFixed(2)}, fonte: ${c.source})\n${c.content}`)
+      .join("\n\n");
+    sections.push(`## Documenti rilevanti dell'utente\n${docs}`);
+  }
+
+  // ── Web results ───────────────────────────────────────────────────────────
+  if (webResults.length > 0) {
+    const web = webResults
+      .map((c, i) => `[WEB ${i + 1}] (${c.source})\n${c.content}`)
+      .join("\n\n");
+    sections.push(`## Risultati web\n${web}`);
+  }
+
+  // ── Chain of Thought ──────────────────────────────────────────────────────
+  if (cot) {
+    sections.push(
+      `## Ragionamento preliminare\n` +
+      `Domanda classificata come: ${cot.category}\n` +
+      `Analisi: ${cot.analysis}\n` +
+      `Approccio suggerito: ${cot.approach}`
+    );
+  }
+
+  // ── Eval guidance ────────────────────────────────────────────────────────
+  if (evalResult.level === "low") {
+    sections.push(
+      `## Nota sulla confidenza\n` +
+      `Le fonti disponibili sono limitate (score: ${evalResult.score.toFixed(2)}). ` +
+      `Sii trasparente sui limiti della risposta e invita l'utente a fornire più contesto.`
+    );
+  }
+
+  // ── Generative UI hint ────────────────────────────────────────────────────
+  sections.push(
+    `## Capacità di rendering UI\n` +
+    `Hai accesso a tool di rendering visuale: render_roadmap, render_career_match, ` +
+    `render_quiz, render_resource_list, render_action_plan.\n` +
+    `Usali quando il contenuto è strutturato e visivamente più utile del testo. ` +
+    `Esempi: piani step-by-step → render_roadmap, confronto carriera → render_career_match. ` +
+    `NON usarli per risposte conversazionali semplici.`
   );
-  return ["## Esempi di ragionamento del coach", lines.join("\n\n")].join("\n");
+
+  return sections.join("\n\n");
 }
 
-function formatDocumentChunks(chunks: RetrievedChunk[]): string {
-  if (chunks.length === 0) return "";
-  const lines = chunks.map((c) => `- [${c.source}, ${c.score.toFixed(2)}] ${c.content}`);
-  return `## Conoscenza dai documenti\n${lines.join("\n")}`;
-}
-
-function formatWebResults(results: RetrievedChunk[]): string {
-  if (results.length === 0) return "";
-  const lines = results.map(
-    (r) => `- [${r.metadata["title"] ?? r.source}](${r.source}) ${r.content}`,
+export function buildVoiceSystemPrompt(name?: string): string {
+  const greeting = name ? `Stai parlando con ${name}.` : "";
+  return (
+    `Sei Wendy, coach vocale di NorthStar. ${greeting}\n` +
+    `Rispondi in italiano con MASSIMO 2-3 frasi brevi e dirette.\n` +
+    `Tono caldo, naturale. Nessuna lista o markdown — solo parlato fluido.`
   );
-  return `## Fonti online (cita se usi questo contenuto)\n${lines.join("\n")}`;
-}
-
-function formatUserContext(ctx: UserContext): string {
-  return [
-    `## Profilo utente`,
-    `- Nome: ${ctx.name}`,
-    `- Percorso: ${ctx.journeyType}`,
-    `- Modalità: ${ctx.userMode}`,
-    ctx.sectorName  ? `- Settore: ${ctx.sectorName}` : null,
-    ctx.objectives?.length ? `- Obiettivi: ${ctx.objectives.join(", ")}` : null,
-  ].filter(Boolean).join("\n");
-}
-
-// ── MAIN BUILDER ──────────────────────────────────────────────────────────────
-
-export function buildSystemPrompt(ctx: PromptContext): string {
-  const sections = [
-    PERSONA_CORE,
-    buildToneSection(ctx.userContext.journeyType),
-    ctx.userContext.memorySection ?? "",
-    buildUncertaintySection(ctx.evalResult),
-    buildCoTSection(ctx.cot ?? null),
-    ctx.userMessage ? buildSocraticSection(ctx.userMessage) : "",
-    formatPersonaExamples(ctx.personaExamples),
-    formatDocumentChunks(ctx.documentChunks),
-    formatWebResults(ctx.webResults),
-    formatUserContext(ctx.userContext),
-  ];
-
-  return sections
-    .filter((s) => s.trim().length > 0)
-    .join("\n\n---\n\n");
 }

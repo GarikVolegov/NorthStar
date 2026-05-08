@@ -1,38 +1,38 @@
 /**
- * Retriever — semantic search over the knowledge graph.
+ * Retriever v2 — adds 'platform_content' sourceType.
  *
- * TWO MODES controlled by the PGVECTOR env var:
+ * sourceTypes:
+ *   'document'         — user-uploaded PDFs, notes
+ *   'persona_example'  — curated coaching examples
+ *   'web'              — live web search results cached as nodes
+ *   'user_note'        — user free-form notes
+ *   'platform_content' — NorthStar courses, articles, career cards (NEW)
  *
- *   PGVECTOR=false (default):
- *     Loads all user embeddings from DB → cosine similarity in JS.
- *     Works immediately, no migration needed.
- *     Performance: fine up to ~5000 chunks per user.
- *
- *   PGVECTOR=true:
- *     Runs a single SQL query using the pgvector <=> (cosine distance) operator.
- *     Requires: run lib/db/migrations/add-pgvector.sql first.
- *     Performance: scales to millions of chunks with HNSW index.
- *
- * Switching modes: set PGVECTOR=true in .env after running the SQL migration.
- * No code changes needed — just the env var.
+ * TWO MODES controlled by PGVECTOR env var (unchanged from v1).
  */
 import { db, pool } from "@workspace/db";
 import { knowledgeNodesTable } from "@workspace/db";
-import { eq, and, isNotNull, inArray } from "drizzle-orm";
+import { eq, and, isNotNull } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { embedText } from "./embedder";
 import { EMBEDDING_DIMS } from "./embedder";
+
+export type SourceType =
+  | "document"
+  | "persona_example"
+  | "web"
+  | "user_note"
+  | "platform_content"; // ← v2: NorthStar authoritative content
 
 export interface RetrievedChunk {
   id: number;
   content: string;
   source: string;
-  sourceType: "document" | "persona_example" | "web" | "user_note";
+  sourceType: SourceType;
   score: number;
   metadata: Record<string, unknown>;
 }
 
-// JS cosine (fallback mode)
 function cosine(a: number[], b: number[]): number {
   let dot = 0, normA = 0, normB = 0;
   for (let i = 0; i < a.length; i++) {
@@ -43,24 +43,27 @@ function cosine(a: number[], b: number[]): number {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB) + 1e-10);
 }
 
-// ── pgvector mode ─────────────────────────────────────────────────────────────
 async function retrieveWithPgvector(
   queryEmbedding: number[],
   userId: number,
   topK: number,
   minScore: number,
-  sourceTypes?: RetrievedChunk["sourceType"][],
+  sourceTypes?: SourceType[],
+  globalUserId?: number,
 ): Promise<RetrievedChunk[]> {
-  // Cast the JS array to a pgvector literal: '[0.1, 0.2, ...]'
   const vectorLiteral = `[${queryEmbedding.join(",")}]`;
-
-  // 1 - (cosine distance) = cosine similarity
-  // The <=> operator returns distance (0=identical, 2=opposite)
-  // so similarity = 1 - distance/2 for normalized vectors,
-  // but OpenAI embeddings ARE L2-normalised, so 1 - (v <=> q)/2 ≈ cosine sim.
   const sourceFilter = sourceTypes && sourceTypes.length > 0
     ? `AND type = ANY(ARRAY[${sourceTypes.map((t) => `'${t}'`).join(",")}])`
     : "";
+
+  // Platform content is stored under userId=0 (global namespace)
+  // User content is stored under the real userId
+  const userFilter = globalUserId != null
+    ? `AND (user_id = $2 OR user_id = $5)`
+    : `AND user_id = $2`;
+
+  const params: unknown[] = [vectorLiteral, userId, minScore, topK];
+  if (globalUserId != null) params.push(globalUserId);
 
   const rows = await pool.query<{
     id: number;
@@ -76,32 +79,32 @@ async function retrieveWithPgvector(
        metadata,
        1 - (embedding_vec <=> $1::vector) AS score
      FROM knowledge_nodes
-     WHERE user_id = $2
+     WHERE 1=1
+       ${userFilter}
        AND embedding_vec IS NOT NULL
        ${sourceFilter}
        AND 1 - (embedding_vec <=> $1::vector) >= $3
      ORDER BY embedding_vec <=> $1::vector
      LIMIT $4`,
-    [vectorLiteral, userId, minScore, topK],
+    params,
   );
 
   return rows.rows.map((r) => ({
     id: r.id,
     content: r.content ?? "",
     source: (r.metadata?.["source"] as string) ?? "unknown",
-    sourceType: (r.type as RetrievedChunk["sourceType"]) ?? "document",
+    sourceType: (r.type as SourceType) ?? "document",
     score: r.score,
     metadata: r.metadata ?? {},
   }));
 }
 
-// ── JS fallback mode ──────────────────────────────────────────────────────────
 async function retrieveWithJs(
   queryEmbedding: number[],
   userId: number,
   topK: number,
   minScore: number,
-  sourceTypes?: RetrievedChunk["sourceType"][],
+  sourceTypes?: SourceType[],
 ): Promise<RetrievedChunk[]> {
   const nodes = await db
     .select()
@@ -117,14 +120,14 @@ async function retrieveWithJs(
     .filter((n) => {
       const emb = n.embedding as number[] | null;
       if (!emb || emb.length !== queryEmbedding.length) return false;
-      if (sourceTypes && !sourceTypes.includes((n.type as RetrievedChunk["sourceType"]) ?? "document")) return false;
+      if (sourceTypes && !sourceTypes.includes((n.type as SourceType) ?? "document")) return false;
       return true;
     })
     .map((n) => ({
       id: n.id,
       content: n.content ?? "",
       source: (n.metadata as Record<string, unknown>)?.["source"] as string ?? "unknown",
-      sourceType: (n.type as RetrievedChunk["sourceType"]) ?? "document",
+      sourceType: (n.type as SourceType) ?? "document",
       score: cosine(queryEmbedding, n.embedding as number[]),
       metadata: (n.metadata as Record<string, unknown>) ?? {},
     }))
@@ -133,22 +136,35 @@ async function retrieveWithJs(
     .slice(0, topK);
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+/**
+ * retrieve() — public API.
+ *
+ * Platform content (type='platform_content') lives under userId=0 in the DB
+ * so it is accessible to all users without duplication.
+ * When sourceTypes includes 'platform_content', the pgvector query
+ * automatically widens the userId filter to include userId=0.
+ */
 export async function retrieve(
   query: string,
   userId: number,
   opts: {
     topK?: number;
     minScore?: number;
-    sourceTypes?: RetrievedChunk["sourceType"][];
+    sourceTypes?: SourceType[];
   } = {},
 ): Promise<RetrievedChunk[]> {
   const { topK = 6, minScore = 0.35, sourceTypes } = opts;
   const queryEmbedding = await embedText(query);
-  const usePgvector = process.env.PGVECTOR === "true";
+  const usePgvector    = process.env.PGVECTOR === "true";
+
+  const needsPlatform = !sourceTypes || sourceTypes.includes("platform_content");
+  const PLATFORM_USER_ID = 0; // global namespace
 
   if (usePgvector) {
-    return retrieveWithPgvector(queryEmbedding, userId, topK, minScore, sourceTypes);
+    return retrieveWithPgvector(
+      queryEmbedding, userId, topK, minScore, sourceTypes,
+      needsPlatform ? PLATFORM_USER_ID : undefined,
+    );
   }
   return retrieveWithJs(queryEmbedding, userId, topK, minScore, sourceTypes);
 }

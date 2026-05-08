@@ -1,11 +1,11 @@
 /**
- * useGrowthChat v7 — pageContext support.
+ * useGrowthChat v8 — Generative UI support.
  *
- * CHANGES vs v6:
- * - UseGrowthChatOptions.userContext now accepts optional `pageContext`
- *   (Record<string, unknown>) — forwarded as-is in every POST body.
- *   The backend injects it into the system prompt so Wendy can answer
- *   context-aware questions (e.g. RIASEC scores, career detail, CV data).
+ * CHANGES vs v7:
+ * - ChatMessage gains optional `uiTool: { name: UiToolName; args: UiToolArgs }`.
+ *   When set, content is empty and GrowthChatMessage renders WendyUIRenderer.
+ * - SSE event type 'ui_tool' is handled: creates an assistant message with
+ *   uiTool set and isStreaming=false immediately (no streaming for UI tools).
  *
  * All other behaviour unchanged.
  */
@@ -16,6 +16,11 @@ export type Domain = "career" | "habits" | "mindset" | "trading" | "general";
 
 export interface SupervisorInfo {
   pass: boolean; score: number; rewritten: boolean; reasons: string[];
+}
+
+export interface UiToolPayload {
+  name: string;
+  args: Record<string, unknown>;
 }
 
 export interface ChatMessage {
@@ -32,6 +37,8 @@ export interface ChatMessage {
   parallelDomains?: string[];
   fusionApplied?: boolean;
   voiceMode?: boolean;
+  /** v8: set when Wendy renders a UI component instead of text */
+  uiTool?: UiToolPayload;
 }
 
 export interface UseGrowthChatOptions {
@@ -43,7 +50,6 @@ export interface UseGrowthChatOptions {
     userMode?: string;
     objectives?: string[];
     sectorName?: string;
-    /** v7: arbitrary page-level context forwarded to the AI prompt */
     pageContext?: Record<string, unknown>;
   };
 }
@@ -93,7 +99,6 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
       const res = await fetch(`${apiBase}/growth-agent/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        // v7: userContext now carries optional pageContext
         body: JSON.stringify({ message: text, sessionId, history, userContext, voiceMode }),
         signal: ctrl.signal,
       });
@@ -112,8 +117,10 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
           if (!raw || raw === "[DONE]") continue;
           try {
             const ev = JSON.parse(raw) as {
-              type: "token" | "status" | "done" | "error";
+              type: "token" | "status" | "done" | "error" | "ui_tool";
               value?: string;
+              name?: string;
+              args?: Record<string, unknown>;
               sources?: Array<{ source: string; score: number }>;
               message?: string;
               sessionId?: number;
@@ -126,13 +133,28 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
               supervisorResult?: SupervisorInfo;
               toolUsed?: string;
             };
+
             if (ev.type === "status" && ev.value) {
               setStatusMessage(ev.value);
+
             } else if (ev.type === "token" && ev.value) {
               setStatusMessage(null);
               setMessages((p) => p.map((m) =>
                 m.id === assistantId ? { ...m, content: m.content + ev.value } : m
               ));
+
+            } else if (ev.type === "ui_tool" && ev.name) {
+              // v8: replace the streaming placeholder with a UI tool message
+              setStatusMessage(null);
+              setMessages((p) => p.map((m) =>
+                m.id === assistantId ? {
+                  ...m,
+                  content:    "",
+                  isStreaming: false,
+                  uiTool: { name: ev.name!, args: ev.args ?? {} },
+                } : m
+              ));
+
             } else if (ev.type === "done") {
               setStatusMessage(null);
               if (ev.sessionId) setSessionId(ev.sessionId);
@@ -156,6 +178,7 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
                   fusionApplied,
                 } : m
               ));
+
             } else if (ev.type === "error") {
               setStatusMessage(null); setError(ev.message ?? "Errore sconosciuto");
               setMessages((p) => p.map((m) =>
