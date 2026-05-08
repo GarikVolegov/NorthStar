@@ -1,124 +1,147 @@
 /**
- * Provider Anthropic
- * Usato per agent_analysis: ragionamento RIASEC+Spiriti, tool use strutturato.
- * Modello default: claude-sonnet-4-5.
+ * Provider Anthropic — v2: supporto multimodale
  *
- * Supporta:
- *   - Chat non-streaming con output testuale
- *   - Tool use (function calling) con stop_reason=tool_use
- *   - Streaming via anthropic.messages.stream (restituisce AsyncIterable<string>)
+ * Novità:
+ *   - normalizeAnthropicMessages(): converte MessageContent
+ *     nel formato nativo Anthropic (array di ContentBlock)
+ *   - Supporta URL pubblici (source.type='url') e data-URI base64
+ *   - streamAnthropicChat aggiornato per passare i messaggi normalizzati
  */
 
-import Anthropic from "@anthropic-ai/sdk";
-import type { ChatMessage, AITool, AIAgentRequest, AIAgentResponse } from "../types";
+import Anthropic from '@anthropic-ai/sdk';
+import type { ChatMessage, MessageContent } from '../types.js';
+import type { AIAgentRequest, AIAgentResponse } from '../types.js';
 
-let _anthropicClient: Anthropic | null = null;
+let _client: Anthropic | null = null;
 
-export function createAnthropicClient(): Anthropic {
-  if (!_anthropicClient) {
+function getClient(): Anthropic {
+  if (!_client) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error("[ai-router] ANTHROPIC_API_KEY mancante");
-    _anthropicClient = new Anthropic({ apiKey });
+    if (!apiKey) throw new Error('[ai-router] ANTHROPIC_API_KEY mancante');
+    _client = new Anthropic({ apiKey });
   }
-  return _anthropicClient;
+  return _client;
 }
 
-/** Converte i tool NorthStar nel formato Anthropic */
-function toAnthropicTools(tools: AITool[]): Anthropic.Tool[] {
-  return tools.map((t) => ({
-    name: t.name,
-    description: t.description,
-    input_schema: {
-      type: "object" as const,
-      ...(t.inputSchema as Record<string, unknown>),
-    },
-  }));
-}
+// ─── Normalizzatore messaggi ──────────────────────────────────────────────────────────
 
-/**
- * Analisi agente (non-streaming) — usato per RIASEC+Spiriti e agent runs.
- * Restituisce testo + eventuali tool call da eseguire lato server.
- */
-export async function analyzeWithAnthropic(
-  request: AIAgentRequest,
-  model: string
-): Promise<AIAgentResponse> {
-  const client = createAnthropicClient();
+type AnthropicMessage = Anthropic.MessageParam;
 
-  const messages: Anthropic.MessageParam[] = [
-    { role: "user", content: request.userPrompt },
-  ];
+function contentToAnthropic(
+  content: MessageContent,
+): string | Anthropic.ContentBlockParam[] {
+  if (typeof content === 'string') return content;
 
-  const params: Anthropic.MessageCreateParamsNonStreaming = {
-    model,
-    max_tokens: request.maxTokens ?? 4096,
-    system: request.systemPrompt,
-    messages,
-    ...(request.tools && request.tools.length > 0
-      ? { tools: toAnthropicTools(request.tools) }
-      : {}),
-    ...(request.temperature !== undefined
-      ? { temperature: request.temperature }
-      : {}),
-  };
-
-  const res = await client.messages.create(params);
-
-  // Estrae testo e tool_use dal content block
-  let text: string | null = null;
-  const toolCalls: AIAgentResponse["toolCalls"] = [];
-
-  for (const block of res.content) {
-    if (block.type === "text") {
-      text = (text ?? "") + block.text;
-    } else if (block.type === "tool_use") {
-      toolCalls.push({
-        id: block.id,
-        name: block.name,
-        input: block.input as Record<string, unknown>,
-      });
+  return content.map((part) => {
+    if (part.type === 'text') {
+      return { type: 'text', text: part.text } as Anthropic.TextBlockParam;
     }
-  }
 
-  return {
-    text,
-    toolCalls,
-    stopReason: res.stop_reason ?? "end_turn",
-    inputTokens: res.usage.input_tokens,
-    outputTokens: res.usage.output_tokens,
-  };
+    // image_url: Anthropic usa source.type='url' o source.type='base64'
+    if (part.url.startsWith('data:image/')) {
+      const mimeMatch  = part.url.match(/^data:([^;]+);base64,/);
+      const mediaType  = (mimeMatch?.[1] ?? 'image/jpeg') as
+        'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+      const base64Data = part.url.split(',')[1] ?? '';
+      return {
+        type:   'image',
+        source: { type: 'base64', media_type: mediaType, data: base64Data },
+      } as Anthropic.ImageBlockParam;
+    }
+
+    // URL pubblico (https://)
+    return {
+      type:   'image',
+      source: { type: 'url', url: part.url } as Anthropic.URLImageSource,
+    } as Anthropic.ImageBlockParam;
+  });
 }
 
-/**
- * Streaming chat via Anthropic (per SSE se l'agente deve rispondere live).
- * Restituisce AsyncIterable<string> normalizzato.
- */
-export async function* streamAnthropicChat(
+function normalizeAnthropicMessages(
   messages: ChatMessage[],
-  systemPrompt: string,
-  model: string,
-  maxTokens = 2048
+): { systemPrompt: string; userMessages: AnthropicMessage[] } {
+  let systemPrompt = '';
+  const userMessages: AnthropicMessage[] = [];
+
+  for (const m of messages) {
+    if (m.role === 'system') {
+      // Anthropic gestisce system come campo separato
+      systemPrompt = typeof m.content === 'string' ? m.content : '';
+      continue;
+    }
+    userMessages.push({
+      role:    m.role as 'user' | 'assistant',
+      content: contentToAnthropic(m.content),
+    });
+  }
+
+  return { systemPrompt, userMessages };
+}
+
+// ─── Streaming chat ─────────────────────────────────────────────────────────────────
+
+export async function* streamAnthropicChat(
+  messages:     ChatMessage[],
+  _legacySystem: string = '',  // mantenuto per retrocompatibilità, ignorato se già in messages
+  model         = 'claude-sonnet-4-5',
+  maxTokens     = 2048,
 ): AsyncIterable<string> {
-  const client = createAnthropicClient();
+  const client = getClient();
+  const { systemPrompt, userMessages } = normalizeAnthropicMessages(messages);
 
-  const anthropicMessages: Anthropic.MessageParam[] = messages
-    .filter((m) => m.role !== "system")
-    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
-
-  const stream = await client.messages.create({
+  const stream = client.messages.stream({
     model,
     max_tokens: maxTokens,
-    system: systemPrompt,
-    messages: anthropicMessages,
-    stream: true,
+    system:     systemPrompt || _legacySystem || undefined,
+    messages:   userMessages,
   });
 
   for await (const event of stream) {
     if (
-      event.type === "content_block_delta" &&
-      event.delta.type === "text_delta"
+      event.type === 'content_block_delta' &&
+      event.delta.type === 'text_delta'
     ) {
       yield event.delta.text;
     }
   }
+}
+
+// ─── analyzeWithAnthropic (usato da ai/index.ts per agent_analysis) ─────────────────
+
+export async function analyzeWithAnthropic(
+  request: AIAgentRequest,
+  model   = 'claude-sonnet-4-5',
+): Promise<AIAgentResponse> {
+  const client = getClient();
+
+  const anthropicTools: Anthropic.Tool[] | undefined = request.tools?.map((t) => ({
+    name:         t.name,
+    description:  t.description,
+    input_schema: t.inputSchema as Anthropic.Tool['input_schema'],
+  }));
+
+  const response = await client.messages.create({
+    model,
+    max_tokens:  request.maxTokens ?? 4096,
+    system:      request.systemPrompt,
+    messages:    [{ role: 'user', content: request.userPrompt }],
+    ...(anthropicTools?.length ? { tools: anthropicTools } : {}),
+  });
+
+  const text = response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map((b) => b.text)
+    .join('');
+
+  const toolCalls = response.content
+    .filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
+    .map((b) => ({ id: b.id, name: b.name, input: b.input as Record<string, unknown> }));
+
+  return {
+    text:         text || null,
+    toolCalls,
+    stopReason:   response.stop_reason ?? 'end_turn',
+    inputTokens:  response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+  };
 }
