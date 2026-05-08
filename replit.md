@@ -41,8 +41,16 @@ VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
 GOOGLE_CLIENT_ID
 AI_INTEGRATIONS_OPENAI_BASE_URL   # Replit proxy OpenAI
 AI_INTEGRATIONS_OPENAI_API_KEY
-AI_MODEL                    # modello OpenAI per agenti orchestratore (default: gpt-4o-mini). Valori validi: gpt-4o-mini, gpt-4.1, gpt-4o
-CORS_ORIGIN                 # origin frontend in produzione (es. https://northstar.app) — senza questo CORS è limitato a localhost:5000
+AI_MODEL                    # modello OpenAI per agenti orchestratore legacy (default: gpt-4o-mini)
+AI_MODEL_OVERRIDE           # override globale modello nel router (opzionale)
+
+# Override provider per use case (senza redeploy)
+AI_STREAMING_PROVIDER       # default: groq
+AI_AGENT_PROVIDER           # default: anthropic
+AI_EMBEDDING_PROVIDER       # default: openai
+AI_RESEARCH_PROVIDER        # default: groq
+AI_JSON_PROVIDER            # default: groq
+CORS_ORIGIN                 # origin frontend in produzione (es. https://northstar.app)
 ```
 
 ---
@@ -54,7 +62,7 @@ CORS_ORIGIN                 # origin frontend in produzione (es. https://northst
 | **Frontend** | React 19, Vite 7, Tailwind CSS v4, Radix UI, Wouter, TanStack React Query, Recharts, Framer Motion, i18next |
 | **Backend** | Express 5, TypeScript, Drizzle ORM, Pino logging, esbuild (custom `build.mjs`) |
 | **AI** | Python 3.11, FastAPI, LangChain, LangGraph — microservizio su porta 8000 |
-| **LLM** | `gpt-4o-mini` via Replit proxy (`AI_INTEGRATIONS_OPENAI_BASE_URL`) per Discovery enricher e agenti orchestratore. Modello configurabile via env `AI_MODEL` (default `gpt-4o-mini`). |
+| **LLM Router** | `artifacts/api-server/src/lib/ai/` — router multi-provider (Groq / Anthropic / OpenAI / Google) con fallback automatico |
 | **Database** | PostgreSQL (Replit managed), Drizzle ORM |
 | **Auth** | JWT custom (bcryptjs + `JWT_SECRET` persistente) |
 | **Monorepo** | pnpm workspaces + catalog |
@@ -87,6 +95,12 @@ artifacts/
         de/translation.json
   api-server/            # Express API (porta 8080)
     src/
+      lib/
+        ai/              # AI Router — PUNTO DI INGRESSO UNICO per tutte le call AI
+          index.ts       # ai.chat(), ai.agent(), ai.embed() — API pubblica
+          router.ts      # use case → provider + modello; override env
+          types.ts       # AIUseCase, AIProviderName, AIRouterConfig...
+          providers/     # implementazioni per ogni provider
       routes/            # 40+ route files organizzati per dominio
         cv.ts            # CV Builder — upload, generate, edit, PDF, DOCX, tailor, cover letter, ATS score
         discovery/       # feed.ts, saved.ts
@@ -101,7 +115,9 @@ lib/
     src/schema/          # Drizzle schema — source of truth
     drizzle/             # SQL migrations
   integrations-openai-ai-server/
-    src/discovery-agent/ # collector-agent.ts, enricher-agent.ts, personalizer-agent.ts
+    src/
+      client.ts          # OpenAI Proxy Replit (legacy, usato da enricher)
+      discovery-agent/   # collector-agent.ts, enricher-agent.ts, personalizer-agent.ts
   integrations-openai-ai-react/
     src/
       admin/             # AdminDashboard, AdminEnricherPanel, AdminCollectorPanel...
@@ -112,6 +128,119 @@ lib/
   api-client-react/      # TanStack React Query hooks generati
 e2e/                     # Playwright specs (auth, riasec, admin, objectives)
 ```
+
+---
+
+## Sistema AI — Router e Modelli
+
+> **⚠️ REGOLA FONDAMENTALE: ogni nuova funzionalità che usa l’AI DEVE passare dal router `artifacts/api-server/src/lib/ai/index.ts` via `ai.chat()`, `ai.agent()` o `ai.embed()`. Non chiamare mai direttamente OpenAI/Groq/Anthropic nelle route.**
+
+### Architettura router
+
+```
+route.ts
+  └→ ai.chat({ useCase: "json_extraction", messages })
+       └→ router.ts: risolve provider (groq) + modello (llama-3.1-70b-versatile)
+            └→ providers/groq.ts: chiama API, gestisce timeout
+                 └→ fallback: providers/openai.ts se groq fallisce
+```
+
+Il file `index.ts` espone tre funzioni pubbliche:
+- **`ai.chat(req)`** — per chiamate unary (JSON, analisi, generazione testo)
+- **`ai.stream(req)`** — per SSE streaming (Wiki AI, career coach)
+- **`ai.embed(req)`** — per embedding (knowledge graph, RAG)
+
+### Mapping use case → provider → modello
+
+| Use Case | Provider default | Modello default | Fallback | Quando usarlo |
+|---|---|---|---|---|
+| `streaming_chat` | **Groq** | `llama-3.1-70b-versatile` | OpenAI `gpt-4o-mini` | Chat SSE, wiki AI, career coach real-time |
+| `agent_analysis` | **Anthropic** | `claude-sonnet-4-5` | OpenAI `gpt-4o-mini` | Ragionamento complesso, tool use, RIASEC analysis |
+| `embedding` | **OpenAI** | `text-embedding-3-small` | — nessuno | Vettori knowledge graph, RAG, similarity search |
+| `research` | **Groq** | `llama-3.1-70b-versatile` | OpenAI `gpt-4o-mini` | Background job: news enrichment, discovery collect |
+| `json_extraction` | **Groq** | `llama-3.1-70b-versatile` | OpenAI `gpt-4o-mini` | CV parse/generate/tailor, ATS score, cover letter |
+
+### Regola decisionale per ogni nuova funzionalità AI
+
+Quando si aggiunge una nuova feature che richiede un modello AI, seguire questo albero decisionale:
+
+```
+1. Risposta in streaming (SSE) al client?
+   → Sì  ┃ usa useCase: "streaming_chat"  (Groq — latenza < 200ms)
+   → No  ┃
+       2. Serve ragionamento profondo / tool calling / analisi multi-step?
+          → Sì  ┃ usa useCase: "agent_analysis"  (Anthropic claude-sonnet-4-5)
+          → No  ┃
+              3. Serve embedding / similarità semantica / RAG?
+                 → Sì  ┃ usa useCase: "embedding"  (OpenAI text-embedding-3-small)
+                 → No  ┃
+                     4. È un job in background (cron, pipeline batch)?
+                        → Sì  ┃ usa useCase: "research"  (Groq — veloce, economico)
+                        → No  ┃ usa useCase: "json_extraction"  (Groq — parse/generate JSON strutturato)
+```
+
+### Profili modelli disponibili
+
+| Modello | Provider | Punti di forza | Costo relativo |
+|---|---|---|---|
+| `llama-3.1-70b-versatile` | Groq | Velocissimo (150+ tok/s), JSON mode, 128K ctx | 🟢 basso |
+| `llama-3.3-70b-versatile` | Groq | Come sopra, migliorato su istruzioni | 🟢 basso |
+| `claude-sonnet-4-5` | Anthropic | Ragionamento eccellente, tool use affidabile, 200K ctx | 🟡 medio |
+| `claude-opus-4-5` | Anthropic | Max qualità, lento | 🔴 alto — solo casi critici |
+| `gpt-4o-mini` | OpenAI | Bilanciato, fallback universale | 🟡 medio |
+| `gpt-4.1` | OpenAI | Ragionamento avanzato, coding | 🔴 alto |
+| `text-embedding-3-small` | OpenAI | Embedding 1536-dim, best-in-class | 🟢 basso |
+| `gemini-1.5-flash` | Google | Alternativa rapida, multimodale | 🟢 basso |
+
+### Override senza redeploy
+
+Per cambiare provider o modello su un use case specifico senza toccare il codice:
+
+```bash
+# Spostare tutto il JSON extraction su OpenAI (es. se Groq ha problemi)
+AI_JSON_PROVIDER=openai
+
+# Usare un modello specifico globalmente (override AI_MODEL_OVERRIDE)
+AI_MODEL_OVERRIDE=gpt-4.1
+
+# Override per il solo agent analysis
+AI_AGENT_PROVIDER=openai
+```
+
+Valori validi per `AI_*_PROVIDER`: `groq` | `anthropic` | `openai` | `google`.
+Se viene passato un valore non valido, il router logga un warning e usa il default.
+
+### Aggiungere un nuovo use case
+
+Se una feature non rientra in nessuno dei 5 use case esistenti:
+
+1. Aggiungere il tipo in `types.ts`:
+   ```typescript
+   export type AIUseCase =
+     | "streaming_chat" | "agent_analysis" | "embedding"
+     | "research" | "json_extraction"
+     | "nuovo_use_case";  // ← aggiungere qui
+   ```
+2. Aggiungere il mapping in `router.ts` (`DEFAULT_ROUTER`, `FALLBACK_ROUTER`, `ENV_OVERRIDES`)
+3. Aggiungere la riga nella tabella qui sopra nel `replit.md`
+4. Aggiungere la env var di override (`AI_NUOVOUSECASE_PROVIDER`) nella sezione **Variabili d’ambiente**
+
+### Regola fallback
+
+- Il router tenta sempre il provider **primary**
+- In caso di timeout (30s) o errore 5xx, ritenta sul **fallback** (se configurato)
+- `embedding` non ha fallback: se OpenAI è giù, l’operazione fallisce con `AIRouterError`
+- Il fallback è sempre **OpenAI** (proxy Replit garantito attivo)
+
+### Costo operativo stimato
+
+| Funzionalità | Use Case | Volume stimato | Costo/mese |
+|---|---|---|---|
+| Discovery enricher (20 item/run, ogni 2h) | `research` via enricher legacy | ~240 run | ~$0.10 |
+| CV generate/tailor per utente | `json_extraction` | on-demand | ~$0.001/call |
+| Wiki AI chat (streaming) | `streaming_chat` | on-demand | ~$0.0002/msg |
+| Knowledge graph embedding | `embedding` | on-demand | ~$0.0001/call |
+| RIASEC agent analysis | `agent_analysis` | on-demand | ~$0.003/call |
 
 ---
 
@@ -336,7 +465,7 @@ Pipeline a 3 stadi che raccoglie, arricchisce e personalizza contenuti per ogni 
 - Admin route: `POST /api/admin/discovery/collect`
 
 ### 2. Enricher Agent — `enricher-agent.ts`
-- Arricchisce i raw items con **gpt-4o-mini** (JSON mode) — modello fisso, non configurabile via AI_MODEL
+- Arricchisce i raw items con **gpt-4o-mini** via proxy Replit (client legacy `integrations-openai-ai-server`) — modello fisso, non passa dal router
 - **Priority queue:** opportunity (5) > formation (4) > sector_trend (3) > news (2) > growth (1)
 - **Concorrenza:** 5 chiamate GPT parallele (`pLimit` interno)
 - **Retry:** 2 tentativi con backoff esponenziale; dopo 3 fallimenti totali → skip definitivo
@@ -474,9 +603,10 @@ Layout: sidebar sticky su desktop, bottom tab bar su mobile.
 - **OpenAPI-first:** `lib/api-spec/openapi.yaml` → Orval genera Zod schemas + typed React Query hooks
 - **Monorepo pnpm workspaces:** catalog per versioni condivise
 - **esbuild custom:** `build.mjs` bundla il server Express; esternalizza native modules (satori, resvg-js, nodemailer...)
-- **AI proxy pattern:** Express fa proxy delle richieste AI-heavy a Python FastAPI porta 8000; Python usa LangGraph agents
+- **AI Router pattern:** ogni call AI passa da `lib/ai/index.ts`; il router risolve provider + modello + fallback in modo trasparente. Le route Express non sanno quale provider viene usato
+- **AI proxy pattern legacy:** Express fa proxy delle richieste AI-heavy a Python FastAPI porta 8000; Python usa LangGraph agents
 - **Startup check:** `startup-check.ts` valida le env vars obbligatorie prima del bind alla porta — fail fast con messaggi chiari
-- **Replit AI Integration:** OpenAI via `AI_INTEGRATIONS_OPENAI_BASE_URL` + `AI_INTEGRATIONS_OPENAI_API_KEY`
+- **Replit AI Integration:** OpenAI via `AI_INTEGRATIONS_OPENAI_BASE_URL` + `AI_INTEGRATIONS_OPENAI_API_KEY` — usato da enricher legacy e come fallback universale del router
 - **SSE streaming:** `hooks/useSSEStream.ts` + `components/ui/streaming-indicator.tsx`
 - **CORS:** ristretto a `CORS_ORIGIN` env var in produzione (default: `http://localhost:5000`)
 - **Auth rate limiting:** `/auth/*` ha rate limiter dedicato (5 req/15min per IP) via `authRateLimiter`
@@ -498,7 +628,10 @@ Layout: sidebar sticky su desktop, bottom tab bar su mobile.
 - **Enricher retry cap:** dopo 3 fallimenti GPT, item marcato `isEnriched=true` con `score=0` — non riprocessato, non appare nel feed
 - **News cache:** LRU in-memory cap 100 entries — evita crescita illimitata in RAM
 - **Email prod:** impostare `EMAIL_FROM` con dominio Resend verificato; senza di esso le email arrivano solo all'owner account
-- **AI_MODEL:** configura il modello OpenAI per gli agenti orchestratore. L'enricher usa sempre `gpt-4o-mini` direttamente.
+- **AI_MODEL (legacy):** configura il modello per il proxy Replit usato dall’enricher. Non influenza il router `lib/ai/`. Per il router usare `AI_MODEL_OVERRIDE` o le env `AI_*_PROVIDER`
+- **AI Router — mai chiamare provider direttamente:** usare sempre `ai.chat()` / `ai.stream()` / `ai.embed()` da `lib/ai/index.ts`. Chiamate dirette a `openai.*` o `anthropic.*` nelle route sono vietate (eccetto enricher legacy)
+- **AI Router — nuovo use case:** aggiungere tipo in `types.ts`, mapping in `router.ts`, riga nella tabella di `replit.md`, env var nella sezione variabili
+- **AI Router — fallback embedding:** `embedding` non ha fallback. Se OpenAI è giù, l’operazione lancia `AIRouterError` e va gestita esplicitamente
 - **CV editor:** `CvEditorDrawer` carica i dati via `GET /api/cv/:userId` al click dell'icona matita — se il CV generato non esiste ancora, il bottone è nascosto
 - **CV DOCX install:** dopo ogni clone/reset eseguire `pnpm add docx --filter api-server` se la dipendenza non è nel `package.json` del server
 - **i18n — chiave mancante:** se una chiave manca in un file `translation.json`, i18next renderizza la chiave grezza nell’UI (es. `"cv.save"`). Aggiungere sempre la chiave a tutti e 5 i file prima di fare commit
@@ -518,13 +651,17 @@ Layout: sidebar sticky su desktop, bottom tab bar su mobile.
 | CV components | `artifacts/orientamento/src/components/cv/` |
 | Frontend routes | `artifacts/orientamento/src/App.tsx` |
 | Cron jobs | `artifacts/api-server/src/jobs/cron.ts` |
+| **AI Router** | `artifacts/api-server/src/lib/ai/router.ts` |
+| **AI public API** | `artifacts/api-server/src/lib/ai/index.ts` |
+| **AI types** | `artifacts/api-server/src/lib/ai/types.ts` |
+| **AI providers** | `artifacts/api-server/src/lib/ai/providers/` |
+| OpenAI legacy client | `lib/integrations-openai-ai-server/src/client.ts` |
 | i18n setup | `artifacts/orientamento/src/i18n.ts` |
 | Traduzioni (it) | `artifacts/orientamento/src/locales/it/translation.json` |
 | Traduzioni (en/es/fr/de) | `artifacts/orientamento/src/locales/{lang}/translation.json` |
 | Discovery agents | `lib/integrations-openai-ai-server/src/discovery-agent/` |
 | Admin UI components | `lib/integrations-openai-ai-react/src/admin/` |
 | Discovery UI | `lib/integrations-openai-ai-react/src/discovery/` |
-| OpenAI client | `lib/integrations-openai-ai-server/src/client.ts` |
 | OpenAI docs | `.local/skills/integrations/SKILL.md` |
 | Brand tokens | `artifacts/orientamento/src/lib/brand.ts` |
 | Design tokens CSS | `lib/design-tokens/northstar-theme.css` |
