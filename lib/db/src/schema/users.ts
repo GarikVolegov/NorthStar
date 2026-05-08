@@ -15,11 +15,6 @@ export const usersTable = pgTable("users", {
   avatarUrl: text("avatar_url"),
 
   // ── Passo 4: username univoco per profilo pubblico ─────────────────
-  /**
-   * Slug URL-safe, univoco. Generato automaticamente al signup come
-   * slugify(name) + '-' + id. L'utente può personalizzarlo.
-   * Usato per la rotta pubblica /u/:username
-   */
   username: text("username").unique(),
 
   // Soft link: points to the last completed test session
@@ -46,11 +41,21 @@ export const usersTable = pgTable("users", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 
   // ── Phase 3: Gamification Base ─────────────────────────────────
-  voiceStreak:       integer("voice_streak").default(0),
-  totalXp:           integer("total_xp").default(0),
+  voiceStreak:        integer("voice_streak").default(0),
+  totalXp:            integer("total_xp").default(0),
   lastVoiceSessionAt: timestamp("last_voice_session_at", { withTimezone: true }),
+
+  // ── Passo 5: Referral tracking ─────────────────────────────────
+  /**
+   * FK verso affiliate_accounts.id — chi ha portato questo utente.
+   * NULL se l’utente non è arrivato tramite referral.
+   */
+  referredByAffiliateId: integer("referred_by_affiliate_id"),
+  /** Timestamp del primo pagamento: marca la conversione del referral */
+  referralConvertedAt: timestamp("referral_converted_at", { withTimezone: true }),
 }, (t) => ({
-  usernameIdx: uniqueIndex("users_username_idx").on(t.username),
+  usernameIdx:    uniqueIndex("users_username_idx").on(t.username),
+  referredByIdx:  index("users_referred_by_idx").on(t.referredByAffiliateId),
 }));
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({
@@ -88,7 +93,6 @@ export const usersRelations = relations(usersTable, ({ many }) => ({
   voiceSessions: many("voiceSessionsTable" as any),
 }));
 
-// ── Utility: genera username da name + id (usato al signup) ─────────────
 /** Produce "mario-rossi-42" da name="Mario Rossi", id=42 */
 export function generateUsername(name: string, id: number): string {
   const slug = name
@@ -96,7 +100,7 @@ export function generateUsername(name: string, id: number): string {
     .replace(/[^a-z0-9\s-]/g, "")
     .trim()
     .replace(/\s+/g, "-")
-    .slice(0, 30)  // cap length
+    .slice(0, 30)
     || "utente";
   return `${slug}-${id}`;
 }
