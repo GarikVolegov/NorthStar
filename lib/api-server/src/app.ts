@@ -31,9 +31,12 @@ import discoveryCollectRouter   from "./routes/admin/discovery-collect";
 import discoverySourcesRouter   from "./routes/admin/discovery-sources";
 import discoveryItemsRouter     from "./routes/admin/discovery-items";
 import discoveryEnrichRouter    from "./routes/admin/discovery-enrich";
-import adminStatsRouter         from "./routes/admin/stats";       // ← nuovo
-import adminUsersRouter         from "./routes/admin/users";       // ← nuovo
-import adminRevenueRouter       from "./routes/admin/revenue";     // ← nuovo
+import adminStatsRouter         from "./routes/admin/stats";
+import adminUsersRouter         from "./routes/admin/users";
+import adminRevenueRouter       from "./routes/admin/revenue";
+
+// Phase 3 — Gamification: Voice Sessions
+import voiceRouter from "./routes/voice";
 
 export function createApp() {
   const app = express();
@@ -79,6 +82,9 @@ export function createApp() {
   app.use("/api/admin/stats",   adminStatsRouter);
   app.use("/api/admin/users",   adminUsersRouter);
   app.use("/api/admin/revenue", adminRevenueRouter);
+
+  // Phase 3 — Gamification: Voice Sessions
+  app.use("/api/voice", voiceRouter);
 
   app.use((_req, res) => res.status(404).json({ error: "Not found" }));
   app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
