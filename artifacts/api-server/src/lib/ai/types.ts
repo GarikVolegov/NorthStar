@@ -7,10 +7,11 @@
 export type AIProviderName = "groq" | "anthropic" | "openai" | "google";
 
 export type AIUseCase =
-  | "streaming_chat"  // Wiki AI, RAG chat — priorità velocità
+  | "streaming_chat"   // Wiki AI, coach SSE — priorità velocità
   | "agent_analysis"  // Agente RIASEC+Spiriti — priorità qualità ragionamento
   | "embedding"       // knowledgenodes — OpenAI text-embedding-3-small
-  | "research";       // background job news/sector — bassa latenza
+  | "research"        // background job news/sector — bassa latenza
+  | "json_extraction"; // CV parse, generate, tailor, cover-letter, ATS score
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
