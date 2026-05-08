@@ -35,3 +35,7 @@ export * from "./discoveryItems";
 export * from "./voiceSessions";
 // Phase 5 — Contextual Copilot
 export * from "./pageContextSnapshots";
+// Affiliate Program
+export * from "./affiliateAccounts";
+export * from "./affiliateCommissions";
+export * from "./affiliateWithdrawals";
