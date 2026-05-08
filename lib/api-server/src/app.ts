@@ -4,7 +4,9 @@
 import express from "express";
 import cors from "cors";
 import { json } from "express";
+import requestID from "express-request-id";
 
+import { loggingMiddleware, logger } from "./middleware/loggingMiddleware";
 import { jwtMiddleware } from "./middleware/jwt";
 import "./jobs/cron";
 
@@ -41,6 +43,13 @@ import leaderboardRouter from "./routes/leaderboard";
 
 export function createApp() {
   const app = express();
+
+  // ── Observability ──────────────────────────────────────────────────────────
+  // 1. Assign X-Request-Id UUID to req.id (or propagate from incoming header).
+  app.use(requestID({ headerName: "X-Request-Id" }));
+  // 2. Mount pino child logger on req.log and set X-Request-Id response header.
+  app.use(loggingMiddleware);
+  // ───────────────────────────────────────────────────────────────────────────
 
   app.use(cors({
     origin: process.env.FRONTEND_URL ?? "http://localhost:5173",
@@ -88,8 +97,11 @@ export function createApp() {
   app.use("/api/leaderboard", leaderboardRouter);
 
   app.use((_req, res) => res.status(404).json({ error: "Not found" }));
-  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    console.error("[api] unhandled error:", err);
+
+  // Global error handler — uses req.log for structured output with requestId.
+  app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const log = (req as any).log ?? logger;
+    log.error({ err }, "unhandled error");
     res.status(500).json({ error: err.message ?? "Internal server error" });
   });
 
