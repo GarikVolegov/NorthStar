@@ -9,6 +9,7 @@ export * from "./growth-agent/ParallelStatusPanel";
 export * from "./growth-agent/useGrowthAnalytics";
 export * from "./growth-agent/useGrowthChat";
 export * from "./growth-agent/useGrowthMemory";
+export * from "./growth-agent/useWendyVoiceSession";   // ← Phase 3
 
 // Discovery Agent System
 export * from "./discovery/DiscoveryFeedPage";

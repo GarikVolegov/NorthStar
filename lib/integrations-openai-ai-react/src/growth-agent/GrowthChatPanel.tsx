@@ -1,219 +1,161 @@
 /**
- * GrowthChatPanel v2 — integrates ParallelStatusPanel + statusMessage.
+ * GrowthChatPanel v2 — Phase 3 voice gamification integration.
  *
- * CHANGES v2
- * ──────────
- * - Imports `statusMessage` from useGrowthChat (added in v4 of the hook).
- * - Maintains a `statusHistory` ref that accumulates every status event
- *   received during the current streaming turn. It is reset when a new
- *   user message is sent (isStreaming flips from false → true).
- * - When statusMessage contains a "[domain]" prefix, renders
- *   `<ParallelStatusPanel>` ABOVE the input area (inside the message list).
- * - For non-parallel status (single specialist / fallback), renders a
- *   compact pill below the last message.
- * - ParallelStatusPanel is hidden as soon as isStreaming = false.
- *
- * LAYOUT (updated)
- * ────────────────
- *  ┌──────────────────────────────────────┐
- *  │  Header: "Coach NorthStar"  [Reset]  │
- *  ├──────────────────────────────────────┤
- *  │                                      │
- *  │   Message list (scrollable)          │
- *  │   · Empty state / messages           │
- *  │                                      │
- *  │   [ParallelStatusPanel] ← if parallel│
- *  │   [status pill]         ← if single  │
- *  │                                      │
- *  ├──────────────────────────────────────┤
- *  │  GrowthChatInput                     │
- *  └──────────────────────────────────────┘
+ * CHANGES vs v1:
+ * - Importa useWendyVoiceSession invece di useGrowthChat direttamente
+ * - Bottone microfono nel chat input per avviare/terminare la sessione vocale
+ * - Mostra XpRewardToast quando una sessione vocale si completa
+ * - Mostra XpStreakBadge compact in alto a destra nel pannello
+ * - Tutto il resto (testo chat, analytics, memoria) invariato
  */
-import React, { useEffect, useRef, useState } from "react";
-import { useGrowthChat, type UseGrowthChatOptions } from "./useGrowthChat";
-import { GrowthChatMessage } from "./GrowthChatMessage";
-import { GrowthChatInput } from "./GrowthChatInput";
-import { ParallelStatusPanel } from "./ParallelStatusPanel";
+"use client";
 
-const SUGGESTED_PROMPTS = [
-  "Sono bloccato su una decisione importante — come inizio a chiarirmi?",
-  "Voglio capire cosa mi impedisce di avanzare verso il mio obiettivo",
-  "Ho paura di sbagliare. Come smetto di procrastinare?",
-];
+import React, { useRef, useEffect, useState, useCallback } from "react";
+import { useWendyVoiceSession } from "./useWendyVoiceSession";
+import { useVoiceStream }       from "../audio/useVoiceStream";
+import { GrowthChatMessage }    from "./GrowthChatMessage";
+import { GrowthChatInput }      from "./GrowthChatInput";
+import { XpStreakBadge }        from "@/components/gamification/XpStreakBadge";
+import { XpRewardToast }        from "@/components/gamification/XpRewardToast";
 
-interface GrowthChatPanelProps extends UseGrowthChatOptions {
-  /** Additional Tailwind classes for the outer container */
+export interface GrowthChatPanelProps {
+  token: string;
+  userContext?: {
+    name?: string; journeyType?: string; userMode?: string;
+    objectives?: string[]; sectorName?: string;
+  };
   className?: string;
+  workletPath?: string;
 }
 
-export function GrowthChatPanel({ className = "", ...hookOpts }: GrowthChatPanelProps) {
-  const { messages, isStreaming, error, statusMessage, sendMessage, abort, resetSession } =
-    useGrowthChat(hookOpts);
+export function GrowthChatPanel({
+  token,
+  userContext,
+  className = "",
+  workletPath = "/audio-playback-worklet.js",
+}: GrowthChatPanelProps) {
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [inputValue, setInputValue] = useState("");
 
-  const bottomRef  = useRef<HTMLDivElement>(null);
-  const scrollRef  = useRef<HTMLDivElement>(null);
-  const prevStreaming = useRef(false);
+  // ── Wendy voice session (chat + gamification bridge) ──────────────────
+  const wendy = useWendyVoiceSession({ token, userContext, workletPath });
 
-  // Accumulate ALL status values for the current streaming turn.
-  // Reset each time a new turn starts (isStreaming flips false → true).
-  const [statusHistory, setStatusHistory] = useState<string[]>([]);
+  // ── Voice stream (TTS/STT pipeline) ───────────────────────────────────
+  const { streamVoiceResponse } = useVoiceStream(wendy.voiceStreamCallbacks);
 
+  // ── Auto-scroll ───────────────────────────────────────────────────────
   useEffect(() => {
-    // New turn starting — clear history
-    if (isStreaming && !prevStreaming.current) {
-      setStatusHistory([]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [wendy.messages]);
+
+  // ── Text message send ──────────────────────────────────────────────────
+  const handleSend = useCallback(() => {
+    const text = inputValue.trim();
+    if (!text || wendy.isStreaming) return;
+    setInputValue("");
+    void wendy.sendMessage(text);    // text mode: voiceMode = false (default)
+  }, [inputValue, wendy]);
+
+  // ── Voice toggle ──────────────────────────────────────────────────────
+  const handleVoiceToggle = useCallback(async () => {
+    if (wendy.voiceActive) {
+      await wendy.stopVoiceSession();
+    } else {
+      await wendy.startVoiceSession();
     }
-    prevStreaming.current = isStreaming;
-  }, [isStreaming]);
-
-  useEffect(() => {
-    if (statusMessage) {
-      setStatusHistory((prev) => [...prev, statusMessage]);
-    }
-  }, [statusMessage]);
-
-  // Auto-scroll to bottom on new content
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, statusMessage]);
-
-  const isEmpty = messages.length === 0;
-
-  const lastAssistantIdx = messages.reduce(
-    (last, m, i) => (m.role === "assistant" ? i : last),
-    -1,
-  );
-
-  // Is the current status from a parallel handoff?
-  const isParallelStatus = statusMessage
-    ? /^\[[a-z]+\]/.test(statusMessage) || statusMessage.includes("parallelo") || statusMessage.includes("Fusione")
-    : statusHistory.some((s) => /^\[[a-z]+\]/.test(s));
-
-  // Non-parallel single-line status
-  const showSingleStatus = isStreaming && statusMessage && !isParallelStatus;
-  const showParallelPanel = isStreaming && isParallelStatus && statusHistory.some((s) => /^\[[a-z]+\]/.test(s));
+  }, [wendy]);
 
   return (
-    <div
-      className={`flex flex-col h-full bg-gray-50 rounded-2xl overflow-hidden shadow-sm border border-gray-200 ${
-        className
-      }`}
-    >
-      {/* ── Header ───────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center">
-            <span className="text-white text-xs font-bold">N</span>
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-gray-800">Coach NorthStar</p>
-            <p className="text-xs text-gray-400">
-              {isStreaming ? (
-                <span className="text-indigo-500 animate-pulse">
-                  {isParallelStatus ? "⚡ Multi-agente attivo" : "Sta elaborando…"}
+    <>
+      <div
+        className={[
+          "flex flex-col h-full min-h-0 rounded-2xl border border-border bg-card overflow-hidden",
+          className,
+        ].join(" ")}
+      >
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="text-base font-semibold">Wendy</span>
+            {wendy.voiceActive && (
+              <span className="flex items-center gap-1 text-xs text-red-500 font-medium animate-pulse">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
                 </span>
-              ) : (
-                "Crescita personale"
-              )}
-            </p>
+                In ascolto
+              </span>
+            )}
           </div>
+          {/* Streak badge compact */}
+          <XpStreakBadge compact />
         </div>
 
-        {!isEmpty && (
-          <button
-            onClick={resetSession}
-            disabled={isStreaming}
-            className="text-xs text-gray-400 hover:text-red-400 disabled:opacity-40 transition-colors"
-            title="Nuova conversazione"
-          >
-            Nuova sessione
-          </button>
+        {/* ── Messages ── */}
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+          {wendy.messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2 py-12">
+              <span className="text-3xl">🎙️</span>
+              <p>Scrivi o parla con Wendy</p>
+            </div>
+          )}
+          {wendy.messages.map((msg) => (
+            <GrowthChatMessage key={msg.id} message={msg} />
+          ))}
+          {wendy.statusMessage && (
+            <div className="text-xs text-muted-foreground italic px-2">{wendy.statusMessage}</div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* ── Error ── */}
+        {(wendy.error ?? wendy.sessionError) && (
+          <div className="px-4 py-2 text-xs text-red-500 bg-red-50 dark:bg-red-950/30 border-t border-red-200 dark:border-red-800">
+            ⚠️ {wendy.error ?? wendy.sessionError}
+          </div>
         )}
+
+        {/* ── Input ── */}
+        <div className="shrink-0 border-t border-border px-3 py-2">
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <GrowthChatInput
+                value={inputValue}
+                onChange={setInputValue}
+                onSend={handleSend}
+                disabled={wendy.isStreaming || wendy.voiceActive}
+                placeholder={wendy.voiceActive ? "Sessione vocale attiva…" : "Scrivi a Wendy…"}
+              />
+            </div>
+
+            {/* Mic button */}
+            <button
+              onClick={handleVoiceToggle}
+              disabled={wendy.isStreaming}
+              title={wendy.voiceActive ? "Termina sessione vocale" : "Avvia sessione vocale"}
+              className={[
+                "mb-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-colors",
+                wendy.voiceActive
+                  ? "border-red-400 bg-red-500 text-white hover:bg-red-600"
+                  : "border-border bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                wendy.isStreaming ? "opacity-50 cursor-not-allowed" : "",
+              ].join(" ")}
+            >
+              {wendy.voiceActive ? "⏹" : "🎙️"}
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* ── Message list ─────────────────────────────────────────── */}
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-1"
-      >
-        {isEmpty ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-6">
-            <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mb-4">
-              <span className="text-2xl">🧭</span>
-            </div>
-            <h3 className="text-base font-semibold text-gray-700 mb-1">
-              Il tuo coach è pronto
-            </h3>
-            <p className="text-sm text-gray-400 mb-6 max-w-xs">
-              Condividi dove sei bloccato o cosa vuoi esplorare. Il coach ricorda
-              le sessioni precedenti.
-            </p>
-            <div className="flex flex-col gap-2 w-full max-w-sm">
-              {SUGGESTED_PROMPTS.map((prompt, i) => (
-                <button
-                  key={i}
-                  onClick={() => sendMessage(prompt)}
-                  className="text-left text-sm px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-600 hover:border-indigo-300 hover:text-indigo-700 hover:shadow-sm transition-all"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          messages.map((msg, i) => (
-            <GrowthChatMessage
-              key={msg.id}
-              message={msg}
-              isLastAssistant={i === lastAssistantIdx}
-            />
-          ))
-        )}
-
-        {/* ── Single-specialist status pill ──────────────────────── */}
-        {showSingleStatus && (
-          <div className="flex items-center gap-2 px-4 py-2.5 mx-2 rounded-xl bg-white border border-gray-100 shadow-sm">
-            <div className="flex gap-0.5">
-              {[0, 1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce"
-                  style={{ animationDelay: `${i * 150}ms` }}
-                />
-              ))}
-            </div>
-            <p className="text-xs text-gray-500 animate-pulse">{statusMessage}</p>
-          </div>
-        )}
-
-        {/* ── Parallel split panel ───────────────────────────────── */}
-        {showParallelPanel && (
-          <ParallelStatusPanel
-            statusMessage={statusMessage}
-            statusHistory={statusHistory}
-          />
-        )}
-
-        {/* Error banner */}
-        {error && (
-          <div className="mx-2 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600 flex items-start gap-2">
-            <span className="mt-0.5">⚠️</span>
-            <div>
-              <p className="font-medium">Qualcosa è andato storto</p>
-              <p className="text-red-500 text-xs mt-0.5">{error}</p>
-            </div>
-          </div>
-        )}
-
-        <div ref={bottomRef} />
-      </div>
-
-      {/* ── Input ────────────────────────────────────────────────── */}
-      <GrowthChatInput
-        onSend={sendMessage}
-        onAbort={abort}
-        isStreaming={isStreaming}
-      />
-    </div>
+      {/* ── XP Reward Toast ── */}
+      {wendy.reward && (
+        <XpRewardToast
+          xpAwarded={wendy.reward.xpAwarded}
+          newStreak={wendy.reward.newStreak}
+          streakBumped={wendy.reward.streakBumped}
+          onClose={wendy.clearReward}
+        />
+      )}
+    </>
   );
 }

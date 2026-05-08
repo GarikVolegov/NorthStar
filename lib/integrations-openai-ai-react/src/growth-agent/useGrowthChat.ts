@@ -1,10 +1,12 @@
 /**
- * useGrowthChat v5 — intermediate metadata in 'done' SSE event.
+ * useGrowthChat v6 — voiceMode + voice session gamification.
  *
- * NEW v5 fields on ChatMessage:
- * - toolUsed?: string          — tool called during generation
- * - parallelDomains?: string[] — ["career","mindset"] if parallel handoff ran
- * - fusionApplied?: boolean    — true if GPT-4o-mini fusion was used
+ * CHANGES vs v5:
+ * - sendMessage now accepts opts: { voiceMode?: boolean }
+ * - voiceMode:true is forwarded in the POST body → server uses WENDY_SYSTEM_PROMPT
+ *   (max 2-3 frasi, gpt-4o-mini, no status events)
+ *
+ * All other behaviour unchanged.
  */
 import { useState, useRef, useCallback, useEffect } from "react";
 
@@ -28,6 +30,7 @@ export interface ChatMessage {
   toolUsed?: string;
   parallelDomains?: string[];
   fusionApplied?: boolean;
+  voiceMode?: boolean;        // ← v6: true when message was sent in voice mode
 }
 
 export interface UseGrowthChatOptions {
@@ -39,6 +42,10 @@ export interface UseGrowthChatOptions {
   };
 }
 
+export interface SendMessageOptions {
+  voiceMode?: boolean;
+}
+
 const SESSION_KEY = "growth_session_id";
 function uid() { return Math.random().toString(36).slice(2); }
 function parseParallelDomains(ctx?: string): string[] | undefined {
@@ -48,11 +55,11 @@ function parseParallelDomains(ctx?: string): string[] | undefined {
 
 export function useGrowthChat(opts: UseGrowthChatOptions) {
   const { apiBase = "/api", token, userContext = {} } = opts;
-  const [messages, setMessages]          = useState<ChatMessage[]>([]);
-  const [isStreaming, setIsStreaming]     = useState(false);
-  const [error, setError]                = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [sessionId, setSessionId]         = useState<number | undefined>(() => {
+  const [messages, setMessages]           = useState<ChatMessage[]>([]);
+  const [isStreaming, setIsStreaming]      = useState(false);
+  const [error, setError]                 = useState<string | null>(null);
+  const [statusMessage, setStatusMessage]  = useState<string | null>(null);
+  const [sessionId, setSessionId]          = useState<number | undefined>(() => {
     const s = localStorage.getItem(SESSION_KEY);
     return s ? Number(s) : undefined;
   });
@@ -62,13 +69,16 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
     if (sessionId !== undefined) localStorage.setItem(SESSION_KEY, String(sessionId));
   }, [sessionId]);
 
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (
+    text: string,
+    { voiceMode = false }: SendMessageOptions = {}
+  ) => {
     if (!text.trim() || isStreaming) return;
     setError(null); setStatusMessage(null);
     const history = messages.map((m) => ({ role: m.role, content: m.content }));
-    const userMsg: ChatMessage      = { id: uid(), role: "user",      content: text };
+    const userMsg: ChatMessage      = { id: uid(), role: "user",      content: text, voiceMode };
     const assistantId = uid();
-    const assistantMsg: ChatMessage = { id: assistantId, role: "assistant", content: "", isStreaming: true };
+    const assistantMsg: ChatMessage = { id: assistantId, role: "assistant", content: "", isStreaming: true, voiceMode };
     setMessages((p) => [...p, userMsg, assistantMsg]);
     setIsStreaming(true);
     const ctrl = new AbortController();
@@ -77,7 +87,8 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
       const res = await fetch(`${apiBase}/growth-agent/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message: text, sessionId, history, userContext }),
+        // ← v6: voiceMode forwarded to server
+        body: JSON.stringify({ message: text, sessionId, history, userContext, voiceMode }),
         signal: ctrl.signal,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
