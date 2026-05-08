@@ -557,6 +557,237 @@ router.post(
 
 ---
 
+## Qualità del Codice Frontend & UX
+
+> **Stato attuale**: React 19 ✅, TanStack Query ✅, i18next 5 lingue ✅, Framer Motion ✅.
+> **Ottimizzazioni consigliate**: memoization su componenti pesanti, `useTransition` per operazioni AI, audit i18n su lingue secondarie.
+
+### 1. React.memo su componenti pesanti
+
+`React.memo` evita re-render costosi quando il componente padre cambia stato ma le props del figlio rimangono identiche. È particolarmente utile per componenti che contengono molto JSX o logica interna.
+
+#### Candidati prioritari nel codebase
+
+| Componente | Perché memoizzare |
+|---|---|
+| `CvDocument` (in `CvGeneratorModal.tsx`) | Renderizza l'intero A4 — si ricostruisce ad ogni keystroke dell'`EditPanel` anche se `cv` non è cambiato |
+| `CvSection` (in `CvGeneratorModal.tsx`) | Piccolo ma renderizzato ~8 volte per ogni update del documento |
+| `EditBlock` (in `CvGeneratorModal.tsx`) | Componente collassabile — si re-renderizza anche quando altri blocchi cambiano |
+| `DiscoveryItemCard` | Lista potenzialmente lunga — ogni update del feed parent causa re-render di tutti i card |
+| `TagInput` | Usato più volte nell'`EditPanel` — riceve `items` e `onChange` stabili se wrappati correttamente |
+
+#### Pattern da seguire
+
+```typescript
+// Prima — si re-renderizza ad ogni update del parent
+function CvDocument({ cv }: { cv: GeneratedCv }) {
+  return <div id="cv-document">...</div>;
+}
+
+// Dopo — si re-renderizza solo se `cv` cambia (confronto shallow)
+const CvDocument = React.memo(function CvDocument({ cv }: { cv: GeneratedCv }) {
+  return <div id="cv-document">...</div>;
+});
+```
+
+#### Regole per l'efficacia di `React.memo`
+
+1. **Le prop devono essere stabili.** Se passi `onChange={() => ...}` inline, `memo` non serve — la funzione è nuova ad ogni render. Soluzione: `useCallback`.
+2. **`CvGeneratorModal` usa già `useCallback` per `handleCvChange`** — ottimo, `memo` su `EditPanel` funzionerà correttamente.
+3. **Non memoizzare tutto.** Componenti semplici (< 5 elementi DOM) costano più da confrontare che da re-renderizzare. Target: componenti con 20+ nodi o lista di item.
+
+```typescript
+// Combinazione corretta: memo + useCallback
+const CvDocument = React.memo(function CvDocument({ cv }: { cv: GeneratedCv }) {
+  // ...
+});
+
+// Nel parent (CvGeneratorModal) — già presente, da mantenere
+const handleCvChange = useCallback((updated: GeneratedCv) => {
+  setGenerated(updated);
+  setHasUnsavedChanges(true);
+  setSaveStatus("idle");
+}, []);  // deps vuote: funzione stabile per tutta la vita del modale
+```
+
+---
+
+### 2. `useTransition` per operazioni AI asincrone
+
+`useTransition` (React 18+) marca un aggiornamento di stato come "non urgente", permettendo a React di mantenere l'interfaccia responsiva durante calcoli pesanti o fetch. L'utente può continuare a interagire (es. chiudere il modale) mentre la generazione è in corso.
+
+#### Stato attuale in `CvGeneratorModal`
+
+`generate()`, `tailorCv()`, `analyzeAts()` usano un semplice `useState` booleano (`loading`, `tailorStatus`). Il bottone viene disabilitato ma la UI si blocca finché il Promise non risolve.
+
+#### Pattern con `useTransition`
+
+```typescript
+import { useTransition } from 'react';
+
+// Nel componente
+const [isPending, startTransition] = useTransition();
+
+async function generate() {
+  setError(null);
+  startTransition(() => {
+    // Gli aggiornamenti di stato qui dentro sono "non urgenti"
+    // React può interromperli per gestire input urgenti (es. click su X)
+    setLoading(true);
+    setHasUnsavedChanges(false);
+  });
+
+  try {
+    const res = await fetch(`${BASE}api/cv/generate`, { /* ... */ });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    startTransition(() => {
+      setGenerated(data.generated);
+      setIsEditing(false);
+      setSaveStatus("idle");
+      setLoading(false);
+    });
+  } catch (err: any) {
+    setError(err.message || "Errore di rete.");
+    setLoading(false);
+  }
+}
+```
+
+#### Differenza pratica
+
+| Senza `useTransition` | Con `useTransition` |
+|---|---|
+| Click su "✕ Chiudi" durante fetch → nessuna risposta fino al completamento | Click su "✕ Chiudi" risponde immediatamente — React prioritizza l'evento |
+| `isPending` non disponibile — serve stato `loading` manuale | `isPending` automatico — può sostituire parte degli stati `loading` |
+| Re-render bloccante durante `setGenerated(largeObject)` | React può rimandare il re-render fino al frame disponibile |
+
+#### Dove applicarlo nel progetto
+
+```typescript
+// CvGeneratorModal — generazione e tailor
+const [isGenerating, startGenerate] = useTransition();
+const [isTailoring, startTailor] = useTransition();
+const [isAnalyzing, startAts] = useTransition();
+
+// Nei bottoni — usa isPending al posto di loading state manuale
+<Button disabled={isGenerating} onClick={() => startGenerate(() => generate())}>
+  {isGenerating ? <Loader2 className="animate-spin" /> : <Sparkles />}
+  {isGenerating ? t("cv.generating") : t("cv.regenerate")}
+</Button>
+```
+
+#### Limitazione importante
+
+`useTransition` non può wrappare direttamente una `async function`. Il pattern corretto è:
+
+```typescript
+// ❌ Non funziona — startTransition non gestisce Promise
+startTransition(async () => {
+  const data = await fetch(...);
+  setState(data);
+});
+
+// ✅ Corretto — startTransition per aggiornamenti UI, await fuori
+function handleGenerate() {
+  startTransition(() => setLoading(true));  // UI update non urgente
+  generate().finally(() => startTransition(() => setLoading(false)));
+}
+```
+
+---
+
+### 3. Validazione configurazione i18n
+
+#### Stato attuale (da `i18n.ts`)
+
+```typescript
+// artifacts/orientamento/src/i18n.ts — già configurato correttamente
+i18n.init({
+  fallbackLng: "it",        // ✅ fallback definito
+  supportedLngs: ["it", "en", "es", "fr", "de"],  // ✅ 5 lingue
+  detection: {
+    order: ["localStorage", "navigator"],
+    lookupLocalStorage: "northstar_lang",  // ✅ chiave stabile
+  },
+});
+```
+
+La configurazione base è **solida**. I rischi sono nelle traduzioni, non nel setup.
+
+#### Audit chiavi mancanti — pattern da adottare
+
+Il comportamento di i18next quando una chiave manca: renderizza la **chiave grezza** (es. `cv.adaptCvTitle` invece del testo). Questo è visibile agli utenti nelle lingue secondarie se le chiavi non vengono aggiunte a tutti i file.
+
+```typescript
+// Hook da aggiungere in development — rileva chiavi mancanti in console
+// artifacts/orientamento/src/i18n.ts
+i18n.init({
+  // ... config esistente ...
+  saveMissing: import.meta.env.DEV,  // solo in dev
+  missingKeyHandler: (lngs, ns, key) => {
+    console.warn(`[i18n] Chiave mancante: "${key}" per lingue: ${lngs.join(', ')}`);
+  },
+});
+```
+
+#### Checklist stabilità lingue secondarie
+
+`CvGeneratorModal` usa ~80 chiavi `cv.*`. Le lingue `en` e `de` sono quelle con più probabilità di avere gap perché l'italiano è la lingua di sviluppo primaria.
+
+| Verifica | Come controllare |
+|---|---|
+| Chiavi `cv.*` presenti in `en` e `de` | `diff <(jq 'keys[]' locales/it/translation.json) <(jq 'keys[]' locales/en/translation.json)` |
+| `t("cv.tailorSteps", { returnObjects: true })` ritorna array | Se la chiave non esiste, `map()` su una stringa causa crash silenzioso |
+| Interpolazioni `{{var}}` consistenti | `cv.savedAt`, `cv.targetRole`, `cv.experienceN` usano `{{when}}`, `{{role}}`, `{{count}}` — devono essere presenti in tutte le lingue |
+| Chiavi con `returnObjects: true` sono array | `cv.tailorSteps`, `cv.letterSteps`, `cv.atsSteps` — devono essere JSON array, non stringhe |
+
+#### Script di audit rapido (da eseguire localmente)
+
+```bash
+# Trova chiavi presenti in IT ma mancanti in EN
+node -e "
+const it = require('./src/locales/it/translation.json');
+const en = require('./src/locales/en/translation.json');
+
+function flatKeys(obj, prefix = '') {
+  return Object.entries(obj).flatMap(([k, v]) =>
+    typeof v === 'object' && !Array.isArray(v)
+      ? flatKeys(v, prefix ? \`\${prefix}.\${k}\` : k)
+      : [prefix ? \`\${prefix}.\${k}\` : k]
+  );
+}
+
+const missing = flatKeys(it).filter(k => {
+  const parts = k.split('.');
+  let node = en;
+  for (const p of parts) { node = node?.[p]; }
+  return node === undefined;
+});
+
+console.log('Chiavi mancanti in EN:', missing.length);
+missing.forEach(k => console.log(' -', k));
+"
+```
+
+#### Regola per nuove chiavi
+
+> Ogni nuova chiave aggiunta a `it/translation.json` **deve essere aggiunta nella stessa PR** a `en/translation.json`, `de/translation.json`, `es/translation.json`, `fr/translation.json`. Per le lingue secondarie è accettabile usare la traduzione italiana come placeholder temporaneo — l'importante è che la chiave esista e non renderizzi la chiave grezza.
+
+---
+
+### Checklist qualità per ogni nuovo componente frontend
+
+- [ ] `React.memo` se il componente riceve oggetti/array come prop e il parent si re-renderizza spesso
+- [ ] Funzioni passate come prop wrappate in `useCallback` (prerequisito per `memo`)
+- [ ] Operazioni AI (fetch verso `/api/v1/cv/*`, `/api/v1/ai/*`) usano `useTransition` se bloccano la UI
+- [ ] `useTranslation()` importato — zero stringhe visibili hardcoded in JSX
+- [ ] Chiavi i18n aggiunte in tutti e 5 i file `translation.json`
+- [ ] Chiavi con `returnObjects: true` sono JSON array in tutti i file lingua
+
+---
+
 ## Sistema AI — Router e Modelli
 
 > **⚠️ REGOLA FONDAMENTALE: ogni nuova funzionalità che usa l'AI DEVE passare dal router `artifacts/api-server/src/lib/ai/index.ts` via `ai.chat()`, `ai.agent()` o `ai.embed()`. Non chiamare mai direttamente OpenAI/Groq/Anthropic nelle route.**
@@ -774,12 +1005,14 @@ Catalogs CRUD, Agent Health Dashboard, Growth Queue, Setup Wizard
 - **API versioning:** `/api/v1/` via `express.Router()` — backward compat con redirect 308 da `/api/`
 - **Error handling:** middleware a 4 argomenti in `middlewares/errorHandler.ts` — `AppError`, `ZodError` → JSON strutturato con `requestId`
 - **Validation:** `middlewares/validateBody(ZodSchema)` su ogni route con `req.body` da client
+- **React.memo:** componenti pesanti (`CvDocument`, `CvSection`, `DiscoveryItemCard`) wrappati con `memo` + `useCallback` sulle prop-funzioni
+- **useTransition:** operazioni AI asincrone (generate, tailor, ATS) usano `startTransition` per mantenere UI responsiva
+- **i18n:** i18next + react-i18next; fallback `it`; `localStorage` key `northstar_lang`; `saveMissing: true` in DEV per audit chiavi mancanti
 - **Portabilità:** `DATABASE_URL` standardizzato; obiettivo zero dipendenze Replit-specifiche
 - **Health check:** `GET /api/health` su Express (già attivo); `GET /health` su FastAPI (🔲 da aggiungere)
 - **Secret management:** `.envrc` + `direnv` in locale; secret manager cloud in produzione
 - **CORS:** ristretto a `CORS_ORIGIN` env var
 - **Auth rate limiting:** `/auth/*` — 5 req/15min per IP
-- **i18n:** i18next + react-i18next; fallback `it`; `localStorage` key `northstar_lang`
 
 ---
 
@@ -792,6 +1025,11 @@ Catalogs CRUD, Agent Health Dashboard, Growth Queue, Setup Wizard
 - **ZodError in errorHandler:** catturato automaticamente se il middleware `validateBody` chiama `next(result.error)` — non wrappare ZodError in AppError
 - **Circuit breaker — singleton:** le istanze `circuitBreakers` in `circuit-breaker.ts` sono module-level. In ambienti serverless (cold start frequenti) il circuit si resetta ad ogni istanza — comportamento atteso
 - **Retry su streaming:** `withRetry` NON va usato su `ai.stream()` — uno stream non può essere riavviato dal client. Il retry si applica solo a `ai.chat()` e `ai.embed()`
+- **React.memo — prerequisito:** `memo` è inutile se le prop-funzioni non sono wrappate in `useCallback`. `CvGeneratorModal` usa già `useCallback` su `handleCvChange` — da mantenere
+- **useTransition — async:** `startTransition` non gestisce Promise direttamente. Wrappare solo gli aggiornamenti di stato, non l'intera funzione async
+- **useTransition — streaming:** non usare con `ai.stream()` SSE — lo streaming è già non-blocking per natura
+- **i18n — returnObjects:** chiavi usate con `{ returnObjects: true }` (`cv.tailorSteps`, `cv.letterSteps`, `cv.atsSteps`) DEVONO essere JSON array in tutti i file lingua. Se sono stringhe, `.map()` crasherà silenziosamente
+- **i18n — saveMissing:** attivare solo in DEV (`import.meta.env.DEV`) — in produzione genererebbe rumore nei log
 - **pnpm workspace:** esegui sempre dalla root o usa `--filter`
 - **Growth scheduler:** si aspetta JSON valido da OpenAI; può warnare se il modello tronca l'output
 - **`completion/me`:** usa SQL raw per `streak_days`/`last_active_at`
@@ -831,6 +1069,7 @@ Catalogs CRUD, Agent Health Dashboard, Growth Queue, Setup Wizard
 | OpenAI legacy client | `lib/integrations-openai-ai-server/src/client.ts` |
 | i18n setup | `artifacts/orientamento/src/i18n.ts` |
 | Traduzioni (it) | `artifacts/orientamento/src/locales/it/translation.json` |
+| **i18n audit script** | `artifacts/orientamento/scripts/i18n-audit.js` 🔲 |
 | Discovery agents | `lib/integrations-openai-ai-server/src/discovery-agent/` |
 | Admin UI components | `lib/integrations-openai-ai-react/src/admin/` |
 | Brand tokens | `artifacts/orientamento/src/lib/brand.ts` |
