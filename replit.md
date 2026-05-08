@@ -59,6 +59,7 @@ CORS_ORIGIN                 # origin frontend in produzione (es. https://northst
 | **Auth** | JWT custom (bcryptjs + `JWT_SECRET` persistente) |
 | **Monorepo** | pnpm workspaces + catalog |
 | **E2E** | Playwright (chromium), specs in `e2e/` |
+| **DOCX** | libreria `docx` (server-side, `api-server`) — installare con `pnpm add docx --filter api-server` |
 
 ---
 
@@ -70,11 +71,17 @@ artifacts/
     src/
       pages/             # ~30 pagine (home, dashboard, discovery, admin...)
       components/        # UI components (navbar, cards, wizard, admin panels)
+        cv/              # CV Builder components
+          CvGeneratorModal.tsx   # modale principale generazione CV (3 template)
+          CvSection.tsx          # card dashboard CV: upload, genera, modifica, download
+          CvEditorDrawer.tsx     # drawer editor manuale CV (sezioni collassabili)
+          CvDownloadMenu.tsx     # dropdown download PDF / DOCX / JSON
       hooks/             # useSSEStream, useTTS, useDiscoveryFeed...
       lib/               # brand.ts, chart-theme.ts, queryClient...
   api-server/            # Express API (porta 8080)
     src/
       routes/            # 40+ route files organizzati per dominio
+        cv.ts            # CV Builder — upload, generate, edit, PDF, DOCX, tailor, cover letter, ATS score
         discovery/       # feed.ts, saved.ts
         admin/           # agent-health, discovery-collect, discovery-sources,
                          # discovery-items, discovery-enrich, analyze-supervisor
@@ -98,6 +105,89 @@ lib/
   api-client-react/      # TanStack React Query hooks generati
 e2e/                     # Playwright specs (auth, riasec, admin, objectives)
 ```
+
+---
+
+## CV Builder
+
+Sistema completo per generare, modificare manualmente e scaricare il CV in più formati.
+
+### Flusso principale
+
+1. **Upload CV** — `POST /api/cv/mine/upload` (PDF o TXT, max 5 MB) → AI estrae JSON strutturato
+2. **Genera da profilo** — `POST /api/cv/mine/generate` → AI genera CV da grafo conoscenze + profilo RIASEC; scegli template (Classic / Minimal / Bold)
+3. **Modifica manuale** — icona matita → apre `CvEditorDrawer` (drawer laterale 520px)
+4. **Scarica** — dropdown `CvDownloadMenu` con 3 formati
+
+### CvEditorDrawer — Editor manuale
+
+Drawer `Sheet` full-height diviso in sezioni collassabili; salva via `PATCH /api/cv/mine/generated`.
+
+| Sezione | Campi |
+|---|---|
+| 👤 Informazioni personali | Nome, Titolo, Email, Telefono, Sede, LinkedIn, Sito, Ruolo target |
+| ✦ Profilo / Sommario | Textarea libera |
+| 💼 Esperienze | CRUD card per card — ruolo, azienda, periodo, sede, descrizione (con `→` bullet), tag skill |
+| 🎓 Formazione | CRUD — titolo, istituto, anno, note |
+| 🔧 Competenze & Strumenti | Tag-editor separato per `skills` e `tools` (Enter o `+`) |
+| 🌐 Lingue | Riga per lingua + livello |
+| 🏅 Certificazioni | Tag-editor |
+
+Footer fisso con bottone **Salva** + badge verde "Salvato!" per 3 secondi. Annulla chiude senza salvare.
+
+### CvDownloadMenu — Formati di download
+
+| Formato | Endpoint / Meccanismo |
+|---|---|
+| **PDF** | `GET /api/cv/:userId/pdf?template=` — usa il template salvato (`classic` / `minimal` / `bold`) |
+| **Word (DOCX)** | `GET /api/cv/:userId/docx` — generato server-side con libreria `docx`; heading H1 nome, H2 sezioni con bordo verde, bullet `→`, stile Calibri |
+| **JSON** | `Blob` costruito client-side dal `generatedCvData` in memoria — nessuna call API |
+
+### API CV — riepilogo endpoint
+
+```
+GET    /api/cv/mine                    → lista CV utente autenticato
+POST   /api/cv/mine/upload             → upload PDF/TXT + estrazione AI
+POST   /api/cv/mine/generate           → genera CV da profilo (body: { template })
+PATCH  /api/cv/mine/generated          → salva modifiche manuali (body: { generated })
+DELETE /api/cv/mine                    → elimina tutto
+
+GET    /api/cv/:userId/pdf?template=   → download PDF binario
+GET    /api/cv/:userId/docx            → download DOCX binario
+POST   /api/cv/:userId/tailor          → adatta CV a offerta di lavoro (AI)
+GET    /api/cv/:userId/versions        → lista versioni salvate
+POST   /api/cv/:userId/versions        → salva nuova versione con nome
+POST   /api/cv/:userId/cover-letter    → genera lettera di accompagnamento (AI)
+GET    /api/cv/:userId/cover-letter/pdf → PDF lettera
+POST   /api/cv/:userId/ats-score       → score compatibilità CV-offerta (AI, 0-100)
+```
+
+### Struttura dati GeneratedCv
+
+```typescript
+interface GeneratedCv {
+  personalInfo: { name, title?, email?, phone?, location?, linkedin?, website? };
+  summary?: string;
+  experience: Array<{ id, title, company, period, location?, description, skills[] }>;
+  education:  Array<{ id, degree, institution, year, description? }>;
+  skills:     string[];
+  tools:      string[];
+  languages:  Array<{ language, level }>;
+  certifications: string[];
+  targetRole?: string;
+  template?:  "classic" | "minimal" | "bold";
+  generatedAt?: string;
+  savedAt?:   string;
+}
+```
+
+### Template PDF
+
+| Template | Stile |
+|---|---|
+| `classic` | Verde scuro `#1a2e1a`, 2 colonne, header verde |
+| `minimal` | Bianco, 1 colonna, tipografia pulita |
+| `bold` | Navy `#0f172a` + Arancio `#f97316`, alto contrasto |
 
 ---
 
@@ -210,6 +300,12 @@ Layout: sidebar sticky su desktop, bottom tab bar su mobile.
 - **Calendario + .ics export:** `GET /api/calendar/export.ics` — RFC-5545 per Google/Apple/Outlook
 - **Audio TTS articoli:** `useTTS` hook (Web Speech API) + `TTSButton`
 - **Peer Review obiettivi:** `objective_comments` table, commenti/reazioni su obiettivi pubblici
+- **CV Builder completo:**
+  - Upload PDF/TXT → estrazione AI (personalInfo, summary, esperienze, educazione, skill, lingue, certificazioni)
+  - Generazione AI da profilo con scelta template (Classic / Minimal / Bold)
+  - **Editor manuale** — `CvEditorDrawer` con CRUD per ogni sezione, tag-editor, salvataggio esplicito
+  - **Download multi-formato** — PDF (3 template), DOCX (generato server-side via `docx`), JSON (client-side)
+  - Tailor CV su offerta di lavoro, ATS score 0-100, cover letter AI, versioning (max 20)
 
 ### Admin Features
 - **Admin Catalogs CRUD:** `GET/POST/PATCH/DELETE /api/admin/catalogs/{sectors|professions|education-paths|growth-articles}`
@@ -252,6 +348,7 @@ Layout: sidebar sticky su desktop, bottom tab bar su mobile.
 - **SSE streaming:** `hooks/useSSEStream.ts` + `components/ui/streaming-indicator.tsx`
 - **CORS:** ristretto a `CORS_ORIGIN` env var in produzione (default: `http://localhost:5000`)
 - **Auth rate limiting:** `/auth/*` ha rate limiter dedicato (5 req/15min per IP) via `authRateLimiter`
+- **CV DOCX:** generazione server-side con libreria `docx` — dipendenza da aggiungere con `pnpm add docx --filter api-server`
 
 ---
 
@@ -269,6 +366,8 @@ Layout: sidebar sticky su desktop, bottom tab bar su mobile.
 - **News cache:** LRU in-memory cap 100 entries — evita crescita illimitata in RAM
 - **Email prod:** impostare `EMAIL_FROM` con dominio Resend verificato; senza di esso le email arrivano solo all'owner account
 - **AI_MODEL:** configura il modello OpenAI per gli agenti orchestratore. L'enricher usa sempre `gpt-4o-mini` direttamente.
+- **CV editor:** `CvEditorDrawer` carica i dati via `GET /api/cv/:userId` al click dell'icona matita — se il CV generato non esiste ancora, il bottone è nascosto
+- **CV DOCX install:** dopo ogni clone/reset eseguire `pnpm add docx --filter api-server` se la dipendenza non è nel `package.json` del server
 
 ---
 
@@ -278,6 +377,8 @@ Layout: sidebar sticky su desktop, bottom tab bar su mobile.
 |---|---|
 | Schema DB | `lib/db/src/schema/index.ts` |
 | API routes | `artifacts/api-server/src/routes/index.ts` |
+| CV routes | `artifacts/api-server/src/routes/cv.ts` |
+| CV components | `artifacts/orientamento/src/components/cv/` |
 | Frontend routes | `artifacts/orientamento/src/App.tsx` |
 | Cron jobs | `artifacts/api-server/src/jobs/cron.ts` |
 | Discovery agents | `lib/integrations-openai-ai-server/src/discovery-agent/` |
