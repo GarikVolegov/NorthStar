@@ -9,6 +9,8 @@ import { getAuthenticatedUserId } from "../lib/plan-utils.js";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { CvPdfDocument } from "../cv-pdf.js";
+import { CvPdfMinimal } from "../cv-pdf-minimal.js";
+import { CvPdfBold } from "../cv-pdf-bold.js";
 import { CoverLetterPdfDocument, type CoverLetterData } from "../cover-letter-pdf.js";
 
 const router: IRouter = Router();
@@ -22,6 +24,17 @@ const upload = multer({
     else cb(new Error("Solo file PDF o TXT supportati"));
   },
 });
+
+export type CvTemplate = "classic" | "minimal" | "bold";
+
+// ── Template registry ─────────────────────────────────────────────────────────
+function renderCvPdf(cv: any, template: CvTemplate): Promise<Buffer> {
+  switch (template) {
+    case "minimal": return renderToBuffer(React.createElement(CvPdfMinimal, { cv }));
+    case "bold":    return renderToBuffer(React.createElement(CvPdfBold, { cv }));
+    default:        return renderToBuffer(React.createElement(CvPdfDocument, { cv })); // classic
+  }
+}
 
 interface CvData {
   personalInfo: {
@@ -71,23 +84,13 @@ async function aiJson<T>(prompt: string): Promise<T> {
   return JSON.parse(stripCodeFences(raw)) as T;
 }
 
-// ── helpers: build CvMeta list from raw cvJson blob ───────────────────
-/**
- * Normalises the flat cvJson blob into the CvMeta shape that
- * CvSection.tsx expects:  { cvs: CvMeta[] }
- *
- * Rules:
- *  - If cvJson has a `generated` sub-object  → one entry with source "generated"
- *  - If cvJson has top-level `extractedAt`    → one entry with source "upload"
- *  - Both can coexist; generated is listed first
- */
 function buildCvMetaList(
   cvJson: Record<string, any> | null,
   cvText: string | null,
   userId: number,
-): Array<{ id: string; filename: string; uploadedAt: string; source: "upload" | "generated"; hasPdf: boolean }> {
+): Array<{ id: string; filename: string; uploadedAt: string; source: "upload" | "generated"; hasPdf: boolean; template?: CvTemplate }> {
   if (!cvJson && !cvText) return [];
-  const list: Array<{ id: string; filename: string; uploadedAt: string; source: "upload" | "generated"; hasPdf: boolean }> = [];
+  const list: Array<{ id: string; filename: string; uploadedAt: string; source: "upload" | "generated"; hasPdf: boolean; template?: CvTemplate }> = [];
 
   if (cvJson?.generated) {
     list.push({
@@ -96,6 +99,7 @@ function buildCvMetaList(
       uploadedAt: cvJson.lastGenerated ?? cvJson.generated.generatedAt ?? new Date().toISOString(),
       source: "generated",
       hasPdf: true,
+      template: (cvJson.generated.template as CvTemplate) ?? "classic",
     });
   }
 
@@ -115,11 +119,9 @@ function buildCvMetaList(
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// SESSION-AWARE endpoints  (/api/cv/mine/*)
-// userId viene sempre da getAuthenticatedUserId(req) — nessun :userId
+// SESSION-AWARE endpoints (/api/cv/mine/*)
 // ══════════════════════════════════════════════════════════════════════
 
-// ── GET /api/cv/mine ──────────────────────────────────────────────────
 router.get("/cv/mine", async (req, res): Promise<void> => {
   const userId = getAuthenticatedUserId(req);
   if (!userId) { res.status(401).json({ error: "Non autenticato" }); return; }
@@ -204,7 +206,6 @@ Estrai tutte le informazioni presenti. Per i campi non trovati usa array vuoti o
   }
 
   const [existing] = await db.select({ cvJson: usersTable.cvJson }).from(usersTable).where(eq(usersTable.id, userId));
-  // Preserve existing generated CV when uploading a new one
   const merged = { ...cvData, generated: (existing?.cvJson as any)?.generated };
 
   await db.update(usersTable)
@@ -216,11 +217,17 @@ Estrai tutte le informazioni presenti. Per i campi non trovati usa array vuoti o
 });
 
 // ── POST /api/cv/mine/generate ─────────────────────────────────────────
+const GenerateMineBody = z.object({
+  template: z.enum(["classic", "minimal", "bold"]).optional().default("classic"),
+});
+
 router.post("/cv/mine/generate", async (req, res): Promise<void> => {
   const userId = getAuthenticatedUserId(req);
   if (!userId) { res.status(401).json({ error: "Non autenticato" }); return; }
 
-  // Fetch everything we need from DB autonomously
+  const parsed = GenerateMineBody.safeParse(req.body ?? {});
+  const template: CvTemplate = parsed.success ? parsed.data.template : "classic";
+
   const [user] = await db
     .select({
       name: usersTable.name,
@@ -234,7 +241,6 @@ router.post("/cv/mine/generate", async (req, res): Promise<void> => {
 
   if (!user) { res.status(404).json({ error: "Utente non trovato" }); return; }
 
-  // Fetch graph nodes
   let graphNodes: Array<{ type: string; label: string }> = [];
   try {
     const { knowledgeGraphTable } = await import("@workspace/db") as any;
@@ -243,7 +249,7 @@ router.post("/cv/mine/generate", async (req, res): Promise<void> => {
         .from(knowledgeGraphTable)
         .where(eq(knowledgeGraphTable.userId, userId));
     }
-  } catch { /* graph table may not exist, proceed without */ }
+  } catch { /* proceed without graph */ }
 
   const cvData = user.cvJson as any;
   const graphRoles  = graphNodes.filter((n) => n.type === "role").map((n) => n.label);
@@ -298,13 +304,16 @@ Integra i dati del CV caricato con le informazioni del grafo. Sii specifico e pr
     return;
   }
 
+  // Persist chosen template inside generated blob
+  generated.template = template;
+
   const updatedJson = { ...(cvData ?? {}), generated, lastGenerated: now };
   await db.update(usersTable)
     .set({ cvJson: updatedJson as any })
     .where(eq(usersTable.id, userId));
 
   const cvs = buildCvMetaList(updatedJson, user.cvText, userId);
-  res.json({ success: true, cvs });
+  res.json({ success: true, cvs, template });
 });
 
 // ── DELETE /api/cv/mine ────────────────────────────────────────────────
@@ -320,10 +329,9 @@ router.delete("/cv/mine", async (req, res): Promise<void> => {
 });
 
 // ══════════════════════════════════════════════════════════════════════
-// LEGACY endpoints (mantengono compatibilità con CvBuilder esistente)
+// LEGACY endpoints
 // ══════════════════════════════════════════════════════════════════════
 
-// ── GET /api/cv/:userId ────────────────────────────────────────────────
 router.get("/cv/:userId", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
@@ -337,7 +345,7 @@ router.get("/cv/:userId", async (req, res): Promise<void> => {
   res.json({ cvData: user.cvJson ?? null, hasCv: !!user.cvJson });
 });
 
-// ── GET /api/cv/:userId/pdf ────────────────────────────────────────────
+// GET /api/cv/:userId/pdf?template=classic|minimal|bold
 router.get("/cv/:userId/pdf", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
@@ -352,8 +360,15 @@ router.get("/cv/:userId/pdf", async (req, res): Promise<void> => {
   const generated = (user.cvJson as any)?.generated;
   if (!generated) { res.status(404).json({ error: "Nessun CV generato. Genera il CV prima di scaricarlo." }); return; }
 
+  // Priorità: query param > template salvato nel CV > classic
+  const validTemplates: CvTemplate[] = ["classic", "minimal", "bold"];
+  const qTemplate = req.query.template as string | undefined;
+  const template: CvTemplate = validTemplates.includes(qTemplate as CvTemplate)
+    ? (qTemplate as CvTemplate)
+    : (validTemplates.includes(generated.template) ? generated.template : "classic");
+
   try {
-    const buffer = await renderToBuffer(React.createElement(CvPdfDocument, { cv: generated }));
+    const buffer = await renderCvPdf(generated, template);
     const safeName = (generated.personalInfo?.name ?? "CV")
       .replace(/[^a-zA-Z0-9\s]/g, "").trim().replace(/\s+/g, "_");
     res.setHeader("Content-Type", "application/pdf");
@@ -366,7 +381,6 @@ router.get("/cv/:userId/pdf", async (req, res): Promise<void> => {
   }
 });
 
-// ── POST /api/cv/upload ────────────────────────────────────────────────
 router.post("/cv/upload", upload.single("file"), async (req, res): Promise<void> => {
   const { userId, rawText } = req.body;
   const uid = parseInt(userId, 10);
@@ -395,7 +409,7 @@ router.post("/cv/upload", upload.single("file"), async (req, res): Promise<void>
   }
 
   if (text.trim().length < 50) {
-    res.status(400).json({ error: "Il testo estratto è troppo breve. Controlla il file." });
+    res.status(400).json({ error: "Il testo estratto \u00e8 troppo breve. Controlla il file." });
     return;
   }
 
@@ -434,7 +448,6 @@ Estrai tutte le informazioni presenti. Per i campi non trovati usa array vuoti o
   res.json({ success: true, cvData });
 });
 
-// ── POST /api/cv/generate ──────────────────────────────────────────────
 const GenerateBody = z.object({
   userId: z.number(),
   profileData: z.object({
@@ -519,7 +532,6 @@ Integra i dati del CV caricato con le informazioni del grafo. Sii specifico e pr
   res.json({ success: true, generated });
 });
 
-// ── POST /api/cv/:userId/tailor ────────────────────────────────────────
 router.post("/cv/:userId/tailor", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
@@ -563,7 +575,6 @@ Restituisci SOLO il JSON aggiornato (stesso schema, senza markdown).`;
   res.json({ success: true, tailored });
 });
 
-// ── PATCH /api/cv/:userId/save ─────────────────────────────────────────
 router.patch("/cv/:userId/save", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
@@ -592,7 +603,6 @@ router.patch("/cv/:userId/save", async (req, res): Promise<void> => {
   res.json({ success: true, savedAt: now });
 });
 
-// ── GET /api/cv/:userId/versions ──────────────────────────────────────
 router.get("/cv/:userId/versions", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
@@ -606,7 +616,6 @@ router.get("/cv/:userId/versions", async (req, res): Promise<void> => {
   res.json({ versions });
 });
 
-// ── POST /api/cv/:userId/versions ─────────────────────────────────────
 router.post("/cv/:userId/versions", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
@@ -634,7 +643,6 @@ router.post("/cv/:userId/versions", async (req, res): Promise<void> => {
   res.json({ success: true, version: { id: newVersion.id, name: newVersion.name, targetRole: newVersion.targetRole, savedAt: newVersion.savedAt } });
 });
 
-// ── GET /api/cv/:userId/versions/:versionId ───────────────────────────
 router.get("/cv/:userId/versions/:versionId", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
@@ -647,7 +655,6 @@ router.get("/cv/:userId/versions/:versionId", async (req, res): Promise<void> =>
   res.json({ version });
 });
 
-// ── PATCH /api/cv/:userId/versions/:versionId ─────────────────────────
 router.patch("/cv/:userId/versions/:versionId", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
@@ -666,7 +673,6 @@ router.patch("/cv/:userId/versions/:versionId", async (req, res): Promise<void> 
   res.json({ success: true });
 });
 
-// ── DELETE /api/cv/:userId/versions/:versionId ────────────────────────
 router.delete("/cv/:userId/versions/:versionId", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
@@ -680,7 +686,6 @@ router.delete("/cv/:userId/versions/:versionId", async (req, res): Promise<void>
   res.json({ success: true });
 });
 
-// ── POST /api/cv/:userId/cover-letter ─────────────────────────────────
 router.post("/cv/:userId/cover-letter", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
@@ -758,7 +763,6 @@ Risposta JSON puro:
   res.json({ success: true, letter: letterData });
 });
 
-// ── GET /api/cv/:userId/cover-letter/pdf ──────────────────────────────
 router.get("/cv/:userId/cover-letter/pdf", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
@@ -787,7 +791,6 @@ router.get("/cv/:userId/cover-letter/pdf", async (req, res): Promise<void> => {
   res.send(buffer);
 });
 
-// ── POST /api/cv/:userId/ats-score ────────────────────────────────────
 router.post("/cv/:userId/ats-score", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }
@@ -845,7 +848,6 @@ Label: "Eccellente" (85+), "Buono" (70-84), "Sufficiente" (55-69), "Da migliorar
   res.json({ success: true, result });
 });
 
-// ── DELETE /api/cv/:userId ─────────────────────────────────────────────
 router.delete("/cv/:userId", async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
   if (isNaN(userId)) { res.status(400).json({ error: "ID non valido" }); return; }

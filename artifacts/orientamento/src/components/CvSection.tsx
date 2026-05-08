@@ -1,41 +1,85 @@
 /**
- * CvSection — Upload CV + Genera da profilo
+ * CvSection — Upload CV + Genera da profilo con scelta template
  *
- * Endpoints usati (tutti session-aware, nessun :userId nell'URL):
- *   GET    /api/cv/mine           → { cvs: CvMeta[] }
- *   POST   /api/cv/mine/upload    → { success, cvs }   (multipart form-data)
- *   POST   /api/cv/mine/generate  → { success, cvs }   (body vuoto)
- *   DELETE /api/cv/mine           → { success }
- *
- * Download PDF disponibile solo per CV generati via GET /api/cv/:userId/pdf
+ * Endpoints usati:
+ *   GET    /api/cv/mine                    → { cvs: CvMeta[] }
+ *   POST   /api/cv/mine/upload             → multipart, { success, cvs }
+ *   POST   /api/cv/mine/generate           → body { template }, { success, cvs }
+ *   DELETE /api/cv/mine                    → { success }
+ *   GET    /api/cv/:userId/pdf?template=   → binary PDF
  */
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   FileText, Upload, Sparkles, Trash2, Download,
-  Loader2, CheckCircle2, AlertCircle,
+  Loader2, CheckCircle2, AlertCircle, LayoutTemplate,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
+type CvTemplate = "classic" | "minimal" | "bold";
+
+const TEMPLATES: Array<{
+  id: CvTemplate;
+  label: string;
+  desc: string;
+  accent: string;
+  bg: string;
+  border: string;
+  dot1: string;
+  dot2: string;
+}> = [
+  {
+    id: "classic",
+    label: "Classic",
+    desc: "Verde scuro · 2 colonne",
+    accent: "text-emerald-700",
+    bg: "bg-emerald-50",
+    border: "border-emerald-300",
+    dot1: "bg-[#1a2e1a]",
+    dot2: "bg-[#2d5a2d]",
+  },
+  {
+    id: "minimal",
+    label: "Minimal",
+    desc: "Bianco · 1 colonna",
+    accent: "text-gray-700",
+    bg: "bg-gray-50",
+    border: "border-gray-300",
+    dot1: "bg-gray-800",
+    dot2: "bg-gray-400",
+  },
+  {
+    id: "bold",
+    label: "Bold",
+    desc: "Navy · Arancio",
+    accent: "text-orange-600",
+    bg: "bg-orange-50",
+    border: "border-orange-300",
+    dot1: "bg-[#0f172a]",
+    dot2: "bg-[#f97316]",
+  },
+];
+
+const LS_KEY = "ns_cv_template";
+
 interface CvMeta {
-  id: string;           // "generated-{userId}" | "uploaded-{userId}"
+  id: string;
   filename: string;
   uploadedAt: string;
   source: "upload" | "generated";
-  hasPdf: boolean;      // true solo per i CV generati (PDF disponibile)
+  hasPdf: boolean;
+  template?: CvTemplate;
 }
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("it-IT", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
+    day: "numeric", month: "long", year: "numeric",
   });
 }
 
@@ -44,6 +88,16 @@ export function CvSection({ userId }: { userId: number }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+
+  // Persist last chosen template in localStorage
+  const [selectedTemplate, setSelectedTemplate] = useState<CvTemplate>(() => {
+    try { return (localStorage.getItem(LS_KEY) as CvTemplate) ?? "classic"; } catch { return "classic"; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem(LS_KEY, selectedTemplate); } catch {}
+  }, [selectedTemplate]);
 
   // ── Fetch CVs ──────────────────────────────────────────────────────
   const { data, isLoading } = useQuery<{ cvs: CvMeta[] }>({
@@ -59,20 +113,20 @@ export function CvSection({ userId }: { userId: number }) {
   });
 
   const cvs = data?.cvs ?? [];
-  // Ordine: prima "generated", poi "uploaded"
   const generatedCv = cvs.find((c) => c.source === "generated") ?? null;
   const uploadedCv  = cvs.find((c) => c.source === "upload") ?? null;
-  const activeCv    = generatedCv ?? uploadedCv; // il principale da mostrare in cima
+
+  // Sync selectedTemplate with saved template from DB
+  useEffect(() => {
+    if (generatedCv?.template) setSelectedTemplate(generatedCv.template);
+  }, [generatedCv?.template]);
 
   // ── Upload ──────────────────────────────────────────────────────────
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
       const form = new FormData();
       form.append("file", file);
-      const res = await apiFetch(`${BASE}api/cv/mine/upload`, {
-        method: "POST",
-        body: form,
-      });
+      const res = await apiFetch(`${BASE}api/cv/mine/upload`, { method: "POST", body: form });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error ?? "Errore upload");
@@ -91,11 +145,7 @@ export function CvSection({ userId }: { userId: number }) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5_000_000) { setUploadError("File troppo grande (max 5 MB)"); return; }
-    const allowed = [
-      "application/pdf",
-      "text/plain",
-    ];
-    if (!allowed.includes(file.type)) { setUploadError("Solo PDF o TXT"); return; }
+    if (!["application/pdf", "text/plain"].includes(file.type)) { setUploadError("Solo PDF o TXT"); return; }
     setUploadError(null);
     uploadMutation.mutate(file);
     if (fileRef.current) fileRef.current.value = "";
@@ -103,8 +153,12 @@ export function CvSection({ userId }: { userId: number }) {
 
   // ── Generate ────────────────────────────────────────────────────────
   const generateMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiFetch(`${BASE}api/cv/mine/generate`, { method: "POST" });
+    mutationFn: async (template: CvTemplate) => {
+      const res = await apiFetch(`${BASE}api/cv/mine/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template }),
+      });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error ?? "Errore generazione");
@@ -115,6 +169,7 @@ export function CvSection({ userId }: { userId: number }) {
       queryClient.invalidateQueries({ queryKey: ["cvs-mine", userId] });
       queryClient.invalidateQueries({ queryKey: ["completion-me"] });
       setGenerateError(null);
+      setShowTemplatePicker(false);
     },
     onError: (err: Error) => setGenerateError(err.message),
   });
@@ -131,16 +186,17 @@ export function CvSection({ userId }: { userId: number }) {
     },
   });
 
-  // ── Download PDF (solo CV generati) ──────────────────────────────────
+  // ── Download PDF ──────────────────────────────────────────────────
   function handleDownloadPdf() {
-    const url = `${BASE}api/cv/${userId}/pdf`;
+    const t = generatedCv?.template ?? selectedTemplate;
     const a = document.createElement("a");
-    a.href = url;
+    a.href = `${BASE}api/cv/${userId}/pdf?template=${t}`;
     a.download = generatedCv?.filename ?? "CV_NorthStar.pdf";
     a.click();
   }
 
   const isBusy = uploadMutation.isPending || generateMutation.isPending || deleteMutation.isPending;
+  const activeTpl = TEMPLATES.find((t) => t.id === selectedTemplate) ?? TEMPLATES[0];
 
   return (
     <Card className="rounded-2xl">
@@ -152,14 +208,13 @@ export function CvSection({ userId }: { userId: number }) {
 
       <CardContent className="space-y-4">
 
-        {/* ── Loading ── */}
         {isLoading && (
           <div className="flex items-center gap-2 text-muted-foreground text-sm">
             <Loader2 className="w-4 h-4 animate-spin" /> Caricamento...
           </div>
         )}
 
-        {/* ── CV generato (priorità visiva) ── */}
+        {/* ── CV generato ── */}
         {!isLoading && generatedCv && (
           <div className="flex items-start justify-between gap-3 p-3 rounded-xl border bg-primary/5 border-primary/20">
             <div className="flex items-start gap-2.5 min-w-0">
@@ -169,7 +224,12 @@ export function CvSection({ userId }: { userId: number }) {
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate">{generatedCv.filename}</p>
                 <p className="text-xs text-muted-foreground">
-                  Generato da profilo · {formatDate(generatedCv.uploadedAt)}
+                  Generato · {formatDate(generatedCv.uploadedAt)}
+                  {generatedCv.template && (
+                    <span className={cn("ml-1.5 capitalize font-medium", activeTpl.accent)}>
+                      · {TEMPLATES.find((t) => t.id === generatedCv.template)?.label ?? generatedCv.template}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
@@ -195,7 +255,7 @@ export function CvSection({ userId }: { userId: number }) {
           </div>
         )}
 
-        {/* ── CV caricato (secondario se esiste anche il generato) ── */}
+        {/* ── CV caricato ── */}
         {!isLoading && uploadedCv && (
           <div className={cn(
             "flex items-start justify-between gap-3 p-3 rounded-xl border",
@@ -211,7 +271,7 @@ export function CvSection({ userId }: { userId: number }) {
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate">{uploadedCv.filename}</p>
                 <p className="text-xs text-muted-foreground">
-                  Caricato manualmente · {formatDate(uploadedCv.uploadedAt)}
+                  Caricato · {formatDate(uploadedCv.uploadedAt)}
                 </p>
               </div>
             </div>
@@ -220,7 +280,6 @@ export function CvSection({ userId }: { userId: number }) {
                 onClick={() => deleteMutation.mutate()}
                 disabled={isBusy}
                 className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors disabled:opacity-40 shrink-0"
-                title="Elimina CV"
               >
                 {deleteMutation.isPending
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -230,15 +289,68 @@ export function CvSection({ userId }: { userId: number }) {
           </div>
         )}
 
-        {/* ── Feedback operazioni ── */}
+        {/* ── Template picker ── */}
+        {showTemplatePicker && (
+          <div className="rounded-xl border bg-muted/30 p-3 space-y-2.5">
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <LayoutTemplate className="w-3.5 h-3.5" /> Scegli il template
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {TEMPLATES.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  onClick={() => setSelectedTemplate(tpl.id)}
+                  className={cn(
+                    "relative flex flex-col items-center gap-1.5 p-2.5 rounded-xl border-2 transition-all text-center",
+                    selectedTemplate === tpl.id
+                      ? `${tpl.bg} ${tpl.border} shadow-sm`
+                      : "bg-background border-border hover:border-muted-foreground/40",
+                  )}
+                >
+                  {/* mini preview */}
+                  <div className="w-10 h-14 rounded-md border border-border overflow-hidden flex flex-col">
+                    <div className={cn("h-5 w-full", tpl.dot1)} />
+                    <div className="flex-1 flex flex-col gap-0.5 p-1">
+                      <div className={cn("h-0.5 w-full rounded-full", tpl.dot2)} />
+                      <div className="h-0.5 w-3/4 rounded-full bg-muted-foreground/20" />
+                      <div className="h-0.5 w-full rounded-full bg-muted-foreground/20" />
+                      <div className="h-0.5 w-2/3 rounded-full bg-muted-foreground/20" />
+                    </div>
+                  </div>
+                  <span className={cn("text-[11px] font-semibold leading-tight", selectedTemplate === tpl.id ? tpl.accent : "text-muted-foreground")}>
+                    {tpl.label}
+                  </span>
+                  <span className="text-[9px] text-muted-foreground leading-tight">{tpl.desc}</span>
+                  {selectedTemplate === tpl.id && (
+                    <span className={cn("absolute top-1.5 right-1.5 w-2 h-2 rounded-full", tpl.dot2)} />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <Button
+              size="sm"
+              className="w-full rounded-full gap-2 text-xs"
+              disabled={isBusy}
+              onClick={() => generateMutation.mutate(selectedTemplate)}
+            >
+              {generateMutation.isPending
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Sparkles className="w-3.5 h-3.5" />}
+              Genera con template {activeTpl.label}
+            </Button>
+          </div>
+        )}
+
+        {/* ── Feedback ── */}
         {uploadMutation.isSuccess && (
           <p className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">
-            <CheckCircle2 className="w-3.5 h-3.5" /> CV caricato e analizzato con successo!
+            <CheckCircle2 className="w-3.5 h-3.5" /> CV caricato e analizzato!
           </p>
         )}
         {generateMutation.isSuccess && (
           <p className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">
-            <CheckCircle2 className="w-3.5 h-3.5" /> CV generato dal tuo profilo NorthStar!
+            <CheckCircle2 className="w-3.5 h-3.5" /> CV generato con template {activeTpl.label}!
           </p>
         )}
         {uploadError && (
@@ -252,14 +364,13 @@ export function CvSection({ userId }: { userId: number }) {
           </p>
         )}
 
-        {/* ── Empty state ── */}
-        {!isLoading && cvs.length === 0 && !uploadMutation.isPending && !generateMutation.isPending && (
+        {!isLoading && cvs.length === 0 && !isBusy && (
           <p className="text-xs text-muted-foreground bg-muted/40 rounded-xl p-3 leading-relaxed">
-            Nessun CV presente. Carica il tuo CV esistente (PDF o TXT) oppure generane uno automaticamente dai dati del tuo profilo NorthStar.
+            Nessun CV presente. Carica il tuo CV (PDF/TXT) oppure generane uno dal profilo NorthStar.
           </p>
         )}
 
-        {/* ── Azioni ── */}
+        {/* ── Azioni principali ── */}
         <div className="flex flex-col sm:flex-row gap-2">
           <Button
             variant="outline"
@@ -278,17 +389,15 @@ export function CvSection({ userId }: { userId: number }) {
             size="sm"
             className="rounded-full gap-2 text-xs flex-1"
             disabled={isBusy}
-            onClick={() => generateMutation.mutate()}
+            onClick={() => setShowTemplatePicker((v) => !v)}
           >
-            {generateMutation.isPending
-              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              : <Sparkles className="w-3.5 h-3.5" />}
+            <LayoutTemplate className="w-3.5 h-3.5" />
             {generatedCv ? "Rigenera CV" : "Genera da profilo"}
           </Button>
         </div>
 
         <p className="text-[11px] text-muted-foreground -mt-1">
-          PDF o TXT · max 5 MB · Il CV generato include competenze, esperienze e settore dal tuo profilo
+          PDF o TXT · max 5 MB · 3 template disponibili · Il template scelto viene salvato
         </p>
 
         <input
