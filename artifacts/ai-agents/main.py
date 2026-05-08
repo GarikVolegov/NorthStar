@@ -1,12 +1,18 @@
 """
-NorthStar AI Agents — FastAPI microservice
-Exposes LangChain/LangGraph AI agents as HTTP endpoints.
-The Express API server proxies AI-intensive tasks to this service.
+NorthStar AI Agents + ML — FastAPI microservice
+
+Espone due famiglie di endpoint:
+  - /run + /chat   : LangChain/LangGraph AI agents (orchestrator, career chat)
+  - /ml/*          : Modulo ML scikit-learn (career recommender, sector similarity)
+
+L'Express API server proxia i task AI-intensivi e le raccomandazioni ML a questo servizio.
 """
 from __future__ import annotations
 import logging
 import os
 import sys
+import time
+from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -16,15 +22,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from schemas import RunRequest, ChatRequest, AgentResult, ChatResult
 from agents.orchestrator import run_task
 from agents.chat import run_career_chat
+from ml.router import ml_router
 from config import PORT
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
+_start_time = time.time()
+
 app = FastAPI(
-    title="NorthStar AI Agents",
-    description="LangChain/LangGraph AI microservice for career orientation",
-    version="1.0.0",
+    title="NorthStar AI Agents + ML",
+    description="LangChain/LangGraph AI microservice + scikit-learn ML per career orientation",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -33,6 +42,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ─── ML Router ───────────────────────────────────────────────────────────────────
+app.include_router(ml_router, prefix="/ml", tags=["ML — Career Recommender"])
+
 
 SUPPORTED_TASKS = [
     "personality_insight",
@@ -50,10 +63,16 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "northstar-ai-agents",
+        "version": "2.0.0",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "uptime_seconds": round(time.time() - _start_time),
         "supported_tasks": SUPPORTED_TASKS,
-        "agents": ["PersonalityInsightAgent", "SectorMotivationAgent",
-                   "WorkModeAdvisorAgent", "AffiliationMaterialsAgent", "CareerChatAgent",
-                   "BusinessValidatorAgent", "IncubatorFinderAgent"],
+        "ml_module": "mounted at /ml",
+        "agents": [
+            "PersonalityInsightAgent", "SectorMotivationAgent",
+            "WorkModeAdvisorAgent", "AffiliationMaterialsAgent", "CareerChatAgent",
+            "BusinessValidatorAgent", "IncubatorFinderAgent",
+        ],
     }
 
 
