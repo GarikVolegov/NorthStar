@@ -33,3 +33,5 @@ export * from "./sessionSummaries";
 export * from "./discoveryItems";
 // Phase 3 — Gamification Base
 export * from "./voiceSessions";
+// Phase 5 — Contextual Copilot
+export * from "./pageContextSnapshots";

@@ -13,6 +13,11 @@ export { WendyThinkingStatus }      from "./growth-agent/WendyThinkingStatus";
 export { WendyToast }               from "./growth-agent/WendyToast";
 export { useWendyToast }            from "./growth-agent/useWendyToast";
 
+// Contextual copilot (Phase 5)
+export { WendyPageContextProvider,
+         useWendyPageContext }       from "./growth-agent/WendyPageContext";
+export { WendyContextButton }       from "./growth-agent/WendyContextButton";
+
 // hooks
 export { useGrowthChat }            from "./growth-agent/useGrowthChat";
 export { useGrowthMemory }          from "./growth-agent/useGrowthMemory";

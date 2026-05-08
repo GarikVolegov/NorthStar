@@ -1,14 +1,15 @@
 /**
- * GrowthChatPanel v3 — Visual Feedback & Error Handling (Phase 4).
+ * GrowthChatPanel v4 — Contextual Copilot integration (Points 4 & 5).
  *
- * CHANGES vs v2:
- * - WendyTypingIndicator: shown while isStreaming and no statusMessage active
- * - WendyThinkingStatus:  shown when statusMessage is set (long-running request)
- * - useWendyToast + WendyToast: toast queue for network/API errors
- * - Error banner: now includes a "🔄 Riprova" button when lastInput is available
- * - lastInput ref: tracks last sent text to enable retry without resetting session
- * - prevErrorRef: deduplicates toast pushes when same error persists across renders
- * - All other behaviour (voice, gamification, text chat) unchanged
+ * CHANGES vs v3:
+ * - Accepts optional `initialMessage` prop: when set the panel sends it
+ *   automatically on mount (used by WendyContextButton to pre-fill + auto-send)
+ * - Accepts optional `pageContext` prop: JSON blob forwarded to sendMessage
+ *   so runGrowthAgent can inject it into the prompt
+ * - useWendyPageContext: reads global page context set by WendyContextButton
+ *   and merges it into every outbound message's userContext
+ * - All v3 behaviour (typing indicator, thinking status, toasts, retry,
+ *   voice, gamification) unchanged
  */
 "use client";
 
@@ -21,6 +22,7 @@ import { WendyTypingIndicator }  from "./WendyTypingIndicator";
 import { WendyThinkingStatus }   from "./WendyThinkingStatus";
 import { useWendyToast }         from "./useWendyToast";
 import { WendyToast }            from "./WendyToast";
+import { useWendyPageContext }   from "./WendyPageContext";
 import { XpStreakBadge }         from "@/components/gamification/XpStreakBadge";
 import { XpRewardToast }         from "@/components/gamification/XpRewardToast";
 
@@ -29,29 +31,49 @@ export interface GrowthChatPanelProps {
   userContext?: {
     name?: string; journeyType?: string; userMode?: string;
     objectives?: string[]; sectorName?: string;
+    /** Arbitrary page context forwarded to the AI */
+    pageContext?: Record<string, unknown>;
   };
   className?: string;
   workletPath?: string;
+  /**
+   * Optional pre-filled message.
+   * When provided the panel sends it automatically after mount.
+   * Used by WendyContextButton to trigger a contextual question.
+   */
+  initialMessage?: string;
 }
 
 export function GrowthChatPanel({
   token,
-  userContext,
+  userContext: userContextProp,
   className = "",
   workletPath = "/audio-playback-worklet.js",
+  initialMessage,
 }: GrowthChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [inputValue, setInputValue] = useState("");
-  /** Last text sent by user — kept for retry */
-  const [lastInput, setLastInput] = useState<string | null>(null);
+  const [lastInput, setLastInput]   = useState<string | null>(null);
+  const didAutoSend = useRef(false);
+
+  // ── Global page context (set by WendyContextButton on any page) ────────────
+  const { context: pageCtx } = useWendyPageContext();
+
+  // ── Merge prop-level + global page context ─────────────────────────────
+  const userContext = {
+    ...userContextProp,
+    pageContext: pageCtx
+      ? { pageId: pageCtx.pageId, pageLabel: pageCtx.pageLabel, ...pageCtx.data }
+      : userContextProp?.pageContext,
+  };
 
   // ── Toast system ──────────────────────────────────────────────────────
   const { toasts, addToast, removeToast } = useWendyToast(5000);
 
-  // ── Wendy voice session (chat + gamification bridge) ──────────────────
+  // ── Wendy voice session ───────────────────────────────────────────────
   const wendy = useWendyVoiceSession({ token, userContext, workletPath });
 
-  // ── Voice stream (TTS/STT pipeline) ───────────────────────────────────
+  // ── Voice stream ───────────────────────────────────────────────────────
   const { streamVoiceResponse } = useVoiceStream(wendy.voiceStreamCallbacks);
 
   // ── Auto-scroll ───────────────────────────────────────────────────────
@@ -59,15 +81,23 @@ export function GrowthChatPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [wendy.messages]);
 
-  // ── Surface new errors as toasts (dedup via prevErrorRef) ─────────────
+  // ── Surface new errors as toasts ─────────────────────────────────────────
   const prevErrorRef = useRef<string | null>(null);
   useEffect(() => {
     const current = wendy.error ?? wendy.sessionError ?? null;
-    if (current && current !== prevErrorRef.current) {
-      addToast(current, "error");
-    }
+    if (current && current !== prevErrorRef.current) addToast(current, "error");
     prevErrorRef.current = current;
   }, [wendy.error, wendy.sessionError, addToast]);
+
+  // ── Auto-send initialMessage on first mount ──────────────────────────────
+  useEffect(() => {
+    if (initialMessage && !didAutoSend.current && !wendy.isStreaming) {
+      didAutoSend.current = true;
+      setLastInput(initialMessage);
+      void wendy.sendMessage(initialMessage);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — fires once on mount
 
   // ── Text message send ──────────────────────────────────────────────────
   const handleSend = useCallback(() => {
@@ -78,7 +108,7 @@ export function GrowthChatPanel({
     void wendy.sendMessage(text);
   }, [inputValue, wendy]);
 
-  // ── Retry last message ────────────────────────────────────────────────
+  // ── Retry ─────────────────────────────────────────────────────────────
   const handleRetry = useCallback(() => {
     if (!lastInput || wendy.isStreaming) return;
     void wendy.sendMessage(lastInput);
@@ -86,20 +116,15 @@ export function GrowthChatPanel({
 
   // ── Voice toggle ──────────────────────────────────────────────────────
   const handleVoiceToggle = useCallback(async () => {
-    if (wendy.voiceActive) {
-      await wendy.stopVoiceSession();
-    } else {
-      await wendy.startVoiceSession();
-    }
+    if (wendy.voiceActive) await wendy.stopVoiceSession();
+    else await wendy.startVoiceSession();
   }, [wendy]);
 
   const hasError = Boolean(wendy.error ?? wendy.sessionError);
-  /** Show bounce dots only while streaming AND no status text is active */
   const showTypingDots = wendy.isStreaming && !wendy.statusMessage;
 
   return (
     <>
-      {/* ── Panel wrapper (relative for WendyToast positioning) ── */}
       <div
         className={[
           "relative flex flex-col h-full min-h-0 rounded-2xl border border-border bg-card overflow-hidden",
@@ -110,6 +135,12 @@ export function GrowthChatPanel({
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-base font-semibold">Wendy</span>
+            {/* Show page context badge when active */}
+            {pageCtx && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/30 px-2 py-0.5 text-[10px] font-medium text-primary">
+                📌 {pageCtx.pageLabel}
+              </span>
+            )}
             {wendy.voiceActive && (
               <span className="flex items-center gap-1 text-xs text-red-500 font-medium animate-pulse">
                 <span className="relative flex h-2 w-2">
@@ -128,7 +159,11 @@ export function GrowthChatPanel({
           {wendy.messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2 py-12">
               <span className="text-3xl">🎙️</span>
-              <p>Scrivi o parla con Wendy</p>
+              <p>
+                {pageCtx
+                  ? `Ciao! Sono pronta a parlare di ${pageCtx.pageLabel} — cosa vuoi sapere?`
+                  : "Scrivi o parla con Wendy"}
+              </p>
             </div>
           )}
 
@@ -136,16 +171,12 @@ export function GrowthChatPanel({
             <GrowthChatMessage key={msg.id} message={msg} />
           ))}
 
-          {/* Thinking pill — visible during long-running status events */}
           <WendyThinkingStatus message={wendy.statusMessage ?? null} />
-
-          {/* Typing indicator — visible while streaming, no status text */}
           {showTypingDots && <WendyTypingIndicator />}
-
           <div ref={messagesEndRef} />
         </div>
 
-        {/* ── Error banner + Retry button ── */}
+        {/* ── Error banner + Retry ── */}
         {hasError && (
           <div className="flex items-center gap-3 px-4 py-2 text-xs text-red-500 bg-red-50 dark:bg-red-950/30 border-t border-red-200 dark:border-red-800 shrink-0">
             <span className="flex-1">⚠️ {wendy.error ?? wendy.sessionError}</span>
@@ -173,8 +204,6 @@ export function GrowthChatPanel({
                 placeholder={wendy.voiceActive ? "Sessione vocale attiva…" : "Scrivi a Wendy…"}
               />
             </div>
-
-            {/* Mic button */}
             <button
               onClick={handleVoiceToggle}
               disabled={wendy.isStreaming}
@@ -192,11 +221,9 @@ export function GrowthChatPanel({
           </div>
         </div>
 
-        {/* ── Toast notifications (absolute inside panel) ── */}
         <WendyToast toasts={toasts} onRemove={removeToast} />
       </div>
 
-      {/* ── XP Reward Toast ── */}
       {wendy.reward && (
         <XpRewardToast
           xpAwarded={wendy.reward.xpAwarded}
