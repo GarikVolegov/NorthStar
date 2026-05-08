@@ -1,47 +1,35 @@
 /**
- * growth-agent/index.ts — barrel file
+ * Growth Agent router — mounts all sub-routes under /api/growth-agent/
  *
- * Exports:
- *   - WENDY_SYSTEM_PROMPT  → system prompt ottimizzato per modalità vocale
- *   - router               → Express router aggregato
+ * Routes:
+ *   POST   /chat          — SSE streaming chat (wrapped in Circuit Breaker)
+ *   GET    /memory        — persistent facts + patterns for the user
+ *   GET    /analytics     — session analytics dashboard data
+ *   POST   /feedback      — thumbs up/down on a response
+ *   POST   /ingest        — add a document to the knowledge base
+ *   GET    /knowledge     — list knowledge base documents
+ *   GET    /notifications — unread coaching nudges
+ *   POST   /page-context  — save page context snapshot (analytics)
  */
 import { Router } from "express";
-import chatRouter        from "./chat";
-import analyticsRouter   from "./analytics";
-import feedbackRouter    from "./feedback";
-import ingestRouter      from "./ingest";
-import knowledgeRouter   from "./knowledge";
-import memoryRouter      from "./memory";
-import notificationsRouter from "./notifications";
+import chat         from "./chat";
+import memory       from "./memory";
+import analytics    from "./analytics";
+import feedback     from "./feedback";
+import ingest       from "./ingest";
+import knowledge    from "./knowledge";
+import notifications from "./notifications";
+import pageContext  from "./page-context";
 
-// ── WENDY VOICE SYSTEM PROMPT ─────────────────────────────────────────────────
-//
-// Usato quando il client invia { voiceMode: true } nel body della richiesta.
-// Principi:
-//   • Risposte cortissime (2-3 frasi) → ottimale per TTS
-//   • Zero markdown, zero elenchi → flusso naturale a voce
-//   • Tono caldo e diretto — Wendy è una persona, non uno strumento
-//   • Personalizzazione immediata con il nome utente
-//   • Termina SEMPRE con una domanda aperta (ingaggio conversazionale)
-//
-export const WENDY_SYSTEM_PROMPT = `
-Sei Wendy, il coach personale di NorthStar.
-Parli SEMPRE in italiano, con tono caldo e diretto.
-Le tue risposte sono BREVI (max 2-3 frasi) perché vengono lette ad alta voce.
-Non usare elenchi puntati, asterischi o markdown — parla come se fossi umana.
-Inizia sempre con il nome dell'utente se lo conosci.
-Esempio: "Ottimo Dionis! Questo obiettivo è solido. Vuoi approfondire la strategia?"
-`.trim();
-
-// ── ROUTER ────────────────────────────────────────────────────────────────────
 const router = Router();
 
-router.use("/chat",          chatRouter);
-router.use("/analytics",     analyticsRouter);
-router.use("/feedback",      feedbackRouter);
-router.use("/ingest",        ingestRouter);
-router.use("/knowledge",     knowledgeRouter);
-router.use("/memory",        memoryRouter);
-router.use("/notifications", notificationsRouter);
+router.use("/chat",         chat);
+router.use("/memory",       memory);
+router.use("/analytics",    analytics);
+router.use("/feedback",     feedback);
+router.use("/ingest",       ingest);
+router.use("/knowledge",    knowledge);
+router.use("/notifications", notifications);
+router.use("/page-context",  pageContext);
 
 export default router;

@@ -1,10 +1,11 @@
 /**
- * useGrowthChat v6 — voiceMode + voice session gamification.
+ * useGrowthChat v7 — pageContext support.
  *
- * CHANGES vs v5:
- * - sendMessage now accepts opts: { voiceMode?: boolean }
- * - voiceMode:true is forwarded in the POST body → server uses WENDY_SYSTEM_PROMPT
- *   (max 2-3 frasi, gpt-4o-mini, no status events)
+ * CHANGES vs v6:
+ * - UseGrowthChatOptions.userContext now accepts optional `pageContext`
+ *   (Record<string, unknown>) — forwarded as-is in every POST body.
+ *   The backend injects it into the system prompt so Wendy can answer
+ *   context-aware questions (e.g. RIASEC scores, career detail, CV data).
  *
  * All other behaviour unchanged.
  */
@@ -30,15 +31,20 @@ export interface ChatMessage {
   toolUsed?: string;
   parallelDomains?: string[];
   fusionApplied?: boolean;
-  voiceMode?: boolean;        // ← v6: true when message was sent in voice mode
+  voiceMode?: boolean;
 }
 
 export interface UseGrowthChatOptions {
   apiBase?: string;
   token: string;
   userContext?: {
-    name?: string; journeyType?: string; userMode?: string;
-    objectives?: string[]; sectorName?: string;
+    name?: string;
+    journeyType?: string;
+    userMode?: string;
+    objectives?: string[];
+    sectorName?: string;
+    /** v7: arbitrary page-level context forwarded to the AI prompt */
+    pageContext?: Record<string, unknown>;
   };
 }
 
@@ -55,11 +61,11 @@ function parseParallelDomains(ctx?: string): string[] | undefined {
 
 export function useGrowthChat(opts: UseGrowthChatOptions) {
   const { apiBase = "/api", token, userContext = {} } = opts;
-  const [messages, setMessages]           = useState<ChatMessage[]>([]);
-  const [isStreaming, setIsStreaming]      = useState(false);
-  const [error, setError]                 = useState<string | null>(null);
-  const [statusMessage, setStatusMessage]  = useState<string | null>(null);
-  const [sessionId, setSessionId]          = useState<number | undefined>(() => {
+  const [messages, setMessages]          = useState<ChatMessage[]>([]);
+  const [isStreaming, setIsStreaming]     = useState(false);
+  const [error, setError]                = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [sessionId, setSessionId]         = useState<number | undefined>(() => {
     const s = localStorage.getItem(SESSION_KEY);
     return s ? Number(s) : undefined;
   });
@@ -87,7 +93,7 @@ export function useGrowthChat(opts: UseGrowthChatOptions) {
       const res = await fetch(`${apiBase}/growth-agent/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        // ← v6: voiceMode forwarded to server
+        // v7: userContext now carries optional pageContext
         body: JSON.stringify({ message: text, sessionId, history, userContext, voiceMode }),
         signal: ctrl.signal,
       });

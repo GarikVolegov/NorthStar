@@ -1,57 +1,29 @@
 /**
- * WendyContextButton — "Chiedi a Wendy" floating action button.
+ * WendyContextButton v2 — saves PageContextSnapshot on click.
  *
- * Place this next to any meaningful UI element. When clicked it:
- *   1. Writes the current page context to WendyPageContext
- *   2. Pre-builds a context-aware prompt from the provided `promptTemplate`
- *   3. Calls `onAskWendy(prompt)` so the parent can open the chat panel
- *      and pre-fill the input.
+ * CHANGES vs v1:
+ * - Accepts `token` prop to call usePageContextSnapshot and persist
+ *   every contextual click to the DB for analytics.
+ * - Token is optional: if omitted, snapshot saving is silently skipped.
  *
- * ─────────────────────────────────────────────────────────────────────
- * Example — on RIASEC results page:
- *
- *   <WendyContextButton
- *     pageId="riasec-results"
- *     pageLabel="Risultati RIASEC"
- *     pageData={{ topTypes: ['I','A','E'], scores: { I:85, A:72 } }}
- *     promptTemplate="Guardando i miei risultati RIASEC (tipi: {topTypes}), quali carriere mi consigli?"
- *     onAskWendy={(prompt) => openWendyPanel(prompt)}
- *   />
- *
- * Example — on Career detail page:
- *
- *   <WendyContextButton
- *     pageId="career-detail"
- *     pageLabel="Dettaglio Carriera"
- *     pageData={{ careerName: 'UX Designer', matchScore: 88 }}
- *     promptTemplate="Sto guardando la carriera {careerName} (match {matchScore}%). È adatta al mio profilo?"
- *     onAskWendy={(prompt) => openWendyPanel(prompt)}
- *   />
+ * All other behaviour unchanged.
  */
 import React, { useCallback } from "react";
-import { useWendyPageContext } from "./WendyPageContext";
+import { useWendyPageContext }     from "./WendyPageContext";
+import { usePageContextSnapshot } from "./usePageContextSnapshot";
 
 export interface WendyContextButtonProps {
-  /** Stable page identifier */
   pageId: string;
-  /** Shown in button tooltip */
   pageLabel: string;
-  /** Data snapshot for this page — injected into prompt + saved to DB */
   pageData: Record<string, unknown>;
-  /**
-   * Template string for the pre-filled prompt.
-   * Use {key} placeholders that match keys in pageData.
-   * Example: "Parliamo della carriera {careerName}!"
-   */
   promptTemplate: string;
-  /** Called with the resolved prompt string when the user clicks */
   onAskWendy: (prompt: string) => void;
-  /** Button variant (default: 'pill') */
+  /** JWT token — used to persist the snapshot; optional */
+  token?: string;
   variant?: "pill" | "icon" | "inline";
   className?: string;
 }
 
-/** Interpolates {key} placeholders with values from `data`. */
 function interpolate(template: string, data: Record<string, unknown>): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => {
     const val = data[key];
@@ -82,19 +54,25 @@ export function WendyContextButton({
   pageData,
   promptTemplate,
   onAskWendy,
+  token,
   variant = "pill",
   className = "",
 }: WendyContextButtonProps) {
-  const { setPageContext } = useWendyPageContext();
+  const { setPageContext }            = useWendyPageContext();
+  const { save: saveSnapshot }        = usePageContextSnapshot(token ?? "");
 
   const handleClick = useCallback(() => {
-    // 1. Write context so GrowthChatPanel can read it
-    setPageContext({ pageId, pageLabel, data: pageData });
-    // 2. Build the interpolated prompt
     const prompt = interpolate(promptTemplate, pageData);
-    // 3. Delegate to parent (open panel + pre-fill input)
+
+    // 1. Update global context (GrowthChatPanel reads this)
+    setPageContext({ pageId, pageLabel, data: pageData });
+
+    // 2. Persist snapshot for analytics (fire-and-forget, only if token provided)
+    if (token) saveSnapshot({ pageId, pageData, promptUsed: prompt });
+
+    // 3. Open panel + pre-fill prompt
     onAskWendy(prompt);
-  }, [pageId, pageLabel, pageData, promptTemplate, onAskWendy, setPageContext]);
+  }, [pageId, pageLabel, pageData, promptTemplate, onAskWendy, token, setPageContext, saveSnapshot]);
 
   return (
     <button

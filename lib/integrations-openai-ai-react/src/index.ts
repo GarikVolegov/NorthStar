@@ -17,6 +17,7 @@ export { useWendyToast }            from "./growth-agent/useWendyToast";
 export { WendyPageContextProvider,
          useWendyPageContext }       from "./growth-agent/WendyPageContext";
 export { WendyContextButton }       from "./growth-agent/WendyContextButton";
+export { usePageContextSnapshot }   from "./growth-agent/usePageContextSnapshot";
 
 // hooks
 export { useGrowthChat }            from "./growth-agent/useGrowthChat";
