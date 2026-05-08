@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { motion, AnimatePresence } from "framer-motion";
+import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import {
   LogOut, User, LayoutDashboard, Menu, X,
   FlaskConical, Layers, BookOpenText, Newspaper, Crown, Briefcase, Users, Calendar, Globe, BrainCircuit, Compass, MapPin,
@@ -35,6 +35,33 @@ const JOURNEY_LABELS: Record<string, { label: string; color: string }> = {
   azienda:     { label: "Azienda",            color: "text-[#A8D5BA] bg-[#A8D5BA]/10 border-[#A8D5BA]/30" },
   investitore: { label: "Investitore",        color: "text-primary bg-primary/10 border-primary/30" },
 };
+
+/**
+ * Mappa path → factory di import dinamico.
+ * Il browser esegue il fetch del chunk JS solo al primo hover;
+ * le chiamate successive sono no-op perché il modulo è già in cache.
+ */
+const PREFETCH_MAP: Record<string, () => Promise<unknown>> = {
+  "/test":            () => import("@/pages/test"),
+  "/settori":         () => import("@/pages/settori"),
+  "/ruoli":           () => import("@/pages/ruoli"),
+  "/lavori":          () => import("@/pages/lavori"),
+  "/crescita":        () => import("@/pages/crescita"),
+  "/news":            () => import("@/pages/news"),
+  "/premium":         () => import("@/pages/premium"),
+  // Rotte autenticate — prefetch al hover sul dropdown utente
+  "/percorso":        () => import("@/pages/percorso"),
+  "/profilo":         () => import("@/pages/profilo"),
+  "/candidature":     () => import("@/pages/candidature"),
+  "/calendario":      () => import("@/pages/Calendario"),
+  "/amici":           () => import("@/pages/amici"),
+  "/coach":           () => import("@/pages/coach"),
+  "/validatore-idea": () => import("@/pages/validatore-idea"),
+};
+
+function prefetchRoute(path: string) {
+  PREFETCH_MAP[path]?.();
+}
 
 export function Navbar() {
   const { t, i18n } = useTranslation();
@@ -74,8 +101,8 @@ export function Navbar() {
   const currentLang = i18n.language?.slice(0, 2).toUpperCase() ?? "IT";
 
   return (
-    <>
-      <motion.header
+    <LazyMotion features={domAnimation} strict>
+      <m.header
         className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4"
         initial={prefersReduced ? {} : { y: -80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -99,6 +126,8 @@ export function Navbar() {
                 <Link
                   key={href}
                   href={href}
+                  onMouseEnter={() => prefetchRoute(href)}
+                  onFocus={() => prefetchRoute(href)}
                   className={`relative text-xs font-semibold tracking-wide px-3 py-1.5 rounded-full transition-all duration-200 uppercase whitespace-nowrap ${
                     isActive
                       ? "text-primary bg-primary/10"
@@ -141,14 +170,20 @@ export function Navbar() {
                 <NotificationBell userId={user.id} />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <motion.button
+                    <m.button
                       className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary/40 hover:bg-primary/5 transition-all"
+                      onMouseEnter={() => {
+                        // Prefetch le rotte più probabili del dropdown utente
+                        prefetchRoute("/profilo");
+                        prefetchRoute("/percorso");
+                        prefetchRoute("/candidature");
+                      }}
                       whileHover={prefersReduced ? {} : { scale: 1.02 }}
                       whileTap={prefersReduced ? {} : { scale: 0.98 }}
                     >
                       <User className="h-3.5 w-3.5 text-primary" />
                       <span className="max-w-[80px] truncate">{user.name}</span>
-                    </motion.button>
+                    </m.button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56 bg-card border-border">
                     <DropdownMenuLabel className="font-normal">
@@ -172,17 +207,33 @@ export function Navbar() {
                     <DropdownMenuItem onClick={() => setLocation("/candidature")} className="cursor-pointer">
                       <Briefcase className="h-4 w-4 mr-2" /> {t("nav.applications")}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setLocation("/calendario")} className="cursor-pointer">
+                    <DropdownMenuItem
+                      onClick={() => setLocation("/calendario")}
+                      onMouseEnter={() => prefetchRoute("/calendario")}
+                      className="cursor-pointer"
+                    >
                       <Calendar className="h-4 w-4 mr-2" /> {t("nav.calendar")}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setLocation("/amici")} className="cursor-pointer">
+                    <DropdownMenuItem
+                      onClick={() => setLocation("/amici")}
+                      onMouseEnter={() => prefetchRoute("/amici")}
+                      className="cursor-pointer"
+                    >
                       <Users className="h-4 w-4 mr-2" /> {t("nav.friends")}
                       {friendsBadge ? <span className="ml-auto text-xs font-semibold text-primary">{friendsBadge}</span> : null}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setLocation("/coach")} className="cursor-pointer">
+                    <DropdownMenuItem
+                      onClick={() => setLocation("/coach")}
+                      onMouseEnter={() => prefetchRoute("/coach")}
+                      className="cursor-pointer"
+                    >
                       <BrainCircuit className="h-4 w-4 mr-2" /> Coach AI
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setLocation("/validatore-idea")} className="cursor-pointer">
+                    <DropdownMenuItem
+                      onClick={() => setLocation("/validatore-idea")}
+                      onMouseEnter={() => prefetchRoute("/validatore-idea")}
+                      className="cursor-pointer"
+                    >
                       <Compass className="h-4 w-4 mr-2" /> Validatore Idea
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -200,7 +251,7 @@ export function Navbar() {
                 >
                   {t("nav.login")}
                 </button>
-                <Link href="/test">
+                <Link href="/test" onMouseEnter={() => prefetchRoute("/test")}>
                   <div className="flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full px-4 py-1.5 hover:bg-primary/90 transition-colors">
                     {t("nav.startJourney")}
                   </div>
@@ -215,22 +266,22 @@ export function Navbar() {
 
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger asChild>
-                <motion.button
+                <m.button
                   className="flex items-center justify-center w-8 h-8 rounded-full border border-border hover:border-primary/40 hover:bg-primary/5 transition-all"
                   whileTap={prefersReduced ? {} : { scale: 0.9 }}
                 >
                   <AnimatePresence mode="wait" initial={false}>
                     {menuOpen ? (
-                      <motion.span key="close" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.18 }}>
+                      <m.span key="close" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.18 }}>
                         <X className="h-4 w-4 text-foreground" />
-                      </motion.span>
+                      </m.span>
                     ) : (
-                      <motion.span key="menu" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.18 }}>
+                      <m.span key="menu" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.18 }}>
                         <Menu className="h-4 w-4 text-foreground" />
-                      </motion.span>
+                      </m.span>
                     )}
                   </AnimatePresence>
-                </motion.button>
+                </m.button>
               </SheetTrigger>
 
               <SheetContent side="right" className="w-72 p-0 flex flex-col bg-card border-border">
@@ -248,7 +299,7 @@ export function Navbar() {
                   {NAV_LINKS.map(({ href, label, icon: Icon }, i) => {
                     const isActive = location === href;
                     return (
-                      <motion.div
+                      <m.div
                         key={href}
                         initial={prefersReduced ? {} : { opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -257,6 +308,7 @@ export function Navbar() {
                         <Link
                           href={href}
                           onClick={() => setMenuOpen(false)}
+                          onFocus={() => prefetchRoute(href)}
                           className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold uppercase tracking-wide transition-colors ${
                             isActive
                               ? "bg-primary/10 text-primary"
@@ -266,7 +318,7 @@ export function Navbar() {
                           <Icon className="h-4 w-4 shrink-0" />
                           {label}
                         </Link>
-                      </motion.div>
+                      </m.div>
                     );
                   })}
 
@@ -302,16 +354,16 @@ export function Navbar() {
                           <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                         </div>
                       </div>
-                      <button onClick={() => { setLocation("/profilo"); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
+                      <button onClick={() => { setLocation("/profilo"); setMenuOpen(false); }} onMouseEnter={() => prefetchRoute("/profilo")} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
                         <LayoutDashboard className="h-4 w-4" /> {t("nav.myProfile")}
                       </button>
-                      <button onClick={() => { setLocation("/candidature"); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
+                      <button onClick={() => { setLocation("/candidature"); setMenuOpen(false); }} onMouseEnter={() => prefetchRoute("/candidature")} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
                         <Briefcase className="h-4 w-4" /> {t("nav.applications")}
                       </button>
-                      <button onClick={() => { setLocation("/percorso"); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-primary hover:text-foreground hover:bg-primary/5 transition-colors font-semibold">
+                      <button onClick={() => { setLocation("/percorso"); setMenuOpen(false); }} onMouseEnter={() => prefetchRoute("/percorso")} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-primary hover:text-foreground hover:bg-primary/5 transition-colors font-semibold">
                         <MapPin className="h-4 w-4" /> Il mio percorso
                       </button>
-                      <button onClick={() => { setLocation("/validatore-idea"); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
+                      <button onClick={() => { setLocation("/validatore-idea"); setMenuOpen(false); }} onMouseEnter={() => prefetchRoute("/validatore-idea")} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
                         <Compass className="h-4 w-4" /> Validatore Idea
                       </button>
                       <button onClick={() => { logout(); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-destructive/80 hover:text-destructive hover:bg-destructive/5 transition-colors">
@@ -320,7 +372,7 @@ export function Navbar() {
                     </>
                   ) : (
                     <>
-                      <Link href="/test" onClick={() => setMenuOpen(false)} className="w-full flex items-center justify-center bg-primary text-primary-foreground text-sm font-bold rounded-full py-2.5 hover:bg-primary/90 transition-colors">
+                      <Link href="/test" onClick={() => setMenuOpen(false)} onMouseEnter={() => prefetchRoute("/test")} className="w-full flex items-center justify-center bg-primary text-primary-foreground text-sm font-bold rounded-full py-2.5 hover:bg-primary/90 transition-colors">
                         {t("nav.startFreeTest")}
                       </Link>
                       <button onClick={() => { setMenuOpen(false); setTimeout(() => setLoginOpen(true), 150); }} className="w-full flex items-center justify-center border border-border text-sm font-semibold rounded-full py-2.5 text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors">
@@ -333,12 +385,12 @@ export function Navbar() {
             </Sheet>
           </div>
         </div>
-      </motion.header>
+      </m.header>
 
       {/* Spacer to push content below fixed navbar */}
       <div className="h-20" />
 
       <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
-    </>
+    </LazyMotion>
   );
 }

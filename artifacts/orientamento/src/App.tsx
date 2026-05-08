@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { motion, AnimatePresence } from "framer-motion";
+import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import { useReducedMotion, easings } from "@/lib/motion";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageLoader } from "@/components/PageLoader";
@@ -199,18 +199,20 @@ function AnimatedRoutes() {
 
   return (
     <ErrorBoundary>
-      <AnimatePresence mode="sync" initial={false}>
-        <motion.div
-          key={location}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0, transition: { duration: 0.12, ease: easings.easeOut } }}
-          exit={{ opacity: 0, y: -4, transition: { duration: 0.08, ease: easings.easeIn } }}
-        >
-          <Suspense fallback={<PageLoader />}>
-            {routes(location)}
-          </Suspense>
-        </motion.div>
-      </AnimatePresence>
+      <LazyMotion features={domAnimation} strict>
+        <AnimatePresence mode="sync" initial={false}>
+          <m.div
+            key={location}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0, transition: { duration: 0.12, ease: easings.easeOut } }}
+            exit={{ opacity: 0, y: -4, transition: { duration: 0.08, ease: easings.easeIn } }}
+          >
+            <Suspense fallback={<PageLoader />}>
+              {routes(location)}
+            </Suspense>
+          </m.div>
+        </AnimatePresence>
+      </LazyMotion>
     </ErrorBoundary>
   );
 }
