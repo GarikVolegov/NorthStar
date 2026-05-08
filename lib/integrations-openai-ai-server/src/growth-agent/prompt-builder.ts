@@ -1,11 +1,16 @@
 /**
- * Prompt Builder v4 — adds uncertainty section based on self-evaluation.
+ * Prompt Builder v5 — voice mode support.
  *
- * SECTIONS (in order):
+ * NEW v5:
+ *   - buildVoiceSystemPrompt(userName) → prompt compatto per TTS (Wendy voice mode)
+ *     Usato quando GrowthAgentOptions.voiceMode === true.
+ *     Bypassa tutte le sezioni RAG/CoT/memory per massimizzare la velocità.
+ *
+ * SECTIONS standard (in order):
  *   1. PERSONA CORE        — principi fissi del coach
  *   2. TONE PROFILE        — come parla (adattato a journeyType)
  *   3. PERSISTENT MEMORY   — fatti biografici + pattern osservati
- *   4. UNCERTAINTY GUIDE   — [NEW v4] istruzioni basate su confidence level
+ *   4. UNCERTAINTY GUIDE   — istruzioni basate su confidence level
  *   5. CHAIN OF THOUGHT    — ragionamento interno nascosto
  *   6. SOCRATIC DIRECTIVE  — come chiudere la risposta
  *   7. PERSONA EXAMPLES    — esempi di stile dal RAG
@@ -35,7 +40,7 @@ export interface PromptContext {
   webResults: RetrievedChunk[];
   cot?: CoTResult | null;
   userMessage?: string;
-  evalResult?: EvalResult | null;  // NEW v4
+  evalResult?: EvalResult | null;
 }
 
 // ── PERSONA CORE ──────────────────────────────────────────────────────────────
@@ -52,7 +57,36 @@ Principi non negoziabili:
 7. Lunghezza: risposte dense ma non lunghe. Max 250 parole salvo richiesta esplicita.
 `.trim();
 
-// ── UNCERTAINTY GUIDE (NEW v4) ──────────────────────────────────────────────
+// ── VOICE SYSTEM PROMPT (v5 NEW) ──────────────────────────────────────────────
+//
+// Prompt compatto per modalità vocale (voiceMode: true).
+// NON include RAG, CoT, memoria — il client vocale non ha bisogno di queste
+// sezioni e la latenza extra non è accettabile in una conversazione a voce.
+//
+// Regole:
+//   • Max 2-3 frasi per risposta
+//   • Zero markdown / elenchi
+//   • Tono caldo, come una persona reale
+//   • Usa il nome utente se disponibile
+//   • Termina sempre con domanda aperta
+//
+export function buildVoiceSystemPrompt(userName?: string): string {
+  const greeting = userName
+    ? `Stai parlando con ${userName}. Inizia le risposte con il suo nome quando è naturale.`
+    : "Non conosci ancora il nome dell'utente — non inventarne uno.";
+
+  return [
+    "Sei Wendy, il coach personale di NorthStar.",
+    "Parli SEMPRE in italiano, con tono caldo e diretto.",
+    "Le tue risposte sono BREVI (max 2-3 frasi) perché vengono lette ad alta voce.",
+    "Non usare elenchi puntati, asterischi o markdown — parla come se fossi umana.",
+    greeting,
+    "Esempio: \"Ottimo Dionis! Questo obiettivo è solido. Vuoi approfondire la strategia?\"",
+    "Termina SEMPRE con una domanda aperta per mantenere il dialogo.",
+  ].join("\n");
+}
+
+// ── UNCERTAINTY GUIDE (v4) ────────────────────────────────────────────────────
 
 function buildUncertaintySection(eval_: EvalResult | null | undefined): string {
   if (!eval_ || eval_.level === "high") return "";
@@ -76,7 +110,6 @@ COMPORTAMENTO RICHIESTO:
 `.trim();
   }
 
-  // medium
   return `
 ## 🔶 Contesto parziale — rispondi con linguaggio moderato
 Score: ${eval_.score.toFixed(2)} / 1.00
@@ -133,7 +166,7 @@ export function buildSystemPrompt(ctx: PromptContext): string {
     PERSONA_CORE,
     buildToneSection(ctx.userContext.journeyType),
     ctx.userContext.memorySection ?? "",
-    buildUncertaintySection(ctx.evalResult),       // NEW v4
+    buildUncertaintySection(ctx.evalResult),
     buildCoTSection(ctx.cot ?? null),
     ctx.userMessage ? buildSocraticSection(ctx.userMessage) : "",
     formatPersonaExamples(ctx.personaExamples),

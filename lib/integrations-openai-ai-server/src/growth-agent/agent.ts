@@ -1,14 +1,22 @@
 /**
- * GrowthAgent v7 — parallel multi-agent handoff.
+ * GrowthAgent v8 — voice mode fast path.
  *
- * CHANGES v7
+ * CHANGES v8
  * ──────────
- * Adds a third routing path: ParallelHandoff.
- * When the RouterAgent detects a multi-domain message (secondaryRoute present),
- * instead of sending to one specialist we fork to BOTH concurrently.
+ * Adds voiceMode support to GrowthAgentOptions.
+ * When voiceMode === true:
+ *   - Skip router, RAG, CoT, self-evaluator, supervisor
+ *   - Use buildVoiceSystemPrompt() (breve, TTS-friendly)
+ *   - Use a lighter model (gpt-4o-mini) for lower latency
+ *   - max_tokens capped at 120 (max ~2-3 frasi)
+ *   - temperature 0.80 (tono più naturale/conversazionale)
+ *
+ * All other paths unchanged from v7.1.
  *
  * ROUTING DECISION (in order):
  * ┌─────────────────────────────────────────────────────────────┐
+ * | voiceMode === true → Wendy fast path (no RAG, no CoT)                      |
+ * ├─────────────────────────────────────────────────────────────┤
  * | Multi-domain: primaryConf >= threshold AND secondaryRoute present          |
  * |   → runParallelHandoff(primary, secondary)                                 |
  * ├─────────────────────────────────────────────────────────────┤
@@ -18,17 +26,12 @@
  * | Fallback: confidence < threshold OR domain = 'general'                     |
  * |   → general pipeline (RAG + CoT + supervisor)                              |
  * └─────────────────────────────────────────────────────────────┘
- *
- * CHANGES v7.1
- * ────────────
- * SupervisorEvalInput now includes userId + sessionId so that rewrite()
- * can fire-and-forget the log to supervisor_logs for the self-improvement job.
  */
 import OpenAI from "openai";
 import { openai } from "../client";
 import { retrieve } from "./retriever";
 import { searchWeb, MIN_LOCAL_CHUNKS } from "./web-search";
-import { buildSystemPrompt, type UserContext } from "./prompt-builder";
+import { buildSystemPrompt, buildVoiceSystemPrompt, type UserContext } from "./prompt-builder";
 import { runChainOfThought } from "./chain-of-thought";
 import { evaluateSelf, type EvalResult } from "./self-evaluator";
 import { routerAgent } from "./router-agent";
@@ -45,7 +48,8 @@ import "./specialists/career-agent";
 import "./specialists/mindset-agent";
 import "./specialists/habits-agent";
 
-export const GROWTH_AGENT_MODEL = "gpt-4o";
+export const GROWTH_AGENT_MODEL       = "gpt-4o";
+export const GROWTH_AGENT_VOICE_MODEL = "gpt-4o-mini"; // modello leggero per voice mode
 
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -55,12 +59,14 @@ export interface ChatMessage {
 
 export interface GrowthAgentOptions {
   userId:           number;
-  sessionId?:       number;   // ← v7.1: forwarded to supervisor for DB logging
+  sessionId?:       number;
   userContext:      UserContext & { memorySection?: string };
   history:          ChatMessage[];
   userMessage:      string;
   maxHistory?:      number;
   memoryFactCount?: number;
+  /** Se true: bypassa RAG/CoT/supervisor, usa WENDY_SYSTEM_PROMPT ottimizzato TTS */
+  voiceMode?:       boolean;
 }
 
 function buildConversationSummary(history: ChatMessage[]): string {
@@ -78,9 +84,71 @@ export async function* runGrowthAgent(
   | { type: "done";   sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult; routeDecision?: RouteDecision; supervisorResult?: SupervisorResult }
   | { type: "error";  message: string }
 > {
-  const { userId, sessionId, userContext, history, userMessage, maxHistory = 12 } = opts;
+  const {
+    userId, sessionId, userContext, history, userMessage,
+    maxHistory = 12, voiceMode = false,
+  } = opts;
 
-  // ── 1. Route + Load memory IN PARALLEL ─────────────────────────────────────
+  // ── VOICE FAST PATH ──────────────────────────────────────────────────────────
+  //
+  // Bypassa completamente RAG, CoT, router, supervisor.
+  // Priorità: latenza < 600ms (TTS non può aspettare).
+  //
+  if (voiceMode) {
+    const systemPrompt = buildVoiceSystemPrompt(userContext.name);
+    const recentHistory = history.slice(-6); // finestra corta: meno token, meno latenza
+
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      { role: "system", content: systemPrompt },
+      ...recentHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+      { role: "user", content: userMessage },
+    ];
+
+    try {
+      const stream = await openai.chat.completions.create({
+        model:       GROWTH_AGENT_VOICE_MODEL,
+        messages,
+        stream:      true,
+        temperature: 0.80,
+        max_tokens:  120, // ~2-3 frasi vocali
+      });
+
+      const tokenBuffer: string[] = [];
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta?.content;
+        if (delta) {
+          tokenBuffer.push(delta);
+          yield { type: "token", value: delta };
+        }
+      }
+
+      yield { type: "done", sources: [] };
+
+      // Salva memoria in background anche in voice mode
+      const assistantContent = tokenBuffer.join("");
+      if (sessionId) {
+        const turns = [
+          ...history.slice(-4),
+          { role: "user" as const,      content: userMessage },
+          { role: "assistant" as const, content: assistantContent },
+        ];
+        (async () => {
+          try {
+            const extracted = await extractMemory(turns);
+            if (extracted && (extracted.facts.length > 0 || extracted.patterns.length > 0)) {
+              await mergeMemory(userId, sessionId, extracted);
+            }
+          } catch { /* non-critical */ }
+        })();
+      }
+    } catch (err) {
+      yield { type: "error", message: err instanceof Error ? err.message : String(err) };
+    }
+    return;
+  }
+
+  // ── STANDARD PATH (v7.1 unchanged) ───────────────────────────────────────────
+
   const [routeDecision, userMemory] = await Promise.all([
     routerAgent.route(userMessage, history),
     loadMemory(userId).catch((err) => {
@@ -129,18 +197,13 @@ export async function* runGrowthAgent(
     routeDecision.confidence >= routeDecision.threshold &&
     routeDecision.domain !== "general";
 
-  // ── 2a. PARALLEL HANDOFF ──────────────────────────────────────────────────────
   if (primaryConfident && routeDecision.secondaryRoute) {
     let fullResponse = "";
     for await (const event of runParallelHandoff({
-      userId,
-      userContext:     enrichedContext,
-      history,
-      userMessage,
+      userId, userContext: enrichedContext, history, userMessage,
       primaryRoute:   routeDecision,
       secondaryRoute: routeDecision.secondaryRoute,
-      memoryFactCount,
-      maxHistory,
+      memoryFactCount, maxHistory,
     })) {
       if (event.type === "token") fullResponse += event.value;
       yield event;
@@ -149,7 +212,6 @@ export async function* runGrowthAgent(
     return;
   }
 
-  // ── 2b. SINGLE SPECIALIST ───────────────────────────────────────────────────────
   if (primaryConfident) {
     const specialist = getSpecialist(routeDecision.domain);
     if (specialist) {
@@ -166,7 +228,6 @@ export async function* runGrowthAgent(
     }
   }
 
-  // ── 2c. GENERAL FALLBACK ───────────────────────────────────────────────────────
   yield { type: "status", value: "🔍 Analizzando il tuo profilo..." };
 
   const conversationSummary = buildConversationSummary(history);
@@ -214,10 +275,8 @@ export async function* runGrowthAgent(
 
     const draft = tokenBuffer.join("");
 
-    // v7.1: include userId + sessionId so supervisor.rewrite() can log to DB
     const supervisorInput = {
-      userMessage,
-      draft,
+      userMessage, draft,
       domain:    routeDecision.domain,
       intent:    routeDecision.intent,
       userId:    String(userId),

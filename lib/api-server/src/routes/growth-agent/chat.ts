@@ -9,23 +9,21 @@
  *   5. [NON-BLOCKING] After stream ends:
  *        a. Save/update coach_sessions (messages, topics, avgConfidence, evalBreakdown)
  *        b. Extract + merge memory (facts + patterns)
- *        c. [NEW Phase 10] Summarize this session via GPT-4o-mini → session_summaries table
+ *        c. Summarize this session via GPT-4o-mini → session_summaries table
  *
- * Phase 10 additions:
- *   - loadRecentSummaries(userId, 3) runs in parallel with loadMemory at step 2.
- *     Zero extra latency for the user: both fetches happen concurrently.
- *   - buildSessionHistorySection() formats the last 3 summaries and appends them
- *     to the system prompt so the coach always has cross-session context.
- *   - summarizeSession() fires after the session is saved (step 5c).
- *     It is FIRE-AND-FORGET — user never waits for it.
- *   - Summarization is SKIPPED for very short sessions (< 4 messages total)
- *     to avoid noisy one-liner summaries.
+ * Voice Mode (voiceMode: true in body):
+ *   - Bypasses RAG, CoT, self-evaluator, supervisor
+ *   - Uses buildVoiceSystemPrompt() → WENDY_SYSTEM_PROMPT (max 2-3 frasi, zero markdown)
+ *   - Uses gpt-4o-mini (lower latency for TTS pipeline)
+ *   - Status events are suppressed (no "🔍 Analizzando..." in voice)
+ *   - Session save + memory extraction still run in background
  *
  * Body: {
  *   message: string,
  *   sessionId?: number,
  *   history: ChatMessage[],
- *   userContext?: Partial<UserContext>
+ *   userContext?: Partial<UserContext>,
+ *   voiceMode?: boolean
  * }
  *
  * SSE events:
@@ -55,9 +53,6 @@ import { usersTable, coachSessionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import type { EvalResult } from "@workspace/integrations-openai-ai-server/growth-agent/self-evaluator";
 
-// Minimum number of messages in a session before we bother summarizing.
-// A session shorter than this (e.g. a single hello-world exchange) produces
-// noise rather than useful context.
 const MIN_MESSAGES_TO_SUMMARIZE = 4;
 
 const router = Router();
@@ -70,11 +65,13 @@ router.post("/", async (req, res) => {
     sessionId,
     history = [],
     userContext: ctxOverride = {},
+    voiceMode = false,
   } = req.body as {
     message: string;
     sessionId?: number;
     history: ChatMessage[];
     userContext?: Partial<UserContext>;
+    voiceMode?: boolean;
   };
 
   if (!message?.trim()) {
@@ -91,32 +88,18 @@ router.post("/", async (req, res) => {
   if (!user) return res.status(401).json({ error: "User not found" });
 
   // ── 2. Load persistent memory + recent session summaries (PARALLEL) ─────
-  //
-  // Both DB reads run concurrently via Promise.all — zero extra latency
-  // compared to the previous version which only loaded memory.
-  //
+  // In voice mode carichiamo comunque la memoria — Wendy conosce l'utente.
+  // Le summaries le saltiamo: non entrano nel prompt vocale ma continuano
+  // a essere scritte in background dalla step 5c.
   const [memory, recentSummaries] = await Promise.all([
     loadMemory(userId),
-    loadRecentSummaries(userId, 3),   // Phase 10: last 3 session summaries
+    voiceMode ? Promise.resolve([]) : loadRecentSummaries(userId, 3),
   ]);
 
-  const memorySection       = buildMemorySection(memory);
-  const sessionHistorySection = buildSessionHistorySection(recentSummaries); // "" if no prior sessions
+  const memorySection        = buildMemorySection(memory);
+  const sessionHistorySection = voiceMode ? "" : buildSessionHistorySection(recentSummaries);
 
-  // ── 3. Build userContext with memory + session history injected ──────────
-  //
-  // sessionHistorySection is appended to memorySection so the prompt builder
-  // receives a single enriched context string. Format:
-  //
-  //   ## Memoria utente
-  //   …facts and patterns…
-  //
-  //   ## Contesto sessioni recenti
-  //   Sessione precedente 1:
-  //     L'utente ha lavorato su…
-  //     Temi: cambio carriera, ansia
-  //     Tono: neutral
-  //
+  // ── 3. Build userContext ─────────────────────────────────────────────────
   const userContext: UserContext & { memorySection?: string } = {
     name:        user.name,
     journeyType: user.journeyType,
@@ -125,7 +108,7 @@ router.post("/", async (req, res) => {
     ...ctxOverride,
   };
 
-  if (recentSummaries.length > 0) {
+  if (!voiceMode && recentSummaries.length > 0) {
     console.log(`[chat] injected ${recentSummaries.length} session summaries for user ${userId}`);
   }
 
@@ -148,12 +131,16 @@ router.post("/", async (req, res) => {
       history,
       userMessage: message,
       memoryFactCount: memory.facts.length,
+      voiceMode,
     })) {
+      // Sopprime gli status event in voice mode — il TTS non li legge
+      if (voiceMode && event.type === "status") continue;
+
       if (event.type === "token") {
         assistantTokens.push(event.value);
       }
-      if (event.type === "done" && event.evalResult) {
-        lastEvalResult = event.evalResult;
+      if (event.type === "done" && (event as any).evalResult) {
+        lastEvalResult = (event as any).evalResult;
       }
       send(event);
       if (event.type === "done" || event.type === "error") break;
@@ -259,17 +246,9 @@ router.post("/", async (req, res) => {
         }
       }
 
-      // ── 5c. Phase 10 — Summarize session (fire-and-forget) ────────────────
-      //
-      // Only summarize once the session has enough messages to be meaningful.
-      // We summarize on EVERY message update (not just session end) so that
-      // even long multi-day sessions have an up-to-date summary available
-      // for the NEXT conversation the user starts.
-      //
-      // summarizeSession() does an INSERT with ON CONFLICT DO UPDATE keyed on
-      // (userId, sessionId), so calling it multiple times is safe — it simply
-      // overwrites the previous summary with a fresher one.
-      //
+      // ── 5c. Summarize session (fire-and-forget) ───────────────────────────
+      // Anche le sessioni voice vengono riassunte — così il contesto
+      // di una conversazione vocale è disponibile nella sessione successiva.
       if (targetSessionId && fullHistory.length >= MIN_MESSAGES_TO_SUMMARIZE) {
         summarizeSession(userId, targetSessionId, fullHistory).catch((err) => {
           console.warn("[chat] session summarization failed (non-critical):", err);
