@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ─── 1. Typecheck ────────────────────────────────────────────────────────────
+  # ─── 1. Typecheck ────────────────────────────────────────────────────────────────────
   typecheck:
     name: TypeScript typecheck
     runs-on: ubuntu-latest
@@ -24,7 +24,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
 
-  # ─── 2. Unit test (Vitest) ───────────────────────────────────────────────────
+  # ─── 2. Unit test (Vitest) ────────────────────────────────────────────────────────────────
   unit-tests:
     name: Unit tests (Vitest)
     runs-on: ubuntu-latest
@@ -41,6 +41,9 @@ jobs:
           NODE_ENV: test
           JWT_SECRET: ci-jwt-secret-32-chars-minimum!
           ADMIN_KEY: ci-admin-key
+          # Mock AI: disabilita completamente le chiamate a provider esterni
+          # nei test unitari (le route AI usano lib/ai che rispetta questo flag)
+          USE_MOCK_AI: 'true'
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         if: always()
@@ -49,7 +52,7 @@ jobs:
           path: artifacts/api-server/coverage/
           retention-days: 7
 
-  # ─── 3. Integration test (Supertest) ────────────────────────────────────────
+  # ─── 3. Integration test (Supertest) ────────────────────────────────────────────────────
   integration-tests:
     name: Integration tests (Supertest)
     runs-on: ubuntu-latest
@@ -85,8 +88,39 @@ jobs:
           JWT_SECRET: ci-jwt-secret-32-chars-minimum!
           ADMIN_KEY: ci-admin-key
           AI_AGENTS_URL: http://localhost:8000
+          # ─ Mock AI ────────────────────────────────────────────────────────────
+          # USE_MOCK_AI=true intercetta TUTTE le chiamate AI nel processo Express
+          # prima che raggiungano Groq/Anthropic/OpenAI/Google.
+          # Il test ai-router.test.ts verifica esplicitamente che fetch non venga
+          # mai chiamato verso api.openai.com, api.anthropic.com, api.groq.com.
+          # Costo API per integration test: 0€.
+          USE_MOCK_AI: 'true'
+          # Le API key non servono con USE_MOCK_AI=true.
+          # Le lasciamo vuote per evitare falsi negativi da SDK che validano la chiave
+          # al momento dell'import (non della chiamata).
+          OPENAI_API_KEY: 'mock-not-used'
+          ANTHROPIC_API_KEY: 'mock-not-used'
+          GROQ_API_KEY: 'mock-not-used'
 
-  # ─── 4. E2E test (Playwright) ────────────────────────────────────────────────
+  # ─── 4. Python AI Agents test (pytest) ───────────────────────────────────────────────
+  python-tests:
+    name: Python ML tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Install Python dependencies
+        run: pip install -r artifacts/ai-agents/requirements.txt
+      - name: Run pytest ML module
+        run: |
+          cd artifacts/ai-agents
+          pytest ml/tests/ -v --tb=short
+        env:
+          # Nessuna API key necessaria per i test ML (scikit-learn, no LLM)
+          PYTHONPATH: '.'
+
+  # ─── 5. E2E test (Playwright) ───────────────────────────────────────────────────────────
   e2e-tests:
     name: E2E tests (Playwright)
     runs-on: ubuntu-latest
@@ -117,26 +151,53 @@ jobs:
         run: pnpm --filter @workspace/db exec drizzle-kit push
         env:
           DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_e2e
+      - name: Seed E2E test user
+        # Crea l'utente e2e@northstar.it per i test Playwright
+        # Lo script legge E2E_USER_EMAIL e E2E_USER_PASSWORD da env
+        run: |
+          pnpm --filter @workspace/api-server run seed:e2e 2>/dev/null || \
+          echo 'seed:e2e script non presente, skip (utente creato da migration)'
+        env:
+          DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_e2e
+          E2E_USER_EMAIL: e2e@northstar.it
+          E2E_USER_PASSWORD: E2ePassword123!
       - name: Build API server
         run: pnpm --filter @workspace/api-server run build
       - name: Start services
         run: |
-          PORT=8080 DATABASE_URL=postgresql://northstar:northstar@localhost:5432/northstar_e2e \
-          JWT_SECRET=ci-jwt-secret-32-chars-minimum! ADMIN_KEY=ci-admin-key \
+          PORT=8080 \
+          DATABASE_URL=postgresql://northstar:northstar@localhost:5432/northstar_e2e \
+          JWT_SECRET=ci-jwt-secret-32-chars-minimum! \
+          ADMIN_KEY=ci-admin-key \
           AI_AGENTS_URL=http://localhost:8000 \
+          USE_MOCK_AI=true \
+          OPENAI_API_KEY=mock-not-used \
+          ANTHROPIC_API_KEY=mock-not-used \
+          GROQ_API_KEY=mock-not-used \
           node artifacts/api-server/dist/index.mjs &
 
           PORT=5000 pnpm --filter @workspace/orientamento run build
           pnpm exec serve -s artifacts/orientamento/dist -l 5000 &
 
-          # Aspetta che i servizi siano pronti
-          npx wait-on http://localhost:8080/api/health http://localhost:5000 --timeout 60000
+          # Attende che i servizi siano pronti (health check avanzato)
+          npx wait-on \
+            http://localhost:8080/api/health/live \
+            http://localhost:8080/api/health/ready \
+            http://localhost:5000 \
+            --timeout 60000
       - name: Run Playwright E2E
         run: pnpm test:e2e
         env:
           BASE_URL: http://localhost:5000
           API_URL: http://localhost:8080
-          CI: true
+          E2E_USER_EMAIL: e2e@northstar.it
+          E2E_USER_PASSWORD: E2ePassword123!
+          CI: 'true'
+          # ─ Mock AI in E2E ──────────────────────────────────────────────────
+          # Il server Express è già avviato con USE_MOCK_AI=true qui sopra.
+          # Playwright non ha bisogno di questa variabile direttamente,
+          # ma la ripetiamo per chiarezza nei log del runner.
+          USE_MOCK_AI: 'true'
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
         if: failure()
@@ -144,3 +205,10 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+      - name: Upload Playwright trace (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 3
