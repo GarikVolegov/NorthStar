@@ -1,28 +1,29 @@
-// Growth Agent
-export * from "./growth-agent/GrowthAnalyticsDashboard";
-export * from "./growth-agent/GrowthChatInput";
-export * from "./growth-agent/GrowthChatMessage";
-export * from "./growth-agent/GrowthChatPanel";
-export * from "./growth-agent/GrowthMemoryPanel";
-export * from "./growth-agent/GrowthProfilePage";
-export * from "./growth-agent/ParallelStatusPanel";
-export * from "./growth-agent/useGrowthAnalytics";
-export * from "./growth-agent/useGrowthChat";
-export * from "./growth-agent/useGrowthMemory";
-export * from "./growth-agent/useWendyVoiceSession";   // ← Phase 3
+// growth-agent — UI components
+export { GrowthChatPanel }          from "./growth-agent/GrowthChatPanel";
+export { GrowthChatInput }          from "./growth-agent/GrowthChatInput";
+export { GrowthChatMessage }        from "./growth-agent/GrowthChatMessage";
+export { GrowthMemoryPanel }        from "./growth-agent/GrowthMemoryPanel";
+export { GrowthProfilePage }        from "./growth-agent/GrowthProfilePage";
+export { GrowthAnalyticsDashboard } from "./growth-agent/GrowthAnalyticsDashboard";
+export { ParallelStatusPanel }      from "./growth-agent/ParallelStatusPanel";
 
-// Discovery Agent System
-export * from "./discovery/DiscoveryFeedPage";
-export * from "./discovery/DiscoveryItemCard";
-export * from "./discovery/DiscoveryItemSkeleton";
-export * from "./discovery/useDiscoveryFeed";
+// Visual feedback (Phase 4)
+export { WendyTypingIndicator }     from "./growth-agent/WendyTypingIndicator";
+export { WendyThinkingStatus }      from "./growth-agent/WendyThinkingStatus";
+export { WendyToast }               from "./growth-agent/WendyToast";
+export { useWendyToast }            from "./growth-agent/useWendyToast";
 
-// Admin
-export * from "./admin/AdminDashboard";
-export * from "./admin/AdminOverviewCards";
-export * from "./admin/AdminCollectorPanel";
-export * from "./admin/AdminEnricherPanel";
-export * from "./admin/AdminAgentHealth";
-export * from "./admin/AdminRecentItems";
-export * from "./admin/DiscoverySourcesManager";
-export * from "./admin/useAdminData";
+// hooks
+export { useGrowthChat }            from "./growth-agent/useGrowthChat";
+export { useGrowthMemory }          from "./growth-agent/useGrowthMemory";
+export { useGrowthAnalytics }       from "./growth-agent/useGrowthAnalytics";
+export { useWendyVoiceSession }     from "./growth-agent/useWendyVoiceSession";
+
+// audio
+export { useVoiceStream }           from "./audio/useVoiceStream";
+
+// discovery
+export { DiscoveryWizard }          from "./discovery/DiscoveryWizard";
+
+// admin
+export { AdminPanel }               from "./admin/AdminPanel";

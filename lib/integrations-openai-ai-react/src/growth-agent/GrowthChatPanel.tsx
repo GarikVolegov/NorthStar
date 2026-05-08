@@ -1,22 +1,28 @@
 /**
- * GrowthChatPanel v2 — Phase 3 voice gamification integration.
+ * GrowthChatPanel v3 — Visual Feedback & Error Handling (Phase 4).
  *
- * CHANGES vs v1:
- * - Importa useWendyVoiceSession invece di useGrowthChat direttamente
- * - Bottone microfono nel chat input per avviare/terminare la sessione vocale
- * - Mostra XpRewardToast quando una sessione vocale si completa
- * - Mostra XpStreakBadge compact in alto a destra nel pannello
- * - Tutto il resto (testo chat, analytics, memoria) invariato
+ * CHANGES vs v2:
+ * - WendyTypingIndicator: shown while isStreaming and no statusMessage active
+ * - WendyThinkingStatus:  shown when statusMessage is set (long-running request)
+ * - useWendyToast + WendyToast: toast queue for network/API errors
+ * - Error banner: now includes a "🔄 Riprova" button when lastInput is available
+ * - lastInput ref: tracks last sent text to enable retry without resetting session
+ * - prevErrorRef: deduplicates toast pushes when same error persists across renders
+ * - All other behaviour (voice, gamification, text chat) unchanged
  */
 "use client";
 
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import { useWendyVoiceSession } from "./useWendyVoiceSession";
-import { useVoiceStream }       from "../audio/useVoiceStream";
-import { GrowthChatMessage }    from "./GrowthChatMessage";
-import { GrowthChatInput }      from "./GrowthChatInput";
-import { XpStreakBadge }        from "@/components/gamification/XpStreakBadge";
-import { XpRewardToast }        from "@/components/gamification/XpRewardToast";
+import { useWendyVoiceSession }  from "./useWendyVoiceSession";
+import { useVoiceStream }        from "../audio/useVoiceStream";
+import { GrowthChatMessage }     from "./GrowthChatMessage";
+import { GrowthChatInput }       from "./GrowthChatInput";
+import { WendyTypingIndicator }  from "./WendyTypingIndicator";
+import { WendyThinkingStatus }   from "./WendyThinkingStatus";
+import { useWendyToast }         from "./useWendyToast";
+import { WendyToast }            from "./WendyToast";
+import { XpStreakBadge }         from "@/components/gamification/XpStreakBadge";
+import { XpRewardToast }         from "@/components/gamification/XpRewardToast";
 
 export interface GrowthChatPanelProps {
   token: string;
@@ -36,6 +42,11 @@ export function GrowthChatPanel({
 }: GrowthChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [inputValue, setInputValue] = useState("");
+  /** Last text sent by user — kept for retry */
+  const [lastInput, setLastInput] = useState<string | null>(null);
+
+  // ── Toast system ──────────────────────────────────────────────────────
+  const { toasts, addToast, removeToast } = useWendyToast(5000);
 
   // ── Wendy voice session (chat + gamification bridge) ──────────────────
   const wendy = useWendyVoiceSession({ token, userContext, workletPath });
@@ -48,13 +59,30 @@ export function GrowthChatPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [wendy.messages]);
 
+  // ── Surface new errors as toasts (dedup via prevErrorRef) ─────────────
+  const prevErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    const current = wendy.error ?? wendy.sessionError ?? null;
+    if (current && current !== prevErrorRef.current) {
+      addToast(current, "error");
+    }
+    prevErrorRef.current = current;
+  }, [wendy.error, wendy.sessionError, addToast]);
+
   // ── Text message send ──────────────────────────────────────────────────
   const handleSend = useCallback(() => {
     const text = inputValue.trim();
     if (!text || wendy.isStreaming) return;
+    setLastInput(text);
     setInputValue("");
-    void wendy.sendMessage(text);    // text mode: voiceMode = false (default)
+    void wendy.sendMessage(text);
   }, [inputValue, wendy]);
+
+  // ── Retry last message ────────────────────────────────────────────────
+  const handleRetry = useCallback(() => {
+    if (!lastInput || wendy.isStreaming) return;
+    void wendy.sendMessage(lastInput);
+  }, [lastInput, wendy]);
 
   // ── Voice toggle ──────────────────────────────────────────────────────
   const handleVoiceToggle = useCallback(async () => {
@@ -65,11 +93,16 @@ export function GrowthChatPanel({
     }
   }, [wendy]);
 
+  const hasError = Boolean(wendy.error ?? wendy.sessionError);
+  /** Show bounce dots only while streaming AND no status text is active */
+  const showTypingDots = wendy.isStreaming && !wendy.statusMessage;
+
   return (
     <>
+      {/* ── Panel wrapper (relative for WendyToast positioning) ── */}
       <div
         className={[
-          "flex flex-col h-full min-h-0 rounded-2xl border border-border bg-card overflow-hidden",
+          "relative flex flex-col h-full min-h-0 rounded-2xl border border-border bg-card overflow-hidden",
           className,
         ].join(" ")}
       >
@@ -87,7 +120,6 @@ export function GrowthChatPanel({
               </span>
             )}
           </div>
-          {/* Streak badge compact */}
           <XpStreakBadge compact />
         </div>
 
@@ -99,19 +131,33 @@ export function GrowthChatPanel({
               <p>Scrivi o parla con Wendy</p>
             </div>
           )}
+
           {wendy.messages.map((msg) => (
             <GrowthChatMessage key={msg.id} message={msg} />
           ))}
-          {wendy.statusMessage && (
-            <div className="text-xs text-muted-foreground italic px-2">{wendy.statusMessage}</div>
-          )}
+
+          {/* Thinking pill — visible during long-running status events */}
+          <WendyThinkingStatus message={wendy.statusMessage ?? null} />
+
+          {/* Typing indicator — visible while streaming, no status text */}
+          {showTypingDots && <WendyTypingIndicator />}
+
           <div ref={messagesEndRef} />
         </div>
 
-        {/* ── Error ── */}
-        {(wendy.error ?? wendy.sessionError) && (
-          <div className="px-4 py-2 text-xs text-red-500 bg-red-50 dark:bg-red-950/30 border-t border-red-200 dark:border-red-800">
-            ⚠️ {wendy.error ?? wendy.sessionError}
+        {/* ── Error banner + Retry button ── */}
+        {hasError && (
+          <div className="flex items-center gap-3 px-4 py-2 text-xs text-red-500 bg-red-50 dark:bg-red-950/30 border-t border-red-200 dark:border-red-800 shrink-0">
+            <span className="flex-1">⚠️ {wendy.error ?? wendy.sessionError}</span>
+            {lastInput && (
+              <button
+                onClick={handleRetry}
+                disabled={wendy.isStreaming}
+                className="shrink-0 rounded-lg border border-red-300 dark:border-red-700 px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors disabled:opacity-50"
+              >
+                🔄 Riprova
+              </button>
+            )}
           </div>
         )}
 
@@ -145,6 +191,9 @@ export function GrowthChatPanel({
             </button>
           </div>
         </div>
+
+        {/* ── Toast notifications (absolute inside panel) ── */}
+        <WendyToast toasts={toasts} onRemove={removeToast} />
       </div>
 
       {/* ── XP Reward Toast ── */}
