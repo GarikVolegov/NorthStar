@@ -78,6 +78,13 @@ artifacts/
           CvDownloadMenu.tsx     # dropdown download PDF / DOCX / JSON
       hooks/             # useSSEStream, useTTS, useDiscoveryFeed...
       lib/               # brand.ts, chart-theme.ts, queryClient...
+      i18n.ts            # setup i18next (5 lingue: it, en, es, fr, de)
+      locales/
+        it/translation.json
+        en/translation.json
+        es/translation.json
+        fr/translation.json
+        de/translation.json
   api-server/            # Express API (porta 8080)
     src/
       routes/            # 40+ route files organizzati per dominio
@@ -105,6 +112,131 @@ lib/
   api-client-react/      # TanStack React Query hooks generati
 e2e/                     # Playwright specs (auth, riasec, admin, objectives)
 ```
+
+---
+
+## Internazionalizzazione (i18n) — Regola obbligatoria
+
+> **⚠️ REGOLA FONDAMENTALE: ogni componente React che mostra testo visibile all’utente DEVE usare `useTranslation`. Non esistono stringhe hardcoded in italiano (o altra lingua) nel JSX.**
+
+L’app supporta **5 lingue**: `it` (default/fallback) · `en` · `es` · `fr` · `de`.
+Setup in `src/i18n.ts`; file di traduzione in `src/locales/{lang}/translation.json`.
+
+### Regole per ogni componente frontend
+
+1. **Importa sempre `useTranslation`**
+   ```tsx
+   import { useTranslation } from "react-i18next";
+
+   export function MioComponente() {
+     const { t } = useTranslation();
+     return <h1>{t("sezione.titolo")}</h1>;
+   }
+   ```
+
+2. **Zero stringhe hardcoded nel JSX** — qualsiasi testo visibile (label, placeholder, tooltip, messaggio di errore, bottone, heading, badge, descrizione) deve passare da `t("chiave")`.
+   ```tsx
+   // ❌ VIETATO
+   <Button>Salva</Button>
+   <p>Nessun dato trovato.</p>
+
+   // ✅ CORRETTO
+   <Button>{t("common.save")}</Button>
+   <p>{t("common.noData")}</p>
+   ```
+
+3. **Chiavi strutturate per dominio** — usa namespace a punti per raggruppare le chiavi logicamente:
+   ```
+   common.*          — azioni generiche (save, cancel, delete, loading, error…)
+   cv.*              — CV Builder (upload, generate, edit, download…)
+   dashboard.*       — Dashboard utente
+   discovery.*       — Feed Discovery
+   onboarding.*      — Wizard onboarding
+   auth.*            — Login, registrazione
+   admin.*           — Admin panel
+   profile.*         — Pagina profilo
+   settings.*        — Impostazioni lingua/profilo
+   errors.*          — Messaggi di errore API
+   ```
+
+4. **Aggiorna sempre tutti e 5 i file** — quando aggiungi nuove chiavi, le aggiungi in tutti i file:
+   - `src/locales/it/translation.json` (lingua base, testo definitivo)
+   - `src/locales/en/translation.json`
+   - `src/locales/es/translation.json`
+   - `src/locales/fr/translation.json`
+   - `src/locales/de/translation.json`
+
+   Se non conosci la traduzione esatta, usa la chiave come valore temporaneo (es. `"cv.save": "[cv.save]"`) e aggiungi un commento TODO nel file. Non lasciare mai una chiave mancante in un file — causerebbe il render della chiave grezza nell’UI.
+
+5. **Interpolazione variabili**
+   ```tsx
+   // Nel JSON: "cv.generatedAt": "Generato il {{date}}"
+   t("cv.generatedAt", { date: formatDate(cv.uploadedAt) })
+   ```
+
+6. **Plurali**
+   ```tsx
+   // Nel JSON:
+   // "cv.experienceCount": "{{count}} esperienza"
+   // "cv.experienceCount_other": "{{count}} esperienze"
+   t("cv.experienceCount", { count: cv.experience.length })
+   ```
+
+7. **`title`, `aria-label`, `placeholder` — anch’essi tradotti**
+   ```tsx
+   <input placeholder={t("cv.namePlaceholder")} />
+   <button title={t("cv.deleteExperience")} aria-label={t("cv.deleteExperience")} />
+   ```
+
+8. **Non tradurre nel backend** — le API restituiscono dati grezzi (chiavi, codici, valori numerici). La traduzione avviene sempre e solo nel frontend tramite `t()`.
+
+9. **Componenti condivisi (`ui/`)** — i componenti Radix/shadcn di base non hanno testo proprio. I wrapper custom che aggiungono label o messaggi devono comunque ricevere il testo tradotto come prop, non hardcoded.
+   ```tsx
+   // ❌ VIETATO in un wrapper
+   <ToastMessage>Operazione completata</ToastMessage>
+
+   // ✅ CORRETTO: la stringa viene dall’esterno già tradotta
+   <ToastMessage>{t("common.success")}</ToastMessage>
+   ```
+
+10. **Revisione PR** — ogni PR che aggiunge o modifica componenti UI deve includere le chiavi nei 5 file `translation.json`. Una PR con stringhe hardcoded in JSX viene rifiutata.
+
+### Struttura minima chiavi comuni (`common.*`)
+
+```jsonc
+// src/locales/it/translation.json (estratto)
+{
+  "common": {
+    "save":      "Salva",
+    "cancel":    "Annulla",
+    "delete":    "Elimina",
+    "edit":      "Modifica",
+    "close":     "Chiudi",
+    "loading":   "Caricamento...",
+    "error":     "Si è verificato un errore",
+    "success":   "Operazione completata",
+    "noData":    "Nessun dato disponibile",
+    "add":       "Aggiungi",
+    "download":  "Scarica",
+    "generate":  "Genera",
+    "upload":    "Carica",
+    "search":    "Cerca",
+    "confirm":   "Conferma",
+    "back":      "Indietro",
+    "next":      "Avanti",
+    "optional":  "opzionale"
+  }
+}
+```
+
+### Checklist per ogni nuovo componente
+
+- [ ] `useTranslation()` importato e usato
+- [ ] Zero stringhe visibili hardcoded in JSX
+- [ ] Chiavi aggiunte in tutti e 5 i file `translation.json`
+- [ ] `placeholder`, `title`, `aria-label` usano `t()`
+- [ ] Messaggi di errore/successo usano chiavi `errors.*` o `common.*`
+- [ ] Valori dinamici (date, numeri, nomi) usano interpolazione `{{var}}`
 
 ---
 
@@ -349,6 +481,7 @@ Layout: sidebar sticky su desktop, bottom tab bar su mobile.
 - **CORS:** ristretto a `CORS_ORIGIN` env var in produzione (default: `http://localhost:5000`)
 - **Auth rate limiting:** `/auth/*` ha rate limiter dedicato (5 req/15min per IP) via `authRateLimiter`
 - **CV DOCX:** generazione server-side con libreria `docx` — dipendenza da aggiungere con `pnpm add docx --filter api-server`
+- **i18n:** `i18next` + `react-i18next` + `i18next-browser-languagedetector`; fallback `it`; lingua salvata in `localStorage` con chiave `northstar_lang`
 
 ---
 
@@ -368,6 +501,10 @@ Layout: sidebar sticky su desktop, bottom tab bar su mobile.
 - **AI_MODEL:** configura il modello OpenAI per gli agenti orchestratore. L'enricher usa sempre `gpt-4o-mini` direttamente.
 - **CV editor:** `CvEditorDrawer` carica i dati via `GET /api/cv/:userId` al click dell'icona matita — se il CV generato non esiste ancora, il bottone è nascosto
 - **CV DOCX install:** dopo ogni clone/reset eseguire `pnpm add docx --filter api-server` se la dipendenza non è nel `package.json` del server
+- **i18n — chiave mancante:** se una chiave manca in un file `translation.json`, i18next renderizza la chiave grezza nell’UI (es. `"cv.save"`). Aggiungere sempre la chiave a tutti e 5 i file prima di fare commit
+- **i18n — stringhe hardcoded:** qualsiasi stringa visibile hardcoded in JSX è un bug di internazionalizzazione. Usare sempre `t("chiave")`. Vedi sezione **Internazionalizzazione** per le regole complete
+- **i18n — lingua default:** `it` (italiano). Il fallback è sempre italiano se una chiave manca nelle altre lingue
+- **i18n — cambio lingua:** `i18n.changeLanguage(lang)` da qualsiasi componente; salvato automaticamente in `localStorage` con chiave `northstar_lang`
 
 ---
 
@@ -381,6 +518,9 @@ Layout: sidebar sticky su desktop, bottom tab bar su mobile.
 | CV components | `artifacts/orientamento/src/components/cv/` |
 | Frontend routes | `artifacts/orientamento/src/App.tsx` |
 | Cron jobs | `artifacts/api-server/src/jobs/cron.ts` |
+| i18n setup | `artifacts/orientamento/src/i18n.ts` |
+| Traduzioni (it) | `artifacts/orientamento/src/locales/it/translation.json` |
+| Traduzioni (en/es/fr/de) | `artifacts/orientamento/src/locales/{lang}/translation.json` |
 | Discovery agents | `lib/integrations-openai-ai-server/src/discovery-agent/` |
 | Admin UI components | `lib/integrations-openai-ai-react/src/admin/` |
 | Discovery UI | `lib/integrations-openai-ai-react/src/discovery/` |
