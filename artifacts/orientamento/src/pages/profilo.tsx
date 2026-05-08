@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, User, Mail, Calendar, CheckCircle2, KeyRound, Sparkles, ShieldCheck, Globe, Lock, Bookmark, X, Users, Briefcase, Trophy, Flame, Award, Compass, TrendingUp, Camera, Trash2, Linkedin } from "lucide-react";
+import { Loader2, User, Mail, Calendar, CheckCircle2, KeyRound, Sparkles, ShieldCheck, Globe, Lock, Bookmark, X, Users, Briefcase, Trophy, Flame, Award, Compass, TrendingUp, Camera, Trash2, Linkedin, FileText } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -24,6 +24,7 @@ import { CertificationsSection } from "@/components/CertificationsSection";
 import { JourneyScoreWidget } from "@/components/JourneyScoreWidget";
 import { LinkedInImportWizard } from "@/components/LinkedInImportWizard";
 import { NftCertificateGallery } from "@/components/NftCertificateGallery";
+import { CvSection } from "@/components/CvSection";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -744,6 +745,10 @@ export default function Profilo() {
             />
           )}
           <JourneyScoreWidget userId={user.id} />
+
+          {/* ── CV Section ── */}
+          <CvSection userId={user.id} />
+
           <UserModeCard userId={user.id} />
           <WorkModeCard userId={user.id} />
           <TestHistoryCard />
