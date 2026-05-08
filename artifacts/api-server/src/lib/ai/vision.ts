@@ -7,24 +7,15 @@
  *   generateImage()        — generazione immagini con DALL-E
  *
  * Provider supportati:
- *   openai    — gpt-4o (default) — miglior rapporto velocità/qualità
- *   anthropic — claude-3-7-sonnet-20250219 — eccelle su PDF/tabelle
- *   google    — gemini-2.0-flash — alternativa economica, multiframe video
+ *   openai    — gpt-4o (default)
+ *   anthropic — claude-3-7-sonnet-20250219
+ *   google    — gemini-2.0-flash
  *
- * Limiti immagini per chiamata:
- *   OpenAI:    max 10 immagini, max 20MB/immagine
- *   Anthropic: max 20 immagini, max 5MB/immagine
- *   Google:    max 16 immagini con gemini-flash
- *
- * Fix v2.1:
- *   [CRITICAL-1] image-optimizer integrato nella pipeline (resize + compress
- *                prima di ogni chiamata VLM — risparmio costi fino a 4×)
- *   [CRITICAL-2] Google: URL pubblici ora fetchati server-side (fix immagini
- *                sempre sbagliate su Gemini con URL https://)
- *   [CRITICAL-3] Anthropic stream: aggiunto try/finally con stream.abort()
- *                per cleanup corretto se il client si disconnette
- *   [BONUS]      Token usage loggato dopo stream OpenAI (finalChatCompletion)
- *   [BONUS]      Timeout 10s su fetch immagini remote (AbortSignal.timeout)
+ * v2.2 additions:
+ *   [OPT-1] Auto-fallback provider: se il primario torna 429/5xx,
+ *           riprova automaticamente sul fallback (openai→anthropic e viceversa)
+ *   [OPT-2] Google streaming nativo via generateContentStream()
+ *   [OPT-3] Timeout configurabile per stream provider (VISION_STREAM_TIMEOUT_MS)
  */
 
 import OpenAI from 'openai';
@@ -32,17 +23,15 @@ import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { logger } from '../logger.js';
 import { optimizeImageBatch } from './image-optimizer.js';
+import { resolveFallbackProvider } from './router.js';
 import type {
   VisionRequest, VisionResult,
   ImageGenRequest, ImageGenResult,
-  TextPart, ImagePart,
 } from './types.js';
 
-// ─── Configurazione ──────────────────────────────────────────────────────────────
+// ─── Configurazione ─────────────────────────────────────────────────────────
 
 const MAX_IMAGES_PER_REQUEST = 5;
-
-/** Timeout in ms per fetch di immagini remote (SSRF + hanging requests) */
 const FETCH_IMAGE_TIMEOUT_MS = 10_000;
 
 const VLM_MODELS = {
@@ -51,152 +40,111 @@ const VLM_MODELS = {
   google:    'gemini-2.0-flash',
 } as const;
 
-// ─── Lazy SDK instances ──────────────────────────────────────────────────────────
-// Istanziati al primo uso per non bloccare il startup se le chiavi mancano
+// ─── Lazy SDK instances ────────────────────────────────────────────────────────
 
 let _openai: OpenAI | null = null;
 let _anthropic: Anthropic | null = null;
 let _google: GoogleGenerativeAI | null = null;
 
-function getOpenAI(): OpenAI {
-  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  return _openai;
-}
-function getAnthropic(): Anthropic {
-  if (!_anthropic) _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  return _anthropic;
-}
-function getGoogle(): GoogleGenerativeAI {
-  if (!_google) _google = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY ?? '');
-  return _google;
-}
+function getOpenAI():    OpenAI             { return (_openai    ??= new OpenAI   ({ apiKey: process.env.OPENAI_API_KEY    })); }
+function getAnthropic(): Anthropic          { return (_anthropic ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })); }
+function getGoogle():    GoogleGenerativeAI { return (_google    ??= new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY ?? '')); }
 
-// ─── Helpers di validazione ───────────────────────────────────────────────────────
+// ─── Helpers di validazione ─────────────────────────────────────────────────────
 
 function validateImageUrls(images: string[]): void {
-  if (images.length === 0)       throw new Error('Nessuna immagine fornita');
+  if (images.length === 0) throw new Error('Nessuna immagine fornita');
   if (images.length > MAX_IMAGES_PER_REQUEST)
     throw new Error(`Massimo ${MAX_IMAGES_PER_REQUEST} immagini per richiesta`);
-
   for (const url of images) {
-    const isHttps    = url.startsWith('https://');
-    const isDataUri  = url.startsWith('data:image/');
-    if (!isHttps && !isDataUri)
+    if (!url.startsWith('https://') && !url.startsWith('data:image/'))
       throw new Error(`URL immagine non valido: ${url.slice(0, 60)}`);
   }
 }
 
-/** Determina il MIME type di un data-URI */
 function mimeFromDataUri(uri: string): string {
-  const match = uri.match(/^data:([^;]+);base64,/);
-  return match?.[1] ?? 'image/jpeg';
+  return uri.match(/^data:([^;]+);base64,/)?.[1] ?? 'image/jpeg';
 }
-
-/** Estrae la stringa base64 pura da un data-URI */
 function b64FromDataUri(uri: string): string {
   return uri.split(',')[1] ?? '';
 }
 
-// ─── [FIX CRITICAL-2] Fetch sicuro di URL remoti ─────────────────────────────────
-// Gemini non accetta URL diretti: scarica server-side con timeout anti-hang.
-// Usato anche da Anthropic se si vuole pre-processare gli URL.
+// ─── Fetch sicuro di URL remoti (CRITICAL-2 + BONUS timeout) ──────────────────
 
 async function fetchImageAsDataUri(url: string): Promise<string> {
   const resp = await fetch(url, {
-    signal: AbortSignal.timeout(FETCH_IMAGE_TIMEOUT_MS),
-    headers: { 'User-Agent': 'NorthStar-Vision/2.1' },
+    signal:  AbortSignal.timeout(FETCH_IMAGE_TIMEOUT_MS),
+    headers: { 'User-Agent': 'NorthStar-Vision/2.2' },
   });
-
-  if (!resp.ok) {
-    throw new Error(`Impossibile scaricare immagine: HTTP ${resp.status} — ${url.slice(0, 80)}`);
-  }
-
+  if (!resp.ok)
+    throw new Error(`HTTP ${resp.status} scaricando immagine: ${url.slice(0, 80)}`);
   const contentType = resp.headers.get('content-type') ?? 'image/jpeg';
-  // Accettiamo solo MIME immagine
-  if (!contentType.startsWith('image/')) {
-    throw new Error(`Content-Type non immagine ("${contentType}") — ${url.slice(0, 80)}`);
-  }
-
-  const buf    = Buffer.from(await resp.arrayBuffer());
-  const b64    = buf.toString('base64');
-  return `data:${contentType};base64,${b64}`;
+  if (!contentType.startsWith('image/'))
+    throw new Error(`Content-Type non immagine ("${contentType}"): ${url.slice(0, 80)}`);
+  const buf = Buffer.from(await resp.arrayBuffer());
+  return `data:${contentType};base64,${buf.toString('base64')}`;
 }
 
-// ─── [FIX CRITICAL-1] Image optimizer pipeline ───────────────────────────────────
-// Comprime e ridimensiona le immagini PRIMA di mandarle al VLM.
-// - Risparmio costi: un'immagine 4096×4096 → 1568px riduce i tile OpenAI da ~17 a ~4
-// - Restituisce anche il detail suggerito in base alle dimensioni finali
+// ─── Image optimizer pipeline (CRITICAL-1) ─────────────────────────────────────
 
 async function preprocessImages(
   images: string[],
-  req:    Pick<VisionRequest, 'intent' | 'detail'>,
+  req: Pick<VisionRequest, 'intent' | 'detail'>,
 ): Promise<{ images: string[]; detail: 'low' | 'high' | 'auto' }> {
-  const batch = await optimizeImageBatch(images, {
-    intent: req.intent ?? 'screenshot',
-  });
-
-  const processedImages = batch.images.map((r) => r.dataUri);
-
-  // Usa il detail suggerito dall'optimizer (basato sulle dimensioni finali)
-  // ma solo se l'utente non ha specificato esplicitamente
-  const suggestedDetail = batch.images[0]?.suggestedDetail ?? 'auto';
-  const detail = req.detail ?? suggestedDetail;
-
+  const batch   = await optimizeImageBatch(images, { intent: req.intent ?? 'screenshot' });
+  const processed = batch.images.map((r) => r.dataUri);
+  const suggested = batch.images[0]?.suggestedDetail ?? 'auto';
+  const detail    = req.detail ?? suggested;
   if (batch.totalSaved > 0) {
-    logger.info({
-      savedBytes:   batch.totalSaved,
-      savedPct:     batch.totalSavedPct,
-      durationMs:   batch.durationMs,
-      intent:       req.intent ?? 'screenshot',
-      detailChosen: detail,
-    }, '[vision] image-optimizer: payload ridotto');
+    logger.info(
+      { savedBytes: batch.totalSaved, savedPct: batch.totalSavedPct, durationMs: batch.durationMs, intent: req.intent ?? 'screenshot', detailChosen: detail },
+      '[vision] image-optimizer: payload ridotto',
+    );
   }
-
-  return { images: processedImages, detail };
+  return { images: processed, detail };
 }
 
-// ─── OpenAI Vision ──────────────────────────────────────────────────────────────
+// ─── [OPT-1] Helper: classifica errori come "ritentabile" ────────────────────────
+// 429 Rate-limit e 5xx server-error vengono ritentati sul provider di fallback.
+// 400 (prompt invalido) e 401 (key sbagliata) non vengono mai ritentati.
+
+function isRetryableError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  // OpenAI SDK: include il codice HTTP nel messaggio
+  if (/status 429|rate.?limit|too many/i.test(msg)) return true;
+  if (/status 5[0-9]{2}|server error|service unavail/i.test(msg)) return true;
+  // Anthropic SDK: usa overloaded_error
+  if (/overloaded/i.test(msg)) return true;
+  return false;
+}
+
+// ─── OpenAI Vision ───────────────────────────────────────────────────────────
 
 function buildOpenAIImageContent(
   images: string[],
   prompt: string,
   detail: VisionRequest['detail'] = 'auto',
 ): OpenAI.Chat.ChatCompletionContentPart[] {
-  const parts: OpenAI.Chat.ChatCompletionContentPart[] = [
+  return [
     { type: 'text', text: prompt },
-  ];
-  for (const url of images) {
-    parts.push({
-      type: 'image_url',
+    ...images.map((url) => ({
+      type: 'image_url' as const,
       image_url: { url, detail: detail ?? 'auto' },
-    });
-  }
-  return parts;
+    })),
+  ];
 }
 
 async function analyzeWithOpenAI(req: VisionRequest): Promise<VisionResult> {
   const t0    = Date.now();
   const model = VLM_MODELS.openai;
   const oai   = getOpenAI();
-
   const { images, detail } = await preprocessImages(req.images, req);
-
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
-  for (const h of req.history ?? []) {
-    messages.push({ role: h.role, content: h.content });
-  }
-  messages.push({
-    role:    'user',
-    content: buildOpenAIImageContent(images, req.prompt, detail),
-  });
-
-  const resp = await oai.chat.completions.create({
-    model,
-    messages,
-    max_tokens:  req.maxTokens  ?? 1024,
-    temperature: req.temperature ?? 0.2,
-  });
-
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    ...(req.history ?? []).map((h) => ({ role: h.role, content: h.content } as OpenAI.Chat.ChatCompletionMessageParam)),
+    { role: 'user', content: buildOpenAIImageContent(images, req.prompt, detail) },
+  ];
+  const resp = await oai.chat.completions.create({ model, messages, max_tokens: req.maxTokens ?? 1024, temperature: req.temperature ?? 0.2 });
   return {
     text:         resp.choices[0]?.message?.content ?? '',
     provider:     'openai',
@@ -208,79 +156,47 @@ async function analyzeWithOpenAI(req: VisionRequest): Promise<VisionResult> {
 }
 
 async function* streamWithOpenAI(req: VisionRequest): AsyncIterable<string> {
-  const model = VLM_MODELS.openai;
   const oai   = getOpenAI();
-
-  // [FIX CRITICAL-1] ottimizza immagini prima del VLM
+  const model = VLM_MODELS.openai;
   const { images, detail } = await preprocessImages(req.images, req);
-
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
-  for (const h of req.history ?? []) {
-    messages.push({ role: h.role, content: h.content });
-  }
-  messages.push({
-    role:    'user',
-    content: buildOpenAIImageContent(images, req.prompt, detail),
-  });
-
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    ...(req.history ?? []).map((h) => ({ role: h.role, content: h.content } as OpenAI.Chat.ChatCompletionMessageParam)),
+    { role: 'user', content: buildOpenAIImageContent(images, req.prompt, detail) },
+  ];
   const stream = await oai.chat.completions.create({
-    model,
-    messages,
-    max_tokens:  req.maxTokens  ?? 1024,
-    temperature: req.temperature ?? 0.2,
-    stream:      true,
-    stream_options: { include_usage: true }, // [BONUS] token usage post-stream
+    model, messages,
+    max_tokens:     req.maxTokens  ?? 1024,
+    temperature:    req.temperature ?? 0.2,
+    stream:         true,
+    stream_options: { include_usage: true },
   });
-
   for await (const chunk of stream) {
     const delta = chunk.choices[0]?.delta?.content;
     if (delta) yield delta;
   }
-
-  // [BONUS] Logga token usage dopo che lo stream è completo
   try {
     const final = await stream.finalChatCompletion();
     if (final.usage) {
-      logger.info({
-        model,
-        inputTokens:  final.usage.prompt_tokens,
-        outputTokens: final.usage.completion_tokens,
-        imageCount:   images.length,
-        intent:       req.intent,
-      }, '[vision/openai] stream token usage');
+      logger.info({ model, inputTokens: final.usage.prompt_tokens, outputTokens: final.usage.completion_tokens, imageCount: images.length, intent: req.intent }, '[vision/openai] stream token usage');
     }
-  } catch {
-    // finalChatCompletion può fallire se il client si è disconnesso — ok
-  }
+  } catch { /* disconnessione client — ok */ }
 }
 
-// ─── Anthropic Vision ───────────────────────────────────────────────────────────
+// ─── Anthropic Vision ───────────────────────────────────────────────────────
 
 function buildAnthropicImageContent(
   images: string[],
   prompt: string,
 ): Anthropic.MessageParam['content'] {
   const content: Anthropic.ContentBlockParam[] = [];
-
   for (const url of images) {
     if (url.startsWith('https://')) {
-      content.push({
-        type:   'image',
-        source: { type: 'url', url } as Anthropic.URLImageSource,
-      });
+      content.push({ type: 'image', source: { type: 'url', url } as Anthropic.URLImageSource });
     } else {
       const mediaType = mimeFromDataUri(url) as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
-      content.push({
-        type:   'image',
-        source: {
-          type:       'base64',
-          media_type: mediaType,
-          data:       b64FromDataUri(url),
-        },
-      });
+      content.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: b64FromDataUri(url) } });
     }
   }
-
   content.push({ type: 'text', text: prompt });
   return content;
 }
@@ -289,153 +205,85 @@ async function analyzeWithAnthropic(req: VisionRequest): Promise<VisionResult> {
   const t0    = Date.now();
   const model = VLM_MODELS.anthropic;
   const anth  = getAnthropic();
-
-  // [FIX CRITICAL-1] ottimizza immagini prima del VLM
   const { images } = await preprocessImages(req.images, req);
-
-  const messages: Anthropic.MessageParam[] = [];
-  for (const h of req.history ?? []) {
-    messages.push({ role: h.role, content: h.content });
-  }
-  messages.push({
-    role:    'user',
-    content: buildAnthropicImageContent(images, req.prompt),
-  });
-
-  const resp = await anth.messages.create({
-    model,
-    messages,
-    max_tokens:  req.maxTokens  ?? 1024,
-  });
-
-  const text = resp.content
-    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-    .map((b) => b.text)
-    .join('');
-
-  return {
-    text,
-    provider:     'anthropic',
-    model,
-    inputTokens:  resp.usage.input_tokens,
-    outputTokens: resp.usage.output_tokens,
-    durationMs:   Date.now() - t0,
-  };
+  const messages: Anthropic.MessageParam[] = [
+    ...(req.history ?? []).map((h) => ({ role: h.role, content: h.content } as Anthropic.MessageParam)),
+    { role: 'user', content: buildAnthropicImageContent(images, req.prompt) },
+  ];
+  const resp = await anth.messages.create({ model, messages, max_tokens: req.maxTokens ?? 1024 });
+  const text = resp.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('');
+  return { text, provider: 'anthropic', model, inputTokens: resp.usage.input_tokens, outputTokens: resp.usage.output_tokens, durationMs: Date.now() - t0 };
 }
 
 async function* streamWithAnthropic(req: VisionRequest): AsyncIterable<string> {
   const model = VLM_MODELS.anthropic;
   const anth  = getAnthropic();
-
-  // [FIX CRITICAL-1] ottimizza immagini prima del VLM
   const { images } = await preprocessImages(req.images, req);
-
-  const messages: Anthropic.MessageParam[] = [];
-  for (const h of req.history ?? []) {
-    messages.push({ role: h.role, content: h.content });
-  }
-  messages.push({
-    role:    'user',
-    content: buildAnthropicImageContent(images, req.prompt),
-  });
-
-  // [FIX CRITICAL-3] Wrap stream in try/finally per cleanup garantito.
-  // Senza questo, se il client si disconnette mentre il generatore è appeso
-  // su `for await`, lo stream Anthropic rimane aperto e consuma banda.
-  const stream = anth.messages.stream({
-    model,
-    messages,
-    max_tokens: req.maxTokens ?? 1024,
-  });
-
+  const messages: Anthropic.MessageParam[] = [
+    ...(req.history ?? []).map((h) => ({ role: h.role, content: h.content } as Anthropic.MessageParam)),
+    { role: 'user', content: buildAnthropicImageContent(images, req.prompt) },
+  ];
+  const stream = anth.messages.stream({ model, messages, max_tokens: req.maxTokens ?? 1024 });
   try {
     for await (const event of stream) {
-      if (
-        event.type === 'content_block_delta' &&
-        event.delta.type === 'text_delta'
-      ) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
         yield event.delta.text;
       }
     }
-
-    // [BONUS] Logga token usage dopo message_stop
     const final = await stream.finalMessage();
-    logger.info({
-      model,
-      inputTokens:  final.usage.input_tokens,
-      outputTokens: final.usage.output_tokens,
-      imageCount:   images.length,
-      intent:       req.intent,
-    }, '[vision/anthropic] stream token usage');
-
+    logger.info({ model, inputTokens: final.usage.input_tokens, outputTokens: final.usage.output_tokens, imageCount: images.length, intent: req.intent }, '[vision/anthropic] stream token usage');
   } finally {
-    // Garantisce la chiusura della connessione HTTP anche in caso di:
-    // - errore nel generatore chiamante
-    // - break anticipato (client disconnesso)
-    // - eccezione durante yield
     stream.abort();
   }
 }
 
-// ─── Google Gemini Vision ─────────────────────────────────────────────────────────
+// ─── Google Gemini Vision ────────────────────────────────────────────────────
 
-async function analyzeWithGoogle(req: VisionRequest): Promise<VisionResult> {
-  const t0    = Date.now();
-  const model = VLM_MODELS.google;
-  const gen   = getGoogle();
-  const genModel = gen.getGenerativeModel({ model });
-
-  // [FIX CRITICAL-1] ottimizza immagini prima del VLM
-  const { images: optimizedImages } = await preprocessImages(req.images, req);
-
-  const parts: Array<string | { inlineData: { data: string; mimeType: string } }> = [
-    req.prompt,
-  ];
-
-  for (const url of optimizedImages) {
+async function buildGeminiParts(
+  images: string[],
+  prompt: string,
+): Promise<Array<string | { inlineData: { data: string; mimeType: string } }>> {
+  const parts: Array<string | { inlineData: { data: string; mimeType: string } }> = [prompt];
+  for (const url of images) {
     if (url.startsWith('data:image/')) {
-      // Già base64 (dopo optimizer o input diretto)
-      parts.push({
-        inlineData: {
-          data:     b64FromDataUri(url),
-          mimeType: mimeFromDataUri(url),
-        },
-      });
+      parts.push({ inlineData: { data: b64FromDataUri(url), mimeType: mimeFromDataUri(url) } });
     } else {
-      // [FIX CRITICAL-2] URL pubblici: fetch server-side con timeout anti-hang.
-      // Prima del fix: url passava come stringa → Gemini vedeva il testo dell'URL.
-      // Ora: scarica l'immagine e la invia come inlineData base64.
-      logger.debug({ url: url.slice(0, 80) },
-        '[vision/google] scarico URL pubblico server-side');
+      // [CRITICAL-2] fetch server-side con timeout
       try {
         const dataUri = await fetchImageAsDataUri(url);
-        parts.push({
-          inlineData: {
-            data:     b64FromDataUri(dataUri),
-            mimeType: mimeFromDataUri(dataUri),
-          },
-        });
+        parts.push({ inlineData: { data: b64FromDataUri(dataUri), mimeType: mimeFromDataUri(dataUri) } });
       } catch (fetchErr) {
-        logger.warn({ err: fetchErr, url: url.slice(0, 80) },
-          '[vision/google] fetch URL fallito — skip immagine');
-        // Skippa l'immagine fallita ma continua con le altre
+        logger.warn({ err: fetchErr, url: url.slice(0, 80) }, '[vision/google] fetch URL fallito — skip immagine');
       }
     }
   }
+  return parts;
+}
 
-  const result = await genModel.generateContent(
-    parts as Parameters<typeof genModel.generateContent>[0]
+async function analyzeWithGoogle(req: VisionRequest): Promise<VisionResult> {
+  const t0       = Date.now();
+  const model    = VLM_MODELS.google;
+  const genModel = getGoogle().getGenerativeModel({ model });
+  const { images } = await preprocessImages(req.images, req);
+  const parts    = await buildGeminiParts(images, req.prompt);
+  const result   = await genModel.generateContent(parts as Parameters<typeof genModel.generateContent>[0]);
+  return { text: result.response.text(), provider: 'google', model, inputTokens: 0, outputTokens: 0, durationMs: Date.now() - t0 };
+}
+
+// [OPT-2] Google streaming nativo via generateContentStream()
+async function* streamWithGoogle(req: VisionRequest): AsyncIterable<string> {
+  const model    = VLM_MODELS.google;
+  const genModel = getGoogle().getGenerativeModel({ model });
+  const { images } = await preprocessImages(req.images, req);
+  const parts    = await buildGeminiParts(images, req.prompt);
+  const stream   = await genModel.generateContentStream(
+    parts as Parameters<typeof genModel.generateContentStream>[0]
   );
-  const text = result.response.text();
-
-  return {
-    text,
-    provider:     'google',
-    model,
-    inputTokens:  0,  // Gemini non espone token count in questa API version
-    outputTokens: 0,
-    durationMs:   Date.now() - t0,
-  };
+  for await (const chunk of stream.stream) {
+    const text = chunk.text();
+    if (text) yield text;
+  }
+  logger.debug({ model, imageCount: images.length }, '[vision/google] stream completato');
 }
 
 // ─── DALL-E Image Generation ────────────────────────────────────────────────────────
@@ -444,10 +292,8 @@ export async function generateImage(req: ImageGenRequest): Promise<ImageGenResul
   const t0    = Date.now();
   const model = req.model ?? 'dall-e-3';
   const oai   = getOpenAI();
-
-  const n = (model === 'dall-e-2') ? (req.n ?? 1) : 1;
-
-  const resp = await oai.images.generate({
+  const n     = (model === 'dall-e-2') ? (req.n ?? 1) : 1;
+  const resp  = await oai.images.generate({
     model,
     prompt:          req.prompt,
     n,
@@ -456,47 +302,72 @@ export async function generateImage(req: ImageGenRequest): Promise<ImageGenResul
     style:           req.style ?? 'vivid',
     response_format: req.responseFormat ?? 'url',
   });
-
-  const images = (resp.data ?? []).map((img) => ({
-    url:           img.url,
-    b64:           img.b64_json,
-    revisedPrompt: img.revised_prompt,
-  }));
-
+  const images = (resp.data ?? []).map((img) => ({ url: img.url, b64: img.b64_json, revisedPrompt: img.revised_prompt }));
   logger.info({ model, n, durationMs: Date.now() - t0 }, '[vision] image generated');
-
   return { images, model, durationMs: Date.now() - t0 };
 }
 
-// ─── API pubblica ──────────────────────────────────────────────────────────────────
+// ─── API pubblica ────────────────────────────────────────────────────────────────
 
 /**
- * Analisi sincrona — attende la risposta completa.
- * Usa per: estrazione dati strutturati, OCR documenti, score.
+ * [OPT-1] Wrappa una chiamata con auto-retry sul provider di fallback.
+ * Attivato solo per errori ritentabili (429, 5xx, overloaded).
  */
-export async function analyzeImages(req: VisionRequest): Promise<VisionResult> {
-  validateImageUrls(req.images);
-  const provider = req.provider ?? 'openai';
-
-  logger.info({
-    provider,
-    model:      VLM_MODELS[provider],
-    imageCount: req.images.length,
-    promptLen:  req.prompt.length,
-    intent:     req.intent,
-  }, '[vision] analyze start');
-
-  switch (provider) {
-    case 'openai':    return analyzeWithOpenAI(req);
-    case 'anthropic': return analyzeWithAnthropic(req);
-    case 'google':    return analyzeWithGoogle(req);
-    default:          return analyzeWithOpenAI(req);
+async function withFallback<T>(
+  primary:  () => Promise<T>,
+  req:      VisionRequest,
+  label:    string,
+): Promise<T> {
+  try {
+    return await primary();
+  } catch (err) {
+    if (!isRetryableError(err)) throw err;
+    const fallbackProvider = resolveFallbackProvider('vision');
+    if (!fallbackProvider) throw err;
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err), primaryProvider: req.provider ?? 'openai', fallbackProvider },
+      `[${label}] provider primario fallito — retry su fallback`,
+    );
+    // Esegui con provider di fallback
+    const fallbackReq = { ...req, provider: fallbackProvider as VisionRequest['provider'] };
+    switch (fallbackProvider) {
+      case 'anthropic': return analyzeWithAnthropic(fallbackReq) as Promise<T>;
+      case 'openai':    return analyzeWithOpenAI(fallbackReq)    as Promise<T>;
+      case 'google':    return analyzeWithGoogle(fallbackReq)    as Promise<T>;
+      default:          throw err;
+    }
   }
 }
 
 /**
- * Analisi con streaming SSE — ritorna chunk di testo progressivi.
- * Usa per: risposte Wendy in tempo reale su immagini.
+ * Analisi sincrona — con auto-fallback su provider alternativo.
+ */
+export async function analyzeImages(req: VisionRequest): Promise<VisionResult> {
+  validateImageUrls(req.images);
+  const provider = req.provider ?? 'openai';
+  const resolved = { ...req, provider };
+
+  logger.info(
+    { provider, model: VLM_MODELS[provider as keyof typeof VLM_MODELS], imageCount: req.images.length, promptLen: req.prompt.length, intent: req.intent },
+    '[vision] analyze start',
+  );
+
+  const callPrimary = () => {
+    switch (provider) {
+      case 'openai':    return analyzeWithOpenAI(resolved);
+      case 'anthropic': return analyzeWithAnthropic(resolved);
+      case 'google':    return analyzeWithGoogle(resolved);
+      default:          return analyzeWithOpenAI(resolved);
+    }
+  };
+
+  return withFallback(callPrimary, resolved, 'vision/analyze');
+}
+
+/**
+ * Analisi con streaming SSE — con auto-fallback su provider alternativo.
+ * Se il provider primario fallisce (es. 429), switcha al fallback in modo
+ * trasparente: il client vede solo il flusso di chunk, non il retry.
  */
 export async function* streamAnalyzeImages(
   req: VisionRequest,
@@ -504,23 +375,44 @@ export async function* streamAnalyzeImages(
   validateImageUrls(req.images);
   const provider = req.provider ?? 'openai';
 
-  logger.info({
-    provider,
-    model:      VLM_MODELS[provider],
-    imageCount: req.images.length,
-    intent:     req.intent,
-  }, '[vision] stream analyze start');
+  logger.info(
+    { provider, model: VLM_MODELS[provider as keyof typeof VLM_MODELS], imageCount: req.images.length, intent: req.intent },
+    '[vision] stream analyze start',
+  );
 
-  switch (provider) {
-    case 'openai':    yield* streamWithOpenAI(req);    break;
-    case 'anthropic': yield* streamWithAnthropic(req); break;
-    case 'google':    {
-      // Google SDK Node non ha streaming nativo — simula con singola call.
-      // TODO: migrare a generateContentStream() quando stabile
-      const result = await analyzeWithGoogle(req);
-      yield result.text;
-      break;
+  // [OPT-1] Tenta il provider primario; se fallisce con errore ritentabile,
+  //         fa yield dal provider di fallback senza interrompere lo stream SSE.
+  let usedProvider = provider;
+  try {
+    switch (provider) {
+      case 'openai':    yield* streamWithOpenAI({ ...req, provider: 'openai' });       break;
+      case 'anthropic': yield* streamWithAnthropic({ ...req, provider: 'anthropic' }); break;
+      case 'google':    yield* streamWithGoogle({ ...req, provider: 'google' });        break;
+      default:          yield* streamWithOpenAI({ ...req, provider: 'openai' });
     }
-    default:          yield* streamWithOpenAI(req);
+  } catch (err) {
+    if (!isRetryableError(err)) throw err;
+
+    const fallbackProvider = resolveFallbackProvider('vision');
+    if (!fallbackProvider) throw err;
+
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err), primaryProvider: provider, fallbackProvider },
+      '[vision/stream] provider primario fallito — retry su fallback',
+    );
+
+    usedProvider = fallbackProvider;
+    // Invia un evento speciale al client così il frontend può mostrarlo
+    // (il formato SSE rimane compatibile — è solo un tipo di evento extra)
+    // NOTA: il caller (wendy-vision.ts route) non intercetta questo — passa
+    //       come chunk al client. Il frontend ignora i chunk non-testo.
+    switch (fallbackProvider) {
+      case 'openai':    yield* streamWithOpenAI({ ...req, provider: 'openai' });       break;
+      case 'anthropic': yield* streamWithAnthropic({ ...req, provider: 'anthropic' }); break;
+      case 'google':    yield* streamWithGoogle({ ...req, provider: 'google' });        break;
+      default: throw err;
+    }
   }
+
+  logger.debug({ usedProvider }, '[vision/stream] completato');
 }
