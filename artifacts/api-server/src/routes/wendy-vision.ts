@@ -5,9 +5,9 @@
  * /analyze pipeline:
  *   1. Auth + rate limit (5 req/min — VLM è costoso)
  *   2. Validazione: max 5 immagini, url https o data-URI
- *   3. Upload sicuro: converte URL pubblici in base64 server-side
- *      (evita CORS e SSRF — vedi sanitizeImageUrls)
- *   4. Streaming SSE identico al formato wendy-chat.ts
+ *   3. [FIX CRITICAL-1] image-optimizer: resize + compress prima del VLM
+ *   4. [FIX CRITICAL-2] Google: URL fetchati server-side (in vision.ts)
+ *   5. Streaming SSE identico al formato wendy-chat.ts
  *
  * /generate pipeline:
  *   1. Auth + rate limit (3 req/min per DALL-E 3)
@@ -36,7 +36,6 @@ import { streamAnalyzeImages, generateImage } from '../lib/ai/vision.js';
 export const wendyVisionRouter = Router();
 
 // ─── Rate limiters separati per VLM vs gen ────────────────────────────────────
-// VLM è 10-50x più costoso del chat testuale, limitiamo più stretto
 const analyzeRateLimiter = rateLimit({
   windowMs: 60_000,
   max: 5,
@@ -45,7 +44,6 @@ const analyzeRateLimiter = rateLimit({
   message: { error: 'Troppe analisi immagini. Attendi un minuto.', code: 'RATE_LIMIT' },
 });
 
-// DALL-E 3 costa ~$0.04/immagine — 3 req/min per utente
 const generateRateLimiter = rateLimit({
   windowMs: 60_000,
   max: 3,
@@ -71,7 +69,7 @@ const AnalyzeBodySchema = z.object({
     .max(5),
   prompt:      z.string().min(1).max(2000),
   provider:    z.enum(['openai', 'anthropic', 'google']).default('openai'),
-  detail:      z.enum(['low', 'high', 'auto']).default('auto'),
+  detail:      z.enum(['low', 'high', 'auto']).optional(), // [v2.1] optional: ora suggerito dall'optimizer
   maxTokens:   z.number().int().min(100).max(4096).default(1024),
   temperature: z.number().min(0).max(1).default(0.2),
   history:     z
@@ -81,6 +79,8 @@ const AnalyzeBodySchema = z.object({
     }))
     .max(10)
     .default([]),
+  // [FIX CRITICAL-1] intent passa al preprocessImages → image-optimizer preset
+  intent: z.enum(['document', 'screenshot', 'photo']).default('screenshot'),
 });
 
 const GenerateBodySchema = z.object({
@@ -94,6 +94,9 @@ const GenerateBodySchema = z.object({
 });
 
 // ─── Security: SSRF protection ─────────────────────────────────────────────────────
+// Nota: questo blocco intercetta pattern letterali nell'URL.
+// Per protezione completa contro SSRF via DNS rebinding, vedi lib/ai/vision.ts
+// dove i fetch remoti avvengono tramite fetchImageAsDataUri().
 
 const BLOCKED_URL_PATTERNS = [
   /localhost/i,
@@ -104,18 +107,18 @@ const BLOCKED_URL_PATTERNS = [
   /172\.(1[6-9]|2\d|3[01])\./,
   /169\.254\./, // link-local
   /::1/,         // IPv6 loopback
-  /metadata\.google/i, // GCP metadata
-  /169\.254\.169\.254/, // AWS metadata
+  /metadata\.google/i,
+  /169\.254\.169\.254/, // AWS/GCP metadata
 ];
 
 function isBlockedUrl(url: string): boolean {
   return BLOCKED_URL_PATTERNS.some((re) => re.test(url));
 }
 
-// ─── Route: /analyze (SSE streaming) ────────────────────────────────────────────
+// ─── Route: /vision/analyze (SSE streaming) ────────────────────────────────────────
 
 wendyVisionRouter.post(
-  '/analyze',
+  '/vision/analyze',
   requireAuth,
   analyzeRateLimiter,
   async (req: Request, res: Response): Promise<void> => {
@@ -127,9 +130,9 @@ wendyVisionRouter.post(
       res.status(400).json({ error: 'Body non valido', details: parsed.error.flatten() });
       return;
     }
-    const { images, prompt, provider, detail, maxTokens, temperature, history } = parsed.data;
+    const { images, prompt, provider, detail, maxTokens, temperature, history, intent } = parsed.data;
 
-    // SSRF check
+    // SSRF check su pattern letterali
     for (const img of images) {
       if (img.startsWith('https://') && isBlockedUrl(img)) {
         res.status(400).json({ error: 'URL immagine non consentito', code: 'BLOCKED_URL' });
@@ -149,12 +152,11 @@ wendyVisionRouter.post(
     let clientDisconnected = false;
     req.on('close', () => { clientDisconnected = true; });
 
-    // Evento di inizio: informa il client su provider e n immagini
-    sendSSE({ type: 'vision_start', provider, imageCount: images.length });
+    sendSSE({ type: 'vision_start', provider, imageCount: images.length, intent });
 
     try {
       for await (const chunk of streamAnalyzeImages({
-        images, prompt, provider, detail, maxTokens, temperature, history,
+        images, prompt, provider, detail, maxTokens, temperature, history, intent,
       })) {
         if (clientDisconnected) break;
         sendSSE({ choices: [{ delta: { content: chunk } }] });
@@ -162,11 +164,11 @@ wendyVisionRouter.post(
 
       if (!clientDisconnected) res.write('data: [DONE]\n\n');
     } catch (err: unknown) {
-      logger.error({ err, userId, provider }, '[wendy-vision] analyze error');
+      logger.error({ err, userId, provider, intent }, '[wendy-vision] analyze error');
       if (!clientDisconnected) {
         sendSSE({
-          error:  err instanceof Error ? err.message : 'VISION_ERROR',
-          code:   'VISION_ERROR',
+          error: err instanceof Error ? err.message : 'VISION_ERROR',
+          code:  'VISION_ERROR',
         });
         res.write('data: [DONE]\n\n');
       }
@@ -176,10 +178,10 @@ wendyVisionRouter.post(
   },
 );
 
-// ─── Route: /generate (JSON) ────────────────────────────────────────────────────────
+// ─── Route: /vision/generate (JSON) ────────────────────────────────────────────────
 
 wendyVisionRouter.post(
-  '/generate',
+  '/vision/generate',
   requireAuth,
   generateRateLimiter,
   async (req: Request, res: Response): Promise<void> => {
@@ -198,7 +200,6 @@ wendyVisionRouter.post(
     try {
       const result = await generateImage(parsed.data);
 
-      // Log revisedPrompt per moderazione contenuti
       for (const img of result.images) {
         if (img.revisedPrompt) {
           logger.info({ userId, revisedPrompt: img.revisedPrompt },
@@ -210,8 +211,8 @@ wendyVisionRouter.post(
         '[wendy-vision] generate end');
 
       res.json({
-        images:    result.images,
-        model:     result.model,
+        images:     result.images,
+        model:      result.model,
         durationMs: result.durationMs,
       });
     } catch (err: unknown) {

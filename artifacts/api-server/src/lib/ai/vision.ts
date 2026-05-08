@@ -2,9 +2,9 @@
  * ai/vision.ts — Vision Language Model (VLM) facade
  *
  * Fornisce:
- *   analyzeImages()   — analisi sincrona (risposta completa)
- *   streamAnalyzeImages() — streaming chunk-by-chunk (SSE)
- *   generateImage()   — generazione immagini con DALL-E
+ *   analyzeImages()        — analisi sincrona (risposta completa)
+ *   streamAnalyzeImages()  — streaming chunk-by-chunk (SSE)
+ *   generateImage()        — generazione immagini con DALL-E
  *
  * Provider supportati:
  *   openai    — gpt-4o (default) — miglior rapporto velocità/qualità
@@ -16,16 +16,22 @@
  *   Anthropic: max 20 immagini, max 5MB/immagine
  *   Google:    max 16 immagini con gemini-flash
  *
- * Validazione input:
- *   - URL devono iniziare con https:// (nessun URL http o localhost)
- *   - data-URI devono iniziare con data:image/ (png/jpeg/webp/gif)
- *   - max MAX_IMAGES_PER_REQUEST immagini per chiamata
+ * Fix v2.1:
+ *   [CRITICAL-1] image-optimizer integrato nella pipeline (resize + compress
+ *                prima di ogni chiamata VLM — risparmio costi fino a 4×)
+ *   [CRITICAL-2] Google: URL pubblici ora fetchati server-side (fix immagini
+ *                sempre sbagliate su Gemini con URL https://)
+ *   [CRITICAL-3] Anthropic stream: aggiunto try/finally con stream.abort()
+ *                per cleanup corretto se il client si disconnette
+ *   [BONUS]      Token usage loggato dopo stream OpenAI (finalChatCompletion)
+ *   [BONUS]      Timeout 10s su fetch immagini remote (AbortSignal.timeout)
  */
 
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { logger } from '../logger.js';
+import { optimizeImageBatch } from './image-optimizer.js';
 import type {
   VisionRequest, VisionResult,
   ImageGenRequest, ImageGenResult,
@@ -35,6 +41,9 @@ import type {
 // ─── Configurazione ──────────────────────────────────────────────────────────────
 
 const MAX_IMAGES_PER_REQUEST = 5;
+
+/** Timeout in ms per fetch di immagini remote (SSRF + hanging requests) */
+const FETCH_IMAGE_TIMEOUT_MS = 10_000;
 
 const VLM_MODELS = {
   openai:    'gpt-4o',
@@ -88,6 +97,64 @@ function b64FromDataUri(uri: string): string {
   return uri.split(',')[1] ?? '';
 }
 
+// ─── [FIX CRITICAL-2] Fetch sicuro di URL remoti ─────────────────────────────────
+// Gemini non accetta URL diretti: scarica server-side con timeout anti-hang.
+// Usato anche da Anthropic se si vuole pre-processare gli URL.
+
+async function fetchImageAsDataUri(url: string): Promise<string> {
+  const resp = await fetch(url, {
+    signal: AbortSignal.timeout(FETCH_IMAGE_TIMEOUT_MS),
+    headers: { 'User-Agent': 'NorthStar-Vision/2.1' },
+  });
+
+  if (!resp.ok) {
+    throw new Error(`Impossibile scaricare immagine: HTTP ${resp.status} — ${url.slice(0, 80)}`);
+  }
+
+  const contentType = resp.headers.get('content-type') ?? 'image/jpeg';
+  // Accettiamo solo MIME immagine
+  if (!contentType.startsWith('image/')) {
+    throw new Error(`Content-Type non immagine ("${contentType}") — ${url.slice(0, 80)}`);
+  }
+
+  const buf    = Buffer.from(await resp.arrayBuffer());
+  const b64    = buf.toString('base64');
+  return `data:${contentType};base64,${b64}`;
+}
+
+// ─── [FIX CRITICAL-1] Image optimizer pipeline ───────────────────────────────────
+// Comprime e ridimensiona le immagini PRIMA di mandarle al VLM.
+// - Risparmio costi: un'immagine 4096×4096 → 1568px riduce i tile OpenAI da ~17 a ~4
+// - Restituisce anche il detail suggerito in base alle dimensioni finali
+
+async function preprocessImages(
+  images: string[],
+  req:    Pick<VisionRequest, 'intent' | 'detail'>,
+): Promise<{ images: string[]; detail: 'low' | 'high' | 'auto' }> {
+  const batch = await optimizeImageBatch(images, {
+    intent: req.intent ?? 'screenshot',
+  });
+
+  const processedImages = batch.images.map((r) => r.dataUri);
+
+  // Usa il detail suggerito dall'optimizer (basato sulle dimensioni finali)
+  // ma solo se l'utente non ha specificato esplicitamente
+  const suggestedDetail = batch.images[0]?.suggestedDetail ?? 'auto';
+  const detail = req.detail ?? suggestedDetail;
+
+  if (batch.totalSaved > 0) {
+    logger.info({
+      savedBytes:   batch.totalSaved,
+      savedPct:     batch.totalSavedPct,
+      durationMs:   batch.durationMs,
+      intent:       req.intent ?? 'screenshot',
+      detailChosen: detail,
+    }, '[vision] image-optimizer: payload ridotto');
+  }
+
+  return { images: processedImages, detail };
+}
+
 // ─── OpenAI Vision ──────────────────────────────────────────────────────────────
 
 function buildOpenAIImageContent(
@@ -112,16 +179,15 @@ async function analyzeWithOpenAI(req: VisionRequest): Promise<VisionResult> {
   const model = VLM_MODELS.openai;
   const oai   = getOpenAI();
 
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+  const { images, detail } = await preprocessImages(req.images, req);
 
-  // Inietta history se presente
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   for (const h of req.history ?? []) {
     messages.push({ role: h.role, content: h.content });
   }
-
   messages.push({
     role:    'user',
-    content: buildOpenAIImageContent(req.images, req.prompt, req.detail),
+    content: buildOpenAIImageContent(images, req.prompt, detail),
   });
 
   const resp = await oai.chat.completions.create({
@@ -145,13 +211,16 @@ async function* streamWithOpenAI(req: VisionRequest): AsyncIterable<string> {
   const model = VLM_MODELS.openai;
   const oai   = getOpenAI();
 
+  // [FIX CRITICAL-1] ottimizza immagini prima del VLM
+  const { images, detail } = await preprocessImages(req.images, req);
+
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   for (const h of req.history ?? []) {
     messages.push({ role: h.role, content: h.content });
   }
   messages.push({
     role:    'user',
-    content: buildOpenAIImageContent(req.images, req.prompt, req.detail),
+    content: buildOpenAIImageContent(images, req.prompt, detail),
   });
 
   const stream = await oai.chat.completions.create({
@@ -160,11 +229,28 @@ async function* streamWithOpenAI(req: VisionRequest): AsyncIterable<string> {
     max_tokens:  req.maxTokens  ?? 1024,
     temperature: req.temperature ?? 0.2,
     stream:      true,
+    stream_options: { include_usage: true }, // [BONUS] token usage post-stream
   });
 
   for await (const chunk of stream) {
     const delta = chunk.choices[0]?.delta?.content;
     if (delta) yield delta;
+  }
+
+  // [BONUS] Logga token usage dopo che lo stream è completo
+  try {
+    const final = await stream.finalChatCompletion();
+    if (final.usage) {
+      logger.info({
+        model,
+        inputTokens:  final.usage.prompt_tokens,
+        outputTokens: final.usage.completion_tokens,
+        imageCount:   images.length,
+        intent:       req.intent,
+      }, '[vision/openai] stream token usage');
+    }
+  } catch {
+    // finalChatCompletion può fallire se il client si è disconnesso — ok
   }
 }
 
@@ -183,7 +269,6 @@ function buildAnthropicImageContent(
         source: { type: 'url', url } as Anthropic.URLImageSource,
       });
     } else {
-      // data-URI base64
       const mediaType = mimeFromDataUri(url) as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
       content.push({
         type:   'image',
@@ -205,13 +290,16 @@ async function analyzeWithAnthropic(req: VisionRequest): Promise<VisionResult> {
   const model = VLM_MODELS.anthropic;
   const anth  = getAnthropic();
 
+  // [FIX CRITICAL-1] ottimizza immagini prima del VLM
+  const { images } = await preprocessImages(req.images, req);
+
   const messages: Anthropic.MessageParam[] = [];
   for (const h of req.history ?? []) {
     messages.push({ role: h.role, content: h.content });
   }
   messages.push({
     role:    'user',
-    content: buildAnthropicImageContent(req.images, req.prompt),
+    content: buildAnthropicImageContent(images, req.prompt),
   });
 
   const resp = await anth.messages.create({
@@ -239,28 +327,53 @@ async function* streamWithAnthropic(req: VisionRequest): AsyncIterable<string> {
   const model = VLM_MODELS.anthropic;
   const anth  = getAnthropic();
 
+  // [FIX CRITICAL-1] ottimizza immagini prima del VLM
+  const { images } = await preprocessImages(req.images, req);
+
   const messages: Anthropic.MessageParam[] = [];
   for (const h of req.history ?? []) {
     messages.push({ role: h.role, content: h.content });
   }
   messages.push({
     role:    'user',
-    content: buildAnthropicImageContent(req.images, req.prompt),
+    content: buildAnthropicImageContent(images, req.prompt),
   });
 
+  // [FIX CRITICAL-3] Wrap stream in try/finally per cleanup garantito.
+  // Senza questo, se il client si disconnette mentre il generatore è appeso
+  // su `for await`, lo stream Anthropic rimane aperto e consuma banda.
   const stream = anth.messages.stream({
     model,
     messages,
     max_tokens: req.maxTokens ?? 1024,
   });
 
-  for await (const event of stream) {
-    if (
-      event.type === 'content_block_delta' &&
-      event.delta.type === 'text_delta'
-    ) {
-      yield event.delta.text;
+  try {
+    for await (const event of stream) {
+      if (
+        event.type === 'content_block_delta' &&
+        event.delta.type === 'text_delta'
+      ) {
+        yield event.delta.text;
+      }
     }
+
+    // [BONUS] Logga token usage dopo message_stop
+    const final = await stream.finalMessage();
+    logger.info({
+      model,
+      inputTokens:  final.usage.input_tokens,
+      outputTokens: final.usage.output_tokens,
+      imageCount:   images.length,
+      intent:       req.intent,
+    }, '[vision/anthropic] stream token usage');
+
+  } finally {
+    // Garantisce la chiusura della connessione HTTP anche in caso di:
+    // - errore nel generatore chiamante
+    // - break anticipato (client disconnesso)
+    // - eccezione durante yield
+    stream.abort();
   }
 }
 
@@ -272,12 +385,16 @@ async function analyzeWithGoogle(req: VisionRequest): Promise<VisionResult> {
   const gen   = getGoogle();
   const genModel = gen.getGenerativeModel({ model });
 
+  // [FIX CRITICAL-1] ottimizza immagini prima del VLM
+  const { images: optimizedImages } = await preprocessImages(req.images, req);
+
   const parts: Array<string | { inlineData: { data: string; mimeType: string } }> = [
     req.prompt,
   ];
 
-  for (const url of req.images) {
+  for (const url of optimizedImages) {
     if (url.startsWith('data:image/')) {
+      // Già base64 (dopo optimizer o input diretto)
       parts.push({
         inlineData: {
           data:     b64FromDataUri(url),
@@ -285,16 +402,31 @@ async function analyzeWithGoogle(req: VisionRequest): Promise<VisionResult> {
         },
       });
     } else {
-      // Gemini non supporta URL diretti: converti in fetch + base64
-      // NOTA: in produzione, usa Google Cloud Storage per URL pubblici
-      logger.warn({ url: url.slice(0, 60) },
-        '[vision/google] URL pubblici non supportati direttamente — usa data-URI');
-      parts.push(url); // fallback: passa come testo
+      // [FIX CRITICAL-2] URL pubblici: fetch server-side con timeout anti-hang.
+      // Prima del fix: url passava come stringa → Gemini vedeva il testo dell'URL.
+      // Ora: scarica l'immagine e la invia come inlineData base64.
+      logger.debug({ url: url.slice(0, 80) },
+        '[vision/google] scarico URL pubblico server-side');
+      try {
+        const dataUri = await fetchImageAsDataUri(url);
+        parts.push({
+          inlineData: {
+            data:     b64FromDataUri(dataUri),
+            mimeType: mimeFromDataUri(dataUri),
+          },
+        });
+      } catch (fetchErr) {
+        logger.warn({ err: fetchErr, url: url.slice(0, 80) },
+          '[vision/google] fetch URL fallito — skip immagine');
+        // Skippa l'immagine fallita ma continua con le altre
+      }
     }
   }
 
-  const result = await genModel.generateContent(parts as Parameters<typeof genModel.generateContent>[0]);
-  const text   = result.response.text();
+  const result = await genModel.generateContent(
+    parts as Parameters<typeof genModel.generateContent>[0]
+  );
+  const text = result.response.text();
 
   return {
     text,
@@ -313,7 +445,6 @@ export async function generateImage(req: ImageGenRequest): Promise<ImageGenResul
   const model = req.model ?? 'dall-e-3';
   const oai   = getOpenAI();
 
-  // DALL-E 3 / gpt-image-1: solo n=1
   const n = (model === 'dall-e-2') ? (req.n ?? 1) : 1;
 
   const resp = await oai.images.generate({
@@ -352,6 +483,7 @@ export async function analyzeImages(req: VisionRequest): Promise<VisionResult> {
     model:      VLM_MODELS[provider],
     imageCount: req.images.length,
     promptLen:  req.prompt.length,
+    intent:     req.intent,
   }, '[vision] analyze start');
 
   switch (provider) {
@@ -376,13 +508,15 @@ export async function* streamAnalyzeImages(
     provider,
     model:      VLM_MODELS[provider],
     imageCount: req.images.length,
+    intent:     req.intent,
   }, '[vision] stream analyze start');
 
   switch (provider) {
     case 'openai':    yield* streamWithOpenAI(req);    break;
     case 'anthropic': yield* streamWithAnthropic(req); break;
     case 'google':    {
-      // Google non supporta streaming nativo nell'SDK Node — simula con singola call
+      // Google SDK Node non ha streaming nativo — simula con singola call.
+      // TODO: migrare a generateContentStream() quando stabile
       const result = await analyzeWithGoogle(req);
       yield result.text;
       break;

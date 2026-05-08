@@ -7,6 +7,8 @@
  *   - MessageContent: parte testuale o immagine (url / base64)
  *   - VisionRequest: input per ai.vision()
  *   - ImageGenRequest / ImageGenResult: per ai.generateImage()
+ *
+ * v2.1: VisionRequest.intent — integrazione image-optimizer presets
  */
 
 export type AIProviderName = "groq" | "anthropic" | "openai" | "google";
@@ -68,6 +70,15 @@ export function extractText(content: MessageContent): string {
 
 // ─── Vision request ───────────────────────────────────────────────────────────
 
+/**
+ * Intent dell'analisi visiva — usato dall'image-optimizer per scegliere
+ * i preset di compressione/resize ottimali:
+ *   'document'   → CV, PDF, fattura: max 2048px, qualità 88, detail='high'
+ *   'screenshot' → UI, grafico, RIASEC: max 1568px, qualità 82, detail='high'
+ *   'photo'      → avatar, foto generica: max 1024px, qualità 75, detail='low'
+ */
+export type VisionIntent = 'document' | 'screenshot' | 'photo';
+
 export interface VisionRequest {
   /**
    * Immagini da analizzare (max 5 per chiamata).
@@ -103,6 +114,13 @@ export interface VisionRequest {
 
   /** Se true, esegue lo stream della risposta invece di aspettare */
   stream?: boolean;
+
+  /**
+   * Intent dell'analisi — guida l'image-optimizer nella scelta dei preset.
+   * default: 'screenshot'
+   * Passa 'document' per CV/PDF, 'photo' per avatar/foto profilo.
+   */
+  intent?: VisionIntent;
 }
 
 export interface VisionResult {
