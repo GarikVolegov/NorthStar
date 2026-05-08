@@ -1,22 +1,21 @@
 /**
- * ProfileEditPanel v3 — aggiunta sezione 'I tuoi progressi' (Passo 3).
+ * ProfileEditPanel v4 — campo username + anteprima URL profilo pubblico.
  *
- * CHANGES vs v2:
- * - Sezione 0 'I tuoi progressi' aggiunta come PRIMO accordion (aperto di default)
- * - ProgressPanel montato con lazy-load al primo open
- * - onRetakeTest propagato verso RiasecProfileCard
- * - Sezioni riordinate: Progressi > Identità > Percorso > Preferenze > CV > RIASEC
+ * CHANGES vs v3:
+ * - Sezione Identità: campo username editabile con validazione slug real-time
+ * - Anteprima URL profilo pubblico sotto il campo username
+ * - username aggiunto al PATCH payload
+ * - ProfileData interface estesa con username
  */
 import React, { useState, useCallback, useRef } from "react";
-import { RiasecProfileCard }  from "./RiasecProfileCard";
-import { ProgressPanel }      from "./ProgressPanel";
-
-// ── Types ───────────────────────────────────────────────────────────────────
+import { RiasecProfileCard } from "./RiasecProfileCard";
+import { ProgressPanel }     from "./ProgressPanel";
 
 export interface ProfileData {
   name:                string;
   email:               string;
   avatarUrl:           string | null;
+  username:            string;
   timezone:            string;
   journeyType:         string;
   userMode:            string;
@@ -29,24 +28,22 @@ export interface ProfileData {
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
 const JOURNEY_OPTIONS = [
-  { value: "indeciso",       label: "Ancora in esplorazione",     description: "Non ho chiaro il percorso, sto cercando direzione", emoji: "🧭" },
-  { value: "in_transizione", label: "In transizione",             description: "Sto cambiando settore, ruolo o stile di vita",       emoji: "🔄" },
-  { value: "in_crescita",    label: "In crescita attiva",         description: "Ho una direzione chiara, voglio accelerare",         emoji: "🚀" },
-  { value: "autonomo",       label: "Indipendente / Imprenditore",description: "Costruisco qualcosa di mio, voglio scalare",         emoji: "🏗️" },
+  { value:"indeciso",       label:"Ancora in esplorazione",     description:"Non ho chiaro il percorso, sto cercando direzione", emoji:"🧭" },
+  { value:"in_transizione", label:"In transizione",             description:"Sto cambiando settore, ruolo o stile di vita",       emoji:"🔄" },
+  { value:"in_crescita",    label:"In crescita attiva",         description:"Ho una direzione chiara, voglio accelerare",         emoji:"🚀" },
+  { value:"autonomo",       label:"Indipendente / Imprenditore",description:"Costruisco qualcosa di mio, voglio scalare",         emoji:"🏗️" },
 ];
 const MODE_OPTIONS = [
-  { value: "explorer", label: "Explorer", description: "Voglio esplorare opzioni e scoprire cosa mi piace", emoji: "🔭" },
-  { value: "builder",  label: "Builder",  description: "Voglio costruire competenze e progetti concreti",   emoji: "🛠️" },
-  { value: "achiever", label: "Achiever", description: "Voglio raggiungere obiettivi misurabili e veloci",  emoji: "🏆" },
+  { value:"explorer", label:"Explorer", description:"Voglio esplorare opzioni e scoprire cosa mi piace", emoji:"🔭" },
+  { value:"builder",  label:"Builder",  description:"Voglio costruire competenze e progetti concreti",   emoji:"🛠️" },
+  { value:"achiever", label:"Achiever", description:"Voglio raggiungere obiettivi misurabili e veloci",  emoji:"🏆" },
 ];
 const WORK_OPTIONS = [
-  { value: "remote",  label: "Remoto",        emoji: "🏠" },
-  { value: "hybrid",  label: "Ibrido",        emoji: "🏭" },
-  { value: "office",  label: "In ufficio",    emoji: "🏙️" },
-  { value: "unknown", label: "Non so ancora", emoji: "🤷" },
+  { value:"remote",  label:"Remoto",        emoji:"🏠" },
+  { value:"hybrid",  label:"Ibrido",        emoji:"🏭" },
+  { value:"office",  label:"In ufficio",    emoji:"🏙️" },
+  { value:"unknown", label:"Non so ancora", emoji:"🤷" },
 ];
 const TIMEZONES = [
   "Europe/Rome","Europe/London","Europe/Berlin","Europe/Madrid",
@@ -54,11 +51,19 @@ const TIMEZONES = [
   "Asia/Tokyo","Asia/Dubai","UTC",
 ];
 
-// ── Hook ──────────────────────────────────────────────────────────────────────
+// Validates username: 3-30 chars, lowercase alphanumeric + hyphens, no leading/trailing hyphen
+function validateUsername(u: string): string | null {
+  if (!u) return "Username obbligatorio";
+  if (u.length < 3) return "Minimo 3 caratteri";
+  if (u.length > 30) return "Massimo 30 caratteri";
+  if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(u) && u.length > 1) return "Solo lettere minuscole, numeri e trattini";
+  if (/--/.test(u)) return "Non usare trattini consecutivi";
+  return null;
+}
 
 function useProfileEdit(token: string, apiBase: string, initialData?: Partial<ProfileData>) {
   const def: ProfileData = {
-    name:"", email:"", avatarUrl:null, timezone:"Europe/Rome",
+    name:"", email:"", avatarUrl:null, username:"", timezone:"Europe/Rome",
     journeyType:"indeciso", userMode:"explorer", workPreference:"unknown",
     autonomyPreference:5, stabilityPreference:5, cvText:null, isPublic:false,
     ...initialData,
@@ -93,10 +98,11 @@ function useProfileEdit(token: string, apiBase: string, initialData?: Partial<Pr
         method:"PATCH",
         headers:{"Content-Type":"application/json", Authorization:`Bearer ${token}`},
         body: JSON.stringify({
-          name:form.name, timezone:form.timezone, journeyType:form.journeyType,
-          userMode:form.userMode, workPreference:form.workPreference,
-          autonomyPreference:form.autonomyPreference, stabilityPreference:form.stabilityPreference,
-          cvText:form.cvText, isPublic:form.isPublic,
+          name:form.name, username:form.username, timezone:form.timezone,
+          journeyType:form.journeyType, userMode:form.userMode,
+          workPreference:form.workPreference, autonomyPreference:form.autonomyPreference,
+          stabilityPreference:form.stabilityPreference, cvText:form.cvText,
+          isPublic:form.isPublic,
         }),
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.error ?? "Errore"); }
@@ -119,7 +125,7 @@ function useProfileEdit(token: string, apiBase: string, initialData?: Partial<Pr
   return { form, update, save, uploadAvatar, status, error, loading };
 }
 
-// ── UI sub-components ───────────────────────────────────────────────────────────
+// ── UI sub-components (identici v3, compatti) ─────────────────────────────
 
 function SectionAccordion({ title, emoji, open, onToggle, children }: {
   title:string; emoji:string; open:boolean; onToggle:()=>void; children:React.ReactNode;
@@ -137,13 +143,12 @@ function SectionAccordion({ title, emoji, open, onToggle, children }: {
     </div>
   );
 }
-
 function RadioCard({ value:_v, selected, emoji, label, description, onClick }: {
   value:string; selected:boolean; emoji:string; label:string; description:string; onClick:()=>void;
 }) {
   return (
     <button onClick={onClick} className={`w-full text-left rounded-xl border p-3.5 transition-all ${
-      selected ? "border-primary bg-primary/8 ring-1 ring-primary" : "border-border hover:border-primary/40 hover:bg-muted/30"
+      selected?"border-primary bg-primary/8 ring-1 ring-primary":"border-border hover:border-primary/40 hover:bg-muted/30"
     }`}>
       <div className="flex items-center gap-2">
         <span className="text-xl">{emoji}</span>
@@ -158,7 +163,6 @@ function RadioCard({ value:_v, selected, emoji, label, description, onClick }: {
     </button>
   );
 }
-
 function SliderField({ label, sublabelLeft, sublabelRight, value, onChange }: {
   label:string; sublabelLeft:string; sublabelRight:string; value:number; onChange:(v:number)=>void;
 }) {
@@ -176,33 +180,32 @@ function SliderField({ label, sublabelLeft, sublabelRight, value, onChange }: {
     </div>
   );
 }
-
 function AvatarUploader({ name, avatarUrl, onUpload }: {
-  name:string; avatarUrl:string|null; onUpload:(file:File)=>Promise<void>;
+  name:string; avatarUrl:string|null; onUpload:(f:File)=>Promise<void>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const [err, setErr] = useState("");
-  const initials = name.split(" ").slice(0,2).map((w)=>w[0]?.toUpperCase()??"" ).join("");
+  const [uploading, setUp] = useState(false);
+  const [err, setErr]      = useState("");
+  const initials = name.split(" ").slice(0,2).map((w)=>w[0]?.toUpperCase()??" ").join("");
   async function handleFile(e:React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if(!file) return;
+    const file=e.target.files?.[0]; if(!file) return;
     if(file.size>2*1024*1024){setErr("Max 2MB");return;}
-    setUploading(true);setErr("");
+    setUp(true);setErr("");
     try{await onUpload(file);}catch(ex){setErr(ex instanceof Error?ex.message:"Errore");}
-    finally{setUploading(false);}
+    finally{setUp(false);}
   }
   return (
     <div className="flex items-center gap-4">
       <div className="relative">
         {avatarUrl
-          ? <img src={avatarUrl} alt={name} className="h-16 w-16 rounded-2xl object-cover border border-border"/>
-          : <div className="h-16 w-16 rounded-2xl bg-primary flex items-center justify-center"><span className="text-primary-foreground text-xl font-bold">{initials||"?"}</span></div>
+          ?<img src={avatarUrl} alt={name} className="h-16 w-16 rounded-2xl object-cover border border-border"/>
+          :<div className="h-16 w-16 rounded-2xl bg-primary flex items-center justify-center"><span className="text-primary-foreground text-xl font-bold">{initials||"?"}</span></div>
         }
         {uploading&&<div className="absolute inset-0 rounded-2xl bg-black/40 flex items-center justify-center"><div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin"/></div>}
       </div>
       <div className="space-y-1">
         <button onClick={()=>inputRef.current?.click()} disabled={uploading}
-          className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors">Cambia foto</button>
+          className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted">Cambia foto</button>
         {err&&<p className="text-xs text-red-500">{err}</p>}
         <p className="text-[10px] text-muted-foreground">JPG o PNG, max 2MB</p>
       </div>
@@ -211,47 +214,40 @@ function AvatarUploader({ name, avatarUrl, onUpload }: {
   );
 }
 
-// ── Main Component ─────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 
 export interface ProfileEditPanelProps {
-  token:         string;
-  initialData?:  Partial<ProfileData>;
-  apiBase?:      string;
-  onSaved?:      (data:ProfileData) => void;
-  onRetakeTest?: () => void;
-  className?:    string;
+  token:string; initialData?:Partial<ProfileData>; apiBase?:string;
+  onSaved?:(d:ProfileData)=>void; onRetakeTest?:()=>void; className?:string;
+  /** Base URL per mostrare l'anteprima del profilo pubblico, es. 'https://northstar.app' */
+  appUrl?: string;
 }
 
 export function ProfileEditPanel({
-  token, initialData, apiBase="/api", onSaved, onRetakeTest, className="",
+  token, initialData, apiBase="/api", onSaved, onRetakeTest, className="", appUrl="https://northstar.app",
 }: ProfileEditPanelProps) {
   const { form, update, save, uploadAvatar, status, error, loading } =
     useProfileEdit(token, apiBase, initialData);
 
   const [openSections, setOpenSections] = useState<Record<string,boolean>>({
-    progress: true,   // ← aperto di default (Passo 3)
-    identity: false,
-    journey:  true,
-    preferences: false,
-    cv:       false,
-    riasec:   false,
+    progress:true, identity:false, journey:true, preferences:false, cv:false, riasec:false,
   });
-  const [progressMounted, setProgressMounted] = useState(true);  // aperto subito
+  const [progressMounted, setProgressMounted] = useState(true);
   const [riasecMounted,   setRiasecMounted]   = useState(false);
 
-  function toggleSection(key: string) {
+  function toggleSection(key:string) {
     const willOpen = !openSections[key];
-    setOpenSections((s) => ({ ...s, [key]: willOpen }));
-    if (key === "progress" && willOpen) setProgressMounted(true);
-    if (key === "riasec"   && willOpen) setRiasecMounted(true);
+    setOpenSections((s)=>({...s,[key]:willOpen}));
+    if(key==="progress"&&willOpen) setProgressMounted(true);
+    if(key==="riasec"  &&willOpen) setRiasecMounted(true);
   }
 
-  async function handleSave() {
-    await save();
-    if (status !== "error") onSaved?.(form);
-  }
+  async function handleSave() { await save(); if(status!=="error") onSaved?.(form); }
 
-  if (loading) return (
+  const usernameError = form.username ? validateUsername(form.username) : null;
+  const profileUrl    = form.username ? `${appUrl}/u/${form.username}` : null;
+
+  if(loading) return (
     <div className="flex h-64 items-center justify-center">
       <div className="h-7 w-7 animate-spin rounded-full border-2 border-primary border-t-transparent"/>
     </div>
@@ -260,37 +256,36 @@ export function ProfileEditPanel({
   return (
     <div className={`space-y-4 max-w-2xl mx-auto ${className}`}>
 
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold">Il tuo profilo</h1>
           <p className="text-xs text-muted-foreground mt-0.5">Queste informazioni guidano Wendy nelle risposte</p>
         </div>
-        <button onClick={handleSave} disabled={status==="saving"}
+        <button onClick={handleSave} disabled={status==="saving"||!!usernameError}
           className={`rounded-xl px-5 py-2 text-sm font-medium transition-all ${
-            status==="saved" ? "bg-green-500 text-white" :
-            status==="error" ? "bg-red-500 text-white" :
+            status==="saved"?"bg-green-500 text-white":
+            status==="error"?"bg-red-500 text-white":
             "bg-primary text-primary-foreground hover:opacity-90"
           } disabled:opacity-50`}>
-          {status==="saving"?"Salvataggio...": status==="saved"?"✓ Salvato": status==="error"?"✕ Errore":"Salva"}
+          {status==="saving"?"Salvataggio...":status==="saved"?"✓ Salvato":status==="error"?"✕ Errore":"Salva"}
         </button>
       </div>
 
-      {error && <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-xs text-red-700">{error}</div>}
+      {error&&<div className="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-xs text-red-700">{error}</div>}
 
-      {/* ── SEZIONE 0: Progressi (Passo 3) ─────────────────────────────── */}
+      {/* Progressi */}
       <SectionAccordion title="I tuoi progressi" emoji="🔥" open={openSections.progress} onToggle={()=>toggleSection("progress")}>
-        {progressMounted && <ProgressPanel token={token} apiBase={apiBase} />}
+        {progressMounted&&<ProgressPanel token={token} apiBase={apiBase}/>}
       </SectionAccordion>
 
-      {/* ── SEZIONE 1: Identità ───────────────────────────────────────── */}
+      {/* Identità */}
       <SectionAccordion title="Identità" emoji="👤" open={openSections.identity} onToggle={()=>toggleSection("identity")}>
         <AvatarUploader name={form.name} avatarUrl={form.avatarUrl} onUpload={uploadAvatar}/>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <label className="text-xs font-medium">Nome</label>
-            <input type="text" value={form.name} onChange={(e)=>update("name",e.target.value)} placeholder="Il tuo nome"
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"/>
+            <input type="text" value={form.name} onChange={(e)=>update("name",e.target.value)}
+              placeholder="Il tuo nome" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"/>
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium">Fuso orario</label>
@@ -300,6 +295,38 @@ export function ProfileEditPanel({
             </select>
           </div>
         </div>
+
+        {/* Username + URL preview */}
+        <div className="space-y-1">
+          <label className="text-xs font-medium">Username pubblico</label>
+          <div className="flex items-center gap-0 rounded-lg border border-border overflow-hidden focus-within:ring-1 focus-within:ring-primary">
+            <span className="px-3 py-2 text-xs text-muted-foreground bg-muted border-r border-border flex-shrink-0">
+              northstar.app/u/
+            </span>
+            <input
+              type="text"
+              value={form.username}
+              onChange={(e)=>update("username", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,""))}
+              placeholder="mario-rossi"
+              maxLength={30}
+              className="flex-1 px-3 py-2 text-sm bg-background outline-none"
+            />
+          </div>
+          {usernameError && <p className="text-xs text-red-500">{usernameError}</p>}
+          {!usernameError && profileUrl && form.isPublic && (
+            <p className="text-[11px] text-indigo-500">
+              🌐 Profilo pubblico visibile su{" "}
+              <a href={profileUrl} target="_blank" rel="noreferrer" className="underline">{profileUrl}</a>
+            </p>
+          )}
+          {!usernameError && profileUrl && !form.isPublic && (
+            <p className="text-[11px] text-muted-foreground">
+              🔒 Il profilo è privato. Attiva &quot;Profilo pubblico&quot; per renderlo visibile.
+            </p>
+          )}
+        </div>
+
+        {/* Toggle isPublic */}
         <div className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
           <div>
             <p className="text-sm font-medium">Profilo pubblico</p>
@@ -312,7 +339,7 @@ export function ProfileEditPanel({
         </div>
       </SectionAccordion>
 
-      {/* ── SEZIONE 2: Percorso ───────────────────────────────────────── */}
+      {/* Percorso */}
       <SectionAccordion title="Il tuo percorso" emoji="🧭" open={openSections.journey} onToggle={()=>toggleSection("journey")}>
         <div className="space-y-1">
           <label className="text-xs font-medium">Dove ti trovi ora?</label>
@@ -332,7 +359,7 @@ export function ProfileEditPanel({
         </div>
       </SectionAccordion>
 
-      {/* ── SEZIONE 3: Preferenze ─────────────────────────────────────── */}
+      {/* Preferenze */}
       <SectionAccordion title="Preferenze lavorative" emoji="⚙️" open={openSections.preferences} onToggle={()=>toggleSection("preferences")}>
         <div className="space-y-1">
           <label className="text-xs font-medium">Modalità di lavoro preferita</label>
@@ -353,30 +380,27 @@ export function ProfileEditPanel({
           value={form.stabilityPreference} onChange={(v)=>update("stabilityPreference",v)}/>
       </SectionAccordion>
 
-      {/* ── SEZIONE 4: CV ────────────────────────────────────────────── */}
+      {/* CV */}
       <SectionAccordion title="CV / Background" emoji="📎" open={openSections.cv} onToggle={()=>toggleSection("cv")}>
         <p className="text-xs text-muted-foreground">
-          Incolla il tuo CV, bio o esperienza professionale in testo libero.
-          Wendy lo usa per darti consigli più precisi. L’IA estrae le informazioni chiave in background.
+          Incolla il tuo CV o bio. Wendy lo usa per darti consigli più precisi.
+          L’IA estrae le informazioni chiave in background.
         </p>
         <textarea rows={8} value={form.cvText??""} onChange={(e)=>update("cvText",e.target.value||null)}
-          placeholder="Es. Sono uno sviluppatore con 3 anni di esperienza in React e Node.js..."
+          placeholder="Es. Sono uno sviluppatore con 3 anni di esperienza..."
           className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm resize-none"/>
-        {form.cvText && form.cvText.length>50 && (
-          <p className="text-[10px] text-muted-foreground">✨ Dopo il salvataggio Wendy analizza il testo e ne estrae le competenze chiave</p>
+        {form.cvText&&form.cvText.length>50&&(
+          <p className="text-[10px] text-muted-foreground">✨ Dopo il salvataggio Wendy analizza il testo</p>
         )}
       </SectionAccordion>
 
-      {/* ── SEZIONE 5: RIASEC (Passo 2) ──────────────────────────────── */}
+      {/* RIASEC */}
       <SectionAccordion title="Il tuo profilo RIASEC" emoji="🧠" open={openSections.riasec} onToggle={()=>toggleSection("riasec")}>
-        {riasecMounted && (
-          <RiasecProfileCard token={token} apiBase={apiBase} onRetake={onRetakeTest}/>
-        )}
+        {riasecMounted&&<RiasecProfileCard token={token} apiBase={apiBase} onRetake={onRetakeTest}/>}
       </SectionAccordion>
 
-      {/* Bottom save */}
       <div className="pb-8">
-        <button onClick={handleSave} disabled={status==="saving"}
+        <button onClick={handleSave} disabled={status==="saving"||!!usernameError}
           className={`w-full rounded-xl py-3 text-sm font-medium transition-all ${
             status==="saved"?"bg-green-500 text-white":"bg-primary text-primary-foreground hover:opacity-90"
           } disabled:opacity-50`}>
