@@ -1,13 +1,13 @@
 /**
  * CvSection — Upload CV + Genera da profilo
  *
- * Endpoints usati:
- *   GET    /api/cv/mine          → { cvs: CvMeta[] }
- *   POST   /api/cv/upload        → { cv: CvMeta }     (multipart form-data)
- *   POST   /api/cv/generate      → { cv: CvMeta }     (genera da dati profilo)
- *   DELETE /api/cv/:id           → 204
+ * Endpoints usati (tutti session-aware, nessun :userId nell'URL):
+ *   GET    /api/cv/mine           → { cvs: CvMeta[] }
+ *   POST   /api/cv/mine/upload    → { success, cvs }   (multipart form-data)
+ *   POST   /api/cv/mine/generate  → { success, cvs }   (body vuoto)
+ *   DELETE /api/cv/mine           → { success }
  *
- * CvMeta: { id, filename, uploadedAt, source: 'upload'|'generated', parsedContent?: string }
+ * Download PDF disponibile solo per CV generati via GET /api/cv/:userId/pdf
  */
 
 import { useRef, useState } from "react";
@@ -24,11 +24,11 @@ import { apiFetch } from "@/lib/api-fetch";
 const BASE = import.meta.env.BASE_URL || "/";
 
 interface CvMeta {
-  id: number;
+  id: string;           // "generated-{userId}" | "uploaded-{userId}"
   filename: string;
   uploadedAt: string;
   source: "upload" | "generated";
-  parsedContent?: string;
+  hasPdf: boolean;      // true solo per i CV generati (PDF disponibile)
 }
 
 function formatDate(iso: string) {
@@ -45,7 +45,7 @@ export function CvSection({ userId }: { userId: number }) {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
 
-  // ── Fetch CVs ────────────────────────────────────────────────────────────
+  // ── Fetch CVs ──────────────────────────────────────────────────────
   const { data, isLoading } = useQuery<{ cvs: CvMeta[] }>({
     queryKey: ["cvs-mine", userId],
     queryFn: async () => {
@@ -59,14 +59,17 @@ export function CvSection({ userId }: { userId: number }) {
   });
 
   const cvs = data?.cvs ?? [];
-  const activeCv = cvs[0] ?? null; // il più recente
+  // Ordine: prima "generated", poi "uploaded"
+  const generatedCv = cvs.find((c) => c.source === "generated") ?? null;
+  const uploadedCv  = cvs.find((c) => c.source === "upload") ?? null;
+  const activeCv    = generatedCv ?? uploadedCv; // il principale da mostrare in cima
 
-  // ── Upload ───────────────────────────────────────────────────────────────
+  // ── Upload ──────────────────────────────────────────────────────────
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
       const form = new FormData();
       form.append("file", file);
-      const res = await apiFetch(`${BASE}api/cv/upload`, {
+      const res = await apiFetch(`${BASE}api/cv/mine/upload`, {
         method: "POST",
         body: form,
       });
@@ -88,17 +91,20 @@ export function CvSection({ userId }: { userId: number }) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5_000_000) { setUploadError("File troppo grande (max 5 MB)"); return; }
-    const allowed = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"];
-    if (!allowed.includes(file.type)) { setUploadError("Solo PDF o DOCX"); return; }
+    const allowed = [
+      "application/pdf",
+      "text/plain",
+    ];
+    if (!allowed.includes(file.type)) { setUploadError("Solo PDF o TXT"); return; }
     setUploadError(null);
     uploadMutation.mutate(file);
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  // ── Generate ─────────────────────────────────────────────────────────────
+  // ── Generate ────────────────────────────────────────────────────────
   const generateMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiFetch(`${BASE}api/cv/generate`, { method: "POST" });
+      const res = await apiFetch(`${BASE}api/cv/mine/generate`, { method: "POST" });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error ?? "Errore generazione");
@@ -113,10 +119,10 @@ export function CvSection({ userId }: { userId: number }) {
     onError: (err: Error) => setGenerateError(err.message),
   });
 
-  // ── Delete ───────────────────────────────────────────────────────────────
+  // ── Delete ──────────────────────────────────────────────────────────
   const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await apiFetch(`${BASE}api/cv/${id}`, { method: "DELETE" });
+    mutationFn: async () => {
+      const res = await apiFetch(`${BASE}api/cv/mine`, { method: "DELETE" });
       if (!res.ok) throw new Error("Errore eliminazione");
     },
     onSuccess: () => {
@@ -125,16 +131,13 @@ export function CvSection({ userId }: { userId: number }) {
     },
   });
 
-  // ── Download (testo) ──────────────────────────────────────────────────────
-  function handleDownload(cv: CvMeta) {
-    if (!cv.parsedContent) return;
-    const blob = new Blob([cv.parsedContent], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
+  // ── Download PDF (solo CV generati) ──────────────────────────────────
+  function handleDownloadPdf() {
+    const url = `${BASE}api/cv/${userId}/pdf`;
     const a = document.createElement("a");
     a.href = url;
-    a.download = cv.filename.replace(/\.(pdf|docx?)$/i, ".txt") || "cv.txt";
+    a.download = generatedCv?.filename ?? "CV_NorthStar.pdf";
     a.click();
-    URL.revokeObjectURL(url);
   }
 
   const isBusy = uploadMutation.isPending || generateMutation.isPending || deleteMutation.isPending;
@@ -156,40 +159,33 @@ export function CvSection({ userId }: { userId: number }) {
           </div>
         )}
 
-        {/* ── CV attivo ── */}
-        {!isLoading && activeCv && (
-          <div className="flex items-start justify-between gap-3 p-3 rounded-xl border bg-muted/30">
+        {/* ── CV generato (priorità visiva) ── */}
+        {!isLoading && generatedCv && (
+          <div className="flex items-start justify-between gap-3 p-3 rounded-xl border bg-primary/5 border-primary/20">
             <div className="flex items-start gap-2.5 min-w-0">
-              <div className={cn(
-                "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
-                activeCv.source === "generated" ? "bg-primary/10" : "bg-emerald-50",
-              )}>
-                {activeCv.source === "generated"
-                  ? <Sparkles className="w-4 h-4 text-primary" />
-                  : <FileText className="w-4 h-4 text-emerald-600" />}
+              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4 text-primary" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{activeCv.filename}</p>
+                <p className="text-sm font-medium truncate">{generatedCv.filename}</p>
                 <p className="text-xs text-muted-foreground">
-                  {activeCv.source === "generated" ? "Generato da profilo" : "Caricato manualmente"} · {formatDate(activeCv.uploadedAt)}
+                  Generato da profilo · {formatDate(generatedCv.uploadedAt)}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              {activeCv.parsedContent && (
-                <button
-                  onClick={() => handleDownload(activeCv)}
-                  className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-                  title="Scarica testo CV"
-                >
-                  <Download className="w-3.5 h-3.5 text-muted-foreground" />
-                </button>
-              )}
               <button
-                onClick={() => deleteMutation.mutate(activeCv.id)}
+                onClick={handleDownloadPdf}
+                className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+                title="Scarica PDF"
+              >
+                <Download className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+              <button
+                onClick={() => deleteMutation.mutate()}
                 disabled={isBusy}
                 className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors disabled:opacity-40"
-                title="Elimina CV"
+                title="Elimina tutto"
               >
                 {deleteMutation.isPending
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
@@ -199,19 +195,52 @@ export function CvSection({ userId }: { userId: number }) {
           </div>
         )}
 
-        {/* ── Operazioni riuscite ── */}
+        {/* ── CV caricato (secondario se esiste anche il generato) ── */}
+        {!isLoading && uploadedCv && (
+          <div className={cn(
+            "flex items-start justify-between gap-3 p-3 rounded-xl border",
+            generatedCv ? "bg-muted/20" : "bg-emerald-50/50 border-emerald-200",
+          )}>
+            <div className="flex items-start gap-2.5 min-w-0">
+              <div className={cn(
+                "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
+                generatedCv ? "bg-muted" : "bg-emerald-50",
+              )}>
+                <FileText className={cn("w-4 h-4", generatedCv ? "text-muted-foreground" : "text-emerald-600")} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{uploadedCv.filename}</p>
+                <p className="text-xs text-muted-foreground">
+                  Caricato manualmente · {formatDate(uploadedCv.uploadedAt)}
+                </p>
+              </div>
+            </div>
+            {!generatedCv && (
+              <button
+                onClick={() => deleteMutation.mutate()}
+                disabled={isBusy}
+                className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors disabled:opacity-40 shrink-0"
+                title="Elimina CV"
+              >
+                {deleteMutation.isPending
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ── Feedback operazioni ── */}
         {uploadMutation.isSuccess && (
           <p className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">
-            <CheckCircle2 className="w-3.5 h-3.5" /> CV caricato con successo!
+            <CheckCircle2 className="w-3.5 h-3.5" /> CV caricato e analizzato con successo!
           </p>
         )}
         {generateMutation.isSuccess && (
           <p className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">
-            <CheckCircle2 className="w-3.5 h-3.5" /> CV generato dal tuo profilo!
+            <CheckCircle2 className="w-3.5 h-3.5" /> CV generato dal tuo profilo NorthStar!
           </p>
         )}
-
-        {/* ── Errori ── */}
         {uploadError && (
           <p className="flex items-center gap-1.5 text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">
             <AlertCircle className="w-3.5 h-3.5" /> {uploadError}
@@ -224,15 +253,14 @@ export function CvSection({ userId }: { userId: number }) {
         )}
 
         {/* ── Empty state ── */}
-        {!isLoading && !activeCv && !uploadMutation.isPending && !generateMutation.isPending && (
+        {!isLoading && cvs.length === 0 && !uploadMutation.isPending && !generateMutation.isPending && (
           <p className="text-xs text-muted-foreground bg-muted/40 rounded-xl p-3 leading-relaxed">
-            Nessun CV presente. Carica il tuo CV esistente oppure generane uno automaticamente dai dati del tuo profilo NorthStar.
+            Nessun CV presente. Carica il tuo CV esistente (PDF o TXT) oppure generane uno automaticamente dai dati del tuo profilo NorthStar.
           </p>
         )}
 
         {/* ── Azioni ── */}
         <div className="flex flex-col sm:flex-row gap-2">
-          {/* Upload */}
           <Button
             variant="outline"
             size="sm"
@@ -243,10 +271,9 @@ export function CvSection({ userId }: { userId: number }) {
             {uploadMutation.isPending
               ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
               : <Upload className="w-3.5 h-3.5" />}
-            {activeCv ? "Sostituisci CV" : "Carica CV"}
+            {uploadedCv ? "Sostituisci CV" : "Carica CV"}
           </Button>
 
-          {/* Genera */}
           <Button
             size="sm"
             className="rounded-full gap-2 text-xs flex-1"
@@ -256,19 +283,18 @@ export function CvSection({ userId }: { userId: number }) {
             {generateMutation.isPending
               ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
               : <Sparkles className="w-3.5 h-3.5" />}
-            Genera da profilo
+            {generatedCv ? "Rigenera CV" : "Genera da profilo"}
           </Button>
         </div>
 
         <p className="text-[11px] text-muted-foreground -mt-1">
-          PDF o DOCX · max 5 MB · I dati del profilo includono esperienze, competenze e settore confermato
+          PDF o TXT · max 5 MB · Il CV generato include competenze, esperienze e settore dal tuo profilo
         </p>
 
-        {/* Hidden file input */}
         <input
           ref={fileRef}
           type="file"
-          accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          accept=".pdf,.txt,application/pdf,text/plain"
           className="sr-only"
           onChange={handleFileChange}
           aria-label="Carica CV"

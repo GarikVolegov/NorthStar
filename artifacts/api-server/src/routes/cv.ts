@@ -4,6 +4,7 @@ import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { ai } from "../lib/ai/index.js";
+import { getAuthenticatedUserId } from "../lib/plan-utils.js";
 // @ts-ignore
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
@@ -58,12 +59,10 @@ interface CvData {
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
-/** Strip optional markdown code fences from LLM JSON outputs */
 function stripCodeFences(raw: string): string {
   return raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
 }
 
-/** Call the AI router for a JSON-returning task */
 async function aiJson<T>(prompt: string): Promise<T> {
   const raw = await ai.chat({
     useCase: "json_extraction",
@@ -71,6 +70,258 @@ async function aiJson<T>(prompt: string): Promise<T> {
   });
   return JSON.parse(stripCodeFences(raw)) as T;
 }
+
+// ── helpers: build CvMeta list from raw cvJson blob ───────────────────
+/**
+ * Normalises the flat cvJson blob into the CvMeta shape that
+ * CvSection.tsx expects:  { cvs: CvMeta[] }
+ *
+ * Rules:
+ *  - If cvJson has a `generated` sub-object  → one entry with source "generated"
+ *  - If cvJson has top-level `extractedAt`    → one entry with source "upload"
+ *  - Both can coexist; generated is listed first
+ */
+function buildCvMetaList(
+  cvJson: Record<string, any> | null,
+  cvText: string | null,
+  userId: number,
+): Array<{ id: string; filename: string; uploadedAt: string; source: "upload" | "generated"; hasPdf: boolean }> {
+  if (!cvJson && !cvText) return [];
+  const list: Array<{ id: string; filename: string; uploadedAt: string; source: "upload" | "generated"; hasPdf: boolean }> = [];
+
+  if (cvJson?.generated) {
+    list.push({
+      id: `generated-${userId}`,
+      filename: `CV_${(cvJson.generated.personalInfo?.name ?? "NorthStar").replace(/\s+/g, "_")}_generato.pdf`,
+      uploadedAt: cvJson.lastGenerated ?? cvJson.generated.generatedAt ?? new Date().toISOString(),
+      source: "generated",
+      hasPdf: true,
+    });
+  }
+
+  if (cvJson?.extractedAt || cvText) {
+    list.push({
+      id: `uploaded-${userId}`,
+      filename: (cvJson?.personalInfo?.name
+        ? `CV_${(cvJson.personalInfo.name as string).replace(/\s+/g, "_")}_caricato.pdf`
+        : "CV_caricato.pdf"),
+      uploadedAt: cvJson?.extractedAt ?? new Date().toISOString(),
+      source: "upload",
+      hasPdf: false,
+    });
+  }
+
+  return list;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// SESSION-AWARE endpoints  (/api/cv/mine/*)
+// userId viene sempre da getAuthenticatedUserId(req) — nessun :userId
+// ══════════════════════════════════════════════════════════════════════
+
+// ── GET /api/cv/mine ──────────────────────────────────────────────────
+router.get("/cv/mine", async (req, res): Promise<void> => {
+  const userId = getAuthenticatedUserId(req);
+  if (!userId) { res.status(401).json({ error: "Non autenticato" }); return; }
+
+  const [user] = await db
+    .select({ cvJson: usersTable.cvJson, cvText: usersTable.cvText })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId));
+
+  if (!user) { res.status(404).json({ error: "Utente non trovato" }); return; }
+
+  const cvs = buildCvMetaList(user.cvJson as any, user.cvText, userId);
+  res.json({ cvs });
+});
+
+// ── POST /api/cv/mine/upload ───────────────────────────────────────────
+const mineUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["application/pdf", "text/plain"];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error("Solo PDF o TXT"));
+  },
+});
+
+router.post("/cv/mine/upload", mineUpload.single("file"), async (req, res): Promise<void> => {
+  const userId = getAuthenticatedUserId(req);
+  if (!userId) { res.status(401).json({ error: "Non autenticato" }); return; }
+
+  let text = "";
+
+  if (req.file) {
+    if (req.file.mimetype === "application/pdf") {
+      try {
+        const pdfParse = ((await import("pdf-parse")) as any).default ?? (await import("pdf-parse"));
+        const parsed = await pdfParse(req.file.buffer);
+        text = parsed.text;
+      } catch {
+        res.status(400).json({ error: "Impossibile leggere il PDF. Prova con un file TXT." });
+        return;
+      }
+    } else {
+      text = req.file.buffer.toString("utf-8");
+    }
+  } else {
+    res.status(400).json({ error: "Nessun file fornito" });
+    return;
+  }
+
+  if (text.trim().length < 50) {
+    res.status(400).json({ error: "Testo estratto troppo breve. Controlla il file." });
+    return;
+  }
+
+  const prompt = `Analizza il seguente curriculum vitae e restituisci un JSON strutturato.
+
+CURRICULUM:
+${text.slice(0, 8000)}
+
+Restituisci SOLO un JSON valido con questa struttura (senza markdown, senza \`\`\`):
+{
+  "personalInfo": { "name": "", "email": "", "phone": "", "location": "", "linkedin": "", "website": "", "title": "" },
+  "summary": "",
+  "experience": [{ "id": "exp1", "title": "", "company": "", "period": "", "location": "", "description": "", "skills": [] }],
+  "education": [{ "id": "edu1", "degree": "", "institution": "", "year": "", "description": "" }],
+  "skills": [],
+  "tools": [],
+  "languages": [{ "language": "", "level": "" }],
+  "certifications": []
+}
+
+Estrai tutte le informazioni presenti. Per i campi non trovati usa array vuoti o stringhe vuote.`;
+
+  let cvData: CvData;
+  try {
+    cvData = await aiJson<CvData>(prompt);
+    cvData.extractedAt = new Date().toISOString();
+  } catch {
+    res.status(500).json({ error: "Errore nel parsing della risposta AI. Riprova." });
+    return;
+  }
+
+  const [existing] = await db.select({ cvJson: usersTable.cvJson }).from(usersTable).where(eq(usersTable.id, userId));
+  // Preserve existing generated CV when uploading a new one
+  const merged = { ...cvData, generated: (existing?.cvJson as any)?.generated };
+
+  await db.update(usersTable)
+    .set({ cvJson: merged as any, cvText: text.slice(0, 50000) })
+    .where(eq(usersTable.id, userId));
+
+  const cvs = buildCvMetaList(merged as any, text, userId);
+  res.json({ success: true, cvs });
+});
+
+// ── POST /api/cv/mine/generate ─────────────────────────────────────────
+router.post("/cv/mine/generate", async (req, res): Promise<void> => {
+  const userId = getAuthenticatedUserId(req);
+  if (!userId) { res.status(401).json({ error: "Non autenticato" }); return; }
+
+  // Fetch everything we need from DB autonomously
+  const [user] = await db
+    .select({
+      name: usersTable.name,
+      email: usersTable.email,
+      cvJson: usersTable.cvJson,
+      cvText: usersTable.cvText,
+      workPreference: usersTable.workPreference,
+    })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId));
+
+  if (!user) { res.status(404).json({ error: "Utente non trovato" }); return; }
+
+  // Fetch graph nodes
+  let graphNodes: Array<{ type: string; label: string }> = [];
+  try {
+    const { knowledgeGraphTable } = await import("@workspace/db") as any;
+    if (knowledgeGraphTable) {
+      graphNodes = await db.select({ type: knowledgeGraphTable.type, label: knowledgeGraphTable.label })
+        .from(knowledgeGraphTable)
+        .where(eq(knowledgeGraphTable.userId, userId));
+    }
+  } catch { /* graph table may not exist, proceed without */ }
+
+  const cvData = user.cvJson as any;
+  const graphRoles  = graphNodes.filter((n) => n.type === "role").map((n) => n.label);
+  const graphSkills = graphNodes.filter((n) => n.type === "skill").map((n) => n.label);
+  const graphTools  = graphNodes.filter((n) => n.type === "tool").map((n) => n.label);
+  const graphCerts  = graphNodes.filter((n) => n.type === "certification").map((n) => n.label);
+
+  const cvSummary = cvData
+    ? `CV caricato con ${(cvData.experience ?? []).length} esperienze, competenze: ${(cvData.skills ?? []).slice(0, 8).join(", ")}`
+    : "Nessun CV caricato";
+
+  const now = new Date().toISOString();
+  const prompt = `Sei un career coach esperto. Genera un curriculum vitae professionale ottimizzato in italiano.
+
+DATI UTENTE:
+- Nome: ${user.name}
+- Email: ${user.email}
+- Preferenza lavorativa: ${user.workPreference ?? "non specificata"}
+
+GRAFO DELLE CONOSCENZE:
+- Ruoli target: ${graphRoles.join(", ") || "non specificati"}
+- Competenze: ${graphSkills.join(", ") || "non specificate"}
+- Strumenti: ${graphTools.join(", ") || "non specificati"}
+- Certificazioni: ${graphCerts.join(", ") || "non specificate"}
+
+DATO CV ESISTENTE:
+${cvSummary}
+${cvData?.experience ? `Esperienze: ${cvData.experience.map((e: any) => `${e.title} @ ${e.company} (${e.period})`).join("; ")}` : ""}
+${cvData?.education ? `Formazione: ${cvData.education.map((e: any) => `${e.degree} - ${e.institution}`).join("; ")}` : ""}
+
+Restituisci SOLO un JSON valido (senza markdown):
+{
+  "personalInfo": { "name": "${user.name}", "email": "${user.email}", "phone": "${cvData?.personalInfo?.phone ?? ""}", "location": "${cvData?.personalInfo?.location ?? ""}", "linkedin": "${cvData?.personalInfo?.linkedin ?? ""}", "title": "" },
+  "summary": "",
+  "experience": [{ "id": "exp1", "title": "", "company": "", "period": "", "location": "", "description": "", "skills": [] }],
+  "education": [{ "id": "edu1", "degree": "", "institution": "", "year": "" }],
+  "skills": [],
+  "tools": [],
+  "languages": [{ "language": "", "level": "" }],
+  "certifications": [],
+  "targetRole": "",
+  "generatedAt": "${now}"
+}
+
+Integra i dati del CV caricato con le informazioni del grafo. Sii specifico e professionale.`;
+
+  let generated: any;
+  try {
+    generated = await aiJson<any>(prompt);
+  } catch {
+    res.status(500).json({ error: "Errore nella generazione. Riprova." });
+    return;
+  }
+
+  const updatedJson = { ...(cvData ?? {}), generated, lastGenerated: now };
+  await db.update(usersTable)
+    .set({ cvJson: updatedJson as any })
+    .where(eq(usersTable.id, userId));
+
+  const cvs = buildCvMetaList(updatedJson, user.cvText, userId);
+  res.json({ success: true, cvs });
+});
+
+// ── DELETE /api/cv/mine ────────────────────────────────────────────────
+router.delete("/cv/mine", async (req, res): Promise<void> => {
+  const userId = getAuthenticatedUserId(req);
+  if (!userId) { res.status(401).json({ error: "Non autenticato" }); return; }
+
+  await db.update(usersTable)
+    .set({ cvJson: null as any, cvText: null as any })
+    .where(eq(usersTable.id, userId));
+
+  res.json({ success: true });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// LEGACY endpoints (mantengono compatibilità con CvBuilder esistente)
+// ══════════════════════════════════════════════════════════════════════
 
 // ── GET /api/cv/:userId ────────────────────────────────────────────────
 router.get("/cv/:userId", async (req, res): Promise<void> => {
@@ -144,7 +395,7 @@ router.post("/cv/upload", upload.single("file"), async (req, res): Promise<void>
   }
 
   if (text.trim().length < 50) {
-    res.status(400).json({ error: "Il testo estratto \u00e8 troppo breve. Controlla il file." });
+    res.status(400).json({ error: "Il testo estratto è troppo breve. Controlla il file." });
     return;
   }
 
@@ -284,16 +535,16 @@ router.post("/cv/:userId/tailor", async (req, res): Promise<void> => {
   const cvJson = JSON.stringify(generated, null, 2);
   const prompt = `Sei un esperto recruiter e career coach italiano. Adatta il CV all'offerta di lavoro.
 
-\u2500\u2500\u2500 CV ATTUALE (JSON) \u2500\u2500\u2500
+─── CV ATTUALE (JSON) ───
 ${cvJson}
 
-\u2500\u2500\u2500 OFFERTA DI LAVORO \u2500\u2500\u2500
+─── OFFERTA DI LAVORO ───
 ${jobPosting.slice(0, 4000)}
 
 ISTRUZIONI:
 1. Aggiorna "targetRole" con il titolo esatto del ruolo
 2. Riscrivi "summary" integrando 3-5 keyword chiave dell'offerta
-3. Per ogni esperienza, riscrivi "description" evidenziando le responsabilit\u00e0 che corrispondono ai requisiti
+3. Per ogni esperienza, riscrivi "description" evidenziando le responsabilità che corrispondono ai requisiti
 4. Riordina "skills" e "tools" mettendo prima quelle che matchano l'offerta
 5. Aggiorna "personalInfo.title" con il titolo del ruolo target
 6. NON inventare esperienze o competenze non presenti nel CV
@@ -543,7 +794,8 @@ router.post("/cv/:userId/ats-score", async (req, res): Promise<void> => {
 
   const { generated, jobPosting } = req.body;
   if (!generated || !jobPosting?.trim()) {
-    res.status(400).json({ error: "Dati CV e offerta richiesti" }); return;
+    res.status(400).json({ error: "Dati CV e offerta richiesti" });
+    return;
   }
 
   const cvText = [
@@ -556,7 +808,7 @@ router.post("/cv/:userId/ats-score", async (req, res): Promise<void> => {
     (generated.certifications ?? []).join(" "),
   ].join("\n");
 
-  const prompt = `Sei un esperto ATS e recruiter HR senior. Analizza la compatibilit\u00e0 tra il CV e l'offerta.
+  const prompt = `Sei un esperto ATS e recruiter HR senior. Analizza la compatibilità tra il CV e l'offerta.
 
 CV:
 ${cvText}
@@ -586,7 +838,8 @@ Label: "Eccellente" (85+), "Buono" (70-84), "Sufficiente" (55-69), "Da migliorar
   try {
     result = await aiJson<any>(prompt);
   } catch {
-    res.status(500).json({ error: "Errore nel parsing della risposta AI" }); return;
+    res.status(500).json({ error: "Errore nel parsing della risposta AI" });
+    return;
   }
 
   res.json({ success: true, result });
