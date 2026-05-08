@@ -35,8 +35,9 @@ import adminStatsRouter         from "./routes/admin/stats";
 import adminUsersRouter         from "./routes/admin/users";
 import adminRevenueRouter       from "./routes/admin/revenue";
 
-// Phase 3 — Gamification: Voice Sessions
-import voiceRouter from "./routes/voice";
+// Phase 3 — Gamification
+import voiceRouter       from "./routes/voice";
+import leaderboardRouter from "./routes/leaderboard";
 
 export function createApp() {
   const app = express();
@@ -49,8 +50,7 @@ export function createApp() {
 
   app.get("/health", (_req, res) => res.json({ ok: true }));
 
-  // OG image route registered BEFORE jwtMiddleware so it is fully public
-  app.use(ogProfileRouter);   // GET /api/og/profile/:userId  (no auth)
+  app.use(ogProfileRouter);
 
   app.use("/api", jwtMiddleware);
 
@@ -83,8 +83,9 @@ export function createApp() {
   app.use("/api/admin/users",   adminUsersRouter);
   app.use("/api/admin/revenue", adminRevenueRouter);
 
-  // Phase 3 — Gamification: Voice Sessions
-  app.use("/api/voice", voiceRouter);
+  // Phase 3 — Gamification
+  app.use("/api/voice",       voiceRouter);
+  app.use("/api/leaderboard", leaderboardRouter);
 
   app.use((_req, res) => res.status(404).json({ error: "Not found" }));
   app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
