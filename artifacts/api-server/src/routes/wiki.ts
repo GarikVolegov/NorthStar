@@ -1,11 +1,10 @@
 import { Router } from "express";
-import { openai } from "@workspace/integrations-openai-ai-server";
 import { db, sectorsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { optionalAuthMiddleware } from "../lib/auth-jwt.js";
 import { aiChatRateLimiter } from "../lib/rate-limiter.js";
 import { getPrompt, fillTemplate } from "../lib/prompt-store.js";
-import { rejectIfOpenAINotConfigured, openAIErrorMessage } from "../lib/openai-availability.js";
+import { ai } from "../lib/ai/index.js";
 
 const router = Router();
 
@@ -26,8 +25,6 @@ router.post("/wiki/:sectorId/ask", optionalAuthMiddleware, aiChatRateLimiter, as
     res.status(404).json({ error: "Settore non trovato" });
     return;
   }
-
-  if (rejectIfOpenAINotConfigured(res)) return;
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -50,25 +47,25 @@ router.post("/wiki/:sectorId/ask", optionalAuthMiddleware, aiChatRateLimiter, as
   });
 
   try {
-    const messages = [
-      { role: "system" as const, content: systemPrompt },
-      ...history.slice(-10).map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-      { role: "user" as const, content: question },
+    const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+      { role: "system", content: systemPrompt },
+      ...history.slice(-10).map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+      { role: "user", content: question },
     ];
 
-    const stream = await openai.chat.completions.create({
-      model: "gpt-4.1",
-      max_tokens: 1024,
+    for await (const chunk of ai.streamChat({
+      useCase: "streaming_chat",
       messages,
-      stream: true,
-    });
-
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      maxTokens: 1024,
+    })) {
+      res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
     }
   } catch (err) {
-    res.write(`data: ${JSON.stringify({ error: openAIErrorMessage(err) })}\n\n`);
+    const message = err instanceof Error ? err.message : "Errore interno";
+    res.write(`data: ${JSON.stringify({ error: message })}\n\n`);
   }
 
   res.write(`data: ${JSON.stringify({ done: true })}\n\n`);

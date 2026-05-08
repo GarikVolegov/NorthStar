@@ -2,9 +2,9 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { and, eq, inArray, or } from "drizzle-orm";
 import { db, knowledgeNodesTable, knowledgeEdgesTable } from "@workspace/db";
-import { openai } from "@workspace/integrations-openai-ai-server";
 import { authMiddleware } from "../lib/auth-jwt.js";
 import { aiChatRateLimiter } from "../lib/rate-limiter.js";
+import { ai } from "../lib/ai/index.js";
 
 const router: IRouter = Router();
 
@@ -68,8 +68,6 @@ const AskBody = z.object({
 
 // ─── Embedding helpers ──────────────────────────────────────────────────────
 
-const EMBED_MODEL = "text-embedding-3-small";
-
 function nodeText(n: { title: string; content: string; type?: string; url?: string | null }): string {
   const parts = [n.title];
   if (n.type) parts.push(`[${n.type}]`);
@@ -82,8 +80,8 @@ async function embedText(text: string): Promise<number[] | null> {
   const trimmed = text.slice(0, 8000);
   if (!trimmed.trim()) return null;
   try {
-    const r = await openai.embeddings.create({ model: EMBED_MODEL, input: trimmed });
-    return r.data[0]?.embedding ?? null;
+    const vecs = await ai.embed(trimmed);
+    return vecs[0] ?? null;
   } catch (err) {
     console.error("[knowledge] embedText failed:", err instanceof Error ? err.message : err);
     return null;
@@ -121,7 +119,6 @@ router.get("/knowledge/graph", authMiddleware, async (_req, res): Promise<void> 
     db.select().from(knowledgeNodesTable).where(eq(knowledgeNodesTable.userId, userId)),
     db.select().from(knowledgeEdgesTable).where(eq(knowledgeEdgesTable.userId, userId)),
   ]);
-  // Strip embeddings from response (heavy + not needed client-side)
   const cleanNodes = nodes.map(({ embedding: _e, embeddedText: _t, ...rest }) => ({
     ...rest,
     hasEmbedding: !!_e && Array.isArray(_e) && _e.length > 0,
@@ -151,7 +148,6 @@ router.post("/knowledge/nodes", authMiddleware, async (req, res): Promise<void> 
       y: v.y ?? 0,
     })
     .returning();
-  // Fire-and-forget embedding generation
   void embedAndStore(created.id, userId, nodeText(created));
   const { embedding: _e, embeddedText: _t, ...clean } = created;
   res.status(201).json({ ...clean, hasEmbedding: false });
@@ -182,7 +178,6 @@ router.patch("/knowledge/nodes/:id", authMiddleware, async (req, res): Promise<v
     res.status(404).json({ error: "Nodo non trovato" });
     return;
   }
-  // If title/content/url/type changed and produces different embedded text, re-embed in background
   const newText = nodeText(updated);
   if (newText !== updated.embeddedText) {
     void embedAndStore(updated.id, userId, newText);
@@ -286,7 +281,7 @@ router.delete("/knowledge/edges/:id", authMiddleware, async (req, res): Promise<
   res.json({ ok: true });
 });
 
-// ─── Backfill embeddings for existing nodes ─────────────────────────────────
+// ─── Backfill embeddings ─────────────────────────────────────────────────────
 
 router.post(
   "/knowledge/embeddings/backfill",
@@ -319,7 +314,7 @@ router.post(
   },
 );
 
-// ─── RAG: Ask the graph ─────────────────────────────────────────────────────
+// ─── RAG: Ask the graph ──────────────────────────────────────────────────────
 
 router.post("/knowledge/ask", authMiddleware, aiChatRateLimiter, async (req, res): Promise<void> => {
   const userId = res.locals.userId as number;
@@ -341,25 +336,20 @@ router.post("/knowledge/ask", authMiddleware, aiChatRateLimiter, async (req, res
   };
 
   try {
-    // 1. Load all user's nodes + edges
     const [allNodes, allEdges] = await Promise.all([
       db.select().from(knowledgeNodesTable).where(eq(knowledgeNodesTable.userId, userId)),
       db.select().from(knowledgeEdgesTable).where(eq(knowledgeEdgesTable.userId, userId)),
     ]);
 
     if (allNodes.length === 0) {
-      send({
-        error: "Il tuo grafo è vuoto. Aggiungi qualche nodo prima di interrogarlo.",
-      });
+      send({ error: "Il tuo grafo è vuoto. Aggiungi qualche nodo prima di interrogarlo." });
       send({ done: true });
       res.end();
       return;
     }
 
-    // 2. Ensure embeddings: backfill missing ones inline (best effort, capped)
-    const missing = allNodes.filter(
-      (n) => !Array.isArray(n.embedding) || n.embedding.length === 0,
-    );
+    // Backfill embeddings mancanti (max 30)
+    const missing = allNodes.filter((n) => !Array.isArray(n.embedding) || n.embedding.length === 0);
     const toBackfill = missing.slice(0, 30);
     if (toBackfill.length > 0) {
       send({ status: "embedding", count: toBackfill.length });
@@ -379,7 +369,6 @@ router.post("/knowledge/ask", authMiddleware, aiChatRateLimiter, async (req, res
       );
     }
 
-    // 3. Embed the question
     send({ status: "retrieving" });
     const qVec = await embedText(question);
     if (!qVec) {
@@ -389,7 +378,6 @@ router.post("/knowledge/ask", authMiddleware, aiChatRateLimiter, async (req, res
       return;
     }
 
-    // 4. Cosine similarity ranking
     const scored = allNodes
       .map((n) => ({
         node: n,
@@ -403,24 +391,19 @@ router.post("/knowledge/ask", authMiddleware, aiChatRateLimiter, async (req, res
 
     const top = scored.slice(0, topK);
 
-    // 5. Expand with direct neighbors of the top nodes for graph context
     const topIds = new Set(top.map((s) => s.node.id));
     const neighborIds = new Set<number>();
     for (const e of allEdges) {
       if (topIds.has(e.sourceId)) neighborIds.add(e.targetId);
       if (topIds.has(e.targetId)) neighborIds.add(e.sourceId);
     }
-    const neighborNodes = allNodes.filter(
-      (n) => neighborIds.has(n.id) && !topIds.has(n.id),
-    );
+    const neighborNodes = allNodes.filter((n) => neighborIds.has(n.id) && !topIds.has(n.id));
     const contextIds = new Set<number>([...topIds, ...neighborIds]);
     const contextEdges = allEdges.filter(
       (e) => contextIds.has(e.sourceId) && contextIds.has(e.targetId),
     );
 
-    // 6. Build the context block
-    const truncate = (s: string, n: number) =>
-      s.length > n ? s.slice(0, n) + "…" : s;
+    const truncate = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "…" : s);
 
     const formatNode = (n: typeof allNodes[number], score?: number) => {
       const head = `#${n.id} [${n.type}] "${n.title}"${
@@ -430,14 +413,8 @@ router.post("/knowledge/ask", authMiddleware, aiChatRateLimiter, async (req, res
       return head + body;
     };
 
-    const topBlock = top
-      .map((s) => formatNode(s.node, s.score))
-      .join("\n\n──\n\n");
-
-    const neighborBlock = neighborNodes
-      .map((n) => formatNode(n))
-      .join("\n\n──\n\n");
-
+    const topBlock = top.map((s) => formatNode(s.node, s.score)).join("\n\n──\n\n");
+    const neighborBlock = neighborNodes.map((n) => formatNode(n)).join("\n\n──\n\n");
     const edgeLines = contextEdges
       .map((e) => {
         const a = allNodes.find((n) => n.id === e.sourceId)?.title ?? `#${e.sourceId}`;
@@ -446,23 +423,12 @@ router.post("/knowledge/ask", authMiddleware, aiChatRateLimiter, async (req, res
       })
       .join("\n");
 
-    // 7. Send citations metadata first
     send({
-      citations: top.map((s) => ({
-        id: s.node.id,
-        title: s.node.title,
-        type: s.node.type,
-        score: s.score,
-      })),
-      neighbors: neighborNodes.map((n) => ({
-        id: n.id,
-        title: n.title,
-        type: n.type,
-      })),
+      citations: top.map((s) => ({ id: s.node.id, title: s.node.title, type: s.node.type, score: s.score })),
+      neighbors: neighborNodes.map((n) => ({ id: n.id, title: n.title, type: n.type })),
     });
 
-    // 8. Stream the LLM answer
-    const prompt = `Sei un assistente che risponde alle domande dell'utente basandoti ESCLUSIVAMENTE sul suo grafo personale di conoscenza (note, competenze, documenti, ruoli, strumenti, certificazioni, concetti, link che lui stesso ha aggiunto).
+    const ragPrompt = `Sei un assistente che risponde alle domande dell'utente basandoti ESCLUSIVAMENTE sul suo grafo personale di conoscenza (note, competenze, documenti, ruoli, strumenti, certificazioni, concetti, link che lui stesso ha aggiunto).
 
 Regole tassative:
 - Rispondi SOLO con informazioni presenti nei nodi del grafo qui sotto. Se l'informazione non c'è, dillo onestamente ("Non ho trovato questa informazione nel tuo grafo") e suggerisci quali nodi potrebbe aggiungere.
@@ -471,12 +437,12 @@ Regole tassative:
 - Rispondi in italiano.
 - Se utile, suggerisci collegamenti mancanti tra nodi che potrebbe creare.
 
-═══ NODI PIÙ RILEVANTI (selezionati per similarità semantica con la domanda) ═══
+═══ NODI PIÙ RILEVANTI ═══
 ${topBlock || "(nessuno)"}
 
 ${
   neighborBlock
-    ? `═══ NODI COLLEGATI (vicini nel grafo, per contesto) ═══\n${neighborBlock}\n`
+    ? `═══ NODI COLLEGATI ═══\n${neighborBlock}\n`
     : ""
 }${
   edgeLines
@@ -489,16 +455,12 @@ ${question}
 Rispondi ora, citando gli id [#N] dei nodi usati.`;
 
     send({ status: "answering" });
-    const stream = await openai.chat.completions.create({
-      model: "gpt-5.1",
-      max_completion_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
-      stream: true,
-    });
-
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) send({ content });
+    for await (const chunk of ai.streamChat({
+      useCase: "streaming_chat",
+      messages: [{ role: "user", content: ragPrompt }],
+      maxTokens: 1024,
+    })) {
+      send({ content: chunk });
     }
   } catch (err) {
     console.error("[knowledge/ask] error:", err);
