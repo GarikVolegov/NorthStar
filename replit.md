@@ -28,25 +28,33 @@ pnpm --filter @workspace/api-server run test:integration   # Vitest + Supertest
 pnpm --filter @workspace/api-server run test:coverage      # coverage report
 pnpm test:e2e                                              # Playwright (tutti i servizi attivi)
 pnpm test:e2e:api                                          # Playwright API-only (no browser)
+
+# ─── DB Security (una tantum, da superuser) ───────────────────────────
+psql -U postgres -d northstar -f scripts/db-roles.sql
+psql -U postgres -d northstar -f scripts/verify-db-privileges.sql
 ```
 
 ### Variabili d'ambiente
 
-**Obbligatorie:** `DATABASE_URL`, `ADMIN_KEY`, `AI_AGENTS_URL`, `JWT_SECRET`
+**Obbligatorie:** `DATABASE_URL`, `DATABASE_URL_MIGRATOR`, `ADMIN_KEY`, `AI_AGENTS_URL`, `JWT_SECRET`
 
-**Opzionali:**
 ```
+# ─── Database: due connessioni separate per ruolo ─────────────────────
+DATABASE_URL             # northstar_app — solo DML (SELECT/INSERT/UPDATE/DELETE)
+DATABASE_URL_MIGRATOR    # northstar_migrator — DDL completo (solo per CI/deploy)
+
 JWT_SECRET
+ADMIN_KEY
 STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
 GNEWS_API_KEY, TAVILY_API_KEY
 RESEND_API_KEY
-EMAIL_FROM                  # mittente email verificato (es. noreply@tuodominio.eu) — OBBLIGATORIO per email a utenti reali
+EMAIL_FROM
 VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
 GOOGLE_CLIENT_ID
-AI_INTEGRATIONS_OPENAI_BASE_URL   # Replit proxy OpenAI
+AI_INTEGRATIONS_OPENAI_BASE_URL
 AI_INTEGRATIONS_OPENAI_API_KEY
-AI_MODEL                    # modello OpenAI per agenti orchestratore legacy (default: gpt-4o-mini)
-AI_MODEL_OVERRIDE           # override globale modello nel router (opzionale)
+AI_MODEL
+AI_MODEL_OVERRIDE
 
 # Override provider per use case (senza redeploy)
 AI_STREAMING_PROVIDER       # default: groq
@@ -54,7 +62,7 @@ AI_AGENT_PROVIDER           # default: anthropic
 AI_EMBEDDING_PROVIDER       # default: openai
 AI_RESEARCH_PROVIDER        # default: groq
 AI_JSON_PROVIDER            # default: groq
-CORS_ORIGIN                 # origin frontend in produzione (es. https://northstar.app)
+CORS_ORIGIN                 # origin frontend in produzione
 ```
 
 ---
@@ -67,12 +75,13 @@ CORS_ORIGIN                 # origin frontend in produzione (es. https://northst
 | **Backend** | Express 5, TypeScript, Drizzle ORM, Pino logging, esbuild (custom `build.mjs`) |
 | **AI** | Python 3.11, FastAPI, LangChain, LangGraph — microservizio su porta 8000 |
 | **LLM Router** | `artifacts/api-server/src/lib/ai/` — router multi-provider (Groq / Anthropic / OpenAI / Google) con fallback automatico |
-| **Database** | PostgreSQL (Replit managed → obiettivo: qualsiasi provider via `DATABASE_URL`), Drizzle ORM |
-| **Auth** | JWT custom (bcryptjs + `JWT_SECRET` persistente) |
+| **Database** | PostgreSQL — Drizzle ORM, due ruoli separati (`northstar_app` DML-only, `northstar_migrator` DDL) |
+| **Auth** | JWT custom (bcryptjs + `JWT_SECRET` persistente), middleware `requireAuth` / `requireAdmin` / `requirePremium` |
+| **Security** | Rate limiting per route (express-rate-limit), RBAC admin (timing-safe key check), db-guard anti-injection |
 | **Monorepo** | pnpm workspaces + catalog |
 | **Testing** | Vitest (unit + integration) + Supertest + Playwright (E2E) |
 | **CI/CD** | GitHub Actions — `.github/workflows/ci.yml` |
-| **DOCX** | libreria `docx` (server-side, `api-server`) — installare con `pnpm add docx --filter api-server` |
+| **DOCX** | libreria `docx` (server-side, `api-server`) |
 
 ---
 
@@ -82,79 +91,74 @@ CORS_ORIGIN                 # origin frontend in produzione (es. https://northst
 artifacts/
   orientamento/          # React/Vite frontend (porta 5000)
     src/
-      pages/             # ~30 pagine (home, dashboard, discovery, admin...)
-      components/        # UI components (navbar, cards, wizard, admin panels)
-        cv/              # CV Builder components
-          CvGeneratorModal.tsx   # modale principale generazione CV (3 template)
-          CvSection.tsx          # card dashboard CV: upload, genera, modifica, download
-          CvEditorDrawer.tsx     # drawer editor manuale CV (sezioni collassabili)
-          CvDownloadMenu.tsx     # dropdown download PDF / DOCX / JSON
-      hooks/             # useSSEStream, useTTS, useDiscoveryFeed...
-      lib/               # brand.ts, chart-theme.ts, queryClient...
-      i18n.ts            # setup i18next (5 lingue: it, en, es, fr, de)
-      locales/
-        it/translation.json
-        en/translation.json
-        es/translation.json
-        fr/translation.json
-        de/translation.json
+      pages/
+      components/
+        cv/
+          CvGeneratorModal.tsx
+          CvSection.tsx
+          CvEditorDrawer.tsx
+          CvDownloadMenu.tsx
+      hooks/
+      lib/
+      i18n.ts
+      locales/           # it, en, es, fr, de
   api-server/            # Express API (porta 8080)
-    vitest.config.ts     # config Vitest (unit + integration)
+    vitest.config.ts
     src/
       __tests__/
-        setup.ts         # env vars globali per tutti i test
-        unit/            # test unitari (AI router, circuit breaker, retry, errorHandler, validateBody)
-        integration/     # test integration con Supertest (health, cv-routes, admin-routes)
-      app.ts             # Express app — middleware stack (security, Pino HTTP, CORS, rate limit)
+        setup.ts
+        unit/            # ai-router, circuit-breaker, retry, error-handler,
+                         # validate-body, rate-limiters, require-admin, db-guard
+        integration/     # health, cv-routes, admin-routes, security
+      app.ts             # Express app — middleware stack
       lib/
-        ai/              # AI Router — PUNTO DI INGRESSO UNICO per tutte le call AI
-          index.ts       # ai.chat(), ai.agent(), ai.embed() — API pubblica
-          router.ts      # use case → provider + modello; override env
-          types.ts       # AIUseCase, AIProviderName, AIRouterConfig...
-          providers/     # implementazioni per ogni provider
-          utils/         # circuit-breaker.ts, retry.ts 🔲
-        logger.ts        # istanza Pino condivisa
-        security-headers.ts  # helmet-like security middleware
-        global-rate-limiter.ts  # 200 req/min per IP
-      middlewares/       # errorHandler.ts 🔲, validateBody.ts 🔲
-      routes/            # 40+ route files organizzati per dominio
-        cv.ts            # CV Builder — upload, generate, edit, PDF, DOCX, tailor, cover letter, ATS score
-        discovery/       # feed.ts, saved.ts
-        admin/           # agent-health, discovery-collect, discovery-sources,
-                         # discovery-items, discovery-enrich, analyze-supervisor
-        growth-agent/    # chat, knowledge, memory, analytics, notifications
-      jobs/              # cron.ts (collector 6h, enricher 2h, personalizer 3h)
-  ai-agents/             # Python FastAPI (porta 8000)
+        ai/
+          index.ts       # ai.chat(), ai.agent(), ai.embed()
+          router.ts
+          types.ts
+          providers/
+          utils/         # circuit-breaker.ts 🔲, retry.ts 🔲
+        logger.ts
+        security-headers.ts
+        global-rate-limiter.ts   # 200 req/min per IP (globale)
+        rate-limiters.ts         # limiter per route: auth, admin, ai, upload, reset ✅
+        db-guard.ts              # anti-injection helper + Drizzle cheat sheet ✅
+      middlewares/
+        errorHandler.ts  🔲
+        validateBody.ts  🔲
+        requireAuth.ts   # JWT verify, popola req.user ✅
+        requireAdmin.ts  # x-admin-key timing-safe + requireAdminRole ✅
+      routes/
+        cv.ts
+        discovery/
+        admin/
+        growth-agent/
+      jobs/
+  ai-agents/
 lib/
   db/
-    src/schema/          # Drizzle schema — source of truth
-    drizzle/             # SQL migrations
-  integrations-openai-ai-server/
-    src/
-      client.ts          # OpenAI Proxy Replit (legacy, usato da enricher)
-      discovery-agent/   # collector-agent.ts, enricher-agent.ts, personalizer-agent.ts
-  integrations-openai-ai-react/
-    src/
-      admin/             # AdminDashboard, AdminEnricherPanel, AdminCollectorPanel...
-      discovery/         # DiscoveryFeedPage, DiscoveryItemCard, useDiscoveryFeed
-      growth-agent/      # GrowthChatPanel, GrowthAnalyticsDashboard...
-  api-spec/              # OpenAPI spec + Orval codegen config
-  api-zod/               # Zod schemas generati
-  api-client-react/      # TanStack React Query hooks generati
-e2e/                     # Playwright specs
-  auth.spec.ts           # Login, register, logout
-  test-riasec.spec.ts    # Flusso test RIASEC completo
-  objectives.spec.ts     # Gestione obiettivi
-  admin.spec.ts          # Admin dashboard
-  api.spec.ts            # API-only (health, auth protection, admin)
-  cv-builder.spec.ts     # CV Builder: genera, template, download, ATS 🔲
-  discovery-feed.spec.ts # Discovery: feed, filtri, bookmark, insight 🔲
-.github/
-  workflows/
-    ci.yml               # Pipeline CI: typecheck → unit → integration → E2E
-.envrc                   # direnv — carica .env automaticamente (locale, non committare)
-docker-compose.yml       # dev: tutti i servizi in locale
-docker-compose.prod.yml  # prod: immagini ottimizzate, health check, no volume mount
+    src/schema/
+    drizzle/
+  integrations-openai-ai-server/src/
+  integrations-openai-ai-react/src/
+  api-spec/
+  api-zod/
+  api-client-react/
+scripts/
+  db-roles.sql           # Crea ruoli northstar_app + northstar_migrator ✅
+  verify-db-privileges.sql  # Verifica privilegi post-setup ✅
+e2e/
+  auth.spec.ts
+  test-riasec.spec.ts
+  objectives.spec.ts
+  admin.spec.ts
+  api.spec.ts
+  cv-builder.spec.ts     🔲
+  discovery-feed.spec.ts 🔲
+.github/workflows/ci.yml
+.envrc
+docker-compose.yml
+docker-compose.prod.yml
 ```
 
 ---
@@ -168,16 +172,17 @@ docker-compose.prod.yml  # prod: immagini ottimizzate, health check, no volume m
 #### 🔲 `direnv` + `.envrc` per sviluppo locale
 
 ```bash
-brew install direnv  # macOS / apt install direnv Linux
-eval "$(direnv hook zsh)"  # nel .zshrc
+brew install direnv
+eval "$(direnv hook zsh)"
 
-# .envrc (mai committare — aggiungere a .gitignore)
-export DATABASE_URL="postgresql://user:pass@localhost:5432/northstar"
+# .envrc — mai committare
+export DATABASE_URL="postgresql://northstar_app:PASSWORD@localhost:5432/northstar"
+export DATABASE_URL_MIGRATOR="postgresql://northstar_migrator:PASSWORD@localhost:5432/northstar"
 export JWT_SECRET="..."
 export ADMIN_KEY="..."
 export AI_AGENTS_URL="http://localhost:8000"
 
-direnv allow  # prima volta
+direnv allow
 ```
 
 #### 🔲 Secret Manager in produzione
@@ -191,64 +196,348 @@ direnv allow  # prima volta
 
 #### ✅ DATABASE_URL già standardizzato
 
-Drizzle usa `postgresql://user:pass@host:5432/db` — cambiare provider non richiede modifiche al codice.
-
 ---
 
 ### 2. Containerizzazione dev/prod
 
-Vedi `docker-compose.yml` (dev con hot reload + DB locale) e `docker-compose.prod.yml` (immagini buildate, restart always, health check conservativi). In produzione il frontend è su CDN — non va containerizzato.
+Vedi `docker-compose.yml` (dev) e `docker-compose.prod.yml` (prod). In produzione il frontend è su CDN.
 
 ---
 
 ### 3. Health Check Endpoint
 
-✅ **Express**: `GET /api/health` già presente in `app.ts` — risponde `{ status: "ok" }` senza auth.
+✅ **Express**: `GET /api/health`.
 
-🔲 **Express avanzato** (da migliorare): aggiungere check DB e AI agents come sub-check con risposta `200 healthy` / `503 degraded`. Vedi pattern in sezione **Qualità del Codice Backend**.
+🔲 **Express avanzato**: aggiungere check DB e AI agents — `200 healthy` / `503 degraded`.
 
-🔲 **FastAPI**: aggiungere `GET /health` in `artifacts/ai-agents/main.py`:
+🔲 **FastAPI**:
 ```python
-import time
-from datetime import datetime, timezone
-_start_time = time.time()
-
 @app.get("/health")
 async def health_check():
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "uptime_seconds": round(time.time() - _start_time),
-    }
+    return { "status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat() }
 ```
 
-Regole: nessun auth, timeout < 1s, 200/503, non loggare le request `/health`.
+---
+
+## Sicurezza
+
+> **Principio guida**: ogni livello ha il minimo accesso necessario per funzionare. Nessun componente può fare più di quello che gli serve.
+
+### 1. Ruoli DB — Principio del Minimo Privilegio
+
+File: `scripts/db-roles.sql` · Verifica: `scripts/verify-db-privileges.sql`
+
+#### Due ruoli separati
+
+| Ruolo | Connessione | Permessi | Quando usato |
+|---|---|---|---|
+| `northstar_app` | `DATABASE_URL` | SELECT, INSERT, UPDATE, DELETE | Runtime Express — sempre attivo |
+| `northstar_migrator` | `DATABASE_URL_MIGRATOR` | DDL completo (CREATE, ALTER, DROP) + DML | Solo in CI durante `drizzle-kit push` |
+
+L'applicazione a runtime **non può mai** eseguire `DROP TABLE`, `ALTER TABLE`, `CREATE TABLE` — anche in caso di SQL injection riuscita il danno è limitato ai dati, non alla struttura.
+
+#### Setup iniziale (una tantum da superuser)
+
+```bash
+# 1. Crea i ruoli
+psql -U postgres -d northstar -f scripts/db-roles.sql
+
+# 2. Verifica — il risultato deve mostrare solo SELECT/INSERT/UPDATE/DELETE per northstar_app
+psql -U postgres -d northstar -f scripts/verify-db-privileges.sql
+
+# 3. Aggiorna le env vars
+# DATABASE_URL=postgresql://northstar_app:PASSWORD@host:5432/northstar
+# DATABASE_URL_MIGRATOR=postgresql://northstar_migrator:PASSWORD@host:5432/northstar
+```
+
+#### Configurazione Drizzle per due ruoli
+
+```typescript
+// lib/db/src/index.ts — connessione runtime (northstar_app)
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const db = drizzle(pool, { schema });
+
+// drizzle.config.ts — connessione migrazione (northstar_migrator)
+import { defineConfig } from 'drizzle-kit';
+export default defineConfig({
+  schema: './lib/db/src/schema/index.ts',
+  out: './lib/db/drizzle',
+  dialect: 'postgresql',
+  dbCredentials: {
+    url: process.env.DATABASE_URL_MIGRATOR ?? process.env.DATABASE_URL!,
+  },
+});
+```
+
+#### Aggiornamento CI — usa `DATABASE_URL_MIGRATOR` per le migrazioni
+
+In `.github/workflows/ci.yml`, il job `integration-tests` già esegue `drizzle-kit push`. Deve usare l'utente migrator:
+
+```yaml
+- name: Run DB migrations
+  run: pnpm --filter @workspace/db exec drizzle-kit push
+  env:
+    DATABASE_URL_MIGRATOR: postgresql://northstar:northstar@localhost:5432/northstar_test
+    # northstar_app usa la stessa password nel container CI — in produzione separare
+    DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_test
+```
+
+---
+
+### 2. Rate Limiting per Route — Livelli Specifici
+
+File: `artifacts/api-server/src/lib/rate-limiters.ts`
+
+#### Strategia a 2 livelli
+
+```
+Ogni request
+    │
+    ├── [globalRateLimiter] — 200 req/min per IP (tutte le route)
+    │
+    └── [limiter specifico] — finestre più strette per route sensibili
+             ├── authLimiter         → POST /auth/login, /auth/register
+             ├── passwordResetLimiter → POST /auth/reset-password
+             ├── adminLimiter        → GET|POST /api/admin/*
+             ├── aiLimiter           → /cv/generate, /cv/tailor, /growth-agent/chat
+             └── uploadLimiter       → POST /cv/*/upload
+```
+
+#### Tabella limiter
+
+| Limiter | Finestra | Max req | Route protette | Obiettivo |
+|---|---|---|---|---|
+| `globalRateLimiter` | 1 min | 200 | `/*` tutte | DoS generico |
+| `authLimiter` | 15 min | 10 | `POST /auth/login`, `/auth/register` | Brute force password |
+| `passwordResetLimiter` | 30 min | 3 | `POST /auth/reset-password` | Email bombing, account enumeration |
+| `adminLimiter` | 1 min | 60 | `/api/admin/*` | Scraping automatico pannello admin |
+| `aiLimiter` | 1 min | 20 | `/cv/generate`, `/cv/tailor`, `/chat` | Costo API LLM |
+| `uploadLimiter` | 10 min | 5 | `POST /cv/*/upload` | DoS via upload ripetuti |
+
+#### Integrazione nelle route — pattern
+
+```typescript
+import { authLimiter, aiLimiter, uploadLimiter, adminLimiter } from '../lib/rate-limiters.js';
+
+// Auth routes
+router.post('/login',    authLimiter, loginHandler);
+router.post('/register', authLimiter, registerHandler);
+router.post('/reset-password', passwordResetLimiter, resetHandler);
+
+// CV routes con costo AI
+router.post('/mine/generate', requireAuth, aiLimiter, generateHandler);
+router.post('/:id/tailor',    requireAuth, aiLimiter, validateBody(TailorSchema), tailorHandler);
+router.post('/mine/upload',   requireAuth, uploadLimiter, uploadHandler);
+
+// Admin routes
+router.get('/metrics',     requireAdmin, adminLimiter, metricsHandler);
+```
+
+#### Risposta 429 strutturata
+
+Ogni limiter risponde con headers RFC 9110 (`RateLimit-Policy`, `RateLimit-Reset`) + body JSON:
+
+```json
+{
+  "error": "TOO_MANY_REQUESTS",
+  "message": "Troppe richieste. Riprova tra qualche minuto.",
+  "retryAfter": "1715170560"
+}
+```
+
+#### Note implementative
+
+- `skipSuccessfulRequests: true` su `authLimiter` — le login riuscite non consumano quota (mitiga falsi positivi per utenti legittimi)
+- `standardHeaders: 'draft-7'` — header RFC 9110 compatibili con client moderni
+- In produzione multi-istanza (es. 2+ Pod su Kubernetes): sostituire il store in-memory con **RedisStore** (`rate-limit-redis`)
+
+```typescript
+// Upgrade a Redis (produzione multi-istanza)
+import { RedisStore } from 'rate-limit-redis';
+import { createClient } from 'redis';
+
+const redisClient = createClient({ url: process.env.REDIS_URL });
+const store = new RedisStore({ sendCommand: (...args) => redisClient.sendCommand(args) });
+
+export const authLimiter = createLimiter('auth', { windowMs: 15 * 60 * 1000, max: 10, store });
+```
+
+---
+
+### 3. Protezione Injection — Drizzle ORM + db-guard
+
+File: `artifacts/api-server/src/lib/db-guard.ts`
+
+#### Regola fondamentale
+
+> **MAI usare `db.execute(sql`...`)` con interpolazione diretta da `req.body`. Sempre e solo Drizzle ORM con metodi tipizzati — genera prepared statements `$1, $2` automaticamente.**
+
+#### Drizzle genera prepared statements automaticamente
+
+Drizzle ORM con driver `node-postgres` serializza sempre i valori come parametri separati dalla query — il driver non può mai confondere dato e struttura SQL:
+
+```typescript
+// ✅ CORRETTO — Drizzle genera: SELECT * FROM users WHERE id = $1
+import { db } from '@workspace/db';
+import { users } from '@workspace/db/schema';
+import { eq, and } from 'drizzle-orm';
+
+// Tutti questi pattern sono sicuri:
+const user = await db.select().from(users).where(eq(users.id, userId));
+const active = await db.select().from(users).where(and(eq(users.email, email), eq(users.isActive, true)));
+await db.insert(users).values({ email, passwordHash, name });
+await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, userId));
+await db.delete(users).where(eq(users.id, userId));
+
+// ✅ Prepared statement esplicito (performance-critical, N chiamate ripetute)
+const getUser = db
+  .select()
+  .from(users)
+  .where(eq(users.id, sql.placeholder('id')))
+  .prepare('get_user_by_id');
+const result = await getUser.execute({ id: userId });
+
+// ❌ SBAGLIATO — interpolazione diretta: ${userId} non è un parametro Drizzle
+await db.execute(sql`SELECT * FROM users WHERE id = ${req.body.id}`);
+
+// ❌ SBAGLIATO — concatenazione manuale
+await db.execute(`SELECT * FROM users WHERE email = '${email}'`);
+```
+
+#### db-guard — tripwire + rilevamento pattern
+
+`lib/db-guard.ts` espone tre utility:
+
+| Funzione | Scopo | Quando usare |
+|---|---|---|
+| `hasSqlInjectionPattern(value)` | Rileva pattern injection in stringa | Nei Zod `.refine()` per campi critici |
+| `sanitizeStringParam(value)` | Rimuove control chars, fa trim | Ultima linea di difesa dopo Zod |
+| `assertNoRawSqlFromUserInput(query, ctx)` | Lancia errore se query raw contiene injection | Code review tripwire nelle query legacy |
+
+```typescript
+// Uso in schema Zod per campo extra-sensibile (es. nome azienda in ricerca)
+import { hasSqlInjectionPattern } from '../lib/db-guard.js';
+
+const SearchSchema = z.object({
+  company: z.string()
+    .max(200)
+    .refine(
+      (val) => !hasSqlInjectionPattern(val),
+      { message: 'Input non valido' },  // messaggio generico — non rivelare il motivo
+    ),
+});
+```
+
+#### Pattern injection rilevati da `hasSqlInjectionPattern`
+
+| Pattern | Esempio | Tipo attacco |
+|---|---|---|
+| Quote singola/doppia escape | `' OR '1'='1` | Classic injection |
+| `UNION SELECT` | `UNION SELECT password FROM users` | Data exfiltration |
+| Commenti SQL `--` `/* */` | `admin'--` | Comment bypass |
+| Statement terminator `;` | `foo; DROP TABLE users;` | Stacked queries |
+| `WAITFOR DELAY` | `WAITFOR DELAY 0:0:5` | Time-based blind |
+| Hex encoding | `0x41424344` | Obfuscation |
+| DDL keywords | `DROP`, `ALTER`, `CREATE` | Structural damage |
+
+**Importante**: questo rilevamento è best-effort e non sostituisce i prepared statements. È una difesa in profondità aggiuntiva per i campi stringa usati in contesti critici.
+
+---
+
+### 4. RBAC Admin — requireAdmin + requireAdminRole
+
+File: `artifacts/api-server/src/middlewares/requireAdmin.ts`
+
+#### Due livelli di protezione admin
+
+```typescript
+// Livello 1 — solo x-admin-key (route admin standard)
+router.get('/metrics', requireAdmin, metricsHandler);
+
+// Livello 2 — x-admin-key + JWT con role='admin' (operazioni distruttive)
+router.delete('/discovery/items/:id', requireAdmin, requireAuth, requireAdminRole, deleteHandler);
+```
+
+#### Timing-safe key comparison
+
+Il confronto della `ADMIN_KEY` usa `crypto.timingSafeEqual` di Node.js per prevenire timing attacks. Un confronto naïve (`===`) permette di dedurre la lunghezza e i prefissi corretti misurando i tempi di risposta:
+
+```typescript
+import { timingSafeEqual } from 'crypto';
+
+function isValidAdminKey(provided: string): boolean {
+  if (!ADMIN_KEY || !provided) return false;
+  // timingSafeEqual richiede buffer di lunghezza uguale
+  const a = Buffer.from(provided.padEnd(ADMIN_KEY.length, '\0'));
+  const b = Buffer.from(ADMIN_KEY.padEnd(provided.length, '\0'));
+  // Controllo lunghezza separato — timingSafeEqual da solo non basta
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b) && provided.length === ADMIN_KEY.length;
+}
+```
+
+#### requireAuth + requirePremium
+
+File: `artifacts/api-server/src/middlewares/requireAuth.ts`
+
+```typescript
+// Route premium-only
+router.post('/cv/:id/tailor', requireAuth, requirePremium, aiLimiter, validateBody(TailorSchema), handler);
+
+// req.user disponibile dopo requireAuth
+interface JwtPayload {
+  sub: number;        // user ID
+  email: string;
+  role: 'user' | 'admin';
+  isPremium: boolean;
+}
+```
+
+#### Errori standardizzati
+
+| Scenario | Status | Error code |
+|---|---|---|
+| Header `x-admin-key` mancante | 401 | `UNAUTHORIZED` |
+| Chiave admin errata | 403 | `FORBIDDEN` |
+| JWT mancante | 401 | `UNAUTHORIZED` |
+| JWT scaduto | 401 | `TOKEN_EXPIRED` |
+| JWT invalido | 401 | `INVALID_TOKEN` |
+| Utente non premium | 403 | `PREMIUM_REQUIRED` |
+| Ruolo non admin | 403 | `FORBIDDEN` |
+
+---
+
+### Checklist sicurezza per ogni nuova route
+
+- [ ] Route admin → `requireAdmin` come primo middleware dopo i limiter
+- [ ] Route autenticate → `requireAuth` prima di accedere a `req.user`
+- [ ] Route premium → `requirePremium` dopo `requireAuth`
+- [ ] Route con payload AI → `aiLimiter` per limitare costo LLM
+- [ ] Route `/auth/*` → `authLimiter` (10 req / 15 min)
+- [ ] Route con upload → `uploadLimiter` (5 req / 10 min)
+- [ ] Query DB → **sempre Drizzle ORM** — mai `db.execute(sql\`...\`)` con valori da `req.body`
+- [ ] Campi stringa critici in ricerca → `.refine((v) => !hasSqlInjectionPattern(v))` nello schema Zod
+- [ ] Errori 401/403 → corpo JSON generico senza stack trace
+- [ ] Log warning su ogni accesso negato (già in `requireAdmin` e `requireAuth`)
 
 ---
 
 ## Testing & CI/CD
 
-> **Strategia a 3 livelli**: Unit (Vitest, senza DB) → Integration (Vitest + Supertest, con DB reale) → E2E (Playwright, tutti i servizi). I livelli superiori girano solo se quelli inferiori passano.
+> **Strategia a 3 livelli**: Unit → Integration → E2E.
 
-### Panoramica livelli
+### Panoramica
 
-| Livello | Tool | DB | Servizi | Velocità | Cosa testa |
-|---|---|---|---|---|---|
-| **Unit** | Vitest | ❌ | ❌ | < 5s | Logica pura: AI router, circuit breaker, retry, errorHandler, validateBody |
-| **Integration** | Vitest + Supertest | ✅ PostgreSQL test | ❌ | < 30s | Endpoint Express con middleware stack reale, validazione, auth |
-| **E2E** | Playwright | ✅ PostgreSQL e2e | ✅ tutti e 3 | ~2 min | Flussi utente completi: login, RIASEC, CV builder, discovery |
+| Livello | Tool | DB | Velocità |
+|---|---|---|---|
+| **Unit** | Vitest | ❌ | < 5s |
+| **Integration** | Vitest + Supertest | ✅ | < 30s |
+| **E2E** | Playwright | ✅ | ~2 min |
 
-### Installazione dipendenze di test
-
-```bash
-# Vitest + Supertest per api-server
-pnpm add -D vitest @vitest/coverage-v8 supertest @types/supertest --filter @workspace/api-server
-
-# Playwright già presente nella root
-# Verifica: pnpm exec playwright --version
-```
-
-### Script `package.json` da aggiungere in `api-server`
+### Script `package.json` (`api-server`)
 
 ```json
 {
@@ -261,817 +550,269 @@ pnpm add -D vitest @vitest/coverage-v8 supertest @types/supertest --filter @work
 }
 ```
 
----
+### File di test presenti
 
-### 1. Unit Test — Vitest
+#### Unit (`src/__tests__/unit/`)
 
-I test unitari non toccano il database né la rete. Ogni modulo viene testato in isolamento usando `vi.mock()` per isolare i provider AI.
-
-#### File presenti in `src/__tests__/unit/`
-
-| File | Cosa testa | Test cases |
+| File | Cosa testa | Tests |
 |---|---|---|
-| `ai-router.test.ts` | Mapping use case → provider, override env, fallback logic | 7 |
-| `circuit-breaker.test.ts` | Stati closed/open/half-open, threshold, recovery time | 6 |
-| `retry.test.ts` | Backoff esponenziale, retryable errors, maxAttempts | 5 |
-| `error-handler.test.ts` | ZodError → 400, AppError → statusCode, generic → 500, requestId | 5 |
-| `validate-body.test.ts` | Body valido, invalido, strip campi extra, campo opzionale, null | 5 |
+| `ai-router.test.ts` | Use case → provider mapping, env override, fallback | 7 |
+| `circuit-breaker.test.ts` | closed/open/half-open, threshold, recovery | 6 |
+| `retry.test.ts` | Backoff esponenziale, retryable errors, fake timer | 5 |
+| `error-handler.test.ts` | ZodError → 400, AppError → statusCode, 500, requestId | 5 |
+| `validate-body.test.ts` | Valido, invalido, strip extra fields, null body | 5 |
+| `rate-limiters.test.ts` | Config windowMs + max per ogni limiter | 5 |
+| `require-admin.test.ts` | Header assente → 401, errato → 403, corretto → next(), timing-safe | 6 |
+| `db-guard.test.ts` | Pattern injection, sanitize, assertNoRawSql | 9 |
 
-#### Pattern mock provider AI
+#### Integration (`src/__tests__/integration/`)
 
-```typescript
-// Il mock viene dichiarato prima dell'import del modulo sotto test
-const mockGroqCall = vi.fn();
-vi.mock('../../lib/ai/providers/groq', () => ({ groqProvider: { chat: mockGroqCall } }));
+| File | Endpoint testati | Focus |
+|---|---|---|
+| `health.test.ts` | `/api/health`, `/api/sectors`, `/api/objectives` | Public + auth protection |
+| `cv-routes.test.ts` | `/cv/mine/generate`, `/cv/:id/tailor` | AI mock, validateBody, auth |
+| `admin-routes.test.ts` | `/admin/metrics`, `/admin/agent-health` | x-admin-key auth, struttura risposta |
+| `security.test.ts` | Admin RBAC, JWT + premium, no stack trace in 403 | RBAC completo |
 
-// Ogni test resetta i mock
-beforeEach(() => vi.clearAllMocks());
-
-// Test: verifica che il router usi Groq per json_extraction
-it('json_extraction usa Groq come provider default', () => {
-  const provider = resolveProvider('json_extraction');
-  expect(provider).toBe('groq');
-});
-
-// Test: verifica fallback su OpenAI se Groq fallisce
-it('passa al fallback se il provider primary lancia errore', async () => {
-  mockGroqCall.mockRejectedValueOnce(new Error('Groq 429 rate limit'));
-  mockOpenAICall.mockResolvedValueOnce({ content: 'fallback response' });
-  const result = await callWithFallback('json_extraction', { messages: [] });
-  expect(result.content).toBe('fallback response');
-});
-```
-
-#### Pattern mock req/res per middleware
+### Pattern chiave
 
 ```typescript
-// Crea mock leggero di req/res Express senza installare librerie aggiuntive
+// Mock req/res senza dipendenze aggiuntive
 function mockRes() {
   const res: any = {};
-  res.status = vi.fn().mockReturnValue(res);  // chainable: res.status(400).json(...)
+  res.status = vi.fn().mockReturnValue(res);
   res.json   = vi.fn().mockReturnValue(res);
   return res;
 }
 
-const mockReq = { id: 'req-123', url: '/test', method: 'GET' };
-
-// Uso nel test errorHandler:
-errorHandler(new AppError(404, 'Not found', 'USER_NOT_FOUND'), mockReq, mockRes(), vi.fn());
-expect(res.status).toHaveBeenCalledWith(404);
-```
-
-#### Fake timer per test retry e circuit breaker
-
-```typescript
+// Fake timer per retry/backoff
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
+await vi.runAllTimersAsync();
 
-it('riprova dopo backoff esponenziale', async () => {
-  const fn = vi.fn()
-    .mockRejectedValueOnce(new Error('429 rate limit'))
-    .mockResolvedValueOnce('ok dopo retry');
-
-  const promise = withRetry(fn, { maxAttempts: 3, baseDelayMs: 1 });
-  await vi.runAllTimersAsync();  // avanza i timer senza aspettare davvero
-  const result = await promise;
-  expect(result).toBe('ok dopo retry');
-  expect(fn).toHaveBeenCalledTimes(2);
-});
-```
-
----
-
-### 2. Integration Test — Vitest + Supertest
-
-I test di integrazione creano una app Express minimale con lo **stesso middleware stack del reale** (`validateBody`, `errorHandler`, `authMiddleware`), ma mockano i provider AI con `vi.mock()`. Il database è un PostgreSQL reale (locale o container CI).
-
-#### File presenti in `src/__tests__/integration/`
-
-| File | Endpoint testati | Focus |
-|---|---|---|
-| `health.test.ts` | `GET /api/health`, `GET /api/sectors`, `GET /api/objectives` | Public endpoints + auth protection |
-| `cv-routes.test.ts` | `POST /api/cv/mine/generate`, `POST /api/cv/:id/tailor` | AI mock, validateBody, auth, error propagation |
-| `admin-routes.test.ts` | `GET /api/admin/metrics`, `GET /api/admin/agent-health`, `GET /api/admin/growth-queue` | x-admin-key auth, struttura risposta |
-
-#### Pattern Supertest
-
-```typescript
-import request from 'supertest';
-import { app } from '../../app';  // l'app Express, senza .listen()
-
-// Supertest crea un server temporaneo per ogni test — nessuna porta occupata
-it('POST /api/cv/42/tailor con body valido → 200', async () => {
-  mockAiChat.mockResolvedValueOnce({ tailored: true });
-
-  const res = await request(app)
-    .post('/api/cv/42/tailor')
-    .set('Authorization', 'Bearer test-token')
-    .send({
-      jobTitle: 'Backend Engineer',
-      jobDescription: 'Build scalable APIs for our European SaaS platform',
-    });
-
-  expect(res.status).toBe(200);
-  expect(res.body).toHaveProperty('tailored');
-  expect(mockAiChat).toHaveBeenCalledWith(
-    expect.objectContaining({ useCase: 'json_extraction' }),
-  );
-});
-```
-
-#### Regola: `app.ts` NON deve chiamare `listen()`
-
-Per permettere a Supertest di gestire il server, `app.ts` deve **esportare `app`** e il `listen()` deve stare in `index.ts`:
-
-```typescript
-// app.ts — SOLO configurazione middleware + route
-export const app = express();
-app.use(express.json());
-// ... middleware e route ...
-
-// index.ts — SOLO avvio server
-import { app } from './app';
-const PORT = process.env.PORT ?? 8080;
-app.listen(PORT, () => logger.info(`Server on port ${PORT}`));
-```
-
-#### Mock AI nei test di integrazione
-
-```typescript
-// Mock globale per tutti i test del file — nessuna chiamata reale a Groq/OpenAI
+// Mock AI globale per integration test
 const mockAiChat = vi.fn();
 vi.mock('../../lib/ai', () => ({ ai: { chat: mockAiChat } }));
-
-// Reset tra i test per evitare interferenze
 beforeEach(() => vi.clearAllMocks());
-
-// Verifica che il router AI venga chiamato con il use case corretto
-expect(mockAiChat).toHaveBeenCalledWith(
-  expect.objectContaining({ useCase: 'json_extraction' }),
-);
 ```
 
----
+### Pipeline CI (`.github/workflows/ci.yml`)
 
-### 3. E2E Test — Playwright
+```
+typecheck → unit-tests → integration-tests → e2e-tests
+```
 
-I test E2E testano i flussi utente completi con browser reale (Chromium). Richiedono tutti e 3 i servizi attivi.
+E2E ha `needs: [unit-tests, integration-tests]` — non gira se i test veloci falliscono.
 
-#### Spec esistenti + nuove
-
-| File | Flusso | Status |
-|---|---|---|
-| `auth.spec.ts` | Login, register, logout | ✅ esistente |
-| `test-riasec.spec.ts` | Test RIASEC completo 28 domande | ✅ esistente |
-| `objectives.spec.ts` | Crea, aggiorna, completa obiettivo | ✅ esistente |
-| `admin.spec.ts` | Admin dashboard, catalogs, agent health | ✅ esistente |
-| `api.spec.ts` | API health, sectors, auth protection, admin | ✅ esistente |
-| `cv-builder.spec.ts` | Genera CV, scegli template, download menu, ATS, ESC | 🔲 nuovo |
-| `discovery-feed.spec.ts` | Feed cards, filtri tipo, insight pill, bookmark | 🔲 nuovo |
-
-#### Convenzione `data-testid`
-
-I selettori E2E usano `data-testid` — mai classi CSS o testo visibile (fragili ai refactor).
+### Soglie coverage
 
 ```typescript
-// ❌ Fragile — dipende dal testo tradotto e dalla classe CSS
-await page.click('.btn-primary >> text=Genera CV');
-
-// ✅ Stabile — data-testid sopravvive a refactor di stile e i18n
-await page.locator('[data-testid="cv-generate-btn"]').click();
+thresholds: { lines: 70, functions: 70, branches: 60 }
 ```
 
-#### `data-testid` obbligatori nei nuovi componenti CV
+### E2E Playwright — spec
 
-```typescript
-// CvSection.tsx — aggiungere
-<section data-testid="cv-section">
-  <Button data-testid="cv-generate-btn">...</Button>
-  <div data-testid="cv-download-menu">...</div>
-  <Button data-testid="cv-ats-btn">...</Button>
-</section>
+| File | Status |
+|---|---|
+| `auth.spec.ts` | ✅ |
+| `test-riasec.spec.ts` | ✅ |
+| `objectives.spec.ts` | ✅ |
+| `admin.spec.ts` | ✅ |
+| `api.spec.ts` | ✅ |
+| `cv-builder.spec.ts` | 🔲 nuovo |
+| `discovery-feed.spec.ts` | 🔲 nuovo |
 
-// CvGeneratorModal.tsx — aggiungere
-<div data-testid="cv-generator-modal">
-  <div data-testid="template-classic">...</div>
-  <div data-testid="template-minimal">...</div>
-  <div data-testid="template-bold">...</div>
-  <Button data-testid="cv-start-generate-btn">...</Button>
-  <div data-testid="cv-generating-loader">...</div>
-</div>
-
-// CvDownloadMenu.tsx — aggiungere
-<DropdownMenuItem data-testid="download-pdf-btn">PDF</DropdownMenuItem>
-<DropdownMenuItem data-testid="download-docx-btn">DOCX</DropdownMenuItem>
-```
-
-#### `data-testid` obbligatori per Discovery
-
-```typescript
-// DiscoveryItemCard.tsx
-<article data-testid="discovery-item-card">
-  <span data-testid={`badge-${item.type}`}>{item.type}</span>
-  <button data-testid="insight-pill">...</button>
-  <div data-testid="insight-expanded">...</div>
-  <button data-testid="bookmark-btn" aria-label={isBookmarked ? 'Rimuovi bookmark' : 'Aggiungi bookmark'}>
-    ...
-  </button>
-</article>
-
-// DiscoveryFeedPage.tsx — filtri
-<button data-testid="filter-article">Articoli</button>
-<button data-testid="filter-video">Video</button>
-```
-
-#### Utente di test — seed in CI
-
-I test E2E che richiedono login usano `test@northstar.app` / `testpassword123`. Questo utente deve esistere nel DB di test. Aggiungere uno script di seed:
-
-```typescript
-// scripts/seed-test-user.ts
-import { db } from '@workspace/db';
-import bcrypt from 'bcryptjs';
-
-await db.insert(users).values({
-  email: 'test@northstar.app',
-  passwordHash: await bcrypt.hash('testpassword123', 10),
-  name: 'Test User',
-  isPremium: true,  // necessario per testare feature premium
-}).onConflictDoNothing();
-
-console.log('✅ Test user creato/già esistente');
-```
-
-```bash
-# Eseguire prima dei test E2E in CI
-pnpm --filter @workspace/db tsx scripts/seed-test-user.ts
-```
-
----
-
-### 4. Pipeline CI — GitHub Actions
-
-File: `.github/workflows/ci.yml`
-
-#### Flusso pipeline
-
-```
-push a main/develop o PR verso main
-        │
-        ├── [typecheck]      TypeScript noEmit — blocca PR con errori di tipo
-        ├── [unit-tests]     Vitest unit — nessun DB, < 5s
-        ├── [integration-tests]  Vitest + Supertest — PostgreSQL container
-        └── [e2e-tests]      Playwright — solo se unit + integration passano
-                              └── PostgreSQL container
-                              └── Build frontend + API
-                              └── wait-on per health check
-                              └── Playwright chromium
-```
-
-#### Ottimizzazioni pipeline
-
-| Tecnica | Dove | Beneficio |
-|---|---|---|
-| `concurrency: cancel-in-progress` | tutti i job | Annulla run precedenti sullo stesso branch |
-| `needs: [unit-tests, integration-tests]` | `e2e-tests` | Non esegue E2E (costoso) se i test veloci falliscono |
-| `cache: 'pnpm'` | `setup-node` | Riusa `node_modules` tra run — ~60s risparmio |
-| `upload-artifact` su failure | Playwright report | Debug rapido senza rieseguire |
-| Coverage upload sempre | unit coverage | Storico copertura nel tempo |
-
-#### Soglie coverage (`vitest.config.ts`)
-
-```typescript
-coverage: {
-  thresholds: {
-    lines:     70,  // minimo 70% righe coperte
-    functions: 70,  // minimo 70% funzioni
-    branches:  60,  // minimo 60% branch (if/else)
-  },
-}
-```
-
-Se la copertura scende sotto le soglie, Vitest esce con codice 1 e la CI fallisce.
-
----
-
-### Checklist testing per ogni nuova feature
-
-- [ ] **Unit test** per ogni nuovo modulo di business logic (router, middleware, utility)
-- [ ] **Integration test** per ogni nuovo endpoint con `validateBody` — testare almeno: 200 con body valido, 400 con body invalido, 401 senza auth
-- [ ] **`data-testid`** su tutti i nuovi elementi interattivi visibili all'utente
-- [ ] **E2E spec** per ogni nuovo flusso utente critico (aggiungerlo a `e2e/`)
-- [ ] Mock AI con `vi.mock('../../lib/ai')` nei test di integrazione — mai chiamate reali
-- [ ] `beforeEach(() => vi.clearAllMocks())` in ogni describe che usa mock
+**Convenzione**: usare sempre `[data-testid="..."]` — mai classi CSS o testo.
 
 ---
 
 ## Qualità del Codice Backend
 
-> **Stato attuale** (da `app.ts`): Pino HTTP ✅, CORS ✅, rate limiting ✅, security headers ✅, health check base ✅.
-> **Mancano**: API versioning, error handler centralizzato con `requestId`, circuit breaker nel router AI, validazione Zod sui payload.
-
 ### 1. API Versioning — `/api/v1/`
 
-Attualmente tutte le route sono su `/api/*`. Introdurre `/api/v1/` permette di rilasciare breaking changes in futuro senza interrompere client esistenti.
-
-#### Come aggiornare `app.ts`
-
-Il cambio è chirurgico — sostituire una riga:
-
 ```typescript
-// Prima (attuale)
-app.use("/api", router);
-
-// Dopo
 const v1Router = express.Router();
-v1Router.use(router);          // tutte le route esistenti su /v1
+v1Router.use(router);
 app.use("/api/v1", v1Router);
-
-// Compatibilità backward — redireziona /api/* → /api/v1/* (opzionale)
-app.use("/api", (req, res, next) => {
-  res.redirect(308, `/api/v1${req.url}`);
-});
+app.use("/api", (req, res) => res.redirect(308, `/api/v1${req.url}`));
 ```
 
-**Regola**: il frontend generato da Orval usa `VITE_API_BASE_URL`. Aggiornare quella variabile a `http://localhost:8080/api/v1` per lo sviluppo — zero modifiche ai hook generati.
-
-#### Struttura futura per breaking change
+### 2. Error Handler Centralizzato
 
 ```typescript
-// routes/index.ts
-const v1 = express.Router();
-const v2 = express.Router();
-
-v1.use("/cv", cvRouter);
-v2.use("/cv", cvRouterV2);  // quando serve
-
-export { v1, v2 };
-
-// app.ts
-app.use("/api/v1", v1);
-app.use("/api/v2", v2);  // quando serve
-```
-
----
-
-### 2. Error Handler Centralizzato + requestId + Logging strutturato
-
-#### 🔲 `middlewares/errorHandler.ts` — da creare
-
-```typescript
-// artifacts/api-server/src/middlewares/errorHandler.ts
-import { Request, Response, NextFunction } from 'express';
-import { ZodError } from 'zod';
-import { logger } from '../lib/logger';
-
+// middlewares/errorHandler.ts
 export class AppError extends Error {
-  constructor(
-    public statusCode: number,
-    message: string,
-    public code?: string,
-  ) {
-    super(message);
-    this.name = 'AppError';
+  constructor(public statusCode: number, message: string, public code?: string) {
+    super(message); this.name = 'AppError';
   }
 }
 
-export function errorHandler(
-  err: unknown,
-  req: Request,
-  res: Response,
-  _next: NextFunction,
-): void {
-  const requestId = (req as any).id;
-
-  if (err instanceof ZodError) {
-    res.status(400).json({
-      error: 'VALIDATION_ERROR',
-      requestId,
-      issues: err.issues.map(i => ({ path: i.path.join('.'), message: i.message })),
-    });
-    return;
-  }
-
-  if (err instanceof AppError) {
-    res.status(err.statusCode).json({
-      error: err.code ?? 'APP_ERROR',
-      message: err.message,
-      requestId,
-    });
-    return;
-  }
-
-  logger.error({ err, requestId, url: req.url, method: req.method }, 'Unhandled error');
-  res.status(500).json({
-    error: 'INTERNAL_ERROR',
-    requestId,
-    message: 'Si è verificato un errore interno.',
-  });
-}
-```
-
-#### 🔲 Registrazione in `app.ts`
-
-```typescript
-import { errorHandler } from './middlewares/errorHandler';
-app.use("/api/v1", v1Router);
-app.use(errorHandler);  // ULTIMO middleware
-```
-
-#### Escludere `/health` dai log Pino
-
-```typescript
-app.use(pinoHttp({
-  logger,
-  autoLogging: {
-    ignore: (req) => req.url === '/api/health' || req.url === '/api/v1/health',
-  },
-}));
-```
-
----
-
-### 3. Circuit Breaker + Retry esponenziale nel Router AI
-
-#### 🔲 `lib/ai/utils/retry.ts`
-
-```typescript
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: { maxAttempts?: number; baseDelayMs?: number; retryOn?: (err: unknown) => boolean } = {},
-): Promise<T> {
-  const { maxAttempts = 3, baseDelayMs = 300, retryOn = isRetryableError } = options;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      if (attempt === maxAttempts || !retryOn(err)) throw err;
-      const delay = baseDelayMs * 2 ** attempt + Math.random() * baseDelayMs;
-      await new Promise(r => setTimeout(r, delay));
-    }
-  }
-  throw new Error('unreachable');
+export function errorHandler(err, req, res, _next) {
+  const requestId = req.id;
+  if (err instanceof ZodError) return res.status(400).json({ error: 'VALIDATION_ERROR', requestId, issues: ... });
+  if (err instanceof AppError) return res.status(err.statusCode).json({ error: err.code, message: err.message, requestId });
+  logger.error({ err, requestId }, 'Unhandled error');
+  res.status(500).json({ error: 'INTERNAL_ERROR', requestId });
 }
 
-function isRetryableError(err: unknown): boolean {
-  if (err instanceof Error) {
-    return err.message.includes('429') ||
-           err.message.includes('timeout') ||
-           err.message.includes('ECONNRESET');
-  }
-  return false;
-}
+// In app.ts — ULTIMO middleware
+app.use(errorHandler);
 ```
 
-#### 🔲 `lib/ai/utils/circuit-breaker.ts`
+### 3. Circuit Breaker + Retry (da creare in `lib/ai/utils/`)
+
+| Stato CB | Comportamento |
+|---|---|
+| `closed` | Chiamata normale |
+| `open` (>5 fail) | Skip → fallback immediato |
+| `half-open` | Un tentativo → se ok torna `closed` |
+
+### 4. validateBody Middleware
 
 ```typescript
-type CircuitState = 'closed' | 'open' | 'half-open';
-
-export class CircuitBreaker {
-  private state: CircuitState = 'closed';
-  private failureCount = 0;
-  private lastFailureTime = 0;
-
-  constructor(
-    private readonly name: string,
-    private readonly failureThreshold = 5,
-    private readonly recoveryTimeMs = 30_000,
-  ) {}
-
-  async execute<T>(fn: () => Promise<T>): Promise<T> {
-    if (this.state === 'open') {
-      const elapsed = Date.now() - this.lastFailureTime;
-      if (elapsed < this.recoveryTimeMs) {
-        throw new Error(`Circuit OPEN per provider ${this.name} — riprova tra ${Math.ceil((this.recoveryTimeMs - elapsed) / 1000)}s`);
-      }
-      this.state = 'half-open';
-    }
-    try {
-      const result = await fn();
-      this.onSuccess();
-      return result;
-    } catch (err) {
-      this.onFailure();
-      throw err;
-    }
-  }
-
-  private onSuccess() { this.failureCount = 0; this.state = 'closed'; }
-  private onFailure() {
-    this.failureCount++;
-    this.lastFailureTime = Date.now();
-    if (this.failureCount >= this.failureThreshold) this.state = 'open';
-  }
-  getState() { return this.state; }
-}
-
-export const circuitBreakers = {
-  groq:      new CircuitBreaker('groq'),
-  anthropic: new CircuitBreaker('anthropic'),
-  openai:    new CircuitBreaker('openai'),
-  google:    new CircuitBreaker('google'),
-};
-```
-
-| Stato | Significato | Comportamento router |
-|---|---|---|
-| `closed` | Provider funziona | Chiamata normale |
-| `open` | Provider in errore (>5 fail) | Skip immediato → fallback |
-| `half-open` | Recovery time scaduto | Ritenta una volta → se ok torna `closed` |
-
----
-
-### 4. Validazione Zod sui payload in ingresso
-
-#### 🔲 `middlewares/validateBody.ts`
-
-```typescript
-import { Request, Response, NextFunction } from 'express';
-import { ZodSchema } from 'zod';
-
 export function validateBody<T>(schema: ZodSchema<T>) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req, res, next) => {
     const result = schema.safeParse(req.body);
     if (!result.success) { next(result.error); return; }
-    req.body = result.data;
+    req.body = result.data;  // dati tipati e sanitizzati
     next();
   };
 }
 ```
 
-#### Route prioritarie da validare subito
+### Checklist nuova route backend
 
-| Route | Motivo |
-|---|---|
-| `POST /cv/mine/upload` | Evita DoS con file non validi |
-| `POST /cv/:id/tailor` | Payload AI — input non valido → costo inutile |
-| `POST /cv/:id/ats-score` | Come sopra |
-| `POST /auth/register` | Sanitizza email/password prima di bcrypt |
-| `POST /business-ideas` | Payload AI potenzialmente lungo |
-| `POST /admin/discovery/collect` | Protegge cron manuale da input malformati |
-
----
-
-### Checklist qualità per ogni nuova route backend
-
-- [ ] Registrata sotto `/api/v1/`
-- [ ] `req.body` validato con `validateBody(ZodSchema)`
-- [ ] Tutti i `catch` usano `next(err)`
-- [ ] Nessuna chiamata diretta a provider AI — sempre `ai.chat()` / `ai.stream()` / `ai.embed()`
-- [ ] Errori applicativi usano `throw new AppError(statusCode, message, code)`
-- [ ] Integration test con almeno: 200 (happy path), 400 (body invalido), 401 (no auth)
+- [ ] Sotto `/api/v1/`
+- [ ] `validateBody(ZodSchema)` se accetta `req.body`
+- [ ] `catch` usa `next(err)` — mai `res.status(500)` inline
+- [ ] Solo `ai.chat()` / `ai.stream()` — mai provider diretti
+- [ ] `throw new AppError(status, msg, code)` per errori applicativi
+- [ ] `requireAuth` / `requireAdmin` / `requirePremium` secondo il livello
+- [ ] Limiter appropriato (`authLimiter`, `aiLimiter`, ecc.)
+- [ ] Integration test: 200 + 400 + 401 minimi
 
 ---
 
-## Qualità del Codice Frontend & UX
+## Qualità Frontend & UX
 
-> **Stato attuale**: React 19 ✅, TanStack Query ✅, i18next 5 lingue ✅, Framer Motion ✅.
-> **Ottimizzazioni consigliate**: memoization su componenti pesanti, `useTransition` per operazioni AI, audit i18n su lingue secondarie.
-
-### 1. React.memo su componenti pesanti
-
-| Componente | Perché memoizzare |
-|---|---|
-| `CvDocument` (in `CvGeneratorModal.tsx`) | Renderizza l'intero A4 — si ricostruisce ad ogni keystroke dell'`EditPanel` anche se `cv` non è cambiato |
-| `CvSection` (in `CvGeneratorModal.tsx`) | Piccolo ma renderizzato ~8 volte per ogni update del documento |
-| `EditBlock` (in `CvGeneratorModal.tsx`) | Componente collassabile — si re-renderizza anche quando altri blocchi cambiano |
-| `DiscoveryItemCard` | Lista potenzialmente lunga — ogni update del feed parent causa re-render di tutti i card |
+### React.memo + useCallback
 
 ```typescript
-const CvDocument = React.memo(function CvDocument({ cv }: { cv: GeneratedCv }) {
-  return <div id="cv-document">...</div>;
-});
-
-// Prerequisito: prop-funzioni stabili con useCallback
-const handleCvChange = useCallback((updated: GeneratedCv) => {
-  setGenerated(updated);
-}, []);
+const CvDocument = React.memo(function CvDocument({ cv }) { ... });
+const handleChange = useCallback((updated) => setGenerated(updated), []);
 ```
 
-### 2. `useTransition` per operazioni AI asincrone
+### useTransition per AI
 
 ```typescript
-const [isGenerating, startGenerate] = useTransition();
-const [isTailoring, startTailor] = useTransition();
-
-// Corretto: startTransition per aggiornamenti UI, await fuori
+const [isPending, startTransition] = useTransition();
 function handleGenerate() {
-  startGenerate(() => setLoading(true));
-  generate().finally(() => startGenerate(() => setLoading(false)));
+  startTransition(() => setLoading(true));
+  generate().finally(() => startTransition(() => setLoading(false)));
 }
 ```
 
-### 3. Validazione configurazione i18n
+### i18n
 
 ```typescript
-i18n.init({
-  saveMissing: import.meta.env.DEV,  // rileva chiavi mancanti in console
-  missingKeyHandler: (lngs, ns, key) => {
-    console.warn(`[i18n] Chiave mancante: "${key}" per lingue: ${lngs.join(', ')}`);
-  },
-});
+i18n.init({ saveMissing: import.meta.env.DEV });
 ```
 
-Chiavi con `returnObjects: true` (`cv.tailorSteps`, `cv.letterSteps`, `cv.atsSteps`) DEVONO essere JSON array in tutti i file lingua.
+Chiavi `cv.tailorSteps`, `cv.letterSteps`, `cv.atsSteps` → DEVONO essere JSON array in tutti e 5 i file.
 
-### Checklist qualità per ogni nuovo componente frontend
+### Checklist nuova feature frontend
 
-- [ ] `React.memo` se il componente riceve oggetti/array come prop e il parent si re-renderizza spesso
-- [ ] Funzioni passate come prop wrappate in `useCallback`
-- [ ] Operazioni AI usano `useTransition`
-- [ ] `useTranslation()` importato — zero stringhe visibili hardcoded in JSX
-- [ ] Chiavi i18n aggiunte in tutti e 5 i file `translation.json`
-- [ ] `data-testid` su ogni elemento interattivo visibile all'utente
+- [ ] `React.memo` + `useCallback` su componenti con prop-funzioni
+- [ ] `useTransition` per operazioni AI
+- [ ] `useTranslation()` — zero stringhe hardcoded
+- [ ] Chiavi i18n in tutti e 5 i file lingua
+- [ ] `data-testid` su ogni elemento interattivo
 
 ---
 
-## Sistema AI — Router e Modelli
+## Sistema AI — Router
 
-> **⚠️ REGOLA FONDAMENTALE: ogni nuova funzionalità che usa l'AI DEVE passare dal router `artifacts/api-server/src/lib/ai/index.ts` via `ai.chat()`, `ai.agent()` o `ai.embed()`. Non chiamare mai direttamente OpenAI/Groq/Anthropic nelle route.**
+> **⚠️ REGOLA: ogni call AI passa SEMPRE da `ai.chat()` / `ai.agent()` / `ai.embed()` — mai provider diretti nelle route.**
 
-### Architettura router
-
-```
-route.ts
-  └→ ai.chat({ useCase: "json_extraction", messages })
-       └→ router.ts: risolve provider (groq) + modello (llama-3.1-70b-versatile)
-            └→ circuitBreaker[groq].execute()
-                 └→ withRetry(() => providers/groq.ts)
-                      └→ fallback: providers/openai.ts se circuit OPEN o retry esaurito
-```
-
-### Mapping use case → provider → modello
-
-| Use Case | Provider default | Modello default | Fallback | Quando usarlo |
-|---|---|---|---|---|
-| `streaming_chat` | **Groq** | `llama-3.1-70b-versatile` | OpenAI `gpt-4o-mini` | Chat SSE, wiki AI, career coach real-time |
-| `agent_analysis` | **Anthropic** | `claude-sonnet-4-5` | OpenAI `gpt-4o-mini` | Ragionamento complesso, tool use, RIASEC analysis |
-| `embedding` | **OpenAI** | `text-embedding-3-small` | — nessuno | Vettori knowledge graph, RAG, similarity search |
-| `research` | **Groq** | `llama-3.1-70b-versatile` | OpenAI `gpt-4o-mini` | Background job: news enrichment, discovery collect |
-| `json_extraction` | **Groq** | `llama-3.1-70b-versatile` | OpenAI `gpt-4o-mini` | CV parse/generate/tailor, ATS score, cover letter |
-
-### Regola decisionale per ogni nuova funzionalità AI
-
-```
-1. Risposta in streaming (SSE)? → streaming_chat (Groq)
-2. Ragionamento profondo / tool use? → agent_analysis (Anthropic)
-3. Embedding / RAG? → embedding (OpenAI)
-4. Job in background? → research (Groq)
-5. Altrimenti → json_extraction (Groq)
-```
-
-### Override senza redeploy
-
-```bash
-AI_JSON_PROVIDER=openai
-AI_MODEL_OVERRIDE=gpt-4.1
-AI_AGENT_PROVIDER=openai
-```
+| Use Case | Provider default | Fallback | Quando usarlo |
+|---|---|---|---|
+| `streaming_chat` | Groq | OpenAI | Chat SSE, career coach |
+| `agent_analysis` | Anthropic | OpenAI | Ragionamento, tool use |
+| `embedding` | OpenAI | — | RAG, similarity |
+| `research` | Groq | OpenAI | Background jobs |
+| `json_extraction` | Groq | OpenAI | CV, ATS score, cover letter |
 
 ---
 
-## Internazionalizzazione (i18n) — Regola obbligatoria
+## Internazionalizzazione (i18n)
 
-> **⚠️ REGOLA FONDAMENTALE: zero stringhe hardcoded nel JSX. Ogni testo visibile usa `t("chiave")`.**
+> **⚠️ REGOLA: zero stringhe hardcoded nel JSX. Ogni testo usa `t("chiave")`.**
 
 5 lingue: `it` (default) · `en` · `es` · `fr` · `de`.
-
-### Checklist per ogni nuovo componente
-
-- [ ] `useTranslation()` importato e usato
-- [ ] Chiavi aggiunte in tutti e 5 i file `translation.json`
-- [ ] `placeholder`, `title`, `aria-label` usano `t()`
-- [ ] Valori dinamici usano interpolazione `{{var}}`
-- [ ] Chiavi con `returnObjects: true` sono JSON array in tutti i file
 
 ---
 
 ## CV Builder
 
-### Flusso principale
-
-1. **Upload** — `POST /api/v1/cv/mine/upload` (PDF/TXT max 5MB) → AI estrae JSON
-2. **Genera** — `POST /api/v1/cv/mine/generate` → AI da profilo RIASEC + knowledge graph
-3. **Modifica** — `CvEditorDrawer` (drawer 520px, sezioni collassabili, salva via PATCH)
-4. **Scarica** — `CvDownloadMenu` — PDF / DOCX / JSON
-
-### API CV — endpoint
-
 ```
-GET    /api/v1/cv/mine
+GET|POST|PATCH|DELETE /api/v1/cv/mine
 POST   /api/v1/cv/mine/upload
 POST   /api/v1/cv/mine/generate
-PATCH  /api/v1/cv/mine/generated
-DELETE /api/v1/cv/mine
 GET    /api/v1/cv/:userId/pdf?template=
-GET    /api/v1/cv/:userId/docx
 POST   /api/v1/cv/:userId/tailor
 POST   /api/v1/cv/:userId/cover-letter
-GET    /api/v1/cv/:userId/cover-letter/pdf
 POST   /api/v1/cv/:userId/ats-score
-GET    /api/v1/cv/:userId/versions
-POST   /api/v1/cv/:userId/versions
+GET|POST /api/v1/cv/:userId/versions
 ```
 
-### Template PDF
-
-| Template | Stile |
-|---|---|
-| `classic` | Verde scuro `#1a2e1a`, 2 colonne |
-| `minimal` | Bianco, 1 colonna |
-| `bold` | Navy `#0f172a` + Arancio `#f97316` |
-
----
-
-## Sistema Discovery (Agenti AI)
-
-### Pipeline
-1. **Collector** — RSS + GNews/Tavily, SHA-256 dedup, ogni 6h
-2. **Enricher** — gpt-4o-mini legacy, 5 parallele, priority queue, ogni 2h
-3. **Personalizer** — score per RIASEC + journeyType, ogni 3h
-
----
-
-## Admin Dashboard
-
-`/admin` → 6 sezioni: Overview, Collector, Enricher, Fonti RSS, Item recenti, Agent Health.
-
----
-
-## Prodotto — Funzionalità
-
-### Core
-- **RIASEC + Five Spirits** → 28 settori, roadmap, salary
-- **AI premium:** Wiki AI, Roadmap generator, Skills Gap, Interview Simulator, Career Coach, Knowledge Graph RAG
-- **Stripe subscription**, **Auth JWT custom**
-
-### User Features
-Journey Types, Career Climber Mode, NorthStar Score, Certificazioni, Onboarding Wizard, PostTest Funnel, Job Board, Business Idea Validator, Calendario .ics, TTS, Peer Review, CV Builder completo
-
-### Admin Features
-Catalogs CRUD, Agent Health Dashboard, Growth Queue, Setup Wizard
-
----
-
-## Design System — Deep Navy Brand
-
-- **Background:** `#0e1018` — mai `bg-white` o `bg-gray-*`
-- **Accent Gold:** `#c19e4a` — CTA, nav attivo
-- **Growth Green:** `#7db89a`
-- **Brand tokens:** `src/lib/brand.ts` + `lib/design-tokens/northstar-theme.css`
-- **Typography:** Inter + Playfair Display italic
+Template: `classic` (verde scuro), `minimal` (bianco), `bold` (navy + arancio).
 
 ---
 
 ## Architettura — Decisioni chiave
 
-- **OpenAPI-first:** Orval genera Zod schemas + React Query hooks — client base URL aggiornare a `/api/v1`
+- **OpenAPI-first:** Orval genera Zod schemas + React Query hooks
 - **Monorepo pnpm workspaces** con catalog
-- **esbuild custom `build.mjs`:** bundla Express, esternalizza native modules
-- **AI Router pattern:** ogni call AI passa da `lib/ai/index.ts` con circuit breaker + retry esponenziale
-- **AI proxy legacy:** Express → Python FastAPI porta 8000 (LangGraph)
-- **Startup check:** fail-fast su env vars obbligatorie
-- **API versioning:** `/api/v1/` via `express.Router()` — backward compat con redirect 308 da `/api/`
-- **Error handling:** middleware a 4 argomenti in `middlewares/errorHandler.ts` — `AppError`, `ZodError` → JSON strutturato con `requestId`
-- **Validation:** `middlewares/validateBody(ZodSchema)` su ogni route con `req.body` da client
-- **React.memo:** componenti pesanti wrappati con `memo` + `useCallback` sulle prop-funzioni
-- **useTransition:** operazioni AI asincrone usano `startTransition` per mantenere UI responsiva
-- **i18n:** i18next + react-i18next; fallback `it`; `saveMissing: true` in DEV
-- **Testing a 3 livelli:** Vitest unit (nessun DB) → Vitest + Supertest integration (PostgreSQL) → Playwright E2E (tutti i servizi)
-- **CI/CD:** GitHub Actions `.github/workflows/ci.yml` — 4 job in sequenza con `needs`
-- **data-testid:** ogni elemento interattivo visibile deve avere `data-testid` stabile (mai classi CSS o testo)
-- **Portabilità:** `DATABASE_URL` standardizzato; obiettivo zero dipendenze Replit-specifiche
-- **Health check:** `GET /api/health` su Express (già attivo); `GET /health` su FastAPI (🔲 da aggiungere)
-- **CORS:** ristretto a `CORS_ORIGIN` env var
-- **Auth rate limiting:** `/auth/*` — 5 req/15min per IP
+- **esbuild custom `build.mjs`**
+- **AI Router** con circuit breaker + retry esponenziale
+- **API versioning** `/api/v1/` + redirect 308
+- **Error handling** centralizzato in `middlewares/errorHandler.ts`
+- **Validation** `middlewares/validateBody(ZodSchema)`
+- **Sicurezza DB** due ruoli separati: `northstar_app` (DML) + `northstar_migrator` (DDL)
+- **Rate limiting a 2 livelli**: global 200 req/min + limiter specifici per route sensibili
+- **RBAC**: `requireAdmin` (timing-safe) + `requireAuth` (JWT) + `requirePremium`
+- **Injection guard**: Drizzle ORM prepared statements + `db-guard.ts` per rilevamento pattern
+- **Testing a 3 livelli:** Vitest unit → Vitest + Supertest integration → Playwright E2E
+- **CI/CD:** GitHub Actions, 4 job in sequenza con `needs`
+- **data-testid** su ogni elemento interattivo
+- **Health check:** `GET /api/health` (Express ✅, FastAPI 🔲)
+- **CORS:** ristretto a `CORS_ORIGIN`
 
 ---
 
 ## Gotchas & regole
 
-- **Porta 5000 obbligatoria** per il frontend — Replit webview preview usa solo quella
-- **Ordine route critico:** route admin con solo `x-admin-key` DEVONO essere registrate prima di `calendarRouter`
-- **API versioning:** il client Orval usa `VITE_API_BASE_URL` — aggiornare a `http://localhost:8080/api/v1` quando si attiva il versioning
+- **Porta 5000 obbligatoria** per il frontend — Replit webview
+- **Ordine route critico:** admin con solo `x-admin-key` PRIMA di `calendarRouter`
 - **Error handler:** DEVE essere l'ultimo `app.use()` in `app.ts`
-- **ZodError in errorHandler:** catturato automaticamente se `validateBody` chiama `next(result.error)` — non wrappare in AppError
-- **Circuit breaker — singleton:** istanze module-level; in serverless si resettano a ogni cold start — comportamento atteso
-- **Retry su streaming:** `withRetry` NON va usato su `ai.stream()` — solo su `ai.chat()` e `ai.embed()`
-- **React.memo — prerequisito:** `memo` è inutile senza `useCallback` sulle prop-funzioni
-- **useTransition — async:** `startTransition` non gestisce Promise direttamente — wrappare solo gli update di stato
-- **useTransition — streaming:** non usare con SSE — già non-blocking per natura
-- **i18n — returnObjects:** chiavi `cv.tailorSteps`, `cv.letterSteps`, `cv.atsSteps` DEVONO essere JSON array — se stringhe, `.map()` crasha silenziosamente
-- **Vitest — `app.ts` no listen:** Supertest richiede che `app.ts` esporti `app` senza chiamare `listen()` — il listen sta in `index.ts`
-- **Vitest — fake timer:** usare `vi.useFakeTimers()` + `vi.runAllTimersAsync()` per testare retry/backoff senza aspettare
-- **Playwright — data-testid:** mai selettori CSS o testo visibile — fragili a refactor e i18n
-- **CI — E2E dipende da unit+integration:** `needs: [unit-tests, integration-tests]` evita sprechi di minuti CI su Playwright se i test base falliscono
-- **pnpm workspace:** esegui sempre dalla root o usa `--filter`
-- **Discovery feed cache:** LRU 5min server-side + sessionStorage 10min — `?refresh=1` per bypass
-- **Enricher retry cap:** dopo 3 fallimenti, item marcato `isEnriched=true` con `score=0` — non riprocessato
-- **AI Router — mai chiamare provider direttamente** nelle route (eccetto enricher legacy)
-- **CV DOCX install:** `pnpm add docx --filter api-server` dopo ogni clone/reset
-- **i18n — lingua default:** `it`. Fallback sempre italiano se chiave manca nelle altre lingue
+- **ZodError → errorHandler:** `validateBody` chiama `next(result.error)` — non wrappare in AppError
+- **Circuit breaker — singleton:** si resetta a cold start in serverless — comportamento atteso
+- **Retry su streaming:** `withRetry` solo su `ai.chat()` + `ai.embed()` — mai su `ai.stream()`
+- **React.memo:** inutile senza `useCallback` sulle prop-funzioni
+- **useTransition:** non gestisce Promise direttamente — wrappare solo update di stato
+- **i18n — returnObjects:** `cv.tailorSteps` ecc. DEVONO essere JSON array — se stringa `.map()` crasha
+- **`app.ts` no listen:** Supertest richiede `export app` senza `listen()` — il listen sta in `index.ts`
+- **Vitest fake timer:** `vi.useFakeTimers()` + `vi.runAllTimersAsync()` per retry/backoff
+- **Playwright:** mai CSS selectors o testo visibile — solo `data-testid`
+- **CI E2E:** `needs: [unit-tests, integration-tests]` — non spreca minuti se i test veloci falliscono
+- **DB ruoli:** `DATABASE_URL` → `northstar_app` (DML); `DATABASE_URL_MIGRATOR` → `northstar_migrator` (DDL)
+- **`db.execute(sql\`...\`)` con req.body:** MAI — usare sempre metodi tipizzati Drizzle
+- **Rate limiter multi-istanza:** store in-memory non condiviso tra Pod — usare RedisStore in produzione
+- **`timingSafeEqual` — lunghezza:** il controllo `provided.length === ADMIN_KEY.length` DEVE essere separato da `timingSafeEqual`
+- **`requirePremium`** dipende da `requireAuth` — usare sempre in sequenza: `requireAuth, requirePremium`
+- **Discovery feed cache:** LRU 5min server-side + sessionStorage 10min — `?refresh=1` bypass
+- **Enricher retry cap:** 3 fallimenti → `isEnriched=true`, `score=0` — non riprocessato
+- **CV DOCX:** `pnpm add docx --filter api-server` dopo clone
 
 ---
 
@@ -1080,26 +821,30 @@ Catalogs CRUD, Agent Health Dashboard, Growth Queue, Setup Wizard
 | Cosa | Dove |
 |---|---|
 | Schema DB | `lib/db/src/schema/index.ts` |
-| **App Express (middleware stack)** | `artifacts/api-server/src/app.ts` |
+| App Express | `artifacts/api-server/src/app.ts` |
 | API routes entry | `artifacts/api-server/src/routes/index.ts` |
 | CV routes | `artifacts/api-server/src/routes/cv.ts` |
 | CV components | `artifacts/orientamento/src/components/cv/` |
-| Frontend routes | `artifacts/orientamento/src/App.tsx` |
 | Cron jobs | `artifacts/api-server/src/jobs/cron.ts` |
-| **AI Router** | `artifacts/api-server/src/lib/ai/router.ts` |
-| **AI public API** | `artifacts/api-server/src/lib/ai/index.ts` |
-| **AI types** | `artifacts/api-server/src/lib/ai/types.ts` |
-| **AI providers** | `artifacts/api-server/src/lib/ai/providers/` |
-| **Circuit breaker** | `artifacts/api-server/src/lib/ai/utils/circuit-breaker.ts` 🔲 |
-| **Retry utility** | `artifacts/api-server/src/lib/ai/utils/retry.ts` 🔲 |
-| **Error handler** | `artifacts/api-server/src/middlewares/errorHandler.ts` 🔲 |
-| **Validate body** | `artifacts/api-server/src/middlewares/validateBody.ts` 🔲 |
-| Logger Pino | `artifacts/api-server/src/lib/logger.ts` |
-| **Vitest config** | `artifacts/api-server/vitest.config.ts` |
-| **Unit tests** | `artifacts/api-server/src/__tests__/unit/` |
-| **Integration tests** | `artifacts/api-server/src/__tests__/integration/` |
-| **CI/CD pipeline** | `.github/workflows/ci.yml` |
-| **E2E specs** | `e2e/` |
+| AI Router | `artifacts/api-server/src/lib/ai/router.ts` |
+| AI public API | `artifacts/api-server/src/lib/ai/index.ts` |
+| AI providers | `artifacts/api-server/src/lib/ai/providers/` |
+| Circuit breaker | `artifacts/api-server/src/lib/ai/utils/circuit-breaker.ts` 🔲 |
+| Retry utility | `artifacts/api-server/src/lib/ai/utils/retry.ts` 🔲 |
+| Error handler | `artifacts/api-server/src/middlewares/errorHandler.ts` 🔲 |
+| Validate body | `artifacts/api-server/src/middlewares/validateBody.ts` 🔲 |
+| **requireAuth** | `artifacts/api-server/src/middlewares/requireAuth.ts` ✅ |
+| **requireAdmin** | `artifacts/api-server/src/middlewares/requireAdmin.ts` ✅ |
+| **Rate limiters** | `artifacts/api-server/src/lib/rate-limiters.ts` ✅ |
+| **DB Guard** | `artifacts/api-server/src/lib/db-guard.ts` ✅ |
+| **DB Roles SQL** | `scripts/db-roles.sql` ✅ |
+| **DB Roles verify** | `scripts/verify-db-privileges.sql` ✅ |
+| Logger | `artifacts/api-server/src/lib/logger.ts` |
+| Vitest config | `artifacts/api-server/vitest.config.ts` |
+| Unit tests | `artifacts/api-server/src/__tests__/unit/` |
+| Integration tests | `artifacts/api-server/src/__tests__/integration/` |
+| CI/CD pipeline | `.github/workflows/ci.yml` |
+| E2E specs | `e2e/` |
 | i18n setup | `artifacts/orientamento/src/i18n.ts` |
 | Traduzioni (it) | `artifacts/orientamento/src/locales/it/translation.json` |
 | Discovery agents | `lib/integrations-openai-ai-server/src/discovery-agent/` |
