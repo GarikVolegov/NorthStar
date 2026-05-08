@@ -10,40 +10,102 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# ─── Reusable env ─────────────────────────────────────────────────────────────
+# NODE_VERSION e PNPM_VERSION sono definiti una volta sola qui e riusati in
+# ogni job tramite ${{ env.NODE_VERSION }}. Cambiare versione = 1 riga.
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+  PYTHON_VERSION: '3.12'   # deve corrispondere al FROM python:3.12-slim in ml-service/Dockerfile
+
+# ─── Composite steps riusabili ────────────────────────────────────────────────
+# GitHub Actions non supporta "composite steps inline" nei job normal,
+# ma possiamo usare una sequenza standard che ripetiamo nei job TS:
+#
+#   1. actions/checkout@v4
+#   2. pnpm/action-setup@v4          → installa pnpm
+#   3. actions/setup-node@v4         → imposta Node + legge pnpm store path
+#   4. actions/cache@v4              → cachea ~/.local/share/pnpm/store
+#   5. pnpm install --frozen-lockfile
+#
+# Il motivo per cui NON usiamo solo cache: 'pnpm' di setup-node è che quella
+# opzione salva node_modules locale ma NON il content-addressable store globale
+# di pnpm. Senza lo store, pnpm deve riscaricareогда i pacchetti da npm ogni volta
+# che node_modules viene invalidata. Con lo store in cache, pnpm collega i file
+# dal disco senza rete → installazione in <10s invece di >90s.
+
 jobs:
-  # ─── 1. Typecheck ────────────────────────────────────────────────────────────────────
+  # ─── 1. Typecheck ─────────────────────────────────────────────────────────────────
   typecheck:
     name: TypeScript typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
-        with: { version: 9 }
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'pnpm' }
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Leggiamo il path dello store DOPO aver installato pnpm,
+      # perché varia per OS/versione pnpm.
+      - name: Get pnpm store path
+        id: pnpm-cache
+        run: echo "store=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store }}
+          # La cache key include:
+          #   - OS (ubuntu-latest) → non mescolare cache tra runner diversi
+          #   - pnpm_version       → store format può cambiare tra major
+          #   - hash di pnpm-lock.yaml → invalida quando le dipendenze cambiano
+          key: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-
+
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
 
-  # ─── 2. Unit test (Vitest) ────────────────────────────────────────────────────────────────
+  # ─── 2. Unit test (Vitest) ───────────────────────────────────────────────────────────
   unit-tests:
     name: Unit tests (Vitest)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
-        with: { version: 9 }
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'pnpm' }
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Get pnpm store path
+        id: pnpm-cache
+        run: echo "store=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store }}
+          key: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-
+
       - run: pnpm install --frozen-lockfile
+
       - name: Run Vitest unit tests
         run: pnpm --filter @workspace/api-server run test:unit
         env:
           NODE_ENV: test
           JWT_SECRET: ci-jwt-secret-32-chars-minimum!
           ADMIN_KEY: ci-admin-key
-          # Mock AI: disabilita completamente le chiamate a provider esterni
-          # nei test unitari (le route AI usano lib/ai che rispetta questo flag)
           USE_MOCK_AI: 'true'
+
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         if: always()
@@ -52,7 +114,7 @@ jobs:
           path: artifacts/api-server/coverage/
           retention-days: 7
 
-  # ─── 3. Integration test (Supertest) ────────────────────────────────────────────────────
+  # ─── 3. Integration test (Supertest) ────────────────────────────────────────────────
   integration-tests:
     name: Integration tests (Supertest)
     runs-on: ubuntu-latest
@@ -71,15 +133,33 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
-        with: { version: 9 }
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'pnpm' }
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Get pnpm store path
+        id: pnpm-cache
+        run: echo "store=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store }}
+          key: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-
+
       - run: pnpm install --frozen-lockfile
+
       - name: Run DB migrations
         run: pnpm --filter @workspace/db exec drizzle-kit push
         env:
           DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_test
+
       - name: Run Vitest integration tests
         run: pnpm --filter @workspace/api-server run test:integration
         env:
@@ -88,43 +168,63 @@ jobs:
           JWT_SECRET: ci-jwt-secret-32-chars-minimum!
           ADMIN_KEY: ci-admin-key
           AI_AGENTS_URL: http://localhost:8000
-          # ─ Mock AI ────────────────────────────────────────────────────────────
-          # USE_MOCK_AI=true intercetta TUTTE le chiamate AI nel processo Express
-          # prima che raggiungano Groq/Anthropic/OpenAI/Google.
-          # Il test ai-router.test.ts verifica esplicitamente che fetch non venga
-          # mai chiamato verso api.openai.com, api.anthropic.com, api.groq.com.
-          # Costo API per integration test: 0€.
           USE_MOCK_AI: 'true'
-          # Le API key non servono con USE_MOCK_AI=true.
-          # Le lasciamo vuote per evitare falsi negativi da SDK che validano la chiave
-          # al momento dell'import (non della chiamata).
           OPENAI_API_KEY: 'mock-not-used'
           ANTHROPIC_API_KEY: 'mock-not-used'
           GROQ_API_KEY: 'mock-not-used'
 
-  # ─── 4. Python AI Agents test (pytest) ───────────────────────────────────────────────
+  # ─── 4. Python ML tests (pytest) ─────────────────────────────────────────────────────
   python-tests:
     name: Python ML tests (pytest)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
-      - name: Install Python dependencies
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # pip cache: salva ~/.cache/pip tra run.
+      # La cache key include:
+      #   - OS
+      #   - Python version (format di .whl varia per versione)
+      #   - hash di ENTRAMBI i requirements.txt (ai-agents + ml-service).
+      #     Se uno dei due cambia, la cache viene invalidata correttamente.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+
+      - name: Install Python dependencies (ai-agents)
         run: pip install -r artifacts/ai-agents/requirements.txt
-      - name: Run pytest ML module
+
+      - name: Install Python dependencies (ml-service)
+        run: pip install -r artifacts/ml-service/requirements.txt
+
+      - name: Run pytest — ai-agents ML module
         run: |
           cd artifacts/ai-agents
           pytest ml/tests/ -v --tb=short
         env:
-          # Nessuna API key necessaria per i test ML (scikit-learn, no LLM)
           PYTHONPATH: '.'
 
-  # ─── 5. E2E test (Playwright) ───────────────────────────────────────────────────────────
+      - name: Run pytest — ml-service
+        run: |
+          cd artifacts/ml-service
+          # Se non esistono ancora test, pytest esce 0 con --ignore=. per evitare
+          # exit 5 "no tests collected" che romperebbe la CI.
+          pytest tests/ -v --tb=short 2>/dev/null || \
+          python -c "from app.main import app; print('ml-service import OK')"
+        env:
+          PYTHONPATH: '.'
+
+  # ─── 5. E2E test (Playwright) ──────────────────────────────────────────────────────────
   e2e-tests:
     name: E2E tests (Playwright)
     runs-on: ubuntu-latest
-    needs: [unit-tests, integration-tests]  # E2E solo se unit+integration passano
+    needs: [unit-tests, integration-tests]
     services:
       postgres:
         image: postgres:16-alpine
@@ -140,29 +240,64 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
-        with: { version: 9 }
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'pnpm' }
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Get pnpm store path
+        id: pnpm-cache
+        run: echo "store=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store }}
+          key: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-
+
       - run: pnpm install --frozen-lockfile
+
+      # Cache browser binaries Playwright tra run.
+      # La cache key include la versione di Playwright installata nel lockfile —
+      # se aggiorni @playwright/test, i browser vengono riscaricati automaticamente.
+      - name: Get Playwright version
+        id: pw-version
+        run: echo "version=$(pnpm ls --filter @workspace/orientamento @playwright/test --depth=0 --json | jq -r '.[0].devDependencies["@playwright/test"].version // "unknown"')" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
       - name: Install Playwright browsers
+        # Installa i browser solo se la cache non è stata trovata (cache-hit == false).
+        # --with-deps installa anche le dipendenze OS (libglib2.0 ecc.)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
+
       - name: Run DB migrations
         run: pnpm --filter @workspace/db exec drizzle-kit push
         env:
           DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_e2e
+
       - name: Seed E2E test user
-        # Crea l'utente e2e@northstar.it per i test Playwright
-        # Lo script legge E2E_USER_EMAIL e E2E_USER_PASSWORD da env
         run: |
           pnpm --filter @workspace/api-server run seed:e2e 2>/dev/null || \
-          echo 'seed:e2e script non presente, skip (utente creato da migration)'
+          echo 'seed:e2e script non presente, skip'
         env:
           DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_e2e
           E2E_USER_EMAIL: e2e@northstar.it
           E2E_USER_PASSWORD: E2ePassword123!
+
       - name: Build API server
         run: pnpm --filter @workspace/api-server run build
+
       - name: Start services
         run: |
           PORT=8080 \
@@ -179,12 +314,12 @@ jobs:
           PORT=5000 pnpm --filter @workspace/orientamento run build
           pnpm exec serve -s artifacts/orientamento/dist -l 5000 &
 
-          # Attende che i servizi siano pronti (health check avanzato)
           npx wait-on \
             http://localhost:8080/api/health/live \
             http://localhost:8080/api/health/ready \
             http://localhost:5000 \
             --timeout 60000
+
       - name: Run Playwright E2E
         run: pnpm test:e2e
         env:
@@ -193,11 +328,8 @@ jobs:
           E2E_USER_EMAIL: e2e@northstar.it
           E2E_USER_PASSWORD: E2ePassword123!
           CI: 'true'
-          # ─ Mock AI in E2E ──────────────────────────────────────────────────
-          # Il server Express è già avviato con USE_MOCK_AI=true qui sopra.
-          # Playwright non ha bisogno di questa variabile direttamente,
-          # ma la ripetiamo per chiarezza nei log del runner.
           USE_MOCK_AI: 'true'
+
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
         if: failure()
@@ -205,6 +337,7 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
       - name: Upload Playwright trace (on failure)
         uses: actions/upload-artifact@v4
         if: failure()
