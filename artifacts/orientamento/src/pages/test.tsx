@@ -107,6 +107,68 @@ async function assignUserToSession(sessionId: number, userId: number): Promise<v
   } catch {}
 }
 
+// ── WendySpeechCaption ─────────────────────────────────────────────────────
+/**
+ * Mostra il testo completo che Wendy sta leggendo.
+ * Le parole già pronunciate (charIndex >= char di fine parola)
+ * diventano text-primary; quelle future restano muted.
+ * Usa l'evento nativo onboundary — charIndex è l'inizio della parola corrente.
+ */
+interface WendySpeechCaptionProps {
+  text: string;        // testo completo
+  charIndex: number;   // charIndex dall'evento onboundary (-1 = non ancora iniziato, -2 = finito)
+}
+function WendySpeechCaption({ text, charIndex }: WendySpeechCaptionProps) {
+  if (!text) return null;
+
+  // Splittiamo in token mantenendo gli spazi come entità separate
+  // in modo da poter ricostruire la posizione assoluta di ogni carattere.
+  const tokens: { word: string; start: number }[] = [];
+  const regex = /\S+/g;
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(text)) !== null) {
+    tokens.push({ word: m[0], start: m.index });
+  }
+
+  return (
+    <div
+      className="w-full px-3 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 text-[11px] leading-relaxed text-center select-none"
+      aria-live="polite"
+      aria-label="Wendy sta dicendo"
+    >
+      {tokens.map((tok, i) => {
+        // La parola è "passata" se il suo inizio è prima del charIndex corrente
+        const isPast    = charIndex >= 0 && tok.start < charIndex;
+        // La parola è "corrente" se charIndex cade dentro di essa
+        const isCurrent = charIndex >= 0 && charIndex >= tok.start && charIndex < tok.start + tok.word.length;
+        // Tutto completato
+        const isDone    = charIndex === -2;
+
+        return (
+          <React.Fragment key={i}>
+            <motion.span
+              animate={{
+                color: (isPast || isDone)
+                  ? "var(--primary)"
+                  : isCurrent
+                  ? "var(--primary)"
+                  : "var(--muted-foreground)",
+                opacity: (isPast || isDone) ? 0.7 : isCurrent ? 1 : 0.45,
+                fontWeight: isCurrent ? 600 : 400,
+              }}
+              transition={{ duration: 0.15 }}
+              style={{ display: "inline" }}
+            >
+              {tok.word}
+            </motion.span>
+            {i < tokens.length - 1 && " "}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── MuteButton ─────────────────────────────────────────────────────────
 interface MuteButtonProps { muted: boolean; onToggle: () => void; reduced: boolean; }
 function MuteButton({ muted, onToggle, reduced }: MuteButtonProps) {
@@ -240,8 +302,16 @@ function TypewriterText({ text, reduced, className }: TypewriterTextProps) {
 }
 
 // ── WelcomeScreen ────────────────────────────────────────────────────────
-interface WelcomeScreenProps { userName?: string; reduced: boolean; muted: boolean; onStart: () => void; }
-function WelcomeScreen({ userName, reduced, muted, onStart }: WelcomeScreenProps) {
+interface WelcomeScreenProps {
+  userName?: string;
+  reduced: boolean;
+  muted: boolean;
+  onStart: () => void;
+  /** charIndex e testo correnti per la caption nella welcome */
+  speechText: string;
+  speechCharIndex: number;
+}
+function WelcomeScreen({ userName, reduced, muted, onStart, speechText, speechCharIndex }: WelcomeScreenProps) {
   const startBtnRef = useRef<HTMLButtonElement>(null);
   useEffect(() => { startBtnRef.current?.focus(); }, []);
 
@@ -294,6 +364,19 @@ function WelcomeScreen({ userName, reduced, muted, onStart }: WelcomeScreenProps
             <WendyAvatar state="curious" phase={0} reduced={reduced} size={140}
               className="shadow-lg relative z-10 sm:w-[170px] sm:h-[170px]" />
           </motion.div>
+
+          {/* Caption sotto avatar nella welcome */}
+          <AnimatePresence>
+            {!muted && speechText && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.3 }}
+                className="w-full max-w-sm"
+              >
+                <WendySpeechCaption text={speechText} charIndex={speechCharIndex} />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <motion.div variants={itemVariants} className="space-y-1 sm:space-y-2">
             <p className="text-sm sm:text-base text-muted-foreground font-medium">{greeting}</p>
@@ -370,28 +453,35 @@ export default function Test() {
   const { user } = useAuth();
   const prefersReduced = useReducedMotion();
 
-  // ── Stato mute: legge da localStorage + sincronizza wendy-voice ──
+  // ── Mute ──
   const [audioMuted, setAudioMuted] = useState<boolean>(() => {
     try { return localStorage.getItem(MUTE_STORAGE_KEY) === "1"; } catch { return false; }
   });
-
-  // Sincronizza il modulo wendy-voice ogni volta che audioMuted cambia
   useEffect(() => {
     setMuted(audioMuted);
     try { localStorage.setItem(MUTE_STORAGE_KEY, audioMuted ? "1" : "0"); } catch {}
   }, [audioMuted]);
+  useEffect(() => { if (isMuted() !== audioMuted) setMuted(audioMuted); }, []); // eslint-disable-line
+  const handleToggleMute = useCallback(() => setAudioMuted((p) => !p), []);
 
-  // Inizializza il modulo con il valore salvato al primo render
-  useEffect(() => {
-    if (isMuted() !== audioMuted) setMuted(audioMuted);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // ── Speech caption state ──
+  // speechText = testo completo che Wendy sta leggendo
+  // speechCharIndex: -1 = nessuno, -2 = completato, >= 0 = charIndex parola corrente
+  const [speechText, setSpeechText]           = useState("");
+  const [speechCharIndex, setSpeechCharIndex] = useState(-1);
+
+  /** Wrapper speak con aggancio automatico ai callback della caption */
+  const speakWithCaption = useCallback((text: string, opts: { interrupt?: boolean } = {}) => {
+    setSpeechText(text);
+    setSpeechCharIndex(-1);
+    speak(text, {
+      ...opts,
+      onBoundary: (ci) => setSpeechCharIndex(ci),
+      onEnd: () => setSpeechCharIndex(-2),
+    });
   }, []);
 
-  const handleToggleMute = useCallback(() => {
-    setAudioMuted((prev) => !prev);
-  }, []);
-
-  // Shortcut tastiera M (non interferisce con input di testo)
+  // Shortcut M
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
@@ -436,6 +526,7 @@ export default function Test() {
     return () => stopAmbientPad();
   }, [showWelcome, prefersReduced]);
 
+  // Legge il testo della domanda ad ogni cambio step
   useEffect(() => {
     if (showWelcome || prefersReduced || audioMuted) return;
     const id = ALL_IDS[currentStep];
@@ -446,7 +537,7 @@ export default function Test() {
       ? t(`test.questions.spirits.${id}`)
       : t(`test.questions.ctx.${id}`);
     if (speakTimerRef.current) clearTimeout(speakTimerRef.current);
-    speakTimerRef.current = setTimeout(() => speak(text, { interrupt: true }), 350);
+    speakTimerRef.current = setTimeout(() => speakWithCaption(text, { interrupt: true }), 350);
     return () => { if (speakTimerRef.current) clearTimeout(speakTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, showWelcome, prefersReduced, audioMuted]);
@@ -582,9 +673,11 @@ export default function Test() {
     ctx:     { label: "Obiettivi",          emoji: "🎯", description: "Ultime domande: allineiamo il percorso ai tuoi obiettivi" },
   } as const;
 
+  // Decide se la caption è attiva (testo presente e non ancora terminato del tutto)
+  const captionActive = !audioMuted && !prefersReduced && !!speechText && speechCharIndex !== -2;
+
   return (
     <>
-      {/* Bottone mute fisso top-right — visibile sempre, su welcome e test */}
       {!prefersReduced && (
         <MuteButton muted={audioMuted} onToggle={handleToggleMute} reduced={prefersReduced} />
       )}
@@ -607,7 +700,9 @@ export default function Test() {
               userName={user?.name ?? user?.email}
               reduced={prefersReduced}
               muted={audioMuted}
-              onStart={() => { stopSpeech(); setShowWelcome(false); }}
+              speechText={speechText}
+              speechCharIndex={speechCharIndex}
+              onStart={() => { stopSpeech(); setSpeechText(""); setSpeechCharIndex(-1); setShowWelcome(false); }}
             />
           </motion.div>
 
@@ -751,12 +846,31 @@ export default function Test() {
                           style={{ background: "var(--primary)", filter: "blur(28px)" }}
                         />
                       )}
+
                       <WendyAvatar state={scenario?.avatarState ?? "focused"} phase={currentPhase}
                         reduced={prefersReduced} size={140} className="shadow-sm relative z-10" />
+
                       <div className="text-center">
                         <p className="text-xs font-semibold tracking-widest uppercase text-muted-foreground/60">Wendy</p>
                         <p className="text-xs text-muted-foreground/50">Orientamento AI</p>
                       </div>
+
+                      {/* ── Caption voce sotto il nome ── */}
+                      <AnimatePresence>
+                        {captionActive && speechText && (
+                          <motion.div
+                            key="caption"
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            transition={{ duration: 0.25 }}
+                            className="w-full"
+                          >
+                            <WendySpeechCaption text={speechText} charIndex={speechCharIndex} />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
                       <AnimatePresence>
                         {lyraHasEntered && scenario?.avatarIntro && (
                           <motion.div

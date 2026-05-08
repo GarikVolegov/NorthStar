@@ -1,12 +1,16 @@
 /**
  * wendy-voice.ts
- * ──────────────────────────────────────────────────────────────────────────
+ * ──────────────────────────────────────────────────────────────────────
  * 1. speak(text, opts?)  — Web Speech API femminile italiana elegante
  * 2. stopSpeech()        — cancella speech in corso
  * 3. setMuted(bool)      — mute globale: blocca speak + silenzia pad
  * 4. isMuted()           — legge lo stato mute corrente
  * 5. startAmbientPad()   — pad armonico via AudioContext (Am pentatonico)
  * 6. stopAmbientPad()    — fade-out e dispose del pad
+ *
+ * SpeakOptions callbacks:
+ *   onBoundary(charIndex) — scatta ad ogni parola (nativo onboundary)
+ *   onEnd()               — scatta al termine della lettura
  */
 
 const VOICE_PITCH  = 1.12;
@@ -23,15 +27,12 @@ export function isMuted(): boolean { return _muted; }
 export function setMuted(value: boolean): void {
   _muted = value;
   if (value) {
-    // Silenzia immediatamente speech in corso
     if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
-    // Porta il pad a 0 senza fermarlo (riprende se si de-muta)
     if (activePad) {
       activePad.masterGain.gain.cancelScheduledValues(activePad.ctx.currentTime);
       activePad.masterGain.gain.linearRampToValueAtTime(0, activePad.ctx.currentTime + 0.3);
     }
   } else {
-    // Riporta il pad al volume normale
     if (activePad) {
       activePad.masterGain.gain.cancelScheduledValues(activePad.ctx.currentTime);
       activePad.masterGain.gain.linearRampToValueAtTime(PAD_GAIN, activePad.ctx.currentTime + 0.6);
@@ -61,35 +62,42 @@ function pickItalianFemaleVoice(): SpeechSynthesisVoice | null {
 // ── speak() ────────────────────────────────────────────────────────────
 export interface SpeakOptions {
   interrupt?: boolean;
+  /** charIndex della parola corrente (evento onboundary nativo) */
+  onBoundary?: (charIndex: number) => void;
+  /** chiamato quando la lettura è completata */
   onEnd?: () => void;
 }
 
 export function speak(text: string, opts: SpeakOptions = {}): void {
-  // Rispetta il mute globale
   if (_muted) return;
   if (typeof speechSynthesis === "undefined" || !text.trim()) return;
-  const { interrupt = true, onEnd } = opts;
+  const { interrupt = true, onBoundary, onEnd } = opts;
   if (interrupt) speechSynthesis.cancel();
+
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang   = "it-IT";
   utter.pitch  = VOICE_PITCH;
   utter.rate   = VOICE_RATE;
   utter.volume = VOICE_VOLUME;
+
+  if (onBoundary) {
+    utter.onboundary = (e: SpeechSynthesisEvent) => {
+      if (e.name === "word") onBoundary(e.charIndex);
+    };
+  }
   if (onEnd) utter.onend = () => onEnd();
-  if (!speechSynthesis.getVoices().length) {
-    speechSynthesis.addEventListener(
-      "voiceschanged",
-      () => {
-        const v = pickItalianFemaleVoice();
-        if (v) utter.voice = v;
-        if (!_muted) speechSynthesis.speak(utter);
-      },
-      { once: true },
-    );
-  } else {
+
+  const doSpeak = () => {
+    if (_muted) return;
     const v = pickItalianFemaleVoice();
     if (v) utter.voice = v;
     speechSynthesis.speak(utter);
+  };
+
+  if (!speechSynthesis.getVoices().length) {
+    speechSynthesis.addEventListener("voiceschanged", doSpeak, { once: true });
+  } else {
+    doSpeak();
   }
 }
 
@@ -146,7 +154,6 @@ export function startAmbientPad(): void {
     osc.start();
     return osc;
   });
-  // Fade-in solo se non mutato
   if (!_muted) {
     masterGain.gain.linearRampToValueAtTime(PAD_GAIN, ctx.currentTime + 2);
   }
