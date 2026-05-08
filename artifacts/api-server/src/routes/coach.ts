@@ -1,11 +1,10 @@
 import { Router } from "express";
-import { openai } from "@workspace/integrations-openai-ai-server";
 import { db, coachSessionsTable, usersTable, testSessionsTable, userObjectivesTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth-jwt.js";
 import { aiChatRateLimiter } from "../lib/rate-limiter.js";
 import { getPrompt } from "../lib/prompt-store.js";
-import { rejectIfOpenAINotConfigured, openAIErrorMessage } from "../lib/openai-availability.js";
+import { ai } from "../lib/ai/index.js";
 
 const router = Router();
 
@@ -74,11 +73,9 @@ ${testSession ? `- Tipi RIASEC primari: ${(testSession.primaryTypes as string[] 
 - Settore confermato: ${testSession.confirmedSectorId ? `ID ${testSession.confirmedSectorId}` : "Non ancora scelto"}
 - Sintesi profilo: ${testSession.profileSummary ?? "N/D"}` : "- Test non ancora completato"}
 ${objectives.length > 0 ? `- Obiettivi attuali: ${objectives.map((o) => `${o.text} (${o.progress}%)`).join("; ")}` : ""}
-${user?.cvText ? `- CV in possesso: sì (${user.cvText.slice(0, 200)}...)` : ""}
+${user?.cvText ? `- CV in possesso: s\u00ec (${user.cvText.slice(0, 200)}...)` : ""}
 
 ${instructions}`;
-
-  if (rejectIfOpenAINotConfigured(res)) return;
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -89,28 +86,23 @@ ${instructions}`;
 
   try {
     const history = (session.messages as Array<{ role: string; content: string }>).slice(-20);
-    const messages = [
-      { role: "system" as const, content: systemPrompt },
+    const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+      { role: "system", content: systemPrompt },
       ...history.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-      { role: "user" as const, content: message },
+      { role: "user", content: message },
     ];
 
-    const stream = await openai.chat.completions.create({
-      model: "gpt-4.1",
-      max_tokens: 1024,
+    for await (const chunk of ai.streamChat({
+      useCase: "streaming_chat",
       messages,
-      stream: true,
-    });
-
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) {
-        assistantContent += content;
-        res.write(`data: ${JSON.stringify({ content })}\n\n`);
-      }
+      maxTokens: 1024,
+    })) {
+      assistantContent += chunk;
+      res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
     }
   } catch (err) {
-    res.write(`data: ${JSON.stringify({ error: openAIErrorMessage(err) })}\n\n`);
+    const message = err instanceof Error ? err.message : "Errore interno";
+    res.write(`data: ${JSON.stringify({ error: message })}\n\n`);
   }
 
   try {
@@ -122,7 +114,7 @@ ${instructions}`;
     ];
 
     const title = (session.messages as unknown[])?.length === 0
-      ? message.slice(0, 60) + (message.length > 60 ? "…" : "")
+      ? message.slice(0, 60) + (message.length > 60 ? "\u2026" : "")
       : session.title;
 
     await db.update(coachSessionsTable)
