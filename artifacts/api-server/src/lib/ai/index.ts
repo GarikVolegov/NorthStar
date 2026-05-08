@@ -4,22 +4,12 @@
  * L'UNICO file che il resto del backend deve importare per usare l'AI.
  * Le route e gli agent NON importano mai direttamente gli SDK provider.
  *
- * API pubblica:
- *   streamChat(request)   → AsyncIterable<string>  (streaming SSE)
- *   analyzeAgent(request) → Promise<AIAgentResponse>
- *   chat(request)         → Promise<string>         (non-streaming)
- *   embed(input)          → Promise<number[][]>
+ * Ogni chiamata AI loga tramite getRequestLogger():
+ *   { requestId, useCase, provider, model, durationMs, inputTokens?, outputTokens? }
+ * → In produzione ogni riga AI è correlabile alla richiesta HTTP padre.
  *
  * Mock AI (CI / test di integrazione):
  *   Se USE_MOCK_AI=true, tutte le chiamate vengono servite dal mock provider.
- *   Zero API esterne, zero costo, risposte deterministiche.
- *   Il mock imposta lastMockUseCase — verificabile nei test.
- *
- * Usage:
- *   import { ai } from "../lib/ai";
- *   for await (const chunk of ai.streamChat({ useCase: "streaming_chat", messages })) {
- *     res.write(`data: ${JSON.stringify({ delta: chunk })}\n\n`);
- *   }
  */
 
 import { resolveAIConfig } from './router.js';
@@ -29,35 +19,17 @@ import { streamOpenAIChat, chatOpenAI, createEmbeddings } from './providers/open
 import { streamGoogleChat } from './providers/google.js';
 import {
   mockStreamChat, mockChat, mockAnalyzeAgent, mockEmbed,
-  MOCK_PROVIDER_NAME, mockCallCount as _mockCallCount,
+  MOCK_PROVIDER_NAME,
 } from './providers/mock.js';
 import { AIRouterError } from './types.js';
 import type { AIChatRequest, AIAgentRequest, AIAgentResponse } from './types.js';
+import { getRequestLogger, logger } from '../logger.js';
 
 // ─── Mock mode ────────────────────────────────────────────────────────────────
-// USE_MOCK_AI=true → tutte le chiamate vanno al mock provider senza toccare rete.
-// Usato in CI e nei test di integrazione per eliminare costo e latenza API.
-
 export const USE_MOCK_AI = process.env.USE_MOCK_AI === 'true';
 
 if (USE_MOCK_AI) {
-  console.log('[ai-router] ⚠ MOCK MODE attivo — nessuna chiamata AI esterna');
-}
-
-// ─── Logging ─────────────────────────────────────────────────────────────────
-
-function logAI(
-  useCase: string,
-  provider: string,
-  model: string,
-  ms: number,
-  extra?: string
-) {
-  console.log(
-    `[ai-router] ${useCase} → ${provider}/${model} (${ms}ms)${
-      extra ? ' ' + extra : ''
-    }`
-  );
+  logger.warn('[ai-router] ⚠ MOCK MODE attivo — nessuna chiamata AI esterna');
 }
 
 // ─── Helpers interni ──────────────────────────────────────────────────────────
@@ -75,12 +47,7 @@ async function* _streamFromProvider(
       yield* streamGroqChat(messages, model, temperature, maxTokens);
       break;
     case 'anthropic':
-      yield* streamAnthropicChat(
-        messages,
-        systemPrompt ?? '',
-        model,
-        maxTokens
-      );
+      yield* streamAnthropicChat(messages, systemPrompt ?? '', model, maxTokens);
       break;
     case 'openai':
       yield* streamOpenAIChat(messages, model, temperature, maxTokens);
@@ -106,179 +73,129 @@ async function _chatFromProvider(
     case 'openai':
       return chatOpenAI(messages, model, temperature, maxTokens);
     default:
-      throw new Error(
-        `[ai-router] Provider "${provider}" non supporta chat non-streaming`
-      );
+      throw new Error(`[ai-router] Provider "${provider}" non supporta chat non-streaming`);
   }
 }
 
 // ─── API pubblica ─────────────────────────────────────────────────────────────
 
 export const ai = {
-  /**
-   * Streaming chat — per Wiki AI, RAG chat, SSE.
-   * Restituisce AsyncIterable<string> normalizzato su tutti i provider.
-   */
   async *streamChat(request: AIChatRequest): AsyncIterable<string> {
+    const log = getRequestLogger();
+
     if (USE_MOCK_AI) {
+      log.debug({ useCase: request.useCase, provider: MOCK_PROVIDER_NAME }, '[ai] stream [mock]');
       yield* mockStreamChat(request);
-      logAI(request.useCase, MOCK_PROVIDER_NAME, 'mock-model', 0, '[mock]');
       return;
     }
 
-    const config = resolveAIConfig(request.useCase);
-    const temperature = request.temperature ?? 0.7;
-    const maxTokens = request.maxTokens ?? 2048;
-    const model = request.model ?? config.model ?? '';
+    const config       = resolveAIConfig(request.useCase);
+    const temperature  = request.temperature ?? 0.7;
+    const maxTokens    = request.maxTokens   ?? 2048;
+    const model        = request.model ?? config.model ?? '';
     const systemMessage = request.messages.find((m) => m.role === 'system');
     const t0 = Date.now();
 
+    log.info({ useCase: request.useCase, provider: config.primary, model }, '[ai] stream start');
+
     try {
-      yield* _streamFromProvider(
-        config.primary,
-        request.messages,
-        model,
-        temperature,
-        maxTokens,
-        systemMessage?.content
-      );
-      logAI(request.useCase, config.primary, model, Date.now() - t0, '[stream]');
+      yield* _streamFromProvider(config.primary, request.messages, model, temperature, maxTokens, systemMessage?.content);
+      log.info({ useCase: request.useCase, provider: config.primary, model, durationMs: Date.now() - t0 }, '[ai] stream end');
     } catch (primaryErr) {
       if (!config.fallback) throw new AIRouterError(request.useCase, config.primary, primaryErr);
-
-      console.warn(
-        `[ai-router] ${config.primary} fallito per ${request.useCase}, retry su ${config.fallback}`,
-        primaryErr instanceof Error ? primaryErr.message : primaryErr
-      );
-
+      log.warn({ useCase: request.useCase, provider: config.primary, err: primaryErr }, '[ai] primary failed, retry fallback');
       const fallbackModel = DEFAULT_FALLBACK_MODELS[config.fallback] ?? model;
-
       try {
-        yield* _streamFromProvider(
-          config.fallback,
-          request.messages,
-          fallbackModel,
-          temperature,
-          maxTokens,
-          systemMessage?.content
-        );
-        logAI(request.useCase, config.fallback, fallbackModel, Date.now() - t0, '[stream][fallback]');
+        yield* _streamFromProvider(config.fallback, request.messages, fallbackModel, temperature, maxTokens, systemMessage?.content);
+        log.info({ useCase: request.useCase, provider: config.fallback, model: fallbackModel, durationMs: Date.now() - t0 }, '[ai] stream end [fallback]');
       } catch (fallbackErr) {
         throw new AIRouterError(request.useCase, config.fallback, fallbackErr);
       }
     }
   },
 
-  /**
-   * Chat non-streaming — per research job, background generation.
-   */
   async chat(request: AIChatRequest): Promise<string> {
+    const log = getRequestLogger();
+
     if (USE_MOCK_AI) {
-      const text = await mockChat(request);
-      logAI(request.useCase, MOCK_PROVIDER_NAME, 'mock-model', 0, '[mock]');
-      return text;
+      log.debug({ useCase: request.useCase, provider: MOCK_PROVIDER_NAME }, '[ai] chat [mock]');
+      return mockChat(request);
     }
 
-    const config = resolveAIConfig(request.useCase);
+    const config      = resolveAIConfig(request.useCase);
     const temperature = request.temperature ?? 0.3;
-    const maxTokens = request.maxTokens ?? 4096;
-    const model = request.model ?? config.model ?? '';
+    const maxTokens   = request.maxTokens   ?? 4096;
+    const model       = request.model ?? config.model ?? '';
     const t0 = Date.now();
 
+    log.info({ useCase: request.useCase, provider: config.primary, model }, '[ai] chat start');
+
     try {
-      const text = await _chatFromProvider(
-        config.primary,
-        request.messages,
-        model,
-        temperature,
-        maxTokens
-      );
-      logAI(request.useCase, config.primary, model, Date.now() - t0);
+      const text = await _chatFromProvider(config.primary, request.messages, model, temperature, maxTokens);
+      log.info({ useCase: request.useCase, provider: config.primary, model, durationMs: Date.now() - t0 }, '[ai] chat end');
       return text;
     } catch (primaryErr) {
       if (!config.fallback) throw new AIRouterError(request.useCase, config.primary, primaryErr);
-
-      console.warn(
-        `[ai-router] ${config.primary} fallito, retry su ${config.fallback}`,
-        primaryErr instanceof Error ? primaryErr.message : primaryErr
-      );
-
+      log.warn({ useCase: request.useCase, provider: config.primary, err: primaryErr }, '[ai] primary failed, retry fallback');
       const fallbackModel = DEFAULT_FALLBACK_MODELS[config.fallback] ?? model;
-      const text = await _chatFromProvider(
-        config.fallback,
-        request.messages,
-        fallbackModel,
-        temperature,
-        maxTokens
-      );
-      logAI(request.useCase, config.fallback, fallbackModel, Date.now() - t0, '[fallback]');
+      const text = await _chatFromProvider(config.fallback, request.messages, fallbackModel, temperature, maxTokens);
+      log.info({ useCase: request.useCase, provider: config.fallback, model: fallbackModel, durationMs: Date.now() - t0 }, '[ai] chat end [fallback]');
       return text;
     }
   },
 
-  /**
-   * Analisi agente — per RIASEC+Spiriti, agent runs.
-   * Usa Anthropic di default (tool use + ragionamento strutturato).
-   */
   async analyzeAgent(request: AIAgentRequest): Promise<AIAgentResponse> {
+    const log = getRequestLogger();
+
     if (USE_MOCK_AI) {
-      const result = await mockAnalyzeAgent(request);
-      logAI('agent_analysis', MOCK_PROVIDER_NAME, 'mock-model', 0, '[mock]');
-      return result;
+      log.debug({ provider: MOCK_PROVIDER_NAME }, '[ai] analyzeAgent [mock]');
+      return mockAnalyzeAgent(request);
     }
 
     const config = resolveAIConfig('agent_analysis');
-    const model = config.model ?? 'claude-sonnet-4-5';
+    const model  = config.model ?? 'claude-sonnet-4-5';
     const t0 = Date.now();
+
+    log.info({ provider: config.primary, model }, '[ai] analyzeAgent start');
 
     try {
       const result = await analyzeWithAnthropic(request, model);
-      logAI(
-        'agent_analysis',
-        config.primary,
-        model,
-        Date.now() - t0,
-        `[in:${result.inputTokens} out:${result.outputTokens}]`
-      );
+      log.info({
+        provider: config.primary, model,
+        durationMs: Date.now() - t0,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+      }, '[ai] analyzeAgent end');
       return result;
     } catch (err) {
-      console.warn('[ai-router] Anthropic agent fallito, retry su openai', err);
+      log.warn({ provider: config.primary, err }, '[ai] Anthropic agent failed, fallback openai');
       const fallbackModel = 'gpt-4o-mini';
       const messages: AIChatRequest['messages'] = [
         { role: 'system', content: request.systemPrompt },
-        { role: 'user', content: request.userPrompt },
+        { role: 'user',   content: request.userPrompt   },
       ];
       const text = await chatOpenAI(messages, fallbackModel, request.temperature ?? 0.3);
-      logAI('agent_analysis', 'openai', fallbackModel, Date.now() - t0, '[fallback]');
-      return {
-        text,
-        toolCalls: [],
-        stopReason: 'end_turn',
-        inputTokens: 0,
-        outputTokens: 0,
-      };
+      log.info({ provider: 'openai', model: fallbackModel, durationMs: Date.now() - t0 }, '[ai] analyzeAgent end [fallback]');
+      return { text, toolCalls: [], stopReason: 'end_turn', inputTokens: 0, outputTokens: 0 };
     }
   },
 
-  /**
-   * Embedding — sempre OpenAI text-embedding-3-small.
-   * Restituisce number[][] pronto per knowledgenodes.embedding (jsonb).
-   */
   async embed(input: string | string[]): Promise<number[][]> {
+    const log = getRequestLogger();
+
     if (USE_MOCK_AI) {
-      const result = await mockEmbed(input);
-      logAI('embedding', MOCK_PROVIDER_NAME, 'mock-embedding', 0, '[mock]');
-      return result;
+      log.debug({ provider: MOCK_PROVIDER_NAME }, '[ai] embed [mock]');
+      return mockEmbed(input);
     }
 
     const t0 = Date.now();
+    log.info({ provider: 'openai', model: 'text-embedding-3-small' }, '[ai] embed start');
     const result = await createEmbeddings(input);
-    logAI('embedding', 'openai', 'text-embedding-3-small', Date.now() - t0);
+    log.info({ provider: 'openai', model: 'text-embedding-3-small', durationMs: Date.now() - t0 }, '[ai] embed end');
     return result;
   },
 };
 
-/** Modelli di fallback se il provider primario è giù */
 const DEFAULT_FALLBACK_MODELS: Record<string, string> = {
   openai:    'gpt-4o-mini',
   groq:      'llama-3.1-70b-versatile',
@@ -287,5 +204,4 @@ const DEFAULT_FALLBACK_MODELS: Record<string, string> = {
 
 export type { AIChatRequest, AIAgentRequest, AIAgentResponse } from './types.js';
 export { AIRouterError } from './types.js';
-// Esporta contatori mock per i test di integrazione
 export { mockCallCount, lastMockUseCase, resetMockCounters } from './providers/mock.js';
