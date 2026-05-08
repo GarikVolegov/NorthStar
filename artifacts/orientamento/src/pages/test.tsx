@@ -18,7 +18,6 @@ const BASE = import.meta.env.BASE_URL || "/";
 const DRAFT_KEY = "northstar_test_draft";
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const ADVANCE_DELAY_MS = 320;
-const SPIRIT_TIMER_SEC = 12;
 const MUTE_STORAGE_KEY = "northstar_audio_muted";
 
 const PHASE_LABELS = ["Attitudini", "Profilo Interiore", "Obiettivi"] as const;
@@ -76,17 +75,32 @@ const PHASE_BG = [
   "bg-amber-50 dark:bg-amber-950/40",
 ] as const;
 
-// Gradient sottile che cambia col tema della fase — visibile sotto la progress bar
 const PHASE_PROGRESS_COLOR = [
   "bg-blue-500 dark:bg-blue-400",
   "bg-violet-500 dark:bg-violet-400",
   "bg-amber-500 dark:bg-amber-400",
 ] as const;
 
+// Colori overlay per il momento cinematico di cambio fase
+const PHASE_OVERLAY_BG = [
+  "from-blue-950/95 to-blue-900/90",
+  "from-violet-950/95 to-violet-900/90",
+  "from-amber-950/95 to-amber-900/90",
+] as const;
+
+const PHASE_OVERLAY_ACCENT = [
+  "bg-blue-400/20 border-blue-400/30",
+  "bg-violet-400/20 border-violet-400/30",
+  "bg-amber-400/20 border-amber-400/30",
+] as const;
+
 const WELCOME_EXIT_DURATION = 0.42;
 const TEST_ENTER_DURATION   = 0.38;
 const SLIDE_EASE_IN  = [0.4, 0, 1, 1] as const;
 const SLIDE_EASE_OUT = [0.16, 1, 0.3, 1] as const;
+
+// Durata overlay di fase in ms
+const PHASE_OVERLAY_MS = 1600;
 
 interface TestDraft {
   step: number;
@@ -180,23 +194,15 @@ function MuteButton({ muted, onToggle, reduced }: MuteButtonProps) {
   );
 }
 
-// ── SpiritBreath: indicatore ambient senza countdown aggressivo ─────────────────────
+// ── SpiritBreath ────────────────────────────────────────────────────────
 function SpiritBreath({ reduced }: { reduced: boolean }) {
   if (reduced) return <span className="text-xs text-muted-foreground/60 italic">Prenditi il tuo tempo</span>;
   return (
     <div className="flex items-center gap-2" aria-hidden="true">
-      {/* tre cerchi che pulsano in sequenza — effetto respiro */}
       {[0, 1, 2].map((i) => (
-        <motion.span
-          key={i}
-          className="block w-1.5 h-1.5 rounded-full bg-primary/50"
+        <motion.span key={i} className="block w-1.5 h-1.5 rounded-full bg-primary/50"
           animate={{ scale: [1, 1.6, 1], opacity: [0.4, 1, 0.4] }}
-          transition={{
-            duration: 2.2,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: i * 0.35,
-          }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut", delay: i * 0.35 }}
         />
       ))}
       <span className="text-xs text-muted-foreground/50 ml-1">Rifletti con calma</span>
@@ -204,29 +210,118 @@ function SpiritBreath({ reduced }: { reduced: boolean }) {
   );
 }
 
-// ── SectionDivider ──────────────────────────────────────────────────────
-const DIVIDER_MS = 1800;
+// ── PhaseOverlay — momento cinematico a schermo intero ──────────────────────
+/**
+ * Compare per PHASE_OVERLAY_MS quando si passa da una fase alla successiva.
+ * Overlay semitrasparente scuro accordato al colore della fase.
+ * Entra: scale(0.85) + blur(12px) → scale(1) + blur(0)
+ * Esce:  scale(1.04) + opacity(0)
+ * Il contenuto (emoji + titolo + barra) si stacca con stagger.
+ */
+interface PhaseOverlayProps {
+  phase: 0 | 1 | 2;
+  label: string;
+  emoji: string;
+  description: string;
+  onDone: () => void;
+}
+function PhaseOverlay({ phase, label, emoji, description, onDone }: PhaseOverlayProps) {
+  useEffect(() => {
+    const id = setTimeout(onDone, PHASE_OVERLAY_MS);
+    return () => clearTimeout(id);
+  }, [onDone]);
+
+  const inner: Variants = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.15 } },
+    exit:  { opacity: 0, transition: { duration: 0.2 } },
+  };
+  const item: Variants = {
+    hidden: { opacity: 0, y: 16, scale: 0.92 },
+    show:  { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: SLIDE_EASE_OUT } },
+  };
+
+  return (
+    <motion.div
+      className={cn(
+        "fixed inset-0 z-[60] flex items-center justify-center bg-gradient-to-br",
+        PHASE_OVERLAY_BG[phase]
+      )}
+      initial={{ opacity: 0, scale: 0.88, filter: "blur(14px)" }}
+      animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+      exit={{ opacity: 0, scale: 1.05, filter: "blur(6px)" }}
+      transition={{ duration: 0.38, ease: SLIDE_EASE_OUT }}
+      aria-live="assertive"
+      aria-label={`Nuova fase: ${label}`}
+    >
+      {/* Alone luminoso dietro l'emoji */}
+      <motion.div
+        className="absolute w-64 h-64 rounded-full pointer-events-none"
+        style={{ background: "var(--primary)", filter: "blur(60px)", opacity: 0.18 }}
+        animate={{ scale: [0.9, 1.1, 0.9] }}
+        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+      />
+
+      <motion.div
+        className="relative z-10 flex flex-col items-center gap-5 px-8 text-center"
+        variants={inner} initial="hidden" animate="show" exit="exit"
+      >
+        {/* Emoji grande */}
+        <motion.div variants={item}
+          className="text-7xl sm:text-8xl leading-none select-none"
+          style={{ filter: "drop-shadow(0 0 24px rgba(255,255,255,0.25))" }}
+        >
+          {emoji}
+        </motion.div>
+
+        {/* Badge fase */}
+        <motion.div variants={item}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-widest border",
+            PHASE_OVERLAY_ACCENT[phase],
+            "text-white/70"
+          )}
+        >
+          Fase {phase + 1} di 3
+        </motion.div>
+
+        {/* Titolo */}
+        <motion.h2 variants={item}
+          className="text-3xl sm:text-4xl font-serif font-bold text-white leading-tight"
+        >
+          {label}
+        </motion.h2>
+
+        {/* Descrizione */}
+        <motion.p variants={item}
+          className="text-sm sm:text-base text-white/60 max-w-xs leading-relaxed"
+        >
+          {description}
+        </motion.p>
+
+        {/* Barra progress animata — si riempie in PHASE_OVERLAY_MS */}
+        <motion.div variants={item} className="w-48 h-0.5 rounded-full bg-white/10 overflow-hidden">
+          <motion.div
+            className="h-full bg-white/50 rounded-full origin-left"
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ duration: PHASE_OVERLAY_MS / 1000 - 0.2, ease: "linear", delay: 0.3 }}
+          />
+        </motion.div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ── SectionDivider (mantenuto per compatibilità) ────────────────────────────
+const DIVIDER_MS = 400; // ora è solo un breve flash dopo l'overlay
 function SectionDivider({ label, emoji, description, onDone, reduced }: {
   label: string; emoji: string; description: string; onDone: () => void; reduced: boolean;
 }) {
   useEffect(() => { const id = setTimeout(onDone, reduced ? 0 : DIVIDER_MS); return () => clearTimeout(id); }, [onDone, reduced]);
   if (reduced) return null;
-  return (
-    <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.35 }}
-      className="mb-8 flex items-center gap-3 bg-primary/8 border border-primary/20 rounded-2xl px-5 py-3.5"
-    >
-      <span className="text-xl">{emoji}</span>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground">{label}</p>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </div>
-      <motion.div className="h-0.5 w-12 bg-primary/30 rounded-full origin-left"
-        initial={{ scaleX: 0 }} animate={{ scaleX: 1 }}
-        transition={{ duration: DIVIDER_MS / 1000, ease: "linear" }}
-      />
-    </motion.div>
-  );
+  // Dopo l'overlay non mostriamo più il banner inline — dismiss rapidamente
+  return null;
 }
 
 // ── TypewriterText ─────────────────────────────────────────────────────
@@ -393,12 +488,7 @@ function WelcomeScreen({ userName, reduced, muted, onStart, speechText, speechCh
   );
 }
 
-// ── WendyMobileStrip: avatar compatto per mobile durante il test ──────────────────
-/**
- * Su mobile (<lg) invece della card verticale intera mostriamo
- * una strip orizzontale appiccicata in cima alla sezione domande:
- * [avatar 48px] [bubble testo intro o caption] — sempre visibile
- */
+// ── WendyMobileStrip ────────────────────────────────────────────────────────
 interface WendyMobileStripProps {
   phase: 0 | 1 | 2;
   avatarState: string;
@@ -422,38 +512,23 @@ function WendyMobileStrip({
         PHASE_BG[phase]
       )}
     >
-      {/* Avatar piccolo 48px */}
       <div className="shrink-0">
-        <WendyAvatar state={avatarState} phase={phase} reduced={reduced} size={48}
-          className="shadow-sm" />
+        <WendyAvatar state={avatarState} phase={phase} reduced={reduced} size={48} className="shadow-sm" />
       </div>
-
-      {/* Contenuto testuale: caption se Wendy sta parlando, altrimenti intro statico */}
       <div className="flex-1 min-w-0">
         <AnimatePresence mode="wait">
           {captionActive && speechText ? (
-            <motion.div key="caption"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
+            <motion.div key="caption" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
               <WendySpeechCaption text={speechText} charIndex={speechCharIndex} />
             </motion.div>
           ) : lyraHasEntered && avatarIntro ? (
-            <motion.p key="intro"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="text-xs text-muted-foreground/70 italic leading-snug line-clamp-2"
-            >
+            <motion.p key="intro" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+              className="text-xs text-muted-foreground/70 italic leading-snug line-clamp-2">
               &ldquo;<TypewriterText text={avatarIntro} reduced={reduced} />&rdquo;
             </motion.p>
           ) : (
-            <motion.p key="name"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-widest"
-            >
-              Wendy
-            </motion.p>
+            <motion.p key="name" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+              className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-widest">Wendy</motion.p>
           )}
         </AnimatePresence>
       </div>
@@ -469,7 +544,6 @@ export default function Test() {
   const { user } = useAuth();
   const prefersReduced = useReducedMotion();
 
-  // ── Mute ──
   const [audioMuted, setAudioMuted] = useState<boolean>(() => {
     try { return localStorage.getItem(MUTE_STORAGE_KEY) === "1"; } catch { return false; }
   });
@@ -480,7 +554,6 @@ export default function Test() {
   useEffect(() => { if (isMuted() !== audioMuted) setMuted(audioMuted); }, []); // eslint-disable-line
   const handleToggleMute = useCallback(() => setAudioMuted((p) => !p), []);
 
-  // ── Speech caption ──
   const [speechText, setSpeechText]           = useState("");
   const [speechCharIndex, setSpeechCharIndex] = useState(-1);
   const speakWithCaption = useCallback((text: string, opts: { interrupt?: boolean } = {}) => {
@@ -493,7 +566,6 @@ export default function Test() {
     });
   }, []);
 
-  // Shortcut M
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
@@ -515,13 +587,13 @@ export default function Test() {
   });
   const [direction, setDirection] = useState<1 | -1>(1);
   const [justSelected, setJustSelected] = useState<string | null>(null);
-  // tapFlash: id domanda appena tappata — per il flash di conferma mobile
   const [tapFlash, setTapFlash] = useState<string | null>(null);
   const [activeDivider, setActiveDivider] = useState<"spirits" | "ctx" | null>(null);
+  // activeOverlay: fase da mostrare nell'overlay cinematico
+  const [activeOverlay, setActiveOverlay] = useState<"spirits" | "ctx" | null>(null);
 
   const hasDraft = !!draft && (draft.step > 0 || Object.keys(draft.answers).length > 0);
   const [showWelcome, setShowWelcome] = useState(!hasDraft);
-
   const [lyraHasEntered, setLyraHasEntered] = useState(false);
   const assignedSessionRef = useRef<number | null>(null);
   const speakTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -587,7 +659,6 @@ export default function Test() {
   const scenario     = SCENARIOS[currentId];
   const isIntroEntry = currentStep === 0 && !resumed && !prefersReduced;
 
-  // Label contatore per la fase corrente (es. "7 / 12")
   const stepCounterLabel = isCtxQ
     ? `${ctxOffset} / ${ALL_CTX_IDS.length}`
     : isSpiritQ
@@ -620,21 +691,28 @@ export default function Test() {
     setDirection(1);
     setAnswers((prev) => ({ ...prev, [id]: value }));
     setJustSelected(id);
-    // Flash tattile su mobile: brevissimo highlight poi avanza
     setTapFlash(id);
     setTimeout(() => setTapFlash(null), 300);
     setTimeout(() => {
       setJustSelected(null);
       const next = currentStep + 1;
-      if (next === SPIRITS_START) { setCurrentStep(next); setActiveDivider("spirits"); return; }
-      if (next === SPIRITS_END)   { setCurrentStep(next); setActiveDivider("ctx");     return; }
+      if (next === SPIRITS_START) {
+        setCurrentStep(next);
+        if (!prefersReduced) { setActiveOverlay("spirits"); } else { setActiveDivider("spirits"); }
+        return;
+      }
+      if (next === SPIRITS_END) {
+        setCurrentStep(next);
+        if (!prefersReduced) { setActiveOverlay("ctx"); } else { setActiveDivider("ctx"); }
+        return;
+      }
       setCurrentStep((p) => p + 1);
     }, ADVANCE_DELAY_MS);
-  }, [justSelected, currentId, currentStep]);
+  }, [justSelected, currentId, currentStep, prefersReduced]);
 
   const handleBack = useCallback(() => {
     if (justSelected !== null) return;
-    setActiveDivider(null); setDirection(-1);
+    setActiveDivider(null); setActiveOverlay(null); setDirection(-1);
     if (currentStep > 0) setCurrentStep((p) => p - 1);
   }, [justSelected, currentStep]);
 
@@ -693,20 +771,35 @@ export default function Test() {
 
   const DIVIDER_CONFIG = {
     spirits: { label: "Profilo Interiore", emoji: "🧠", description: "Le prossime domande esplorano le tue dimensioni personali" },
-    ctx:     { label: "Obiettivi",          emoji: "🎯", description: "Ultime domande: allineiamo il percorso ai tuoi obiettivi" },
+    ctx:     { label: "Obiettivi",         emoji: "🎯", description: "Ultime domande: allineiamo il percorso ai tuoi obiettivi" },
   } as const;
 
   const captionActive = !audioMuted && !prefersReduced && !!speechText && speechCharIndex !== -2;
-
-  // Banner riprendi test
   const showResumeBanner = !!draft && resumeBannerVisible && !resumed
     && currentStep === 0 && Object.keys(answers).length === 0;
+
+  // Fase dell'overlay da visualizzare (1 = Profilo Interiore, 2 = Obiettivi)
+  const overlayPhase: 0 | 1 | 2 = activeOverlay === "ctx" ? 2 : 1;
 
   return (
     <>
       {!prefersReduced && (
         <MuteButton muted={audioMuted} onToggle={handleToggleMute} reduced={prefersReduced} />
       )}
+
+      {/* ── PhaseOverlay cinematico — z-[60] sopra tutto ── */}
+      <AnimatePresence>
+        {activeOverlay && !prefersReduced && (
+          <PhaseOverlay
+            key={activeOverlay}
+            phase={overlayPhase}
+            label={DIVIDER_CONFIG[activeOverlay].label}
+            emoji={DIVIDER_CONFIG[activeOverlay].emoji}
+            description={DIVIDER_CONFIG[activeOverlay].description}
+            onDone={() => setActiveOverlay(null)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence mode="wait">
         {showWelcome ? (
@@ -754,7 +847,6 @@ export default function Test() {
             ) : (
               <div className="container max-w-5xl mx-auto px-4 py-10 min-h-[80vh]">
 
-                {/* Banner riprendi */}
                 <AnimatePresence>
                   {showResumeBanner && (
                     <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
@@ -776,7 +868,6 @@ export default function Test() {
                   )}
                 </AnimatePresence>
 
-                {/* Phase stepper */}
                 <div className="flex items-center justify-center gap-1.5 mb-4">
                   {PHASE_LABELS.map((label, i) => {
                     const isActive = currentPhase === i;
@@ -806,7 +897,6 @@ export default function Test() {
                   })}
                 </div>
 
-                {/* Header: indietro + contatore numerico */}
                 <div className="flex items-center justify-between mb-2">
                   <motion.button onClick={handleBack} disabled={currentStep === 0 || justSelected !== null}
                     className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors min-h-[44px] px-1"
@@ -814,16 +904,12 @@ export default function Test() {
                   >
                     <ArrowLeft className="w-4 h-4" />{t("test.back")}
                   </motion.button>
-
-                  {/* Contatore animato: "fase · N / TOT" */}
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="hidden sm:inline">{headerLabel}</span>
                     <AnimatePresence mode="wait">
                       <motion.span
                         key={stepCounterLabel}
-                        initial={{ opacity: 0, y: -6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 6 }}
+                        initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}
                         transition={{ duration: 0.2 }}
                         className="font-mono tabular-nums font-semibold text-foreground/70 bg-muted/60 rounded-md px-2 py-0.5"
                       >
@@ -833,7 +919,6 @@ export default function Test() {
                   </div>
                 </div>
 
-                {/* ── Progress bar h-1.5 con colore di fase ── */}
                 <div className="relative h-1.5 bg-muted rounded-full mb-8 overflow-hidden">
                   <motion.div
                     className={cn("absolute inset-y-0 left-0 rounded-full", PHASE_PROGRESS_COLOR[currentPhase])}
@@ -841,7 +926,6 @@ export default function Test() {
                     animate={{ width: `${progress}%` }}
                     transition={prefersReduced ? { duration: 0 } : { duration: 0.45, ease: easings.easeOut }}
                   />
-                  {/* shimmer highlight */}
                   {!prefersReduced && (
                     <motion.div
                       className="absolute inset-y-0 w-16 bg-gradient-to-r from-transparent via-white/30 to-transparent"
@@ -852,6 +936,7 @@ export default function Test() {
                   )}
                 </div>
 
+                {/* SectionDivider rimane per reduced-motion fallback */}
                 <AnimatePresence>
                   {activeDivider && (
                     <SectionDivider key={activeDivider}
@@ -863,10 +948,9 @@ export default function Test() {
                   )}
                 </AnimatePresence>
 
-                {/* Layout principale: desktop = 2 colonne, mobile = strip + domande */}
                 <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8 items-start">
 
-                  {/* ── Colonna avatar: DESKTOP only (hidden su mobile, gestita da WendyMobileStrip) ── */}
+                  {/* Colonna avatar desktop */}
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={`avatar-col-${currentPhase}`}
@@ -881,9 +965,7 @@ export default function Test() {
                                          { opacity: 1, scale: 1 }
                       }
                       exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.25 } }}
-                      transition={
-                        isIntroEntry ? { duration: 0.72, ease: [0.16, 1, 0.3, 1] } : { duration: 0.35 }
-                      }
+                      transition={ isIntroEntry ? { duration: 0.72, ease: [0.16, 1, 0.3, 1] } : { duration: 0.35 } }
                       className={cn(
                         "relative hidden lg:flex flex-col items-center gap-4 rounded-3xl p-6 transition-colors duration-500",
                         PHASE_BG[currentPhase]
@@ -907,20 +989,28 @@ export default function Test() {
                         <p className="text-xs text-muted-foreground/50">Orientamento AI</p>
                       </div>
 
-                      {/* Caption voce desktop */}
-                      <AnimatePresence>
-                        {captionActive && speechText && (
-                          <motion.div key="caption"
+                      {/* ── Fix #5: caption e bubble non si sovrappongono mai ── */}
+                      {/* Quando la caption è attiva, il bubble sparisce (exit). */}
+                      {/* Tra le due zone c'è un micro-divider per chiarezza visiva. */}
+                      <AnimatePresence mode="wait">
+                        {captionActive && speechText ? (
+                          // ── Caption live: Wendy sta parlando ORA
+                          <motion.div
+                            key="caption-zone"
                             initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.25 }}
-                            className="w-full">
+                            className="w-full"
+                          >
+                            {/* micro-divider */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="flex-1 h-px bg-border/40" />
+                              <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider font-medium">in ascolto</span>
+                              <div className="flex-1 h-px bg-border/40" />
+                            </div>
                             <WendySpeechCaption text={speechText} charIndex={speechCharIndex} />
                           </motion.div>
-                        )}
-                      </AnimatePresence>
-
-                      <AnimatePresence>
-                        {lyraHasEntered && scenario?.avatarIntro && (
+                        ) : lyraHasEntered && scenario?.avatarIntro ? (
+                          // ── Bubble statico: Wendy non sta parlando
                           <motion.div
                             key={`bubble-${currentStep}`}
                             initial={{ opacity: 0, y: 8, scale: 0.97 }}
@@ -934,14 +1024,13 @@ export default function Test() {
                             <TypewriterText text={scenario.avatarIntro} reduced={prefersReduced} className="italic text-foreground/80" />
                             <span className="text-muted-foreground/60 italic ml-0.5">&rdquo;</span>
                           </motion.div>
-                        )}
+                        ) : null}
                       </AnimatePresence>
                     </motion.div>
                   </AnimatePresence>
 
-                  {/* ── Colonna domande ── */}
+                  {/* Colonna domande */}
                   <div>
-                    {/* Strip mobile: visibile solo sotto lg */}
                     <div className="lg:hidden">
                       <WendyMobileStrip
                         phase={currentPhase}
@@ -973,7 +1062,6 @@ export default function Test() {
                                   <span key={n} className={cn("w-2 h-2 rounded-full", n <= questionInGroup ? "bg-primary" : "bg-muted")} />
                                 ))}
                               </div>
-                              {/* SpiritBreath: sostituisce il countdown aggressivo */}
                               <div className="ml-auto">
                                 <SpiritBreath reduced={prefersReduced} />
                               </div>
@@ -1007,7 +1095,6 @@ export default function Test() {
                           {OPTIONS.map((opt, optIdx) => {
                             const selected = answers[currentId] === opt.value;
                             const isJustSelected = justSelected === currentId && selected;
-                            // tapFlash: flash di conferma immediato su mobile
                             const isFlashing = tapFlash === currentId && selected;
                             return (
                               <motion.button
@@ -1017,7 +1104,6 @@ export default function Test() {
                                 initial={prefersReduced ? false : { opacity: 0, y: 8 }}
                                 animate={{
                                   opacity: 1, y: 0,
-                                  // Flash bg: la risposta selezionata fa un breve pulse di luminosità
                                   backgroundColor: isFlashing && !prefersReduced
                                     ? ["var(--primary)", "color-mix(in srgb, var(--primary) 80%, white 20%)", "var(--primary)"]
                                     : undefined,
@@ -1027,7 +1113,6 @@ export default function Test() {
                                   backgroundColor: isFlashing ? { duration: 0.28, times: [0, 0.5, 1] } : {},
                                 }}
                                 whileHover={prefersReduced || justSelected !== null ? undefined : { scale: 1.01 }}
-                                // whileTap: scala giù subito — feedback tattile immediato su touch
                                 whileTap={prefersReduced || justSelected !== null ? undefined : { scale: 0.97, transition: { duration: 0.08 } }}
                                 className={cn(
                                   "w-full flex items-center justify-between px-4 sm:px-5 py-4 min-h-[56px] rounded-xl border text-left text-sm sm:text-base font-medium transition-colors duration-150",
