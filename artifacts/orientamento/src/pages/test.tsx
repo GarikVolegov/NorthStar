@@ -76,6 +76,13 @@ const PHASE_BG = [
   "bg-amber-50 dark:bg-amber-950/40",
 ] as const;
 
+// Gradient sottile che cambia col tema della fase — visibile sotto la progress bar
+const PHASE_PROGRESS_COLOR = [
+  "bg-blue-500 dark:bg-blue-400",
+  "bg-violet-500 dark:bg-violet-400",
+  "bg-amber-500 dark:bg-amber-400",
+] as const;
+
 const WELCOME_EXIT_DURATION = 0.42;
 const TEST_ENTER_DURATION   = 0.38;
 const SLIDE_EASE_IN  = [0.4, 0, 1, 1] as const;
@@ -108,59 +115,31 @@ async function assignUserToSession(sessionId: number, userId: number): Promise<v
 }
 
 // ── WendySpeechCaption ─────────────────────────────────────────────────────
-/**
- * Mostra il testo completo che Wendy sta leggendo.
- * Le parole già pronunciate (charIndex >= char di fine parola)
- * diventano text-primary; quelle future restano muted.
- * Usa l'evento nativo onboundary — charIndex è l'inizio della parola corrente.
- */
-interface WendySpeechCaptionProps {
-  text: string;        // testo completo
-  charIndex: number;   // charIndex dall'evento onboundary (-1 = non ancora iniziato, -2 = finito)
-}
+interface WendySpeechCaptionProps { text: string; charIndex: number; }
 function WendySpeechCaption({ text, charIndex }: WendySpeechCaptionProps) {
   if (!text) return null;
-
-  // Splittiamo in token mantenendo gli spazi come entità separate
-  // in modo da poter ricostruire la posizione assoluta di ogni carattere.
   const tokens: { word: string; start: number }[] = [];
   const regex = /\S+/g;
   let m: RegExpExecArray | null;
-  while ((m = regex.exec(text)) !== null) {
-    tokens.push({ word: m[0], start: m.index });
-  }
-
+  while ((m = regex.exec(text)) !== null) tokens.push({ word: m[0], start: m.index });
   return (
-    <div
-      className="w-full px-3 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 text-[11px] leading-relaxed text-center select-none"
-      aria-live="polite"
-      aria-label="Wendy sta dicendo"
-    >
+    <div className="w-full px-3 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 text-[11px] leading-relaxed text-center select-none"
+      aria-live="polite" aria-label="Wendy sta dicendo">
       {tokens.map((tok, i) => {
-        // La parola è "passata" se il suo inizio è prima del charIndex corrente
         const isPast    = charIndex >= 0 && tok.start < charIndex;
-        // La parola è "corrente" se charIndex cade dentro di essa
         const isCurrent = charIndex >= 0 && charIndex >= tok.start && charIndex < tok.start + tok.word.length;
-        // Tutto completato
         const isDone    = charIndex === -2;
-
         return (
           <React.Fragment key={i}>
             <motion.span
               animate={{
-                color: (isPast || isDone)
-                  ? "var(--primary)"
-                  : isCurrent
-                  ? "var(--primary)"
-                  : "var(--muted-foreground)",
+                color: (isPast || isDone || isCurrent) ? "var(--primary)" : "var(--muted-foreground)",
                 opacity: (isPast || isDone) ? 0.7 : isCurrent ? 1 : 0.45,
                 fontWeight: isCurrent ? 600 : 400,
               }}
               transition={{ duration: 0.15 }}
               style={{ display: "inline" }}
-            >
-              {tok.word}
-            </motion.span>
+            >{tok.word}</motion.span>
             {i < tokens.length - 1 && " "}
           </React.Fragment>
         );
@@ -173,13 +152,11 @@ function WendySpeechCaption({ text, charIndex }: WendySpeechCaptionProps) {
 interface MuteButtonProps { muted: boolean; onToggle: () => void; reduced: boolean; }
 function MuteButton({ muted, onToggle, reduced }: MuteButtonProps) {
   return (
-    <motion.button
-      onClick={onToggle}
+    <motion.button onClick={onToggle}
       aria-label={muted ? "Attiva audio" : "Silenzia audio"}
       title={muted ? "Attiva audio (M)" : "Silenzia audio (M)"}
       className={cn(
-        "fixed top-4 right-4 z-50",
-        "flex items-center justify-center w-9 h-9 rounded-full",
+        "fixed top-4 right-4 z-50 flex items-center justify-center w-9 h-9 rounded-full",
         "border transition-colors duration-200 shadow-sm backdrop-blur-sm",
         muted
           ? "bg-muted/90 border-border/60 text-muted-foreground hover:bg-muted"
@@ -189,62 +166,40 @@ function MuteButton({ muted, onToggle, reduced }: MuteButtonProps) {
       whileTap={reduced ? {} : { scale: 0.92 }}
     >
       <AnimatePresence mode="wait" initial={false}>
-        {muted ? (
-          <motion.span key="muted"
-            initial={{ opacity: 0, scale: 0.7, rotate: -15 }}
-            animate={{ opacity: 1, scale: 1, rotate: 0 }}
-            exit={{ opacity: 0, scale: 0.7, rotate: 15 }}
-            transition={{ duration: 0.18 }}
-            className="flex items-center justify-center"
-          >
-            <VolumeX className="w-4 h-4" />
-          </motion.span>
-        ) : (
-          <motion.span key="unmuted"
-            initial={{ opacity: 0, scale: 0.7, rotate: 15 }}
-            animate={{ opacity: 1, scale: 1, rotate: 0 }}
-            exit={{ opacity: 0, scale: 0.7, rotate: -15 }}
-            transition={{ duration: 0.18 }}
-            className="flex items-center justify-center"
-          >
-            <Volume2 className="w-4 h-4" />
-          </motion.span>
-        )}
+        {muted
+          ? <motion.span key="muted" initial={{ opacity: 0, scale: 0.7, rotate: -15 }} animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              exit={{ opacity: 0, scale: 0.7, rotate: 15 }} transition={{ duration: 0.18 }}
+              className="flex items-center justify-center"><VolumeX className="w-4 h-4" /></motion.span>
+          : <motion.span key="unmuted" initial={{ opacity: 0, scale: 0.7, rotate: 15 }} animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              exit={{ opacity: 0, scale: 0.7, rotate: -15 }} transition={{ duration: 0.18 }}
+              className="flex items-center justify-center"><Volume2 className="w-4 h-4" /></motion.span>
+        }
       </AnimatePresence>
       <span className="sr-only">{muted ? "Audio silenzioso" : "Audio attivo"}</span>
     </motion.button>
   );
 }
 
-// ── SpiritTimer ─────────────────────────────────────────────────────────
-const CIRC = 2 * Math.PI * 20;
-function SpiritTimer({ totalSec, paused, reduced }: { totalSec: number; paused: boolean; reduced: boolean }) {
-  const [remaining, setRemaining] = useState(totalSec);
-  useEffect(() => {
-    if (reduced || paused || remaining <= 0) return;
-    const id = setInterval(() => setRemaining((r) => { if (r <= 1) { clearInterval(id); return 0; } return r - 1; }), 1000);
-    return () => clearInterval(id);
-  }, [paused, reduced, remaining]);
-  const offset = CIRC * (1 - remaining / totalSec);
-  const strokeColor = remaining <= 1 ? "var(--destructive)" : remaining <= 4 ? "#f59e0b" : "var(--primary)";
+// ── SpiritBreath: indicatore ambient senza countdown aggressivo ─────────────────────
+function SpiritBreath({ reduced }: { reduced: boolean }) {
   if (reduced) return <span className="text-xs text-muted-foreground/60 italic">Prenditi il tuo tempo</span>;
   return (
     <div className="flex items-center gap-2" aria-hidden="true">
-      <svg width="28" height="28" viewBox="0 0 48 48" className="-rotate-90">
-        <circle cx="24" cy="24" r="20" fill="none" strokeWidth="3" className="stroke-muted" />
-        <motion.circle cx="24" cy="24" r="20" fill="none" strokeWidth="3" strokeLinecap="round"
-          style={{ stroke: strokeColor }} strokeDasharray={CIRC}
-          animate={{ strokeDashoffset: offset }} transition={{ duration: 0.9, ease: "linear" }}
+      {/* tre cerchi che pulsano in sequenza — effetto respiro */}
+      {[0, 1, 2].map((i) => (
+        <motion.span
+          key={i}
+          className="block w-1.5 h-1.5 rounded-full bg-primary/50"
+          animate={{ scale: [1, 1.6, 1], opacity: [0.4, 1, 0.4] }}
+          transition={{
+            duration: 2.2,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: i * 0.35,
+          }}
         />
-      </svg>
-      <AnimatePresence mode="wait">
-        {remaining > 0
-          ? <motion.span key={remaining} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}
-              transition={{ duration: 0.2 }} className="text-xs font-mono tabular-nums" style={{ color: strokeColor }}>{remaining}s</motion.span>
-          : <motion.span key="done" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              className="text-xs text-muted-foreground/50">Rispondi quando sei pronto</motion.span>
-        }
-      </AnimatePresence>
+      ))}
+      <span className="text-xs text-muted-foreground/50 ml-1">Rifletti con calma</span>
     </div>
   );
 }
@@ -307,7 +262,6 @@ interface WelcomeScreenProps {
   reduced: boolean;
   muted: boolean;
   onStart: () => void;
-  /** charIndex e testo correnti per la caption nella welcome */
   speechText: string;
   speechCharIndex: number;
 }
@@ -365,14 +319,11 @@ function WelcomeScreen({ userName, reduced, muted, onStart, speechText, speechCh
               className="shadow-lg relative z-10 sm:w-[170px] sm:h-[170px]" />
           </motion.div>
 
-          {/* Caption sotto avatar nella welcome */}
           <AnimatePresence>
             {!muted && speechText && (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.3 }}
-                className="w-full max-w-sm"
-              >
+                className="w-full max-w-sm">
                 <WendySpeechCaption text={speechText} charIndex={speechCharIndex} />
               </motion.div>
             )}
@@ -389,8 +340,7 @@ function WelcomeScreen({ userName, reduced, muted, onStart, speechText, speechCh
           </motion.div>
 
           <motion.p variants={itemVariants}
-            className="text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed max-w-sm sm:max-w-md"
-          >
+            className="text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed max-w-sm sm:max-w-md">
             Rispondo a qualche domanda su di te — sul modo in cui lavori,
             pensi e vuoi crescere — e costruisco il tuo profilo professionale su misura.
           </motion.p>
@@ -409,8 +359,7 @@ function WelcomeScreen({ userName, reduced, muted, onStart, speechText, speechCh
 
           <motion.div variants={itemVariants} className="hidden sm:flex flex-col items-center gap-3 pt-2 w-full">
             <Button ref={startBtnRef} size="lg" onClick={onStart}
-              className="rounded-full px-8 h-14 text-base font-semibold w-full sm:w-auto gap-2"
-            >
+              className="rounded-full px-8 h-14 text-base font-semibold w-full sm:w-auto gap-2">
               Inizia il percorso
               <motion.span className="inline-flex"
                 animate={reduced ? {} : { x: [0, 4, 0] }}
@@ -429,8 +378,7 @@ function WelcomeScreen({ userName, reduced, muted, onStart, speechText, speechCh
           <div className="absolute bottom-0 left-0 right-0 h-28 pointer-events-none bg-gradient-to-t from-background to-transparent" />
           <div className="relative w-full flex flex-col items-center gap-2 pt-4 border-t border-border/30">
             <Button ref={startBtnRef} size="lg" onClick={onStart}
-              className="rounded-full h-14 text-base font-semibold w-full gap-2"
-            >
+              className="rounded-full h-14 text-base font-semibold w-full gap-2">
               Inizia il percorso
               <motion.span className="inline-flex"
                 animate={reduced ? {} : { x: [0, 4, 0] }}
@@ -442,6 +390,74 @@ function WelcomeScreen({ userName, reduced, muted, onStart, speechText, speechCh
         </motion.div>
       </div>
     </div>
+  );
+}
+
+// ── WendyMobileStrip: avatar compatto per mobile durante il test ──────────────────
+/**
+ * Su mobile (<lg) invece della card verticale intera mostriamo
+ * una strip orizzontale appiccicata in cima alla sezione domande:
+ * [avatar 48px] [bubble testo intro o caption] — sempre visibile
+ */
+interface WendyMobileStripProps {
+  phase: 0 | 1 | 2;
+  avatarState: string;
+  reduced: boolean;
+  avatarIntro: string | undefined;
+  captionActive: boolean;
+  speechText: string;
+  speechCharIndex: number;
+  lyraHasEntered: boolean;
+}
+function WendyMobileStrip({
+  phase, avatarState, reduced, avatarIntro, captionActive, speechText, speechCharIndex, lyraHasEntered
+}: WendyMobileStripProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: SLIDE_EASE_OUT }}
+      className={cn(
+        "flex items-center gap-3 rounded-2xl px-3 py-2.5 mb-5 transition-colors duration-500",
+        PHASE_BG[phase]
+      )}
+    >
+      {/* Avatar piccolo 48px */}
+      <div className="shrink-0">
+        <WendyAvatar state={avatarState} phase={phase} reduced={reduced} size={48}
+          className="shadow-sm" />
+      </div>
+
+      {/* Contenuto testuale: caption se Wendy sta parlando, altrimenti intro statico */}
+      <div className="flex-1 min-w-0">
+        <AnimatePresence mode="wait">
+          {captionActive && speechText ? (
+            <motion.div key="caption"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <WendySpeechCaption text={speechText} charIndex={speechCharIndex} />
+            </motion.div>
+          ) : lyraHasEntered && avatarIntro ? (
+            <motion.p key="intro"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="text-xs text-muted-foreground/70 italic leading-snug line-clamp-2"
+            >
+              &ldquo;<TypewriterText text={avatarIntro} reduced={reduced} />&rdquo;
+            </motion.p>
+          ) : (
+            <motion.p key="name"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-widest"
+            >
+              Wendy
+            </motion.p>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
   );
 }
 
@@ -464,13 +480,9 @@ export default function Test() {
   useEffect(() => { if (isMuted() !== audioMuted) setMuted(audioMuted); }, []); // eslint-disable-line
   const handleToggleMute = useCallback(() => setAudioMuted((p) => !p), []);
 
-  // ── Speech caption state ──
-  // speechText = testo completo che Wendy sta leggendo
-  // speechCharIndex: -1 = nessuno, -2 = completato, >= 0 = charIndex parola corrente
+  // ── Speech caption ──
   const [speechText, setSpeechText]           = useState("");
   const [speechCharIndex, setSpeechCharIndex] = useState(-1);
-
-  /** Wrapper speak con aggancio automatico ai callback della caption */
   const speakWithCaption = useCallback((text: string, opts: { interrupt?: boolean } = {}) => {
     setSpeechText(text);
     setSpeechCharIndex(-1);
@@ -503,6 +515,8 @@ export default function Test() {
   });
   const [direction, setDirection] = useState<1 | -1>(1);
   const [justSelected, setJustSelected] = useState<string | null>(null);
+  // tapFlash: id domanda appena tappata — per il flash di conferma mobile
+  const [tapFlash, setTapFlash] = useState<string | null>(null);
   const [activeDivider, setActiveDivider] = useState<"spirits" | "ctx" | null>(null);
 
   const hasDraft = !!draft && (draft.step > 0 || Object.keys(draft.answers).length > 0);
@@ -526,7 +540,6 @@ export default function Test() {
     return () => stopAmbientPad();
   }, [showWelcome, prefersReduced]);
 
-  // Legge il testo della domanda ad ogni cambio step
   useEffect(() => {
     if (showWelcome || prefersReduced || audioMuted) return;
     const id = ALL_IDS[currentStep];
@@ -574,6 +587,13 @@ export default function Test() {
   const scenario     = SCENARIOS[currentId];
   const isIntroEntry = currentStep === 0 && !resumed && !prefersReduced;
 
+  // Label contatore per la fase corrente (es. "7 / 12")
+  const stepCounterLabel = isCtxQ
+    ? `${ctxOffset} / ${ALL_CTX_IDS.length}`
+    : isSpiritQ
+    ? `${spiritOffset + 1} / ${ALL_SPIRIT_IDS.length}`
+    : `${currentStep + 1} / ${ALL_RIASEC_IDS.length}`;
+
   const questionText = isCtxQ
     ? t(`test.questions.ctx.${currentId}`)
     : isSpiritQ
@@ -600,6 +620,9 @@ export default function Test() {
     setDirection(1);
     setAnswers((prev) => ({ ...prev, [id]: value }));
     setJustSelected(id);
+    // Flash tattile su mobile: brevissimo highlight poi avanza
+    setTapFlash(id);
+    setTimeout(() => setTapFlash(null), 300);
     setTimeout(() => {
       setJustSelected(null);
       const next = currentStep + 1;
@@ -673,8 +696,11 @@ export default function Test() {
     ctx:     { label: "Obiettivi",          emoji: "🎯", description: "Ultime domande: allineiamo il percorso ai tuoi obiettivi" },
   } as const;
 
-  // Decide se la caption è attiva (testo presente e non ancora terminato del tutto)
   const captionActive = !audioMuted && !prefersReduced && !!speechText && speechCharIndex !== -2;
+
+  // Banner riprendi test
+  const showResumeBanner = !!draft && resumeBannerVisible && !resumed
+    && currentStep === 0 && Object.keys(answers).length === 0;
 
   return (
     <>
@@ -684,10 +710,8 @@ export default function Test() {
 
       <AnimatePresence mode="wait">
         {showWelcome ? (
-          <motion.div
-            key="welcome"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+          <motion.div key="welcome"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             exit={
               prefersReduced
                 ? { opacity: 0, transition: { duration: 0.15 } }
@@ -707,8 +731,7 @@ export default function Test() {
           </motion.div>
 
         ) : (
-          <motion.div
-            key="test"
+          <motion.div key="test"
             initial={prefersReduced ? { opacity: 0 } : { opacity: 0, y: 32 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, transition: { duration: 0.15 } }}
@@ -731,33 +754,29 @@ export default function Test() {
             ) : (
               <div className="container max-w-5xl mx-auto px-4 py-10 min-h-[80vh]">
 
-                {(() => {
-                  const showResumeBanner = !!draft && resumeBannerVisible && !resumed
-                    && currentStep === 0 && Object.keys(answers).length === 0;
-                  return (
-                    <AnimatePresence>
-                      {showResumeBanner && (
-                        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.3 }}
-                          className="mb-6 flex items-center gap-3 bg-primary/10 border border-primary/25 rounded-2xl px-4 py-3"
-                        >
-                          <RotateCcw className="w-4 h-4 text-primary shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground">Hai un test in corso</p>
-                            <p className="text-xs text-muted-foreground">
-                              Avevi risposto a {draft?.step ?? 0} domande su {ALL_IDS.length}. Vuoi riprendere?
-                            </p>
-                          </div>
-                          <div className="flex gap-2 shrink-0">
-                            <Button size="sm" variant="ghost" onClick={handleDismissDraft} className="rounded-full h-7 px-2"><X className="w-3.5 h-3.5" /></Button>
-                            <Button size="sm" onClick={handleResume} className="rounded-full h-7 px-3 text-xs">Riprendi</Button>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  );
-                })()}
+                {/* Banner riprendi */}
+                <AnimatePresence>
+                  {showResumeBanner && (
+                    <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.3 }}
+                      className="mb-6 flex items-center gap-3 bg-primary/10 border border-primary/25 rounded-2xl px-4 py-3"
+                    >
+                      <RotateCcw className="w-4 h-4 text-primary shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground">Hai un test in corso</p>
+                        <p className="text-xs text-muted-foreground">
+                          Avevi risposto a {draft?.step ?? 0} domande su {ALL_IDS.length}. Vuoi riprendere?
+                        </p>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <Button size="sm" variant="ghost" onClick={handleDismissDraft} className="rounded-full h-7 px-2"><X className="w-3.5 h-3.5" /></Button>
+                        <Button size="sm" onClick={handleResume} className="rounded-full h-7 px-3 text-xs">Riprendi</Button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
+                {/* Phase stepper */}
                 <div className="flex items-center justify-center gap-1.5 mb-4">
                   {PHASE_LABELS.map((label, i) => {
                     const isActive = currentPhase === i;
@@ -787,20 +806,51 @@ export default function Test() {
                   })}
                 </div>
 
-                <div className="flex items-center justify-between mb-3">
+                {/* Header: indietro + contatore numerico */}
+                <div className="flex items-center justify-between mb-2">
                   <motion.button onClick={handleBack} disabled={currentStep === 0 || justSelected !== null}
-                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors min-h-[44px] px-1"
                     whileHover={prefersReduced ? {} : { x: -2 }} whileTap={prefersReduced ? {} : { scale: 0.97 }}
                   >
                     <ArrowLeft className="w-4 h-4" />{t("test.back")}
                   </motion.button>
-                  <span className="text-sm text-muted-foreground">{headerLabel}</span>
+
+                  {/* Contatore animato: "fase · N / TOT" */}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="hidden sm:inline">{headerLabel}</span>
+                    <AnimatePresence mode="wait">
+                      <motion.span
+                        key={stepCounterLabel}
+                        initial={{ opacity: 0, y: -6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 6 }}
+                        transition={{ duration: 0.2 }}
+                        className="font-mono tabular-nums font-semibold text-foreground/70 bg-muted/60 rounded-md px-2 py-0.5"
+                      >
+                        {stepCounterLabel}
+                      </motion.span>
+                    </AnimatePresence>
+                  </div>
                 </div>
 
-                <motion.div initial={false} animate={{ scaleX: progress / 100 }}
-                  transition={prefersReduced ? { duration: 0 } : { duration: 0.4, ease: easings.easeOut }}
-                  style={{ transformOrigin: "left" }} className="h-1 bg-primary rounded-full mb-8"
-                />
+                {/* ── Progress bar h-1.5 con colore di fase ── */}
+                <div className="relative h-1.5 bg-muted rounded-full mb-8 overflow-hidden">
+                  <motion.div
+                    className={cn("absolute inset-y-0 left-0 rounded-full", PHASE_PROGRESS_COLOR[currentPhase])}
+                    initial={false}
+                    animate={{ width: `${progress}%` }}
+                    transition={prefersReduced ? { duration: 0 } : { duration: 0.45, ease: easings.easeOut }}
+                  />
+                  {/* shimmer highlight */}
+                  {!prefersReduced && (
+                    <motion.div
+                      className="absolute inset-y-0 w-16 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                      animate={{ x: ["-4rem", `${progress + 4}%`] }}
+                      transition={{ duration: 0.7, ease: "easeOut" }}
+                      key={currentStep}
+                    />
+                  )}
+                </div>
 
                 <AnimatePresence>
                   {activeDivider && (
@@ -813,8 +863,10 @@ export default function Test() {
                   )}
                 </AnimatePresence>
 
+                {/* Layout principale: desktop = 2 colonne, mobile = strip + domande */}
                 <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8 items-start">
 
+                  {/* ── Colonna avatar: DESKTOP only (hidden su mobile, gestita da WendyMobileStrip) ── */}
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={`avatar-col-${currentPhase}`}
@@ -833,7 +885,7 @@ export default function Test() {
                         isIntroEntry ? { duration: 0.72, ease: [0.16, 1, 0.3, 1] } : { duration: 0.35 }
                       }
                       className={cn(
-                        "relative flex flex-col items-center gap-4 rounded-3xl p-6 transition-colors duration-500",
+                        "relative hidden lg:flex flex-col items-center gap-4 rounded-3xl p-6 transition-colors duration-500",
                         PHASE_BG[currentPhase]
                       )}
                     >
@@ -855,17 +907,13 @@ export default function Test() {
                         <p className="text-xs text-muted-foreground/50">Orientamento AI</p>
                       </div>
 
-                      {/* ── Caption voce sotto il nome ── */}
+                      {/* Caption voce desktop */}
                       <AnimatePresence>
                         {captionActive && speechText && (
-                          <motion.div
-                            key="caption"
-                            initial={{ opacity: 0, y: 6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -4 }}
-                            transition={{ duration: 0.25 }}
-                            className="w-full"
-                          >
+                          <motion.div key="caption"
+                            initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.25 }}
+                            className="w-full">
                             <WendySpeechCaption text={speechText} charIndex={speechCharIndex} />
                           </motion.div>
                         )}
@@ -891,137 +939,166 @@ export default function Test() {
                     </motion.div>
                   </AnimatePresence>
 
-                  <AnimatePresence mode="wait" custom={direction}>
-                    <motion.div key={currentStep} custom={direction} variants={questionVariants} initial="enter" animate="center" exit="exit">
+                  {/* ── Colonna domande ── */}
+                  <div>
+                    {/* Strip mobile: visibile solo sotto lg */}
+                    <div className="lg:hidden">
+                      <WendyMobileStrip
+                        phase={currentPhase}
+                        avatarState={scenario?.avatarState ?? "focused"}
+                        reduced={prefersReduced}
+                        avatarIntro={scenario?.avatarIntro}
+                        captionActive={captionActive}
+                        speechText={speechText}
+                        speechCharIndex={speechCharIndex}
+                        lyraHasEntered={lyraHasEntered}
+                      />
+                    </div>
 
-                      {spiritInfo && (() => {
-                        const display = SPIRIT_DISPLAY[spiritInfo.transKey];
-                        return (
+                    <AnimatePresence mode="wait" custom={direction}>
+                      <motion.div key={currentStep} custom={direction} variants={questionVariants} initial="enter" animate="center" exit="exit">
+
+                        {spiritInfo && (() => {
+                          const display = SPIRIT_DISPLAY[spiritInfo.transKey];
+                          return (
+                            <div className="flex items-center gap-3 mb-4 flex-wrap">
+                              <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-full px-4 py-1.5">
+                                <span>{display.emoji}</span>
+                                <span className="text-sm font-medium text-primary">
+                                  {display.name} · <span className="font-normal text-muted-foreground text-xs">{display.desc}</span>
+                                </span>
+                              </div>
+                              <div className="flex gap-1.5">
+                                {[1,2,3].map((n) => (
+                                  <span key={n} className={cn("w-2 h-2 rounded-full", n <= questionInGroup ? "bg-primary" : "bg-muted")} />
+                                ))}
+                              </div>
+                              {/* SpiritBreath: sostituisce il countdown aggressivo */}
+                              <div className="ml-auto">
+                                <SpiritBreath reduced={prefersReduced} />
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {isCtxQ && (
                           <div className="flex items-center gap-3 mb-4">
                             <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-full px-4 py-1.5">
-                              <span>{display.emoji}</span>
+                              <span>🎯</span>
                               <span className="text-sm font-medium text-primary">
-                                {display.name} · <span className="font-normal text-muted-foreground text-xs">{display.desc}</span>
+                                {t("test.ctxBadge", { current: ctxOffset, total: ALL_CTX_IDS.length })}
                               </span>
                             </div>
-                            <div className="flex gap-1.5">
-                              {[1,2,3].map((n) => (
-                                <span key={n} className={cn("w-2 h-2 rounded-full", n <= questionInGroup ? "bg-primary" : "bg-muted")} />
-                              ))}
-                            </div>
-                            <div className="ml-auto">
-                              <SpiritTimer key={currentStep} totalSec={SPIRIT_TIMER_SEC} paused={justSelected !== null} reduced={prefersReduced} />
-                            </div>
                           </div>
-                        );
-                      })()}
+                        )}
 
-                      {isCtxQ && (
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-full px-4 py-1.5">
-                            <span>🎯</span>
-                            <span className="text-sm font-medium text-primary">
-                              {t("test.ctxBadge", { current: ctxOffset, total: ALL_CTX_IDS.length })}
-                            </span>
-                          </div>
-                        </div>
-                      )}
+                        {scenario?.scenario && (
+                          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}
+                            className="mb-5 px-4 py-3 rounded-xl bg-muted/50 border border-border/50 text-sm text-muted-foreground italic leading-relaxed">
+                            📍 {scenario.scenario}
+                          </motion.div>
+                        )}
 
-                      {scenario?.scenario && (
-                        <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}
-                          className="mb-5 px-4 py-3 rounded-xl bg-muted/50 border border-border/50 text-sm text-muted-foreground italic leading-relaxed"
-                        >
-                          📍 {scenario.scenario}
-                        </motion.div>
-                      )}
+                        <h2 className="text-xl sm:text-2xl md:text-[1.6rem] font-serif font-semibold text-foreground mb-7 leading-snug">
+                          {questionText}
+                        </h2>
 
-                      <h2 className="text-xl sm:text-2xl md:text-[1.6rem] font-serif font-semibold text-foreground mb-7 leading-snug">
-                        {questionText}
-                      </h2>
-
-                      <div className="space-y-3">
-                        {OPTIONS.map((opt, optIdx) => {
-                          const selected = answers[currentId] === opt.value;
-                          const isJustSelected = justSelected === currentId && selected;
-                          return (
-                            <motion.button
-                              key={opt.value}
-                              onClick={() => handleAnswer(opt.value)}
-                              disabled={justSelected !== null}
-                              initial={prefersReduced ? false : { opacity: 0, y: 8 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={prefersReduced ? { duration: 0 } : { delay: optIdx * 0.04, duration: 0.28, ease: easings.easeOut }}
-                              whileHover={prefersReduced || justSelected !== null ? undefined : { scale: 1.01 }}
-                              whileTap={prefersReduced || justSelected !== null ? undefined : { scale: 0.98 }}
-                              className={cn(
-                                "w-full flex items-center justify-between px-4 sm:px-5 py-4 min-h-[56px] rounded-xl border text-left text-sm sm:text-base font-medium transition-colors duration-150",
-                                selected ? "bg-primary text-primary-foreground border-primary shadow-md"
-                                         : "bg-card border-border hover:border-primary/40 hover:bg-primary/5 text-foreground",
-                                justSelected !== null && !selected && "opacity-50"
-                              )}
-                            >
-                              <span className="flex items-center gap-3 flex-1 min-w-0">
-                                <span className={cn(
-                                  "hidden pointer-fine:inline-flex items-center justify-center w-5 h-5 rounded-md text-[10px] font-bold border shrink-0 transition-opacity duration-150",
-                                  selected ? "border-primary-foreground/40 text-primary-foreground/70 opacity-70"
-                                    : justSelected !== null ? "opacity-0"
-                                    : "border-muted-foreground/30 text-muted-foreground/60 opacity-60"
-                                )}>{opt.value}</span>
-                                {opt.label}
-                              </span>
-                              <motion.div
+                        <div className="space-y-3">
+                          {OPTIONS.map((opt, optIdx) => {
+                            const selected = answers[currentId] === opt.value;
+                            const isJustSelected = justSelected === currentId && selected;
+                            // tapFlash: flash di conferma immediato su mobile
+                            const isFlashing = tapFlash === currentId && selected;
+                            return (
+                              <motion.button
+                                key={opt.value}
+                                onClick={() => handleAnswer(opt.value)}
+                                disabled={justSelected !== null}
+                                initial={prefersReduced ? false : { opacity: 0, y: 8 }}
+                                animate={{
+                                  opacity: 1, y: 0,
+                                  // Flash bg: la risposta selezionata fa un breve pulse di luminosità
+                                  backgroundColor: isFlashing && !prefersReduced
+                                    ? ["var(--primary)", "color-mix(in srgb, var(--primary) 80%, white 20%)", "var(--primary)"]
+                                    : undefined,
+                                }}
+                                transition={prefersReduced ? { duration: 0 } : {
+                                  opacity: { delay: optIdx * 0.04, duration: 0.28, ease: easings.easeOut },
+                                  backgroundColor: isFlashing ? { duration: 0.28, times: [0, 0.5, 1] } : {},
+                                }}
+                                whileHover={prefersReduced || justSelected !== null ? undefined : { scale: 1.01 }}
+                                // whileTap: scala giù subito — feedback tattile immediato su touch
+                                whileTap={prefersReduced || justSelected !== null ? undefined : { scale: 0.97, transition: { duration: 0.08 } }}
                                 className={cn(
-                                  "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ml-3",
-                                  selected ? "border-primary-foreground bg-primary-foreground/20" : "border-muted-foreground"
+                                  "w-full flex items-center justify-between px-4 sm:px-5 py-4 min-h-[56px] rounded-xl border text-left text-sm sm:text-base font-medium transition-colors duration-150",
+                                  selected ? "bg-primary text-primary-foreground border-primary shadow-md"
+                                           : "bg-card border-border hover:border-primary/40 hover:bg-primary/5 text-foreground",
+                                  justSelected !== null && !selected && "opacity-50"
                                 )}
-                                animate={
-                                  prefersReduced ? {} :
-                                  isJustSelected ? { scale: [1, 1.35, 0.95, 1.1, 1] } :
-                                  selected       ? { scale: [1, 1.2, 1] } : { scale: 1 }
-                                }
-                                transition={isJustSelected ? { duration: 0.4, ease: "easeOut" } : { duration: 0.25 }}
                               >
-                                {selected && (
-                                  isJustSelected
-                                    ? <motion.div initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.18 }}>
-                                        <Check className="w-3 h-3 text-primary-foreground" />
-                                      </motion.div>
-                                    : <div className="w-2.5 h-2.5 rounded-full bg-primary-foreground" />
-                                )}
-                              </motion.div>
-                            </motion.button>
-                          );
-                        })}
-                      </div>
+                                <span className="flex items-center gap-3 flex-1 min-w-0">
+                                  <span className={cn(
+                                    "hidden pointer-fine:inline-flex items-center justify-center w-5 h-5 rounded-md text-[10px] font-bold border shrink-0 transition-opacity duration-150",
+                                    selected ? "border-primary-foreground/40 text-primary-foreground/70 opacity-70"
+                                      : justSelected !== null ? "opacity-0"
+                                      : "border-muted-foreground/30 text-muted-foreground/60 opacity-60"
+                                  )}>{opt.value}</span>
+                                  {opt.label}
+                                </span>
+                                <motion.div
+                                  className={cn(
+                                    "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ml-3",
+                                    selected ? "border-primary-foreground bg-primary-foreground/20" : "border-muted-foreground"
+                                  )}
+                                  animate={
+                                    prefersReduced ? {} :
+                                    isJustSelected ? { scale: [1, 1.35, 0.95, 1.1, 1] } :
+                                    selected       ? { scale: [1, 1.2, 1] } : { scale: 1 }
+                                  }
+                                  transition={isJustSelected ? { duration: 0.4, ease: "easeOut" } : { duration: 0.25 }}
+                                >
+                                  {selected && (
+                                    isJustSelected
+                                      ? <motion.div initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.18 }}>
+                                          <Check className="w-3 h-3 text-primary-foreground" />
+                                        </motion.div>
+                                      : <div className="w-2.5 h-2.5 rounded-full bg-primary-foreground" />
+                                  )}
+                                </motion.div>
+                              </motion.button>
+                            );
+                          })}
+                        </div>
 
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8, duration: 0.4 }}
-                        className="hidden pointer-fine:flex items-center gap-3 mt-8 text-xs text-muted-foreground/50 justify-center flex-wrap"
-                      >
-                        <span className="flex items-center gap-1">
-                          <kbd className="px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-muted/40 font-mono text-[10px]">1</kbd>
-                          <span>–</span>
-                          <kbd className="px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-muted/40 font-mono text-[10px]">5</kbd>
-                          <span className="ml-1">seleziona</span>
-                        </span>
-                        {answers[currentId] !== undefined && (
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8, duration: 0.4 }}
+                          className="hidden pointer-fine:flex items-center gap-3 mt-8 text-xs text-muted-foreground/50 justify-center flex-wrap"
+                        >
                           <span className="flex items-center gap-1">
-                            <kbd className="px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-muted/40 font-mono text-[10px]">Enter</kbd>
-                            <span className="ml-1">conferma</span>
+                            <kbd className="px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-muted/40 font-mono text-[10px]">1</kbd>
+                            <span>–</span>
+                            <kbd className="px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-muted/40 font-mono text-[10px]">5</kbd>
+                            <span className="ml-1">seleziona</span>
                           </span>
-                        )}
-                        {currentStep > 0 && (
+                          {answers[currentId] !== undefined && (
+                            <span className="flex items-center gap-1">
+                              <kbd className="px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-muted/40 font-mono text-[10px]">Enter</kbd>
+                              <span className="ml-1">conferma</span>
+                            </span>
+                          )}
+                          {currentStep > 0 && (
+                            <span className="flex items-center gap-1">
+                              <kbd className="px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-muted/40 font-mono text-[10px]">←</kbd>
+                              <span className="ml-1">indietro</span>
+                            </span>
+                          )}
                           <span className="flex items-center gap-1">
-                            <kbd className="px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-muted/40 font-mono text-[10px]">←</kbd>
-                            <span className="ml-1">indietro</span>
+                            <kbd className="px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-muted/40 font-mono text-[10px]">M</kbd>
+                            <span className="ml-1">{audioMuted ? "riattiva audio" : "silenzia"}</span>
                           </span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <kbd className="px-1.5 py-0.5 rounded border border-muted-foreground/20 bg-muted/40 font-mono text-[10px]">M</kbd>
-                          <span className="ml-1">{audioMuted ? "riattiva audio" : "silenzia"}</span>
-                        </span>
+                        </motion.div>
                       </motion.div>
-                    </motion.div>
-                  </AnimatePresence>
+                    </AnimatePresence>
+                  </div>
                 </div>
               </div>
             )}
