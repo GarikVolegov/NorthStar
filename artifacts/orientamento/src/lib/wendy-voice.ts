@@ -1,12 +1,12 @@
 /**
  * wendy-voice.ts
- * ─────────────────────────────────────────────────────────────────────────────
- * Funzionalità:
- *   1. speak()            — Web Speech API, voce italiana femminile elegante
- *   2. startAmbientPad()  — pad armonico via AudioContext (Am pentatonico)
- *   3. setMuted(bool)     — mute globale: silenzia voce + pad in realtime
- *   4. getMuted()         — legge stato mute corrente
- *   5. subscribe(fn)      — notifica i listener React quando cambia il mute
+ * ──────────────────────────────────────────────────────────────────────────
+ * 1. speak(text, opts?)  — Web Speech API femminile italiana elegante
+ * 2. stopSpeech()        — cancella speech in corso
+ * 3. setMuted(bool)      — mute globale: blocca speak + silenzia pad
+ * 4. isMuted()           — legge lo stato mute corrente
+ * 5. startAmbientPad()   — pad armonico via AudioContext (Am pentatonico)
+ * 6. stopAmbientPad()    — fade-out e dispose del pad
  */
 
 const VOICE_PITCH  = 1.12;
@@ -14,40 +14,32 @@ const VOICE_RATE   = 0.88;
 const VOICE_VOLUME = 1.0;
 const PAD_GAIN     = 0.038;
 const PAD_LFO_FREQ = 0.08;
-const MUTE_KEY     = "wendy_muted";
 
-// ── Stato mute ───────────────────────────────────────────────────────────────
-let muted: boolean = (() => {
-  try { return localStorage.getItem(MUTE_KEY) === "1"; } catch { return false; }
-})();
+// ── Stato mute globale ─────────────────────────────────────────────────
+let _muted = false;
 
-const listeners = new Set<(m: boolean) => void>();
-
-export function getMuted(): boolean { return muted; }
-
-export function subscribe(fn: (m: boolean) => void): () => void {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
-}
+export function isMuted(): boolean { return _muted; }
 
 export function setMuted(value: boolean): void {
-  muted = value;
-  try { localStorage.setItem(MUTE_KEY, value ? "1" : "0"); } catch {}
-  listeners.forEach((fn) => fn(value));
-
+  _muted = value;
   if (value) {
-    // Muta immediatamente
+    // Silenzia immediatamente speech in corso
     if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
-    setPadMuted(true);
+    // Porta il pad a 0 senza fermarlo (riprende se si de-muta)
+    if (activePad) {
+      activePad.masterGain.gain.cancelScheduledValues(activePad.ctx.currentTime);
+      activePad.masterGain.gain.linearRampToValueAtTime(0, activePad.ctx.currentTime + 0.3);
+    }
   } else {
-    // Riattiva pad se era attivo
-    setPadMuted(false);
+    // Riporta il pad al volume normale
+    if (activePad) {
+      activePad.masterGain.gain.cancelScheduledValues(activePad.ctx.currentTime);
+      activePad.masterGain.gain.linearRampToValueAtTime(PAD_GAIN, activePad.ctx.currentTime + 0.6);
+    }
   }
 }
 
-export function toggleMuted(): void { setMuted(!muted); }
-
-// ── Selezione voce ──────────────────────────────────────────────────────────
+// ── Selezione voce ─────────────────────────────────────────────────────
 function pickItalianFemaleVoice(): SpeechSynthesisVoice | null {
   if (typeof speechSynthesis === "undefined") return null;
   const voices = speechSynthesis.getVoices();
@@ -66,42 +58,37 @@ function pickItalianFemaleVoice(): SpeechSynthesisVoice | null {
   return null;
 }
 
-// ── speak() ─────────────────────────────────────────────────────────────────
+// ── speak() ────────────────────────────────────────────────────────────
 export interface SpeakOptions {
   interrupt?: boolean;
   onEnd?: () => void;
 }
 
 export function speak(text: string, opts: SpeakOptions = {}): void {
-  // Non fa nulla se mutato
-  if (muted) return;
+  // Rispetta il mute globale
+  if (_muted) return;
   if (typeof speechSynthesis === "undefined" || !text.trim()) return;
-
   const { interrupt = true, onEnd } = opts;
   if (interrupt) speechSynthesis.cancel();
-
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang   = "it-IT";
   utter.pitch  = VOICE_PITCH;
   utter.rate   = VOICE_RATE;
   utter.volume = VOICE_VOLUME;
-
-  const voice = pickItalianFemaleVoice();
-  if (voice) utter.voice = voice;
   if (onEnd) utter.onend = () => onEnd();
-
   if (!speechSynthesis.getVoices().length) {
     speechSynthesis.addEventListener(
       "voiceschanged",
       () => {
-        if (muted) return; // ricontrolla: potrebbe essere stato mutato nel frattempo
         const v = pickItalianFemaleVoice();
         if (v) utter.voice = v;
-        speechSynthesis.speak(utter);
+        if (!_muted) speechSynthesis.speak(utter);
       },
       { once: true },
     );
   } else {
+    const v = pickItalianFemaleVoice();
+    if (v) utter.voice = v;
     speechSynthesis.speak(utter);
   }
 }
@@ -110,7 +97,7 @@ export function stopSpeech(): void {
   if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
 }
 
-// ── Ambient pad (Web Audio API) ──────────────────────────────────────────────
+// ── Ambient pad ────────────────────────────────────────────────────────
 interface PadNode {
   ctx: AudioContext;
   masterGain: GainNode;
@@ -132,20 +119,16 @@ const PAD_FREQUENCIES = [
 export function startAmbientPad(): void {
   if (activePad) return;
   if (typeof AudioContext === "undefined" && typeof (window as unknown as { webkitAudioContext?: unknown }).webkitAudioContext === "undefined") return;
-
   const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const ctx = new AudioCtx();
-
   const lpf = ctx.createBiquadFilter();
   lpf.type            = "lowpass";
   lpf.frequency.value = 400;
   lpf.Q.value         = 0.7;
-
   const masterGain = ctx.createGain();
   masterGain.gain.value = 0;
   masterGain.connect(ctx.destination);
   lpf.connect(masterGain);
-
   const lfo = ctx.createOscillator();
   lfo.type            = "sine";
   lfo.frequency.value = PAD_LFO_FREQ;
@@ -154,7 +137,6 @@ export function startAmbientPad(): void {
   lfo.connect(lfoGain);
   lfoGain.connect(masterGain.gain);
   lfo.start();
-
   const oscillators: OscillatorNode[] = PAD_FREQUENCIES.map(({ freq, detune }) => {
     const osc = ctx.createOscillator();
     osc.type            = "sine";
@@ -164,22 +146,11 @@ export function startAmbientPad(): void {
     osc.start();
     return osc;
   });
-
-  activePad = { ctx, masterGain, oscillators, lfo, lfoGain };
-
   // Fade-in solo se non mutato
-  if (!muted) {
+  if (!_muted) {
     masterGain.gain.linearRampToValueAtTime(PAD_GAIN, ctx.currentTime + 2);
   }
-}
-
-/** Muta o riattiva il pad in realtime con fade di 0.4s */
-export function setPadMuted(value: boolean): void {
-  if (!activePad) return;
-  const { ctx, masterGain } = activePad;
-  const target = value ? 0 : PAD_GAIN;
-  masterGain.gain.cancelScheduledValues(ctx.currentTime);
-  masterGain.gain.linearRampToValueAtTime(target, ctx.currentTime + 0.4);
+  activePad = { ctx, masterGain, oscillators, lfo, lfoGain };
 }
 
 export function stopAmbientPad(fadeSec = 2): void {
