@@ -42,6 +42,14 @@ export const usersTable = pgTable("users", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+
+  // ── Phase 3: Gamification Base ──────────────────────────────────
+  /** Consecutive days the user completed at least one voice session */
+  voiceStreak: integer("voice_streak").default(0),
+  /** Cumulative XP earned across all activities */
+  totalXp: integer("total_xp").default(0),
+  /** Timestamp of the last completed voice session (used for streak calculation) */
+  lastVoiceSessionAt: timestamp("last_voice_session_at", { withTimezone: true }),
 });
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({
@@ -90,4 +98,5 @@ export type JobApplication = typeof jobApplicationsTable.$inferSelect;
 // Drizzle relational query support
 export const usersRelations = relations(usersTable, ({ many }) => ({
   jobApplications: many(jobApplicationsTable),
+  voiceSessions: many("voiceSessionsTable" as any),
 }));

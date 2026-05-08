@@ -31,3 +31,5 @@ export * from "./responseFeedback";
 export * from "./sessionSummaries";
 // Discovery Agent System
 export * from "./discoveryItems";
+// Phase 3 — Gamification Base
+export * from "./voiceSessions";
