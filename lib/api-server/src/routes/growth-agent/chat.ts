@@ -5,7 +5,7 @@
  *   1. Load user profile from DB
  *   2. Load persistent memory (facts + patterns) AND recent session summaries — parallel
  *   3. Build userContext with memory + session history injected
- *   4. Stream GPT-4o response token by token
+ *   4. Stream GPT-4o response token by token  [wrapped in Circuit Breaker]
  *   5. [NON-BLOCKING] After stream ends:
  *        a. Save/update coach_sessions (messages, topics, avgConfidence, evalBreakdown)
  *        b. Extract + merge memory (facts + patterns)
@@ -17,6 +17,13 @@
  *   - Uses gpt-4o-mini (lower latency for TTS pipeline)
  *   - Status events are suppressed (no "🔍 Analizzando..." in voice)
  *   - Session save + memory extraction still run in background
+ *
+ * Circuit Breaker (wendyBreaker):
+ *   - Wraps the entire runGrowthAgent() call
+ *   - OPEN  → aiFallbackStream('open')    emitted; HTTP 200 + X-Circuit-State: OPEN
+ *   - Timeout → aiFallbackStream('timeout') emitted
+ *   - HALF_OPEN probe failure → re-opens breaker, fallback emitted
+ *   - State header: X-Circuit-State: CLOSED | OPEN | HALF_OPEN
  *
  * Body: {
  *   message: string,
@@ -52,6 +59,12 @@ import { db } from "@workspace/db";
 import { usersTable, coachSessionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import type { EvalResult } from "@workspace/integrations-openai-ai-server/growth-agent/self-evaluator";
+import {
+  wendyBreaker,
+  aiFallbackStream,
+  classifyBreakerError,
+  CircuitOpenError,
+} from "../../ai-circuit-breaker";
 
 const MIN_MESSAGES_TO_SUMMARIZE = 4;
 
@@ -88,22 +101,19 @@ router.post("/", async (req, res) => {
   if (!user) return res.status(401).json({ error: "User not found" });
 
   // ── 2. Load persistent memory + recent session summaries (PARALLEL) ─────
-  // In voice mode carichiamo comunque la memoria — Wendy conosce l'utente.
-  // Le summaries le saltiamo: non entrano nel prompt vocale ma continuano
-  // a essere scritte in background dalla step 5c.
   const [memory, recentSummaries] = await Promise.all([
     loadMemory(userId),
     voiceMode ? Promise.resolve([]) : loadRecentSummaries(userId, 3),
   ]);
 
-  const memorySection        = buildMemorySection(memory);
+  const memorySection         = buildMemorySection(memory);
   const sessionHistorySection = voiceMode ? "" : buildSessionHistorySection(recentSummaries);
 
   // ── 3. Build userContext ─────────────────────────────────────────────────
   const userContext: UserContext & { memorySection?: string } = {
-    name:        user.name,
-    journeyType: user.journeyType,
-    userMode:    user.userMode,
+    name:          user.name,
+    journeyType:   user.journeyType,
+    userMode:      user.userMode,
     memorySection: memorySection + sessionHistorySection,
     ...ctxOverride,
   };
@@ -116,6 +126,8 @@ router.post("/", async (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
+  // Expose circuit state to the client (useful for debugging / monitoring)
+  res.setHeader("X-Circuit-State", wendyBreaker.getState());
   res.flushHeaders();
 
   const send = (data: unknown) =>
@@ -123,35 +135,59 @@ router.post("/", async (req, res) => {
 
   const assistantTokens: string[] = [];
   let lastEvalResult: EvalResult | undefined;
+  let usedFallback = false;
 
   try {
-    for await (const event of runGrowthAgent({
-      userId,
-      userContext,
-      history,
-      userMessage: message,
-      memoryFactCount: memory.facts.length,
-      voiceMode,
-    })) {
-      // Sopprime gli status event in voice mode — il TTS non li legge
-      if (voiceMode && event.type === "status") continue;
+    // ── Circuit Breaker: wrap runGrowthAgent inside wendyBreaker.fire() ───
+    // fire() returns a promise wrapping the full iteration. We convert the
+    // async generator to a promise by consuming it inside fire(), then
+    // replay the collected events. This keeps the breaker timeout working
+    // correctly without restructuring the streaming loop.
+    await wendyBreaker.fire(async () => {
+      for await (const event of runGrowthAgent({
+        userId,
+        userContext,
+        history,
+        userMessage: message,
+        memoryFactCount: memory.facts.length,
+        voiceMode,
+      })) {
+        if (voiceMode && event.type === "status") continue;
 
-      if (event.type === "token") {
-        assistantTokens.push(event.value);
+        if (event.type === "token") {
+          assistantTokens.push(event.value);
+        }
+        if (event.type === "done" && (event as any).evalResult) {
+          lastEvalResult = (event as any).evalResult;
+        }
+        send(event);
+        if (event.type === "done" || event.type === "error") break;
       }
-      if (event.type === "done" && (event as any).evalResult) {
-        lastEvalResult = (event as any).evalResult;
-      }
-      send(event);
-      if (event.type === "done" || event.type === "error") break;
-    }
+    });
   } catch (err) {
-    send({ type: "error", message: String(err) });
+    usedFallback = true;
+    const reason = classifyBreakerError(err);
+
+    if (err instanceof CircuitOpenError) {
+      // Breaker is OPEN — stream graceful fallback, do NOT count as a new failure
+      console.warn(`[chat] Circuit OPEN for user ${userId} — streaming fallback`);
+    } else {
+      // Unexpected error (network, parse, etc.) — already recorded by breaker
+      console.error(`[chat] runGrowthAgent error (reason: ${reason}):`, err);
+    }
+
+    // Stream the fallback message then close
+    for await (const event of aiFallbackStream(reason)) {
+      send(event);
+    }
   } finally {
     res.end();
   }
 
   // ── 5. Post-stream: save session + extract memory + summarize (non-blocking)
+  // Skip if we served a fallback — no real assistant content to persist.
+  if (usedFallback) return;
+
   setImmediate(async () => {
     try {
       const assistantContent = assistantTokens.join("");
@@ -173,12 +209,12 @@ router.post("/", async (req, res) => {
           .insert(coachSessionsTable)
           .values({
             userId,
-            title:          message.slice(0, 80),
-            messages:       fullHistory as any,
-            messageCount:   fullHistory.length,
-            topics:         [],
-            avgConfidence:  lastEvalResult?.score ?? null,
-            evalBreakdown:  evalBreakdownIncrement,
+            title:         message.slice(0, 80),
+            messages:      fullHistory as any,
+            messageCount:  fullHistory.length,
+            topics:        [],
+            avgConfidence: lastEvalResult?.score ?? null,
+            evalBreakdown: evalBreakdownIncrement,
           })
           .returning({ id: coachSessionsTable.id });
         targetSessionId = newSession.id;
@@ -197,7 +233,7 @@ router.post("/", async (req, res) => {
             ? (prevAvg * prevCount + newScore) / (prevCount + 1)
             : (prevAvg ?? newScore ?? null);
 
-          const prevBreakdown  = (existing.evalBreakdown as Record<string, number>) ?? {};
+          const prevBreakdown   = (existing.evalBreakdown as Record<string, number>) ?? {};
           const mergedBreakdown: Record<string, number> = { ...prevBreakdown };
           if (lastEvalResult) {
             mergedBreakdown[lastEvalResult.level] =
@@ -247,8 +283,6 @@ router.post("/", async (req, res) => {
       }
 
       // ── 5c. Summarize session (fire-and-forget) ───────────────────────────
-      // Anche le sessioni voice vengono riassunte — così il contesto
-      // di una conversazione vocale è disponibile nella sessione successiva.
       if (targetSessionId && fullHistory.length >= MIN_MESSAGES_TO_SUMMARIZE) {
         summarizeSession(userId, targetSessionId, fullHistory).catch((err) => {
           console.warn("[chat] session summarization failed (non-critical):", err);
