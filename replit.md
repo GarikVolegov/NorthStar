@@ -95,12 +95,17 @@ artifacts/
         de/translation.json
   api-server/            # Express API (porta 8080)
     src/
+      app.ts             # Express app — middleware stack (security, Pino HTTP, CORS, rate limit)
       lib/
         ai/              # AI Router — PUNTO DI INGRESSO UNICO per tutte le call AI
           index.ts       # ai.chat(), ai.agent(), ai.embed() — API pubblica
           router.ts      # use case → provider + modello; override env
           types.ts       # AIUseCase, AIProviderName, AIRouterConfig...
           providers/     # implementazioni per ogni provider
+        logger.ts        # istanza Pino condivisa
+        security-headers.ts  # helmet-like security middleware
+        global-rate-limiter.ts  # 200 req/min per IP
+      middlewares/       # 🔲 da popolare: errorHandler, requestId, validateBody
       routes/            # 40+ route files organizzati per dominio
         cv.ts            # CV Builder — upload, generate, edit, PDF, DOCX, tailor, cover letter, ATS score
         discovery/       # feed.ts, saved.ts
@@ -108,7 +113,6 @@ artifacts/
                          # discovery-items, discovery-enrich, analyze-supervisor
         growth-agent/    # chat, knowledge, memory, analytics, notifications
       jobs/              # cron.ts (collector 6h, enricher 2h, personalizer 3h)
-      middleware/        # jwt.ts, startup-check.ts
   ai-agents/             # Python FastAPI (porta 8000)
 lib/
   db/
@@ -136,240 +140,56 @@ docker-compose.prod.yml  # prod: immagini ottimizzate, health check, no volume m
 
 ## Roadmap Infrastruttura
 
-> Questa sezione documenta l'evoluzione pianificata dell'infrastruttura verso un'architettura cloud-native e portabile. Le voci contrassegnate con 🔲 sono da implementare; quelle con ✅ sono già in produzione.
+> Le voci con 🔲 sono da implementare; quelle con ✅ sono già in produzione.
 
-### 1. Portabilità da Replit — dipendenze da eliminare
+### 1. Portabilità da Replit
 
-L'app attualmente dipende da variabili specifiche di Replit (`AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`, database managed). L'obiettivo è renderla deployabile su qualsiasi cloud (Railway, Fly.io, GCP, AWS) senza modifiche al codice.
-
-#### 🔲 Variabili d'ambiente cross-platform con `direnv`
-
-Usa `direnv` per caricare automaticamente `.env` in sviluppo locale — equivalente al comportamento Replit, ma funziona ovunque:
+#### 🔲 `direnv` + `.envrc` per sviluppo locale
 
 ```bash
-# Installazione
-brew install direnv  # macOS
-apt install direnv   # Linux
+brew install direnv  # macOS / apt install direnv Linux
+eval "$(direnv hook zsh)"  # nel .zshrc
 
-# Nel shell rc (.zshrc / .bashrc)
-eval "$(direnv hook zsh)"
-
-# .envrc alla root del progetto (già listato in .gitignore)
+# .envrc (mai committare — aggiungere a .gitignore)
 export DATABASE_URL="postgresql://user:pass@localhost:5432/northstar"
 export JWT_SECRET="..."
 export ADMIN_KEY="..."
 export AI_AGENTS_URL="http://localhost:8000"
-# ... tutte le variabili opzionali
 
-# Prima volta nella directory
-direnv allow
+direnv allow  # prima volta
 ```
-
-Il file `.envrc` non va mai committato — contiene segreti locali. Aggiungere `.envrc` a `.gitignore`.
 
 #### 🔲 Secret Manager in produzione
 
-In produzione non usare file `.env` — usare il secret manager del cloud provider:
-
-| Cloud | Servizio | Integrazione |
-|---|---|---|
-| **AWS** | Secrets Manager | SDK `@aws-sdk/client-secrets-manager`, fetch a startup |
-| **GCP** | Secret Manager | `@google-cloud/secret-manager`, fetch a startup |
-| **Railway / Fly.io** | Variables UI | Iniettate come env vars, stessa interfaccia `.env` |
-| **Replit (attuale)** | Secrets tab | Iniettate come env vars automaticamente |
-
-Pattern consigliato per il fetch a startup (da aggiungere in `startup-check.ts`):
-```typescript
-// Esempio GCP
-if (process.env.NODE_ENV === 'production' && process.env.USE_SECRET_MANAGER) {
-  const secrets = await fetchGCPSecrets(['JWT_SECRET', 'DATABASE_URL', ...]);
-  Object.assign(process.env, secrets);
-}
-```
+| Cloud | Servizio |
+|---|---|
+| AWS | Secrets Manager — `@aws-sdk/client-secrets-manager` |
+| GCP | Secret Manager — `@google-cloud/secret-manager` |
+| Railway / Fly.io | Variables UI — iniettate come env vars |
+| Replit (attuale) | Secrets tab — iniettate automaticamente |
 
 #### ✅ DATABASE_URL già standardizzato
 
-Drizzle ORM usa già `DATABASE_URL` nella forma `postgresql://user:pass@host:5432/db`. Cambiare provider DB non richiede modifiche al codice — solo aggiornare la variabile d'ambiente.
+Drizzle usa `postgresql://user:pass@host:5432/db` — cambiare provider non richiede modifiche al codice.
 
 ---
 
-### 2. Containerizzazione — ambienti dev/prod separati
+### 2. Containerizzazione dev/prod
 
-#### 🔲 `docker-compose.yml` (sviluppo locale)
-
-Ambienti separati tramite Docker Compose profiles. Obiettivo: `docker compose up` avvia tutto senza configurazione manuale.
-
-```yaml
-# docker-compose.yml — sviluppo
-version: '3.9'
-
-services:
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: northstar
-      POSTGRES_USER: dev
-      POSTGRES_PASSWORD: dev
-    ports: ['5432:5432']
-    volumes: ['pgdata:/var/lib/postgresql/data']
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U dev']
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  api-server:
-    build:
-      context: .
-      dockerfile: artifacts/api-server/Dockerfile.dev
-    ports: ['8080:8080']
-    env_file: .env
-    volumes:
-      - ./artifacts/api-server/src:/app/src  # hot reload
-    depends_on:
-      db:
-        condition: service_healthy
-
-  ai-agents:
-    build:
-      context: ./artifacts/ai-agents
-      dockerfile: Dockerfile.dev
-    ports: ['8000:8000']
-    env_file: .env
-    volumes:
-      - ./artifacts/ai-agents:/app  # hot reload
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  frontend:
-    build:
-      context: ./artifacts/orientamento
-      dockerfile: Dockerfile.dev
-    ports: ['5000:5000']
-    env_file: .env
-    volumes:
-      - ./artifacts/orientamento/src:/app/src  # hot reload
-
-volumes:
-  pgdata:
-```
-
-#### 🔲 `docker-compose.prod.yml` (produzione)
-
-```yaml
-# docker-compose.prod.yml — produzione
-version: '3.9'
-
-services:
-  api-server:
-    image: ghcr.io/tuborg/northstar-api:latest
-    restart: always
-    env_file: .env.prod  # NO segreti in chiaro — usare secret manager
-    ports: ['8080:8080']
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health']
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    depends_on:
-      ai-agents:
-        condition: service_healthy
-
-  ai-agents:
-    image: ghcr.io/tuborg/northstar-ai:latest
-    restart: always
-    env_file: .env.prod
-    ports: ['8000:8000']
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-
-# Nota: in prod il frontend è servito da CDN (Vercel/Cloudflare Pages)
-# Non containerizzare il frontend — build statica deployata su edge
-```
-
-**Differenze chiave dev vs prod:**
-
-| Aspetto | Dev | Prod |
-|---|---|---|
-| Hot reload | ✅ volume mount `src/` | ❌ immagine buildata |
-| DB | Container locale | RDS / Cloud SQL / Neon |
-| Frontend | Container Vite dev server | Build statica su CDN |
-| Segreti | `.env` file | Secret Manager / env vars piattaforma |
-| Restart policy | no | `always` |
-| Health check | veloce (5s) | conservativo (30s + start_period) |
+Vedi `docker-compose.yml` (dev con hot reload + DB locale) e `docker-compose.prod.yml` (immagini buildate, restart always, health check conservativi). In produzione il frontend è su CDN — non va containerizzato.
 
 ---
 
-### 3. Health Check Endpoint — standard per tutti i servizi
+### 3. Health Check Endpoint
 
-Ogni servizio deve esporre `GET /health` che risponde entro 1 secondo. Usato da Docker, load balancer, Kubernetes readiness probe, e monitoraggio esterno.
+✅ **Express**: `GET /api/health` già presente in `app.ts` — risponde `{ status: "ok" }` senza auth.
 
-#### 🔲 Express — `GET /health`
+🔲 **Express avanzato** (da migliorare): aggiungere check DB e AI agents come sub-check con risposta `200 healthy` / `503 degraded`. Vedi pattern in sezione **Qualità del Codice Backend**.
 
-Aggiungere in `artifacts/api-server/src/routes/index.ts` **prima** di qualsiasi middleware auth:
-
-```typescript
-// routes/index.ts — prima riga, nessun middleware
-app.get('/health', async (req, res) => {
-  const checks: Record<string, 'ok' | 'error'> = {};
-
-  // Check DB
-  try {
-    await db.execute(sql`SELECT 1`);
-    checks.database = 'ok';
-  } catch {
-    checks.database = 'error';
-  }
-
-  // Check AI agents proxy
-  try {
-    const r = await fetch(`${process.env.AI_AGENTS_URL}/health`, { signal: AbortSignal.timeout(2000) });
-    checks.ai_agents = r.ok ? 'ok' : 'error';
-  } catch {
-    checks.ai_agents = 'error';
-  }
-
-  const status = Object.values(checks).every(v => v === 'ok') ? 200 : 503;
-  res.status(status).json({
-    status: status === 200 ? 'healthy' : 'degraded',
-    timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version ?? 'unknown',
-    checks,
-  });
-});
-```
-
-Risposta attesa (200 healthy):
-```json
-{
-  "status": "healthy",
-  "timestamp": "2026-05-08T12:00:00.000Z",
-  "version": "1.0.0",
-  "checks": {
-    "database": "ok",
-    "ai_agents": "ok"
-  }
-}
-```
-
-#### 🔲 FastAPI — `GET /health`
-
-Aggiungere in `artifacts/ai-agents/main.py`:
-
+🔲 **FastAPI**: aggiungere `GET /health` in `artifacts/ai-agents/main.py`:
 ```python
 import time
-from fastapi import FastAPI
 from datetime import datetime, timezone
-
-app = FastAPI()
 _start_time = time.time()
 
 @app.get("/health")
@@ -381,14 +201,359 @@ async def health_check():
     }
 ```
 
-#### Regole per `GET /health`
+Regole: nessun auth, timeout < 1s, 200/503, non loggare le request `/health`.
 
-- **Nessun auth** — accessibile senza token o API key
-- **Timeout massimo 1s** — se risponde dopo 1s, il check fallisce
-- **200** se tutti i check passano, **503** se anche solo uno fallisce
-- **Non loggare** le richieste `/health` (escludere da Pino/access log per evitare rumore)
-- **Non includere segreti** nella risposta — solo stati `ok`/`error`
-- Il frontend può esporre `GET /` che serve `index.html` — il health check del CDN è automatico
+---
+
+## Qualità del Codice Backend
+
+> **Stato attuale** (da `app.ts`): Pino HTTP ✅, CORS ✅, rate limiting ✅, security headers ✅, health check base ✅.
+> **Mancano**: API versioning, error handler centralizzato con `requestId`, circuit breaker nel router AI, validazione Zod sui payload.
+
+### 1. API Versioning — `/api/v1/`
+
+Attualmente tutte le route sono su `/api/*`. Introdurre `/api/v1/` permette di rilasciare breaking changes in futuro senza interrompere client esistenti.
+
+#### Come aggiornare `app.ts`
+
+Il cambio è chirurgico — sostituire una riga:
+
+```typescript
+// Prima (attuale)
+app.use("/api", router);
+
+// Dopo
+const v1Router = express.Router();
+v1Router.use(router);          // tutte le route esistenti su /v1
+app.use("/api/v1", v1Router);
+
+// Compatibilità backward — redireziona /api/* → /api/v1/* (opzionale)
+app.use("/api", (req, res, next) => {
+  res.redirect(308, `/api/v1${req.url}`);
+});
+```
+
+**Regola**: il frontend generato da Orval usa `VITE_API_BASE_URL`. Aggiornare quella variabile a `http://localhost:8080/api/v1` per lo sviluppo — zero modifiche ai hook generati.
+
+#### Struttura futura per breaking change
+
+```typescript
+// routes/index.ts
+const v1 = express.Router();
+const v2 = express.Router();
+
+v1.use("/cv", cvRouter);
+v2.use("/cv", cvRouterV2);  // quando serve
+
+export { v1, v2 };
+
+// app.ts
+app.use("/api/v1", v1);
+app.use("/api/v2", v2);  // quando serve
+```
+
+---
+
+### 2. Error Handler Centralizzato + requestId + Logging strutturato
+
+#### Stato attuale in `app.ts`
+
+`app.ts` usa già `pinoHttp` con `logger` da `lib/logger.ts`. Il `req.id` è già popolato da pino-http (UUID auto-generato). **Manca** un error handler Express a 4 argomenti che lo usa.
+
+#### 🔲 `middlewares/errorHandler.ts` — da creare
+
+```typescript
+// artifacts/api-server/src/middlewares/errorHandler.ts
+import { Request, Response, NextFunction } from 'express';
+import { ZodError } from 'zod';
+import { logger } from '../lib/logger';
+
+export class AppError extends Error {
+  constructor(
+    public statusCode: number,
+    message: string,
+    public code?: string,
+  ) {
+    super(message);
+    this.name = 'AppError';
+  }
+}
+
+export function errorHandler(
+  err: unknown,
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): void {
+  const requestId = (req as any).id;  // popolato da pino-http
+
+  // Errori di validazione Zod
+  if (err instanceof ZodError) {
+    res.status(400).json({
+      error: 'VALIDATION_ERROR',
+      requestId,
+      issues: err.issues.map(i => ({ path: i.path.join('.'), message: i.message })),
+    });
+    return;
+  }
+
+  // Errori applicativi espliciti
+  if (err instanceof AppError) {
+    res.status(err.statusCode).json({
+      error: err.code ?? 'APP_ERROR',
+      message: err.message,
+      requestId,
+    });
+    return;
+  }
+
+  // Errori inattesi — logga stack, non esporre dettagli al client
+  logger.error({ err, requestId, url: req.url, method: req.method }, 'Unhandled error');
+  res.status(500).json({
+    error: 'INTERNAL_ERROR',
+    requestId,
+    message: 'Si è verificato un errore interno.',
+  });
+}
+```
+
+#### 🔲 Registrazione in `app.ts`
+
+Aggiungere **dopo** `app.use("/api/v1", v1Router)` — l'error handler Express deve essere l'**ultimo** middleware:
+
+```typescript
+import { errorHandler } from './middlewares/errorHandler';
+
+// ... tutto il resto ...
+app.use("/api/v1", v1Router);
+
+// ─── ULTIMO middleware — error handler a 4 argomenti ─────────────────────────
+app.use(errorHandler);
+```
+
+#### Come usarlo nelle route
+
+```typescript
+// In qualsiasi route handler — usa next(err) invece di try/catch inline
+import { AppError } from '../middlewares/errorHandler';
+
+router.get('/profile', async (req, res, next) => {
+  try {
+    const user = await getUser(req.userId);
+    if (!user) throw new AppError(404, 'Utente non trovato', 'USER_NOT_FOUND');
+    res.json(user);
+  } catch (err) {
+    next(err);  // passa all'errorHandler centralizzato
+  }
+});
+```
+
+#### Escludere `/health` dai log Pino
+
+In `app.ts`, nel `pinoHttp`, aggiungere `autoLogging` per filtrare la route di health check:
+
+```typescript
+app.use(
+  pinoHttp({
+    logger,
+    autoLogging: {
+      ignore: (req) => req.url === '/api/health' || req.url === '/api/v1/health',
+    },
+    serializers: { /* ... esistente ... */ },
+  }),
+);
+```
+
+---
+
+### 3. Circuit Breaker + Retry esponenziale nel Router AI
+
+Il router AI (`lib/ai/router.ts`) fa già fallback automatico al provider secondario. Il miglioramento consiste nell'aggiungere:
+- **Retry esponenziale** con jitter per errori temporanei (timeout, rate limit 429)
+- **Circuit breaker** che smette di chiamare un provider già in errore per N secondi, evitando cascate
+
+#### 🔲 Pattern retry esponenziale — da integrare in ogni `providers/*.ts`
+
+```typescript
+// lib/ai/utils/retry.ts
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: { maxAttempts?: number; baseDelayMs?: number; retryOn?: (err: unknown) => boolean } = {},
+): Promise<T> {
+  const { maxAttempts = 3, baseDelayMs = 300, retryOn = isRetryableError } = options;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt === maxAttempts || !retryOn(err)) throw err;
+      // Backoff esponenziale con jitter: delay = base * 2^attempt + random(0..base)
+      const delay = baseDelayMs * 2 ** attempt + Math.random() * baseDelayMs;
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  throw new Error('unreachable');
+}
+
+function isRetryableError(err: unknown): boolean {
+  if (err instanceof Error) {
+    // Rate limit o timeout
+    return err.message.includes('429') ||
+           err.message.includes('timeout') ||
+           err.message.includes('ECONNRESET');
+  }
+  return false;
+}
+```
+
+#### 🔲 Pattern circuit breaker — da integrare in `router.ts`
+
+```typescript
+// lib/ai/utils/circuit-breaker.ts
+type CircuitState = 'closed' | 'open' | 'half-open';
+
+export class CircuitBreaker {
+  private state: CircuitState = 'closed';
+  private failureCount = 0;
+  private lastFailureTime = 0;
+
+  constructor(
+    private readonly name: string,
+    private readonly failureThreshold = 5,
+    private readonly recoveryTimeMs = 30_000,  // 30s
+  ) {}
+
+  async execute<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.state === 'open') {
+      const elapsed = Date.now() - this.lastFailureTime;
+      if (elapsed < this.recoveryTimeMs) {
+        throw new Error(`Circuit OPEN per provider ${this.name} — riprova tra ${Math.ceil((this.recoveryTimeMs - elapsed) / 1000)}s`);
+      }
+      this.state = 'half-open';
+    }
+
+    try {
+      const result = await fn();
+      this.onSuccess();
+      return result;
+    } catch (err) {
+      this.onFailure();
+      throw err;
+    }
+  }
+
+  private onSuccess() {
+    this.failureCount = 0;
+    this.state = 'closed';
+  }
+
+  private onFailure() {
+    this.failureCount++;
+    this.lastFailureTime = Date.now();
+    if (this.failureCount >= this.failureThreshold) {
+      this.state = 'open';
+    }
+  }
+
+  getState() { return this.state; }
+}
+
+// Istanze singleton per provider — una per processo
+export const circuitBreakers = {
+  groq:      new CircuitBreaker('groq'),
+  anthropic: new CircuitBreaker('anthropic'),
+  openai:    new CircuitBreaker('openai'),
+  google:    new CircuitBreaker('google'),
+};
+```
+
+**Integrazione in `router.ts`**: ogni chiamata a un provider viene wrappata in `circuitBreakers[provider].execute(() => withRetry(() => callProvider(...)))`. Se il circuit è `open`, il router salta direttamente al fallback.
+
+#### Tabella stati circuit breaker
+
+| Stato | Significato | Comportamento router |
+|---|---|---|
+| `closed` | Provider funziona | Chiamata normale |
+| `open` | Provider in errore (>5 fail) | Skip immediato → fallback |
+| `half-open` | Recovery time scaduto | Ritenta una volta → se ok torna `closed` |
+
+---
+
+### 4. Validazione Zod sui payload in ingresso
+
+TypeScript protegge a compile-time, ma i payload JSON arrivano a runtime come `unknown`. Zod valida la forma reale e lancia errori strutturati (catturati dall'`errorHandler`).
+
+#### 🔲 `middlewares/validateBody.ts` — da creare
+
+```typescript
+// artifacts/api-server/src/middlewares/validateBody.ts
+import { Request, Response, NextFunction } from 'express';
+import { ZodSchema } from 'zod';
+
+export function validateBody<T>(schema: ZodSchema<T>) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      next(result.error);  // passa ZodError → errorHandler lo formatta come 400
+      return;
+    }
+    req.body = result.data;  // body sostituito con dati tipati e sanitizzati
+    next();
+  };
+}
+```
+
+#### Uso nelle route
+
+```typescript
+import { z } from 'zod';
+import { validateBody } from '../middlewares/validateBody';
+
+const TailorCvSchema = z.object({
+  jobTitle:       z.string().min(1).max(200),
+  jobDescription: z.string().min(10).max(5000),
+  targetCompany:  z.string().max(200).optional(),
+});
+
+router.post(
+  '/:userId/tailor',
+  authMiddleware,
+  validateBody(TailorCvSchema),   // ← validazione automatica
+  async (req, res, next) => {
+    try {
+      const { jobTitle, jobDescription } = req.body;  // già tipato
+      // ...
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+```
+
+#### Route prioritarie da validare subito
+
+| Route | Motivo |
+|---|---|
+| `POST /cv/mine/upload` | Evita DoS con file non validi |
+| `POST /cv/:id/tailor` | Payload AI — input non valido → costo inutile |
+| `POST /cv/:id/ats-score` | Come sopra |
+| `POST /auth/register` | Sanitizza email/password prima di bcrypt |
+| `POST /business-ideas` | Payload AI potenzialmente lungo |
+| `POST /admin/discovery/collect` | Protegge cron manuale da input malformati |
+
+#### Regola generale
+
+> **Ogni route che accetta un `req.body` da client non autenticato DEVE avere `validateBody(ZodSchema)` come middleware.** Le route admin-only (protette da `x-admin-key`) possono usare Zod in modo più permissivo, ma è comunque consigliato.
+
+---
+
+### Checklist qualità per ogni nuova route backend
+
+- [ ] Registrata sotto `/api/v1/` (non `/api/` diretto)
+- [ ] `req.body` validato con `validateBody(ZodSchema)` se accetta payload
+- [ ] Tutti i `catch` usano `next(err)` — mai `res.status(500).json(...)` inline
+- [ ] Nessuna chiamata diretta a provider AI — sempre `ai.chat()` / `ai.stream()` / `ai.embed()`
+- [ ] Errori applicativi usano `throw new AppError(statusCode, message, code)`
 
 ---
 
@@ -402,8 +567,9 @@ async def health_check():
 route.ts
   └→ ai.chat({ useCase: "json_extraction", messages })
        └→ router.ts: risolve provider (groq) + modello (llama-3.1-70b-versatile)
-            └→ providers/groq.ts: chiama API, gestisce timeout
-                 └→ fallback: providers/openai.ts se groq fallisce
+            └→ circuitBreaker[groq].execute()
+                 └→ withRetry(() => providers/groq.ts)
+                      └→ fallback: providers/openai.ts se circuit OPEN o retry esaurito
 ```
 
 Il file `index.ts` espone tre funzioni pubbliche:
@@ -422,8 +588,6 @@ Il file `index.ts` espone tre funzioni pubbliche:
 | `json_extraction` | **Groq** | `llama-3.1-70b-versatile` | OpenAI `gpt-4o-mini` | CV parse/generate/tailor, ATS score, cover letter |
 
 ### Regola decisionale per ogni nuova funzionalità AI
-
-Quando si aggiunge una nuova feature che richiede un modello AI, seguire questo albero decisionale:
 
 ```
 1. Risposta in streaming (SSE) al client?
@@ -455,43 +619,27 @@ Quando si aggiunge una nuova feature che richiede un modello AI, seguire questo 
 
 ### Override senza redeploy
 
-Per cambiare provider o modello su un use case specifico senza toccare il codice:
-
 ```bash
-# Spostare tutto il JSON extraction su OpenAI (es. se Groq ha problemi)
-AI_JSON_PROVIDER=openai
-
-# Usare un modello specifico globalmente (override AI_MODEL_OVERRIDE)
-AI_MODEL_OVERRIDE=gpt-4.1
-
-# Override per il solo agent analysis
-AI_AGENT_PROVIDER=openai
+AI_JSON_PROVIDER=openai        # sposta JSON extraction su OpenAI
+AI_MODEL_OVERRIDE=gpt-4.1      # override globale modello
+AI_AGENT_PROVIDER=openai       # sposta agent analysis su OpenAI
 ```
 
 Valori validi per `AI_*_PROVIDER`: `groq` | `anthropic` | `openai` | `google`.
-Se viene passato un valore non valido, il router logga un warning e usa il default.
 
 ### Aggiungere un nuovo use case
 
-Se una feature non rientra in nessuno dei 5 use case esistenti:
+1. Aggiungere tipo in `types.ts`
+2. Aggiungere mapping in `router.ts` (`DEFAULT_ROUTER`, `FALLBACK_ROUTER`, `ENV_OVERRIDES`)
+3. Aggiungere riga nella tabella sopra
+4. Aggiungere env var di override nella sezione variabili d'ambiente
 
-1. Aggiungere il tipo in `types.ts`:
-   ```typescript
-   export type AIUseCase =
-     | "streaming_chat" | "agent_analysis" | "embedding"
-     | "research" | "json_extraction"
-     | "nuovo_use_case";  // ← aggiungere qui
-   ```
-2. Aggiungere il mapping in `router.ts` (`DEFAULT_ROUTER`, `FALLBACK_ROUTER`, `ENV_OVERRIDES`)
-3. Aggiungere la riga nella tabella qui sopra nel `replit.md`
-4. Aggiungere la env var di override (`AI_NUOVOUSECASE_PROVIDER`) nella sezione **Variabili d'ambiente**
+### Regola fallback e circuit breaker
 
-### Regola fallback
-
-- Il router tenta sempre il provider **primary**
-- In caso di timeout (30s) o errore 5xx, ritenta sul **fallback** (se configurato)
-- `embedding` non ha fallback: se OpenAI è giù, l'operazione fallisce con `AIRouterError`
-- Il fallback è sempre **OpenAI** (proxy Replit garantito attivo)
+- Il router tenta il provider **primary** → se circuit `open` o retry esaurito → **fallback**
+- In caso di timeout (30s) o errore 5xx → retry esponenziale (max 3) con backoff
+- `embedding` non ha fallback: se OpenAI è giù → `AIRouterError` — gestire esplicitamente
+- Circuit breaker si apre dopo 5 fallimenti consecutivi, si chiude dopo 30s di recovery
 
 ### Costo operativo stimato
 
@@ -510,72 +658,17 @@ Se una feature non rientra in nessuno dei 5 use case esistenti:
 > **⚠️ REGOLA FONDAMENTALE: ogni componente React che mostra testo visibile all'utente DEVE usare `useTranslation`. Non esistono stringhe hardcoded in italiano (o altra lingua) nel JSX.**
 
 L'app supporta **5 lingue**: `it` (default/fallback) · `en` · `es` · `fr` · `de`.
-Setup in `src/i18n.ts`; file di traduzione in `src/locales/{lang}/translation.json`.
 
 ### Regole per ogni componente frontend
 
-1. **Importa sempre `useTranslation`**
-   ```tsx
-   import { useTranslation } from "react-i18next";
-
-   export function MioComponente() {
-     const { t } = useTranslation();
-     return <h1>{t("sezione.titolo")}</h1>;
-   }
-   ```
-
-2. **Zero stringhe hardcoded nel JSX** — qualsiasi testo visibile (label, placeholder, tooltip, messaggio di errore, bottone, heading, badge, descrizione) deve passare da `t("chiave")`.
-   ```tsx
-   // ❌ VIETATO
-   <Button>Salva</Button>
-   <p>Nessun dato trovato.</p>
-
-   // ✅ CORRETTO
-   <Button>{t("common.save")}</Button>
-   <p>{t("common.noData")}</p>
-   ```
-
-3. **Chiavi strutturate per dominio** — usa namespace a punti per raggruppare le chiavi logicamente:
-   ```
-   common.*          — azioni generiche (save, cancel, delete, loading, error…)
-   cv.*              — CV Builder (upload, generate, edit, download…)
-   dashboard.*       — Dashboard utente
-   discovery.*       — Feed Discovery
-   onboarding.*      — Wizard onboarding
-   auth.*            — Login, registrazione
-   admin.*           — Admin panel
-   profile.*         — Pagina profilo
-   settings.*        — Impostazioni lingua/profilo
-   errors.*          — Messaggi di errore API
-   ```
-
-4. **Aggiorna sempre tutti e 5 i file** — quando aggiungi nuove chiavi, le aggiungi in tutti i file:
-   - `src/locales/it/translation.json` (lingua base, testo definitivo)
-   - `src/locales/en/translation.json`
-   - `src/locales/es/translation.json`
-   - `src/locales/fr/translation.json`
-   - `src/locales/de/translation.json`
-
-5. **Interpolazione variabili**
-   ```tsx
-   t("cv.generatedAt", { date: formatDate(cv.uploadedAt) })
-   ```
-
-6. **Plurali**
-   ```tsx
-   t("cv.experienceCount", { count: cv.experience.length })
-   ```
-
-7. **`title`, `aria-label`, `placeholder` — anch'essi tradotti**
-   ```tsx
-   <input placeholder={t("cv.namePlaceholder")} />
-   ```
-
-8. **Non tradurre nel backend** — le API restituiscono dati grezzi. La traduzione avviene solo nel frontend.
-
-9. **Wrapper `ui/`** — ricevono il testo già tradotto come prop, non hardcoded internamente.
-
-10. **PR** — stringhe hardcoded in JSX → rifiutata.
+1. Importa sempre `useTranslation` e usa `t("chiave")`
+2. Zero stringhe hardcoded nel JSX
+3. Chiavi strutturate per dominio (`common.*`, `cv.*`, `dashboard.*`, `discovery.*`, `auth.*`, `admin.*`...)
+4. Aggiorna sempre tutti e 5 i file `locales/{lang}/translation.json`
+5. `placeholder`, `title`, `aria-label` usano `t()`
+6. Non tradurre nel backend — solo nel frontend
+7. Wrapper `ui/` ricevono testo già tradotto come prop
+8. PR con stringhe hardcoded in JSX → rifiutata
 
 ### Checklist per ogni nuovo componente
 
@@ -583,58 +676,35 @@ Setup in `src/i18n.ts`; file di traduzione in `src/locales/{lang}/translation.js
 - [ ] Zero stringhe visibili hardcoded in JSX
 - [ ] Chiavi aggiunte in tutti e 5 i file `translation.json`
 - [ ] `placeholder`, `title`, `aria-label` usano `t()`
-- [ ] Messaggi di errore/successo usano chiavi `errors.*` o `common.*`
 - [ ] Valori dinamici usano interpolazione `{{var}}`
 
 ---
 
 ## CV Builder
 
-Sistema completo per generare, modificare manualmente e scaricare il CV in più formati.
-
 ### Flusso principale
 
-1. **Upload CV** — `POST /api/cv/mine/upload` (PDF o TXT, max 5 MB) → AI estrae JSON strutturato
-2. **Genera da profilo** — `POST /api/cv/mine/generate` → AI genera CV da grafo conoscenze + profilo RIASEC
-3. **Modifica manuale** — icona matita → apre `CvEditorDrawer` (drawer laterale 520px)
-4. **Scarica** — dropdown `CvDownloadMenu` con 3 formati
-
-### CvEditorDrawer — Editor manuale
-
-| Sezione | Campi |
-|---|---|
-| 👤 Informazioni personali | Nome, Titolo, Email, Telefono, Sede, LinkedIn, Sito, Ruolo target |
-| ✦ Profilo / Sommario | Textarea libera |
-| 💼 Esperienze | CRUD — ruolo, azienda, periodo, sede, descrizione, tag skill |
-| 🎓 Formazione | CRUD — titolo, istituto, anno, note |
-| 🔧 Competenze & Strumenti | Tag-editor per `skills` e `tools` |
-| 🌐 Lingue | Riga per lingua + livello |
-| 🏅 Certificazioni | Tag-editor |
-
-### CvDownloadMenu — Formati
-
-| Formato | Endpoint / Meccanismo |
-|---|---|
-| **PDF** | `GET /api/cv/:userId/pdf?template=` |
-| **Word (DOCX)** | `GET /api/cv/:userId/docx` — server-side via `docx` |
-| **JSON** | Blob client-side dal `generatedCvData` |
+1. **Upload** — `POST /api/v1/cv/mine/upload` (PDF/TXT max 5MB) → AI estrae JSON
+2. **Genera** — `POST /api/v1/cv/mine/generate` → AI da profilo RIASEC + knowledge graph
+3. **Modifica** — `CvEditorDrawer` (drawer 520px, sezioni collassabili, salva via PATCH)
+4. **Scarica** — `CvDownloadMenu` — PDF / DOCX / JSON
 
 ### API CV — endpoint
 
 ```
-GET    /api/cv/mine                    → lista CV
-POST   /api/cv/mine/upload             → upload + estrazione AI
-POST   /api/cv/mine/generate           → genera da profilo
-PATCH  /api/cv/mine/generated          → salva modifiche manuali
-DELETE /api/cv/mine                    → elimina tutto
-GET    /api/cv/:userId/pdf?template=   → PDF
-GET    /api/cv/:userId/docx            → DOCX
-POST   /api/cv/:userId/tailor          → adatta a offerta (AI)
-GET    /api/cv/:userId/versions        → lista versioni
-POST   /api/cv/:userId/versions        → salva versione
-POST   /api/cv/:userId/cover-letter    → genera cover letter (AI)
-GET    /api/cv/:userId/cover-letter/pdf → PDF cover letter
-POST   /api/cv/:userId/ats-score       → ATS score 0-100 (AI)
+GET    /api/v1/cv/mine                    → lista CV
+POST   /api/v1/cv/mine/upload             → upload + estrazione AI
+POST   /api/v1/cv/mine/generate           → genera da profilo
+PATCH  /api/v1/cv/mine/generated          → salva modifiche manuali
+DELETE /api/v1/cv/mine                    → elimina tutto
+GET    /api/v1/cv/:userId/pdf?template=   → PDF
+GET    /api/v1/cv/:userId/docx            → DOCX
+POST   /api/v1/cv/:userId/tailor          → adatta a offerta (AI)
+POST   /api/v1/cv/:userId/cover-letter    → genera cover letter (AI)
+GET    /api/v1/cv/:userId/cover-letter/pdf → PDF cover letter
+POST   /api/v1/cv/:userId/ats-score       → ATS score 0-100 (AI)
+GET    /api/v1/cv/:userId/versions        → lista versioni
+POST   /api/v1/cv/:userId/versions        → salva versione
 ```
 
 ### Template PDF
@@ -649,26 +719,16 @@ POST   /api/cv/:userId/ats-score       → ATS score 0-100 (AI)
 
 ## Sistema Discovery (Agenti AI)
 
-Pipeline a 3 stadi che raccoglie, arricchisce e personalizza contenuti per ogni utente.
-
-### 1. Collector Agent — `collector-agent.ts`
-- Raccoglie da RSS configurabili + API (GNews, Tavily); deduplication via SHA-256
-- Schedule: **ogni 6 ore** — `POST /api/admin/discovery/collect`
-
-### 2. Enricher Agent — `enricher-agent.ts`
-- **gpt-4o-mini** via proxy Replit legacy; 5 call parallele; retry max 3
-- Priority queue: opportunity (5) > formation (4) > sector_trend (3) > news (2) > growth (1)
-- Filtro: `relevanceScore < 0.25` → non appare nel feed
-- Costo: ~$0.10/mese — Schedule: **ogni 2 ore**
-
-### 3. Personalizer Agent — `personalizer-agent.ts`
-- Sovrascrive `personalScore` per profilo RIASEC + journeyType — Schedule: **ogni 3 ore**
+### Pipeline
+1. **Collector** (`collector-agent.ts`) — RSS + GNews/Tavily, SHA-256 dedup, ogni 6h
+2. **Enricher** (`enricher-agent.ts`) — gpt-4o-mini legacy, 5 parallele, priority queue, ogni 2h, ~$0.10/mese
+3. **Personalizer** (`personalizer-agent.ts`) — score per RIASEC + journeyType, ogni 3h
 
 ---
 
 ## Admin Dashboard
 
-Percorso: `/admin` → `<AdminDashboard />` (6 sezioni: Overview, Collector, Enricher, Fonti RSS, Item recenti, Agent Health).
+`/admin` → 6 sezioni: Overview, Collector, Enricher, Fonti RSS, Item recenti, Agent Health.
 
 ---
 
@@ -681,15 +741,15 @@ Percorso: `/admin` → `<AdminDashboard />` (6 sezioni: Overview, Collector, Enr
 ## Prodotto — Funzionalità
 
 ### Core
-- **RIASEC + Five Spirits test** → matching 28 settori, roadmap, salary
-- **AI features (premium):** Wiki AI, Roadmap generator, Skills Gap, Interview Simulator, Career Coach, Knowledge Graph RAG
+- **RIASEC + Five Spirits** → 28 settori, roadmap, salary
+- **AI premium:** Wiki AI, Roadmap generator, Skills Gap, Interview Simulator, Career Coach, Knowledge Graph RAG
 - **Stripe subscription**, **Auth JWT custom**
 
 ### User Features
-- Journey Types, Career Climber Mode, NorthStar Score pubblico, Certificazioni, Onboarding Wizard, PostTest Funnel, Job Board, Business Idea Validator, Calendario .ics, TTS, Peer Review obiettivi, CV Builder completo
+Journey Types, Career Climber Mode, NorthStar Score, Certificazioni, Onboarding Wizard, PostTest Funnel, Job Board, Business Idea Validator, Calendario .ics, TTS, Peer Review, CV Builder completo
 
 ### Admin Features
-- Catalogs CRUD, Agent Health Dashboard, Growth Queue, Setup Wizard
+Catalogs CRUD, Agent Health Dashboard, Growth Queue, Setup Wizard
 
 ---
 
@@ -705,13 +765,73 @@ Percorso: `/admin` → `<AdminDashboard />` (6 sezioni: Overview, Collector, Enr
 
 ## Architettura — Decisioni chiave
 
-- **OpenAPI-first:** Orval genera Zod schemas + React Query hooks
+- **OpenAPI-first:** Orval genera Zod schemas + React Query hooks — client base URL aggiornare a `/api/v1`
 - **Monorepo pnpm workspaces** con catalog
 - **esbuild custom `build.mjs`:** bundla Express, esternalizza native modules
-- **AI Router pattern:** ogni call AI passa da `lib/ai/index.ts` — provider trasparente per le route
+- **AI Router pattern:** ogni call AI passa da `lib/ai/index.ts` con circuit breaker + retry esponenziale
 - **AI proxy legacy:** Express → Python FastAPI porta 8000 (LangGraph)
 - **Startup check:** fail-fast su env vars obbligatorie
-- **Portabilità:** `DATABASE_URL` standardizzato; obiettivo zero dipendenze Replit-specifiche nel codice
-- **Health check:** `GET /health` su Express (porta 8080) e FastAPI (porta 8000) — nessun auth, risposta < 1s
+- **API versioning:** `/api/v1/` via `express.Router()` — backward compat con redirect 308 da `/api/`
+- **Error handling:** middleware a 4 argomenti in `middlewares/errorHandler.ts` — `AppError`, `ZodError` → JSON strutturato con `requestId`
+- **Validation:** `middlewares/validateBody(ZodSchema)` su ogni route con `req.body` da client
+- **Portabilità:** `DATABASE_URL` standardizzato; obiettivo zero dipendenze Replit-specifiche
+- **Health check:** `GET /api/health` su Express (già attivo); `GET /health` su FastAPI (🔲 da aggiungere)
 - **Secret management:** `.envrc` + `direnv` in locale; secret manager cloud in produzione
-- **C
+- **CORS:** ristretto a `CORS_ORIGIN` env var
+- **Auth rate limiting:** `/auth/*` — 5 req/15min per IP
+- **i18n:** i18next + react-i18next; fallback `it`; `localStorage` key `northstar_lang`
+
+---
+
+## Gotchas & regole
+
+- **Porta 5000 obbligatoria** per il frontend — Replit webview preview usa solo quella
+- **Ordine route critico:** route admin con solo `x-admin-key` DEVONO essere registrate prima di `calendarRouter` (~riga 78 in `routes/index.ts`), altrimenti ricevono 401
+- **API versioning:** il client Orval usa `VITE_API_BASE_URL` — aggiornare a `http://localhost:8080/api/v1` quando si attiva il versioning
+- **Error handler:** DEVE essere l'ultimo `app.use()` in `app.ts` — dopo tutte le route. Se messo prima non cattura gli errori
+- **ZodError in errorHandler:** catturato automaticamente se il middleware `validateBody` chiama `next(result.error)` — non wrappare ZodError in AppError
+- **Circuit breaker — singleton:** le istanze `circuitBreakers` in `circuit-breaker.ts` sono module-level. In ambienti serverless (cold start frequenti) il circuit si resetta ad ogni istanza — comportamento atteso
+- **Retry su streaming:** `withRetry` NON va usato su `ai.stream()` — uno stream non può essere riavviato dal client. Il retry si applica solo a `ai.chat()` e `ai.embed()`
+- **pnpm workspace:** esegui sempre dalla root o usa `--filter`
+- **Growth scheduler:** si aspetta JSON valido da OpenAI; può warnare se il modello tronca l'output
+- **`completion/me`:** usa SQL raw per `streak_days`/`last_active_at`
+- **Errori tsc pre-esistenti:** `api-client-react` dist non buildata, params `any`-typed — non introdotti da feature nuove, ignorabili
+- **Playwright:** `BASE_URL`/`API_URL` per staging
+- **Discovery feed cache:** LRU 5min server-side + sessionStorage 10min — `?refresh=1` per bypass
+- **Enricher retry cap:** dopo 3 fallimenti, item marcato `isEnriched=true` con `score=0` — non riprocessato
+- **AI_MODEL (legacy):** configura enricher proxy Replit — non influenza il router `lib/ai/`
+- **AI Router — mai chiamare provider direttamente** nelle route (eccetto enricher legacy)
+- **CV editor:** `CvEditorDrawer` carica dati via GET al click matita — bottone nascosto se CV non esiste
+- **CV DOCX install:** `pnpm add docx --filter api-server` dopo ogni clone/reset
+- **i18n — chiave mancante:** i18next renderizza la chiave grezza. Aggiungere sempre a tutti e 5 i file
+- **i18n — lingua default:** `it`. Fallback sempre italiano se chiave manca nelle altre lingue
+
+---
+
+## Pointers rapidi
+
+| Cosa | Dove |
+|---|---|
+| Schema DB | `lib/db/src/schema/index.ts` |
+| **App Express (middleware stack)** | `artifacts/api-server/src/app.ts` |
+| API routes entry | `artifacts/api-server/src/routes/index.ts` |
+| CV routes | `artifacts/api-server/src/routes/cv.ts` |
+| CV components | `artifacts/orientamento/src/components/cv/` |
+| Frontend routes | `artifacts/orientamento/src/App.tsx` |
+| Cron jobs | `artifacts/api-server/src/jobs/cron.ts` |
+| **AI Router** | `artifacts/api-server/src/lib/ai/router.ts` |
+| **AI public API** | `artifacts/api-server/src/lib/ai/index.ts` |
+| **AI types** | `artifacts/api-server/src/lib/ai/types.ts` |
+| **AI providers** | `artifacts/api-server/src/lib/ai/providers/` |
+| **Circuit breaker** | `artifacts/api-server/src/lib/ai/utils/circuit-breaker.ts` 🔲 |
+| **Retry utility** | `artifacts/api-server/src/lib/ai/utils/retry.ts` 🔲 |
+| **Error handler** | `artifacts/api-server/src/middlewares/errorHandler.ts` 🔲 |
+| **Validate body** | `artifacts/api-server/src/middlewares/validateBody.ts` 🔲 |
+| Logger Pino | `artifacts/api-server/src/lib/logger.ts` |
+| OpenAI legacy client | `lib/integrations-openai-ai-server/src/client.ts` |
+| i18n setup | `artifacts/orientamento/src/i18n.ts` |
+| Traduzioni (it) | `artifacts/orientamento/src/locales/it/translation.json` |
+| Discovery agents | `lib/integrations-openai-ai-server/src/discovery-agent/` |
+| Admin UI components | `lib/integrations-openai-ai-react/src/admin/` |
+| Brand tokens | `artifacts/orientamento/src/lib/brand.ts` |
+| Design tokens CSS | `lib/design-tokens/northstar-theme.css` |
