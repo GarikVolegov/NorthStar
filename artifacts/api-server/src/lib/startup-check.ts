@@ -14,26 +14,36 @@ interface EnvEntry {
 }
 
 const REQUIRED: EnvEntry[] = [
-  { key: "DATABASE_URL",  description: "Connessione PostgreSQL — necessaria per tutto" },
-  { key: "ADMIN_KEY",     description: "Chiave di accesso alle route /admin/*" },
-  { key: "AI_AGENTS_URL", description: "Python AI Service — Wiki, Roadmap e Grafo RAG non funzionano senza" },
-  { key: "JWT_SECRET",    description: "Secret JWT — senza questo tutti i token vengono invalidati ad ogni restart" },
+  { key: "DATABASE_URL",   description: "Connessione PostgreSQL — necessaria per tutto" },
+  { key: "ADMIN_KEY",      description: "Chiave di accesso alle route /admin/*" },
+  { key: "JWT_SECRET",     description: "Secret JWT — senza questo tutti i token vengono invalidati ad ogni restart" },
+  { key: "GROQ_API_KEY",   description: "Groq — provider primario AI (streaming chat, json extraction, research)" },
 ];
 
 const OPTIONAL: EnvEntry[] = [
+  // ── AI Provider ─────────────────────────────────────────────────────────────
+  { key: "ANTHROPIC_API_KEY",     description: "Anthropic Claude — agent_analysis (RIASEC+Spiriti). Senza questo l'analisi profilo cade su OpenAI" },
+  { key: "OPENAI_API_KEY",        description: "OpenAI — embedding (obbligatorio per RAG) + fallback universale se Groq/Anthropic sono giù" },
+  // ── AI Router overrides (hot-swap senza redeploy) ───────────────────────────
+  { key: "AI_STREAMING_PROVIDER", description: "Override provider streaming_chat (groq|openai|anthropic|google). Default: groq" },
+  { key: "AI_JSON_PROVIDER",      description: "Override provider json_extraction (groq|openai). Default: groq" },
+  { key: "AI_RESEARCH_PROVIDER",  description: "Override provider research job (groq|openai). Default: groq" },
+  { key: "AI_AGENT_PROVIDER",     description: "Override provider agent_analysis (anthropic|openai). Default: anthropic" },
+  { key: "AI_MODEL_OVERRIDE",     description: "Override globale del modello AI (es. gpt-4o, llama-3.3-70b). Sovrascrive il default del provider selezionato" },
+  // ── Pagamenti ────────────────────────────────────────────────────────────────
   { key: "STRIPE_SECRET_KEY",               description: "Stripe — checkout e abbonamenti disabilitati" },
   { key: "STRIPE_WEBHOOK_SECRET",           description: "Stripe webhooks — eventi pagamento non processati" },
+  // ── News & Research ──────────────────────────────────────────────────────────
   { key: "GNEWS_API_KEY",                   description: "GNews — scheduler notizie disabilitato" },
-  { key: "TAVILY_API_KEY",                  description: "Tavily — scheduler ricerca disabilitato" },
+  { key: "TAVILY_API_KEY",                  description: "Tavily — scheduler ricerca settoriale disabilitato" },
+  // ── Email & Push ─────────────────────────────────────────────────────────────
   { key: "RESEND_API_KEY",                  description: "Resend — email reminder e digest settimanale disabilitati" },
-  { key: "EMAIL_FROM",                      description: "Email mittente verificato (es. noreply@tuodominio.eu) — senza questo le email vanno solo all'owner Resend" },
+  { key: "EMAIL_FROM",                      description: "Email mittente verificato (es. noreply@tuodominio.eu)" },
   { key: "VAPID_PUBLIC_KEY",                description: "Web Push — notifiche push disabilitate" },
   { key: "VAPID_PRIVATE_KEY",               description: "Web Push — notifiche push disabilitate" },
   { key: "VAPID_EMAIL",                     description: "Web Push — notifiche push disabilitate" },
+  // ── Auth & CORS ──────────────────────────────────────────────────────────────
   { key: "GOOGLE_CLIENT_ID",                description: "Google OAuth — login con Google disabilitato" },
-  { key: "AI_INTEGRATIONS_OPENAI_BASE_URL", description: "Integrazione Replit OpenAI — Wiki AI, Roadmap, Growth Research disabilitati" },
-  { key: "AI_INTEGRATIONS_OPENAI_API_KEY",  description: "Integrazione Replit OpenAI — necessaria insieme a AI_INTEGRATIONS_OPENAI_BASE_URL" },
-  { key: "AI_MODEL",                        description: "Modello OpenAI per agenti orchestratore (default: gpt-4o-mini). Usare un modello esistente (gpt-4o-mini, gpt-4.1, gpt-4o)" },
   { key: "CORS_ORIGIN",                     description: "Origin frontend in produzione (es. https://northstar.app) — senza questo CORS è aperto solo a localhost:5000" },
 ];
 
@@ -70,6 +80,19 @@ export function runStartupCheck(): StartupCheckResult {
     console.log(`  ${icon}  ${entry.key.padEnd(28)} ${present ? "ok" : `non impostato — ${entry.description}`}`);
     if (!present) warnings.push(entry.key);
   }
+
+  // --- AI Router summary ---
+  const aiProvider = process.env.AI_STREAMING_PROVIDER ?? "groq";
+  const hasGroq = !!process.env.GROQ_API_KEY;
+  const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+  const hasOpenAI = !!process.env.OPENAI_API_KEY;
+
+  console.log(`\n  [AI ROUTER]`);
+  console.log(`  streaming_chat  → ${aiProvider}  ${hasGroq ? "✓" : "⚠ GROQ_API_KEY mancante"}`);
+  console.log(`  agent_analysis  → ${process.env.AI_AGENT_PROVIDER ?? "anthropic"}  ${hasAnthropic ? "✓" : "⚠ ANTHROPIC_API_KEY mancante (fallback openai)"}`);
+  console.log(`  embedding       → openai  ${hasOpenAI ? "✓" : "✗ OPENAI_API_KEY mancante — RAG disabilitato"}`);
+  console.log(`  json_extraction → ${process.env.AI_JSON_PROVIDER ?? "groq"}  ${hasGroq ? "✓" : "⚠ GROQ_API_KEY mancante"}`);
+  console.log(`  research        → ${process.env.AI_RESEARCH_PROVIDER ?? "groq"}  ${hasGroq ? "✓" : "⚠ GROQ_API_KEY mancante"}`);
 
   console.log(`\n${separator}`);
 
