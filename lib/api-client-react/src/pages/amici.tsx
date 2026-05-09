@@ -16,6 +16,7 @@
  *   - Tailwind CSS
  */
 import { useState, useEffect, useRef, useCallback } from "react";
+import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, UserPlus, Compass, UserCheck, UserX, Clock,
@@ -53,10 +54,6 @@ const cardVariants = {
 };
 
 // ── Hook: useSearch ───────────────────────────────────────────────────────────
-//
-// Gestisce la ricerca con debounce 300ms.
-// Ritorna lo stato della ricerca e le azioni per agire sui risultati.
-
 function useSearch() {
   const [query, setQuery]         = useState("");
   const [sectorFilter, setSector] = useState<number | null>(null);
@@ -70,49 +67,39 @@ function useSearch() {
       setState({ status: "idle" });
       return;
     }
-
-    // Annulla richiesta precedente
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
-
     setState({ status: "searching" });
-
     try {
       const params = new URLSearchParams({ q: q.trim() });
       if (sector !== null) params.set("sector", String(sector));
-
       const res = await fetch(`/api/friends/search?${params}`, {
         credentials: "include",
         signal: ac.signal,
       });
-
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         setState({ status: "error", message: body.error ?? "Errore nella ricerca" });
         return;
       }
-
       const data = await res.json();
       setState({
-        status:   "done",
-        results:  data.results ?? [],
-        query:    q.trim(),
-        hasMore:  data.hasMore ?? false,
+        status:  "done",
+        results: data.results ?? [],
+        query:   q.trim(),
+        hasMore: data.hasMore ?? false,
       });
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === "AbortError") return; // richiesta annullata, ignora
+      if (err instanceof Error && err.name === "AbortError") return;
       setState({ status: "error", message: "Connessione non riuscita" });
     }
   }, []);
 
-  // Debounce: 300ms dopo l'ultimo keystroke
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => doSearch(query, sectorFilter), 300);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query, sectorFilter, doSearch]);
 
   const clear = useCallback(() => {
@@ -131,17 +118,7 @@ function useSearch() {
     setPending((p) => ({ ...p, [userId]: "sent" }));
   }, []);
 
-  return {
-    query,
-    setQuery,
-    sectorFilter,
-    setSector,
-    state,
-    clear,
-    pendingIds,
-    markSending,
-    markSent,
-  };
+  return { query, setQuery, sectorFilter, setSector, state, clear, pendingIds, markSending, markSent };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -166,7 +143,6 @@ function Avatar({ user }: { user: { name: string; avatarUrl: string | null } }) 
       />
     );
   }
-
   return (
     <div className="w-11 h-11 rounded-full bg-[#1e2333] flex items-center justify-center flex-shrink-0 ring-2 ring-white/5">
       <span className="text-sm font-semibold text-[#7c8db5]">{initials}</span>
@@ -213,7 +189,7 @@ function SkeletonList({ count = 4 }: { count?: number }) {
   );
 }
 
-// ── Empty states ─────────────────────────────────────────────────────────────
+// ── Empty states ──────────────────────────────────────────────────────────────
 
 function EmptyState({
   icon: Icon,
@@ -276,10 +252,17 @@ function FriendCard({
       className="flex items-center gap-3 p-4 rounded-xl bg-[#0d1421] border border-white/[0.06]
                  hover:border-white/10 transition-all group"
     >
-      <Avatar user={friend.user} />
+      <Link href={`/profilo/${friend.user.id}`} aria-label={`Vai al profilo di ${friend.user.name}`}>
+        <Avatar user={friend.user} />
+      </Link>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <span className="text-[14px] font-semibold text-[#dce6f5] truncate">{friend.user.name}</span>
+          <Link
+            href={`/profilo/${friend.user.id}`}
+            className="text-[14px] font-semibold text-[#dce6f5] truncate hover:text-[#7eb3ff] transition-colors"
+          >
+            {friend.user.name}
+          </Link>
           <JourneyBadge type={friend.user.journeyType} />
         </div>
         <div className="flex items-center gap-3 text-[12px] text-[#7c8db5]">
@@ -332,10 +315,17 @@ function RequestCard({
       className="flex items-center gap-3 p-4 rounded-xl bg-[#0d1421] border border-[#1a3a6b]/40
                  hover:border-[#1a3a6b]/70 transition-all"
     >
-      <Avatar user={request.user} />
+      <Link href={`/profilo/${request.user.id}`} aria-label={`Vai al profilo di ${request.user.name}`}>
+        <Avatar user={request.user} />
+      </Link>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <span className="text-[14px] font-semibold text-[#dce6f5] truncate">{request.user.name}</span>
+          <Link
+            href={`/profilo/${request.user.id}`}
+            className="text-[14px] font-semibold text-[#dce6f5] truncate hover:text-[#7eb3ff] transition-colors"
+          >
+            {request.user.name}
+          </Link>
         </div>
         <div className="flex items-center gap-3 text-[12px] text-[#7c8db5]">
           {request.user.sectorName && <span className="truncate">{request.user.sectorName}</span>}
@@ -389,10 +379,17 @@ function SuggestionCard({
       className="flex items-center gap-3 p-4 rounded-xl bg-[#0d1421] border border-white/[0.06]
                  hover:border-white/10 transition-all"
     >
-      <Avatar user={suggestion} />
+      <Link href={`/profilo/${suggestion.id}`} aria-label={`Vai al profilo di ${suggestion.name}`}>
+        <Avatar user={suggestion} />
+      </Link>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <span className="text-[14px] font-semibold text-[#dce6f5] truncate">{suggestion.name}</span>
+          <Link
+            href={`/profilo/${suggestion.id}`}
+            className="text-[14px] font-semibold text-[#dce6f5] truncate hover:text-[#7eb3ff] transition-colors"
+          >
+            {suggestion.name}
+          </Link>
         </div>
         <div className="flex items-center gap-3 text-[12px] text-[#7c8db5]">
           {suggestion.sectorName && <span className="truncate">{suggestion.sectorName}</span>}
@@ -425,8 +422,6 @@ function SuggestionCard({
 }
 
 // ── SearchResultCard ──────────────────────────────────────────────────────────
-// Card per i risultati di ricerca: uguale a SuggestionCard ma con stato
-// "sent" (richiesta già inviata) gestito separatamente.
 
 function SearchResultCard({
   user,
@@ -444,10 +439,17 @@ function SearchResultCard({
       className="flex items-center gap-3 p-4 rounded-xl bg-[#0d1421] border border-white/[0.06]
                  hover:border-white/10 transition-all"
     >
-      <Avatar user={user} />
+      <Link href={`/profilo/${user.id}`} aria-label={`Vai al profilo di ${user.name}`}>
+        <Avatar user={user} />
+      </Link>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <span className="text-[14px] font-semibold text-[#dce6f5] truncate">{user.name}</span>
+          <Link
+            href={`/profilo/${user.id}`}
+            className="text-[14px] font-semibold text-[#dce6f5] truncate hover:text-[#7eb3ff] transition-colors"
+          >
+            {user.name}
+          </Link>
         </div>
         <div className="flex items-center gap-2 text-[12px] text-[#7c8db5] flex-wrap">
           {user.sectorName && <span className="truncate max-w-[120px]">{user.sectorName}</span>}
@@ -545,7 +547,7 @@ function SearchBar({
   );
 }
 
-// ── TabEsplora — contenuto completo della tab ─────────────────────────────────
+// ── TabEsplora ────────────────────────────────────────────────────────────────
 
 function TabEsplora({
   suggestions,
@@ -558,7 +560,6 @@ function TabEsplora({
 }) {
   const search = useSearch();
 
-  // Funzione che invia la richiesta e aggiorna lo stato ottimistico
   async function handleConnectSearch(user: SearchResult) {
     search.markSending(user.id);
     try {
@@ -569,11 +570,10 @@ function TabEsplora({
       if (res.ok || res.status === 409) {
         search.markSent(user.id);
       } else {
-        // ripristina a idle su errore
-        search.markSending(user.id); // trick: forza re-render
+        search.markSending(user.id);
       }
     } catch {
-      // ignora — l'utente può riprovare
+      // ignora
     }
   }
 
@@ -581,8 +581,6 @@ function TabEsplora({
 
   return (
     <div className="space-y-4">
-
-      {/* ── Barra di ricerca ──────────────────────────────────────────── */}
       <SearchBar
         query={search.query}
         onChange={search.setQuery}
@@ -590,7 +588,6 @@ function TabEsplora({
         isSearching={search.state.status === "searching"}
       />
 
-      {/* ── Risultati ricerca ─────────────────────────────────────────── */}
       <AnimatePresence mode="wait">
         {isActiveSearch ? (
           <motion.div
@@ -600,9 +597,7 @@ function TabEsplora({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
-            {search.state.status === "searching" && (
-              <SkeletonList count={3} />
-            )}
+            {search.state.status === "searching" && <SkeletonList count={3} />}
 
             {search.state.status === "error" && (
               <div className="text-center py-8 text-[#7c8db5] text-[13px]">
@@ -612,7 +607,6 @@ function TabEsplora({
 
             {search.state.status === "done" && (
               <>
-                {/* Header risultati */}
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-[12px] text-[#4a5a75]">
                     {search.state.results.length === 0
@@ -637,18 +631,18 @@ function TabEsplora({
                     animate="visible"
                     className="space-y-3"
                   >
-                    {search.state.results.map((user) => (
+                    {search.state.results.map((u) => (
                       <SearchResultCard
-                        key={user.id}
-                        user={user}
+                        key={u.id}
+                        user={u}
                         status={
-                          search.pendingIds[user.id] === "sent"
+                          search.pendingIds[u.id] === "sent"
                             ? "sent"
-                            : search.pendingIds[user.id] === "sending"
+                            : search.pendingIds[u.id] === "sending"
                             ? "sending"
                             : "idle"
                         }
-                        onConnect={() => handleConnectSearch(user)}
+                        onConnect={() => handleConnectSearch(u)}
                       />
                     ))}
                   </motion.div>
@@ -663,7 +657,6 @@ function TabEsplora({
             )}
           </motion.div>
         ) : (
-          /* ── Suggerimenti (stato idle) ────────────────────────────── */
           <motion.div
             key="suggestions"
             initial={{ opacity: 0 }}
@@ -853,7 +846,6 @@ export default function AmiciPage() {
             )}
           </motion.div>
         ) : (
-          /* ── Tab Esplora ───────────────────────────────────────────────── */
           <motion.div key="esplora" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <TabEsplora
               suggestions={suggestions}
