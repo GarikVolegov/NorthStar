@@ -1,23 +1,16 @@
-import Stripe from 'stripe';
+/**
+ * @deprecated Questo file è dead code — tutta la logica webhook
+ * è stata consolidata in routes/webhooks/stripe.ts.
+ *
+ * TODO: eliminare in un cleanup sprint successivo.
+ * Non montato da app.ts — nessun effetto in produzione.
+ */
 
+// File mantenuto vuoto intenzionalmente per evitare import errors
+// da eventuali riferimenti residui. Eliminare quando confermato safe.
 export class WebhookHandlers {
-  static async processWebhook(payload: Buffer, signature: string): Promise<void> {
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    if (!webhookSecret) {
-      throw new Error('STRIPE_WEBHOOK_SECRET is not configured');
-    }
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-    const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
-
-    // Handle subscription events to update user records
-    if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.created') {
-      const sub = event.data.object as Stripe.Subscription;
-      const { db, usersTable } = await import('@workspace/db');
-      const { eq, sql } = await import('drizzle-orm');
-      await db
-        .update(usersTable)
-        .set({ stripeSubscriptionId: sub.id })
-        .where(eq(usersTable.stripeCustomerId, sub.customer as string));
-    }
+  /** @deprecated Non usare — usa stripeWebhookHandler da routes/webhooks/stripe.ts */
+  static async processWebhook(_payload: Buffer, _signature: string): Promise<void> {
+    throw new Error('WebhookHandlers.processWebhook is deprecated. Use stripeWebhookHandler instead.');
   }
 }

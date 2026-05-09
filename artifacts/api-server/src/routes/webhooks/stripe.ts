@@ -15,36 +15,76 @@
  *   );
  *
  * Events gestiti:
- *   - invoice.paid                    → primo pagamento: conferma referral
- *                                        rinnovo: commissione mensile affiliato
- *   - customer.subscription.deleted   → cancella referral attivo
+ *   - invoice.paid                      → primo pagamento: conferma referral
+ *                                          rinnovo: commissione mensile affiliato
+ *   - customer.subscription.updated     → aggiorna stripeSubscriptionId su users
+ *   - customer.subscription.created     → aggiorna stripeSubscriptionId su users
+ *   - customer.subscription.deleted     → cancella referral attivo
  *
  * Idempotency:
- *   Stripe può inviare lo stesso evento più volte.
- *   TODO: implementare dedup via Redis (stripeEventId → processed)
- *   Per ora: le operazioni DB sono idempotenti (onConflictDoNothing).
+ *   Redis dedup: stripeEventId → processed (TTL 24h).
+ *   Fallback graceful se REDIS_URL non configurato (log warning).
+ *   Operazioni DB rimangono idempotenti (onConflictDoNothing) come seconda linea.
  *
  * Test locale:
  *   stripe listen --forward-to localhost:8080/api/webhooks/stripe
  *   stripe trigger invoice.paid
+ *   stripe trigger customer.subscription.updated
  */
 
 import type { Request, Response } from 'express';
 import Stripe from 'stripe';
+import Redis from 'ioredis';
 import { db } from '@workspace/db';
 import {
   affiliateReferralsTable,
   usersTable,
 } from '@workspace/db/schema';
 import { eq } from 'drizzle-orm';
+import { stripe } from '../../stripeClient.js';
 import { cancelReferral } from '../lib/affiliate/referralService.js';
 import { applyMonthlyCommission } from '../lib/affiliate/commissionService.js';
 import { processPostPaymentReferral } from '../lib/affiliate/referralCodeService.js';
 import { captureError, addBreadcrumb } from '../../lib/sentry.js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+// ── Redis singleton per idempotency ────────────────────────────────────────
+// Fallback graceful se REDIS_URL non configurato: log warning, skip dedup.
+let redis: Redis | null = null;
+if (process.env.REDIS_URL) {
+  redis = new Redis(process.env.REDIS_URL, {
+    maxRetriesPerRequest: 2,
+    enableReadyCheck: false,
+    lazyConnect: true,
+  });
+  redis.on('error', (err) => {
+    // Non crashare il server se Redis è down — degraded mode
+    console.warn('[stripe webhook] Redis error (idempotency degraded):', err.message);
+  });
+} else {
+  console.warn('[stripe webhook] REDIS_URL non configurato — idempotency Redis disabilitata. Configura REDIS_URL su Railway per produzione.');
+}
 
-// ── Helper: trova utente NorthStar da Stripe customerId ──────────────────
+// ── Helper: idempotency check ──────────────────────────────────────────────
+async function isAlreadyProcessed(eventId: string): Promise<boolean> {
+  if (!redis) return false;
+  try {
+    const result = await redis.get(`stripe:event:${eventId}`);
+    return result !== null;
+  } catch {
+    return false; // degraded: processa comunque
+  }
+}
+
+async function markAsProcessed(eventId: string): Promise<void> {
+  if (!redis) return;
+  try {
+    await redis.set(`stripe:event:${eventId}`, '1', 'EX', 86400); // TTL 24h
+  } catch {
+    // degraded: non bloccare il flusso
+  }
+}
+
+// ── Helper: trova utente NorthStar da Stripe customerId ───────────────────
 async function findUserByStripeCustomerId(
   customerId: string,
 ): Promise<{ id: number } | null> {
@@ -56,12 +96,12 @@ async function findUserByStripeCustomerId(
   return user ?? null;
 }
 
-// ── Helper: calcola mese corrente YYYY-MM ──────────────────────────────
+// ── Helper: calcola mese corrente YYYY-MM ──────────────────────────────────
 function currentMonth(): string {
   return new Date().toISOString().slice(0, 7);
 }
 
-// ── Main handler ───────────────────────────────────────────────────
+// ── Main handler ───────────────────────────────────────────────────────────
 export async function stripeWebhookHandler(
   req: Request,
   res: Response,
@@ -87,16 +127,19 @@ export async function stripeWebhookHandler(
     return;
   }
 
-  // Breadcrumb Sentry: tracceremo ogni step del processing
-  addBreadcrumb('stripe', `event received: ${event.type}`, { eventId: event.id });
+  // ── Idempotency check Redis ────────────────────────────────────────────
+  if (await isAlreadyProcessed(event.id)) {
+    console.log(`[stripe webhook] Evento già processato, skip: ${event.id}`);
+    res.json({ received: true, skipped: true, eventId: event.id });
+    return;
+  }
 
-  // TODO: dedup via Redis
-  // const alreadyProcessed = await redis.get(`stripe:event:${event.id}`);
-  // if (alreadyProcessed) { res.json({ received: true, skipped: true }); return; }
+  addBreadcrumb('stripe', `event received: ${event.type}`, { eventId: event.id });
 
   try {
     switch (event.type) {
-      // ── invoice.paid ──────────────────────────────────────────────────
+
+      // ── invoice.paid ────────────────────────────────────────────────────
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
@@ -109,16 +152,24 @@ export async function stripeWebhookHandler(
         addBreadcrumb('affiliate', 'user found for invoice.paid', { userId: user.id });
 
         const [existingReferral] = await db
-          .select({ id: affiliateReferralsTable.id, status: affiliateReferralsTable.status, affiliateId: affiliateReferralsTable.affiliateId })
+          .select({
+            id: affiliateReferralsTable.id,
+            status: affiliateReferralsTable.status,
+            affiliateId: affiliateReferralsTable.affiliateId,
+          })
           .from(affiliateReferralsTable)
           .where(eq(affiliateReferralsTable.referredUserId, user.id))
           .limit(1);
 
         if (!existingReferral) {
+          // Primo pagamento: prova a confermare referral da codice signup
           await processPostPaymentReferral(user.id);
 
           const [newReferral] = await db
-            .select({ affiliateId: affiliateReferralsTable.affiliateId, status: affiliateReferralsTable.status })
+            .select({
+              affiliateId: affiliateReferralsTable.affiliateId,
+              status: affiliateReferralsTable.status,
+            })
             .from(affiliateReferralsTable)
             .where(eq(affiliateReferralsTable.referredUserId, user.id))
             .limit(1);
@@ -133,7 +184,7 @@ export async function stripeWebhookHandler(
               ipAddress,
             });
             if (result === 'duplicate') {
-              console.log(`[Stripe webhook] Prima commissione duplicata ignorata: affiliateId=${newReferral.affiliateId} month=${currentMonth()}`);
+              console.log(`[stripe webhook] Prima commissione duplicata ignorata: affiliateId=${newReferral.affiliateId} month=${currentMonth()}`);
             }
           }
           break;
@@ -141,6 +192,7 @@ export async function stripeWebhookHandler(
 
         if (existingReferral.status !== 'active') break;
 
+        // Rinnovo mensile: applica commissione
         const result = await applyMonthlyCommission({
           affiliateId:    existingReferral.affiliateId,
           referredUserId: user.id,
@@ -151,8 +203,27 @@ export async function stripeWebhookHandler(
         });
 
         if (result === 'duplicate') {
-          console.log(`[Stripe webhook] Commissione duplicata ignorata: affiliateId=${existingReferral.affiliateId} month=${currentMonth()}`);
+          console.log(`[stripe webhook] Commissione duplicata ignorata: affiliateId=${existingReferral.affiliateId} month=${currentMonth()}`);
         }
+        break;
+      }
+
+      // ── customer.subscription.updated / created ─────────────────────────
+      // Aggiorna stripeSubscriptionId su users per mantenere sincronizzazione.
+      // Prima gestito da webhookHandlers.ts (dead code) — ora consolidato qui.
+      case 'customer.subscription.updated':
+      case 'customer.subscription.created': {
+        const sub = event.data.object as Stripe.Subscription;
+        const customerId = sub.customer as string;
+
+        addBreadcrumb('stripe', `subscription ${event.type}`, { subscriptionId: sub.id });
+
+        await db
+          .update(usersTable)
+          .set({ stripeSubscriptionId: sub.id })
+          .where(eq(usersTable.stripeCustomerId, customerId));
+
+        console.log(`[stripe webhook] stripeSubscriptionId aggiornato: ${sub.id} per customer ${customerId}`);
         break;
       }
 
@@ -178,16 +249,19 @@ export async function stripeWebhookHandler(
         break;
     }
 
-    // TODO: await redis.set(`stripe:event:${event.id}`, '1', 'EX', 86400);
+    // Marca evento come processato su Redis
+    await markAsProcessed(event.id);
+
     res.json({ received: true, eventId: event.id, type: event.type });
   } catch (err) {
-    // Invia a Sentry per alert immediato — rispondo 200 per evitare retry Stripe
+    // Risponde 200 per evitare retry Stripe — l'errore è loggato su Sentry.
+    // Se il processing fallisce ripetutamente, investigare da Sentry dashboard.
     captureError(err, {
       path:      '/api/webhooks/stripe',
       eventType: event.type,
       extra:     { eventId: event.id },
     });
-    console.error('[Stripe webhook] Errore processing event:', event.id, err);
-    res.json({ received: true, error: 'Processing error — check logs' });
+    console.error('[stripe webhook] Errore processing event:', event.id, err);
+    res.json({ received: true, error: 'Processing error — check Sentry' });
   }
 }
