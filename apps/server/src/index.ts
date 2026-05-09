@@ -34,6 +34,14 @@
  *   GET  /api/growth-agent/onboarding/status  — needsOnboarding
  *   POST /api/growth-agent/onboarding         — primo msg Wendy (SSE)
  *
+ *   ── Network (Step 1) ──────────────────────────────────────────────────
+ *   GET    /api/friends                       — lista amici accettati
+ *   GET    /api/friends/requests              — richieste ricevute
+ *   GET    /api/friends/suggestions           — utenti suggeriti
+ *   POST   /api/friends/request/:id           — invia richiesta
+ *   PUT    /api/friends/:id/accept            — accetta richiesta
+ *   DELETE /api/friends/:id                   — rimuovi / rifiuta
+ *
  * MIDDLEWARE STACK (ordine):
  *   1. helmet()           — security headers
  *   2. cors()             — CORS configurato da ALLOWED_ORIGINS
@@ -63,6 +71,7 @@ import { publicProfileRouter }         from "./profile/public-profile-router";
 import { riasecRouter }                from "./profile/riasec-router";
 import { onboardingRouter }            from "./growth-agent/onboarding-router";
 import { stripeWebhookRouter }         from "./stripe/stripe-webhook-router";
+import { networkRouter }               from "./network/network-router";
 
 // ── App ───────────────────────────────────────────────────────────────────────
 
@@ -124,6 +133,7 @@ app.use("/api/users/me",                requireAuth, profileRouter);
 app.use("/api/users/me/progress",       requireAuth, progressRouter);
 app.use("/api/riasec",                  requireAuth, riasecRouter);
 app.use("/api/growth-agent/onboarding", requireAuth, onboardingRouter);
+app.use("/api/friends",                 requireAuth, networkRouter);
 
 // ── Public routes (optional auth) ─────────────────────────────────────────────
 
