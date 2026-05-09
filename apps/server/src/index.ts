@@ -17,6 +17,11 @@
  *                                               isPremium, isAffiliate, sectorName,
  *                                               sectorId, objectives[], ...
  *
+ *   ── Stripe ────────────────────────────────────────────────────────────
+ *   POST /api/stripe/webhook                  — webhook Stripe (raw body, no auth)
+ *                                               gestisce: subscription.created/updated/deleted
+ *                                               invalida cache profilo dopo ogni evento
+ *
  *   ── Affiliate (Passo 5) ───────────────────────────────────────────────
  *   GET  /api/affiliate/dashboard             — dashboard dati
  *   POST /api/affiliate/withdraw              — richiesta prelievo
@@ -39,8 +44,9 @@
  *   2. cors()            — CORS configurato da ALLOWED_ORIGINS
  *   3. morgan()          — HTTP logging (dev: dev, prod: combined)
  *   4. cookieParser()    — per leggere ns_token cookie
- *   5. express.json()    — body parsing JSON
- *   6. saveRefCookie()   — intercetta ?ref=CODE sulle pagine signup/join
+ *   5. /api/stripe/webhook — raw body (PRIMA di express.json)
+ *   6. express.json()    — body parsing JSON
+ *   7. saveRefCookie()   — intercetta ?ref=CODE sulle pagine signup/join
  */
 import "dotenv/config";
 import express            from "express";
@@ -57,6 +63,7 @@ import { progressRouter }            from "./profile/progress-router";
 import { publicProfileRouter }       from "./profile/public-profile-router";
 import { riasecRouter }              from "./profile/riasec-router";
 import { onboardingRouter }          from "./growth-agent/onboarding-router";
+import { stripeWebhookRouter }       from "./stripe/stripe-webhook-router";
 
 // ── App ──────────────────────────────────────────────────────────────────────
 
@@ -85,6 +92,16 @@ app.use(cors({
 app.use(helmet({ contentSecurityPolicy: isProd }));
 app.use(morgan(isProd ? "combined" : "dev"));
 app.use(cookieParser());
+
+// ── Stripe webhook (raw body — DEVE stare PRIMA di express.json) ─────────────
+//
+// Stripe richiede il body grezzo (Buffer/string non parsato) per validare
+// la firma HMAC. Se express.json() fosse montato prima, il body verrebbe
+// deserializzato e la verifica fallirebbe con "No signatures found matching".
+// Il router gestisce internamente la lettura del body raw tramite req stream.
+app.use("/api/stripe", stripeWebhookRouter);
+
+// ── JSON body parser (dopo il webhook Stripe) ────────────────────────────────
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: false }));
 
