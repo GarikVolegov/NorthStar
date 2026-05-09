@@ -20,10 +20,15 @@ export * from "./newsArticles";
 export * from "./growthArticles";
 export * from "./agentReview";
 export * from "./agentLogs";
+// ── Affiliate system ──────────────────────────────────────────────────
 export * from "./affiliateAccounts";
 export * from "./affiliateCommissions";
+export * from "./affiliateReferrals";   // ← Fase 1: referral confermati
 export * from "./affiliateWithdrawals";
 export * from "./affiliationLeads";
+// ── Audit (append-only) ───────────────────────────────────────────────
+export * from "./auditLog";             // ← Fase 1: log immutabile
+// ── Other ─────────────────────────────────────────────────────────────
 export * from "./businessIdeas";
 export * from "./calendar";
 export * from "./certifications";
