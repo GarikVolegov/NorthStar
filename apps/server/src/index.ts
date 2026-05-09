@@ -11,17 +11,17 @@
  * ROUTE MAP:
  *   GET  /api/health                          — healthcheck (public)
  *
- *   ── Auth ──────────────────────────────────────────────────────────────
+ *   ── Auth ──────────────────────────────────────────────────────────────────
  *   GET  /api/auth/me                         — profilo completo (alias /api/users/me)
  *
- *   ── Stripe ────────────────────────────────────────────────────────────
+ *   ── Stripe ────────────────────────────────────────────────────────────────
  *   POST /api/stripe/webhook                  — webhook Stripe (raw body, no auth)
  *
- *   ── Affiliate (Passo 5) ───────────────────────────────────────────────
+ *   ── Affiliate (Passo 5) ───────────────────────────────────────────────────
  *   GET  /api/affiliate/dashboard             — dashboard dati
  *   POST /api/affiliate/withdraw              — richiesta prelievo
  *
- *   ── Profile (Passi 1-4) ───────────────────────────────────────────────
+ *   ── Profile (Passi 1-4) ───────────────────────────────────────────────────
  *   GET  /api/users/me                        — profilo utente
  *   PATCH /api/users/me                       — aggiorna profilo
  *   POST /api/users/me/objectives             — aggiunge obiettivo
@@ -30,17 +30,23 @@
  *   GET  /api/u/:username                     — profilo pubblico (opzionale auth)
  *   GET  /api/riasec/session/:sessionId       — RIASEC profile
  *
- *   ── Growth Agent (Passo 6) ────────────────────────────────────────────
+ *   ── Growth Agent (Passo 6) ────────────────────────────────────────────────
  *   GET  /api/growth-agent/onboarding/status  — needsOnboarding
  *   POST /api/growth-agent/onboarding         — primo msg Wendy (SSE)
  *
- *   ── Network (Step 1) ──────────────────────────────────────────────────
+ *   ── Network (Step 1) ──────────────────────────────────────────────────────
  *   GET    /api/friends                       — lista amici accettati
  *   GET    /api/friends/requests              — richieste ricevute
  *   GET    /api/friends/suggestions           — utenti suggeriti
  *   POST   /api/friends/request/:id           — invia richiesta
  *   PUT    /api/friends/:id/accept            — accetta richiesta
  *   DELETE /api/friends/:id                   — rimuovi / rifiuta
+ *
+ *   ── Notifications ─────────────────────────────────────────────────────────
+ *   GET  /api/notifications                   — snapshot JSON
+ *   GET  /api/notifications/stream            — SSE stream (EventSource)
+ *   POST /api/notifications/friend-request/:id/accept  — accetta da notifica
+ *   POST /api/notifications/friend-request/:id/decline — rifiuta da notifica
  *
  * MIDDLEWARE STACK (ordine):
  *   1. helmet()           — security headers
@@ -72,6 +78,7 @@ import { riasecRouter }                from "./profile/riasec-router";
 import { onboardingRouter }            from "./growth-agent/onboarding-router";
 import { stripeWebhookRouter }         from "./stripe/stripe-webhook-router";
 import { networkRouter }               from "./network/network-router";
+import { notificationsRouter }         from "./notifications/notifications-router";
 
 // ── App ───────────────────────────────────────────────────────────────────────
 
@@ -95,13 +102,10 @@ app.use(cors({
   exposedHeaders: ["X-Session-Id", "X-Request-Id"],
 }));
 
-// ── Global middleware ─────────────────────────────────────────────────────────
+// ── Global middleware ──────────────────────────────────────────────────────────
 
 app.use(helmet({ contentSecurityPolicy: isProd }));
 app.use(cookieParser());
-
-// requestLogger: genera requestId, inietta req.log, logga req/res
-// Montato subito dopo i security middleware, prima di tutto il resto.
 app.use(requestLogger);
 
 // ── Stripe webhook (raw body — DEVE stare PRIMA di express.json) ──────────────
@@ -123,7 +127,7 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// ── /api/auth/me — alias di /api/users/me ────────────────────────────────────
+// ── /api/auth/me — alias di /api/users/me ─────────────────────────────────────
 app.use("/api/auth", requireAuth, profileRouter);
 
 // ── Protected routes ──────────────────────────────────────────────────────────
@@ -134,6 +138,7 @@ app.use("/api/users/me/progress",       requireAuth, progressRouter);
 app.use("/api/riasec",                  requireAuth, riasecRouter);
 app.use("/api/growth-agent/onboarding", requireAuth, onboardingRouter);
 app.use("/api/friends",                 requireAuth, networkRouter);
+app.use("/api/notifications",           requireAuth, notificationsRouter);
 
 // ── Public routes (optional auth) ─────────────────────────────────────────────
 
@@ -164,7 +169,7 @@ app.use((err: Error, req: express.Request, res: express.Response, _next: express
   res.status(500).json({ error: message });
 });
 
-// ── Start ─────────────────────────────────────────────────────────────────────
+// ── Start ──────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
   logger.info(
