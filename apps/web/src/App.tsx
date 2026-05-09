@@ -17,6 +17,14 @@
  *   AnimatePresence, tutti i PageWrapper, tutti i Route guards.
  *   Questo file inietta solo le Route aggiuntive tramite
  *   extraRoutes prop.
+ *
+ * data-auth-ready:
+ *   Il <div> root espone data-auth-ready={String(!authLoading)}.
+ *   Viene impostato a "true" quando useAuth() ha completato il fetch
+ *   di /api/auth/me (isLoading → false).
+ *   Usato da e2e/helpers/auth.ts → waitForAuthReady() come segnale
+ *   deterministico che l'auth è pronta, invece del fragile networkidle.
+ *   Impatto runtime: zero — attributo HTML inerte letto solo dai test.
  */
 
 import { Route, Switch, useLocation } from 'wouter';
@@ -31,7 +39,6 @@ import { SmartSkeleton } from '@/components/ui/SmartSkeleton';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // ─── Lazy imports lib (copiati da lib/api-client-react) ───────────────────────
-// TDZ crash se dichiarati dopo il componente che li usa
 const HomePage           = lazy(() => import('@/pages/home'));
 const TestPage           = lazy(() => import('@/pages/test'));
 const ResultsPage        = lazy(() => import('@/pages/results'));
@@ -63,8 +70,6 @@ const LazyValidatore     = lazy(() => import('@/pages/validatore-idea'));
 const LazyGrafoConoscenza= lazy(() => import('@/pages/grafo-conoscenza'));
 
 // ─── Lazy imports apps/web — ROUTE SPECIFICHE DI QUESTO DEPLOYMENT ────────────
-// /wendy   → pagina chat Wendy (growth agent AI)
-// /affiliate → dashboard programma affiliazione
 const WendyRoute     = lazy(() => import('./pages/wendy'));
 const AffiliateRoute = lazy(() => import('./pages/affiliate'));
 
@@ -144,6 +149,17 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
 export default function App() {
   const [location] = useLocation();
 
+  // ── data-auth-ready ────────────────────────────────────────────────────
+  // Espone lo stato di isLoading di useAuth() come attributo HTML sul nodo
+  // radice così Playwright può rilevarlo con:
+  //   page.waitForSelector('[data-auth-ready="true"]')
+  // Transizioni:
+  //   mount       → data-auth-ready="false"  (fetch /api/auth/me in corso)
+  //   fetch done  → data-auth-ready="true"   (user oppure null, non importa)
+  // Il segnale è deterministico anche con SSE aperte che tengono
+  // networkidle sospeso indefinitamente.
+  const { isLoading: authLoading } = useAuth();
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [location]);
@@ -154,7 +170,10 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen bg-[#0e1018] text-[#e6e8ed] pb-20 md:pb-0">
+      <div
+        className="min-h-screen bg-[#0e1018] text-[#e6e8ed] pb-20 md:pb-0"
+        data-auth-ready={String(!authLoading)}
+      >
         <Navbar />
 
         <main className="relative">
@@ -184,17 +203,6 @@ export default function App() {
               <Route path="/amici"             component={() => pw(<AuthRoute component={LazyAmici} />)} />
 
               {/* ── apps/web — Route specifiche ──────────────────────────── */}
-              {/*
-               * /wendy    — Chat con Wendy (growth agent AI)
-               *             Protetta da AuthRoute: redirect a /login se non loggato.
-               *             Wendy ha bisogno di user.objectives e user.sectorName
-               *             che vengono passati da WendyPage via useAuth().
-               *
-               * /affiliate — Dashboard programma affiliazione
-               *              Protetta da AuthRoute: redirect a /login se non loggato.
-               *              Il guard isAffiliate (abilitazione dashboard) è gestito
-               *              internamente da AffiliateDashboard, non qui.
-               */}
               <Route path="/wendy"             component={() => pw(<AuthRoute component={WendyRoute} />)} />
               <Route path="/affiliate"         component={() => pw(<AuthRoute component={AffiliateRoute} />)} />
 
