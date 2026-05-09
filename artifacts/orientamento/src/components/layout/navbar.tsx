@@ -3,7 +3,8 @@ import { Link, useLocation } from "wouter";
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import {
   LogOut, User, LayoutDashboard, Menu, X,
-  FlaskConical, Layers, BookOpenText, Newspaper, Crown, Briefcase, Users, Calendar, Globe, BrainCircuit, Compass, MapPin,
+  FlaskConical, Layers, BookOpenText, Newspaper, Crown, Briefcase, Users,
+  Calendar, Globe, BrainCircuit, Compass, MapPin, HandCoins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,11 +30,11 @@ const LANG_LABELS: Record<string, string> = {
 };
 
 const JOURNEY_LABELS: Record<string, { label: string; color: string }> = {
-  indeciso:    { label: "Indeciso",           color: "text-primary bg-primary/10 border-primary/30" },
-  dipendente:  { label: "Dipendente",         color: "text-[#A8D5BA] bg-[#A8D5BA]/10 border-[#A8D5BA]/30" },
-  autonomo:    { label: "Autonomo",           color: "text-primary bg-primary/10 border-primary/30" },
-  azienda:     { label: "Azienda",            color: "text-[#A8D5BA] bg-[#A8D5BA]/10 border-[#A8D5BA]/30" },
-  investitore: { label: "Investitore",        color: "text-primary bg-primary/10 border-primary/30" },
+  indeciso:    { label: "Indeciso",    color: "text-primary bg-primary/10 border-primary/30" },
+  dipendente:  { label: "Dipendente",  color: "text-[#A8D5BA] bg-[#A8D5BA]/10 border-[#A8D5BA]/30" },
+  autonomo:    { label: "Autonomo",    color: "text-primary bg-primary/10 border-primary/30" },
+  azienda:     { label: "Azienda",     color: "text-[#A8D5BA] bg-[#A8D5BA]/10 border-[#A8D5BA]/30" },
+  investitore: { label: "Investitore", color: "text-primary bg-primary/10 border-primary/30" },
 };
 
 /**
@@ -42,21 +43,23 @@ const JOURNEY_LABELS: Record<string, { label: string; color: string }> = {
  * le chiamate successive sono no-op perché il modulo è già in cache.
  */
 const PREFETCH_MAP: Record<string, () => Promise<unknown>> = {
-  "/test":            () => import("@/pages/test"),
-  "/settori":         () => import("@/pages/settori"),
-  "/ruoli":           () => import("@/pages/ruoli"),
-  "/lavori":          () => import("@/pages/lavori"),
-  "/crescita":        () => import("@/pages/crescita"),
-  "/news":            () => import("@/pages/news"),
-  "/premium":         () => import("@/pages/premium"),
-  // Rotte autenticate — prefetch al hover sul dropdown utente
-  "/percorso":        () => import("@/pages/percorso"),
-  "/profilo":         () => import("@/pages/profilo"),
-  "/candidature":     () => import("@/pages/candidature"),
-  "/calendario":      () => import("@/pages/Calendario"),
-  "/amici":           () => import("@/pages/amici"),
-  "/coach":           () => import("@/pages/coach"),
-  "/validatore-idea": () => import("@/pages/validatore-idea"),
+  "/test":                      () => import("@/pages/test"),
+  "/settori":                   () => import("@/pages/settori"),
+  "/ruoli":                     () => import("@/pages/ruoli"),
+  "/lavori":                    () => import("@/pages/lavori"),
+  "/crescita":                  () => import("@/pages/crescita"),
+  "/news":                      () => import("@/pages/news"),
+  "/premium":                   () => import("@/pages/premium"),
+  // Rotte autenticate
+  "/percorso":                  () => import("@/pages/percorso"),
+  "/profilo":                   () => import("@/pages/profilo"),
+  "/candidature":               () => import("@/pages/candidature"),
+  "/calendario":                () => import("@/pages/Calendario"),
+  "/amici":                     () => import("@/pages/amici"),
+  "/coach":                     () => import("@/pages/coach"),
+  "/validatore-idea":           () => import("@/pages/validatore-idea"),
+  // Fase 4: dashboard affiliato
+  "/affiliazione/dashboard":    () => import("@/pages/affiliazione-dashboard"),
 };
 
 function prefetchRoute(path: string) {
@@ -74,13 +77,13 @@ export function Navbar() {
   const prefersReduced = useReducedMotion();
 
   const NAV_LINKS = [
-    { href: "/test",     label: t("nav.test"),     icon: FlaskConical },
-    { href: "/settori",  label: t("nav.sectors"),  icon: Layers },
-    { href: "/ruoli",    label: "Ruoli",            icon: Briefcase },
-    { href: "/lavori",   label: "Lavori",           icon: MapPin },
-    { href: "/crescita", label: t("nav.growth"),   icon: BookOpenText },
-    { href: "/news",     label: t("nav.news"),     icon: Newspaper },
-    { href: "/premium",  label: t("nav.premium"),  icon: Crown },
+    { href: "/test",     label: t("nav.test"),    icon: FlaskConical },
+    { href: "/settori",  label: t("nav.sectors"), icon: Layers },
+    { href: "/ruoli",    label: "Ruoli",           icon: Briefcase },
+    { href: "/lavori",   label: "Lavori",          icon: MapPin },
+    { href: "/crescita", label: t("nav.growth"),  icon: BookOpenText },
+    { href: "/news",     label: t("nav.news"),    icon: Newspaper },
+    { href: "/premium",  label: t("nav.premium"), icon: Crown },
   ];
 
   useState(() => {
@@ -92,6 +95,9 @@ export function Navbar() {
   });
 
   const friendsBadge = pendingFriends && pendingFriends > 0 ? pendingFriends : null;
+
+  // true se l'utente è un affiliato (campo opzionale — fallback: visibile a tutti i loggati)
+  const isAffiliate = user ? ((user as Record<string, unknown>).isAffiliate ?? true) : false;
 
   function changeLanguage(lang: string) {
     i18n.changeLanguage(lang);
@@ -118,7 +124,7 @@ export function Navbar() {
             </span>
           </Link>
 
-          {/* Desktop nav links — centered */}
+          {/* Desktop nav links */}
           <nav className="hidden md:flex items-center gap-0.5 flex-1 justify-center">
             {NAV_LINKS.map(({ href, label }) => {
               const isActive = location === href || location.startsWith(href + "/");
@@ -173,10 +179,10 @@ export function Navbar() {
                     <m.button
                       className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary/40 hover:bg-primary/5 transition-all"
                       onMouseEnter={() => {
-                        // Prefetch le rotte più probabili del dropdown utente
                         prefetchRoute("/profilo");
                         prefetchRoute("/percorso");
                         prefetchRoute("/candidature");
+                        if (isAffiliate) prefetchRoute("/affiliazione/dashboard");
                       }}
                       whileHover={prefersReduced ? {} : { scale: 1.02 }}
                       whileTap={prefersReduced ? {} : { scale: 0.98 }}
@@ -236,6 +242,19 @@ export function Navbar() {
                     >
                       <Compass className="h-4 w-4 mr-2" /> Validatore Idea
                     </DropdownMenuItem>
+                    {/* ── Fase 4: Dashboard Affiliazione ── */}
+                    {isAffiliate && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setLocation("/affiliazione/dashboard")}
+                          onMouseEnter={() => prefetchRoute("/affiliazione/dashboard")}
+                          className="cursor-pointer text-primary focus:text-primary"
+                        >
+                          <HandCoins className="h-4 w-4 mr-2" /> Dashboard Affiliazione
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive cursor-pointer">
                       <LogOut className="h-4 w-4 mr-2" /> {t("nav.logout")}
@@ -366,6 +385,16 @@ export function Navbar() {
                       <button onClick={() => { setLocation("/validatore-idea"); setMenuOpen(false); }} onMouseEnter={() => prefetchRoute("/validatore-idea")} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
                         <Compass className="h-4 w-4" /> Validatore Idea
                       </button>
+                      {/* ── Fase 4: Dashboard Affiliazione (mobile) ── */}
+                      {isAffiliate && (
+                        <button
+                          onClick={() => { setLocation("/affiliazione/dashboard"); setMenuOpen(false); }}
+                          onMouseEnter={() => prefetchRoute("/affiliazione/dashboard")}
+                          className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-primary hover:text-foreground hover:bg-primary/5 transition-colors font-semibold"
+                        >
+                          <HandCoins className="h-4 w-4" /> Dashboard Affiliazione
+                        </button>
+                      )}
                       <button onClick={() => { logout(); setMenuOpen(false); }} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-destructive/80 hover:text-destructive hover:bg-destructive/5 transition-colors">
                         <LogOut className="h-4 w-4" /> {t("nav.logout")}
                       </button>
@@ -387,7 +416,7 @@ export function Navbar() {
         </div>
       </m.header>
 
-      {/* Spacer to push content below fixed navbar */}
+      {/* Spacer */}
       <div className="h-20" />
 
       <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
