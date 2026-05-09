@@ -8,7 +8,7 @@
  * Stripe verifica la firma sul body grezzo — se il body è già stato
  * parsato da JSON middleware, la firma non corrisponde.
  *
- * Mounting in index.ts:
+ * Mounting in app.ts (già configurato):
  *   app.post('/api/webhooks/stripe',
  *     express.raw({ type: 'application/json' }),
  *     stripeWebhookHandler
@@ -40,6 +40,7 @@ import { eq } from 'drizzle-orm';
 import { cancelReferral } from '../lib/affiliate/referralService.js';
 import { applyMonthlyCommission } from '../lib/affiliate/commissionService.js';
 import { processPostPaymentReferral } from '../lib/affiliate/referralCodeService.js';
+import { captureError, addBreadcrumb } from '../../lib/sentry.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -81,9 +82,13 @@ export async function stripeWebhookHandler(
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
+    captureError(err, { path: '/api/webhooks/stripe', eventType: 'signature_verification_failed' });
     res.status(400).json({ error: `Webhook signature verification failed: ${message}` });
     return;
   }
+
+  // Breadcrumb Sentry: tracceremo ogni step del processing
+  addBreadcrumb('stripe', `event received: ${event.type}`, { eventId: event.id });
 
   // TODO: dedup via Redis
   // const alreadyProcessed = await redis.get(`stripe:event:${event.id}`);
@@ -92,16 +97,17 @@ export async function stripeWebhookHandler(
   try {
     switch (event.type) {
       // ── invoice.paid ──────────────────────────────────────────────────
-case 'invoice.paid': {
+      case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
-        const amountCents = invoice.amount_paid; // centesimi reali pagati
+        const amountCents = invoice.amount_paid;
         const ipAddress = req.ip ?? 'webhook';
 
         const user = await findUserByStripeCustomerId(customerId);
         if (!user) break;
 
-        // Controlla se esiste già un referral confermato per questo utente
+        addBreadcrumb('affiliate', 'user found for invoice.paid', { userId: user.id });
+
         const [existingReferral] = await db
           .select({ id: affiliateReferralsTable.id, status: affiliateReferralsTable.status, affiliateId: affiliateReferralsTable.affiliateId })
           .from(affiliateReferralsTable)
@@ -109,12 +115,8 @@ case 'invoice.paid': {
           .limit(1);
 
         if (!existingReferral) {
-          // Primo pagamento: prova a confermare il referral dal codice salvato al signup.
-          // processPostPaymentReferral è idempotente (controlla referralConvertedAt)
-          // e gestisce internamente la creazione di affiliate_referrals.
           await processPostPaymentReferral(user.id);
 
-          // Dopo la conferma, rileggi il referral per applicare la prima commissione
           const [newReferral] = await db
             .select({ affiliateId: affiliateReferralsTable.affiliateId, status: affiliateReferralsTable.status })
             .from(affiliateReferralsTable)
@@ -137,7 +139,6 @@ case 'invoice.paid': {
           break;
         }
 
-        // Referral già esistente — rinnovo mensile: applica commissione
         if (existingReferral.status !== 'active') break;
 
         const result = await applyMonthlyCommission({
@@ -163,6 +164,8 @@ case 'invoice.paid': {
         const user = await findUserByStripeCustomerId(customerId);
         if (!user) break;
 
+        addBreadcrumb('affiliate', 'cancelling referral on subscription deleted', { userId: user.id });
+
         await cancelReferral({
           referredUserId: user.id,
           reason:         'subscription_deleted',
@@ -172,16 +175,19 @@ case 'invoice.paid': {
       }
 
       default:
-        // Event non gestito — rispondi 200 per evitare retry Stripe
         break;
     }
 
     // TODO: await redis.set(`stripe:event:${event.id}`, '1', 'EX', 86400);
     res.json({ received: true, eventId: event.id, type: event.type });
   } catch (err) {
+    // Invia a Sentry per alert immediato — rispondo 200 per evitare retry Stripe
+    captureError(err, {
+      path:      '/api/webhooks/stripe',
+      eventType: event.type,
+      extra:     { eventId: event.id },
+    });
     console.error('[Stripe webhook] Errore processing event:', event.id, err);
-    // Rispondo 200 — Stripe fa retry su 5xx, non su 2xx.
-    // L'errore va investigato tramite i log / Sentry.
     res.json({ received: true, error: 'Processing error — check logs' });
   }
 }
