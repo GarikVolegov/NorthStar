@@ -10,8 +10,9 @@
  * è un wrapper che monta questo componente.
  *
  * Props:
- *   token    — JWT dell'utente autenticato
- *   apiBase  — base URL dell'API (default "/api")
+ *   token        — JWT dell'utente autenticato
+ *   apiBase      — base URL dell'API (default "/api")
+ *   isAffiliate  — se false mostra AccessDenied; se undefined nessun guard
  *
  * Sezioni:
  *   1. KPI cards  — Commissioni totali / Bloccati / Prelevabili
@@ -20,10 +21,14 @@
  *   4. Tabella referral attivi
  *   5. Modale prelievo
  *   6. Storico prelievi
+ *
+ * Changelog:
+ *   - Step 3: aggiunto prop isAffiliate + AccessDenied guard
+ *   - Step 3: useAffiliateDashboard salta fetch se isAffiliate === false
  */
 import React, { useState, useEffect, useCallback } from "react";
 
-// ── Types ───────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────
 
 export interface AccountData {
   referralCode:                string;
@@ -59,14 +64,20 @@ export interface DashboardData {
   projections:       { currentMonthEur: number; annualEur: number };
 }
 
-// ── Hook (esportato per riuso) ────────────────────────────────────────────────
+// ── Hook (esportato per riuso) ──────────────────────────────────────────────
 
-export function useAffiliateDashboard(token: string, apiBase = "/api") {
+export function useAffiliateDashboard(
+  token: string,
+  apiBase = "/api",
+  isAffiliate?: boolean,
+) {
   const [data,    setData]    = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(isAffiliate !== false);
   const [error,   setError]   = useState<string | null>(null);
 
   const fetch_ = useCallback(async () => {
+    // Guard: non fare fetch se l'utente non è affiliato
+    if (isAffiliate === false) return;
     setLoading(true); setError(null);
     try {
       const res = await fetch(`${apiBase}/affiliate/dashboard`, {
@@ -80,7 +91,7 @@ export function useAffiliateDashboard(token: string, apiBase = "/api") {
     } finally {
       setLoading(false);
     }
-  }, [token, apiBase]);
+  }, [token, apiBase, isAffiliate]);
 
   useEffect(() => { fetch_(); }, [fetch_]);
 
@@ -105,7 +116,7 @@ export function useAffiliateDashboard(token: string, apiBase = "/api") {
   return { data, loading, error, refetch: fetch_, withdraw };
 }
 
-// ── UI Helpers ─────────────────────────────────────────────────────────────────
+// ── UI Helpers ───────────────────────────────────────────────────────────────
 
 function KpiCard({ label, value, sub, accent = false }: {
   label: string; value: string; sub?: string; accent?: boolean;
@@ -151,7 +162,32 @@ function fmtDate(d: string | null) {
   });
 }
 
-// ── WithdrawModal ───────────────────────────────────────────────────────────────
+// ── AccessDenied ─────────────────────────────────────────────────────────────────
+
+function AccessDenied() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[320px] gap-4 p-8 text-center">
+      <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center text-3xl">
+        🔒
+      </div>
+      <div>
+        <p className="text-base font-semibold">Accesso riservato</p>
+        <p className="text-sm text-muted-foreground mt-1 max-w-xs">
+          La dashboard di affiliazione è disponibile solo per gli affiliati NorthStar.
+          Contatta il supporto per richiedere l’accesso.
+        </p>
+      </div>
+      <a
+        href="/dashboard"
+        className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground"
+      >
+        Torna alla dashboard
+      </a>
+    </div>
+  );
+}
+
+// ── WithdrawModal ───────────────────────────────────────────────────────────────────
 
 function WithdrawModal({
   maxEur,
@@ -261,17 +297,43 @@ function WithdrawModal({
   );
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+// ── Main component ───────────────────────────────────────────────────────────────
 
 export interface AffiliateDashboardProps {
   /** JWT dell'utente — obbligatorio */
-  token:    string;
+  token:        string;
   /** Base URL dell'API. Default: "/api" */
-  apiBase?: string;
+  apiBase?:     string;
+  /**
+   * Step 3: guard accesso.
+   * - undefined  = nessun guard (comportamento legacy)
+   * - true       = utente affiliato, mostra dashboard
+   * - false      = utente NON affiliato, mostra AccessDenied
+   */
+  isAffiliate?: boolean;
 }
 
-export function AffiliateDashboard({ token, apiBase = "/api" }: AffiliateDashboardProps) {
-  const { data, loading, error, refetch, withdraw } = useAffiliateDashboard(token, apiBase);
+export function AffiliateDashboard({
+  token,
+  apiBase = "/api",
+  isAffiliate,
+}: AffiliateDashboardProps) {
+
+  // Guard: se esplicitamente false, mostra accesso negato senza fare fetch
+  if (isAffiliate === false) {
+    return <AccessDenied />;
+  }
+
+  return <AffiliateDashboardInner token={token} apiBase={apiBase} isAffiliate={isAffiliate} />;
+}
+
+// Componente interno separato così il hook non gira quando isAffiliate=false
+function AffiliateDashboardInner({
+  token,
+  apiBase = "/api",
+  isAffiliate,
+}: AffiliateDashboardProps) {
+  const { data, loading, error, refetch, withdraw } = useAffiliateDashboard(token, apiBase, isAffiliate);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [copied, setCopied]             = useState(false);
 
