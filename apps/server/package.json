@@ -8,6 +8,8 @@
     "build": "tsc --project tsconfig.json",
     "start": "node dist/index.js",
     "lint":  "eslint src --ext .ts",
+    "test":  "vitest run",
+    "test:watch": "vitest",
 
     "// ── SEED E2E ──────────────────────────────────────────────────────────": "---",
     "seed:e2e":           "tsx ../../scripts/src/seed-e2e.ts",
@@ -15,6 +17,7 @@
   },
   "dependencies": {
     "@workspace/db":    "*",
+    "bcryptjs":         "^2.4.3",
     "cookie-parser":    "^1.4.7",
     "cors":             "^2.8.5",
     "dotenv":           "^16.4.7",
@@ -28,13 +31,17 @@
     "zod":              "^3.23.8"
   },
   "devDependencies": {
+    "@types/bcryptjs":      "^2.4.6",
     "@types/cookie-parser": "^1.4.8",
     "@types/cors":          "^2.8.17",
     "@types/express":       "^4.17.21",
     "@types/jsonwebtoken":  "^9.0.7",
     "@types/node":          "^20.14.0",
+    "@types/supertest":     "^6.0.2",
     "pino-pretty":          "^11.2.1",
+    "supertest":            "^7.0.0",
     "tsx":                  "^4.16.0",
-    "typescript":           "^5.5.0"
+    "typescript":           "^5.5.0",
+    "vitest":               "^1.6.0"
   }
 }
