@@ -37,9 +37,9 @@ import {
   usersTable,
 } from '@workspace/db/schema';
 import { eq } from 'drizzle-orm';
-import { cancelReferral } from '../lib/affiliate/referralService.js';
-import { applyMonthlyCommission } from '../lib/affiliate/commissionService.js';
-import { processPostPaymentReferral } from '../lib/affiliate/referralCodeService.js';
+import { cancelReferral } from '../../lib/affiliate/referralService.js';
+import { applyMonthlyCommission } from '../../lib/affiliate/commissionService.js';
+import { processPostPaymentReferral } from '../../lib/affiliate/referralCodeService.js';
 import { captureError, addBreadcrumb } from '../../lib/sentry.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -100,7 +100,6 @@ export async function stripeWebhookHandler(
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
-        const amountCents = invoice.amount_paid;
         const ipAddress = req.ip ?? 'webhook';
 
         const user = await findUserByStripeCustomerId(customerId);
@@ -115,7 +114,7 @@ export async function stripeWebhookHandler(
           .limit(1);
 
         if (!existingReferral) {
-          await processPostPaymentReferral(user.id);
+          await processPostPaymentReferral(user.id, invoice.payment_intent as string | undefined);
 
           const [newReferral] = await db
             .select({ affiliateId: affiliateReferralsTable.affiliateId, status: affiliateReferralsTable.status })
@@ -128,7 +127,6 @@ export async function stripeWebhookHandler(
               affiliateId:    newReferral.affiliateId,
               referredUserId: user.id,
               month:          currentMonth(),
-              amountCents,
               actorId:        null,
               ipAddress,
             });
@@ -145,7 +143,6 @@ export async function stripeWebhookHandler(
           affiliateId:    existingReferral.affiliateId,
           referredUserId: user.id,
           month:          currentMonth(),
-          amountCents,
           actorId:        null,
           ipAddress,
         });

@@ -80,9 +80,12 @@ export async function attachReferralToUser(
  * Chiamato dal webhook Stripe dopo invoice.paid.
  * Legge referredByAffiliateId dall'utente e invoca confirmReferral().
  * Idempotente: se referralConvertedAt è già impostato, non fa nulla.
+ *
+ * @param paymentIntentId - stripe payment_intent ID dell'invoice (per idempotency confirmReferral)
  */
 export async function processPostPaymentReferral(
-  userId: number
+  userId: number,
+  paymentIntentId?: string | undefined,
 ): Promise<void> {
   const [user] = await db
     .select({
@@ -113,12 +116,22 @@ export async function processPostPaymentReferral(
 
   if (!affiliateId) return; // Nessun referral valido
 
+  // Leggi lo userId del referrer dall'account affiliato
+  const [affiliateAccount] = await db
+    .select({ userId: affiliateAccountsTable.userId })
+    .from(affiliateAccountsTable)
+    .where(eq(affiliateAccountsTable.id, affiliateId))
+    .limit(1);
+
+  if (!affiliateAccount) return;
+
   // Conferma il referral (crea affiliate_referrals + aggiorna balance)
+  // firstPaymentIntentId è richiesto dall'interfaccia ConfirmReferralParams per idempotency
   await confirmReferral({
-    referrerId: affiliateId,
-    referredUserId: userId,
-    actorId: userId,
-    ipAddress: "webhook",
+    referrerUserId:       affiliateAccount.userId,
+    referredUserId:       userId,
+    firstPaymentIntentId: paymentIntentId ?? `fallback-${affiliateId}-${userId}`,
+    ipAddress:            "webhook",
   });
 
   // Marca conversione

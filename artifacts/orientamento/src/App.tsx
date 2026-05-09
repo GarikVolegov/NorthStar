@@ -172,7 +172,7 @@ function AnimatedRoutes() {
       <Route path="/affiliazione/centri-formazione" component={AffiliazioneFormazione} />
       {/* Fase 4: dashboard privata affiliato — DOPO le route pubbliche /affiliazione/* */}
       <Route path="/affiliazione/dashboard">
-        <ProtectedRoute component={Affiliazionedashboard} />
+        <ProtectedRoute component={AffiliazioneDashboard} />
       </Route>
       <Route path="/colloquio/:id">
         <ProtectedRoute component={Colloquio} />
