@@ -5,8 +5,17 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 
 // App principale (router + layout)
-// Importata da lib/api-client-react tramite re-export in App.tsx
 import App from './App';
+
+// ─── Phase 0 — Web Vitals Baseline ───────────────────────────────────────────
+// Attivo SOLO in development e staging. NON invia dati in produzione.
+// Rimuovere o collegare a un endpoint analytics nella Fase 2.
+import { reportWebVitals } from './lib/reportWebVitals';
+
+if (import.meta.env.MODE !== 'production') {
+  reportWebVitals();
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 const root = document.getElementById('root');
 if (!root) throw new Error('[NorthStar] #root element not found in index.html');
