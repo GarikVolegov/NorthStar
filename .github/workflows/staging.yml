@@ -3,23 +3,29 @@ name: Deploy Staging
 # ─────────────────────────────────────────────────────────────────────────────
 # Trigger: ogni push su branch develop
 # Jobs in sequenza:
-#   typecheck → unit-tests → db-migrate → health-check → deploy
+#   typecheck → unit-tests → db-migrate → deploy (con Sentry release)
 #
 # Secret richiesti (GitHub Environment "staging"):
 #   STAGING_DATABASE_URL
 #   STAGING_DATABASE_URL_MIGRATOR
 #   STAGING_JWT_SECRET
 #   STAGING_ADMIN_KEY
-#   RAILWAY_STAGING_API_TOKEN   (o FLY_API_TOKEN per Fly.io)
-#   RAILWAY_STAGING_SERVICE_ID  (ID servizio Railway)
-#   SLACK_WEBHOOK_URL           (opzionale — notifiche)
+#   RAILWAY_STAGING_API_TOKEN
+#   RAILWAY_STAGING_SERVICE_ID
+#   SENTRY_AUTH_TOKEN         ← Fase 3: token Sentry con scope releases:write
+#   SLACK_WEBHOOK_URL         (opzionale)
+#
+# Variabili (GitHub Environment "staging"):
+#   STAGING_URL               es. https://staging.northstar.app
+#   SENTRY_ORG                slug dell'organizzazione su sentry.io
+#   SENTRY_PROJECT            slug del progetto su sentry.io
+#   SLACK_NOTIFY              'true' per abilitare notifiche Slack
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
   push:
     branches: [develop]
 
-# Una sola run alla volta per staging — cancella la precedente se c'è
 concurrency:
   group: staging-deploy
   cancel-in-progress: true
@@ -93,13 +99,14 @@ jobs:
           ADMIN_KEY: ci-staging-admin-key
           USE_MOCK_AI: 'true'
           AI_MOCK_MODE: 'true'
+          SENTRY_DSN: ''
 
   # ─── 3. DB Migration staging ─────────────────────────────────────────────────
   db-migrate:
     name: DB migration (staging)
     runs-on: ubuntu-latest
     needs: unit-tests
-    environment: staging   # accede ai secret dell'environment GitHub
+    environment: staging
     steps:
       - uses: actions/checkout@v4
 
@@ -126,11 +133,10 @@ jobs:
       - name: Apply Drizzle migrations to staging DB
         run: pnpm --filter @workspace/db exec drizzle-kit push
         env:
-          # Usa il ruolo migrator (DDL completo) — vedi DB_RULES.md
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL_MIGRATOR }}
           DATABASE_URL_MIGRATOR: ${{ secrets.STAGING_DATABASE_URL_MIGRATOR }}
 
-  # ─── 4. Deploy ───────────────────────────────────────────────────────────────
+  # ─── 4. Deploy + Sentry Release ──────────────────────────────────────────────
   deploy:
     name: Deploy to Railway (staging)
     runs-on: ubuntu-latest
@@ -138,12 +144,14 @@ jobs:
     environment: staging
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # necessario per sentry-cli set-commits --auto
 
-      # ── Railway ──────────────────────────────────────────────────────────────
-      # Decommentare il blocco Railway O il blocco Fly.io secondo provider scelto
+      - name: Set SENTRY_RELEASE
+        run: echo "SENTRY_RELEASE=staging@$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Install Railway CLI
-        run: npm install -g @railway/cli
+        run: npm install -g @railway/cli --silent
 
       - name: Deploy to Railway
         run: |
@@ -153,14 +161,23 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_STAGING_API_TOKEN }}
 
-      # ── Fly.io (alternativa) ────────────────────────────────────────────────
-      # - name: Deploy to Fly.io
-      #   uses: superfly/flyctl-actions/setup-flyctl@master
-      # - run: flyctl deploy --remote-only --config fly.staging.toml
-      #   env:
-      #     FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      # Sentry release per staging — permette di correlare errori staging con commit
+      - name: Create Sentry release (staging)
+        run: |
+          npm install -g @sentry/cli --silent
+          sentry-cli releases new "$SENTRY_RELEASE"
+          sentry-cli releases set-commits "$SENTRY_RELEASE" --auto
+          sentry-cli releases finalize "$SENTRY_RELEASE"
+          sentry-cli releases deploys "$SENTRY_RELEASE" new \
+            --env staging \
+            --name "$(git rev-parse --short HEAD)" \
+            --url "${{ vars.STAGING_URL }}"
+          echo "✅ Sentry release $SENTRY_RELEASE"
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
 
-      # ─── Health check post-deploy ────────────────────────────────────────────
       - name: Wait for staging to be healthy
         run: |
           echo "Attendo che staging risponda su /api/health..."
@@ -177,14 +194,13 @@ jobs:
           echo "❌ Staging non risponde dopo 2 minuti"
           exit 1
 
-      # ─── Notifica Slack (opzionale) ──────────────────────────────────────────
       - name: Notify Slack — deploy OK
         if: success() && vars.SLACK_NOTIFY == 'true'
         uses: slackapi/slack-github-action@v1.27.0
         with:
           payload: |
             {
-              "text": "✅ *NorthStar Staging* deploy completato\n*Branch*: `${{ github.ref_name }}`\n*Commit*: `${{ github.sha }}`\n*By*: ${{ github.actor }}"
+              "text": "✅ *NorthStar Staging* deploy completato\n*Branch*: `${{ github.ref_name }}`\n*Release*: `${{ env.SENTRY_RELEASE }}`\n*By*: ${{ github.actor }}"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -196,7 +212,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "🔴 *NorthStar Staging* deploy FALLITO\n*Branch*: `${{ github.ref_name }}`\n*Commit*: `${{ github.sha }}`\n*Job*: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              "text": "🔴 *NorthStar Staging* deploy FALLITO\n*Branch*: `${{ github.ref_name }}`\n*Release*: `${{ env.SENTRY_RELEASE }}`\n*Job*: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
