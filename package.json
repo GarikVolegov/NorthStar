@@ -6,7 +6,7 @@
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
 
     "// ── DEV ─────────────────────────────────────────────": "---",
-    "dev":         "pnpm run dev:server",
+    "dev":         "pnpm run dev:all",
     "dev:server":  "pnpm --filter @northstar/server run dev",
     "dev:web":     "pnpm --filter @northstar/web    run dev",
     "dev:all":     "concurrently -n server,web -c cyan,magenta \"pnpm run dev:server\" \"pnpm run dev:web\"",
@@ -21,7 +21,9 @@
     "typecheck":      "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
 
     "// ── LINT ──────────────────────────────────────────": "---",
+    "lint":        "pnpm run lint:server",
     "lint:server": "pnpm --filter @northstar/server run lint",
+    "lint:all":    "pnpm -r --if-present run lint",
 
     "// ── DB ────────────────────────────────────────────": "---",
     "db:generate": "pnpm --filter @workspace/db run generate",
@@ -35,7 +37,10 @@
     "// ── TEST ──────────────────────────────────────────": "---",
     "test:e2e":         "playwright test e2e/api.spec.ts",
     "test:e2e:browser": "playwright test e2e/auth.spec.ts e2e/test-riasec.spec.ts e2e/admin.spec.ts e2e/objectives.spec.ts",
-    "test:e2e:all":     "playwright test"
+    "test:e2e:all":     "playwright test",
+
+    "// ── CLEAN ─────────────────────────────────────────": "---",
+    "clean": "find . -name dist -not -path '*/node_modules/*' -exec rm -rf {} + ; find . -name .turbo -exec rm -rf {} +"
   },
   "private": true,
   "engines": {
