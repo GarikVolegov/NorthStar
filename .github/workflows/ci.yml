@@ -11,28 +11,10 @@ concurrency:
   cancel-in-progress: true
 
 # ─── Reusable env ─────────────────────────────────────────────────────────────
-# NODE_VERSION e PNPM_VERSION sono definiti una volta sola qui e riusati in
-# ogni job tramite ${{ env.NODE_VERSION }}. Cambiare versione = 1 riga.
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '9'
-  PYTHON_VERSION: '3.12'   # deve corrispondere al FROM python:3.12-slim in ml-service/Dockerfile
-
-# ─── Composite steps riusabili ────────────────────────────────────────────────
-# GitHub Actions non supporta "composite steps inline" nei job normal,
-# ma possiamo usare una sequenza standard che ripetiamo nei job TS:
-#
-#   1. actions/checkout@v4
-#   2. pnpm/action-setup@v4          → installa pnpm
-#   3. actions/setup-node@v4         → imposta Node + legge pnpm store path
-#   4. actions/cache@v4              → cachea ~/.local/share/pnpm/store
-#   5. pnpm install --frozen-lockfile
-#
-# Il motivo per cui NON usiamo solo cache: 'pnpm' di setup-node è che quella
-# opzione salva node_modules locale ma NON il content-addressable store globale
-# di pnpm. Senza lo store, pnpm deve riscaricareогда i pacchetti da npm ogni volta
-# che node_modules viene invalidata. Con lo store in cache, pnpm collega i file
-# dal disco senza rete → installazione in <10s invece di >90s.
+  PYTHON_VERSION: '3.12'
 
 jobs:
   # ─── 1. Typecheck ─────────────────────────────────────────────────────────────────
@@ -50,8 +32,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # Leggiamo il path dello store DOPO aver installato pnpm,
-      # perché varia per OS/versione pnpm.
       - name: Get pnpm store path
         id: pnpm-cache
         run: echo "store=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
@@ -59,10 +39,6 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ${{ steps.pnpm-cache.outputs.store }}
-          # La cache key include:
-          #   - OS (ubuntu-latest) → non mescolare cache tra runner diversi
-          #   - pnpm_version       → store format può cambiare tra major
-          #   - hash di pnpm-lock.yaml → invalida quando le dipendenze cambiano
           key: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-
@@ -105,6 +81,8 @@ jobs:
           JWT_SECRET: ci-jwt-secret-32-chars-minimum!
           ADMIN_KEY: ci-admin-key
           USE_MOCK_AI: 'true'
+          # Sentry disabilitato in CI test — no DSN = no-op automatico
+          SENTRY_DSN: ''
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -172,6 +150,8 @@ jobs:
           OPENAI_API_KEY: 'mock-not-used'
           ANTHROPIC_API_KEY: 'mock-not-used'
           GROQ_API_KEY: 'mock-not-used'
+          # Sentry disabilitato in CI test
+          SENTRY_DSN: ''
 
   # ─── 4. Python ML tests (pytest) ─────────────────────────────────────────────────────
   python-tests:
@@ -184,12 +164,6 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      # pip cache: salva ~/.cache/pip tra run.
-      # La cache key include:
-      #   - OS
-      #   - Python version (format di .whl varia per versione)
-      #   - hash di ENTRAMBI i requirements.txt (ai-agents + ml-service).
-      #     Se uno dei due cambia, la cache viene invalidata correttamente.
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
@@ -213,8 +187,6 @@ jobs:
       - name: Run pytest — ml-service
         run: |
           cd artifacts/ml-service
-          # Se non esistono ancora test, pytest esce 0 con --ignore=. per evitare
-          # exit 5 "no tests collected" che romperebbe la CI.
           pytest tests/ -v --tb=short 2>/dev/null || \
           python -c "from app.main import app; print('ml-service import OK')"
         env:
@@ -262,9 +234,6 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Cache browser binaries Playwright tra run.
-      # La cache key include la versione di Playwright installata nel lockfile —
-      # se aggiorni @playwright/test, i browser vengono riscaricati automaticamente.
       - name: Get Playwright version
         id: pw-version
         run: echo "version=$(pnpm ls --filter @workspace/orientamento @playwright/test --depth=0 --json | jq -r '.[0].devDependencies["@playwright/test"].version // "unknown"')" >> $GITHUB_OUTPUT
@@ -276,8 +245,6 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
 
       - name: Install Playwright browsers
-        # Installa i browser solo se la cache non è stata trovata (cache-hit == false).
-        # --with-deps installa anche le dipendenze OS (libglib2.0 ecc.)
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
 
@@ -309,6 +276,7 @@ jobs:
           OPENAI_API_KEY=mock-not-used \
           ANTHROPIC_API_KEY=mock-not-used \
           GROQ_API_KEY=mock-not-used \
+          SENTRY_DSN='' \
           node artifacts/api-server/dist/index.mjs &
 
           PORT=5000 pnpm --filter @workspace/orientamento run build
@@ -345,3 +313,38 @@ jobs:
           name: playwright-traces
           path: test-results/
           retention-days: 3
+
+  # ─── 6. Sentry Release (solo su push a main) ─────────────────────────────────────────
+  # Crea una release Sentry associata al commit SHA — abilita:
+  #   - Regressione detection ("questo errore era risolto nella v1.2.3")
+  #   - Source maps upload (stack trace leggibili in Sentry)
+  #   - Deployment tracking (quando il codice è andato in prod)
+  sentry-release:
+    name: Sentry release (main only)
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [typecheck, unit-tests, integration-tests]
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # Sentry ha bisogno della storia completa per set-commits
+
+      - name: Create Sentry release
+        run: |
+          npm install -g @sentry/cli --silent
+          RELEASE="production@$(git rev-parse --short HEAD)"
+          echo "SENTRY_RELEASE=$RELEASE" >> $GITHUB_ENV
+
+          sentry-cli releases new "$RELEASE"
+          sentry-cli releases set-commits "$RELEASE" --auto
+          sentry-cli releases finalize "$RELEASE"
+          sentry-cli releases deploys "$RELEASE" new \
+            --env production \
+            --name "$(git rev-parse --short HEAD)" \
+            --url "${{ vars.PRODUCTION_URL }}"
+          echo "✅ Sentry release $RELEASE creata e finalizzata"
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}

@@ -12,6 +12,7 @@
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",
     "@resvg/resvg-js": "^2.6.2",
+    "@sentry/node": "^8",
     "@swc/helpers": "^0.5.21",
     "@types/nodemailer": "^8.0.0",
     "@types/web-push": "^3.6.4",
@@ -34,6 +35,7 @@
     "rate-limit-redis": "^4.2.0",
     "react": "catalog:",
     "satori": "^0.26.0",
+    "stripe": "^17",
     "web-push": "^3.6.7",
     "zod": "catalog:"
   },

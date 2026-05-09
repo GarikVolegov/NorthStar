@@ -7,6 +7,7 @@ import { z } from "zod";
 import { sendVerificationEmail, sendResetEmail, sendPasswordChangedEmail } from "../lib/email";
 import { signToken, authMiddleware } from "../lib/auth-jwt.js";
 import { rateLimit } from "express-rate-limit";
+import { attachReferralToUser } from "../lib/affiliate/referralCodeService.js";
 
 function makeAuthLimiter(max: number, windowMs = 60_000, message = "Troppi tentativi. Riprova tra un minuto.") {
   return rateLimit({
@@ -32,6 +33,12 @@ const RegisterBody = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   testSessionId: z.number().optional(),
+  /**
+   * Codice referral opzionale (es. "NS-A-1234").
+   * Può essere passato anche come query param ?ref=NS-A-1234
+   * (la query string ha priorità sul body per compatibilità con link diretti).
+   */
+  referralCode: z.string().max(20).optional(),
 });
 
 const LoginBody = z.object({
@@ -113,7 +120,11 @@ router.post("/auth/register", registerLimiter, async (req, res): Promise<void> =
     return;
   }
 
-  const { name, email, password, testSessionId } = parsed.data;
+  const { name, email, password, testSessionId, referralCode: bodyRef } = parsed.data;
+
+  // Query string ?ref= ha priorità sul campo body — compatibile con link diretti
+  // es. northstar.app/register?ref=NS-A-1234
+  const rawRef = ((req.query.ref as string | undefined) ?? bodyRef ?? "").trim();
 
   const existing = await db.select().from(usersTable).where(eq(usersTable.email, email));
   if (existing.length > 0) {
@@ -125,15 +136,26 @@ router.post("/auth/register", registerLimiter, async (req, res): Promise<void> =
   const verificationCode = generateCode();
   const verificationCodeExpires = new Date(Date.now() + 15 * 60 * 1000);
 
-  await db.insert(usersTable).values({
-    name,
-    email,
-    passwordHash,
-    testSessionId: testSessionId ?? null,
-    emailVerified: false,
-    verificationCode,
-    verificationCodeExpires,
-  });
+  // Usa .returning() per ottenere l'id del nuovo utente senza un SELECT extra
+  const [newUser] = await db
+    .insert(usersTable)
+    .values({
+      name,
+      email,
+      passwordHash,
+      testSessionId: testSessionId ?? null,
+      emailVerified: false,
+      verificationCode,
+      verificationCodeExpires,
+    })
+    .returning({ id: usersTable.id });
+
+  // ── Referral: fire-and-forget, non blocca mai la registrazione ──────────
+  if (rawRef && newUser?.id) {
+    attachReferralToUser(newUser.id, rawRef).catch((err) =>
+      console.error("[auth] attachReferralToUser fire-and-forget failed", err)
+    );
+  }
 
   const sendResult = await trySendVerificationEmail(email, name, verificationCode);
 

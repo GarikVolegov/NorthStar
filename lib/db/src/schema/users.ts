@@ -45,17 +45,29 @@ export const usersTable = pgTable("users", {
   totalXp:            integer("total_xp").default(0),
   lastVoiceSessionAt: timestamp("last_voice_session_at", { withTimezone: true }),
 
-  // ── Passo 5: Referral tracking ─────────────────────────────────
+  // ── Fase 1.2: Referral tracking completo ───────────────────────
+  /**
+   * Codice raw inserito al signup (es. "NS-A-1234").
+   * Viene scritto subito alla registrazione, prima che affiliate_accounts
+   * venga cercato/creato. NULL se nessun referral è stato usato.
+   * Dopo il primo pagamento Stripe, referredByAffiliateId viene popolato
+   * da processPostPaymentReferral() e questo campo rimane come audit trail.
+   */
+  referredByCode: text("referred_by_code"),
+
   /**
    * FK verso affiliate_accounts.id — chi ha portato questo utente.
-   * NULL se l’utente non è arrivato tramite referral.
+   * Viene impostato da processPostPaymentReferral() dopo invoice.paid.
+   * NULL se l'utente non è ancora convertito o non ha usato un referral.
    */
   referredByAffiliateId: integer("referred_by_affiliate_id"),
-  /** Timestamp del primo pagamento: marca la conversione del referral */
+
+  /** Timestamp del primo pagamento: marca la conversione del referral. */
   referralConvertedAt: timestamp("referral_converted_at", { withTimezone: true }),
 }, (t) => ({
-  usernameIdx:    uniqueIndex("users_username_idx").on(t.username),
-  referredByIdx:  index("users_referred_by_idx").on(t.referredByAffiliateId),
+  usernameIdx:      uniqueIndex("users_username_idx").on(t.username),
+  referredByIdx:    index("users_referred_by_idx").on(t.referredByAffiliateId),
+  referredByCodeIdx: index("users_referred_by_code_idx").on(t.referredByCode),
 }));
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({
