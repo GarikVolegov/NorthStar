@@ -21,6 +21,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useMobileNav } from '@/hooks/useMobileNav';
 import { MobileDrawer } from '@/components/layout/MobileDrawer';
 import { DrawerNavLink } from '@/components/layout/DrawerNavLink';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { cn } from '@/lib/utils';
 
 // ─── Nav items config ──────────────────────────────────────────────────────
@@ -176,6 +177,10 @@ export function Navbar() {
                     ★ Premium
                   </Link>
                 )}
+
+                {/* ── NotificationBell ─────────────────────────────── */}
+                <NotificationBell />
+
                 <Link
                   href="/profilo"
                   className={cn(
@@ -207,8 +212,11 @@ export function Navbar() {
             )}
           </div>
 
-          {/* ── Mobile: CTA + Hamburger ───────────────────────────────── */}
+          {/* ── Mobile: NotificationBell + CTA + Hamburger ───────────────── */}
           <div className="flex md:hidden items-center gap-1">
+            {/* NotificationBell solo se autenticato */}
+            {user && <NotificationBell />}
+
             {/* CTA rapida solo se non autenticato */}
             {!user && (
               <Link
