@@ -1,0 +1,138 @@
+name: Rollback Production
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Trigger: manuale via GitHub Actions UI (workflow_dispatch)
+# Uso:
+#   1. Vai su Actions → "Rollback Production" → Run workflow
+#   2. Inserisci il commit SHA a cui tornare (es. abc1234)
+#   3. Conferma — il workflow fa checkout di quel commit e ri-deploya
+#
+# ATTENZIONE:
+#   - Il rollback NON fa down-migration del DB
+#   - Se il commit target ha uno schema diverso dall'attuale DB,
+#     devi applicare manualmente la migration di rollback
+#   - Usa solo per emergenze — preferisci un hotfix su main
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'SHA del commit a cui tornare (es. abc1234f)'
+        required: true
+        type: string
+      environment:
+        description: 'Ambiente target'
+        required: true
+        type: choice
+        options:
+          - production
+          - staging
+        default: production
+      confirm:
+        description: 'Scrivi ROLLBACK per confermare (sicurezza extra)'
+        required: true
+        type: string
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+
+jobs:
+  validate:
+    name: Validate rollback request
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation word
+        run: |
+          if [ "${{ inputs.confirm }}" != "ROLLBACK" ]; then
+            echo "❌ Parola di conferma errata. Scrivi esattamente: ROLLBACK"
+            exit 1
+          fi
+          echo "✅ Conferma valida"
+
+      - name: Log rollback intent
+        run: |
+          echo "🔄 Rollback richiesto da: ${{ github.actor }}"
+          echo "📦 Ambiente: ${{ inputs.environment }}"
+          echo "🎯 Target SHA: ${{ inputs.commit_sha }}"
+          echo "⏰ Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+  rollback:
+    name: Execute rollback
+    runs-on: ubuntu-latest
+    needs: validate
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout target commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Get pnpm store path
+        id: pnpm-cache
+        run: echo "store=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store }}
+          key: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-
+
+      - run: pnpm install --frozen-lockfile
+
+      # ── Deploy su Railway ────────────────────────────────────────────────────
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Rollback deploy — Railway
+        if: inputs.environment == 'production'
+        run: |
+          railway up \
+            --service ${{ secrets.RAILWAY_PROD_SERVICE_ID }} \
+            --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_PROD_API_TOKEN }}
+
+      - name: Rollback deploy — Railway staging
+        if: inputs.environment == 'staging'
+        run: |
+          railway up \
+            --service ${{ secrets.RAILWAY_STAGING_SERVICE_ID }} \
+            --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_STAGING_API_TOKEN }}
+
+      # ── Health check post-rollback ───────────────────────────────────────────
+      - name: Health check post-rollback
+        run: |
+          URL="${{ inputs.environment == 'production' && vars.PRODUCTION_URL || vars.STAGING_URL }}"
+          echo "Health check su $URL/api/health ..."
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/api/health" 2>/dev/null || echo "000")
+            echo "Tentativo $i/12 — HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Rollback completato e applicazione healthy!"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "❌ Health check fallito dopo rollback — verifica manualmente"
+          exit 1
+
+      - name: Log rollback complete
+        if: success()
+        run: |
+          echo "✅ ROLLBACK COMPLETATO"
+          echo "Ambiente: ${{ inputs.environment }}"
+          echo "SHA ripristinato: ${{ inputs.commit_sha }}"
+          echo "Eseguito da: ${{ github.actor }}"
+          echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
