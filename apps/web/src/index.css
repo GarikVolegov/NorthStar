@@ -1,0 +1,30 @@
+/* Tailwind 4 — import unico, nessun @tailwind directive */
+@import "tailwindcss";
+
+/* NorthStar design tokens — allineati con il tema esistente */
+:root {
+  --color-bg:        #0e1018;
+  --color-surface:   #1a1d2a;
+  --color-gold:      #c19e4a;
+  --color-text:      #e6e8ed;
+  --color-muted:     #7db89a;
+  --color-border:    rgba(193, 158, 74, 0.2);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar custom — match dark theme */
+::-webkit-scrollbar        { width: 6px; }
+::-webkit-scrollbar-track  { background: var(--color-surface); }
+::-webkit-scrollbar-thumb  { background: var(--color-gold); border-radius: 3px; }
