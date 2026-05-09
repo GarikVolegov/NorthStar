@@ -9,12 +9,12 @@
  *   3. Al submit del form di signup, frontend legge getReferralCode() e
  *      invia { referralCode: 'ABCD1234' } nel body della POST /api/auth/signup
  *   4. Il route handler chiama linkReferral(newUserId, 'ABCD1234') DOPO
- *      aver creato l’utente
+ *      aver creato l'utente
  *   5. linkReferral:
  *      a. Trova affiliateAccount via referralCode
- *      b. Setta users.referred_by_affiliate_id
- *      c. Incrementa affiliate_accounts.total_referrals
- *      d. Se l’utente è già abbonato (edge case OAuth): triggera commissione
+ *      b. Setta users.referred_by_affiliate_id + incrementa total_referrals
+ *         in una singola db.transaction (atomico, no race condition)
+ *      c. Se l'utente è già abbonato (edge case OAuth): triggera commissione
  *
  * SERVER MIDDLEWARE:
  *   saveRefCookie(req, res): se req.query.ref esiste, setta il cookie.
@@ -24,13 +24,19 @@
  *   saveReferralCode(code) — scrive il cookie
  *   getReferralCode()      — legge il cookie
  *   clearReferralCode()    — rimuove il cookie dopo il signup
+ *
+ * INTEGRITÀ:
+ *   linkReferral usa db.transaction per garantire che il collegamento
+ *   utente-affiliato e l'incremento del contatore siano atomici.
+ *   L'UPDATE su users usa una WHERE condizionale (referredByAffiliateId IS NULL)
+ *   come guard a livello DB contro doppie scritture concorrenti.
  */
 import { db } from "@workspace/db";
 import {
   affiliateAccountsTable,
   usersTable,
 } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, isNull, sql } from "drizzle-orm";
 import type { Request, Response, NextFunction } from "express";
 
 // ── Constants ───────────────────────────────────────────────────────────────────
@@ -44,10 +50,6 @@ export const REF_CODE_MAX_LEN   = 20;
 /**
  * Express middleware: se ?ref=CODE è presente nella query string,
  * setta il cookie ns_ref per 30 giorni.
- *
- * Uso:
- *   app.get('/signup', saveRefCookie, signupPageHandler);
- *   app.get('/join',   saveRefCookie, joinPageHandler);
  */
 export function saveRefCookie(req: Request, res: Response, next: NextFunction): void {
   const code = req.query.ref;
@@ -56,7 +58,7 @@ export function saveRefCookie(req: Request, res: Response, next: NextFunction): 
     if (sanitized.length > 0) {
       res.cookie(REF_COOKIE_NAME, sanitized, {
         maxAge:   REF_COOKIE_DAYS * 24 * 60 * 60 * 1000,
-        httpOnly: false,   // leggibile da JS lato client (per prefill form)
+        httpOnly: false,
         sameSite: "lax",
         secure:   process.env.NODE_ENV === "production",
       });
@@ -67,7 +69,6 @@ export function saveRefCookie(req: Request, res: Response, next: NextFunction): 
 
 /**
  * Legge il referral code dalla request (priorità: body > query > cookie).
- * Da usare nel route handler POST /api/auth/signup.
  */
 export function extractRefCode(req: Request): string | null {
   const fromBody   = typeof req.body?.referralCode === "string" ? req.body.referralCode : null;
@@ -90,14 +91,23 @@ export interface LinkReferralResult {
 }
 
 /**
- * Collega un nuovo utente al suo affiliato.
+ * Collega un nuovo utente al suo affiliato in modo atomico.
  *
- * Da chiamare SUBITO dopo aver creato l’utente nel DB.
- * È idempotente: se l’utente ha già un referredByAffiliateId, non fa nulla.
+ * RACE CONDITION FIX:
+ *   Il vecchio codice eseguiva:
+ *     1. SELECT per verificare che l'utente non fosse già collegato
+ *     2. UPDATE per impostare referredByAffiliateId
+ *     3. UPDATE per incrementare totalReferrals
+ *   Tra i passi 1 e 2 una seconda richiesta concorrente (es. doppio
+ *   submit del form) poteva passare il check e scrivere due volte.
+ *
+ *   La nuova versione usa db.transaction con un UPDATE condizionale:
+ *     WHERE referred_by_affiliate_id IS NULL
+ *   Se rowCount = 0, un'altra transazione ha già effettuato il collegamento
+ *   e usciamo senza modificare totalReferrals. L'intero blocco è atomico.
  *
  * @param newUserId     ID del nuovo utente appena creato
  * @param referralCode  codice letto da extractRefCode(req)
- * @returns LinkReferralResult
  */
 export async function linkReferral(
   newUserId:    number,
@@ -105,7 +115,7 @@ export async function linkReferral(
 ): Promise<LinkReferralResult> {
   if (!referralCode) return { linked: false, reason: "no_code" };
 
-  // 1. Trova l’account affiliato
+  // Trova l'account affiliato (operazione di sola lettura, fuori dalla tx)
   const affiliate = await db
     .select({ id: affiliateAccountsTable.id, userId: affiliateAccountsTable.userId })
     .from(affiliateAccountsTable)
@@ -114,48 +124,40 @@ export async function linkReferral(
     .then((r) => r[0] ?? null);
 
   if (!affiliate) return { linked: false, reason: "code_not_found" };
-
-  // 2. Evita auto-referral
   if (affiliate.userId === newUserId) return { linked: false, reason: "self_referral" };
 
-  // 3. Controlla che l’utente non sia già collegato (idempotenza)
-  const user = await db
-    .select({ referredByAffiliateId: usersTable.referredByAffiliateId })
-    .from(usersTable)
-    .where(eq(usersTable.id, newUserId))
-    .limit(1)
-    .then((r) => r[0] ?? null);
+  // Transazione atomica: collega l'utente E incrementa il contatore
+  // in un'unica operazione. La WHERE ... IS NULL previene doppi link.
+  const linked = await db.transaction(async (tx) => {
+    // UPDATE condizionale: scrive solo se l'utente non è già collegato
+    const updateResult = await tx
+      .update(usersTable)
+      .set({ referredByAffiliateId: affiliate.id })
+      .where(
+        sql`${usersTable.id} = ${newUserId}
+        AND ${usersTable.referredByAffiliateId} IS NULL
+        AND ${newUserId} != ${affiliate.userId}`
+      );
 
-  if (user?.referredByAffiliateId != null) {
-    return { linked: false, reason: "already_linked" };
-  }
+    // rowCount = 0 → utente già collegato (concorrenza) o auto-referral
+    if ((updateResult.rowCount ?? 0) === 0) return false;
 
-  // 4. Collega l’utente all’affiliato
-  await db
-    .update(usersTable)
-    .set({ referredByAffiliateId: affiliate.id })
-    .where(eq(usersTable.id, newUserId));
+    // Incrementa contatore solo se il collegamento è avvenuto
+    await tx
+      .update(affiliateAccountsTable)
+      .set({ totalReferrals: sql`total_referrals + 1` })
+      .where(eq(affiliateAccountsTable.id, affiliate.id));
 
-  // 5. Incrementa il contatore referral totali
-  await db
-    .update(affiliateAccountsTable)
-    .set({ totalReferrals: sql`total_referrals + 1` })
-    .where(eq(affiliateAccountsTable.id, affiliate.id));
+    return true;
+  });
 
+  if (!linked) return { linked: false, reason: "already_linked" };
   return { linked: true, affiliateId: affiliate.id };
 }
 
-// ── Client helpers (browser, importabili nel frontend) ────────────────────────
-// Questi NON usano Node.js — sono puro browser JS.
+// ── Client helpers (browser) ────────────────────────────────────────────────
 
 export const clientRefTracking = {
-  /**
-   * Scrive il cookie ns_ref.
-   * Chiama questa funzione quando l’URL ha ?ref=CODE.
-   *
-   *   if (new URLSearchParams(location.search).get('ref'))
-   *     clientRefTracking.save(new URLSearchParams(location.search).get('ref')!)
-   */
   save(code: string): void {
     if (typeof document === "undefined") return;
     const sanitized = code.replace(/[^a-zA-Z0-9]/g, "").slice(0, REF_CODE_MAX_LEN);
@@ -164,14 +166,12 @@ export const clientRefTracking = {
     document.cookie = `${REF_COOKIE_NAME}=${sanitized}; expires=${expires}; path=/; SameSite=Lax`;
   },
 
-  /** Legge il codice dal cookie. Ritorna null se assente. */
   get(): string | null {
     if (typeof document === "undefined") return null;
     const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${REF_COOKIE_NAME}=([^;]*)`) );
     return match ? match[1] : null;
   },
 
-  /** Elimina il cookie dopo il signup andato a buon fine. */
   clear(): void {
     if (typeof document === "undefined") return;
     document.cookie = `${REF_COOKIE_NAME}=; Max-Age=0; path=/`;

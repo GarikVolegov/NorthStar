@@ -23,12 +23,12 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { db } from "@workspace/db";
 import { usersTable, userObjectivesTable, testSessionsTable, sectorsTable } from "@workspace/db";
-import { eq, and, isNull, isNotNull } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { extractCvJson } from "./cv-extractor";
+import { getProfileCache, invalidateProfileCache, setProfileCache } from "../lib/cache";
 
 export const profileRouter = Router();
 
-// ── Auth helpers ────────────────────────────────────────────────────────────
 function requireAuth(req: Request, res: Response, next: () => void) {
   const uid = (req as Request & { user?: { id: number } }).user?.id;
   if (!uid) { res.status(401).json({ error: "Non autenticato" }); return; }
@@ -38,7 +38,6 @@ function userId(req: Request): number {
   return (req as Request & { user: { id: number } }).user.id;
 }
 
-// ── Validation schema ────────────────────────────────────────────────────────
 const patchSchema = z.object({
   name:                z.string().min(1).max(100).optional(),
   timezone:            z.string().max(60).optional(),
@@ -51,25 +50,47 @@ const patchSchema = z.object({
   isPublic:            z.boolean().optional(),
 }).strict();
 
-// ── GET /api/users/me (e alias GET /api/auth/me registrato in index.ts) ─────
-//
-// Strategia query:
-//   1. Fetch dati utente base + stripeSubscriptionId (per isPremium)
-//   2. LEFT JOIN testSessionsTable su users.testSessionId
-//   3. LEFT JOIN sectorsTable su testSessions.confirmedSectorId → sectorName
-//   4. Subquery separata: userObjectives attivi (completed = false)
-//
-// Usiamo due query separate invece di un unico mega-join perché Drizzle
-// non supporta nativamente array_agg in una singola query typed.
-// Due round-trip su DB locale < 1ms: tradeoff accettabile.
+type ProfileResponse = {
+  id: number;
+  name: string | null;
+  email: string;
+  avatarUrl: string | null;
+  timezone: string | null;
+  journeyType: string | null;
+  userMode: string | null;
+  workPreference: string | null;
+  autonomyPreference: number | null;
+  stabilityPreference: number | null;
+  cvText: string | null;
+  isPublic: boolean | null;
+  streakDays: number | null;
+  totalXp: number | null;
+  createdAt: Date | string;
+  isAffiliate: boolean | null;
+  sectorId: number | null;
+  isPremium: boolean;
+  sectorName: string | null;
+  objectives: Array<{
+    id: number;
+    text: string;
+    category: string | null;
+    progress: number | null;
+    dueDate: Date | string | null;
+  }>;
+};
+
 profileRouter.get("/me", requireAuth, async (req, res) => {
   try {
     const uid = userId(req);
+    const cached = await getProfileCache<ProfileResponse>(uid);
 
-    // ── Query 1: utente + sector via testSession ───────────────────────────
+    if (cached) {
+      res.json(cached);
+      return;
+    }
+
     const row = await db
       .select({
-        // Campi base utente
         id:                  usersTable.id,
         name:                usersTable.name,
         email:               usersTable.email,
@@ -86,23 +107,17 @@ profileRouter.get("/me", requireAuth, async (req, res) => {
         totalXp:             usersTable.totalXp,
         createdAt:           usersTable.createdAt,
         isAffiliate:         usersTable.isAffiliate,
-        // Per calcolare isPremium lato JS (non esponiamo stripe IDs al client)
         _stripeSubId:        usersTable.stripeSubscriptionId,
-        // Per sectorName fallback da recommendations JSONB
         _testSessionId:      usersTable.testSessionId,
-        // Da JOIN testSessions
         sectorId:            testSessionsTable.confirmedSectorId,
         _recommendations:    testSessionsTable.recommendations,
-        // Da JOIN sectors
         sectorName:          sectorsTable.name,
       })
       .from(usersTable)
-      // LEFT JOIN: se l'utente non ha ancora fatto il test, testSessionId è NULL
       .leftJoin(
         testSessionsTable,
         eq(usersTable.testSessionId, testSessionsTable.id),
       )
-      // LEFT JOIN: se confirmedSectorId è NULL (settore non confermato), sectorName è NULL
       .leftJoin(
         sectorsTable,
         eq(testSessionsTable.confirmedSectorId, sectorsTable.id),
@@ -113,7 +128,6 @@ profileRouter.get("/me", requireAuth, async (req, res) => {
 
     if (!row) { res.status(404).json({ error: "Utente non trovato" }); return; }
 
-    // ── Query 2: objectives attivi (non completati) ────────────────────────
     const objectives = await db
       .select({
         id:       userObjectivesTable.id,
@@ -131,28 +145,27 @@ profileRouter.get("/me", requireAuth, async (req, res) => {
       )
       .orderBy(userObjectivesTable.createdAt);
 
-    // ── Calcola sectorName con fallback ────────────────────────────────────
-    // Priority: sectors.name (authoritative) > recommendations[0].sectorName (denormalized)
     const recs = row._recommendations as Array<{ sectorName: string }> | null;
     const resolvedSectorName =
       row.sectorName ??
       (Array.isArray(recs) && recs.length > 0 ? recs[0].sectorName : null);
 
-    // ── Costruisci risposta (non esporre campi privati _*) ─────────────────
     const { _stripeSubId, _testSessionId, _recommendations, sectorName: _sn, ...rest } = row;
 
-    res.json({
+    const payload: ProfileResponse = {
       ...rest,
-      isPremium:  _stripeSubId != null,
+      isPremium: _stripeSubId != null,
       sectorName: resolvedSectorName ?? null,
       objectives,
-    });
+    };
+
+    await setProfileCache(uid, payload);
+    res.json(payload);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Errore" });
   }
 });
 
-// ── PATCH /api/users/me ──────────────────────────────────────────────────────
 profileRouter.patch("/me", requireAuth, async (req, res) => {
   const parsed = patchSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -171,7 +184,8 @@ profileRouter.patch("/me", requireAuth, async (req, res) => {
       .set({ ...patch, updatedAt: new Date() })
       .where(eq(usersTable.id, uid));
 
-    // Estrai CV in background se cvText aggiornato
+    await invalidateProfileCache(uid);
+
     if (patch.cvText) {
       (async () => {
         try {
@@ -180,6 +194,7 @@ profileRouter.patch("/me", requireAuth, async (req, res) => {
             .update(usersTable)
             .set({ cvJson })
             .where(eq(usersTable.id, uid));
+          await invalidateProfileCache(uid);
         } catch (e) {
           console.warn("[cv-extractor] background extraction failed:", e);
         }
@@ -192,8 +207,6 @@ profileRouter.patch("/me", requireAuth, async (req, res) => {
   }
 });
 
-// ── POST /api/users/me/objectives ────────────────────────────────────────────
-// Aggiunge un nuovo obiettivo per l'utente autenticato.
 const objectiveSchema = z.object({
   text:     z.string().min(1).max(500),
   category: z.string().max(50).optional(),
@@ -206,22 +219,24 @@ profileRouter.post("/me/objectives", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Dati non validi", issues: parsed.error.issues }); return;
   }
   try {
+    const uid = userId(req);
     const [obj] = await db
       .insert(userObjectivesTable)
       .values({
-        userId:   userId(req),
+        userId:   uid,
         text:     parsed.data.text,
         category: parsed.data.category ?? "altro",
         dueDate:  parsed.data.dueDate ?? null,
       })
       .returning();
+
+    await invalidateProfileCache(uid);
     res.status(201).json(obj);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Errore" });
   }
 });
 
-// ── POST /api/users/me/avatar ────────────────────────────────────────────────
 import multer from "multer";
 
 const upload = multer({
@@ -241,11 +256,13 @@ profileRouter.post(
     const file = (req as Request & { file?: Express.Multer.File }).file;
     if (!file) { res.status(400).json({ error: "Nessun file" }); return; }
     try {
-      const avatarUrl = await uploadToStorage(file.buffer, file.mimetype, userId(req));
+      const uid = userId(req);
+      const avatarUrl = await uploadToStorage(file.buffer, file.mimetype, uid);
       await db
         .update(usersTable)
         .set({ avatarUrl, updatedAt: new Date() })
-        .where(eq(usersTable.id, userId(req)));
+        .where(eq(usersTable.id, uid));
+      await invalidateProfileCache(uid);
       res.json({ avatarUrl });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : "Errore upload" });
