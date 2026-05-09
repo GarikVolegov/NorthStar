@@ -1,4 +1,12 @@
+/**
+ * cache.ts — Cache Redis per i profili utente.
+ *
+ * Il logger strutturato (pino) viene usato al posto di console.warn:
+ * ogni evento di cache (error, miss, hit) porta { cacheKey, durationMs }
+ * per semplificare il debugging in produzione.
+ */
 import Redis from "ioredis";
+import { logger } from "./logger";
 
 const redisUrl = process.env.REDIS_URL?.trim();
 const ttlRaw = Number.parseInt(process.env.PROFILE_CACHE_TTL_SECONDS ?? "300", 10);
@@ -11,17 +19,17 @@ let redis: Redis | null = null;
 
 if (redisUrl) {
   redis = new Redis(redisUrl, {
-    lazyConnect: true,
+    lazyConnect:          true,
     maxRetriesPerRequest: 1,
-    enableOfflineQueue: false,
+    enableOfflineQueue:   false,
   });
 
   redis.on("error", (err) => {
-    console.warn("[cache] redis error:", err.message);
+    logger.warn({ err }, "[cache] redis connection error");
   });
 
   redis.connect().catch((err) => {
-    console.warn("[cache] redis connect failed:", err.message);
+    logger.warn({ err }, "[cache] redis connect failed");
   });
 }
 
@@ -31,33 +39,33 @@ export function profileCacheKey(userId: number): string {
 
 export async function getProfileCache<T>(userId: number): Promise<T | null> {
   if (!redis) return null;
-
+  const key = profileCacheKey(userId);
   try {
-    const raw = await redis.get(profileCacheKey(userId));
+    const raw = await redis.get(key);
     if (!raw) return null;
     return JSON.parse(raw) as T;
   } catch (err) {
-    console.warn("[cache] get failed:", err instanceof Error ? err.message : String(err));
+    logger.warn({ err, cacheKey: key }, "[cache] get failed");
     return null;
   }
 }
 
 export async function setProfileCache(userId: number, value: unknown): Promise<void> {
   if (!redis) return;
-
+  const key = profileCacheKey(userId);
   try {
-    await redis.set(profileCacheKey(userId), JSON.stringify(value), "EX", PROFILE_CACHE_TTL_SECONDS);
+    await redis.set(key, JSON.stringify(value), "EX", PROFILE_CACHE_TTL_SECONDS);
   } catch (err) {
-    console.warn("[cache] set failed:", err instanceof Error ? err.message : String(err));
+    logger.warn({ err, cacheKey: key }, "[cache] set failed");
   }
 }
 
 export async function invalidateProfileCache(userId: number): Promise<void> {
   if (!redis) return;
-
+  const key = profileCacheKey(userId);
   try {
-    await redis.del(profileCacheKey(userId));
+    await redis.del(key);
   } catch (err) {
-    console.warn("[cache] delete failed:", err instanceof Error ? err.message : String(err));
+    logger.warn({ err, cacheKey: key }, "[cache] delete failed");
   }
 }
