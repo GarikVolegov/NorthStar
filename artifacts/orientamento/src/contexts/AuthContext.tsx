@@ -1,3 +1,12 @@
+/**
+ * AuthContext — gestione autenticazione globale.
+ * FRONTEND_RULES.md: unico punto di verità per token + user.
+ *
+ * Changelog:
+ *   - Fase 4: aggiunto isAffiliate?: boolean al tipo AuthUser.
+ *     Viene popolato da GET /api/auth/me al mount; è poi usato
+ *     in navbar.tsx per mostrare/nascondere il link dashboard affiliazione.
+ */
 import {
   createContext,
   useContext,
@@ -26,6 +35,8 @@ export interface AuthUser {
   journeyType?: string | null;
   avatarUrl?: string | null;
   isPublic?: boolean;
+  /** Fase 4: accesso dashboard affiliazione — viene da users.is_affiliate */
+  isAffiliate?: boolean;
 }
 
 interface AuthContextValue {
@@ -67,19 +78,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const [authReady, setAuthReady] = useState<boolean>(false);
 
-  // FIX #2: clear ALL React Query cache on logout to prevent data leaks
   const logout = useCallback(() => {
     setUser(null);
     setToken(null);
     queryClient.clear();
   }, [queryClient]);
 
-  // FIX #6: updateUser persists to localStorage immediately (synchronously)
   const updateUser = useCallback((updates: Partial<AuthUser>) => {
     setUser((prev) => {
       if (!prev) return prev;
       const next = { ...prev, ...updates };
-      // Write immediately — don't wait for the useEffect flush
       try {
         localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(next));
       } catch { /* storage full or private mode */ }
@@ -87,7 +95,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // Persist token + register token getter on every change
   useEffect(() => {
     if (user && token) {
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
@@ -99,13 +106,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthTokenGetter(token ? () => token : null);
   }, [user, token]);
 
-  // Listen for global auth-expired event
   useEffect(() => {
     window.addEventListener(AUTH_EXPIRED_EVENT, logout);
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, logout);
   }, [logout]);
 
-  // Validate cached token once on mount
+  // Valida il token cached al mount e aggiorna i dati freschi (incluso isAffiliate)
   const didMountValidate = useRef(false);
   useEffect(() => {
     if (didMountValidate.current) return;
@@ -124,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
       .then(async (res) => {
         if (res.ok) {
+          // fresh include isAffiliate dal DB aggiornato
           const fresh = (await res.json()) as AuthUser;
           setUser((prev) => (prev ? { ...prev, ...fresh } : fresh));
         } else if (res.status === 401) {
@@ -141,11 +148,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // FIX #3: write token to localStorage synchronously BEFORE setting state
-  // so apiFetch can read it immediately in any useEffect triggered by login
   const login = useCallback(
     (u: AuthUser, t: string) => {
-      // Persist synchronously first — avoids race where apiFetch reads stale token
       try {
         localStorage.setItem(TOKEN_STORAGE_KEY, t);
         localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(u));

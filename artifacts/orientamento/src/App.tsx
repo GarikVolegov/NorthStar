@@ -55,6 +55,8 @@ const AffiliazioneScuole = lazy(() => import("@/pages/affiliazione-scuole"));
 const AffiliazioneUniversita = lazy(() => import("@/pages/affiliazione-universita"));
 const AffiliazioneAgenzie = lazy(() => import("@/pages/affiliazione-agenzie"));
 const AffiliazioneFormazione = lazy(() => import("@/pages/affiliazione-formazione"));
+// ── Fase 4: Dashboard affiliato (area privata) ─────────────────────────────
+const AffiliazioneDashboard = lazy(() => import("@/pages/affiliazione-dashboard"));
 const Colloquio = lazy(() => import("@/pages/colloquio"));
 const SkillsGap = lazy(() => import("@/pages/skills-gap"));
 const Coach = lazy(() => import("@/pages/coach"));
@@ -168,6 +170,10 @@ function AnimatedRoutes() {
       <Route path="/affiliazione/universita" component={AffiliazioneUniversita} />
       <Route path="/affiliazione/agenzie-lavoro" component={AffiliazioneAgenzie} />
       <Route path="/affiliazione/centri-formazione" component={AffiliazioneFormazione} />
+      {/* Fase 4: dashboard privata affiliato — DOPO le route pubbliche /affiliazione/* */}
+      <Route path="/affiliazione/dashboard">
+        <ProtectedRoute component={Affiliazionedashboard} />
+      </Route>
       <Route path="/colloquio/:id">
         <ProtectedRoute component={Colloquio} />
       </Route>

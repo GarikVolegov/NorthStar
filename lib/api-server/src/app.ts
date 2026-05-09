@@ -1,5 +1,6 @@
 /**
  * Express application entrypoint.
+ * API_RULES.md: ogni router ha il suo file, app.ts è solo mount.
  */
 import express from "express";
 import cors from "cors";
@@ -19,6 +20,9 @@ import "./jobs/cron";
 
 // OG Image (public — no auth)
 import { ogProfileRouter } from "./routes/og";
+
+// Auth (brute-force protected, JWT applicato dentro il router)
+import authMeRouter from "./routes/auth/me";
 
 // Growth Agent
 import ingestRouter        from "./routes/growth-agent/ingest";
@@ -66,18 +70,17 @@ export function createApp() {
   app.get("/health", publicLimiter, (_req, res) => res.json({ ok: true }));
   app.use(publicLimiter, ogProfileRouter);
 
-  // ── Auth routes (brute-force protected) ─────────────────────────────────────
-  // loginLimiter is applied before jwtMiddleware so it runs pre-authentication.
-  // Mount any future /api/auth/* routes here with loginLimiter prepended.
-  app.use("/api/auth", loginLimiter);
+  // ── Auth routes (brute-force protected, JWT applicato dentro ogni router) ───
+  // loginLimiter su /api/auth/* come protezione anti-brute-force.
+  // Il jwtMiddleware globale parte da /api ma NON copre /api/auth —
+  // ogni sotto-router auth gestisce la propria autenticazione.
+  app.use("/api/auth", loginLimiter, authMeRouter);
 
-  // ── JWT authentication — all /api/* routes require a valid token ────────────
+  // ── JWT authentication — tutti gli altri /api/* richiedono token valido ─────
   app.use("/api", jwtMiddleware);
 
   // ── Growth Agent ─────────────────────────────────────────────────
-  // SSE chat gets its own strict limiter (OpenAI cost guard)
   app.use("/api/growth-agent/chat",          aiChatLimiter, chatRouter);
-  // All other growth-agent routes share the generic api limiter
   app.use("/api/growth-agent/ingest",        apiLimiter, ingestRouter);
   app.use("/api/growth-agent/knowledge",     apiLimiter, knowledgeRouter);
   app.use("/api/growth-agent/memory",        apiLimiter, memoryRouter);

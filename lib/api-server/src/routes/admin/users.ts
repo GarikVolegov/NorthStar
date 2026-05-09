@@ -3,7 +3,12 @@
  *
  * GET  /api/admin/users          → lista paginata utenti (search, page, limit)
  * GET  /api/admin/users/:id      → dettaglio singolo utente
- * PATCH /api/admin/users/:id     → aggiorna campi admin-only (userMode, journeyType, emailVerified)
+ * PATCH /api/admin/users/:id     → aggiorna campi admin-only
+ *
+ * Changelog:
+ *   - Fase 4: aggiunto isAffiliate alla allowed list PATCH
+ *     (admin può attivare/disattivare accesso dashboard affiliazione)
+ *   - Fase 4: aggiunto isAffiliate alle SELECT lista e dettaglio
  */
 import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
@@ -41,6 +46,8 @@ router.get("/", async (req: Request, res: Response): Promise<void> => {
           streakDays:    usersTable.streakDays,
           lastActiveAt:  usersTable.lastActiveAt,
           createdAt:     usersTable.createdAt,
+          // Fase 4: visibile nella lista admin per filtro rapido
+          isAffiliate:   usersTable.isAffiliate,
         })
         .from(usersTable)
         .where(where)
@@ -78,6 +85,7 @@ router.get("/:id", async (req: Request, res: Response): Promise<void> => {
     // Rimuovi campi sensibili prima di rispondere
     const { passwordHash, verificationCode, resetToken, ...safeUser } = user;
     void passwordHash; void verificationCode; void resetToken;
+    // safeUser include isAffiliate automaticamente (Drizzle $inferSelect)
     res.json({ user: safeUser });
   } catch (err) {
     console.error("[admin/users/:id]", err);
@@ -91,7 +99,15 @@ router.patch("/:id", async (req: Request, res: Response): Promise<void> => {
   const id = parseInt(req.params["id"] ?? "", 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const allowed = ["userMode", "journeyType", "emailVerified", "isPublic", "streakDays"];
+  // Fase 4: isAffiliate aggiunto — admin può attivare accesso dashboard
+  const allowed = [
+    "userMode",
+    "journeyType",
+    "emailVerified",
+    "isPublic",
+    "streakDays",
+    "isAffiliate",   // ← NUOVO: abilita/disabilita dashboard affiliazione
+  ];
   const update: Record<string, unknown> = {};
   for (const key of allowed) {
     if (req.body[key] !== undefined) update[key] = req.body[key];
@@ -101,6 +117,12 @@ router.patch("/:id", async (req: Request, res: Response): Promise<void> => {
     return;
   }
   update.updatedAt = new Date();
+
+  // Valida isAffiliate se presente
+  if (update.isAffiliate !== undefined && typeof update.isAffiliate !== "boolean") {
+    res.status(400).json({ error: "isAffiliate deve essere un booleano" });
+    return;
+  }
 
   try {
     const [updated] = await db
@@ -114,6 +136,7 @@ router.patch("/:id", async (req: Request, res: Response): Promise<void> => {
         userMode:      usersTable.userMode,
         journeyType:   usersTable.journeyType,
         emailVerified: usersTable.emailVerified,
+        isAffiliate:   usersTable.isAffiliate,   // ← NUOVO nel returning
         updatedAt:     usersTable.updatedAt,
       });
     if (!updated) { res.status(404).json({ error: "User not found" }); return; }

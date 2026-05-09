@@ -1,3 +1,8 @@
+/**
+ * DB_RULES.md: modifiche additive only. Ogni nuova colonna ha DEFAULT
+ * per garantire compatibilità con righe esistenti senza migration
+ * distruttiva.
+ */
 import {
   pgTable, text, serial, timestamp, integer, boolean, jsonb,
   index, uniqueIndex,
@@ -14,7 +19,7 @@ export const usersTable = pgTable("users", {
   googleId: text("google_id").unique(),
   avatarUrl: text("avatar_url"),
 
-  // ── Passo 4: username univoco per profilo pubblico ─────────────────
+  // ── Passo 4: username univoco per profilo pubblico ────────────────────
   username: text("username").unique(),
 
   // Soft link: points to the last completed test session
@@ -40,12 +45,12 @@ export const usersTable = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 
-  // ── Phase 3: Gamification Base ─────────────────────────────────
+  // ── Phase 3: Gamification Base ────────────────────────────────────
   voiceStreak:        integer("voice_streak").default(0),
   totalXp:            integer("total_xp").default(0),
   lastVoiceSessionAt: timestamp("last_voice_session_at", { withTimezone: true }),
 
-  // ── Fase 1.2: Referral tracking completo ───────────────────────
+  // ── Fase 1.2: Referral tracking completo ───────────────────────────
   /**
    * Codice raw inserito al signup (es. "NS-A-1234").
    * Viene scritto subito alla registrazione, prima che affiliate_accounts
@@ -64,10 +69,28 @@ export const usersTable = pgTable("users", {
 
   /** Timestamp del primo pagamento: marca la conversione del referral. */
   referralConvertedAt: timestamp("referral_converted_at", { withTimezone: true }),
+
+  // ── Fase 4: Accesso dashboard affiliazione ──────────────────────────
+  /**
+   * true = questo utente ha accesso alla dashboard affiliazione
+   * (/affiliazione/dashboard) e al menu navbar corrispondente.
+   *
+   * Viene impostato:
+   *   - dall'admin via PATCH /api/admin/users/:id  { isAffiliate: true }
+   *   - automaticamente quando un affiliate_account viene creato
+   *     per questo userId (trigger o logica in processPostPaymentReferral)
+   *
+   * DEFAULT false: tutti gli utenti esistenti non sono affiliati.
+   * È incluso nella risposta di GET /api/auth/me per aggiornare
+   * il token locale senza richiedere un nuovo login.
+   */
+  isAffiliate: boolean("is_affiliate").notNull().default(false),
 }, (t) => ({
-  usernameIdx:      uniqueIndex("users_username_idx").on(t.username),
-  referredByIdx:    index("users_referred_by_idx").on(t.referredByAffiliateId),
-  referredByCodeIdx: index("users_referred_by_code_idx").on(t.referredByCode),
+  usernameIdx:        uniqueIndex("users_username_idx").on(t.username),
+  referredByIdx:      index("users_referred_by_idx").on(t.referredByAffiliateId),
+  referredByCodeIdx:  index("users_referred_by_code_idx").on(t.referredByCode),
+  // Index parziale: solo affiliati attivi — efficiente per le query admin
+  isAffiliateIdx:     index("users_is_affiliate_idx").on(t.isAffiliate),
 }));
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({
