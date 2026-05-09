@@ -15,9 +15,40 @@ export default defineConfig({
     navigationTimeout: 20_000,
   },
   projects: [
+    // ── Desktop ────────────────────────────────────────────────────────────
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
+
+    // ── Mobile (feat/mobile-pwa-optimization) ──────────────────────────
+    //
+    // Esegui solo i test mobile con:
+    //   pnpm playwright test --project="Mobile Chrome"
+    //   pnpm playwright test --project="Mobile Safari"
+    //
+    // In CI aggiungi MOBILE_TESTS=true per attivare automaticamente.
+    ...(process.env.MOBILE_TESTS
+      ? [
+          {
+            name: "Mobile Chrome (Pixel 5)",
+            use: { ...devices["Pixel 5"] },
+          },
+          {
+            name: "Mobile Safari (iPhone 12)",
+            use: { ...devices["iPhone 12"] },
+          },
+        ]
+      : [
+          // Sempre attivi anche senza flag per dev locale
+          {
+            name: "Mobile Chrome (Pixel 5)",
+            use: { ...devices["Pixel 5"] },
+          },
+          {
+            name: "Mobile Safari (iPhone 12)",
+            use: { ...devices["iPhone 12"] },
+          },
+        ]),
   ],
 });
