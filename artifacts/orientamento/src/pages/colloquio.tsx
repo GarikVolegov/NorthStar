@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
+import { StreamErrorBoundary } from "@/components/ErrorBoundary";
 import { useGetSector } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -218,6 +219,7 @@ export default function Colloquio() {
       </div>
 
       {/* Chat area */}
+      <StreamErrorBoundary>
       <div className="flex-1 overflow-y-auto rounded-2xl border bg-muted/20 p-4 space-y-4 mb-4 min-h-0">
         {!started ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-12 gap-4">
@@ -275,6 +277,7 @@ export default function Colloquio() {
           </>
         )}
       </div>
+      </StreamErrorBoundary>
 
       {/* Input area */}
       {started && phase !== "final" && (

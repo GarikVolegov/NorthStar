@@ -3,6 +3,7 @@ import { useWendyChat } from '../hooks/useWendyChat.js';
 import { WendyThinkingIndicator } from './WendyThinkingIndicator.js';
 import { WendyVoiceOverlay } from './wendy/WendyVoiceOverlay.js';
 import type { VoiceChatMessage } from '../hooks/useVoiceChat.js';
+import { StreamErrorBoundary } from './ErrorBoundary.js';
 
 /**
  * WendyChat v2 — aggiunte:
@@ -158,6 +159,7 @@ export function WendyChat({
         </div>
 
         {/* Messaggi */}
+        <StreamErrorBoundary>
         <div
           role="log"
           aria-label="Conversazione con Wendy"
@@ -208,6 +210,7 @@ export function WendyChat({
           <WendyThinkingIndicator thinking={thinking} />
           <div ref={messagesEndRef} />
         </div>
+        </StreamErrorBoundary>
 
         {/* Error banner */}
         {streamError && !messages.some((m) => m.role === 'error') && (

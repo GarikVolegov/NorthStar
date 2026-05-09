@@ -1,6 +1,47 @@
 import { Component, type ReactNode, type ErrorInfo } from "react";
 import { AlertTriangle, RefreshCw, Home } from "lucide-react";
 
+/* ── StreamErrorBoundary ──────────────────────────────────────────────────────
+ * Boundary leggero per aree di streaming SSE.
+ * Cattura errori di render e mostra un bottone "Riprova" inline
+ * che resetta il boundary senza ricaricare la pagina.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+interface StreamBoundaryProps {
+  children: ReactNode;
+  label?: string;
+}
+
+interface StreamBoundaryState {
+  hasError: boolean;
+}
+
+export class StreamErrorBoundary extends Component<StreamBoundaryProps, StreamBoundaryState> {
+  state: StreamBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): StreamBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[StreamErrorBoundary]", error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError)
+      return (
+        <button
+          onClick={() => this.setState({ hasError: false })}
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-muted hover:bg-muted/80 border border-border transition-colors"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          {this.props.label ?? "Riprova"}
+        </button>
+      );
+    return this.props.children;
+  }
+}
+
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;

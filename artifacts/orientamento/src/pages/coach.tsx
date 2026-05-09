@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BrainCircuit, Plus, Trash2, Send, Loader2, MessageSquare } from "lucide-react";
+import { StreamErrorBoundary } from "@/components/ErrorBoundary";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -277,6 +278,7 @@ export default function Coach() {
       </aside>
 
       {/* Main chat */}
+      <StreamErrorBoundary>
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-3 border-b flex items-center gap-3 shrink-0">
@@ -385,6 +387,7 @@ export default function Coach() {
           </div>
         )}
       </main>
+      </StreamErrorBoundary>
     </div>
   );
 }
