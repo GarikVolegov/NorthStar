@@ -1,31 +1,40 @@
 # NorthStar — Docker Compose
-# Usage: docker compose up --build
-# All services start in the correct order with health checks.
+# Usage:   docker compose up --build
+# Dev:     docker compose up postgres           (solo DB locale)
+# Full:    docker compose up --build
+#
+# Servizi:
+#   postgres          — PostgreSQL 16
+#   ai-agents         — Microservizio Python AI (porta 8000)
+#   api-server        — Express server legacy    (porta 8080, artifacts/)
+#   northstar-server  — Express server nuovo     (porta 3001, apps/server/)
+#   frontend          — React frontend           (porta 5000)
+#   jaeger            — Distributed tracing UI   (porta 16686)
 
 services:
 
-  # ─── PostgreSQL ──────────────────────────────────────────────────
+  # ─── PostgreSQL ───────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: northstar
+      POSTGRES_USER:     northstar
       POSTGRES_PASSWORD: northstar_dev
-      POSTGRES_DB: northstar
+      POSTGRES_DB:       northstar
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U northstar"]
+      test:     ["CMD-SHELL", "pg_isready -U northstar"]
       interval: 5s
-      timeout: 5s
-      retries: 5
+      timeout:  5s
+      retries:  5
 
-  # ─── Python AI Microservice ───────────────────────────────────────
+  # ─── Python AI Microservice ──────────────────────────────────────────────
   ai-agents:
     build:
-      context: ./artifacts/ai-agents
+      context:    ./artifacts/ai-agents
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
@@ -35,50 +44,81 @@ services:
       - AI_INTEGRATIONS_OPENAI_BASE_URL=${AI_INTEGRATIONS_OPENAI_BASE_URL}
       - TAVILY_API_KEY=${TAVILY_API_KEY:-}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test:         ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval:     10s
+      timeout:      5s
+      retries:      5
       start_period: 15s
 
-  # ─── Express API Server ───────────────────────────────────────────
+  # ─── Express API Server (legacy — artifacts/) ──────────────────────────
   api-server:
     build:
-      context: .
+      context:    .
       dockerfile: artifacts/api-server/Dockerfile
     restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
-      PORT: 8080
-      NODE_ENV: development
-      DATABASE_URL: postgresql://northstar:northstar_dev@postgres:5432/northstar
-      AI_AGENTS_URL: http://ai-agents:8000
-      JWT_SECRET: ${JWT_SECRET}
-      ADMIN_KEY: ${ADMIN_KEY}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
-      GNEWS_API_KEY: ${GNEWS_API_KEY:-}
-      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
-      OTEL_SERVICE_NAME: northstar-api
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      PORT:                   8080
+      NODE_ENV:               development
+      DATABASE_URL:           postgresql://northstar:northstar_dev@postgres:5432/northstar
+      AI_AGENTS_URL:          http://ai-agents:8000
+      JWT_SECRET:             ${JWT_SECRET}
+      ADMIN_KEY:              ${ADMIN_KEY}
+      STRIPE_SECRET_KEY:      ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET:  ${STRIPE_WEBHOOK_SECRET:-}
+      GNEWS_API_KEY:          ${GNEWS_API_KEY:-}
+      TAVILY_API_KEY:         ${TAVILY_API_KEY:-}
+      RESEND_API_KEY:         ${RESEND_API_KEY:-}
+      OTEL_SERVICE_NAME:                northstar-api
+      OTEL_EXPORTER_OTLP_ENDPOINT:     http://jaeger:4318
     depends_on:
       postgres:
         condition: service_healthy
       ai-agents:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test:         ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval:     10s
+      timeout:      5s
+      retries:      5
       start_period: 20s
 
-  # ─── React Frontend ───────────────────────────────────────────────
+  # ─── NorthStar Express Server (nuovo — apps/server/) ───────────────────
+  northstar-server:
+    build:
+      context:    .
+      dockerfile: apps/server/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      PORT:                  3001
+      NODE_ENV:              production
+      DATABASE_URL:          postgresql://northstar:northstar_dev@postgres:5432/northstar
+      JWT_SECRET:            ${JWT_SECRET}
+      JWT_EXPIRES_IN:        ${JWT_EXPIRES_IN:-7d}
+      OPENAI_API_KEY:        ${OPENAI_API_KEY}
+      OPENAI_MODEL:          ${OPENAI_MODEL:-gpt-4o-mini}
+      STRIPE_SECRET_KEY:     ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      ALLOWED_ORIGINS:       ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      AFFILIATE_COMMISSION_PCT:        ${AFFILIATE_COMMISSION_PCT:-20}
+      AFFILIATE_MIN_WITHDRAWAL_EUR:    ${AFFILIATE_MIN_WITHDRAWAL_EUR:-10}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:         ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval:     10s
+      timeout:      5s
+      retries:      5
+      start_period: 20s
+
+  # ─── React Frontend ─────────────────────────────────────────────────────────
   frontend:
     build:
-      context: ./artifacts/orientamento
+      context:    ./artifacts/orientamento
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
@@ -89,7 +129,7 @@ services:
       api-server:
         condition: service_healthy
 
-  # ─── Jaeger (distributed tracing UI) ─────────────────────────────
+  # ─── Jaeger (distributed tracing UI) ──────────────────────────────────
   jaeger:
     image: jaegertracing/all-in-one:1.57
     restart: unless-stopped
