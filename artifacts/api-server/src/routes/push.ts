@@ -5,7 +5,7 @@ import { z } from "zod";
 import { authMiddleware } from "../lib/auth-jwt.js";
 
 const router: IRouter = Router();
-router.use(authMiddleware);
+router.use("/push", authMiddleware);
 
 router.post("/push/subscribe", async (req, res): Promise<void> => {
   const userId = res.locals.userId as number;

@@ -23,7 +23,7 @@
  * Se la memoria non è disponibile, Wendy risponde ugualmente senza contesto.
  */
 
-import { db } from '../storage.js';
+import { db } from '@workspace/db';
 import { ai } from './ai/index.js';
 import { logger } from './logger.js';
 

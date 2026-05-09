@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, usersTable, testSessionsTable, userObjectivesTable } from "@workspace/db";
 import { certificationsTable } from "@workspace/db";
-import { eq, count } from "drizzle-orm";
+import { eq, count, and } from "drizzle-orm";
 
 const router = Router();
 
@@ -18,7 +18,9 @@ router.get("/journey-score/:userId", async (req, res): Promise<void> => {
 
   const sessions = await db.select().from(testSessionsTable).where(eq(testSessionsTable.userId, userId));
   const [objCount] = await db.select({ c: count() }).from(userObjectivesTable).where(eq(userObjectivesTable.userId, userId));
-  const [completedObj] = await db.select({ c: count() }).from(userObjectivesTable).where(eq(userObjectivesTable.userId, userId));
+  const [completedObj] = await db.select({ c: count() }).from(userObjectivesTable).where(
+    and(eq(userObjectivesTable.userId, userId), eq(userObjectivesTable.completed, true))
+  );
   const [certCount] = await db.select({ c: count() }).from(certificationsTable).where(eq(certificationsTable.userId, userId));
 
   const hasTest = sessions.length > 0;

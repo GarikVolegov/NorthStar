@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { ai } from "../lib/ai/index.js";
 import { db, sectorsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
@@ -75,15 +75,14 @@ Regole tassative:
 - ID formato: role_1..role_5, skill_1..skill_7, tool_1..tool_5, cert_1..cert_4`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-5.1",
-      max_completion_tokens: 2048,
+    const text = await ai.chat({
+      useCase: "json_extraction",
       messages: [{ role: "user", content: prompt }],
+      maxTokens: 2048,
+      temperature: 0.3,
     });
 
-    const text = response.choices[0]?.message?.content ?? "{}";
     let graph: { nodes: GraphNode[]; edges: GraphEdge[] } = { nodes: [], edges: [] };
-
     try {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -155,21 +154,17 @@ ${edgeLines.join("\n")}
   res.flushHeaders();
 
   try {
-    const stream = await openai.chat.completions.create({
-      model: "gpt-5.1",
-      max_completion_tokens: 1024,
-      stream: true,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...messages.slice(-10),
-      ],
-    });
+    const allMessages = [
+      { role: "system" as const, content: systemPrompt },
+      ...messages.slice(-10),
+    ];
 
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content;
-      if (delta) {
-        res.write(`data: ${JSON.stringify({ text: delta })}\n\n`);
-      }
+    for await (const chunk of ai.streamChat({
+      useCase: "streaming_chat",
+      messages: allMessages,
+      maxTokens: 1024,
+    })) {
+      res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
     }
 
     res.write("data: [DONE]\n\n");

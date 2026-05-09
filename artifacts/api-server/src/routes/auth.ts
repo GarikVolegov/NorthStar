@@ -69,6 +69,8 @@ function safeUser(user: typeof usersTable.$inferSelect) {
     id: user.id,
     name: user.name,
     email: user.email,
+    username: user.username,
+    avatarUrl: user.avatarUrl,
     testSessionId: user.testSessionId,
     emailVerified: user.emailVerified,
     stripeSubscriptionId: user.stripeSubscriptionId,
@@ -76,6 +78,13 @@ function safeUser(user: typeof usersTable.$inferSelect) {
     autonomyPreference: user.autonomyPreference,
     stabilityPreference: user.stabilityPreference,
     timezone: user.timezone,
+    journeyType: user.journeyType,
+    userMode: user.userMode,
+    isAffiliate: user.isAffiliate,
+    isPublic: user.isPublic,
+    totalXp: user.totalXp ?? 0,
+    voiceStreak: user.voiceStreak ?? 0,
+    streakDays: user.streakDays,
     createdAt: user.createdAt.toISOString(),
   };
 }

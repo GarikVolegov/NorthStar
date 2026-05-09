@@ -1,10 +1,9 @@
 import { Router, type IRouter } from "express";
-import { openai } from "@workspace/integrations-openai-ai-server";
 import { db, sectorsTable, usersTable, testSessionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { optionalAuthMiddleware } from "../lib/auth-jwt.js";
 import { aiGenerationRateLimiter } from "../lib/rate-limiter.js";
-import { rejectIfOpenAINotConfigured, openAIErrorMessage } from "../lib/openai-availability.js";
+import { ai } from "../lib/ai/index.js";
 
 const router: IRouter = Router();
 
@@ -116,8 +115,6 @@ router.post(
     const userId = res.locals.userId as number | undefined;
     const ctx = userId ? await fetchUserContext(userId, sectorId) : null;
 
-    if (rejectIfOpenAINotConfigured(res)) return;
-
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -209,26 +206,17 @@ Regole tassative:
 - JSON valido senza commenti.`;
 
     try {
-      const stream = await openai.chat.completions.create({
-        model: "gpt-4.1",
-        max_tokens: 8192,
+      for await (const chunk of ai.streamChat({
+        useCase: "json_extraction",
         messages: [{ role: "user", content: prompt }],
-        stream: true,
-      });
-
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content;
-        if (content) {
-          res.write(`data: ${JSON.stringify({ content })}\n\n`);
-        }
+        maxTokens: 8192,
+        temperature: 0.4,
+      })) {
+        res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
       }
     } catch (err) {
-      res.write(
-        `data: ${JSON.stringify({
-          error: openAIErrorMessage(err),
-          detail: err instanceof Error ? err.message : "unknown",
-        })}\n\n`,
-      );
+      const errMsg = err instanceof Error ? err.message : "Errore AI";
+      res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`);
     }
 
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`);

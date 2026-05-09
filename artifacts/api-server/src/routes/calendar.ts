@@ -5,7 +5,7 @@ import { z } from "zod";
 import { authMiddleware } from "../lib/auth-jwt.js";
 
 const router: IRouter = Router();
-router.use(authMiddleware);
+router.use("/calendar", authMiddleware);
 
 const FREE_EVENT_LIMIT = 20;
 const FREE_ALLOWED_MINUTES = [30, 120] as const;

@@ -1,7 +1,7 @@
 import { tavilySearch } from "../../lib/tavily";
 import { db, growthArticlesTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { ai } from "../../lib/ai/index.js";
 import { logger } from "../../lib/logger";
 import { getPrompt, fillTemplate } from "../../lib/prompt-store.js";
 
@@ -62,17 +62,25 @@ export async function runGrowthResearch(): Promise<{ added: number; attempted: n
         ANSWER: answerLine,
       });
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4.1-mini",
-        max_tokens: 800,
+      const rawText = await ai.chat({
+        useCase: "json_extraction",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
         ],
-        response_format: { type: "json_object" },
+        maxTokens: 1200,
+        temperature: 0.2,
       });
 
-      const raw = JSON.parse(completion.choices[0]?.message?.content ?? "{}") as Record<string, unknown>;
+      let raw: Record<string, unknown> = {};
+      try {
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        raw = jsonMatch ? (JSON.parse(jsonMatch[0]) as Record<string, unknown>) : {};
+      } catch {
+        logger.warn({ query }, "Growth research: JSON parse failed — skipping");
+        continue;
+      }
+
       if (!raw.title || !raw.description || !raw.content) continue;
 
       const title = String(raw.title).slice(0, 200);

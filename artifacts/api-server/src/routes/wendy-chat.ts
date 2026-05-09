@@ -25,7 +25,7 @@
 
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../lib/auth-jwt.js';
+import { requireAuth } from '../middlewares/requireAuth.js';
 import { ai } from '../lib/ai/index.js';
 import { loadWendyContext, saveSessionSummary } from '../lib/wendy-memory.js';
 import { retrieveKnowledge } from '../lib/wendy-rag.js';

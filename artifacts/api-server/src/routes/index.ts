@@ -52,10 +52,13 @@ import jobsRouter from "./jobs";
 import objectiveCommentsRouter from "./objective-comments";
 import linkedinRouter from "./linkedin";
 import nftCertificatesRouter from "./nft-certificates";
+import affiliateDashboardRouter from "./affiliate-dashboard";
 // ── Wendy 2.0 — multimodal AI routes ─────────────────────────────────────────
 import { wendyVisionRouter } from "./wendy-vision";
 import { wendyTTSRouter } from "./wendy-tts";
 import { wendyFeedbackRouter } from "./wendy-feedback";
+import { wendyChatRouter } from "./wendy-chat";
+import mlRecommendRouter from "./ml-recommend";
 
 const router: IRouter = Router();
 
@@ -115,12 +118,17 @@ router.use(objectiveCommentsRouter);
 router.use(certificationsRouter);
 router.use(linkedinRouter);
 router.use(nftCertificatesRouter);
+router.use(affiliateDashboardRouter);
 // ── Wendy 2.0 routes ─────────────────────────────────────────────────────────
 // Vision: POST /v1/ai/vision/analyze  POST /v1/ai/vision/generate
 // TTS:    POST /v1/ai/tts             POST /v1/ai/voice/token
 // Feedback: POST/GET /v1/ai/feedback
+// Chat:   POST /v1/ai/stream (Wendy conversational chat)
 router.use('/v1/ai', wendyVisionRouter);   // /v1/ai/vision/*
 router.use('/v1/ai', wendyTTSRouter);      // /v1/ai/tts + /v1/ai/voice/token
 router.use('/v1/ai', wendyFeedbackRouter); // /v1/ai/feedback/*
+router.use('/v1/ai', wendyChatRouter);     // /v1/ai/stream (SSE chat)
+// ML routes: POST /v1/ml/recommend, /v1/ml/sector-similarity, etc.
+router.use('/v1/ml', mlRecommendRouter);
 
 export default router;

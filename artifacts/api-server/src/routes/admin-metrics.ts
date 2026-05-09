@@ -1,18 +1,11 @@
 import { Router } from "express";
 import { db, usersTable, testSessionsTable, sectorsTable } from "@workspace/db";
-import { sql, count, gte, and, isNotNull } from "drizzle-orm";
+import { sql, count, gte, isNotNull } from "drizzle-orm";
+import { requireAdmin } from "../middlewares/requireAdmin.js";
 
 const router = Router();
-const ADMIN_KEY = process.env.ADMIN_KEY ?? "northstar-admin";
 
-function adminAuth(req: any, res: any, next: any) {
-  if (req.headers["x-admin-key"] !== ADMIN_KEY) {
-    res.status(401).json({ error: "Non autorizzato" }); return;
-  }
-  next();
-}
-
-router.get("/admin/metrics", adminAuth, async (req, res): Promise<void> => {
+router.get("/admin/metrics", requireAdmin, async (req, res): Promise<void> => {
   try {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);

@@ -32,6 +32,7 @@ import { securityHeaders } from './lib/security-headers.js';
 import { globalRateLimiter } from './lib/global-rate-limiter.js';
 import { initSentry, getSentryErrorHandler } from './lib/sentry.js';
 import { stripeWebhookHandler } from './routes/webhooks/stripe.js';
+import { errorHandler } from './lib/middlewares/error-handler.js';
 
 // ── 0. Sentry bootstrap — PRIMA di qualsiasi import che possa lanciare errori ──
 await initSentry();
@@ -107,15 +108,12 @@ app.use('/api', router);
 // DEVE avere la firma (err, req, res, next) — 4 parametri.
 app.use(getSentryErrorHandler());
 
-// ── 10. Catch-all 404 / 500 ─────────────────────────────────────────────
+// ── 10. Catch-all 404 ────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: 'Route non trovata' });
 });
 
-app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  const message = err instanceof Error ? err.message : 'Errore interno del server';
-  logger.error({ err }, message);
-  res.status(500).json({ error: 'Errore interno del server' });
-});
+// ── 11. Centralized error handler — DEVE essere l'ultimo middleware ────────────
+app.use(errorHandler);
 
 export default app;

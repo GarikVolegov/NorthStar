@@ -4,7 +4,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { authMiddleware } from "../lib/auth-jwt.js";
 
 const router: IRouter = Router();
-router.use(authMiddleware);
+router.use("/notifications", authMiddleware);
 
 // ── GET /api/notifications ────────────────────────────────────────────────────
 router.get("/notifications", async (req: Request, res: Response): Promise<void> => {
