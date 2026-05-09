@@ -730,13 +730,15 @@ export default function Results() {
                     {t("results.otherDirections", { defaultValue: "Altre direzioni" })}
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    {secondary.map((rec) => {
+                    {secondary.map((rec, index) => {
                       const alignment = getWorkModeAlignment(currentWorkMode, rec.sector?.workMode ?? null);
                       return (
                         <motion.div
                           key={rec.sectorId}
+                          initial={prefersReduced ? {} : { opacity: 0, y: 20 }}
+                          animate={prefersReduced ? {} : { opacity: 1, y: 0 }}
+                          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.15 + index * 0.1 }}
                           whileHover={prefersReduced ? undefined : { y: -3 }}
-                          transition={{ type: "spring", stiffness: 350, damping: 28 }}
                         >
                           <Card className="flex flex-col border border-border hover:border-primary/30 transition-colors">
                             <CardHeader className="pb-3">

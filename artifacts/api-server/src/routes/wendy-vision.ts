@@ -28,7 +28,7 @@
 
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../lib/auth-jwt.js';
+import { requireAuth } from '../middlewares/requireAuth.js';
 import { rateLimit } from 'express-rate-limit';
 import { logger } from '../lib/logger.js';
 import { streamAnalyzeImages, generateImage } from '../lib/ai/vision.js';
@@ -40,7 +40,8 @@ const analyzeRateLimiter = rateLimit({
   windowMs: 60_000,
   max: 5,
   keyGenerator: (req: Request) =>
-    (req as Request & { user?: { id: string } }).user?.id ?? req.ip ?? 'anon',
+    (req as Request & { user?: { id: string } }).user?.id ?? 'anon',
+  validate: { ip: false },
   message: { error: 'Troppe analisi immagini. Attendi un minuto.', code: 'RATE_LIMIT' },
 });
 
@@ -48,7 +49,8 @@ const generateRateLimiter = rateLimit({
   windowMs: 60_000,
   max: 3,
   keyGenerator: (req: Request) =>
-    (req as Request & { user?: { id: string } }).user?.id ?? req.ip ?? 'anon',
+    (req as Request & { user?: { id: string } }).user?.id ?? 'anon',
+  validate: { ip: false },
   message: { error: 'Troppa generazione di immagini. Attendi un minuto.', code: 'RATE_LIMIT' },
 });
 

@@ -681,6 +681,7 @@ export default function Test() {
     setAnswers((prev) => ({ ...prev, [id]: value }));
     setJustSelected(id);
     setTapFlash(id);
+    if ("vibrate" in navigator) navigator.vibrate(12);
     setTimeout(() => setTapFlash(null), 300);
     setTimeout(() => {
       setJustSelected(null);

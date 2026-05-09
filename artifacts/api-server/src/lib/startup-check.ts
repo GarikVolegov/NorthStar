@@ -17,11 +17,11 @@ const REQUIRED: EnvEntry[] = [
   { key: "DATABASE_URL",   description: "Connessione PostgreSQL — necessaria per tutto" },
   { key: "ADMIN_KEY",      description: "Chiave di accesso alle route /admin/*" },
   { key: "JWT_SECRET",     description: "Secret JWT — senza questo tutti i token vengono invalidati ad ogni restart" },
-  { key: "GROQ_API_KEY",   description: "Groq — provider primario AI (streaming chat, json extraction, research)" },
 ];
 
 const OPTIONAL: EnvEntry[] = [
   // ── AI Provider ─────────────────────────────────────────────────────────────
+  { key: "GROQ_API_KEY",          description: "Groq — provider primario AI (streaming chat, json extraction, research)" },
   { key: "ANTHROPIC_API_KEY",     description: "Anthropic Claude — agent_analysis (RIASEC+Spiriti). Senza questo l'analisi profilo cade su OpenAI" },
   { key: "OPENAI_API_KEY",        description: "OpenAI — embedding (obbligatorio per RAG) + fallback universale se Groq/Anthropic sono giù" },
   // ── AI Router overrides (hot-swap senza redeploy) ───────────────────────────

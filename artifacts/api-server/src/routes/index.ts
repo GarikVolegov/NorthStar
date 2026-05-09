@@ -53,9 +53,9 @@ import objectiveCommentsRouter from "./objective-comments";
 import linkedinRouter from "./linkedin";
 import nftCertificatesRouter from "./nft-certificates";
 // ── Wendy 2.0 — multimodal AI routes ─────────────────────────────────────────
-import wendyVisionRouter from "./wendy-vision";
+import { wendyVisionRouter } from "./wendy-vision";
 import { wendyTTSRouter } from "./wendy-tts";
-import wendyFeedbackRouter from "./wendy-feedback";
+import { wendyFeedbackRouter } from "./wendy-feedback";
 
 const router: IRouter = Router();
 

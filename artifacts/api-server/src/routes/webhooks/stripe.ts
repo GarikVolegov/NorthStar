@@ -37,12 +37,16 @@ import {
   usersTable,
 } from '@workspace/db/schema';
 import { eq } from 'drizzle-orm';
-import { cancelReferral } from '../lib/affiliate/referralService.js';
-import { applyMonthlyCommission } from '../lib/affiliate/commissionService.js';
-import { processPostPaymentReferral } from '../lib/affiliate/referralCodeService.js';
+import { cancelReferral } from '../../lib/affiliate/referralService.js';
+import { applyMonthlyCommission } from '../../lib/affiliate/commissionService.js';
+import { processPostPaymentReferral } from '../../lib/affiliate/referralCodeService.js';
 import { captureError, addBreadcrumb } from '../../lib/sentry.js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const getStripe = (): Stripe => {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error('STRIPE_SECRET_KEY is not configured');
+  return new Stripe(key);
+};
 
 // ── Helper: trova utente NorthStar da Stripe customerId ──────────────────
 async function findUserByStripeCustomerId(
@@ -75,7 +79,7 @@ export async function stripeWebhookHandler(
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(
+    event = getStripe().webhooks.constructEvent(
       req.body as Buffer,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET!,

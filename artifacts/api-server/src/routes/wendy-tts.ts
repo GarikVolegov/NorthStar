@@ -18,7 +18,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { createHash } from 'crypto';
-import { requireAuth } from '../lib/auth-jwt.js';
+import { requireAuth } from '../middlewares/requireAuth.js';
 import { rateLimit } from 'express-rate-limit';
 import { logger } from '../lib/logger.js';
 
@@ -79,14 +79,16 @@ function cacheSet(key: string, buffer: Buffer): void {
 // ─── Rate limiters ────────────────────────────────────────────────────────────────
 
 const ttsRateLimit = rateLimit({
+  validate: { ip: false },
   windowMs: 60_000, max: 10,
-  keyGenerator: (req: Request) => (req as Request & { user?: { id: string } }).user?.id ?? req.ip ?? 'anon',
+  keyGenerator: (req: Request) => (req as Request & { user?: { id: string } }).user?.id ?? 'anon',
   message: { error: 'Troppe richieste TTS. Attendi un minuto.', code: 'RATE_LIMIT' },
 });
 
 const tokenRateLimit = rateLimit({
   windowMs: 60_000, max: 20,
-  keyGenerator: (req: Request) => (req as Request & { user?: { id: string } }).user?.id ?? req.ip ?? 'anon',
+  validate: { ip: false },
+  keyGenerator: (req: Request) => (req as Request & { user?: { id: string } }).user?.id ?? 'anon',
   message: { error: 'Troppe richieste token vocale.', code: 'RATE_LIMIT' },
 });
 

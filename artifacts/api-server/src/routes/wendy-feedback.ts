@@ -15,9 +15,9 @@
 
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../lib/auth-jwt.js';
+import { requireAuth } from '../middlewares/requireAuth.js';
 import { rateLimit } from 'express-rate-limit';
-import { db } from '../storage.js';
+import { db } from '@workspace/db';
 import { logger } from '../lib/logger.js';
 
 export const wendyFeedbackRouter = Router();
@@ -28,7 +28,8 @@ const feedbackWriteLimit = rateLimit({
   windowMs: 60_000,
   max:      30,  // 30 voti/min è già molto generoso per click umani
   keyGenerator: (req: Request) =>
-    (req as Request & { user?: { id: string } }).user?.id ?? req.ip ?? 'anon',
+    (req as Request & { user?: { id: string } }).user?.id ?? 'anon',
+  validate: { ip: false },
   message: { error: 'Troppi feedback. Attendi un minuto.', code: 'RATE_LIMIT' },
 });
 
@@ -37,7 +38,8 @@ const statsReadLimit = rateLimit({
   windowMs: 60_000,
   max:      10,
   keyGenerator: (req: Request) =>
-    (req as Request & { user?: { id: string } }).user?.id ?? req.ip ?? 'anon',
+    (req as Request & { user?: { id: string } }).user?.id ?? 'anon',
+  validate: { ip: false },
   message: { error: 'Troppe richieste stats. Attendi un minuto.', code: 'RATE_LIMIT' },
 });
 

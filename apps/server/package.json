@@ -16,7 +16,7 @@
     "seed:e2e-affiliate": "tsx ../../scripts/src/seed-e2e-affiliate.ts"
   },
   "dependencies": {
-    "@workspace/db":    "*",
+    "@workspace/db":    "workspace:*",
     "bcryptjs":         "^2.4.3",
     "cookie-parser":    "^1.4.7",
     "cors":             "^2.8.5",

@@ -5,6 +5,7 @@ import { ArrowRight, BookOpen, Clock, Sparkles, TrendingUp, Star, Lock } from "l
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "react-i18next";
+import { motion } from "framer-motion";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -321,11 +322,21 @@ export default function Crescita() {
             <h2 className="text-xl md:text-2xl font-serif font-bold text-foreground mb-1">{t("growth.exploreByArea", { defaultValue: "Esplora per area" })}</h2>
             <p className="text-sm md:text-base text-muted-foreground">{t("growth.exploreByAreaDesc", { defaultValue: "Scegli il tema su cui vuoi lavorare adesso." })}</p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+          <motion.div
+            className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4"
+            initial="hidden"
+            animate="show"
+            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06 } } }}
+          >
             {catData.map(cat => (
-              <CategoryCard key={cat.id} cat={cat} />
+              <motion.div
+                key={cat.id}
+                variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } } }}
+              >
+                <CategoryCard cat={cat} />
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
@@ -342,11 +353,21 @@ export default function Crescita() {
                 {t("growth.seeAll", { defaultValue: "Vedi tutti" })} <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <motion.div
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+              initial="hidden"
+              animate="show"
+              variants={{ hidden: {}, show: { transition: { staggerChildren: 0.07 } } }}
+            >
               {recentArticles.map(a => (
-                <ArticleCard key={a.id} article={a} />
+                <motion.div
+                  key={a.id}
+                  variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } } }}
+                >
+                  <ArticleCard article={a} />
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
         </section>
       )}

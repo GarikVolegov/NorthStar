@@ -172,7 +172,7 @@ function AnimatedRoutes() {
       <Route path="/affiliazione/centri-formazione" component={AffiliazioneFormazione} />
       {/* Fase 4: dashboard privata affiliato — DOPO le route pubbliche /affiliazione/* */}
       <Route path="/affiliazione/dashboard">
-        <ProtectedRoute component={Affiliazionedashboard} />
+        <ProtectedRoute component={AffiliazioneDashboard} />
       </Route>
       <Route path="/colloquio/:id">
         <ProtectedRoute component={Colloquio} />
@@ -273,16 +273,16 @@ function Router() {
 
 function App() {
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <Router />
           </WouterRouter>
           <Toaster />
         </TooltipProvider>
-      </QueryClientProvider>
-    </AuthProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 
