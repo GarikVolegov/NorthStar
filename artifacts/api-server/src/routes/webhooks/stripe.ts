@@ -22,7 +22,11 @@
  *   - customer.subscription.deleted     → cancella referral attivo
  *
  * Idempotency:
- *   Redis dedup: stripeEventId → processed (TTL 24h).
+ *   Redis dedup: stripeEventId → processed|failed (TTL 24h).
+ *   markAsProcessed() viene chiamato sia in caso di successo SIA in caso
+ *   di errore processing, per evitare doppio processing su retry manuale
+ *   o reinvio da Stripe Dashboard. L'errore è loggato su Sentry per
+ *   investigazione separata.
  *   Fallback graceful se REDIS_URL non configurato (log warning).
  *   Operazioni DB rimangono idempotenti (onConflictDoNothing) come seconda linea.
  *
@@ -47,8 +51,7 @@ import { applyMonthlyCommission } from '../lib/affiliate/commissionService.js';
 import { processPostPaymentReferral } from '../lib/affiliate/referralCodeService.js';
 import { captureError, addBreadcrumb } from '../../lib/sentry.js';
 
-// ── Redis singleton per idempotency ────────────────────────────────────────
-// Fallback graceful se REDIS_URL non configurato: log warning, skip dedup.
+// ── Redis singleton per idempotency ────────────────────────────────────────────
 let redis: Redis | null = null;
 if (process.env.REDIS_URL) {
   redis = new Redis(process.env.REDIS_URL, {
@@ -57,14 +60,13 @@ if (process.env.REDIS_URL) {
     lazyConnect: true,
   });
   redis.on('error', (err) => {
-    // Non crashare il server se Redis è down — degraded mode
     console.warn('[stripe webhook] Redis error (idempotency degraded):', err.message);
   });
 } else {
   console.warn('[stripe webhook] REDIS_URL non configurato — idempotency Redis disabilitata. Configura REDIS_URL su Railway per produzione.');
 }
 
-// ── Helper: idempotency check ──────────────────────────────────────────────
+// ── Helper: idempotency check ───────────────────────────────────────────────
 async function isAlreadyProcessed(eventId: string): Promise<boolean> {
   if (!redis) return false;
   try {
@@ -75,16 +77,30 @@ async function isAlreadyProcessed(eventId: string): Promise<boolean> {
   }
 }
 
-async function markAsProcessed(eventId: string): Promise<void> {
+/**
+ * Marca l'evento come processato su Redis (TTL 24h).
+ *
+ * FIX: viene chiamato sia in caso di SUCCESSO sia in caso di ERRORE
+ * di processing. Questo previene il doppio processing in caso di retry
+ * manuale o reinvio da Stripe Dashboard, perché l'evento risulta già
+ * visto da Redis. L'errore originale è comunque catturato su Sentry.
+ *
+ * status: 'processed' | 'failed' — utile per audit trail da Redis CLI:
+ *   redis-cli GET stripe:event:<id>  → "processed" | "failed"
+ */
+async function markAsProcessed(
+  eventId: string,
+  status: 'processed' | 'failed' = 'processed',
+): Promise<void> {
   if (!redis) return;
   try {
-    await redis.set(`stripe:event:${eventId}`, '1', 'EX', 86400); // TTL 24h
+    await redis.set(`stripe:event:${eventId}`, status, 'EX', 86400); // TTL 24h
   } catch {
     // degraded: non bloccare il flusso
   }
 }
 
-// ── Helper: trova utente NorthStar da Stripe customerId ───────────────────
+// ── Helper: trova utente NorthStar da Stripe customerId ─────────────────
 async function findUserByStripeCustomerId(
   customerId: string,
 ): Promise<{ id: number } | null> {
@@ -96,12 +112,12 @@ async function findUserByStripeCustomerId(
   return user ?? null;
 }
 
-// ── Helper: calcola mese corrente YYYY-MM ──────────────────────────────────
+// ── Helper: calcola mese corrente YYYY-MM ────────────────────────────────
 function currentMonth(): string {
   return new Date().toISOString().slice(0, 7);
 }
 
-// ── Main handler ───────────────────────────────────────────────────────────
+// ── Main handler ────────────────────────────────────────────────────────────
 export async function stripeWebhookHandler(
   req: Request,
   res: Response,
@@ -139,7 +155,7 @@ export async function stripeWebhookHandler(
   try {
     switch (event.type) {
 
-      // ── invoice.paid ────────────────────────────────────────────────────
+      // ── invoice.paid ────────────────────────────────────────────────────────
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
@@ -162,7 +178,6 @@ export async function stripeWebhookHandler(
           .limit(1);
 
         if (!existingReferral) {
-          // Primo pagamento: prova a confermare referral da codice signup
           await processPostPaymentReferral(user.id);
 
           const [newReferral] = await db
@@ -192,7 +207,6 @@ export async function stripeWebhookHandler(
 
         if (existingReferral.status !== 'active') break;
 
-        // Rinnovo mensile: applica commissione
         const result = await applyMonthlyCommission({
           affiliateId:    existingReferral.affiliateId,
           referredUserId: user.id,
@@ -208,9 +222,7 @@ export async function stripeWebhookHandler(
         break;
       }
 
-      // ── customer.subscription.updated / created ─────────────────────────
-      // Aggiorna stripeSubscriptionId su users per mantenere sincronizzazione.
-      // Prima gestito da webhookHandlers.ts (dead code) — ora consolidato qui.
+      // ── customer.subscription.updated / created ─────────────────────────────
       case 'customer.subscription.updated':
       case 'customer.subscription.created': {
         const sub = event.data.object as Stripe.Subscription;
@@ -227,7 +239,7 @@ export async function stripeWebhookHandler(
         break;
       }
 
-      // ── customer.subscription.deleted ──────────────────────────────────
+      // ── customer.subscription.deleted ────────────────────────────────────
       case 'customer.subscription.deleted': {
         const sub = event.data.object as Stripe.Subscription;
         const customerId = sub.customer as string;
@@ -249,19 +261,26 @@ export async function stripeWebhookHandler(
         break;
     }
 
-    // Marca evento come processato su Redis
-    await markAsProcessed(event.id);
-
+    // ✅ Successo: marca evento come processato
+    await markAsProcessed(event.id, 'processed');
     res.json({ received: true, eventId: event.id, type: event.type });
+
   } catch (err) {
-    // Risponde 200 per evitare retry Stripe — l'errore è loggato su Sentry.
-    // Se il processing fallisce ripetutamente, investigare da Sentry dashboard.
+    // ✅ FIX: marca come 'failed' ANCHE in caso di errore.
+    // Questo previene il doppio processing se l'evento viene reinviato
+    // manualmente da Stripe Dashboard o via CLI.
+    // L'errore è loggato su Sentry per investigazione separata.
+    await markAsProcessed(event.id, 'failed');
+
     captureError(err, {
       path:      '/api/webhooks/stripe',
       eventType: event.type,
       extra:     { eventId: event.id },
     });
     console.error('[stripe webhook] Errore processing event:', event.id, err);
-    res.json({ received: true, error: 'Processing error — check Sentry' });
+
+    // Risponde 200 per evitare retry automatici Stripe — il processing
+    // fallito è tracciato su Sentry + Redis con status 'failed'.
+    res.json({ received: true, error: 'Processing error — check Sentry', eventId: event.id });
   }
 }
