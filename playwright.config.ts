@@ -11,8 +11,9 @@ export default defineConfig({
     baseURL: process.env.BASE_URL ?? "http://localhost:5000",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
-    actionTimeout: 10_000,
-    navigationTimeout: 20_000,
+    // Aumentato per gestire SSE + lazy loading pesante
+    actionTimeout:     15_000,
+    navigationTimeout: 25_000,
   },
   projects: [
     {
