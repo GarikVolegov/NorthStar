@@ -1,4 +1,9 @@
 /**
+ * ⚠️  REGOLA 0 — Prima di modificare questo file leggi:
+ *   → API_RULES.md  (route, auth, middleware, SSE, Stripe, error handling)
+ *   → DB_RULES.md   (se tocchi accesso al DB, Drizzle, migrations, seed)
+ *   → AI_RULES.md   (se aggiungi o modifichi endpoint AI / Wendy / streaming)
+ *
  * index.ts — Entry point Express server NorthStar.
  *
  * PORTA: process.env.PORT ?? 3001
