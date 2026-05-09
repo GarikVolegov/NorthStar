@@ -1,17 +1,58 @@
 # See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
-# compiled output
+# ── Compiled output ────────────────────────────────────────────────────────
 dist
 tmp
 out-tsc
 *.tsbuildinfo
 .expo
 .expo-shared
+build/
+.next/
+out/
 
-# dependencies
+# ── Dependencies ───────────────────────────────────────────────────────────
 node_modules
+.pnpm-store/
 
-# IDEs and editors
+# ── Environment & secrets ──────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+!.env.staging.example
+*.pem
+*.key
+*.crt
+*.p12
+
+# ── Database ───────────────────────────────────────────────────────────────
+*.sql
+*.db
+*.sqlite
+*.sqlite3
+backups/
+
+# ── Logs ───────────────────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log
+yarn-error.log
+testem.log
+/libpeerconnection.log
+
+# ── Test output ────────────────────────────────────────────────────────────
+test-results/
+playwright-report/
+coverage/
+/typings
+
+# ── Temporary & backup files ───────────────────────────────────────────────
+*.tmp
+*.bak
+*.swp
+*~
+
+# ── IDE ────────────────────────────────────────────────────────────────────
 /.idea
 .project
 .classpath
@@ -19,31 +60,22 @@ node_modules
 *.launch
 .settings/
 *.sublime-workspace
-
-# IDE - VSCode
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# misc
-/.sass-cache
-/connect.lock
-/coverage
-/libpeerconnection.log
-npm-debug.log
-yarn-error.log
-testem.log
-/typings
-
-# System Files
+# ── System files ───────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+/.sass-cache
+/connect.lock
 
-.cursor/rules/nx-rules.mdc
-.github/instructions/nx.instructions.md
-
-# Replit
+# ── Replit-specific ────────────────────────────────────────────────────────
 .cache/
 .local/
+attached_assets/
+skills-lock.json
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md
