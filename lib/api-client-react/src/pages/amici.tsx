@@ -4,6 +4,7 @@
  * Struttura:
  *   - Header con titolo + contatore
  *   - 3 Tab: Connessioni | Richieste (badge) | Esplora
+ *   - Tab Esplora: barra di ricerca con debounce 300ms + filtro settore
  *   - Contenuto animato con framer-motion (stagger cards)
  *   - Skeleton loader durante il caricamento
  *   - Empty state curato per ogni tab
@@ -14,13 +15,31 @@
  *   - Lucide icons (già in progetto)
  *   - Tailwind CSS
  */
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, UserPlus, Compass, UserCheck, UserX, Clock, Star, Zap } from "lucide-react";
+import {
+  Users, UserPlus, Compass, UserCheck, UserX, Clock,
+  Star, Zap, Search, X, Loader2, SlidersHorizontal,
+} from "lucide-react";
 import { useFriends, type Friend, type FriendRequest, type Suggestion } from "@/hooks/useFriends";
 
-// ── Tipi tab ──────────────────────────────────────────────────────────────────
+// ── Tipi ──────────────────────────────────────────────────────────────────────
 type Tab = "connessioni" | "richieste" | "esplora";
+
+type SearchResult = {
+  id: number;
+  name: string;
+  avatarUrl: string | null;
+  sectorName: string | null;
+  journeyType: string | null;
+  totalXp: number | null;
+};
+
+type SearchState =
+  | { status: "idle" }
+  | { status: "searching" }
+  | { status: "done"; results: SearchResult[]; query: string; hasMore: boolean }
+  | { status: "error"; message: string };
 
 // ── Costanti animazione ───────────────────────────────────────────────────────
 const listVariants = {
@@ -32,6 +51,98 @@ const cardVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } },
   exit:    { opacity: 0, scale: 0.96, transition: { duration: 0.18 } },
 };
+
+// ── Hook: useSearch ───────────────────────────────────────────────────────────
+//
+// Gestisce la ricerca con debounce 300ms.
+// Ritorna lo stato della ricerca e le azioni per agire sui risultati.
+
+function useSearch() {
+  const [query, setQuery]         = useState("");
+  const [sectorFilter, setSector] = useState<number | null>(null);
+  const [state, setState]         = useState<SearchState>({ status: "idle" });
+  const [pendingIds, setPending]  = useState<Record<number, "sending" | "sent">>({}); 
+  const debounceRef               = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef                  = useRef<AbortController | null>(null);
+
+  const doSearch = useCallback(async (q: string, sector: number | null) => {
+    if (q.trim().length < 2) {
+      setState({ status: "idle" });
+      return;
+    }
+
+    // Annulla richiesta precedente
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    setState({ status: "searching" });
+
+    try {
+      const params = new URLSearchParams({ q: q.trim() });
+      if (sector !== null) params.set("sector", String(sector));
+
+      const res = await fetch(`/api/friends/search?${params}`, {
+        credentials: "include",
+        signal: ac.signal,
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setState({ status: "error", message: body.error ?? "Errore nella ricerca" });
+        return;
+      }
+
+      const data = await res.json();
+      setState({
+        status:   "done",
+        results:  data.results ?? [],
+        query:    q.trim(),
+        hasMore:  data.hasMore ?? false,
+      });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return; // richiesta annullata, ignora
+      setState({ status: "error", message: "Connessione non riuscita" });
+    }
+  }, []);
+
+  // Debounce: 300ms dopo l'ultimo keystroke
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => doSearch(query, sectorFilter), 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query, sectorFilter, doSearch]);
+
+  const clear = useCallback(() => {
+    setQuery("");
+    setSector(null);
+    setState({ status: "idle" });
+    abortRef.current?.abort();
+    setPending({});
+  }, []);
+
+  const markSending = useCallback((userId: number) => {
+    setPending((p) => ({ ...p, [userId]: "sending" }));
+  }, []);
+
+  const markSent = useCallback((userId: number) => {
+    setPending((p) => ({ ...p, [userId]: "sent" }));
+  }, []);
+
+  return {
+    query,
+    setQuery,
+    sectorFilter,
+    setSector,
+    state,
+    clear,
+    pendingIds,
+    markSending,
+    markSent,
+  };
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -94,10 +205,10 @@ function SkeletonCard() {
   );
 }
 
-function SkeletonList() {
+function SkeletonList({ count = 4 }: { count?: number }) {
   return (
     <div className="space-y-3">
-      {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+      {Array.from({ length: count }).map((_, i) => <SkeletonCard key={i} />)}
     </div>
   );
 }
@@ -313,6 +424,289 @@ function SuggestionCard({
   );
 }
 
+// ── SearchResultCard ──────────────────────────────────────────────────────────
+// Card per i risultati di ricerca: uguale a SuggestionCard ma con stato
+// "sent" (richiesta già inviata) gestito separatamente.
+
+function SearchResultCard({
+  user,
+  onConnect,
+  status,
+}: {
+  user: SearchResult;
+  onConnect: () => void;
+  status: "idle" | "sending" | "sent";
+}) {
+  return (
+    <motion.div
+      variants={cardVariants}
+      layout
+      className="flex items-center gap-3 p-4 rounded-xl bg-[#0d1421] border border-white/[0.06]
+                 hover:border-white/10 transition-all"
+    >
+      <Avatar user={user} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          <span className="text-[14px] font-semibold text-[#dce6f5] truncate">{user.name}</span>
+        </div>
+        <div className="flex items-center gap-2 text-[12px] text-[#7c8db5] flex-wrap">
+          {user.sectorName && <span className="truncate max-w-[120px]">{user.sectorName}</span>}
+          {user.totalXp != null && (
+            <span className="flex items-center gap-1">
+              <Zap className="w-3 h-3 text-amber-400" />
+              {user.totalXp.toLocaleString("it-IT")} XP
+            </span>
+          )}
+        </div>
+        {user.journeyType && (
+          <div className="mt-1">
+            <JourneyBadge type={user.journeyType} />
+          </div>
+        )}
+      </div>
+
+      {status === "sent" ? (
+        <span className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-emerald-400 bg-emerald-400/10 flex items-center gap-1.5">
+          <UserCheck className="w-3.5 h-3.5" />
+          Inviata
+        </span>
+      ) : (
+        <button
+          onClick={onConnect}
+          disabled={status === "sending"}
+          aria-label={`Connettiti con ${user.name}`}
+          className="px-3 py-1.5 rounded-lg text-[12px] font-semibold text-[#7eb3ff]
+                     bg-[#1a3a6b]/60 hover:bg-[#1a3a6b] transition-colors
+                     disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+        >
+          {status === "sending" ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <UserPlus className="w-3.5 h-3.5" />
+          )}
+          Connetti
+        </button>
+      )}
+    </motion.div>
+  );
+}
+
+// ── SearchBar ─────────────────────────────────────────────────────────────────
+
+function SearchBar({
+  query,
+  onChange,
+  onClear,
+  isSearching,
+}: {
+  query: string;
+  onChange: (v: string) => void;
+  onClear: () => void;
+  isSearching: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="relative">
+      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#4a5a75] pointer-events-none">
+        {isSearching
+          ? <Loader2 className="w-4 h-4 animate-spin" />
+          : <Search className="w-4 h-4" />
+        }
+      </div>
+      <input
+        ref={inputRef}
+        type="search"
+        value={query}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Cerca per nome…"
+        autoComplete="off"
+        spellCheck={false}
+        aria-label="Cerca utenti per nome"
+        className="
+          w-full pl-10 pr-10 py-2.5 rounded-xl
+          bg-[#0d1421] border border-white/[0.08]
+          text-[14px] text-[#dce6f5] placeholder:text-[#4a5a75]
+          focus:outline-none focus:border-[#2a4a8b]/70 focus:ring-1 focus:ring-[#2a4a8b]/40
+          transition-all
+        "
+      />
+      {query.length > 0 && (
+        <button
+          onClick={onClear}
+          aria-label="Cancella ricerca"
+          className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded text-[#4a5a75]
+                     hover:text-[#7c8db5] transition-colors"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── TabEsplora — contenuto completo della tab ─────────────────────────────────
+
+function TabEsplora({
+  suggestions,
+  pendingFriendIds,
+  onConnectSuggestion,
+}: {
+  suggestions: Suggestion[];
+  pendingFriendIds: Record<string, string>;
+  onConnectSuggestion: (id: string) => void;
+}) {
+  const search = useSearch();
+
+  // Funzione che invia la richiesta e aggiorna lo stato ottimistico
+  async function handleConnectSearch(user: SearchResult) {
+    search.markSending(user.id);
+    try {
+      const res = await fetch(`/api/friends/request/${user.id}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok || res.status === 409) {
+        search.markSent(user.id);
+      } else {
+        // ripristina a idle su errore
+        search.markSending(user.id); // trick: forza re-render
+      }
+    } catch {
+      // ignora — l'utente può riprovare
+    }
+  }
+
+  const isActiveSearch = search.query.trim().length >= 2;
+
+  return (
+    <div className="space-y-4">
+
+      {/* ── Barra di ricerca ──────────────────────────────────────────── */}
+      <SearchBar
+        query={search.query}
+        onChange={search.setQuery}
+        onClear={search.clear}
+        isSearching={search.state.status === "searching"}
+      />
+
+      {/* ── Risultati ricerca ─────────────────────────────────────────── */}
+      <AnimatePresence mode="wait">
+        {isActiveSearch ? (
+          <motion.div
+            key="search-results"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {search.state.status === "searching" && (
+              <SkeletonList count={3} />
+            )}
+
+            {search.state.status === "error" && (
+              <div className="text-center py-8 text-[#7c8db5] text-[13px]">
+                <p>{search.state.message}</p>
+              </div>
+            )}
+
+            {search.state.status === "done" && (
+              <>
+                {/* Header risultati */}
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[12px] text-[#4a5a75]">
+                    {search.state.results.length === 0
+                      ? `Nessun risultato per "${search.state.query}"`
+                      : `${search.state.results.length}${
+                          search.state.hasMore ? "+" : ""
+                        } risultat${search.state.results.length === 1 ? "o" : "i"} per "${search.state.query}"`
+                    }
+                  </p>
+                </div>
+
+                {search.state.results.length === 0 ? (
+                  <EmptyState
+                    icon={Search}
+                    title="Nessun utente trovato"
+                    description={`Non ci sono utenti pubblici con il nome "${search.state.query}"`}
+                  />
+                ) : (
+                  <motion.div
+                    variants={listVariants}
+                    initial="hidden"
+                    animate="visible"
+                    className="space-y-3"
+                  >
+                    {search.state.results.map((user) => (
+                      <SearchResultCard
+                        key={user.id}
+                        user={user}
+                        status={
+                          search.pendingIds[user.id] === "sent"
+                            ? "sent"
+                            : search.pendingIds[user.id] === "sending"
+                            ? "sending"
+                            : "idle"
+                        }
+                        onConnect={() => handleConnectSearch(user)}
+                      />
+                    ))}
+                  </motion.div>
+                )}
+
+                {search.state.hasMore && (
+                  <p className="text-center text-[11px] text-[#4a5a75] mt-3">
+                    Affina la ricerca per trovare risultati più specifici
+                  </p>
+                )}
+              </>
+            )}
+          </motion.div>
+        ) : (
+          /* ── Suggerimenti (stato idle) ────────────────────────────── */
+          <motion.div
+            key="suggestions"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {suggestions.length === 0 ? (
+              <EmptyState
+                icon={Compass}
+                title="Nessun suggerimento al momento"
+                description="Completa il tuo profilo per essere trovato da altri utenti"
+              />
+            ) : (
+              <>
+                <p className="text-[12px] text-[#4a5a75] mb-4 flex items-center gap-1.5">
+                  <Star className="w-3.5 h-3.5 text-amber-400/60" />
+                  Persone con il tuo stesso settore o percorso
+                </p>
+                <motion.div
+                  variants={listVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="space-y-3"
+                >
+                  {suggestions.map((s) => (
+                    <SuggestionCard
+                      key={s.id}
+                      suggestion={s}
+                      sending={pendingFriendIds[s.id] === "sending"}
+                      onConnect={() => onConnectSuggestion(s.id)}
+                    />
+                  ))}
+                </motion.div>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // ── Pagina principale ─────────────────────────────────────────────────────────
 
 export default function AmiciPage() {
@@ -459,36 +853,13 @@ export default function AmiciPage() {
             )}
           </motion.div>
         ) : (
+          /* ── Tab Esplora ───────────────────────────────────────────────── */
           <motion.div key="esplora" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {suggestions.length === 0 ? (
-              <EmptyState
-                icon={Compass}
-                title="Nessun suggerimento al momento"
-                description="Completa il tuo profilo e rendi visibile il tuo percorso per essere trovato"
-              />
-            ) : (
-              <>
-                <p className="text-[12px] text-[#4a5a75] mb-4 flex items-center gap-1.5">
-                  <Star className="w-3.5 h-3.5 text-amber-400/60" />
-                  Persone con il tuo stesso settore o percorso
-                </p>
-                <motion.div
-                  variants={listVariants}
-                  initial="hidden"
-                  animate="visible"
-                  className="space-y-3"
-                >
-                  {suggestions.map((s) => (
-                    <SuggestionCard
-                      key={s.id}
-                      suggestion={s}
-                      sending={pendingIds[s.id] === "sending"}
-                      onConnect={() => actions.sendRequest(s.id)}
-                    />
-                  ))}
-                </motion.div>
-              </>
-            )}
+            <TabEsplora
+              suggestions={suggestions}
+              pendingFriendIds={pendingIds}
+              onConnectSuggestion={(id) => actions.sendRequest(id)}
+            />
           </motion.div>
         )}
       </AnimatePresence>
