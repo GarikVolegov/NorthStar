@@ -7,7 +7,11 @@
     "dev":   "tsx watch src/index.ts",
     "build": "tsc --project tsconfig.json",
     "start": "node dist/index.js",
-    "lint":  "eslint src --ext .ts"
+    "lint":  "eslint src --ext .ts",
+
+    "// ── SEED E2E ──────────────────────────────────────────────────────────": "---",
+    "seed:e2e":           "tsx ../../scripts/src/seed-e2e.ts",
+    "seed:e2e-affiliate": "tsx ../../scripts/src/seed-e2e-affiliate.ts"
   },
   "dependencies": {
     "@workspace/db":    "*",
