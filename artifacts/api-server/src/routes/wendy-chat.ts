@@ -29,7 +29,7 @@ import { requireAuth } from '../middlewares/requireAuth.js';
 import { ai } from '../lib/ai/index.js';
 import { loadWendyContext, saveSessionSummary } from '../lib/wendy-memory.js';
 import { retrieveKnowledge } from '../lib/wendy-rag.js';
-import { rateLimit } from 'express-rate-limit';
+import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import { logger } from '../lib/logger.js';
 
 export const wendyChatRouter = Router();
@@ -38,8 +38,10 @@ export const wendyChatRouter = Router();
 const chatRateLimiter = rateLimit({
   windowMs: 60_000,
   max: 10,
-  keyGenerator: (req: Request) =>
-    (req as Request & { user?: { id: string } }).user?.id ?? req.ip ?? 'anon',
+  keyGenerator: (req: Request) => {
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
+    return userId ? `user:${userId}` : ipKeyGenerator(req);
+  },
   standardHeaders: true,
   legacyHeaders:   false,
   message: { error: 'Troppi messaggi. Attendi un momento.', code: 'RATE_LIMIT' },

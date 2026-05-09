@@ -18,6 +18,8 @@ router.get("/completion/me", async (req, res): Promise<void> => {
       workPreference: usersTable.workPreference,
       cvText: usersTable.cvText,
       isPublic: usersTable.isPublic,
+      streakDays: usersTable.streakDays,
+      lastActiveAt: usersTable.lastActiveAt,
     })
     .from(usersTable)
     .where(eq(usersTable.id, userId));
@@ -27,57 +29,54 @@ router.get("/completion/me", async (req, res): Promise<void> => {
     return;
   }
 
-  const [objTotal] = await db
-    .select({ val: count() })
-    .from(userObjectivesTable)
-    .where(eq(userObjectivesTable.userId, userId));
-
-  const [objDone] = await db
-    .select({ val: count() })
-    .from(userObjectivesTable)
-    .where(
-      and(
-        eq(userObjectivesTable.userId, userId),
-        eq(userObjectivesTable.completed, true),
+  const [[objTotal], [objDone], [latestSession]] = await Promise.all([
+    db
+      .select({ val: count() })
+      .from(userObjectivesTable)
+      .where(eq(userObjectivesTable.userId, userId)),
+    db
+      .select({ val: count() })
+      .from(userObjectivesTable)
+      .where(
+        and(
+          eq(userObjectivesTable.userId, userId),
+          eq(userObjectivesTable.completed, true),
+        ),
       ),
-    );
+    db
+      .select({ confirmedSectorId: testSessionsTable.confirmedSectorId })
+      .from(testSessionsTable)
+      .where(eq(testSessionsTable.userId, userId))
+      .orderBy(desc(testSessionsTable.createdAt))
+      .limit(1),
+  ]);
 
-  const [latestSession] = await db
-    .select({ confirmedSectorId: testSessionsTable.confirmedSectorId })
-    .from(testSessionsTable)
-    .where(eq(testSessionsTable.userId, userId))
-    .orderBy(desc(testSessionsTable.createdAt))
-    .limit(1);
+  // ─── Streak calculation — solo Drizzle ORM, nessun raw SQL ──────────────────
+  const now = new Date();
+  const last = user.lastActiveAt ? new Date(user.lastActiveAt) : null;
+  let streakDays = user.streakDays ?? 0;
 
-  let streakDays = 0;
-  try {
-    const [streakRow] = await db.execute<{ streak_days: number; last_active_at: Date | null }>(
-      `SELECT streak_days, last_active_at FROM users WHERE id = ${userId} LIMIT 1`,
-    ) as any;
-    if (streakRow) {
-      const now = new Date();
-      const last = streakRow.last_active_at ? new Date(streakRow.last_active_at) : null;
-      let current = Number(streakRow.streak_days ?? 0);
-      if (!last) {
-        current = 1;
-      } else {
-        const diffDays = Math.floor((now.getTime() - last.getTime()) / 86_400_000);
-        if (diffDays === 0) {
-        } else if (diffDays === 1) {
-          current = current + 1;
-        } else {
-          current = 1;
-        }
-      }
-      if (!last || Math.floor((now.getTime() - last.getTime()) / 86_400_000) >= 1) {
-        await db.execute(
-          `UPDATE users SET streak_days = ${current}, last_active_at = NOW() WHERE id = ${userId}`,
-        );
-      }
-      streakDays = current;
+  let newStreak = streakDays;
+  if (!last) {
+    newStreak = 1;
+  } else {
+    const diffDays = Math.floor((now.getTime() - last.getTime()) / 86_400_000);
+    if (diffDays === 0) {
+      // Stesso giorno — nessuna variazione
+    } else if (diffDays === 1) {
+      newStreak = streakDays + 1;
+    } else {
+      newStreak = 1; // Streak interrotto
     }
-  } catch {
-    streakDays = 0;
+  }
+
+  const shouldUpdate = !last || Math.floor((now.getTime() - last.getTime()) / 86_400_000) >= 1;
+  if (shouldUpdate) {
+    await db
+      .update(usersTable)
+      .set({ streakDays: newStreak, lastActiveAt: now })
+      .where(eq(usersTable.id, userId));
+    streakDays = newStreak;
   }
 
   res.json({

@@ -102,7 +102,7 @@ export default function Candidature() {
     queryKey: ["applications", user?.id],
     queryFn: async () => {
       if (!user?.id) return { applications: [] };
-      const res = await fetch(`${BASE}api/applications/${user.id}`);
+      const res = await apiFetch(`${BASE}api/applications/${user.id}`);
       return res.json() as Promise<{ applications: Application[] }>;
     },
     enabled: !!user?.id,
@@ -112,10 +112,10 @@ export default function Candidature() {
 
   const createMutation = useMutation({
     mutationFn: async (payload: typeof EMPTY_FORM) => {
-      const res = await fetch(`${BASE}api/applications`, {
+      const res = await apiFetch(`${BASE}api/applications`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, userId: user?.id }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Errore nella creazione");
       return res.json();
@@ -131,7 +131,7 @@ export default function Candidature() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: Partial<Application> }) => {
-      const res = await fetch(`${BASE}api/applications/${id}`, {
+      const res = await apiFetch(`${BASE}api/applications/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates),
@@ -144,7 +144,7 @@ export default function Candidature() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`${BASE}api/applications/${id}`, { method: "DELETE" });
+      const res = await apiFetch(`${BASE}api/applications/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Errore nell'eliminazione");
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["applications", user?.id] }),
@@ -607,7 +607,7 @@ function AppCard({
 
   const addNoteMutation = useMutation({
     mutationFn: async (text: string) => {
-      const res = await fetch(`${BASE}api/applications/${app.id}/notes`, {
+      const res = await apiFetch(`${BASE}api/applications/${app.id}/notes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
@@ -623,7 +623,7 @@ function AppCard({
 
   const deleteNoteMutation = useMutation({
     mutationFn: async (index: number) => {
-      const res = await fetch(`${BASE}api/applications/${app.id}/notes/${index}`, { method: "DELETE" });
+      const res = await apiFetch(`${BASE}api/applications/${app.id}/notes/${index}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Errore");
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["applications", userId] }),

@@ -14,6 +14,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { runStartupCheck } from "./lib/startup-check";
 import { seedSectors, patchDipendentiSteps, patchWorkModeFields, seedProfessions, seedEducationPaths, ensureCoachSessionsTable, ensurePromptsTable } from "./lib/seed";
+import { seedStripeProducts } from "./lib/stripe-seed.js";
 import { startInterviewReminderScheduler } from "./lib/interview-reminder.js";
 import { startWeeklyDigestScheduler } from "./lib/weekly-digest.js";
 import { startCalendarReminderScheduler } from "./lib/calendar-scheduler.js";
@@ -62,6 +63,9 @@ if (!process.env.VERCEL) {
     } catch (seedErr) {
       logger.error({ err: seedErr }, "Failed to seed sectors");
     }
+
+    // Stripe products seed — idempotente, no-op se STRIPE_SECRET_KEY non è configurata
+    await seedStripeProducts();
 
     startInterviewReminderScheduler();
     startCalendarReminderScheduler();

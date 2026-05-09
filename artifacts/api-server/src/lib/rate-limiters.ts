@@ -21,10 +21,8 @@ function createLimiter(name: string, options: Partial<Options>) {
     standardHeaders: 'draft-7', // RateLimit-Policy, RateLimit headers (RFC 9110)
     legacyHeaders: false,
     skipSuccessfulRequests: false,
-    keyGenerator: (req) => {
-      // Usa l'IP reale (app.set('trust proxy', 1) già in app.ts)
-      return req.ip ?? req.socket.remoteAddress ?? 'unknown';
-    },
+    // Nessun keyGenerator custom: il default di express-rate-limit gestisce già
+    // IPv6 e trust proxy correttamente (app.set('trust proxy', 1) è in app.ts).
     handler: (req, res) => {
       logger.warn(
         { ip: req.ip, route: req.path, limiter: name },

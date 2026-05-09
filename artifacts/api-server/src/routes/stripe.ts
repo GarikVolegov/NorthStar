@@ -1,28 +1,34 @@
 import { Router } from "express";
 import { storage } from "../storage";
 import { getUncachableStripeClient } from "../stripeClient";
+import { authMiddleware } from "../lib/auth-jwt.js";
 
 const router = Router();
 
+// ── GET /api/stripe/products — pubblico: lista prodotti e prezzi ──────────────
 router.get("/stripe/products", async (_req, res): Promise<void> => {
   const rows = await storage.listProductsWithPrices();
 
-  const productsMap = new Map<string, any>();
+  const productsMap = new Map<string, {
+    id: string; name: string; description: string | null;
+    metadata: unknown; prices: Array<{ id: string; unitAmount: number | null; currency: string; recurring: unknown }>;
+  }>();
+
   for (const row of rows) {
     if (!productsMap.has(row.product_id as string)) {
       productsMap.set(row.product_id as string, {
-        id: row.product_id,
-        name: row.product_name,
-        description: row.product_description,
+        id: row.product_id as string,
+        name: row.product_name as string,
+        description: row.product_description as string | null,
         metadata: row.product_metadata,
-        prices: []
+        prices: [],
       });
     }
     if (row.price_id) {
-      productsMap.get(row.product_id as string).prices.push({
-        id: row.price_id,
-        unitAmount: row.unit_amount,
-        currency: row.currency,
+      productsMap.get(row.product_id as string)!.prices.push({
+        id: row.price_id as string,
+        unitAmount: row.unit_amount as number | null,
+        currency: row.currency as string,
         recurring: row.recurring,
       });
     }
@@ -31,15 +37,18 @@ router.get("/stripe/products", async (_req, res): Promise<void> => {
   res.json({ data: Array.from(productsMap.values()) });
 });
 
-router.post("/stripe/checkout", async (req, res): Promise<void> => {
-  const { priceId, userId, userEmail } = req.body as {
-    priceId: string;
-    userId?: number;
-    userEmail?: string;
-  };
+// ── POST /api/stripe/checkout — crea sessione checkout Stripe ────────────────
+router.post("/stripe/checkout", authMiddleware, async (req, res): Promise<void> => {
+  const userId = res.locals.userId as number;
+  const { priceId, userEmail } = req.body as { priceId: string; userEmail?: string };
 
   if (!priceId) {
-    res.status(400).json({ error: "priceId is required" });
+    res.status(400).json({ error: "priceId è obbligatorio" });
+    return;
+  }
+
+  if (!process.env.STRIPE_SECRET_KEY) {
+    res.status(503).json({ error: "Stripe non configurato" });
     return;
   }
 
@@ -47,31 +56,28 @@ router.post("/stripe/checkout", async (req, res): Promise<void> => {
 
   let customerId: string | undefined;
 
-  if (userId) {
-    const user = await storage.getUserById(userId);
-    if (user?.stripeCustomerId) {
-      customerId = user.stripeCustomerId;
-    } else if (user) {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        name: user.name,
-        metadata: { userId: String(user.id) },
-      });
-      await storage.updateUserStripeInfo(user.id, { stripeCustomerId: customer.id });
-      customerId = customer.id;
-    }
-  } else if (userEmail) {
-    const customer = await stripe.customers.create({ email: userEmail });
+  const user = await storage.getUserById(userId);
+  if (user?.stripeCustomerId) {
+    customerId = user.stripeCustomerId;
+  } else if (user) {
+    const customer = await stripe.customers.create({
+      email: user.email ?? userEmail,
+      name: user.name,
+      metadata: { userId: String(user.id) },
+    });
+    await storage.updateUserStripeInfo(user.id, { stripeCustomerId: customer.id });
     customerId = customer.id;
   }
 
-  const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+  const baseUrl = process.env.CORS_ORIGIN
+    ?? `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`
+    ?? "http://localhost:5000";
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
-    payment_method_types: ['card'],
+    payment_method_types: ["card"],
     line_items: [{ price: priceId, quantity: 1 }],
-    mode: 'subscription',
+    mode: "subscription",
     success_url: `${baseUrl}/premium/successo?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${baseUrl}/premium`,
   });
@@ -79,10 +85,12 @@ router.post("/stripe/checkout", async (req, res): Promise<void> => {
   res.json({ url: session.url });
 });
 
-router.get("/stripe/subscription/:userId", async (req, res): Promise<void> => {
-  const userId = parseInt(req.params.userId, 10);
-  if (!userId) {
-    res.status(400).json({ error: "Invalid userId" });
+// ── GET /api/stripe/subscription — stato abbonamento utente autenticato ───────
+router.get("/stripe/subscription", authMiddleware, async (req, res): Promise<void> => {
+  const userId = res.locals.userId as number;
+
+  if (!process.env.STRIPE_SECRET_KEY) {
+    res.json({ subscription: null, isPremium: false });
     return;
   }
 
@@ -93,25 +101,29 @@ router.get("/stripe/subscription/:userId", async (req, res): Promise<void> => {
   }
 
   const subscription = await storage.getSubscription(user.stripeSubscriptionId);
-  const isPremium = subscription?.status === 'active' || subscription?.status === 'trialing';
+  const isPremium = subscription?.status === "active" || subscription?.status === "trialing";
   res.json({ subscription, isPremium });
 });
 
-router.post("/stripe/portal", async (req, res): Promise<void> => {
-  const { userId } = req.body as { userId: number };
-  if (!userId) {
-    res.status(400).json({ error: "userId is required" });
+// ── POST /api/stripe/portal — portale gestione abbonamento ───────────────────
+router.post("/stripe/portal", authMiddleware, async (req, res): Promise<void> => {
+  const userId = res.locals.userId as number;
+
+  if (!process.env.STRIPE_SECRET_KEY) {
+    res.status(503).json({ error: "Stripe non configurato" });
     return;
   }
 
   const user = await storage.getUserById(userId);
   if (!user?.stripeCustomerId) {
-    res.status(400).json({ error: "No Stripe customer found for this user" });
+    res.status(400).json({ error: "Nessun cliente Stripe associato all'account" });
     return;
   }
 
   const stripe = await getUncachableStripeClient();
-  const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+  const baseUrl = process.env.CORS_ORIGIN
+    ?? `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`
+    ?? "http://localhost:5000";
 
   const portalSession = await stripe.billingPortal.sessions.create({
     customer: user.stripeCustomerId,

@@ -24,7 +24,7 @@
  * Key prefix Redis: "rl:{limiterName}:" — evita collisioni con altre chiavi Redis.
  */
 
-import { rateLimit, type Store, type Options } from 'express-rate-limit';
+import { rateLimit, ipKeyGenerator, type Store, type Options } from 'express-rate-limit';
 import type { Request } from 'express';
 import { getRequestLogger } from './logger.js';
 
@@ -170,7 +170,7 @@ export const aiChatLimiter = lazyLimiter('ai_chat', {
   max: 40,
   keyGenerator: (req: Request) => {
     const user = (req as Request & { user?: { id: number } }).user;
-    return user?.id ? `user:${user.id}` : req.ip ?? 'unknown';
+    return user?.id ? `user:${user.id}` : ipKeyGenerator(req);
   },
   message: { error: 'Limite AI raggiunto. Riprova tra un minuto.' },
 });
@@ -184,7 +184,7 @@ export const aiGenerationLimiter = lazyLimiter('ai_generation', {
   max: 10,
   keyGenerator: (req: Request) => {
     const user = (req as Request & { user?: { id: number } }).user;
-    return user?.id ? `user:${user.id}` : req.ip ?? 'unknown';
+    return user?.id ? `user:${user.id}` : ipKeyGenerator(req);
   },
   message: { error: 'Limite generazione AI raggiunto. Riprova tra un minuto.' },
 });
