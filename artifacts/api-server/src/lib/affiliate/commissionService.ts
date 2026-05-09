@@ -35,6 +35,12 @@ export interface ApplyCommissionParams {
   referredUserId: number;
   /** Mese di competenza: 'YYYY-MM' (es. '2026-05') */
   month:          string;
+  /**
+   * Importo grezzo Stripe in cents (es. invoice.amount_paid).
+   * Opzionale: la commissione effettiva è sempre COMMISSION_CENTS fissi.
+   * Il campo viene conservato nell'audit log per riconciliazione contabile.
+   */
+  amountCents?:   number;
   /** null = sistema/cron, numero = admin che ha triggerato manualmente */
   actorId?:       number | null;
   /** IP per audit trail */
@@ -55,7 +61,7 @@ export interface ApplyCommissionParams {
 export async function applyMonthlyCommission(
   params: ApplyCommissionParams,
 ): Promise<CommissionResult> {
-  const { affiliateId, referredUserId, month, actorId = null, ipAddress } = params;
+  const { affiliateId, referredUserId, month, amountCents, actorId = null, ipAddress } = params;
 
   return await db.transaction(async (tx) => {
     // ── Step 1: Insert idempotente ────────────────────────────────────
@@ -154,7 +160,9 @@ export async function applyMonthlyCommission(
         affiliateId,
         referredUserId,
         month,
-        amountCents: COMMISSION_CENTS,
+        amountCents:      COMMISSION_CENTS,
+        // Importo grezzo Stripe — per riconciliazione contabile
+        stripeAmountCents: amountCents ?? null,
         appliedTo,
         newLockedBalance:       appliedTo === 'locked' ? newLocked : 0,
         newWithdrawableBalance: appliedTo === 'withdrawable'

@@ -80,6 +80,12 @@ export async function attachReferralToUser(
  * Chiamato dal webhook Stripe dopo invoice.paid.
  * Legge referredByAffiliateId dall'utente e invoca confirmReferral().
  * Idempotente: se referralConvertedAt è già impostato, non fa nulla.
+ *
+ * NOTA: processPostPaymentReferral non ha accesso diretto al paymentIntentId
+ * di Stripe perché viene invocato da stripeWebhookHandler tramite
+ * un livello di astrazione. Usiamo 'webhook-invoice' come sentinel value;
+ * il UNIQUE su referredUserId in affiliate_referrals garantisce l'idempotency
+ * indipendentemente dal valore di firstPaymentIntentId.
  */
 export async function processPostPaymentReferral(
   userId: number
@@ -113,12 +119,25 @@ export async function processPostPaymentReferral(
 
   if (!affiliateId) return; // Nessun referral valido
 
+  // ── Conflitto A (fix): usa referrerUserId + firstPaymentIntentId ──────────
+  // affiliateAccountsTable.id NON è lo userId del referrer; dobbiamo
+  // recuperare lo userId del referrer dall'account affiliato.
+  const [affiliateAccount] = await db
+    .select({ userId: affiliateAccountsTable.userId })
+    .from(affiliateAccountsTable)
+    .where(eq(affiliateAccountsTable.id, affiliateId))
+    .limit(1);
+
+  if (!affiliateAccount) return;
+
   // Conferma il referral (crea affiliate_referrals + aggiorna balance)
   await confirmReferral({
-    referrerId: affiliateId,
-    referredUserId: userId,
-    actorId: userId,
-    ipAddress: "webhook",
+    referrerUserId:       affiliateAccount.userId,
+    referredUserId:       userId,
+    // Sentinel: l'idempotency reale è garantita da UNIQUE(referredUserId)
+    // su affiliate_referrals, non da questo campo.
+    firstPaymentIntentId: 'webhook-invoice',
+    ipAddress:            'webhook',
   });
 
   // Marca conversione
