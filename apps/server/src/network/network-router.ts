@@ -4,6 +4,7 @@
  * GET    /api/friends              — lista amici (status=accepted)
  * GET    /api/friends/requests     — richieste ricevute in attesa
  * GET    /api/friends/suggestions  — utenti suggeriti (stesso settore)
+ * GET    /api/friends/search       — ricerca utenti per nome/settore (?q=&sector=)
  * POST   /api/friends/request/:id  — invia richiesta di amicizia
  * PUT    /api/friends/:id/accept   — accetta una richiesta ricevuta
  * DELETE /api/friends/:id          — rimuovi amico o rifiuta richiesta
@@ -18,7 +19,7 @@ import {
   testSessionsTable,
   sectorsTable,
 } from "@workspace/db";
-import { eq, or, and, ne, notInArray, sql } from "drizzle-orm";
+import { eq, or, and, notInArray, ilike, sql } from "drizzle-orm";
 
 export const networkRouter = Router();
 
@@ -54,6 +55,29 @@ async function getPublicUser(userId: number): Promise<PublicUser | null> {
     .limit(1)
     .then((r) => r[0] ?? null);
   return row;
+}
+
+/**
+ * Restituisce tutti gli ID già correlati all'utente (se stesso + connessioni
+ * accepted/pending/blocked in entrambe le direzioni).
+ * Usato per escludere utenti da suggestions e search.
+ */
+async function getExcludedIds(me: number): Promise<Set<number>> {
+  const rows = await db
+    .select()
+    .from(friendshipsTable)
+    .where(
+      or(
+        eq(friendshipsTable.requesterId, me),
+        eq(friendshipsTable.receiverId, me),
+      ),
+    );
+  const ids = new Set<number>([me]);
+  for (const f of rows) {
+    ids.add(f.requesterId);
+    ids.add(f.receiverId);
+  }
+  return ids;
 }
 
 // ── GET /api/friends — lista connessioni accettate ────────────────────────────
@@ -121,23 +145,7 @@ networkRouter.get("/requests", async (req: Request, res: Response) => {
 networkRouter.get("/suggestions", async (req: Request, res: Response) => {
   try {
     const me = uid(req);
-
-    // ID di utenti già connessi o con richiesta pendente
-    const existing = await db
-      .select()
-      .from(friendshipsTable)
-      .where(
-        or(
-          eq(friendshipsTable.requesterId, me),
-          eq(friendshipsTable.receiverId, me),
-        ),
-      );
-
-    const excludeIds = new Set<number>([me]);
-    for (const f of existing) {
-      excludeIds.add(f.requesterId);
-      excludeIds.add(f.receiverId);
-    }
+    const excludeIds = await getExcludedIds(me);
 
     // Trova sectorId dell'utente corrente
     const meRow = await db
@@ -158,7 +166,6 @@ networkRouter.get("/suggestions", async (req: Request, res: Response) => {
       mySectorId = session?.confirmedSectorId ?? null;
     }
 
-    // Utenti con stesso settore, non già connessi, pubblici
     const candidates = await db
       .select({
         id:          usersTable.id,
@@ -188,6 +195,105 @@ networkRouter.get("/suggestions", async (req: Request, res: Response) => {
     });
 
     res.json({ suggestions: sorted.slice(0, 12) });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Errore" });
+  }
+});
+
+// ── GET /api/friends/search — ricerca utenti ─────────────────────────────────
+//
+// Query params:
+//   q       — stringa di ricerca sul nome (min 2 caratteri, max 80)
+//   sector  — (opzionale) ID settore per filtrare
+//   limit   — (opzionale) max risultati, default 15, max 30
+//
+// Risposta: { results: PublicUser[], total: number }
+// I risultati escludono: se stessi, utenti già connessi/pending/blocked.
+// Ordinamento: match esatto nome > match parziale > totalXp desc.
+
+networkRouter.get("/search", async (req: Request, res: Response) => {
+  try {
+    const me = uid(req);
+
+    // ── Validazione parametri ────────────────────────────────────────────────
+    const rawQ = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    if (rawQ.length < 2) {
+      res.status(400).json({ error: "Il termine di ricerca deve avere almeno 2 caratteri" });
+      return;
+    }
+    if (rawQ.length > 80) {
+      res.status(400).json({ error: "Termine di ricerca troppo lungo" });
+      return;
+    }
+
+    const sectorFilter =
+      typeof req.query.sector === "string" && req.query.sector !== ""
+        ? parseInt(req.query.sector, 10)
+        : null;
+
+    const limit = Math.min(
+      parseInt(typeof req.query.limit === "string" ? req.query.limit : "15", 10) || 15,
+      30,
+    );
+
+    // ── Escludi utenti già correlati ─────────────────────────────────────────
+    const excludeIds = await getExcludedIds(me);
+
+    // ── Query principale ─────────────────────────────────────────────────────
+    // ilike è case-insensitive su Postgres (Drizzle ORM).
+    // Usiamo il pattern %query% per match parziale sul nome.
+    const namePattern = `%${rawQ}%`;
+
+    const baseConditions = and(
+      eq(usersTable.isPublic, true),
+      notInArray(usersTable.id, [...excludeIds]),
+      ilike(usersTable.name, namePattern),
+      // Se sector è specificato, filtra per quel settore
+      ...(sectorFilter !== null
+        ? [eq(testSessionsTable.confirmedSectorId, sectorFilter)]
+        : []),
+    );
+
+    const rows = await db
+      .select({
+        id:          usersTable.id,
+        name:        usersTable.name,
+        avatarUrl:   usersTable.avatarUrl,
+        journeyType: usersTable.journeyType,
+        totalXp:     usersTable.totalXp,
+        sectorName:  sectorsTable.name,
+        sectorId:    testSessionsTable.confirmedSectorId,
+      })
+      .from(usersTable)
+      .leftJoin(testSessionsTable, eq(usersTable.testSessionId, testSessionsTable.id))
+      .leftJoin(sectorsTable, eq(testSessionsTable.confirmedSectorId, sectorsTable.id))
+      .where(baseConditions)
+      .limit(limit + 1); // +1 per sapere se ci sono altri risultati
+
+    const hasMore = rows.length > limit;
+    const results = rows.slice(0, limit);
+
+    // ── Ordinamento lato applicazione ────────────────────────────────────────
+    // 1. Match esatto sul nome (case-insensitive) → in cima
+    // 2. Match che inizia con la query → secondo
+    // 3. Match parziale rimanente → terzo
+    // 4. A parità: totalXp desc
+    const q = rawQ.toLowerCase();
+    const sorted = results.sort((a, b) => {
+      const aName = a.name.toLowerCase();
+      const bName = b.name.toLowerCase();
+      const aExact  = aName === q ? 2 : aName.startsWith(q) ? 1 : 0;
+      const bExact  = bName === q ? 2 : bName.startsWith(q) ? 1 : 0;
+      if (aExact !== bExact) return bExact - aExact;
+      return (b.totalXp ?? 0) - (a.totalXp ?? 0);
+    });
+
+    res.json({
+      results: sorted,
+      total: sorted.length,
+      hasMore,
+      query: rawQ,
+    });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Errore" });
   }
