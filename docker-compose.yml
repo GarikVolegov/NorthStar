@@ -2,6 +2,7 @@
 # Usage:   docker compose up --build
 # Dev:     docker compose up postgres           (solo DB locale)
 # Full:    docker compose up --build
+# Nuovo server only: docker compose up postgres northstar-server
 #
 # Servizi:
 #   postgres          — PostgreSQL 16
@@ -94,7 +95,8 @@ services:
       - "3001:3001"
     environment:
       PORT:                  3001
-      NODE_ENV:              production
+      # Step 5: NODE_ENV=development in dev, sovrascrivere in prod
+      NODE_ENV:              ${NODE_ENV:-development}
       DATABASE_URL:          postgresql://northstar:northstar_dev@postgres:5432/northstar
       JWT_SECRET:            ${JWT_SECRET}
       JWT_EXPIRES_IN:        ${JWT_EXPIRES_IN:-7d}
@@ -102,7 +104,9 @@ services:
       OPENAI_MODEL:          ${OPENAI_MODEL:-gpt-4o-mini}
       STRIPE_SECRET_KEY:     ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
-      ALLOWED_ORIGINS:       ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      # Step 5: ALLOWED_ORIGINS da env per override production
+      ALLOWED_ORIGINS:       ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:5000}
+      APP_URL:               ${APP_URL:-http://localhost:5173}
       AFFILIATE_COMMISSION_PCT:        ${AFFILIATE_COMMISSION_PCT:-20}
       AFFILIATE_MIN_WITHDRAWAL_EUR:    ${AFFILIATE_MIN_WITHDRAWAL_EUR:-10}
     depends_on:
@@ -116,6 +120,11 @@ services:
       start_period: 20s
 
   # ─── React Frontend ─────────────────────────────────────────────────────────
+  # Nota: il frontend Vite (apps/web) viene servito da Replit in dev.
+  # Questo servizio fa girare il frontend legacy (artifacts/orientamento)
+  # o un eventuale build statico di apps/web.
+  # Step 5: VITE_API_URL aggiornato per puntare al northstar-server (3001)
+  # invece che solo al server legacy (8080).
   frontend:
     build:
       context:    ./artifacts/orientamento
@@ -124,9 +133,10 @@ services:
     ports:
       - "5000:5000"
     environment:
-      VITE_API_URL: http://localhost:8080/api
+      # Nuovo server (porta 3001) — cambia in https://api.northstar.app in prod
+      VITE_API_URL: ${VITE_API_URL:-http://northstar-server:3001/api}
     depends_on:
-      api-server:
+      northstar-server:
         condition: service_healthy
 
   # ─── Jaeger (distributed tracing UI) ──────────────────────────────────
