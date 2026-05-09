@@ -4,22 +4,52 @@
 
 ---
 
+## ⚠️ Regola 0 — Leggi le RULES prima di toccare codice
+
+> Prima di aprire qualsiasi file del progetto, apri il documento di riferimento corrispondente all'area che stai modificando.
+
+| Area | File da leggere prima |
+|---|---|
+| API / Express / route / middleware | `API_RULES.md` |
+| Database / Drizzle / migrazioni / schema | `DB_RULES.md` |
+| UI React / Tailwind / shadcn / componenti | `FRONTEND_RULES.md` |
+| AI agents / Wendy / LLM router / streaming | `AI_RULES.md` |
+| Branch / commit / PR / merge | `GIT_RULES.md` |
+
+**Perché?** Ogni file di RULES contiene pattern obbligatori, checklist, gotchas e anti-pattern specifici per quell'area. Ignorarli introduce bug architetturali difficili da tracciare.
+
+---
+
 ## Avvio rapido
 
 | Servizio | Comando | Porta |
 |---|---|---|
 | Frontend (Vite) | `PORT=5000 pnpm --filter @workspace/orientamento run dev` | 5000 |
-| API Server (Express) | `PORT=8080 pnpm --filter @workspace/api-server run dev` | 8080 |
+| API Server legacy (Express) | `PORT=8080 pnpm --filter @workspace/api-server run dev` | 8080 |
+| NorthStar Server nuovo (Express) | `pnpm dev:server` oppure `pnpm dev` | 3001 |
 | Python AI (FastAPI) | `cd artifacts/ai-agents && python3.11 -m uvicorn main:app --host 0.0.0.0 --port 8000` | 8000 |
 
 ```bash
-# DB migrations
+# ─── Dev (nuovo server apps/server/) ─────────────────────────────────
+pnpm dev            # avvia solo northstar-server (:3001)
+pnpm dev:server     # alias diretto @northstar/server
+pnpm dev:web        # avvia solo @northstar/web
+pnpm dev:all        # server + web insieme (concurrently, label colorati)
+
+# ─── Build & Start ────────────────────────────────────────────────────
+pnpm build:server   # compila TypeScript apps/server → dist/
+pnpm start:server   # avvia server compilato (produzione)
+
+# ─── Lint ─────────────────────────────────────────────────────────────
+pnpm lint:server    # ESLint su apps/server/src
+
+# ─── DB migrations ────────────────────────────────────────────────────
 pnpm --filter @workspace/db exec drizzle-kit push
 
-# Build completo
+# ─── Build completo ───────────────────────────────────────────────────
 pnpm run build
 
-# Typecheck
+# ─── Typecheck ────────────────────────────────────────────────────────
 pnpm run typecheck
 
 # ─── Testing ─────────────────────────────────────────────────────────
@@ -36,6 +66,8 @@ psql -U postgres -d northstar -f scripts/verify-db-privileges.sql
 
 ### Variabili d'ambiente
 
+> Copia `.env.example` in `.env` e compila i valori. Non committare mai `.env`.
+
 **Obbligatorie:** `DATABASE_URL`, `DATABASE_URL_MIGRATOR`, `ADMIN_KEY`, `AI_AGENTS_URL`, `JWT_SECRET`
 
 ```
@@ -44,6 +76,7 @@ DATABASE_URL             # northstar_app — solo DML (SELECT/INSERT/UPDATE/DELE
 DATABASE_URL_MIGRATOR    # northstar_migrator — DDL completo (solo per CI/deploy)
 
 JWT_SECRET
+JWT_EXPIRES_IN           # default: 7d
 ADMIN_KEY
 STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
 GNEWS_API_KEY, TAVILY_API_KEY
@@ -53,6 +86,8 @@ VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
 GOOGLE_CLIENT_ID
 AI_INTEGRATIONS_OPENAI_BASE_URL
 AI_INTEGRATIONS_OPENAI_API_KEY
+OPENAI_API_KEY           # usato da apps/server (northstar-server)
+OPENAI_MODEL             # default: gpt-4o-mini
 AI_MODEL
 AI_MODEL_OVERRIDE
 
@@ -63,6 +98,15 @@ AI_EMBEDDING_PROVIDER       # default: openai
 AI_RESEARCH_PROVIDER        # default: groq
 AI_JSON_PROVIDER            # default: groq
 CORS_ORIGIN                 # origin frontend in produzione
+ALLOWED_ORIGINS             # usato da northstar-server (virgola-separati)
+
+# ─── Frontend (Vite) ──────────────────────────────────────────────────
+VITE_API_URL             # URL base API vista dal browser (default: /api)
+VITE_APP_URL             # URL pubblico app (default: http://localhost:3000)
+
+# ─── Affiliate ────────────────────────────────────────────────────────
+AFFILIATE_COMMISSION_PCT          # default: 20
+AFFILIATE_MIN_WITHDRAWAL_EUR      # default: 10
 ```
 
 ---
@@ -102,7 +146,7 @@ artifacts/
       lib/
       i18n.ts
       locales/           # it, en, es, fr, de
-  api-server/            # Express API (porta 8080)
+  api-server/            # Express API legacy (porta 8080)
     vitest.config.ts
     src/
       __tests__/
@@ -135,12 +179,34 @@ artifacts/
         growth-agent/
       jobs/
   ai-agents/
+apps/
+  server/                # NorthStar Express server NUOVO (porta 3001)
+    src/
+      index.ts           # entry point — vedi API_RULES.md prima di modificare
+      middleware/
+        jwt.ts
+      routes/
+        profile.ts
+        affiliate.ts
+        growth-agent/
+    Dockerfile           # multi-stage build per produzione
+    package.json
+  web/
+    src/
+      components/
+        affiliate/
+          AffiliateDashboard.tsx  # wrapper — logica in lib/growth-agent
+      pages/
+        wendy.tsx         # pagina Wendy/GrowthChat
 lib/
   db/
     src/schema/
     drizzle/
   integrations-openai-ai-server/src/
   integrations-openai-ai-react/src/
+    growth-agent/         # fonte di verità: AffiliateDashboard, GrowthChatPanel,
+                          # useGrowthChat, WendyOnboardingOverlay, ecc.
+      index.ts            # public API del package
   api-spec/
   api-zod/
   api-client-react/
@@ -156,6 +222,7 @@ e2e/
   cv-builder.spec.ts     🔲
   discovery-feed.spec.ts 🔲
 .github/workflows/ci.yml
+.env.example             # template env vars — copiare in .env
 .envrc
 docker-compose.yml
 docker-compose.prod.yml
@@ -202,11 +269,34 @@ direnv allow
 
 Vedi `docker-compose.yml` (dev) e `docker-compose.prod.yml` (prod). In produzione il frontend è su CDN.
 
+Servizi Docker disponibili:
+
+| Servizio | Porta | Dockerfile |
+|---|---|---|
+| `postgres` | 5432 | image postgres:16-alpine |
+| `ai-agents` | 8000 | `artifacts/ai-agents/Dockerfile` |
+| `api-server` | 8080 | `artifacts/api-server/Dockerfile` (legacy) |
+| `northstar-server` | 3001 | `apps/server/Dockerfile` ✅ |
+| `frontend` | 5000 | `artifacts/orientamento/Dockerfile` |
+| `jaeger` | 16686 | image jaegertracing/all-in-one |
+
+```bash
+# Solo DB locale (dev veloce)
+docker compose up postgres
+
+# Solo DB + nuovo server
+docker compose up postgres northstar-server
+
+# Stack completo
+docker compose up --build
+```
+
 ---
 
 ### 3. Health Check Endpoint
 
 ✅ **Express**: `GET /api/health`.
+✅ **NorthStar Server**: `GET /api/health` (porta 3001).
 
 🔲 **Express avanzato**: aggiungere check DB e AI agents — `200 healthy` / `503 degraded`.
 
@@ -786,7 +876,7 @@ Template: `classic` (verde scuro), `minimal` (bianco), `bold` (navy + arancio).
 - **CI/CD:** GitHub Actions, 4 job in sequenza con `needs`
 - **data-testid** su ogni elemento interattivo
 - **Health check:** `GET /api/health` (Express ✅, FastAPI 🔲)
-- **CORS:** ristretto a `CORS_ORIGIN`
+- **CORS:** ristretto a `CORS_ORIGIN` / `ALLOWED_ORIGINS`
 
 ---
 
@@ -813,6 +903,8 @@ Template: `classic` (verde scuro), `minimal` (bianco), `bold` (navy + arancio).
 - **Discovery feed cache:** LRU 5min server-side + sessionStorage 10min — `?refresh=1` bypass
 - **Enricher retry cap:** 3 fallimenti → `isEnriched=true`, `score=0` — non riprocessato
 - **CV DOCX:** `pnpm add docx --filter api-server` dopo clone
+- **AffiliateDashboard:** logica SOLO in `lib/integrations-openai-ai-react/src/growth-agent/AffiliateDashboard.tsx` — `apps/web/.../AffiliateDashboard.tsx` è un wrapper
+- **northstar-server env:** usa `ALLOWED_ORIGINS` (virgola-separati) invece di `CORS_ORIGIN`
 
 ---
 
@@ -821,8 +913,16 @@ Template: `classic` (verde scuro), `minimal` (bianco), `bold` (navy + arancio).
 | Cosa | Dove |
 |---|---|
 | Schema DB | `lib/db/src/schema/index.ts` |
-| App Express | `artifacts/api-server/src/app.ts` |
-| API routes entry | `artifacts/api-server/src/routes/index.ts` |
+| App Express (legacy) | `artifacts/api-server/src/app.ts` |
+| API routes entry (legacy) | `artifacts/api-server/src/routes/index.ts` |
+| **NorthStar Server entry** | `apps/server/src/index.ts` ✅ |
+| **NorthStar Server routes** | `apps/server/src/routes/` ✅ |
+| **NorthStar JWT middleware** | `apps/server/src/middleware/jwt.ts` ✅ |
+| **NorthStar Dockerfile** | `apps/server/Dockerfile` ✅ |
+| **Growth Agent public API** | `lib/integrations-openai-ai-react/src/growth-agent/index.ts` ✅ |
+| **AffiliateDashboard (lib)** | `lib/integrations-openai-ai-react/src/growth-agent/AffiliateDashboard.tsx` ✅ |
+| **AffiliateDashboard (web)** | `apps/web/src/components/affiliate/AffiliateDashboard.tsx` (wrapper) ✅ |
+| **Wendy page** | `apps/web/src/pages/wendy.tsx` ✅ |
 | CV routes | `artifacts/api-server/src/routes/cv.ts` |
 | CV components | `artifacts/orientamento/src/components/cv/` |
 | Cron jobs | `artifacts/api-server/src/jobs/cron.ts` |
@@ -849,3 +949,4 @@ Template: `classic` (verde scuro), `minimal` (bianco), `bold` (navy + arancio).
 | Traduzioni (it) | `artifacts/orientamento/src/locales/it/translation.json` |
 | Discovery agents | `lib/integrations-openai-ai-server/src/discovery-agent/` |
 | Brand tokens | `artifacts/orientamento/src/lib/brand.ts` |
+| **Env template** | `.env.example` ✅ |
