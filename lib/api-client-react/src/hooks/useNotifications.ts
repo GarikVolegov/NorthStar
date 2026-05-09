@@ -1,121 +1,147 @@
 /**
- * useNotifications — real-time in-app notifications via WebSocket.
+ * useNotifications
  *
- * Replaces polling of GET /notifications with a persistent WS connection.
- * New notifications arrive instantly; read status is synced in real-time.
+ * Hook che mantiene una connessione SSE a /api/notifications/stream.
+ * Aggiorna lo stato ogni volta che arriva un evento "update" dal server.
+ *
+ * Funzionalità:
+ *  - Riconnessione automatica con exponential backoff (max 30s)
+ *  - Fallback a polling ogni 30s se SSE non supportato
+ *  - Azioni inline: acceptRequest / declineRequest aggiornano lo stato localmente
+ *    senza attendere il prossimo ciclo SSE
  *
  * Usage:
- *
- *   const { notifications, unreadCount, markRead, markAllRead } =
- *     useNotifications({ jwt });
+ *   const { notifications, unreadCount, actions } = useNotifications();
  */
+import { useState, useEffect, useRef, useCallback } from "react";
+import type { AppNotification } from "../../../apps/server/src/notifications/notifications-router";
 
-import { useState, useCallback, useEffect } from "react";
-import { useWebSocket } from "./useWebSocket";
-import type { ServerWsEvent } from "@workspace/api-zod/ws-events";
+export type { AppNotification };
 
-export interface NotificationItem {
-  id: number;
-  userId: number;
-  eventId: number | null;
-  channel: string;
-  title: string;
-  body: string | null;
-  isRead: boolean;
-  sentAt: string;
-  openedAt: string | null;
+interface NotificationsState {
+  notifications: AppNotification[];
+  unreadCount:   number;
 }
 
-export interface UseNotificationsOptions {
-  /** JWT bearer token for WS authentication. */
-  jwt: string | null;
-  /** WebSocket base URL. Defaults to same-origin /ws */
-  wsBaseUrl?: string;
-  /** Initial notifications loaded from the REST API (optional). */
-  initialNotifications?: NotificationItem[];
-  /** REST API base (used by markRead / markAllRead helpers). */
-  apiBase?: string;
-}
+const API_BASE = "/api/notifications";
 
-export function useNotifications({
-  jwt,
-  wsBaseUrl,
-  initialNotifications = [],
-  apiBase = "/api",
-}: UseNotificationsOptions) {
-  const [notifications, setNotifications] =
-    useState<NotificationItem[]>(initialNotifications);
+export function useNotifications() {
+  const [state,       setState]       = useState<NotificationsState>({ notifications: [], unreadCount: 0 });
+  const [connected,   setConnected]   = useState(false);
+  const [pendingIds,  setPendingIds]  = useState<Record<string, "accepting" | "declining">>({});
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const esRef        = useRef<EventSource | null>(null);
+  const retryDelay   = useRef(2000);
+  const retryTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mounted      = useRef(true);
 
-  // Build the WS URL — use native WebSocket protocol switching
-  const wsUrl = jwt
-    ? (() => {
-        const base =
-          wsBaseUrl ??
-          (typeof window !== "undefined"
-            ? `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`
-            : "");
-        return `${base}/ws?token=${encodeURIComponent(jwt)}`;
-      })()
-    : null;
+  // ── Fetch snapshot (polling fallback + primo caricamento) ─────────────────
+  const fetchSnapshot = useCallback(async () => {
+    try {
+      const res  = await fetch(API_BASE, { credentials: "include" });
+      if (!res.ok) return;
+      const data = await res.json() as NotificationsState;
+      if (mounted.current) setState(data);
+    } catch { /* ignora */ }
+  }, []);
 
-  const handleMessage = useCallback((event: ServerWsEvent) => {
-    switch (event.type) {
-      case "notification:new":
-        setNotifications((prev) =>
-          // Prevent duplicates
-          prev.some((n) => n.id === event.payload.id)
-            ? prev
-            : [event.payload, ...prev],
-        );
-        break;
+  // ── Connessione SSE ────────────────────────────────────────────────────────
+  const connect = useCallback(() => {
+    if (!mounted.current) return;
+    if (typeof EventSource === "undefined") {
+      // Fallback: polling ogni 30s
+      void fetchSnapshot();
+      const id = setInterval(() => void fetchSnapshot(), 30_000);
+      return () => clearInterval(id);
+    }
 
-      case "notification:read":
-        setNotifications((prev) =>
-          prev.map((n) =>
-            n.id === event.payload.id ? { ...n, isRead: true } : n,
-          ),
-        );
-        break;
+    const es = new EventSource(`${API_BASE}/stream`, { withCredentials: true });
+    esRef.current = es;
 
-      case "notification:read_all":
-        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-        break;
+    es.addEventListener("update", (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data) as NotificationsState;
+        if (mounted.current) {
+          setState(data);
+          setConnected(true);
+          retryDelay.current = 2000; // reset backoff
+        }
+      } catch { /* JSON malformato */ }
+    });
 
-      default:
-        break;
+    es.addEventListener("error", () => {
+      es.close();
+      esRef.current = null;
+      if (!mounted.current) return;
+      setConnected(false);
+      // Exponential backoff
+      retryTimer.current = setTimeout(() => {
+        retryDelay.current = Math.min(retryDelay.current * 2, 30_000);
+        connect();
+      }, retryDelay.current);
+    });
+
+    es.addEventListener("open", () => {
+      if (mounted.current) setConnected(true);
+    });
+  }, [fetchSnapshot]);
+
+  useEffect(() => {
+    mounted.current = true;
+    void fetchSnapshot(); // carica subito senza aspettare SSE
+    connect();
+    return () => {
+      mounted.current = false;
+      esRef.current?.close();
+      if (retryTimer.current) clearTimeout(retryTimer.current);
+    };
+  }, [connect, fetchSnapshot]);
+
+  // ── Azioni ─────────────────────────────────────────────────────────────────
+
+  const acceptRequest = useCallback(async (friendshipId: number, notificationId: string) => {
+    setPendingIds((p) => ({ ...p, [notificationId]: "accepting" }));
+    try {
+      const res = await fetch(`${API_BASE}/friend-request/${friendshipId}/accept`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      // Rimuovi localmente senza aspettare SSE
+      setState((prev) => ({
+        notifications: prev.notifications.filter((n) => n.id !== notificationId),
+        unreadCount:   Math.max(0, prev.unreadCount - 1),
+      }));
+    } catch (err) {
+      console.error("acceptRequest error", err);
+    } finally {
+      setPendingIds((p) => { const n = { ...p }; delete n[notificationId]; return n; });
     }
   }, []);
 
-  useWebSocket<ServerWsEvent>({ url: wsUrl, onMessage: handleMessage });
+  const declineRequest = useCallback(async (friendshipId: number, notificationId: string) => {
+    setPendingIds((p) => ({ ...p, [notificationId]: "declining" }));
+    try {
+      const res = await fetch(`${API_BASE}/friend-request/${friendshipId}/decline`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setState((prev) => ({
+        notifications: prev.notifications.filter((n) => n.id !== notificationId),
+        unreadCount:   Math.max(0, prev.unreadCount - 1),
+      }));
+    } catch (err) {
+      console.error("declineRequest error", err);
+    } finally {
+      setPendingIds((p) => { const n = { ...p }; delete n[notificationId]; return n; });
+    }
+  }, []);
 
-  // Sync initial list when it changes externally (e.g. after first REST fetch)
-  useEffect(() => {
-    setNotifications(initialNotifications);
-  }, [initialNotifications]);
-
-  // ── REST helpers (optimistic update + server sync) ─────────────────────
-
-  const markRead = useCallback(
-    async (id: number) => {
-      // Optimistic
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
-      );
-      await fetch(`${apiBase}/notifications/${id}/read`, { method: "POST" }).catch(
-        console.error,
-      );
-    },
-    [apiBase],
-  );
-
-  const markAllRead = useCallback(async () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    await fetch(`${apiBase}/notifications/read-all`, { method: "POST" }).catch(
-      console.error,
-    );
-  }, [apiBase]);
-
-  return { notifications, unreadCount, markRead, markAllRead };
+  return {
+    ...state,
+    connected,
+    pendingIds,
+    actions: { acceptRequest, declineRequest },
+  };
 }
