@@ -1,46 +1,50 @@
 /**
- * AffiliateDashboard — Passo 5: UI dashboard programma affiliazione.
+ * ⚠️  REGOLA 0 — Prima di modificare questo file leggi:
+ *   → FRONTEND_RULES.md  (pattern React, Tailwind, shadcn tokens)
+ *   → API_RULES.md        (endpoint /api/affiliate/*, auth Bearer)
  *
- * SEZIONI:
- *   1. Balance cards  — locked, disponibile, totale guadagnato
- *   2. Link referral  — URL copia con badge "X referral attivi"
- *   3. Progress bar   — quanti referral mancano per abbonamento gratuito
- *   4. Tabella referral recenti (nome, data, commissione mensile)
- *   5. Storico prelievi
- *   6. CTA prelievo   — modale semplice con importo + metodo
+ * AffiliateDashboard — versione CANONICA (fonte di verità).
  *
- * Design: card indigo/emerald, zero librerie aggiuntive.
+ * Questo è l'unico file che contiene la logica reale.
+ * apps/web/src/components/affiliate/AffiliateDashboard.tsx
+ * è un wrapper che monta questo componente.
  *
  * Props:
- *   token     JWT
- *   apiBase   default '/api'
- *   appUrl    default 'https://northstar.app' (per costruire referralUrl)
- *   className
+ *   token    — JWT dell'utente autenticato
+ *   apiBase  — base URL dell'API (default "/api")
+ *
+ * Sezioni:
+ *   1. KPI cards  — Commissioni totali / Bloccati / Prelevabili
+ *   2. Progress bar rinnovo  — mostra €bloccati/29€ e data scadenza
+ *   3. Referral link  — codice + URL con copia one-click
+ *   4. Tabella referral attivi
+ *   5. Modale prelievo
+ *   6. Storico prelievi
  */
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-interface AffiliateAccount {
-  referralCode:              string;
-  referralUrl:               string;
-  lockedBalanceEur:          number;
-  withdrawableEur:           number;
-  totalEarnedEur:            number;
-  totalReferrals:            number;
-  isPremiumActive:           boolean;
-  nextRenewalAt:             string | null;
-  status:                    string;
+export interface AccountData {
+  referralCode:                string;
+  referralUrl:                 string;
+  lockedBalanceEur:            number;
+  withdrawableEur:             number;
+  totalEarnedEur:              number;
+  totalReferrals:              number;
+  isPremiumActive:             boolean;
+  nextRenewalAt:               string | null;
+  status:                      string;
   referralsToFreeSubscription: number;
 }
-interface ReferralRow {
+export interface ReferralRow {
   userId:     number;
   name:       string | null;
   joinedAt:   string;
   monthlyEur: number;
   isActive:   boolean;
 }
-interface WithdrawalRow {
+export interface WithdrawalRow {
   id:        number;
   amountEur: number;
   method:    string;
@@ -48,108 +52,171 @@ interface WithdrawalRow {
   createdAt: string;
   paidAt:    string | null;
 }
-interface DashboardData {
-  account:            AffiliateAccount;
-  recentReferrals:    ReferralRow[];
-  recentWithdrawals:  WithdrawalRow[];
-  projections:        { currentMonthEur: number; annualEur: number };
+export interface DashboardData {
+  account:           AccountData;
+  recentReferrals:   ReferralRow[];
+  recentWithdrawals: WithdrawalRow[];
+  projections:       { currentMonthEur: number; annualEur: number };
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Hook (esportato per riuso) ────────────────────────────────────────────────
 
-function fmt(eur: number) {
-  return eur.toLocaleString("it-IT", { style: "currency", currency: "EUR" });
+export function useAffiliateDashboard(token: string, apiBase = "/api") {
+  const [data,    setData]    = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState<string | null>(null);
+
+  const fetch_ = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch(`${apiBase}/affiliate/dashboard`, {
+        headers:     { Authorization: `Bearer ${token}` },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setData(await res.json());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Errore sconosciuto");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, apiBase]);
+
+  useEffect(() => { fetch_(); }, [fetch_]);
+
+  const withdraw = useCallback(async (
+    amount: number,
+    method: "paypal" | "bank_transfer",
+    destination?: string,
+  ) => {
+    const res = await fetch(`${apiBase}/affiliate/withdraw`, {
+      method:      "POST",
+      headers:     { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      credentials: "include",
+      body:        JSON.stringify({ amount, method, destination }),
+    });
+    if (!res.ok) {
+      const e = await res.json();
+      throw new Error(e.error ?? "Errore prelievo");
+    }
+    await fetch_();
+  }, [token, apiBase, fetch_]);
+
+  return { data, loading, error, refetch: fetch_, withdraw };
 }
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" });
-}
 
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      onClick={async () => { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(()=>setCopied(false), 2000); }}
-      className="flex-shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
-    >{copied ? "✓ Copiato!" : "Copia link"}</button>
-  );
-}
+// ── UI Helpers ─────────────────────────────────────────────────────────────────
 
-// ── Balance cards ──────────────────────────────────────────────────────────────
-
-function BalanceCard({ label, value, sublabel, color, emoji }: {
-  label: string; value: string; sublabel?: string;
-  color: "indigo" | "emerald" | "violet"; emoji: string;
+function KpiCard({ label, value, sub, accent = false }: {
+  label: string; value: string; sub?: string; accent?: boolean;
 }) {
-  const colors = {
-    indigo:  { bg: "bg-indigo-50",  border: "border-indigo-100", text: "text-indigo-700",  sub: "text-indigo-400" },
-    emerald: { bg: "bg-emerald-50", border: "border-emerald-100",text: "text-emerald-700", sub: "text-emerald-400" },
-    violet:  { bg: "bg-violet-50",  border: "border-violet-100", text: "text-violet-700",  sub: "text-violet-400" },
-  }[color];
   return (
-    <div className={`rounded-xl border ${colors.border} ${colors.bg} p-4`}>
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-xl">{emoji}</span>
-        <span className={`text-xs font-medium ${colors.sub}`}>{label}</span>
-      </div>
-      <p className={`text-2xl font-black tabular-nums ${colors.text}`}>{value}</p>
-      {sublabel && <p className={`text-[10px] mt-1 ${colors.sub}`}>{sublabel}</p>}
+    <div className={`rounded-xl border p-4 space-y-1 ${
+      accent ? "border-primary bg-primary/5" : "border-border bg-card"
+    }`}>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={`text-2xl font-bold ${
+        accent ? "text-primary" : "text-foreground"
+      }`}>{value}</p>
+      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
     </div>
   );
 }
 
-// ── Withdraw Modal ─────────────────────────────────────────────────────────────────
+const STATUS_BADGE: Record<string, string> = {
+  pending: "bg-yellow-100 text-yellow-800",
+  applied: "bg-green-100  text-green-800",
+  paid:    "bg-blue-100   text-blue-800",
+  failed:  "bg-red-100    text-red-700",
+  void:    "bg-gray-100   text-gray-500",
+};
 
-function WithdrawModal({ maxEur, onClose, onSubmit }: {
-  maxEur: number;
-  onClose: () => void;
-  onSubmit: (amount: number, method: "paypal" | "bank_transfer", destination: string) => Promise<void>;
+function Badge({ status }: { status: string }) {
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${
+      STATUS_BADGE[status] ?? "bg-gray-100 text-gray-500"
+    }`}>
+      {status}
+    </span>
+  );
+}
+
+function fmt(eur: number) {
+  return eur.toLocaleString("it-IT", { style: "currency", currency: "EUR" });
+}
+function fmtDate(d: string | null) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("it-IT", {
+    day: "2-digit", month: "short", year: "numeric",
+  });
+}
+
+// ── WithdrawModal ───────────────────────────────────────────────────────────────
+
+function WithdrawModal({
+  maxEur,
+  onClose,
+  onConfirm,
+}: {
+  maxEur:     number;
+  onClose:    () => void;
+  onConfirm:  (amount: number, method: "paypal" | "bank_transfer", dest: string) => Promise<void>;
 }) {
-  const [amount,      setAmount]      = useState(Math.floor(maxEur));
-  const [method,      setMethod]      = useState<"paypal" | "bank_transfer">("paypal");
-  const [destination, setDestination] = useState("");
-  const [loading,     setLoading]     = useState(false);
-  const [error,       setError]       = useState("");
+  const [amount, setAmount] = useState(maxEur.toFixed(2));
+  const [method, setMethod] = useState<"paypal" | "bank_transfer">("paypal");
+  const [dest,   setDest]   = useState("");
+  const [busy,   setBusy]   = useState(false);
+  const [err,    setErr]    = useState("");
 
-  async function handleSubmit() {
-    if (amount <= 0 || amount > maxEur) { setError("Importo non valido"); return; }
-    if (!destination.trim()) { setError("Inserisci la destinazione"); return; }
-    setLoading(true); setError("");
-    try { await onSubmit(amount, method, destination); onClose(); }
-    catch (e) { setError(e instanceof Error ? e.message : "Errore"); }
-    finally { setLoading(false); }
+  async function submit() {
+    const n = parseFloat(amount);
+    if (isNaN(n) || n <= 0)  { setErr("Importo non valido"); return; }
+    if (n > maxEur)           { setErr(`Massimo: ${fmt(maxEur)}`); return; }
+    if (!dest.trim())         { setErr("Inserisci la destinazione"); return; }
+    setBusy(true); setErr("");
+    try   { await onConfirm(n, method, dest); onClose(); }
+    catch (e) { setErr(e instanceof Error ? e.message : "Errore"); }
+    finally   { setBusy(false); }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold">Richiedi prelievo</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl bg-background p-6 shadow-xl space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-base font-semibold">Richiedi prelievo</h2>
+        <p className="text-xs text-muted-foreground">
+          Disponibile: <span className="font-medium text-foreground">{fmt(maxEur)}</span>
+        </p>
 
         <div className="space-y-1">
-          <label className="text-xs font-medium">Importo (max {fmt(maxEur)})</label>
-          <div className="flex items-center gap-2">
-            <input type="number" min={1} max={maxEur} step={0.01} value={amount}
-              onChange={(e)=>setAmount(Number(e.target.value))}
-              className="flex-1 rounded-lg border border-border px-3 py-2 text-sm"/>
-            <span className="text-sm font-medium">€</span>
-          </div>
+          <label className="text-xs font-medium">Importo (€)</label>
+          <input
+            type="number" step="0.01" min="1" max={maxEur}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          />
         </div>
 
         <div className="space-y-1">
           <label className="text-xs font-medium">Metodo</label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex gap-2">
             {(["paypal", "bank_transfer"] as const).map((m) => (
-              <button key={m} onClick={()=>setMethod(m)}
-                className={`rounded-xl border py-2.5 text-xs font-medium transition-all ${
-                  method===m?"border-primary bg-primary/8 text-primary":"border-border"
-                }`}>
-                {m==="paypal" ? "🐙 PayPal" : "🏦 Bonifico"}
+              <button
+                key={m}
+                onClick={() => setMethod(m)}
+                className={`flex-1 rounded-lg border py-2 text-xs font-medium transition-colors ${
+                  method === m
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border"
+                }`}
+              >
+                {m === "paypal" ? "PayPal" : "Bonifico"}
               </button>
             ))}
           </div>
@@ -157,261 +224,257 @@ function WithdrawModal({ maxEur, onClose, onSubmit }: {
 
         <div className="space-y-1">
           <label className="text-xs font-medium">
-            {method==="paypal" ? "Email PayPal" : "IBAN"}
+            {method === "paypal" ? "Email PayPal" : "IBAN"}
           </label>
-          <input type="text" value={destination} onChange={(e)=>setDestination(e.target.value)}
-            placeholder={method==="paypal" ? "email@paypal.com" : "IT60 X054 2811 1010 0000 0123 456"}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm"/>
+          <input
+            type="text"
+            placeholder={
+              method === "paypal"
+                ? "nome@email.com"
+                : "IT60 X054 2811 1010 0000 0123 456"
+            }
+            value={dest}
+            onChange={(e) => setDest(e.target.value)}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          />
         </div>
 
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {err && <p className="text-xs text-red-500">{err}</p>}
 
-        <button onClick={handleSubmit} disabled={loading}
-          className="w-full rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50">
-          {loading ? "Invio..." : `Preleva ${fmt(amount)}`}
-        </button>
-
-        <p className="text-[10px] text-center text-muted-foreground">
-          Il pagamento viene elaborato entro 3-5 giorni lavorativi.
-        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-lg border border-border py-2 text-xs"
+          >
+            Annulla
+          </button>
+          <button
+            onClick={submit}
+            disabled={busy}
+            className="flex-1 rounded-lg bg-primary py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
+          >
+            {busy ? "Invio..." : "Conferma prelievo"}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Status badge ────────────────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string,{ label:string; className:string }> = {
-    pending:   { label:"In attesa",   className:"bg-yellow-50 text-yellow-700 border-yellow-200" },
-    paid:      { label:"Pagato",      className:"bg-emerald-50 text-emerald-700 border-emerald-200" },
-    rejected:  { label:"Rifiutato",  className:"bg-red-50 text-red-700 border-red-200" },
-    applied:   { label:"Attivo",     className:"bg-indigo-50 text-indigo-700 border-indigo-200" },
-    active:    { label:"Attivo",     className:"bg-emerald-50 text-emerald-700 border-emerald-200" },
-    suspended: { label:"Sospeso",    className:"bg-red-50 text-red-700 border-red-200" },
-  };
-  const meta = map[status] ?? { label: status, className: "bg-gray-50 text-gray-600 border-gray-200" };
-  return (
-    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${meta.className}`}>
-      {meta.label}
-    </span>
-  );
-}
-
-// ── Main: AffiliateDashboard ───────────────────────────────────────────────────────────
+// ── Main component ─────────────────────────────────────────────────────────────
 
 export interface AffiliateDashboardProps {
-  token:      string;
-  apiBase?:   string;
-  className?: string;
+  /** JWT dell'utente — obbligatorio */
+  token:    string;
+  /** Base URL dell'API. Default: "/api" */
+  apiBase?: string;
 }
 
-export function AffiliateDashboard({ token, apiBase="/api", className="" }: AffiliateDashboardProps) {
-  const [data,     setData]     = useState<DashboardData | null>(null);
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState<string | null>(null);
-  const [withdraw, setWithdraw] = useState(false);
+export function AffiliateDashboard({ token, apiBase = "/api" }: AffiliateDashboardProps) {
+  const { data, loading, error, refetch, withdraw } = useAffiliateDashboard(token, apiBase);
+  const [showWithdraw, setShowWithdraw] = useState(false);
+  const [copied, setCopied]             = useState(false);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const res = await fetch(`${apiBase}/affiliate/dashboard`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(await res.text());
-      setData(await res.json() as DashboardData);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Errore");
-    } finally { setLoading(false); }
-  }, [token, apiBase]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  async function handleWithdraw(amount: number, method: "paypal" | "bank_transfer", destination: string) {
-    const res = await fetch(`${apiBase}/affiliate/withdraw`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body:    JSON.stringify({ amount, method, destination }),
-    });
-    if (!res.ok) { const e = await res.json(); throw new Error(e.error ?? "Errore"); }
-    await fetchData(); // refresh
+  function copyLink() {
+    if (!data) return;
+    navigator.clipboard.writeText(data.account.referralUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   if (loading) return (
     <div className="flex h-64 items-center justify-center">
-      <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"/>
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
     </div>
   );
+
   if (error) return (
-    <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+    <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+      {error}
+      <button onClick={refetch} className="ml-2 underline">Riprova</button>
+    </div>
   );
+
   if (!data) return null;
 
   const { account, recentReferrals, recentWithdrawals, projections } = data;
-  const pctToFree = Math.min(
-    100,
-    Math.round(((5 - account.referralsToFreeSubscription) / 5) * 100),
-  );
+  const lockProgress = Math.min(100, (account.lockedBalanceEur / 29) * 100);
 
   return (
-    <>
-      {withdraw && (
-        <WithdrawModal
-          maxEur={account.withdrawableEur}
-          onClose={()=>setWithdraw(false)}
-          onSubmit={handleWithdraw}
-        />
-      )}
+    <div className="space-y-6 p-4 sm:p-6 max-w-3xl mx-auto">
 
-      <div className={`space-y-5 ${className}`}>
-
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-bold">Programma Affiliazione</h2>
-            <p className="text-xs text-muted-foreground">5.80€ per ogni referral attivo / mese</p>
-          </div>
-          <StatusBadge status={account.status}/>
-        </div>
-
-        {/* Balance cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <BalanceCard emoji="🔒" label="Bloccato (cauzione)" color="indigo"
-            value={fmt(account.lockedBalanceEur)}
-            sublabel="Si sblocca dopo il 5° referral"/>
-          <BalanceCard emoji="💰" label="Disponibile" color="emerald"
-            value={fmt(account.withdrawableEur)}
-            sublabel={account.withdrawableEur >= 1 ? "Prelevabile ora" : "Min. 1€ per prelevare"}/>
-          <BalanceCard emoji="📈" label="Totale guadagnato" color="violet"
-            value={fmt(account.totalEarnedEur)}
-            sublabel={`Proiezione annua: ${fmt(projections.annualEur)}`}/>
-        </div>
-
-        {/* Referral link */}
-        <div className="rounded-xl border border-border bg-card p-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold">Il tuo link affiliato</p>
-            <span className="rounded-full bg-indigo-50 border border-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-600">
-              {account.totalReferrals} referral
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 rounded-lg bg-muted px-3 py-2 text-xs truncate">
-              {account.referralUrl}
-            </code>
-            <CopyButton text={account.referralUrl}/>
-          </div>
-          <p className="mt-2 text-[10px] text-muted-foreground">
-            Codice: <strong>{account.referralCode}</strong>
-            {account.nextRenewalAt && ` • Rinnovo: ${fmtDate(account.nextRenewalAt)}`}
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">Programma Affiliazione</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Invita amici e guadagna il 20% del loro abbonamento ogni mese
           </p>
         </div>
+        <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+          account.isPremiumActive
+            ? "bg-green-100 text-green-700"
+            : "bg-red-100 text-red-600"
+        }`}>
+          {account.isPremiumActive ? "✓ Premium attivo" : "Premium scaduto"}
+        </span>
+      </div>
 
-        {/* Progress verso abbonamento gratuito */}
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-emerald-700">🎉 Abbonamento gratuito</p>
-            <p className="text-xs font-bold text-emerald-700">
-              {5 - account.referralsToFreeSubscription}/5 referral
-            </p>
-          </div>
-          <div className="h-2.5 rounded-full bg-emerald-100 overflow-hidden">
-            <div className="h-full rounded-full bg-emerald-500 transition-all duration-700"
-              style={{ width: `${pctToFree}%` }}/>
-          </div>
+      {/* KPI cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <KpiCard
+          label="Commissioni totali"
+          value={fmt(account.totalEarnedEur)}
+          sub={`${account.totalReferrals} referral`}
+        />
+        <KpiCard
+          label="Bloccati (rinnovo)"
+          value={fmt(account.lockedBalanceEur)}
+          sub="Coprono il tuo abbonamento"
+        />
+        <KpiCard
+          label="Prelevabili ora"
+          value={fmt(account.withdrawableEur)}
+          sub="Disponibili al prelievo"
+          accent
+        />
+      </div>
+
+      {/* Rinnovo progress */}
+      <div className="rounded-xl border border-border bg-card p-4 space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-medium">Copertura abbonamento</span>
+          <span className="text-muted-foreground text-xs">
+            Prossimo rinnovo: {fmtDate(account.nextRenewalAt)}
+          </span>
+        </div>
+        <div className="h-2 rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-full rounded-full bg-primary transition-all"
+            style={{ width: `${lockProgress}%` }}
+          />
+        </div>
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>{fmt(account.lockedBalanceEur)} bloccati su 29,00€</span>
           {account.referralsToFreeSubscription > 0 ? (
-            <p className="mt-1.5 text-[10px] text-emerald-600">
-              Ancora <strong>{account.referralsToFreeSubscription}</strong> referral per coprire l’abbonamento
-            </p>
+            <span>
+              Mancano <strong>{account.referralsToFreeSubscription}</strong> referral per rinnovo gratuito
+            </span>
           ) : (
-            <p className="mt-1.5 text-[10px] text-emerald-600 font-semibold">
-              ✅ Il tuo abbonamento è coperto dai referral!
-            </p>
+            <span className="text-green-600 font-medium">✓ Rinnovo garantito</span>
           )}
         </div>
+        {account.lockedBalanceEur < 29 && account.nextRenewalAt && (
+          <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-1.5">
+            Se i bloccati sono &lt;29€ al rinnovo, verrà addebitata la differenza
+            ({fmt(29 - account.lockedBalanceEur)}) sulla tua carta.
+          </p>
+        )}
+      </div>
 
-        {/* Prelievo CTA */}
-        <div className="flex gap-3">
+      {/* Referral link */}
+      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <h2 className="text-sm font-semibold">Il tuo link di invito</h2>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 rounded-lg bg-muted px-3 py-2 text-xs font-mono truncate">
+            {account.referralUrl}
+          </code>
           <button
-            onClick={()=>setWithdraw(true)}
-            disabled={account.withdrawableEur < 1}
-            className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-40"
+            onClick={copyLink}
+            className="shrink-0 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground"
           >
-            Richiedi prelievo
+            {copied ? "✓ Copiato" : "Copia"}
           </button>
-          <div className="rounded-xl border border-border bg-card px-4 flex items-center">
-            <div className="text-center">
-              <p className="text-xs font-black text-indigo-600">{fmt(projections.currentMonthEur)}</p>
-              <p className="text-[9px] text-muted-foreground">mese corrente</p>
-            </div>
-          </div>
         </div>
+        <p className="text-xs text-muted-foreground">
+          Codice: <strong>{account.referralCode}</strong>
+          {" · "}{fmt(projections.currentMonthEur)} questo mese
+          {" · "} Proiezione annua: <strong>{fmt(projections.annualEur)}</strong>
+        </p>
+      </div>
 
-        {/* Referral recenti */}
+      {/* Prelievo CTA */}
+      {account.withdrawableEur >= 1 && (
+        <button
+          onClick={() => setShowWithdraw(true)}
+          className="w-full rounded-xl bg-primary py-3 text-sm font-medium text-primary-foreground"
+        >
+          Preleva {fmt(account.withdrawableEur)} →
+        </button>
+      )}
+
+      {/* Tabella referral */}
+      {recentReferrals.length > 0 && (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
-            <p className="text-xs font-semibold">Referral recenti</p>
+            <h2 className="text-sm font-semibold">Referral attivi questo mese</h2>
           </div>
-          {recentReferrals.length === 0 ? (
-            <div className="px-4 py-8 text-center">
-              <p className="text-2xl mb-2">🔗</p>
-              <p className="text-sm font-medium">Nessun referral ancora</p>
-              <p className="text-xs text-muted-foreground mt-1">Condividi il tuo link per guadagnare</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border">
-              {recentReferrals.map((r, i) => (
-                <div key={i} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                      <span className="text-xs font-bold text-indigo-600">
-                        {(r.name ?? "?")[0]?.toUpperCase()}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{r.name ?? "Utente"}</p>
-                      <p className="text-[10px] text-muted-foreground">{fmtDate(r.joinedAt)}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-emerald-600">+{fmt(r.monthlyEur)}/mese</p>
-                    <StatusBadge status={r.isActive ? "active" : "pending"}/>
-                  </div>
-                </div>
+          <table className="w-full text-xs">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="px-4 py-2 text-left font-medium">Nome</th>
+                <th className="px-4 py-2 text-left font-medium">Iscritto il</th>
+                <th className="px-4 py-2 text-right font-medium">Commissione/mese</th>
+                <th className="px-4 py-2 text-center font-medium">Stato</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {recentReferrals.map((r) => (
+                <tr key={r.userId}>
+                  <td className="px-4 py-2.5">{r.name ?? "Utente anonimo"}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground">{fmtDate(r.joinedAt)}</td>
+                  <td className="px-4 py-2.5 text-right font-medium">{fmt(r.monthlyEur)}</td>
+                  <td className="px-4 py-2.5 text-center">
+                    <Badge status={r.isActive ? "applied" : "void"} />
+                  </td>
+                </tr>
               ))}
-            </div>
-          )}
+            </tbody>
+          </table>
         </div>
+      )}
 
-        {/* Storico prelievi */}
-        {recentWithdrawals.length > 0 && (
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <div className="px-4 py-3 border-b border-border">
-              <p className="text-xs font-semibold">Storico prelievi</p>
-            </div>
-            <div className="divide-y divide-border">
-              {recentWithdrawals.map((w) => (
-                <div key={w.id} className="flex items-center justify-between px-4 py-3">
-                  <div>
-                    <p className="text-sm font-medium">{fmt(w.amountEur)}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {w.method === "paypal" ? "🐙 PayPal" : "🏦 Bonifico"}
-                      {" • "}{fmtDate(w.createdAt)}
-                    </p>
-                  </div>
-                  <StatusBadge status={w.status}/>
-                </div>
-              ))}
-            </div>
+      {/* Storico prelievi */}
+      {recentWithdrawals.length > 0 && (
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-border">
+            <h2 className="text-sm font-semibold">Storico prelievi</h2>
           </div>
-        )}
+          <table className="w-full text-xs">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="px-4 py-2 text-left font-medium">Data</th>
+                <th className="px-4 py-2 text-left font-medium">Metodo</th>
+                <th className="px-4 py-2 text-right font-medium">Importo</th>
+                <th className="px-4 py-2 text-center font-medium">Stato</th>
+                <th className="px-4 py-2 text-left font-medium">Pagato il</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {recentWithdrawals.map((w) => (
+                <tr key={w.id}>
+                  <td className="px-4 py-2.5 text-muted-foreground">{fmtDate(w.createdAt)}</td>
+                  <td className="px-4 py-2.5 capitalize">
+                    {w.method === "bank_transfer" ? "Bonifico" : "PayPal"}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-medium">{fmt(w.amountEur)}</td>
+                  <td className="px-4 py-2.5 text-center"><Badge status={w.status} /></td>
+                  <td className="px-4 py-2.5 text-muted-foreground">{fmtDate(w.paidAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-        {/* Footer note */}
-        <p className="text-center text-[10px] text-muted-foreground pb-4">
-          Le commissioni vengono registrate ogni mese al rinnovo dell’abbonamento del referral.
-          I primi 29€ restano bloccati come cauzione per il tuo abbonamento.
-        </p>
-
-      </div>
-    </>
+      {/* Modale prelievo */}
+      {showWithdraw && (
+        <WithdrawModal
+          maxEur={account.withdrawableEur}
+          onClose={() => setShowWithdraw(false)}
+          onConfirm={withdraw}
+        />
+      )}
+    </div>
   );
 }
