@@ -14,11 +14,17 @@
  *      - Se true: mostra WendyOnboardingOverlay (3 step)
  *      - POST /api/growth-agent/onboarding → SSE primo messaggio Wendy
  *      - Poi chat normale via useGrowthChat
+ *
+ * MOBILE-FIRST NOTES (feat/mobile-pwa-optimization):
+ *   - Header: min-h-[56px], padding p-4 mobile / md:p-5
+ *   - Avatar: 44x44px (tap target minimo iOS/Android)
+ *   - Testo troncato con truncate per evitare overflow su schermi piccoli
+ *   - Loading/Error: padding sicuro p-4 / md:p-8, max-w-sm centrato
  */
 import React, { useEffect, useState } from "react";
 import { GrowthChatPanel } from "../../lib/growth-agent";
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────────────
 
 /** Legge un cookie per nome. Restituisce undefined se assente. */
 function getCookie(name: string): string | undefined {
@@ -33,7 +39,7 @@ function readToken(): string | null {
   return getCookie("ns_token") ?? localStorage.getItem("ns_token") ?? null;
 }
 
-// ── Tipi ───────────────────────────────────────────────────────────────────
+// ── Tipi ───────────────────────────────────────────────────────────────────────────
 
 interface UserProfile {
   name?:        string;
@@ -41,7 +47,7 @@ interface UserProfile {
   userMode?:    string;
 }
 
-// ── Componente ─────────────────────────────────────────────────────────────
+// ── Componente ─────────────────────────────────────────────────────────────────────
 
 export function WendyPage() {
   const [token,   setToken]   = useState<string | null>(null);
@@ -86,11 +92,12 @@ export function WendyPage() {
       });
   }, [token, apiBase]);
 
-  // ── Render ────────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
+      // p-4: padding sicuro su tutti i device mobile
+      <div className="flex h-full items-center justify-center p-4">
         <div className="h-7 w-7 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
       </div>
     );
@@ -98,8 +105,9 @@ export function WendyPage() {
 
   if (error || !token) {
     return (
-      <div className="flex h-full items-center justify-center p-8">
-        <div className="rounded-xl border border-red-200 bg-red-50 px-6 py-5 text-center text-sm text-red-700">
+      // p-4 mobile, md:p-8 desktop
+      <div className="flex h-full items-center justify-center p-4 md:p-8">
+        <div className="w-full max-w-sm rounded-xl border border-red-200 bg-red-50 px-4 py-4 md:px-6 md:py-5 text-center text-sm text-red-700">
           <p className="font-semibold mb-1">🚫 Accesso non autorizzato</p>
           <p>{error ?? "Token mancante. Effettua il login."}</p>
         </div>
@@ -109,14 +117,24 @@ export function WendyPage() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b border-border px-5 py-3 shrink-0">
-        <div className="h-9 w-9 rounded-full bg-indigo-100 flex items-center justify-center text-xl">
+      {/*
+       * Header mobile-first:
+       * - min-h-[56px]: altezza minima per zona touch sicura
+       * - px-4 / md:px-5: padding orizzontale scalabile
+       * - py-2 / md:py-3: padding verticale scalabile
+       */}
+      <div className="flex items-center gap-3 border-b border-border px-4 py-2 shrink-0 min-h-[56px] md:px-5 md:py-3">
+        {/*
+         * Avatar 44x44px: tap target minimo consigliato da Apple HIG e Material.
+         * h-11 w-11 = 44px (1 Tailwind unit = 4px)
+         */}
+        <div className="h-11 w-11 rounded-full bg-indigo-100 flex items-center justify-center text-xl shrink-0">
           🧡
         </div>
-        <div>
-          <p className="text-sm font-semibold leading-tight">Wendy</p>
-          <p className="text-xs text-muted-foreground">La tua coach personale NorthStar</p>
+        <div className="min-w-0">
+          {/* truncate: evita overflow su schermi piccoli */}
+          <p className="text-sm font-semibold leading-tight truncate">Wendy</p>
+          <p className="text-xs text-muted-foreground truncate">La tua coach personale NorthStar</p>
         </div>
       </div>
 
