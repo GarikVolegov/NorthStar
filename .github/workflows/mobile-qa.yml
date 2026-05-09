@@ -1,0 +1,304 @@
+# mobile-qa.yml
+#
+# Fase 4 — Mobile QA pipeline
+#
+# Contiene 2 job indipendenti:
+#   1. lighthouse-mobile  — Lighthouse CI su emulazione Pixel 5
+#                           Soglie: Perf ≥ 70, A11y ≥ 85, BP ≥ 85, PWA ≥ 70
+#   2. playwright-mobile  — Playwright E2E su Pixel 5 + iPhone 12
+#                           Test: onboarding, navigazione mobile, scenario offline
+#
+# Si attiva su:
+#   - push a main / develop che toccano il frontend
+#   - ogni PR verso main
+#   - dispatch manuale (workflow_dispatch)
+
+name: Mobile QA
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'apps/web/**'
+      - 'lib/api-client-react/**'
+      - '.github/workflows/mobile-qa.yml'
+      - 'lighthouserc.json'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'lib/api-client-react/**'
+  workflow_dispatch:
+    inputs:
+      skip_lighthouse:
+        description: 'Salta Lighthouse CI (utile per debug Playwright)'
+        required: false
+        default: 'false'
+      skip_playwright:
+        description: 'Salta Playwright mobile (utile per debug Lighthouse)'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: mobile-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 1 — Lighthouse CI mobile
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+  lighthouse-mobile:
+    name: "Lighthouse CI (mobile emulation)"
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.skip_lighthouse != 'true' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # ── Cache pnpm store ──────────────────────────────────────────────────
+      - name: Get pnpm store path
+        id: pnpm-cache
+        run: echo "store=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store }}
+          key: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── Build frontend ────────────────────────────────────────────────────
+      - name: Build @northstar/web
+        run: pnpm --filter @northstar/web run build
+        env:
+          NODE_ENV: production
+          VITE_API_URL: http://localhost:3001
+
+      # ── Install Lighthouse CI ─────────────────────────────────────────────
+      - name: Install @lhci/cli
+        run: npm install -g @lhci/cli@0.14.x --silent
+
+      # ── Run Lighthouse CI ─────────────────────────────────────────────────
+      - name: Run Lighthouse CI (mobile)
+        run: |
+          lhci autorun \
+            --config=lighthouserc.json \
+            --collect.startServerCommand="pnpm --filter @northstar/web preview --port 5173" \
+            --collect.url="http://localhost:5173" \
+            --collect.url="http://localhost:5173/test" \
+            --collect.url="http://localhost:5173/settori" \
+            --collect.startServerReadyPattern="Local:"
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      # ── Upload report ─────────────────────────────────────────────────────
+      - name: Upload Lighthouse reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-reports-${{ github.run_number }}
+          path: .lighthouseci/
+          retention-days: 14
+
+      # ── Commento PR con i risultati ───────────────────────────────────────
+      - name: Comment Lighthouse results on PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request' && always()
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const dir = '.lighthouseci';
+            if (!fs.existsSync(dir)) { console.log('No LHCI reports found'); return; }
+
+            // Leggi i manifest JSON generati da LHCI
+            const manifests = fs.readdirSync(dir)
+              .filter(f => f.endsWith('.json') && f !== 'links.json');
+
+            let tableRows = '';
+            for (const file of manifests.slice(0, 3)) {
+              try {
+                const data = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+                const cats = data.categories || {};
+                const url  = (data.finalUrl || file).replace('http://localhost:5173', '');
+                const perf = Math.round((cats.performance?.score ?? 0) * 100);
+                const a11y = Math.round((cats.accessibility?.score ?? 0) * 100);
+                const bp   = Math.round((cats['best-practices']?.score ?? 0) * 100);
+                const pwa  = Math.round((cats.pwa?.score ?? 0) * 100);
+                const icon = (s) => s >= 90 ? '🟢' : s >= 70 ? '🟡' : '🔴';
+                tableRows += `| \`${url || '/'}\ ` +
+                  `| ${icon(perf)} ${perf} | ${icon(a11y)} ${a11y}` +
+                  ` | ${icon(bp)} ${bp} | ${icon(pwa)} ${pwa} |\n`;
+              } catch {}
+            }
+
+            const body = tableRows
+              ? `## ⚡ Lighthouse CI — Mobile\n\n` +
+                `| URL | Perf | A11y | Best Pract. | PWA |\n` +
+                `|-----|------|------|-------------|-----|\n` +
+                tableRows +
+                `\n> Soglie: Perf ≥ 70 · A11y ≥ 85 · BP ≥ 85 · PWA ≥ 70`
+              : '## ⚡ Lighthouse CI — nessun report trovato';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 2 — Playwright mobile
+# ─────────────────────────────────────────────────────────────────────────────
+  playwright-mobile:
+    name: "Playwright E2E (Pixel 5 + iPhone 12)"
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.skip_playwright != 'true' }}
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: northstar
+          POSTGRES_PASSWORD: northstar
+          POSTGRES_DB: northstar_mobile_e2e
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Get pnpm store path
+        id: pnpm-cache
+        run: echo "store=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store }}
+          key: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── Cache Playwright browsers ─────────────────────────────────────────
+      - name: Get Playwright version
+        id: pw-version
+        run: |
+          VERSION=$(node -e "try { console.log(require('./node_modules/@playwright/test/package.json').version) } catch { console.log('unknown') }")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-mobile-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
+      - name: Install Playwright browsers (chromium + webkit)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      - name: Install Playwright system deps (cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium webkit
+
+      # ── Setup DB ──────────────────────────────────────────────────────────
+      - name: Run DB migrations
+        run: pnpm --filter @workspace/db exec drizzle-kit push
+        env:
+          DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_mobile_e2e
+
+      - name: Seed E2E users
+        run: |
+          pnpm --filter @workspace/api-server run seed:e2e 2>/dev/null || \
+          echo 'seed:e2e non presente, skip'
+        env:
+          DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_mobile_e2e
+          E2E_USER_EMAIL: ${{ vars.TEST_USER_EMAIL || 'e2e@northstar.it' }}
+          E2E_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD || 'E2ePassword123!' }}
+
+      # ── Build e avvia i servizi ───────────────────────────────────────────
+      - name: Build API server
+        run: pnpm --filter @workspace/api-server run build
+
+      - name: Build frontend
+        run: pnpm --filter @northstar/web run build
+        env:
+          NODE_ENV: production
+          VITE_API_URL: http://localhost:8080
+
+      - name: Start services
+        run: |
+          # API
+          PORT=8080 \
+          DATABASE_URL=postgresql://northstar:northstar@localhost:5432/northstar_mobile_e2e \
+          JWT_SECRET=ci-jwt-secret-32-chars-minimum! \
+          ADMIN_KEY=ci-admin-key \
+          USE_MOCK_AI=true \
+          OPENAI_API_KEY=mock-not-used \
+          ANTHROPIC_API_KEY=mock-not-used \
+          GROQ_API_KEY=mock-not-used \
+          SENTRY_DSN='' \
+          node artifacts/api-server/dist/index.mjs &
+
+          # Frontend (serve la build statica)
+          npx serve -s apps/web/dist -l 5173 &
+
+          npx wait-on \
+            http://localhost:8080/api/health/live \
+            http://localhost:5173 \
+            --timeout 60000
+
+      # ── Playwright mobile tests ───────────────────────────────────────────
+      - name: Run Playwright mobile tests
+        run: pnpm exec playwright test e2e/mobile/ --reporter=html,github
+        env:
+          BASE_URL: http://localhost:5173
+          API_URL: http://localhost:8080
+          TEST_USER_EMAIL: ${{ vars.TEST_USER_EMAIL || 'e2e@northstar.it' }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD || 'E2ePassword123!' }}
+          CI: 'true'
+          USE_MOCK_AI: 'true'
+
+      - name: Upload Playwright mobile report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-mobile-report-${{ github.run_number }}
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload Playwright mobile traces (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-mobile-traces-${{ github.run_number }}
+          path: test-results/
+          retention-days: 7
