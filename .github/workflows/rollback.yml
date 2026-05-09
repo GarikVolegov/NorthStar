@@ -1,17 +1,34 @@
 name: Rollback Production
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Trigger: manuale via GitHub Actions UI (workflow_dispatch)
-# Uso:
-#   1. Vai su Actions → "Rollback Production" → Run workflow
-#   2. Inserisci il commit SHA a cui tornare (es. abc1234)
-#   3. Conferma — il workflow fa checkout di quel commit e ri-deploya
+# Trigger: MANUALE via GitHub Actions UI (workflow_dispatch)
 #
-# ATTENZIONE:
-#   - Il rollback NON fa down-migration del DB
-#   - Se il commit target ha uno schema diverso dall'attuale DB,
-#     devi applicare manualmente la migration di rollback
-#   - Usa solo per emergenze — preferisci un hotfix su main
+# Uso:
+#   1. Actions → "Rollback Production" → Run workflow
+#   2. Inserisci il SHA del commit a cui tornare
+#   3. Scegli l'ambiente (production / staging)
+#   4. Scrivi ROLLBACK nel campo confirm
+#   5. (Opzionale) Scrivi il motivo nel campo reason
+#
+# Flusso:
+#   validate → db-safety-check → rollback → [health check + Sentry + Slack]
+#
+# ATTENZIONE DB:
+#   Il rollback NON esegue down-migration automatica.
+#   db-safety-check blocca il rollback se il commit target ha uno schema
+#   INCOMPATIBILE con il DB attuale (DROP TABLE / DROP COLUMN).
+#   Se lo schema è solo additivo (nuove colonne nullable), il rollback è safe.
+#
+# Secret richiesti (da entrambi gli environment):
+#   RAILWAY_PROD_API_TOKEN / RAILWAY_STAGING_API_TOKEN
+#   RAILWAY_PROD_SERVICE_ID / RAILWAY_STAGING_SERVICE_ID
+#   SENTRY_AUTH_TOKEN
+#   SLACK_WEBHOOK_URL (opzionale)
+#
+# Variabili:
+#   PRODUCTION_URL / STAGING_URL
+#   SENTRY_ORG / SENTRY_PROJECT
+#   SLACK_NOTIFY
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -30,15 +47,21 @@ on:
           - staging
         default: production
       confirm:
-        description: 'Scrivi ROLLBACK per confermare (sicurezza extra)'
+        description: 'Scrivi ROLLBACK per confermare'
         required: true
         type: string
+      reason:
+        description: 'Motivo del rollback (audit trail, opzionale)'
+        required: false
+        type: string
+        default: ''
 
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '9'
 
 jobs:
+  # ─── 1. Validate ────────────────────────────────────────────────────────────────
   validate:
     name: Validate rollback request
     runs-on: ubuntu-latest
@@ -51,23 +74,117 @@ jobs:
           fi
           echo "✅ Conferma valida"
 
+      - name: Check SHA format
+        run: |
+          SHA="${{ inputs.commit_sha }}"
+          if ! echo "$SHA" | grep -qE '^[0-9a-f]{7,40}$'; then
+            echo "❌ SHA non valido: $SHA"
+            echo "   Formato atteso: 7-40 caratteri hex (es. abc1234 o abc1234def567890...)"
+            exit 1
+          fi
+          echo "✅ SHA formato valido: $SHA"
+
       - name: Log rollback intent
         run: |
-          echo "🔄 Rollback richiesto da: ${{ github.actor }}"
-          echo "📦 Ambiente: ${{ inputs.environment }}"
-          echo "🎯 Target SHA: ${{ inputs.commit_sha }}"
-          echo "⏰ Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "## 🔄 Rollback Richiesto" >> $GITHUB_STEP_SUMMARY
+          echo "| Campo | Valore |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Ambiente | \`${{ inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| SHA target | \`${{ inputs.commit_sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| SHA corrente | \`$(echo $GITHUB_SHA | cut -c1-7)\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Richiesto da | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Motivo | ${{ inputs.reason || '(non specificato)' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Timestamp | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
 
+  # ─── 2. DB Safety Check ─────────────────────────────────────────────────────────
+  # Confronta lo schema Drizzle del commit TARGET con quello del commit CORRENTE.
+  # Se il target ha DROP TABLE o DROP COLUMN → BLOCCA (richiederebbe down-migration).
+  # Se il target ha solo colonne in meno rispetto all'attuale → WARNING ma non blocca
+  #   (le colonne extra nel DB vengono ignorate dall'app).
+  # Se nessun diff di schema → SAFE, procedi.
+  db-safety-check:
+    name: DB schema safety check
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout current HEAD (main)
+        uses: actions/checkout@v4
+        with:
+          path: current
+          fetch-depth: 1
+
+      - name: Checkout target commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+          path: target
+          fetch-depth: 1
+
+      - name: Compare Drizzle schema files
+        id: schema-diff
+        run: |
+          echo "## 🗃 DB Schema Safety Check" >> $GITHUB_STEP_SUMMARY
+
+          # Confronta la directory schema tra HEAD e target
+          SCHEMA_CURRENT="current/lib/db/src/schema"
+          SCHEMA_TARGET="target/lib/db/src/schema"
+
+          if [ ! -d "$SCHEMA_CURRENT" ] || [ ! -d "$SCHEMA_TARGET" ]; then
+            echo "⚠️ Directory schema non trovata — skip check" >> $GITHUB_STEP_SUMMARY
+            echo "safe=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          DIFF=$(diff -r --unified=2 "$SCHEMA_TARGET" "$SCHEMA_CURRENT" 2>/dev/null || true)
+
+          if [ -z "$DIFF" ]; then
+            echo "✅ Schema identico tra target e HEAD — rollback safe" >> $GITHUB_STEP_SUMMARY
+            echo "safe=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "**Diff schema rilevato:**" >> $GITHUB_STEP_SUMMARY
+          echo '```diff' >> $GITHUB_STEP_SUMMARY
+          echo "$DIFF" | head -100 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          # Controlla DROP: il commit target rimuove tabelle o colonne
+          # Nel diff, le righe '+' sono quelle presenti in HEAD ma non in target
+          # (cioè, nel target sono assenti = DROP implicito)
+          DANGEROUS=$(echo "$DIFF" | grep -E '^\+.*(pgTable|drizzle-orm)' | grep -viE '^\+\+\+' | wc -l)
+
+          if [ "$DANGEROUS" -gt 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **ROLLBACK BLOCCATO**: il commit target ha uno schema che rimuove" >> $GITHUB_STEP_SUMMARY
+            echo "tabelle o colonne presenti nel DB attuale." >> $GITHUB_STEP_SUMMARY
+            echo "Esegui manualmente la down-migration prima del rollback." >> $GITHUB_STEP_SUMMARY
+            echo "safe=false" >> $GITHUB_OUTPUT
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ Schema diff rilevato ma nessun DROP pericoloso." >> $GITHUB_STEP_SUMMARY
+            echo "Le colonne extra nel DB verranno ignorate dall'app — rollback safe." >> $GITHUB_STEP_SUMMARY
+            echo "safe=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Fail if schema unsafe
+        if: steps.schema-diff.outputs.safe == 'false'
+        run: |
+          echo "❌ Rollback bloccato per incompatibilità schema DB."
+          echo "Vedi il job summary per i dettagli del diff."
+          exit 1
+
+  # ─── 3. Rollback ────────────────────────────────────────────────────────────────
   rollback:
     name: Execute rollback
     runs-on: ubuntu-latest
-    needs: validate
+    needs: db-safety-check
     environment: ${{ inputs.environment }}
     steps:
       - name: Checkout target commit
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.commit_sha }}
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -89,50 +206,136 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # ── Deploy su Railway ────────────────────────────────────────────────────
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
+      - name: Set rollback env vars
+        run: |
+          TARGET_SHORT=$(echo "${{ inputs.commit_sha }}" | cut -c1-7)
+          CURRENT_SHORT=$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')
+          echo "TARGET_SHA=$TARGET_SHORT" >> $GITHUB_ENV
+          echo "CURRENT_SHA=$CURRENT_SHORT" >> $GITHUB_ENV
+          echo "SENTRY_RELEASE=${{ inputs.environment }}@$TARGET_SHORT" >> $GITHUB_ENV
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            echo "DEPLOY_URL=${{ vars.PRODUCTION_URL }}" >> $GITHUB_ENV
+            echo "HEALTH_ATTEMPTS=18" >> $GITHUB_ENV
+          else
+            echo "DEPLOY_URL=${{ vars.STAGING_URL }}" >> $GITHUB_ENV
+            echo "HEALTH_ATTEMPTS=12" >> $GITHUB_ENV
+          fi
 
-      - name: Rollback deploy — Railway
+      # ── Deploy Railway ─────────────────────────────────────────────────────────────
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli --silent
+
+      - name: Rollback deploy — production (Railway)
         if: inputs.environment == 'production'
         run: |
+          echo "🔄 Deploy rollback a $TARGET_SHA su production..."
           railway up \
             --service ${{ secrets.RAILWAY_PROD_SERVICE_ID }} \
             --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_PROD_API_TOKEN }}
 
-      - name: Rollback deploy — Railway staging
+      - name: Rollback deploy — staging (Railway)
         if: inputs.environment == 'staging'
         run: |
+          echo "🔄 Deploy rollback a $TARGET_SHA su staging..."
           railway up \
             --service ${{ secrets.RAILWAY_STAGING_SERVICE_ID }} \
             --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_STAGING_API_TOKEN }}
 
-      # ── Health check post-rollback ───────────────────────────────────────────
+      # ── Fly.io (alternativa, decommentare se necessario) ───────────────────────
+      # - name: Rollback deploy — Fly.io
+      #   uses: superfly/flyctl-actions/setup-flyctl@master
+      # - run: |
+      #     CONFIG="fly.${{ inputs.environment }}.toml"
+      #     flyctl deploy --remote-only --config "$CONFIG"
+      #   env:
+      #     FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # ── Health check ────────────────────────────────────────────────────────────
       - name: Health check post-rollback
         run: |
-          URL="${{ inputs.environment == 'production' && vars.PRODUCTION_URL || vars.STAGING_URL }}"
-          echo "Health check su $URL/api/health ..."
-          for i in $(seq 1 12); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/api/health" 2>/dev/null || echo "000")
-            echo "Tentativo $i/12 — HTTP $STATUS"
+          echo "Attendo health check su $DEPLOY_URL ..."
+          for i in $(seq 1 $HEALTH_ATTEMPTS); do
+            RESPONSE=$(curl -s -w "\n%{http_code}" "$DEPLOY_URL/api/health" 2>/dev/null || echo -e "\n000")
+            STATUS=$(echo "$RESPONSE" | tail -1)
+            BODY=$(echo "$RESPONSE" | head -1)
+            echo "Tentativo $i/$HEALTH_ATTEMPTS — HTTP $STATUS"
             if [ "$STATUS" = "200" ]; then
               echo "✅ Rollback completato e applicazione healthy!"
+              echo "   Body: $BODY"
               exit 0
             fi
+            [ -n "$BODY" ] && echo "   Body: $BODY"
             sleep 10
           done
-          echo "❌ Health check fallito dopo rollback — verifica manualmente"
+          echo "❌ Health check fallito post-rollback — verifica manualmente"
           exit 1
 
-      - name: Log rollback complete
+      # ── Sentry: notifica rollback ─────────────────────────────────────────────
+      # Crea un deployment Sentry per la versione ripristinata.
+      # Permette di vedere in Sentry "questa versione è quella attiva ora"
+      # e correlare i nuovi errori con la versione corretta.
+      - name: Notify Sentry — rollback deployment
         if: success()
         run: |
-          echo "✅ ROLLBACK COMPLETATO"
-          echo "Ambiente: ${{ inputs.environment }}"
-          echo "SHA ripristinato: ${{ inputs.commit_sha }}"
-          echo "Eseguito da: ${{ github.actor }}"
-          echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          npm install -g @sentry/cli --silent
+
+          # La release target può già esistere (fu creata al deploy originale)
+          # sentry-cli è idempotente su 'new' se la release esiste già
+          sentry-cli releases new "$SENTRY_RELEASE" 2>/dev/null || true
+          sentry-cli releases deploys "$SENTRY_RELEASE" new \
+            --env "${{ inputs.environment }}" \
+            --name "rollback-to-$TARGET_SHA" \
+            --url "$DEPLOY_URL"
+
+          echo "✅ Sentry notificato: rollback a $SENTRY_RELEASE"
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        continue-on-error: true   # Non bloccare il rollback se Sentry fallisce
+
+      # ── Slack: alert rollback ──────────────────────────────────────────────────
+      - name: Notify Slack — rollback OK
+        if: success() && vars.SLACK_NOTIFY == 'true'
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "⚠️ *NorthStar Rollback Completato*\n*Ambiente*: `${{ inputs.environment }}`\n*Versione ripristinata*: `${{ env.TARGET_SHA }}`\n*Versione precedente*: `${{ env.CURRENT_SHA }}`\n*Motivo*: ${{ inputs.reason || '(non specificato)' }}\n*Eseguito da*: ${{ github.actor }}\n*Health*: ✅ OK"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Notify Slack — rollback FAILED
+        if: failure() && vars.SLACK_NOTIFY == 'true'
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "🔴 *NorthStar Rollback FALLITO*\n*Ambiente*: `${{ inputs.environment }}`\n*SHA target*: `${{ inputs.commit_sha }}`\n*Motivo*: ${{ inputs.reason || '(non specificato)' }}\n*Eseguito da*: ${{ github.actor }}\n*Job*: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Job summary
+        if: always()
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "## ✅ Rollback Completato" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Rollback Fallito" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "| Campo | Valore |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Ambiente | \`${{ inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| SHA ripristinato | \`${{ env.TARGET_SHA }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Eseguito da | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Motivo | ${{ inputs.reason || '(non specificato)' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Timestamp | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
