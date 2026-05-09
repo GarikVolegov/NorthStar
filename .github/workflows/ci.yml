@@ -10,14 +10,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# ─── Reusable env ─────────────────────────────────────────────────────────────
+# ─── Reusable env ─────────────────────────────────────────────────────────────────
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '9'
   PYTHON_VERSION: '3.12'
 
 jobs:
-  # ─── 1. Typecheck ─────────────────────────────────────────────────────────────────
+  # ─── 1. Typecheck ─────────────────────────────────────────────────────────────────────
   typecheck:
     name: TypeScript typecheck
     runs-on: ubuntu-latest
@@ -46,7 +46,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
 
-  # ─── 2. Unit test (Vitest) ───────────────────────────────────────────────────────────
+  # ─── 2. Unit test (Vitest) ──────────────────────────────────────────────────────────
   unit-tests:
     name: Unit tests (Vitest)
     runs-on: ubuntu-latest
@@ -81,7 +81,6 @@ jobs:
           JWT_SECRET: ci-jwt-secret-32-chars-minimum!
           ADMIN_KEY: ci-admin-key
           USE_MOCK_AI: 'true'
-          # Sentry disabilitato in CI test — no DSN = no-op automatico
           SENTRY_DSN: ''
 
       - name: Upload coverage report
@@ -92,7 +91,7 @@ jobs:
           path: artifacts/api-server/coverage/
           retention-days: 7
 
-  # ─── 3. Integration test (Supertest) ────────────────────────────────────────────────
+  # ─── 3. Integration test (Supertest) ───────────────────────────────────────────────
   integration-tests:
     name: Integration tests (Supertest)
     runs-on: ubuntu-latest
@@ -150,10 +149,9 @@ jobs:
           OPENAI_API_KEY: 'mock-not-used'
           ANTHROPIC_API_KEY: 'mock-not-used'
           GROQ_API_KEY: 'mock-not-used'
-          # Sentry disabilitato in CI test
           SENTRY_DSN: ''
 
-  # ─── 4. Python ML tests (pytest) ─────────────────────────────────────────────────────
+  # ─── 4. Python ML tests (pytest) ─────────────────────────────────────────────────────────────
   python-tests:
     name: Python ML tests (pytest)
     runs-on: ubuntu-latest
@@ -192,7 +190,18 @@ jobs:
         env:
           PYTHONPATH: '.'
 
-  # ─── 5. E2E test (Playwright) ──────────────────────────────────────────────────────────
+  # ─── 5. E2E test (Playwright) ────────────────────────────────────────────────────────────────
+  #
+  # Env var mapping (helpers/auth.ts ⇔ CI):
+  #   TEST_USER_EMAIL      = utente base autenticato  (wendy, affiliate CTA)
+  #   TEST_USER_PASSWORD   = password utente base
+  #   TEST_AFFILIATE_EMAIL = utente con isAffiliate=true (affiliate dashboard)
+  #   TEST_AFFILIATE_PASSWORD = password utente affiliate
+  #
+  # Seed:
+  #   seed:e2e          → crea TEST_USER (base, objectives, sectorId)
+  #   seed:e2e-affiliate → crea TEST_AFFILIATE (isAffiliate=true) [graceful skip]
+  #
   e2e-tests:
     name: E2E tests (Playwright)
     runs-on: ubuntu-latest
@@ -253,14 +262,28 @@ jobs:
         env:
           DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_e2e
 
-      - name: Seed E2E test user
+      - name: Seed E2E base user
+        # Crea l'utente base con objectives e sectorId per le spec
+        # wendy.spec.ts e affiliate.spec.ts (branch non-affiliate)
         run: |
           pnpm --filter @workspace/api-server run seed:e2e 2>/dev/null || \
           echo 'seed:e2e script non presente, skip'
         env:
           DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_e2e
-          E2E_USER_EMAIL: e2e@northstar.it
-          E2E_USER_PASSWORD: E2ePassword123!
+          E2E_USER_EMAIL: ${{ vars.TEST_USER_EMAIL || 'e2e@northstar.it' }}
+          E2E_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD || 'E2ePassword123!' }}
+
+      - name: Seed E2E affiliate user
+        # Crea l'utente con isAffiliate=true per affiliate.spec.ts
+        # (branch "Affiliato": stats card, referral link, dialog ritiro)
+        # Graceful skip se lo script non è ancora implementato.
+        run: |
+          pnpm --filter @workspace/api-server run seed:e2e-affiliate 2>/dev/null || \
+          echo 'seed:e2e-affiliate script non presente, skip'
+        env:
+          DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_e2e
+          AFFILIATE_SEED_EMAIL: ${{ vars.TEST_AFFILIATE_EMAIL || 'affiliate-e2e@northstar.it' }}
+          AFFILIATE_SEED_PASSWORD: ${{ secrets.TEST_AFFILIATE_PASSWORD || 'AffiliateE2e123!' }}
 
       - name: Build API server
         run: pnpm --filter @workspace/api-server run build
@@ -293,8 +316,14 @@ jobs:
         env:
           BASE_URL: http://localhost:5000
           API_URL: http://localhost:8080
-          E2E_USER_EMAIL: e2e@northstar.it
-          E2E_USER_PASSWORD: E2ePassword123!
+          # Nomi usati da e2e/helpers/auth.ts (loginViaApi, loginAsAffiliate)
+          TEST_USER_EMAIL: ${{ vars.TEST_USER_EMAIL || 'e2e@northstar.it' }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD || 'E2ePassword123!' }}
+          TEST_AFFILIATE_EMAIL: ${{ vars.TEST_AFFILIATE_EMAIL || 'affiliate-e2e@northstar.it' }}
+          TEST_AFFILIATE_PASSWORD: ${{ secrets.TEST_AFFILIATE_PASSWORD || 'AffiliateE2e123!' }}
+          # Retrocompatibilità con spec precedenti che usano E2E_USER_*
+          E2E_USER_EMAIL: ${{ vars.TEST_USER_EMAIL || 'e2e@northstar.it' }}
+          E2E_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD || 'E2ePassword123!' }}
           CI: 'true'
           USE_MOCK_AI: 'true'
 
@@ -314,11 +343,7 @@ jobs:
           path: test-results/
           retention-days: 3
 
-  # ─── 6. Sentry Release (solo su push a main) ─────────────────────────────────────────
-  # Crea una release Sentry associata al commit SHA — abilita:
-  #   - Regressione detection ("questo errore era risolto nella v1.2.3")
-  #   - Source maps upload (stack trace leggibili in Sentry)
-  #   - Deployment tracking (quando il codice è andato in prod)
+  # ─── 6. Sentry Release (solo su push a main) ───────────────────────────────────────────────
   sentry-release:
     name: Sentry release (main only)
     runs-on: ubuntu-latest
@@ -328,7 +353,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # Sentry ha bisogno della storia completa per set-commits
+          fetch-depth: 0
 
       - name: Create Sentry release
         run: |
