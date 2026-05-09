@@ -16,6 +16,13 @@
  * Prelievo:
  *   requestWithdrawal()  →  crea un withdrawal 'pending', scala withdrawableBalance
  *   Il pagamento effettivo avviene con un cron separato (PayPal/bank API).
+ *
+ * INTEGRITÀ:
+ *   - getOrCreateAccount: upsert atomico via ON CONFLICT per evitare
+ *     duplicati in caso di richieste concorrenti.
+ *   - recordMonthlyCommission: aggiornamento wallet in db.transaction
+ *     per garantire che insert commissione e update balance siano atomici.
+ *   - requestWithdrawal: già in db.transaction con check pessimistico.
  */
 import { db } from "@workspace/db";
 import {
@@ -88,52 +95,82 @@ function currentMonth(): string {
 
 /**
  * Recupera o crea il wallet affiliato per un utente.
- * Lazy: il conto viene creato al primo accesso alla dashboard.
+ *
+ * ATOMICITÀ: usa INSERT ... ON CONFLICT (user_id) DO NOTHING + re-select
+ * invece del pattern "check then insert". In questo modo due richieste
+ * concorrenti non possono creare duplicati: la seconda INSERT viene
+ * ignorata silenziosamente e il re-select recupera la riga esistente.
+ *
+ * Il referral_code è generato prima dell'insert con un loop di collision-
+ * check contro il DB, ma la collision è estremamente rara (8 char hex).
+ * In caso di collisione sul UNIQUE, il DB rilancerà un errore 23505 che
+ * il chiamante può loggare; un semplice retry risolve.
  */
 export async function getOrCreateAccount(userId: number) {
+  // Fast path: recupera riga esistente
   const existing = await db
     .select()
     .from(affiliateAccountsTable)
     .where(eq(affiliateAccountsTable.userId, userId))
-    .limit(1);
+    .limit(1)
+    .then((r) => r[0] ?? null);
 
-  if (existing.length > 0) return existing[0];
+  if (existing) return existing;
 
-  let code: string;
-  let collision = true;
-  do {
-    code = generateReferralCode();
-    const check = await db
-      .select({ id: affiliateAccountsTable.id })
-      .from(affiliateAccountsTable)
-      .where(eq(affiliateAccountsTable.referralCode, code))
-      .limit(1);
-    collision = check.length > 0;
-  } while (collision);
+  // Genera un codice univoco (collision detection)
+  const code = await generateUniqueReferralCode();
 
-  const [newAccount] = await db
+  // INSERT atomico: se un'altra richiesta concorrente ha già creato il
+  // record per questo userId, ON CONFLICT non fa nulla e il re-select
+  // restituisce la riga vincente.
+  await db
     .insert(affiliateAccountsTable)
     .values({
       userId,
-      referralCode: code!,
+      referralCode:    code,
       isPremiumActive: true,
-      nextRenewalAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      nextRenewalAt:   new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     })
-    .returning();
+    .onConflictDoNothing({ target: affiliateAccountsTable.userId });
 
-  return newAccount;
+  // Re-select: ottiene il record indipendentemente da chi lo ha inserito
+  const created = await db
+    .select()
+    .from(affiliateAccountsTable)
+    .where(eq(affiliateAccountsTable.userId, userId))
+    .limit(1)
+    .then((r) => r[0]);
+
+  if (!created) throw new Error(`[affiliate] getOrCreateAccount: record mancante per userId=${userId}`);
+  return created;
+}
+
+/** Genera un referral code non ancora presente nel DB. */
+async function generateUniqueReferralCode(): Promise<string> {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const code = generateReferralCode();
+    const clash = await db
+      .select({ id: affiliateAccountsTable.id })
+      .from(affiliateAccountsTable)
+      .where(eq(affiliateAccountsTable.referralCode, code))
+      .limit(1)
+      .then((r) => r[0] ?? null);
+    if (!clash) return code;
+  }
+  // Fallback ultra-sicuro: timestamp hex
+  return Date.now().toString(16).toUpperCase();
 }
 
 /**
  * Registra la commissione mensile per un referral confermato.
  *
- * Chiamata da:
- *   - Webhook Stripe quando un refermato rinnova con successo
- *   - Cron mensile che processa tutti i referral attivi
+ * ATOMICITÀ: l'insert della commissione e l'update del wallet avvengono
+ * nella stessa db.transaction. Se uno dei due fallisce, nessuno viene
+ * persistito — niente commissioni "fantasma" senza wallet aggiornato.
  *
- * Logica regola 29€:
- *   lockedBalance < LOCK_THRESHOLD  →  metti la commissione in locked
- *   lockedBalance >= LOCK_THRESHOLD →  metti la commissione in withdrawable
+ * L'INSERT usa ON CONFLICT DO NOTHING per l'idempotenza: chiamare questa
+ * funzione più volte per lo stesso (affiliateId, referredUserId, month)
+ * non produce duplicati.
  */
 export async function recordMonthlyCommission(
   affiliateId: number,
@@ -156,34 +193,40 @@ export async function recordMonthlyCommission(
   const appliedTo: "locked" | "withdrawable" =
     account.lockedBalance < LOCK_THRESHOLD_CENTS ? "locked" : "withdrawable";
 
-  // Upsert idempotente — ON CONFLICT non fa nulla (commissione già registrata)
-  await db.execute(sql`
-    INSERT INTO affiliate_commissions
-      (affiliate_id, referred_user_id, amount_cents, month, applied_to, status, applied_at)
-    VALUES
-      (${affiliateId}, ${referredUserId}, ${COMMISSION_CENTS}, ${targetMonth},
-       ${appliedTo}, 'applied', NOW())
-    ON CONFLICT (affiliate_id, referred_user_id, month) DO NOTHING
-  `);
+  // Transazione: insert commissione + update wallet sono atomici.
+  // Se la commissione esiste già (ON CONFLICT DO NOTHING → 0 righe inserite)
+  // saltiamo anche l'update del wallet per evitare doppi accrediti.
+  await db.transaction(async (tx) => {
+    const result = await tx.execute(sql`
+      INSERT INTO affiliate_commissions
+        (affiliate_id, referred_user_id, amount_cents, month, applied_to, status, applied_at)
+      VALUES
+        (${affiliateId}, ${referredUserId}, ${COMMISSION_CENTS}, ${targetMonth},
+         ${appliedTo}, 'applied', NOW())
+      ON CONFLICT (affiliate_id, referred_user_id, month) DO NOTHING
+    `);
 
-  // Aggiorna il wallet
-  if (appliedTo === "locked") {
-    await db
-      .update(affiliateAccountsTable)
-      .set({
-        lockedBalance: sql`LEAST(locked_balance + ${COMMISSION_CENTS}, ${LOCK_THRESHOLD_CENTS})`,
-        totalEarned:   sql`total_earned + ${COMMISSION_CENTS}`,
-      })
-      .where(eq(affiliateAccountsTable.id, affiliateId));
-  } else {
-    await db
-      .update(affiliateAccountsTable)
-      .set({
-        withdrawableBalance: sql`withdrawable_balance + ${COMMISSION_CENTS}`,
-        totalEarned:         sql`total_earned + ${COMMISSION_CENTS}`,
-      })
-      .where(eq(affiliateAccountsTable.id, affiliateId));
-  }
+    // rowCount = 0 → commissione già presente, evitiamo doppio accredito
+    if ((result.rowCount ?? 0) === 0) return;
+
+    if (appliedTo === "locked") {
+      await tx
+        .update(affiliateAccountsTable)
+        .set({
+          lockedBalance: sql`LEAST(locked_balance + ${COMMISSION_CENTS}, ${LOCK_THRESHOLD_CENTS})`,
+          totalEarned:   sql`total_earned + ${COMMISSION_CENTS}`,
+        })
+        .where(eq(affiliateAccountsTable.id, affiliateId));
+    } else {
+      await tx
+        .update(affiliateAccountsTable)
+        .set({
+          withdrawableBalance: sql`withdrawable_balance + ${COMMISSION_CENTS}`,
+          totalEarned:         sql`total_earned + ${COMMISSION_CENTS}`,
+        })
+        .where(eq(affiliateAccountsTable.id, affiliateId));
+    }
+  });
 
   return { applied: true, appliedTo };
 }
@@ -223,12 +266,11 @@ export async function processRenewal(affiliateId: number): Promise<{
   const newRenewal = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   if (account.lockedBalance >= LOCK_THRESHOLD_CENTS) {
-    // Rinnovo gratuito con locked balance
     await db
       .update(affiliateAccountsTable)
       .set({
-        lockedBalance:  sql`locked_balance - ${LOCK_THRESHOLD_CENTS}`,
-        nextRenewalAt:  newRenewal,
+        lockedBalance:   sql`locked_balance - ${LOCK_THRESHOLD_CENTS}`,
+        nextRenewalAt:   newRenewal,
         isPremiumActive: true,
       })
       .where(eq(affiliateAccountsTable.id, affiliateId));
@@ -236,7 +278,6 @@ export async function processRenewal(affiliateId: number): Promise<{
   }
 
   const diff = LOCK_THRESHOLD_CENTS - account.lockedBalance;
-  // Azzera il locked (sarà la differenza ad essere addebitata su carta)
   await db
     .update(affiliateAccountsTable)
     .set({
@@ -275,7 +316,7 @@ export async function requestWithdrawal(
     );
   }
 
-  // Scala subito il balance (pessimistic lock tramite transazione)
+  // Scala subito il balance con check pessimistico nella stessa transazione
   const [withdrawal] = await db.transaction(async (tx) => {
     await tx
       .update(affiliateAccountsTable)
@@ -306,7 +347,6 @@ export async function getDashboardData(
 ): Promise<AffiliateDashboardData> {
   const account = await getOrCreateAccount(userId);
 
-  // Referral recenti: JOIN users per il nome
   const referralRows = await db
     .select({
       userId:   usersTable.id,
@@ -331,7 +371,6 @@ export async function getDashboardData(
     .orderBy(desc(affiliateWithdrawalsTable.createdAt))
     .limit(10);
 
-  // Proiezione mese corrente
   const monthCount = await db
     .select({ cnt: sql<number>`COUNT(DISTINCT referred_user_id)` })
     .from(affiliateCommissionsTable)
