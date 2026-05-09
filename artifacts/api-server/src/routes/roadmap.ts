@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, sectorsTable, usersTable, testSessionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { optionalAuthMiddleware } from "../lib/auth-jwt.js";
-import { aiGenerationRateLimiter } from "../lib/rate-limiter.js";
+import { aiGenerationRateLimiter, agentLimiter } from "../lib/rate-limiter.js";
 import { ai } from "../lib/ai/index.js";
 
 const router: IRouter = Router();
@@ -98,6 +98,7 @@ Genera percorsi generici partendo da zero, senza ipotizzare background specifici
 router.post(
   "/roadmap/:sectorId/generate",
   optionalAuthMiddleware,
+  agentLimiter,
   aiGenerationRateLimiter,
   async (req, res): Promise<void> => {
     const sectorId = Number.parseInt(String(req.params.sectorId), 10);

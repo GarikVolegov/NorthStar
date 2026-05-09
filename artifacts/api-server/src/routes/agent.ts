@@ -5,10 +5,11 @@ import { getAuthenticatedUserId, getUserPlan } from "../lib/plan-utils";
 import { parseOrchestratorData } from "../lib/agent-helpers";
 import { logAgentCall } from "../agents/logger";
 import { logger } from "../lib/logger";
+import { agentLimiter } from "../lib/rate-limiter.js";
 
 const router: IRouter = Router();
 
-router.post("/agent", async (req, res): Promise<void> => {
+router.post("/agent", agentLimiter, async (req, res): Promise<void> => {
   const userId = getAuthenticatedUserId(req);
   if (!userId) {
     res.status(401).json({ error: "Authentication required" });

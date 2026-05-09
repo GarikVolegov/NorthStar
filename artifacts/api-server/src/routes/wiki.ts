@@ -2,13 +2,13 @@ import { Router } from "express";
 import { db, sectorsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { optionalAuthMiddleware } from "../lib/auth-jwt.js";
-import { aiChatRateLimiter } from "../lib/rate-limiter.js";
+import { aiChatRateLimiter, agentLimiter } from "../lib/rate-limiter.js";
 import { getPrompt, fillTemplate } from "../lib/prompt-store.js";
 import { ai } from "../lib/ai/index.js";
 
 const router = Router();
 
-router.post("/wiki/:sectorId/ask", optionalAuthMiddleware, aiChatRateLimiter, async (req, res): Promise<void> => {
+router.post("/wiki/:sectorId/ask", optionalAuthMiddleware, agentLimiter, aiChatRateLimiter, async (req, res): Promise<void> => {
   const sectorId = parseInt(req.params.sectorId, 10);
   const { question, history = [] } = req.body as {
     question: string;

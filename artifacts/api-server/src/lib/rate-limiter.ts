@@ -73,6 +73,18 @@ export const aiGenerationRateLimiter = createRateLimiter({
 });
 
 /**
+ * Agent limiter — POST /agent, /wiki/:id/ask, /roadmap/:id/stream
+ * 5 chiamate/minuto per utenti free, 30/min per premium.
+ * Protezione burst: impedisce spike improvvisi indipendentemente dal limite orario.
+ */
+export const agentLimiter = createRateLimiter({
+  windowMs: 60 * 1000,   // 1 minuto
+  freeLimit: 5,
+  premiumLimit: 30,
+  group: "agent",
+});
+
+/**
  * Strict rate limiter for auth endpoints (/auth/register, /auth/login, /auth/forgot-password).
  * 5 attempts per 15 minutes per IP — brute force / credential stuffing protection.
  */
