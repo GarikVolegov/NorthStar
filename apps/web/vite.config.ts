@@ -4,7 +4,6 @@ import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
 export default defineConfig(({ mode }) => {
-  // Carica variabili VITE_* da .env, .env.local, .env.[mode]
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
@@ -15,21 +14,20 @@ export default defineConfig(({ mode }) => {
 
     resolve: {
       alias: {
-        // @/ punta a apps/web/src
-        // Allineato con tsconfig.json paths per evitare discrepanze
+        // @/ → apps/web/src  (allineato con tsconfig paths)
         '@': path.resolve(__dirname, './src'),
+        // @growth-agent → lib/growth-agent/src  (#6 — elimina ../../../lib/ relativi)
+        '@growth-agent': path.resolve(__dirname, '../../lib/growth-agent/src'),
       },
     },
 
     server: {
       port: 5173,
       host: true,
-      // Proxy API verso northstar-server in dev locale
       proxy: {
         '/api': {
           target: env.VITE_API_URL ?? 'http://localhost:3001',
           changeOrigin: true,
-          // Non riscrive il path: /api/health → http://localhost:3001/api/health
         },
       },
     },
@@ -37,7 +35,6 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       sourcemap: mode !== 'production',
-      // Chunk splitting: vendor React separato per cache-busting efficiente
       rollupOptions: {
         output: {
           manualChunks: {

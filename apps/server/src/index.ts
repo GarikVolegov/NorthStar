@@ -11,12 +11,18 @@
  * ROUTE MAP:
  *   GET  /api/health                          — healthcheck (public)
  *
- *   ── Affiliate (Passo 5) ───────────────────────────────
+ *   ── Auth ──────────────────────────────────────────────────────────────
+ *   GET  /api/auth/me                         — profilo completo (alias /api/users/me)
+ *                                               restituisce: id, name, email, avatarUrl,
+ *                                               isPremium, isAffiliate, sectorName,
+ *                                               sectorId, objectives[], ...
+ *
+ *   ── Affiliate (Passo 5) ───────────────────────────────────────────────
  *   GET  /api/affiliate/dashboard             — dashboard dati
  *   POST /api/affiliate/withdraw              — richiesta prelievo
  *
- *   ── Profile (Passi 1-4) ────────────────────────────
- *   GET  /api/users/me                        — profilo utente
+ *   ── Profile (Passi 1-4) ───────────────────────────────────────────────
+ *   GET  /api/users/me                        — profilo utente (stesso handler di /api/auth/me)
  *   PATCH /api/users/me                       — aggiorna profilo
  *   POST /api/users/me/objectives             — aggiunge obiettivo
  *   GET  /api/users/me/progress               — XP, streak, timeline
@@ -24,7 +30,7 @@
  *   GET  /api/u/:username                     — profilo pubblico (opzionale auth)
  *   GET  /api/riasec/session/:sessionId       — RIASEC profile
  *
- *   ── Growth Agent (Passo 6) ──────────────────────────
+ *   ── Growth Agent (Passo 6) ────────────────────────────────────────────
  *   GET  /api/growth-agent/onboarding/status  — needsOnboarding
  *   POST /api/growth-agent/onboarding         — primo msg Wendy (SSE)
  *
@@ -52,13 +58,13 @@ import { publicProfileRouter }       from "./profile/public-profile-router";
 import { riasecRouter }              from "./profile/riasec-router";
 import { onboardingRouter }          from "./growth-agent/onboarding-router";
 
-// ── App ─────────────────────────────────────────────────────────────────────
+// ── App ──────────────────────────────────────────────────────────────────────
 
 const app  = express();
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
 const isProd = process.env.NODE_ENV === "production";
 
-// ── CORS ──────────────────────────────────────────────────────────────────
+// ── CORS ─────────────────────────────────────────────────────────────────────
 
 const allowedOrigins = (
   process.env.ALLOWED_ORIGINS ?? "http://localhost:3000,http://localhost:5173"
@@ -66,27 +72,23 @@ const allowedOrigins = (
 
 app.use(cors({
   origin: (origin, cb) => {
-    // Permetti richieste senza origin (Postman, server-to-server)
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
     cb(new Error(`CORS: origine non permessa: ${origin}`));
   },
-  credentials:     true,   // necessario per cookie ns_token
-  allowedHeaders:  ["Content-Type", "Authorization"],
-  exposedHeaders:  ["X-Session-Id"],
+  credentials:    true,
+  allowedHeaders: ["Content-Type", "Authorization"],
+  exposedHeaders: ["X-Session-Id"],
 }));
 
 // ── Global middleware ────────────────────────────────────────────────────────
 
-app.use(helmet({
-  // Disabilita contentSecurityPolicy per evitare blocchi su SSE in dev
-  contentSecurityPolicy: isProd,
-}));
+app.use(helmet({ contentSecurityPolicy: isProd }));
 app.use(morgan(isProd ? "combined" : "dev"));
 app.use(cookieParser());
-app.use(express.json({ limit: "2mb" }));   // 2MB per upload CV
+app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: false }));
 
-// ── Health check (public, nessun auth) ─────────────────────────────────────
+// ── Health check (public) ────────────────────────────────────────────────────
 
 app.get("/api/health", (_req, res) => {
   res.json({
@@ -96,43 +98,40 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-// ── Referral cookie middleware (intercetta ?ref= PRIMA del JWT) ─────────────
-// Montato su /signup e /join (pagine landing del frontend servite da Next.js).
-// Se il tuo frontend è su un altro server puoi rimuovere questo blocco
-// e gestirlo lato Next.js con clientRefTracking.save().
-// app.get("/signup", saveRefCookie, (_req, res) => res.redirect("http://localhost:3000/signup"));
-// app.get("/join",   saveRefCookie, (_req, res) => res.redirect("http://localhost:3000/signup"));
+// ── /api/auth/me — alias di /api/users/me ───────────────────────────────────
+//
+// useAuth() nel frontend chiama GET /api/auth/me per ottenere il profilo
+// completo con objectives, sectorName, isPremium, isAffiliate.
+// Montiamo lo stesso profileRouter anche su questo path:
+//   GET /api/auth/me → profileRouter.get("/me") → risposta completa
+//
+// Nota: usiamo requireAuth qui (non nel router) così la catena middleware
+// è identica a /api/users/me e il handler non deve duplicarsi.
+app.use("/api/auth", requireAuth, profileRouter);
 
-// ── Protected routes ───────────────────────────────────────────────────────────
+// ── Protected routes ─────────────────────────────────────────────────────────
 
-// Affiliate (Passo 5)
-app.use("/api/affiliate",                     requireAuth, affiliateRouter);
+app.use("/api/affiliate",              requireAuth, affiliateRouter);
+app.use("/api/users/me",               requireAuth, profileRouter);
+app.use("/api/users/me/progress",      requireAuth, progressRouter);
+app.use("/api/riasec",                 requireAuth, riasecRouter);
+app.use("/api/growth-agent/onboarding", requireAuth, onboardingRouter);
 
-// Profile (Passi 1–4)
-app.use("/api/users/me",                       requireAuth, profileRouter);
-app.use("/api/users/me/progress",              requireAuth, progressRouter);
-app.use("/api/riasec",                         requireAuth, riasecRouter);
+// ── Public routes (optional auth) ────────────────────────────────────────────
 
-// Growth Agent onboarding (Passo 6)
-app.use("/api/growth-agent/onboarding",        requireAuth, onboardingRouter);
+app.use("/api/u", optionalAuth, publicProfileRouter);
 
-// ── Public routes (optional auth) ───────────────────────────────────────────
-
-// Profilo pubblico /api/u/:username — optionalAuth per personalizzazione
-app.use("/api/u",                              optionalAuth, publicProfileRouter);
-
-// ── 404 handler ──────────────────────────────────────────────────────────────────
+// ── 404 handler ──────────────────────────────────────────────────────────────
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Route non trovata" });
 });
 
-// ── Global error handler ───────────────────────────────────────────────────────
+// ── Global error handler ─────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (!isProd) console.error("[ERROR]", err);
-  // Non esporre stack trace in produzione
   const message = isProd ? "Errore interno del server" : err.message;
   res.status(500).json({ error: message });
 });
@@ -147,4 +146,4 @@ app.listen(PORT, () => {
   console.log(`└────────────────────────────────────┘`);
 });
 
-export default app; // per i test
+export default app;
