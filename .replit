@@ -75,6 +75,10 @@ integrations = ["javascript_openai_ai_integrations:2.0.0", "python_openai_ai_int
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
 
+# ============================================================
+# PORT MAPPING — solo le 3 porte necessarie
+# ============================================================
+
 [[ports]]
 localPort = 5000
 externalPort = 80
@@ -87,68 +91,23 @@ externalPort = 8000
 localPort = 8080
 externalPort = 8099
 
-[[ports]]
-localPort = 8081
-externalPort = 80
-
-[[ports]]
-localPort = 8082
-externalPort = 3002
-
-[[ports]]
-localPort = 8083
-externalPort = 3003
-
-[[ports]]
-localPort = 8084
-externalPort = 5000
-
-[[ports]]
-localPort = 8085
-externalPort = 4200
-
-[[ports]]
-localPort = 8086
-externalPort = 5173
-
-[[ports]]
-localPort = 8087
-externalPort = 6000
-
-[[ports]]
-localPort = 8088
-externalPort = 6800
-
-[[ports]]
-localPort = 8089
-externalPort = 8000
-
-[[ports]]
-localPort = 8090
-externalPort = 8008
-
-[[ports]]
-localPort = 8091
-externalPort = 8081
-
-[[ports]]
-localPort = 9999
-externalPort = 3001
-
-[[ports]]
-localPort = 21003
-externalPort = 3000
-
 [nix]
 channel = "stable-25_05"
 packages = ["libxcrypt"]
 
-[userenv]
+# ============================================================
+# SECRETS — NON aggiungere mai valori qui!
+# Imposta tutte le variabili nel pannello Replit Secrets:
+#
+#   JWT_SECRET             → genera con: openssl rand -hex 64
+#   ADMIN_KEY              → genera con: openssl rand -hex 32
+#   STRIPE_PUBLISHABLE_KEY → da Stripe Dashboard
+#   STRIPE_SECRET_KEY      → da Stripe Dashboard
+#   STRIPE_WEBHOOK_SECRET  → da Stripe Dashboard (obbligatorio!)
+#   RESEND_API_KEY         → da Resend Dashboard
+#   TAVILY_API_KEY         → da Tavily Dashboard
+#   DATABASE_URL           → da Neon/Supabase
+#   AI_AGENTS_URL          → http://localhost:8000
+# ============================================================
 
-[userenv.shared]
-JWT_SECRET = "53dbd6b4f55cea9445c57d52d8eed0fd28dcddfc2c0a7a4b985d23936dd3b3d4e49b2443373ef86916d81b2b7755c850"
-STRIPE_PUBLISHABLE_KEY = "pk_test_51TSh2S8n2aRXPtfyU3Xik33d4nd4G0640m2A8HBfJgQxLHYDVezOVGgxfKWoXJ4z5tRMqRgXvgnQwX9Fd3q0w7Zi00TMu4CCyk"
-RESEND_API_KEY = "re_F7Absseu_DD8LrvunouT6aYAm93ycXkRZ"
-TAVILY_API_KEY = "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"
-AI_AGENTS_URL = "http://localhost:8000"
-ADMIN_KEY = "northstar-admin-2025"
+[userenv]
