@@ -7,6 +7,7 @@
  * Layout:
  *   ─ Hero card: avatar + nome + settore + XP + badge di percorso
  *   ─ Pulsante azione connessione (dinamico per status)
+ *   ─ Bottone "Messaggio" (solo se accepted + !isOwner) → /amici?dm=<userId>
  *   ─ Bio (se presente)
  *   ─ Stats strip: connessioni · badge · membro da
  *   ─ Griglia badge (ultimi 6)
@@ -22,6 +23,7 @@ import {
   Users, Zap, Award, Calendar, Linkedin,
   UserPlus, UserCheck, UserX, Clock,
   ChevronLeft, Edit2, Lock, AlertCircle, Loader2,
+  MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePublicProfile } from '@/hooks/usePublicProfile';
@@ -107,6 +109,8 @@ function ProfileSkeleton() {
 function ConnectionButton({
   status,
   pending,
+  userId,
+  userName,
   onSend,
   onCancel,
   onAccept,
@@ -114,6 +118,8 @@ function ConnectionButton({
 }: {
   status: 'none' | 'pending_sent' | 'pending_received' | 'accepted';
   pending: boolean;
+  userId: number;
+  userName: string;
   onSend: () => void;
   onCancel: () => void;
   onAccept: () => void;
@@ -179,14 +185,27 @@ function ConnectionButton({
     </div>
   );
 
-  // accepted
+  // accepted — mostra pill + bottone Messaggio
   return (
     <div className="flex gap-2">
-      <span className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm
+      <span className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm
                        font-medium text-emerald-400 bg-emerald-400/10 border border-emerald-400/20">
         <UserCheck className="w-4 h-4" />
         Connesso
       </span>
+
+      {/* Bottone Messaggio — naviga su /amici?dm=<userId> */}
+      <Link
+        href={`/amici?dm=${userId}&name=${encodeURIComponent(userName)}`}
+        className="flex items-center justify-center gap-2 flex-1 px-4 py-2.5 rounded-xl text-sm
+                   font-semibold text-[#7eb3ff] bg-[#1a3a6b] hover:bg-[#1f4480]
+                   transition-colors"
+        aria-label={`Invia un messaggio a ${userName}`}
+      >
+        <MessageCircle className="w-4 h-4" />
+        Messaggio
+      </Link>
+
       <button
         onClick={onRemove}
         disabled={pending}
@@ -363,6 +382,8 @@ export default function ProfilePage() {
           <ConnectionButton
             status={connectionStatus}
             pending={actionPending}
+            userId={user.id}
+            userName={user.name}
             onSend={actions.sendRequest}
             onCancel={actions.cancelRequest}
             onAccept={actions.acceptRequest}

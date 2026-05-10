@@ -7,6 +7,11 @@
  *   - Toast in-page per nuove richieste amicizia
  *   - Invalidazione cache DM quando arriva new_message
  *
+ * Step 5 (DM deep-link):
+ *   - Legge ?dm=<userId>&name=<name> da URL al mount
+ *   - Apre automaticamente il tab Messaggi con la conversazione pre-selezionata
+ *   - Rimuove il query param dall'URL dopo l'apertura (history replace)
+ *
  * Struttura:
  *   - Header con titolo + contatore
  *   - 4 Tab: Connessioni | Richieste (badge) | Esplora | Messaggi (badge DM)
@@ -17,7 +22,7 @@
  *   - Empty state curato per ogni tab
  */
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, UserPlus, Compass, UserCheck, UserX, Clock,
@@ -88,9 +93,6 @@ const cardVariants = {
 };
 
 // ── Toast notifica richiesta amicizia ─────────────────────────────────────────
-//
-// Mostrato in basso a destra quando arriva una nuova richiesta via SSE.
-// Si auto-chiude dopo 6s. Bottoni Accetta/Rifiuta inline.
 
 function FriendRequestToast({
   notif,
@@ -104,7 +106,6 @@ function FriendRequestToast({
   const [progress, setProgress] = useState(100);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Barra di progresso + auto-close
   useEffect(() => {
     const DURATION = 6000;
     const TICK     = 50;
@@ -159,7 +160,6 @@ function FriendRequestToast({
       role="alert"
       aria-live="polite"
     >
-      {/* Barra progresso */}
       <div className="h-0.5 bg-[#1a2d4f]">
         <motion.div
           className="h-full bg-[#4a8bff]"
@@ -169,7 +169,6 @@ function FriendRequestToast({
       </div>
 
       <div className="p-4">
-        {/* Header */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2">
             <Bell className="w-3.5 h-3.5 text-[#4a8bff]" />
@@ -186,7 +185,6 @@ function FriendRequestToast({
           </button>
         </div>
 
-        {/* Utente */}
         <div className="flex items-center gap-3 mb-3">
           {notif.from.avatarUrl ? (
             <img
@@ -212,7 +210,6 @@ function FriendRequestToast({
           </div>
         </div>
 
-        {/* Azioni */}
         <div className="flex items-center gap-2">
           <button
             onClick={handleDecline}
@@ -245,9 +242,6 @@ function FriendRequestToast({
     </motion.div>
   );
 }
-
-// ── ToastContainer ─────────────────────────────────────────────────────────────
-// Stack di toast in basso a destra, max 3 contemporanei.
 
 function ToastContainer({ toasts, onDismiss }: {
   toasts: FriendRequestNotification[];
@@ -1062,15 +1056,42 @@ function ConversationList({
 }
 
 // ── TabMessaggi ────────────────────────────────────────────────────────────────
+//
+// Accetta initialUserId e initialUserName per il deep-link da /profilo.
+// Se initialUserId > 0, crea al volo un DMConversation "stub" da aprire
+// immediatamente (i messaggi reali vengono caricati da useMessages).
 
-function TabMessaggi({ myId }: { myId: number }) {
-  const [selectedConv, setSelectedConv] = useState<DMConversation | null>(null);
+function TabMessaggi({
+  myId,
+  initialUserId,
+  initialUserName,
+}: {
+  myId: number;
+  initialUserId?: number;
+  initialUserName?: string;
+}) {
+  const [selectedConv, setSelectedConv] = useState<DMConversation | null>(() => {
+    if (initialUserId && initialUserId > 0) {
+      return {
+        conversationId: -1, // placeholder — non usato per i messaggi
+        participant: {
+          id: initialUserId,
+          name: initialUserName ?? "...",
+          avatarUrl: null,
+        },
+        lastMessage: null,
+        unreadCount: 0,
+        updatedAt: null,
+      };
+    }
+    return null;
+  });
 
   return (
     <AnimatePresence mode="wait">
       {selectedConv ? (
         <ChatWindow
-          key={`chat-${selectedConv.conversationId}`}
+          key={`chat-${selectedConv.participant.id}`}
           conversation={selectedConv}
           myId={myId}
           onBack={() => setSelectedConv(null)}
@@ -1095,43 +1116,53 @@ function TabMessaggi({ myId }: { myId: number }) {
 export default function AmiciPage() {
   const [activeTab, setActiveTab] = useState<Tab>("connessioni");
   const queryClient = useQueryClient();
+  const [location, navigate] = useLocation();
+
+  // ── Deep-link ?dm=<userId>&name=<name> ───────────────────────────────────
+  //
+  // Quando si arriva da /profilo via bottone "Messaggio", leggiamo i param
+  // e switchiamo automaticamente al tab messaggi con la chat già aperta.
+  // Puliamo l'URL subito dopo (history replace) per non sporcare la history.
+
+  const [dmTarget, setDmTarget] = useState<{ userId: number; name: string } | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const dmId   = parseInt(params.get("dm") ?? "", 10);
+    const dmName = params.get("name") ?? "";
+
+    if (!isNaN(dmId) && dmId > 0) {
+      setDmTarget({ userId: dmId, name: decodeURIComponent(dmName) });
+      setActiveTab("messaggi");
+      // Rimuovi ?dm= dall'URL senza aggiungere voce alla history
+      navigate("/amici", { replace: true });
+    }
+  // Esegui solo al primo mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { friends, requests, suggestions, loading, error, pendingIds, actions, refetch } = useFriends();
 
-  // Toast state: coda di FriendRequestNotification da mostrare
   const [toasts, setToasts] = useState<FriendRequestNotification[]>([]);
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // ── SSE notifiche in tempo reale ─────────────────────────────────────────
-  //
-  // useNotificationsStream apre UNA SOLA connessione SSE a /api/notifications/stream.
-  // Se la navbar monta già questo hook, le query key coincidono e
-  // React Query deduplicerà il fetch — non ci saranno connessioni duplicate.
-  //
-  // onFriendRequest: aggiorna lista richieste senza reload
-  // onNewDM: invalida cache conversazioni (badge aggiornato)
-
   const { data: notifData } = useNotificationsStream({
     onFriendRequest: useCallback((notif: FriendRequestNotification) => {
-      // Aggiorna la lista richieste nel tab
       void refetch();
-      // Mostra toast in-page
       setToasts((prev) => [
-        ...prev.filter((t) => t.id !== notif.id), // evita duplicati
+        ...prev.filter((t) => t.id !== notif.id),
         notif,
       ]);
     }, [refetch]),
 
     onNewDM: useCallback(() => {
-      // Invalida lista conversazioni → badge DM si aggiorna
       queryClient.invalidateQueries({ queryKey: dmKeys.conversations() });
     }, [queryClient]),
   });
 
-  // Badge tab
   const dmBadge = (notifData?.unreadMessagesCount ?? 0) > 0
     ? notifData!.unreadMessagesCount
     : undefined;
@@ -1253,13 +1284,16 @@ export default function AmiciPage() {
             </motion.div>
           ) : (
             <motion.div key="messaggi" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <TabMessaggi myId={myId} />
+              <TabMessaggi
+                myId={myId}
+                initialUserId={dmTarget?.userId}
+                initialUserName={dmTarget?.name}
+              />
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Toast container — fuori dal max-w-2xl per posizionamento fixed */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </>
   );
