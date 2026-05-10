@@ -1,147 +1,211 @@
 /**
- * useNotifications
+ * useNotifications.ts
  *
- * Hook che mantiene una connessione SSE a /api/notifications/stream.
- * Aggiorna lo stato ogni volta che arriva un evento "update" dal server.
+ * Hook React Query per il sistema notifiche NorthStar.
  *
- * Funzionalità:
- *  - Riconnessione automatica con exponential backoff (max 30s)
- *  - Fallback a polling ogni 30s se SSE non supportato
- *  - Azioni inline: acceptRequest / declineRequest aggiornano lo stato localmente
- *    senza attendere il prossimo ciclo SSE
+ * Tipi di notifica supportati:
+ *   - friend_request  : richiesta di amicizia ricevuta
+ *   - new_message     : messaggi DM non letti (raggruppati per mittente)
  *
- * Usage:
- *   const { notifications, unreadCount, actions } = useNotifications();
+ * Esporta:
+ *   useNotificationsSnapshot()    — query REST (polling fallback)
+ *   useNotificationsStream()      — SSE con EventSource (tempo reale, 15s)
+ *   useAcceptFriendRequest()      — accetta richiesta da notifica
+ *   useDeclineFriendRequest()     — rifiuta richiesta da notifica
+ *
+ * Nota: entrambi gli hook (snapshot e stream) scrivono sulla stessa cache key
+ * `notificationKeys.all`, quindi si possono usare insieme senza conflitti.
+ * In genere si usa solo useNotificationsStream() nella navbar/shell;
+ * useNotificationsSnapshot() serve come fallback per browser che bloccano SSE.
  */
-import { useState, useEffect, useRef, useCallback } from "react";
-import type { AppNotification } from "../../../apps/server/src/notifications/notifications-router";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
+import { apiClient } from '../lib/api-client';
 
-export type { AppNotification };
+// ── Tipi ──────────────────────────────────────────────────────────────────────
 
-interface NotificationsState {
-  notifications: AppNotification[];
-  unreadCount:   number;
+export interface FriendRequestNotification {
+  id: string;
+  type: 'friend_request';
+  friendshipId: number;
+  from: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+    sectorName: string | null;
+  };
+  sentAt: string;
+  read: boolean;
 }
 
-const API_BASE = "/api/notifications";
+export interface DMNotification {
+  id: string;
+  type: 'new_message';
+  from: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+  };
+  unreadCount: number;
+  lastMessageAt: string;
+  read: boolean;
+}
 
-export function useNotifications() {
-  const [state,       setState]       = useState<NotificationsState>({ notifications: [], unreadCount: 0 });
-  const [connected,   setConnected]   = useState(false);
-  const [pendingIds,  setPendingIds]  = useState<Record<string, "accepting" | "declining">>({});
+export type AppNotification = FriendRequestNotification | DMNotification;
 
-  const esRef        = useRef<EventSource | null>(null);
-  const retryDelay   = useRef(2000);
-  const retryTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mounted      = useRef(true);
+export interface NotificationsPayload {
+  notifications: AppNotification[];
+  unreadCount: number;           // totale (friend_requests + unread DMs sender count)
+  friendRequestCount: number;    // numero richieste pending
+  unreadMessagesCount: number;   // somma messaggi non letti da tutti i mittenti
+}
 
-  // ── Fetch snapshot (polling fallback + primo caricamento) ─────────────────
-  const fetchSnapshot = useCallback(async () => {
-    try {
-      const res  = await fetch(API_BASE, { credentials: "include" });
-      if (!res.ok) return;
-      const data = await res.json() as NotificationsState;
-      if (mounted.current) setState(data);
-    } catch { /* ignora */ }
-  }, []);
+// ── Query Keys ────────────────────────────────────────────────────────────────
 
-  // ── Connessione SSE ────────────────────────────────────────────────────────
-  const connect = useCallback(() => {
-    if (!mounted.current) return;
-    if (typeof EventSource === "undefined") {
-      // Fallback: polling ogni 30s
-      void fetchSnapshot();
-      const id = setInterval(() => void fetchSnapshot(), 30_000);
-      return () => clearInterval(id);
-    }
+export const notificationKeys = {
+  all: ['notifications'] as const,
+};
 
-    const es = new EventSource(`${API_BASE}/stream`, { withCredentials: true });
-    esRef.current = es;
+// ── useNotificationsSnapshot — polling REST fallback ─────────────────────────────
 
-    es.addEventListener("update", (e: MessageEvent) => {
-      try {
-        const data = JSON.parse(e.data) as NotificationsState;
-        if (mounted.current) {
-          setState(data);
-          setConnected(true);
-          retryDelay.current = 2000; // reset backoff
-        }
-      } catch { /* JSON malformato */ }
-    });
+export function useNotificationsSnapshot() {
+  return useQuery({
+    queryKey: notificationKeys.all,
+    queryFn: async () => {
+      return apiClient.get<NotificationsPayload>('/notifications');
+    },
+    staleTime: 1000 * 15,
+    refetchInterval: 1000 * 60,
+  });
+}
 
-    es.addEventListener("error", () => {
-      es.close();
-      esRef.current = null;
-      if (!mounted.current) return;
-      setConnected(false);
-      // Exponential backoff
-      retryTimer.current = setTimeout(() => {
-        retryDelay.current = Math.min(retryDelay.current * 2, 30_000);
-        connect();
-      }, retryDelay.current);
-    });
+// ── useNotificationsStream — SSE in tempo reale ──────────────────────────────────
+//
+// Apre una connessione SSE a /api/notifications/stream.
+// Ogni evento "update" sovrascrive la cache React Query.
+// Si può passare un callback `onNewDM` per mostrare un toast quando
+// arriva una nuova notifica DM.
 
-    es.addEventListener("open", () => {
-      if (mounted.current) setConnected(true);
-    });
-  }, [fetchSnapshot]);
+export function useNotificationsStream(options?: {
+  onNewDM?: (notif: DMNotification) => void;
+  onFriendRequest?: (notif: FriendRequestNotification) => void;
+}) {
+  const queryClient = useQueryClient();
+  const esRef       = useRef<EventSource | null>(null);
+  const prevDMRef   = useRef<Set<string>>(new Set());
+  const prevFRRef   = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    mounted.current = true;
-    void fetchSnapshot(); // carica subito senza aspettare SSE
-    connect();
-    return () => {
-      mounted.current = false;
-      esRef.current?.close();
-      if (retryTimer.current) clearTimeout(retryTimer.current);
+    const es = new EventSource('/api/notifications/stream', { withCredentials: true });
+    esRef.current = es;
+
+    es.addEventListener('update', (event) => {
+      try {
+        const data = JSON.parse(event.data) as NotificationsPayload;
+
+        // Aggiorna cache React Query — tutte le query su `notificationKeys.all`
+        queryClient.setQueryData(notificationKeys.all, data);
+
+        // Callback per nuovi DM (non presenti nel set precedente)
+        if (options?.onNewDM) {
+          data.notifications
+            .filter((n): n is DMNotification => n.type === 'new_message')
+            .forEach((n) => {
+              if (!prevDMRef.current.has(n.id)) {
+                options.onNewDM?.(n);
+              }
+            });
+        }
+
+        // Callback per nuove richieste amicizia
+        if (options?.onFriendRequest) {
+          data.notifications
+            .filter((n): n is FriendRequestNotification => n.type === 'friend_request')
+            .forEach((n) => {
+              if (!prevFRRef.current.has(n.id)) {
+                options.onFriendRequest?.(n);
+              }
+            });
+        }
+
+        // Aggiorna i set per il prossimo ciclo
+        prevDMRef.current = new Set(
+          data.notifications
+            .filter((n) => n.type === 'new_message')
+            .map((n) => n.id),
+        );
+        prevFRRef.current = new Set(
+          data.notifications
+            .filter((n) => n.type === 'friend_request')
+            .map((n) => n.id),
+        );
+      } catch {
+        // JSON parse error — ignora
+      }
+    });
+
+    es.onerror = () => {
+      // L'EventSource fa reconnect automatico; non servono azioni
     };
-  }, [connect, fetchSnapshot]);
 
-  // ── Azioni ─────────────────────────────────────────────────────────────────
+    return () => {
+      es.close();
+      esRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryClient]);
 
-  const acceptRequest = useCallback(async (friendshipId: number, notificationId: string) => {
-    setPendingIds((p) => ({ ...p, [notificationId]: "accepting" }));
-    try {
-      const res = await fetch(`${API_BASE}/friend-request/${friendshipId}/accept`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      // Rimuovi localmente senza aspettare SSE
-      setState((prev) => ({
-        notifications: prev.notifications.filter((n) => n.id !== notificationId),
-        unreadCount:   Math.max(0, prev.unreadCount - 1),
-      }));
-    } catch (err) {
-      console.error("acceptRequest error", err);
-    } finally {
-      setPendingIds((p) => { const n = { ...p }; delete n[notificationId]; return n; });
-    }
-  }, []);
+  // Restituisce i dati dalla cache (aggiornati via SSE)
+  return useQuery({
+    queryKey: notificationKeys.all,
+    queryFn: async () => apiClient.get<NotificationsPayload>('/notifications'),
+    staleTime: Infinity, // gestito dall'SSE, non fare refetch automatico
+    refetchOnWindowFocus: false,
+  });
+}
 
-  const declineRequest = useCallback(async (friendshipId: number, notificationId: string) => {
-    setPendingIds((p) => ({ ...p, [notificationId]: "declining" }));
-    try {
-      const res = await fetch(`${API_BASE}/friend-request/${friendshipId}/decline`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      setState((prev) => ({
-        notifications: prev.notifications.filter((n) => n.id !== notificationId),
-        unreadCount:   Math.max(0, prev.unreadCount - 1),
-      }));
-    } catch (err) {
-      console.error("declineRequest error", err);
-    } finally {
-      setPendingIds((p) => { const n = { ...p }; delete n[notificationId]; return n; });
-    }
-  }, []);
+// ── useAcceptFriendRequest ────────────────────────────────────────────────────────
 
-  return {
-    ...state,
-    connected,
-    pendingIds,
-    actions: { acceptRequest, declineRequest },
-  };
+export function useAcceptFriendRequest() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (friendshipId: number) => {
+      return apiClient.post(`/notifications/friend-request/${friendshipId}/accept`, {});
+    },
+    onSuccess: () => {
+      // Invalida notifiche E lista amici
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['friends'] });
+    },
+  });
+}
+
+// ── useDeclineFriendRequest ─────────────────────────────────────────────────────
+
+export function useDeclineFriendRequest() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (friendshipId: number) => {
+      return apiClient.post(`/notifications/friend-request/${friendshipId}/decline`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    },
+  });
+}
+
+// ── Utility: totalUnreadCount ────────────────────────────────────────────────────
+//
+// Usa questo valore per il badge rosso nella navbar.
+// = friendRequestCount + (conversazioni DM con unread > 0)
+
+export function useTotalUnreadCount(): number {
+  const { data } = useNotificationsSnapshot();
+  return data?.unreadCount ?? 0;
 }

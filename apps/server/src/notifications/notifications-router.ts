@@ -1,22 +1,18 @@
 /**
  * notifications-router.ts — /api/notifications
  *
- * Sistema notifiche in-app leggero: nessuna tabella dedicata.
+ * Sistema notifiche in-app: nessuna tabella dedicata.
  * Le notifiche vengono derivate da:
- *   - friendshipsTable (richieste in arrivo pending)
- *   - (future) messages, achievements, ecc.
+ *   - friendshipsTable  (richieste in arrivo pending)
+ *   - messagesTable     (messaggi DM non letti, raggruppati per mittente)
  *
  * Endpoint:
- *   GET  /api/notifications/stream  — SSE stream (text/event-stream)
- *                                     Invia evento "ping" ogni 25s + "update" quando
- *                                     cambiano le richieste pending.
  *   GET  /api/notifications         — snapshot corrente (polling fallback)
- *   POST /api/notifications/friend-request/:id/accept  — shortcut accetta da notifica
- *   POST /api/notifications/friend-request/:id/decline — shortcut rifiuta da notifica
- *
- * NOTA: per il SSE usiamo lo stesso pattern di onboarding-router.ts (già in progetto).
- * Il client mantiene una singola connessione aperta; il server fa poll sul DB ogni 15s
- * e manda un evento "update" solo se il count è cambiato.
+ *   GET  /api/notifications/stream  — SSE stream
+ *                                     - evento "update" ogni 15s (o alla connessione)
+ *                                     - keepalive ":ping" ogni 25s
+ *   POST /api/notifications/friend-request/:id/accept  — shortcut accetta
+ *   POST /api/notifications/friend-request/:id/decline — shortcut rifiuta
  */
 import { Router, type Request, type Response } from "express";
 import { db } from "@workspace/db";
@@ -25,12 +21,15 @@ import {
   usersTable,
   testSessionsTable,
   sectorsTable,
+  messagesTable,
+  conversationsTable,
+  conversationParticipantsTable,
 } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 
 export const notificationsRouter = Router();
 
-// ── Tipi ──────────────────────────────────────────────────────────────────────
+// ── Tipi ─────────────────────────────────────────────────────────────────────
 
 export interface FriendRequestNotification {
   id: string;          // `friend-request-${friendshipId}`
@@ -46,12 +45,26 @@ export interface FriendRequestNotification {
   read: boolean;
 }
 
-export type AppNotification = FriendRequestNotification;
+export interface DMNotification {
+  id: string;          // `dm-${senderId}`
+  type: "new_message";
+  from: {
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+  };
+  unreadCount: number;  // numero messaggi non letti da questo mittente
+  lastMessageAt: string;
+  read: boolean;        // sempre false (derivato da isRead=false)
+}
 
-// ── Helper: carica tutte le notifiche per un utente ──────────────────────────
+export type AppNotification = FriendRequestNotification | DMNotification;
 
-async function loadNotifications(userId: number): Promise<AppNotification[]> {
-  // Richieste di amicizia pendenti ricevute
+// ── Helper: richieste di amicizia pending ──────────────────────────────────────
+
+async function loadFriendRequestNotifications(
+  userId: number,
+): Promise<FriendRequestNotification[]> {
   const rows = await db
     .select({
       id:          friendshipsTable.id,
@@ -62,9 +75,9 @@ async function loadNotifications(userId: number): Promise<AppNotification[]> {
       sectorName:  sectorsTable.name,
     })
     .from(friendshipsTable)
-    .leftJoin(usersTable,       eq(usersTable.id, friendshipsTable.requesterId))
+    .leftJoin(usersTable,        eq(usersTable.id, friendshipsTable.requesterId))
     .leftJoin(testSessionsTable, eq(usersTable.testSessionId, testSessionsTable.id))
-    .leftJoin(sectorsTable,     eq(testSessionsTable.confirmedSectorId, sectorsTable.id))
+    .leftJoin(sectorsTable,      eq(testSessionsTable.confirmedSectorId, sectorsTable.id))
     .where(
       and(
         eq(friendshipsTable.receiverId, userId),
@@ -90,56 +103,166 @@ async function loadNotifications(userId: number): Promise<AppNotification[]> {
   }));
 }
 
+// ── Helper: messaggi DM non letti, raggruppati per mittente ─────────────────────
+//
+// Strategia:
+//   1. Trova tutte le conversazioni dirette di cui l'utente fa parte
+//   2. Per ciascuna, conta i messaggi non letti inviati dall'altro partecipante
+//   3. Emette una DMNotification per ogni conversazione con unread > 0
+
+async function loadDMNotifications(userId: number): Promise<DMNotification[]> {
+  // Step 1: trova i conversationId delle conversazioni dirette dell'utente
+  const myConvs = await db
+    .select({ conversationId: conversationParticipantsTable.conversationId })
+    .from(conversationParticipantsTable)
+    .innerJoin(
+      conversationsTable,
+      and(
+        eq(conversationsTable.id, conversationParticipantsTable.conversationId),
+        eq(conversationsTable.type, "direct"),
+      ),
+    )
+    .where(eq(conversationParticipantsTable.userId, userId));
+
+  if (myConvs.length === 0) return [];
+
+  const notifications: DMNotification[] = [];
+
+  await Promise.all(
+    myConvs.map(async ({ conversationId }) => {
+      // Step 2: trova l'altro partecipante
+      const other = await db
+        .select({ userId: conversationParticipantsTable.userId })
+        .from(conversationParticipantsTable)
+        .where(
+          and(
+            eq(conversationParticipantsTable.conversationId, conversationId),
+            sql`${conversationParticipantsTable.userId} != ${userId}`,
+          ),
+        )
+        .limit(1)
+        .then((r) => r[0] ?? null);
+
+      if (!other) return;
+
+      // Step 3: conta messaggi non letti inviati dall'altro
+      const unreadRows = await db
+        .select({
+          count:         sql<number>`COUNT(*)`,
+          lastMessageAt: sql<string>`MAX(${messagesTable.createdAt})`,
+        })
+        .from(messagesTable)
+        .where(
+          and(
+            eq(messagesTable.conversationId, conversationId),
+            eq(messagesTable.senderId, other.userId),
+            eq(messagesTable.isRead, false),
+            eq(messagesTable.isDeleted, false),
+          ),
+        )
+        .then((r) => r[0] ?? null);
+
+      const unreadCount = Number(unreadRows?.count ?? 0);
+      if (unreadCount === 0) return;
+
+      // Step 4: recupera dati mittente
+      const sender = await db
+        .select({ id: usersTable.id, name: usersTable.name, avatarUrl: usersTable.avatarUrl })
+        .from(usersTable)
+        .where(eq(usersTable.id, other.userId))
+        .limit(1)
+        .then((r) => r[0] ?? null);
+
+      if (!sender) return;
+
+      notifications.push({
+        id:            `dm-${sender.id}`,
+        type:          "new_message",
+        from:          { id: sender.id, name: sender.name ?? "Utente", avatarUrl: sender.avatarUrl ?? null },
+        unreadCount,
+        lastMessageAt: unreadRows?.lastMessageAt
+          ? new Date(unreadRows.lastMessageAt).toISOString()
+          : new Date().toISOString(),
+        read: false,
+      });
+    }),
+  );
+
+  return notifications.sort(
+    (a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime(),
+  );
+}
+
+// ── Helper composto ─────────────────────────────────────────────────────────────────
+
+async function loadAllNotifications(userId: number) {
+  const [friendRequests, dmNotifications] = await Promise.all([
+    loadFriendRequestNotifications(userId),
+    loadDMNotifications(userId),
+  ]);
+
+  const notifications: AppNotification[] = [
+    ...friendRequests,
+    ...dmNotifications,
+  ].sort((a, b) => {
+    const aTime = a.type === "friend_request" ? a.sentAt : a.lastMessageAt;
+    const bTime = b.type === "friend_request" ? b.sentAt : b.lastMessageAt;
+    return new Date(bTime).getTime() - new Date(aTime).getTime();
+  });
+
+  return {
+    notifications,
+    unreadCount:          notifications.length,
+    friendRequestCount:   friendRequests.length,
+    unreadMessagesCount:  dmNotifications.reduce((s, n) => s + n.unreadCount, 0),
+  };
+}
+
 function uid(req: Request): number {
   return (req as Request & { user: { id: number } }).user.id;
 }
 
-// ── GET /api/notifications — snapshot JSON (polling fallback) ─────────────────
+// ── GET /api/notifications — snapshot JSON ───────────────────────────────────────
 
 notificationsRouter.get("/", async (req: Request, res: Response) => {
   try {
-    const notifications = await loadNotifications(uid(req));
-    res.json({ notifications, unreadCount: notifications.length });
+    const data = await loadAllNotifications(uid(req));
+    res.json(data);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Errore" });
   }
 });
 
-// ── GET /api/notifications/stream — SSE ──────────────────────────────────────
+// ── GET /api/notifications/stream — SSE ──────────────────────────────────────────
 
 notificationsRouter.get("/stream", async (req: Request, res: Response) => {
   const me = uid(req);
 
-  res.setHeader("Content-Type",  "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache, no-transform");
-  res.setHeader("Connection",    "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no"); // disable nginx buffering
+  res.setHeader("Content-Type",       "text/event-stream");
+  res.setHeader("Cache-Control",      "no-cache, no-transform");
+  res.setHeader("Connection",         "keep-alive");
+  res.setHeader("X-Accel-Buffering",  "no");
   res.flushHeaders();
 
-  // Invia subito lo snapshot iniziale
   const sendUpdate = async () => {
     try {
-      const notifications = await loadNotifications(me);
-      const payload = JSON.stringify({ notifications, unreadCount: notifications.length });
+      const data    = await loadAllNotifications(me);
+      const payload = JSON.stringify(data);
       res.write(`event: update\ndata: ${payload}\n\n`);
     } catch {
       res.write(`event: error\ndata: {}\n\n`);
     }
   };
 
+  // Snapshot immediato alla connessione
   await sendUpdate();
 
-  // Poll ogni 15 secondi
-  const pollInterval = setInterval(() => {
-    void sendUpdate();
-  }, 15_000);
+  // Poll ogni 15 secondi (copre sia friend_requests che DM non letti)
+  const pollInterval = setInterval(() => { void sendUpdate(); }, 15_000);
 
-  // Ping ogni 25s per tenere viva la connessione (evita timeout proxy)
-  const pingInterval = setInterval(() => {
-    res.write(":ping\n\n");
-  }, 25_000);
+  // Keepalive ogni 25s
+  const pingInterval = setInterval(() => { res.write(":ping\n\n"); }, 25_000);
 
-  // Cleanup alla chiusura connessione
   const cleanup = () => {
     clearInterval(pollInterval);
     clearInterval(pingInterval);
@@ -150,7 +273,7 @@ notificationsRouter.get("/stream", async (req: Request, res: Response) => {
   res.on("finish",  cleanup);
 });
 
-// ── POST /api/notifications/friend-request/:id/accept ────────────────────────
+// ── POST /api/notifications/friend-request/:id/accept ───────────────────────────
 
 notificationsRouter.post(
   "/friend-request/:id/accept",
@@ -165,8 +288,8 @@ notificationsRouter.post(
         .where(eq(friendshipsTable.id, friendshipId))
         .limit(1);
 
-      if (!row)                   { res.status(404).json({ error: "Non trovata" }); return; }
-      if (row.receiverId !== me)  { res.status(403).json({ error: "Non autorizzato" }); return; }
+      if (!row)                     { res.status(404).json({ error: "Non trovata" });   return; }
+      if (row.receiverId !== me)    { res.status(403).json({ error: "Non autorizzato" }); return; }
       if (row.status !== "pending") { res.status(409).json({ error: "Stato non valido" }); return; }
 
       const [updated] = await db
@@ -182,7 +305,7 @@ notificationsRouter.post(
   },
 );
 
-// ── POST /api/notifications/friend-request/:id/decline ───────────────────────
+// ── POST /api/notifications/friend-request/:id/decline ──────────────────────────
 
 notificationsRouter.post(
   "/friend-request/:id/decline",
@@ -197,8 +320,8 @@ notificationsRouter.post(
         .where(eq(friendshipsTable.id, friendshipId))
         .limit(1);
 
-      if (!row)                   { res.status(404).json({ error: "Non trovata" }); return; }
-      if (row.receiverId !== me)  { res.status(403).json({ error: "Non autorizzato" }); return; }
+      if (!row)                  { res.status(404).json({ error: "Non trovata" });    return; }
+      if (row.receiverId !== me) { res.status(403).json({ error: "Non autorizzato" }); return; }
 
       await db.delete(friendshipsTable).where(eq(friendshipsTable.id, friendshipId));
       res.json({ success: true });
