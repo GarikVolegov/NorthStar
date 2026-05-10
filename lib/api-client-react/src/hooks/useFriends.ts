@@ -1,170 +1,217 @@
 /**
- * useFriends
+ * useFriends.ts
  *
- * Hook per la sezione Network (/amici).
- * Gestisce connessioni, richieste in arrivo e suggerimenti.
+ * Hook principale per la gestione delle connessioni (friendships).
  *
- * Pattern identico a useLeaderboard: fetch nativo + useState + useCallback.
- * Nessuna dipendenza esterna oltre a React.
- *
- * Usage:
- *   const { friends, requests, suggestions, loading, actions } = useFriends();
+ * Espone:
+ *   - friends[]     — connessioni accettate
+ *   - requests[]    — richieste di amicizia in arrivo
+ *   - suggestions[] — suggeriti con matchScore (Step 4)
+ *   - loading       — true durante il primo fetch
+ *   - error         — messaggio di errore se il fetch fallisce
+ *   - pendingIds    — mappa friendshipId / userId → stato azione in corso
+ *   - actions       — { sendRequest, acceptRequest, remove }
+ *   - refetch       — invalida tutte le query del network
  */
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 
-// ── Tipi ─────────────────────────────────────────────────────────────────────
+// ── Tipi pubblici ───────────────────────────────────────────────────────────
 
-export interface NetworkUser {
+export type PublicUser = {
   id: number;
   name: string;
   avatarUrl: string | null;
   sectorName: string | null;
   journeyType: string | null;
   totalXp: number | null;
-}
+};
 
-export interface Friend {
+export type Friend = {
   friendshipId: number;
   since: string;
-  user: NetworkUser;
-}
+  user: PublicUser;
+};
 
-export interface FriendRequest {
+export type FriendRequest = {
   friendshipId: number;
   sentAt: string;
-  user: NetworkUser;
+  user: PublicUser;
+};
+
+/** Suggestion include matchScore: 0–100 (Step 4) */
+export type Suggestion = PublicUser & {
+  matchScore?: number;
+};
+
+// ── Query keys ───────────────────────────────────────────────────────────────
+
+const FRIENDS_KEY      = ["network", "friends"]   as const;
+const REQUESTS_KEY     = ["network", "requests"]  as const;
+const SUGGESTIONS_KEY  = ["network", "suggestions"] as const;
+
+// ── Fetch helpers ────────────────────────────────────────────────────────────
+
+async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, { credentials: "include", ...init });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<T>;
 }
 
-export interface Suggestion {
-  id: number;
-  name: string;
-  avatarUrl: string | null;
-  sectorName: string | null;
-  journeyType: string | null;
-  totalXp: number | null;
-  sectorId: number | null;
-}
-
-export type FriendshipAction = "sending" | "accepting" | "removing" | null;
-
-// ── Hook ──────────────────────────────────────────────────────────────────────
+// ── useFriends ───────────────────────────────────────────────────────────────
 
 export function useFriends() {
-  const [friends,     setFriends]     = useState<Friend[]>([]);
-  const [requests,    setRequests]    = useState<FriendRequest[]>([]);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState<string | null>(null);
-  // Mappa id → azione in corso per UI ottimistica
-  const [pendingIds,  setPendingIds]  = useState<Record<number, FriendshipAction>>({});
+  const qc = useQueryClient();
 
-  // ── Fetch parallelo all'avvio ─────────────────────────────────────────────
+  // ─ Fetch friends ────────────────────────────────────────────────────────
+  const friendsQuery = useQuery({
+    queryKey: FRIENDS_KEY,
+    queryFn: () => apiFetch<{ friends: Friend[] }>("/api/friends"),
+    staleTime: 60_000,
+  });
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [friendsRes, requestsRes, suggestionsRes] = await Promise.all([
-        fetch("/api/friends",             { credentials: "include" }),
-        fetch("/api/friends/requests",    { credentials: "include" }),
-        fetch("/api/friends/suggestions", { credentials: "include" }),
-      ]);
+  // ─ Fetch requests ──────────────────────────────────────────────────────
+  const requestsQuery = useQuery({
+    queryKey: REQUESTS_KEY,
+    queryFn: () => apiFetch<{ requests: FriendRequest[] }>("/api/friends/requests"),
+    staleTime: 30_000,
+  });
 
-      if (!friendsRes.ok || !requestsRes.ok || !suggestionsRes.ok) {
-        throw new Error("Errore nel caricamento del network");
-      }
+  // ─ Fetch suggestions con matchScore ─────────────────────────────────
+  const suggestionsQuery = useQuery({
+    queryKey: SUGGESTIONS_KEY,
+    queryFn: () =>
+      apiFetch<{ suggestions: Suggestion[] }>("/api/friends/suggestions"),
+    staleTime: 5 * 60_000, // 5 min: il ranking cambia raramente
+  });
 
-      const [f, r, s] = await Promise.all([
-        friendsRes.json() as Promise<{ friends: Friend[] }>,
-        requestsRes.json() as Promise<{ requests: FriendRequest[] }>,
-        suggestionsRes.json() as Promise<{ suggestions: Suggestion[] }>,
-      ]);
+  // ─ Pending state (ottimistic UI per azioni) ──────────────────────────
+  // pendingIds mappa: friendshipId (number) | userId (number stringificato) → stato
+  // Nota: usiamo string key per gestire sia friendshipId che userId nella stessa mappa
+  type PendingState = Record<string, "accepting" | "removing" | "sending">;
 
-      setFriends(f.friends);
-      setRequests(r.requests);
-      setSuggestions(s.suggestions);
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // ─ Mutation: invia richiesta ───────────────────────────────────────────
+  const sendRequestMutation = useMutation({
+    mutationFn: (userId: number) =>
+      apiFetch(`/api/friends/request/${userId}`, { method: "POST" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: SUGGESTIONS_KEY });
+    },
+  });
 
-  useEffect(() => {
-    void fetchAll();
-  }, [fetchAll]);
+  // ─ Mutation: accetta richiesta ───────────────────────────────────────
+  const acceptMutation = useMutation({
+    mutationFn: ({ friendshipId }: { friendshipId: number; userId: number }) =>
+      apiFetch(`/api/friends/${friendshipId}/accept`, { method: "PUT" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: FRIENDS_KEY });
+      void qc.invalidateQueries({ queryKey: REQUESTS_KEY });
+    },
+  });
 
-  // ── Azioni ────────────────────────────────────────────────────────────────
+  // ─ Mutation: rimuovi / rifiuta ───────────────────────────────────────
+  const removeMutation = useMutation({
+    mutationFn: (friendshipId: number) =>
+      apiFetch(`/api/friends/${friendshipId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: FRIENDS_KEY });
+      void qc.invalidateQueries({ queryKey: REQUESTS_KEY });
+      void qc.invalidateQueries({ queryKey: SUGGESTIONS_KEY });
+    },
+  });
 
-  /** Invia richiesta di amicizia a un utente (da Esplora) */
-  const sendRequest = useCallback(async (targetUserId: number) => {
-    setPendingIds((p) => ({ ...p, [targetUserId]: "sending" }));
-    try {
-      const res = await fetch(`/api/friends/request/${targetUserId}`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      // Rimuovi dai suggerimenti (optimistic)
-      setSuggestions((prev) => prev.filter((s) => s.id !== targetUserId));
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setPendingIds((p) => { const n = { ...p }; delete n[targetUserId]; return n; });
-    }
-  }, []);
+  // ─ API pubblica ───────────────────────────────────────────────────────────
 
-  /** Accetta una richiesta ricevuta */
-  const acceptRequest = useCallback(async (friendshipId: number, requesterId: number) => {
-    setPendingIds((p) => ({ ...p, [friendshipId]: "accepting" }));
-    try {
-      const res = await fetch(`/api/friends/${friendshipId}/accept`, {
-        method: "PUT",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      // Aggiorna stato localmente senza refetch completo
-      const accepted = requests.find((r) => r.friendshipId === friendshipId);
-      if (accepted) {
-        setRequests((prev) => prev.filter((r) => r.friendshipId !== friendshipId));
-        setFriends((prev) => [
-          ...prev,
-          { friendshipId, since: new Date().toISOString(), user: accepted.user },
-        ]);
-      }
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setPendingIds((p) => { const n = { ...p }; delete n[friendshipId]; return n; });
-    }
-  }, [requests]);
+  const refetch = useCallback(() => {
+    void qc.invalidateQueries({ queryKey: ["network"] });
+  }, [qc]);
 
-  /** Rimuovi amico o rifiuta richiesta */
-  const remove = useCallback(async (friendshipId: number) => {
-    setPendingIds((p) => ({ ...p, [friendshipId]: "removing" }));
-    try {
-      const res = await fetch(`/api/friends/${friendshipId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      setFriends((prev)  => prev.filter((f) => f.friendshipId !== friendshipId));
-      setRequests((prev) => prev.filter((r) => r.friendshipId !== friendshipId));
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setPendingIds((p) => { const n = { ...p }; delete n[friendshipId]; return n; });
-    }
-  }, []);
+  // pendingIds semplificato: traccka le operazioni in corso
+  const pendingIds: PendingState = {};
+  if (sendRequestMutation.isPending && sendRequestMutation.variables) {
+    pendingIds[String(sendRequestMutation.variables)] = "sending";
+  }
+  if (acceptMutation.isPending && acceptMutation.variables) {
+    pendingIds[String(acceptMutation.variables.friendshipId)] = "accepting";
+  }
+  if (removeMutation.isPending && removeMutation.variables) {
+    pendingIds[String(removeMutation.variables)] = "removing";
+  }
 
   return {
-    friends,
-    requests,
-    suggestions,
-    loading,
-    error,
+    friends:     friendsQuery.data?.friends ?? [],
+    requests:    requestsQuery.data?.requests ?? [],
+    suggestions: suggestionsQuery.data?.suggestions ?? [],
+    loading:
+      friendsQuery.isLoading ||
+      requestsQuery.isLoading ||
+      suggestionsQuery.isLoading,
+    error:
+      friendsQuery.error?.message ??
+      requestsQuery.error?.message ??
+      null,
     pendingIds,
-    refetch: fetchAll,
-    actions: { sendRequest, acceptRequest, remove },
+    actions: {
+      sendRequest:   (userId: number)                               => sendRequestMutation.mutate(userId),
+      acceptRequest: (friendshipId: number, userId: number)         => acceptMutation.mutate({ friendshipId, userId }),
+      remove:        (friendshipId: number)                         => removeMutation.mutate(friendshipId),
+    },
+    refetch,
   };
+}
+
+// ── Hooks singoli (per componenti che necessitano solo di una sezione) ──────
+
+export function useFriendsList() {
+  return useQuery({
+    queryKey: FRIENDS_KEY,
+    queryFn:  () => apiFetch<{ friends: Friend[] }>("/api/friends"),
+    staleTime: 60_000,
+  });
+}
+
+export function useFriendRequests() {
+  return useQuery({
+    queryKey: REQUESTS_KEY,
+    queryFn:  () => apiFetch<{ requests: FriendRequest[] }>("/api/friends/requests"),
+    staleTime: 30_000,
+  });
+}
+
+export function useSuggestions() {
+  return useQuery({
+    queryKey: SUGGESTIONS_KEY,
+    queryFn:  () => apiFetch<{ suggestions: Suggestion[] }>("/api/friends/suggestions"),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useAcceptFriendRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (friendshipId: number) =>
+      apiFetch(`/api/friends/${friendshipId}/accept`, { method: "PUT" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: FRIENDS_KEY });
+      void qc.invalidateQueries({ queryKey: REQUESTS_KEY });
+    },
+  });
+}
+
+export function useDeclineFriendRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (friendshipId: number) =>
+      apiFetch(`/api/friends/${friendshipId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: REQUESTS_KEY });
+    },
+  });
 }

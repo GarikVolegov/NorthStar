@@ -3,11 +3,16 @@
  *
  * GET    /api/friends              — lista amici (status=accepted)
  * GET    /api/friends/requests     — richieste ricevute in attesa
- * GET    /api/friends/suggestions  — utenti suggeriti (stesso settore)
- * GET    /api/friends/search       — ricerca utenti per nome/settore (?q=&sector=)
+ * GET    /api/friends/suggestions  — utenti suggeriti con matchScore (0-100)
+ * GET    /api/friends/search       — ricerca utenti per nome (?q=&sector=)
  * POST   /api/friends/request/:id  — invia richiesta di amicizia
  * PUT    /api/friends/:id/accept   — accetta una richiesta ricevuta
  * DELETE /api/friends/:id          — rimuovi amico o rifiuta richiesta
+ *
+ * Algoritmo matchScore (0-100):
+ *   - Stesso settore           → +50 pt
+ *   - Stesso journeyType       → +30 pt
+ *   - |deltaXP| <= 2000        → +20 * (1 - |deltaXP| / 2000) pt (lineare)
  *
  * Tutti gli endpoint richiedono autenticazione (requireAuth montato in index.ts).
  */
@@ -36,6 +41,7 @@ type PublicUser = {
   sectorName: string | null;
   journeyType: string | null;
   totalXp: number | null;
+  matchScore?: number;
 };
 
 async function getPublicUser(userId: number): Promise<PublicUser | null> {
@@ -58,7 +64,7 @@ async function getPublicUser(userId: number): Promise<PublicUser | null> {
 }
 
 /**
- * Restituisce tutti gli ID già correlati all'utente (se stesso + connessioni
+ * Restituisce tutti gli ID già correlati all’utente (se stesso + connessioni
  * accepted/pending/blocked in entrambe le direzioni).
  * Usato per escludere utenti da suggestions e search.
  */
@@ -80,7 +86,54 @@ async function getExcludedIds(me: number): Promise<Set<number>> {
   return ids;
 }
 
-// ── GET /api/friends — lista connessioni accettate ────────────────────────────
+// ── Algoritmo matchScore ──────────────────────────────────────────────────────────
+//
+// Segnali (totale max 100):
+//   1. sameSector    → 50 pt  — segnale più forte: stesso mondo lavorativo
+//   2. sameJourney   → 30 pt  — stesso tipo di percorso (es. entrambi "in_crescita")
+//   3. xpProximity   → 0-20pt — XP simile: se |delta| <= 2000 assegna punteggio
+//                               lineare (2000 delta = 0pt, 0 delta = 20pt)
+//
+// Note:
+//   - Se uno dei due utenti non ha sectorId/journeyType/totalXp
+//     il segnale vale 0 (non penalizza, non premia).
+//   - Il punteggio minimo restituito è 0, max 100.
+
+type MatchInput = {
+  sectorId: number | null;
+  journeyType: string | null;
+  totalXp: number | null;
+};
+
+function computeMatchScore(me: MatchInput, other: MatchInput): number {
+  let score = 0;
+
+  // Segnale 1: stesso settore (50 pt)
+  if (me.sectorId !== null && other.sectorId !== null && me.sectorId === other.sectorId) {
+    score += 50;
+  }
+
+  // Segnale 2: stesso journeyType (30 pt)
+  if (
+    me.journeyType !== null &&
+    other.journeyType !== null &&
+    me.journeyType === other.journeyType
+  ) {
+    score += 30;
+  }
+
+  // Segnale 3: vicinanza XP (0-20 pt)
+  if (me.totalXp !== null && other.totalXp !== null) {
+    const delta = Math.abs(me.totalXp - other.totalXp);
+    if (delta <= 2000) {
+      score += Math.round(20 * (1 - delta / 2000));
+    }
+  }
+
+  return Math.min(100, Math.max(0, score));
+}
+
+// ── GET /api/friends — lista connessioni accettate ──────────────────────────
 
 networkRouter.get("/", async (req: Request, res: Response) => {
   try {
@@ -112,7 +165,7 @@ networkRouter.get("/", async (req: Request, res: Response) => {
   }
 });
 
-// ── GET /api/friends/requests — richieste in arrivo ───────────────────────────
+// ── GET /api/friends/requests — richieste in arrivo ────────────────────────
 
 networkRouter.get("/requests", async (req: Request, res: Response) => {
   try {
@@ -140,16 +193,20 @@ networkRouter.get("/requests", async (req: Request, res: Response) => {
   }
 });
 
-// ── GET /api/friends/suggestions — utenti suggeriti ───────────────────────────
+// ── GET /api/friends/suggestions — utenti suggeriti con matchScore ────────────
 
 networkRouter.get("/suggestions", async (req: Request, res: Response) => {
   try {
     const me = uid(req);
     const excludeIds = await getExcludedIds(me);
 
-    // Trova sectorId dell'utente corrente
+    // Profilo dell’utente corrente per il calcolo del match
     const meRow = await db
-      .select({ testSessionId: usersTable.testSessionId })
+      .select({
+        testSessionId: usersTable.testSessionId,
+        journeyType:   usersTable.journeyType,
+        totalXp:       usersTable.totalXp,
+      })
       .from(usersTable)
       .where(eq(usersTable.id, me))
       .limit(1)
@@ -165,6 +222,12 @@ networkRouter.get("/suggestions", async (req: Request, res: Response) => {
         .then((r) => r[0]);
       mySectorId = session?.confirmedSectorId ?? null;
     }
+
+    const myProfile: MatchInput = {
+      sectorId:    mySectorId,
+      journeyType: meRow?.journeyType ?? null,
+      totalXp:     meRow?.totalXp ?? null,
+    };
 
     const candidates = await db
       .select({
@@ -185,37 +248,42 @@ networkRouter.get("/suggestions", async (req: Request, res: Response) => {
           notInArray(usersTable.id, [...excludeIds]),
         ),
       )
-      .limit(20);
+      .limit(50); // recupera più candidati per calcolare meglio il ranking
 
-    // Ordina: stesso settore prima
-    const sorted = candidates.sort((a, b) => {
-      const aMatch = mySectorId && a.sectorId === mySectorId ? 1 : 0;
-      const bMatch = mySectorId && b.sectorId === mySectorId ? 1 : 0;
-      return bMatch - aMatch;
-    });
+    // Calcola matchScore per ogni candidato e ordina DESC
+    const scored = candidates
+      .map((c) => ({
+        id:          c.id,
+        name:        c.name,
+        avatarUrl:   c.avatarUrl,
+        journeyType: c.journeyType,
+        totalXp:     c.totalXp,
+        sectorName:  c.sectorName,
+        matchScore:  computeMatchScore(myProfile, {
+          sectorId:    c.sectorId ?? null,
+          journeyType: c.journeyType ?? null,
+          totalXp:     c.totalXp ?? null,
+        }),
+      }))
+      .sort((a, b) => b.matchScore - a.matchScore);
 
-    res.json({ suggestions: sorted.slice(0, 12) });
+    res.json({ suggestions: scored.slice(0, 12) });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Errore" });
   }
 });
 
-// ── GET /api/friends/search — ricerca utenti ─────────────────────────────────
+// ── GET /api/friends/search — ricerca utenti con matchScore ─────────────────
 //
 // Query params:
 //   q       — stringa di ricerca sul nome (min 2 caratteri, max 80)
 //   sector  — (opzionale) ID settore per filtrare
 //   limit   — (opzionale) max risultati, default 15, max 30
-//
-// Risposta: { results: PublicUser[], total: number }
-// I risultati escludono: se stessi, utenti già connessi/pending/blocked.
-// Ordinamento: match esatto nome > match parziale > totalXp desc.
 
 networkRouter.get("/search", async (req: Request, res: Response) => {
   try {
     const me = uid(req);
 
-    // ── Validazione parametri ────────────────────────────────────────────────
     const rawQ = typeof req.query.q === "string" ? req.query.q.trim() : "";
     if (rawQ.length < 2) {
       res.status(400).json({ error: "Il termine di ricerca deve avere almeno 2 caratteri" });
@@ -236,19 +304,42 @@ networkRouter.get("/search", async (req: Request, res: Response) => {
       30,
     );
 
-    // ── Escludi utenti già correlati ─────────────────────────────────────────
-    const excludeIds = await getExcludedIds(me);
+    // Profilo dell’utente corrente per il calcolo del match
+    const meRow = await db
+      .select({
+        testSessionId: usersTable.testSessionId,
+        journeyType:   usersTable.journeyType,
+        totalXp:       usersTable.totalXp,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.id, me))
+      .limit(1)
+      .then((r) => r[0]);
 
-    // ── Query principale ─────────────────────────────────────────────────────
-    // ilike è case-insensitive su Postgres (Drizzle ORM).
-    // Usiamo il pattern %query% per match parziale sul nome.
+    let mySectorId: number | null = null;
+    if (meRow?.testSessionId) {
+      const session = await db
+        .select({ confirmedSectorId: testSessionsTable.confirmedSectorId })
+        .from(testSessionsTable)
+        .where(eq(testSessionsTable.id, meRow.testSessionId))
+        .limit(1)
+        .then((r) => r[0]);
+      mySectorId = session?.confirmedSectorId ?? null;
+    }
+
+    const myProfile: MatchInput = {
+      sectorId:    mySectorId,
+      journeyType: meRow?.journeyType ?? null,
+      totalXp:     meRow?.totalXp ?? null,
+    };
+
+    const excludeIds = await getExcludedIds(me);
     const namePattern = `%${rawQ}%`;
 
     const baseConditions = and(
       eq(usersTable.isPublic, true),
       notInArray(usersTable.id, [...excludeIds]),
       ilike(usersTable.name, namePattern),
-      // Se sector è specificato, filtra per quel settore
       ...(sectorFilter !== null
         ? [eq(testSessionsTable.confirmedSectorId, sectorFilter)]
         : []),
@@ -268,38 +359,43 @@ networkRouter.get("/search", async (req: Request, res: Response) => {
       .leftJoin(testSessionsTable, eq(usersTable.testSessionId, testSessionsTable.id))
       .leftJoin(sectorsTable, eq(testSessionsTable.confirmedSectorId, sectorsTable.id))
       .where(baseConditions)
-      .limit(limit + 1); // +1 per sapere se ci sono altri risultati
+      .limit(limit + 1);
 
     const hasMore = rows.length > limit;
     const results = rows.slice(0, limit);
 
-    // ── Ordinamento lato applicazione ────────────────────────────────────────
-    // 1. Match esatto sul nome (case-insensitive) → in cima
-    // 2. Match che inizia con la query → secondo
-    // 3. Match parziale rimanente → terzo
-    // 4. A parità: totalXp desc
+    // Ordina: match nome esatto > startsWith > parziale; a parità matchScore DESC
     const q = rawQ.toLowerCase();
-    const sorted = results.sort((a, b) => {
-      const aName = a.name.toLowerCase();
-      const bName = b.name.toLowerCase();
-      const aExact  = aName === q ? 2 : aName.startsWith(q) ? 1 : 0;
-      const bExact  = bName === q ? 2 : bName.startsWith(q) ? 1 : 0;
-      if (aExact !== bExact) return bExact - aExact;
-      return (b.totalXp ?? 0) - (a.totalXp ?? 0);
-    });
+    const scored = results
+      .map((r) => ({
+        ...r,
+        matchScore: computeMatchScore(myProfile, {
+          sectorId:    r.sectorId ?? null,
+          journeyType: r.journeyType ?? null,
+          totalXp:     r.totalXp ?? null,
+        }),
+      }))
+      .sort((a, b) => {
+        const aName = a.name.toLowerCase();
+        const bName = b.name.toLowerCase();
+        const aPrio = aName === q ? 2 : aName.startsWith(q) ? 1 : 0;
+        const bPrio = bName === q ? 2 : bName.startsWith(q) ? 1 : 0;
+        if (aPrio !== bPrio) return bPrio - aPrio;
+        return b.matchScore - a.matchScore;
+      });
 
     res.json({
-      results: sorted,
-      total: sorted.length,
+      results: scored,
+      total:   scored.length,
       hasMore,
-      query: rawQ,
+      query:   rawQ,
     });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Errore" });
   }
 });
 
-// ── POST /api/friends/request/:targetId — invia richiesta ─────────────────────
+// ── POST /api/friends/request/:targetId — invia richiesta ───────────────────
 
 networkRouter.post("/request/:targetId", async (req: Request, res: Response) => {
   try {
@@ -311,7 +407,6 @@ networkRouter.post("/request/:targetId", async (req: Request, res: Response) => 
       return;
     }
 
-    // Verifica che non esista già
     const existing = await db
       .select()
       .from(friendshipsTable)
@@ -340,7 +435,7 @@ networkRouter.post("/request/:targetId", async (req: Request, res: Response) => 
   }
 });
 
-// ── PUT /api/friends/:id/accept — accetta richiesta ───────────────────────────
+// ── PUT /api/friends/:id/accept — accetta richiesta ─────────────────────────
 
 networkRouter.put("/:id/accept", async (req: Request, res: Response) => {
   try {
@@ -370,7 +465,7 @@ networkRouter.put("/:id/accept", async (req: Request, res: Response) => {
   }
 });
 
-// ── DELETE /api/friends/:id — rimuovi / rifiuta ────────────────────────────────
+// ── DELETE /api/friends/:id — rimuovi / rifiuta ───────────────────────────
 
 networkRouter.delete("/:id", async (req: Request, res: Response) => {
   try {
