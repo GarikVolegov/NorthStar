@@ -3,19 +3,24 @@
  *
  * Pagina Community di NorthStar.
  * Tab:
- *   0 — Messaggi (DMPanel)
- *   1 — Connessioni (lista amici accettati) — placeholder per Step 4
- *   2 — Richieste (pending) — placeholder per Step 4
+ *   0 — Messaggi     (DMPanel)
+ *   1 — Connessioni  (ConnessioniPanel)
+ *   2 — Richieste    (RichiestePanel)
+ *   3 — Esplora      (EsploraPanel)
  */
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DMPanel } from '@/components/dm/DMPanel';
+import { ConnessioniPanel }  from '@/components/community/ConnessioniPanel';
+import { RichiestePanel }    from '@/components/community/RichiestePanel';
+import { EsploraPanel }      from '@/components/community/EsploraPanel';
 import { cn } from '@/lib/utils';
 
 const TABS = [
   { id: 'messaggi',    label: 'Messaggi' },
   { id: 'connessioni', label: 'Connessioni' },
   { id: 'richieste',   label: 'Richieste' },
+  { id: 'esplora',     label: 'Esplora' },
 ] as const;
 
 type Tab = typeof TABS[number]['id'];
@@ -35,10 +40,11 @@ export default function AmiciPage() {
           </p>
         </div>
 
-        {/* Tab bar */}
+        {/* Tab bar — scroll orizzontale su mobile */}
         <div
           className="flex items-center gap-1 mb-6
-                     bg-[#1a1d2a] rounded-xl p-1 w-fit"
+                     bg-[#1a1d2a] rounded-xl p-1 w-full overflow-x-auto
+                     scrollbar-hide"
           role="tablist"
           aria-label="Sezioni Community"
         >
@@ -50,7 +56,7 @@ export default function AmiciPage() {
               aria-controls={`panel-${t.id}`}
               onClick={() => setTab(t.id)}
               className={cn(
-                'relative px-4 py-2 text-sm font-medium rounded-lg',
+                'relative shrink-0 px-4 py-2 text-sm font-medium rounded-lg',
                 'transition-colors duration-150 tap-highlight-none',
                 tab === t.id
                   ? 'text-[#0e1018]'
@@ -81,62 +87,14 @@ export default function AmiciPage() {
             role="tabpanel"
             aria-labelledby={tab}
           >
-            {tab === 'messaggi' && <DMPanel />}
-
-            {tab === 'connessioni' && (
-              <PlaceholderPanel
-                icon={
-                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 00-3-3.87" />
-                    <path d="M16 3.13a4 4 0 010 7.75" />
-                  </svg>
-                }
-                title="Le tue connessioni"
-                subtitle="Qui vedrai tutti gli utenti con cui sei connesso. Disponibile nello Step 4."
-              />
-            )}
-
-            {tab === 'richieste' && (
-              <PlaceholderPanel
-                icon={
-                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="16" />
-                    <line x1="8" y1="12" x2="16" y2="12" />
-                  </svg>
-                }
-                title="Richieste di connessione"
-                subtitle="Accetta o rifiuta le richieste in arrivo. Disponibile nello Step 4."
-              />
-            )}
+            {tab === 'messaggi'    && <DMPanel />}
+            {tab === 'connessioni' && <ConnessioniPanel />}
+            {tab === 'richieste'   && <RichiestePanel />}
+            {tab === 'esplora'     && <EsploraPanel />}
           </motion.div>
         </AnimatePresence>
+
       </div>
     </main>
-  );
-}
-
-// ─── Placeholder per tab non ancora sviluppate ────────────────────────────────
-function PlaceholderPanel({
-  icon, title, subtitle,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="text-[#7db89a]/25 mb-4">{icon}</div>
-      <p className="text-sm font-semibold text-[#c8cad0]">{title}</p>
-      <p className="text-xs text-[#7db89a]/40 mt-1.5 max-w-[32ch]">{subtitle}</p>
-    </div>
   );
 }
