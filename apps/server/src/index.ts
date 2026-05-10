@@ -23,13 +23,16 @@
  *
  *   ── Profile (Passi 1-4) ───────────────────────────────────────────────────
  *   GET  /api/users/me                        — profilo utente
- *   PATCH /api/users/me                       — aggiorna profilo
+ *   PATCH /api/users/me                       — aggiorna profilo (incl. city, bio)
  *   POST /api/users/me/objectives             — aggiunge obiettivo
  *   GET  /api/users/me/progress               — XP, streak, timeline
  *   POST /api/users/me/progress/xp            — assegna XP
  *   GET  /api/users/:id/public                — profilo pubblico per /profilo/:id
  *   GET  /api/u/:username                     — profilo pubblico (opzionale auth)
  *   GET  /api/riasec/session/:sessionId       — RIASEC profile
+ *
+ *   ── City Autocomplete (public) ────────────────────────────────────────────
+ *   GET  /api/city/autocomplete               — ricerca città via Nominatim
  *
  *   ── Growth Agent (Passo 6) ────────────────────────────────────────────────
  *   GET  /api/growth-agent/onboarding/status  — needsOnboarding
@@ -93,6 +96,7 @@ import { networkRouter }               from "./network/network-router";
 import { profileRouter as networkProfileRouter } from "./network/profile-router";
 import { dmRouter }                    from "./network/dm-router";
 import { notificationsRouter }         from "./notifications/notifications-router";
+import { cityRouter }                  from "./city/city-router";
 
 // ── App ───────────────────────────────────────────────────────────────────────
 
@@ -140,6 +144,9 @@ app.get("/api/health", (req, res) => {
     ts:      new Date().toISOString(),
   });
 });
+
+// ── City autocomplete (public — no auth) ──────────────────────────────────────
+app.use("/api/city", cityRouter);
 
 // ── /api/auth/me — alias di /api/users/me ─────────────────────────────────────
 app.use("/api/auth", requireAuth, profileRouter);

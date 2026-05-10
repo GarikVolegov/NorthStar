@@ -74,23 +74,34 @@ export const usersTable = pgTable("users", {
   /**
    * true = questo utente ha accesso alla dashboard affiliazione
    * (/affiliazione/dashboard) e al menu navbar corrispondente.
-   *
-   * Viene impostato:
-   *   - dall'admin via PATCH /api/admin/users/:id  { isAffiliate: true }
-   *   - automaticamente quando un affiliate_account viene creato
-   *     per questo userId (trigger o logica in processPostPaymentReferral)
-   *
-   * DEFAULT false: tutti gli utenti esistenti non sono affiliati.
-   * È incluso nella risposta di GET /api/auth/me per aggiornare
-   * il token locale senza richiedere un nuovo login.
    */
   isAffiliate: boolean("is_affiliate").notNull().default(false),
+
+  // ── Network Step 2: Posizione + Bio ────────────────────────────────
+  /**
+   * Città dell'utente — label human-readable (es. "Roma, Lazio, Italia").
+   * Impostata tramite CityAutocomplete su Nominatim (OpenStreetMap).
+   * DEFAULT null: tutti gli utenti esistenti non hanno città.
+   */
+  city:        text("city").default(null as unknown as string),
+
+  /**
+   * Place ID Nominatim (osm_id + osm_type, es. "R365331").
+   * Permette ricerche future per prossimità senza geocoding ripetuto.
+   */
+  cityPlaceId: text("city_place_id").default(null as unknown as string),
+
+  /**
+   * Bio breve — max 300 char. Mostrata nel profilo pubblico e nelle card
+   * della sezione Esplora del network.
+   */
+  bio: text("bio").default(null as unknown as string),
 }, (t) => ({
   usernameIdx:        uniqueIndex("users_username_idx").on(t.username),
   referredByIdx:      index("users_referred_by_idx").on(t.referredByAffiliateId),
   referredByCodeIdx:  index("users_referred_by_code_idx").on(t.referredByCode),
-  // Index parziale: solo affiliati attivi — efficiente per le query admin
   isAffiliateIdx:     index("users_is_affiliate_idx").on(t.isAffiliate),
+  cityIdx:            index("users_city_idx").on(t.city),
 }));
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({

@@ -13,6 +13,9 @@
  *   isPremium,               ← derivato: stripeSubscriptionId != null
  *   sectorName,              ← sectors.name via testSession.confirmedSectorId
  *   sectorId,                ← testSessions.confirmedSectorId
+ *   city,                    ← città impostata tramite CityAutocomplete
+ *   cityPlaceId,             ← place_id Nominatim per ricerche future
+ *   bio,                     ← bio breve max 300 char
  *   objectives               ← array da userObjectives (non completati)
  *
  * PATCH: accetta solo campi nella whitelist patchSchema (.strict()).
@@ -48,6 +51,10 @@ const patchSchema = z.object({
   stabilityPreference: z.number().int().min(1).max(10).optional(),
   cvText:              z.string().max(20_000).nullable().optional(),
   isPublic:            z.boolean().optional(),
+  // ── Network Step 2: Posizione + Bio ──────────────────────────────────
+  city:                z.string().max(200).nullable().optional(),
+  cityPlaceId:         z.string().max(100).nullable().optional(),
+  bio:                 z.string().max(300).nullable().optional(),
 }).strict();
 
 type ProfileResponse = {
@@ -70,6 +77,9 @@ type ProfileResponse = {
   sectorId: number | null;
   isPremium: boolean;
   sectorName: string | null;
+  city: string | null;
+  cityPlaceId: string | null;
+  bio: string | null;
   objectives: Array<{
     id: number;
     text: string;
@@ -107,6 +117,9 @@ profileRouter.get("/me", requireAuth, async (req, res) => {
         totalXp:             usersTable.totalXp,
         createdAt:           usersTable.createdAt,
         isAffiliate:         usersTable.isAffiliate,
+        city:                usersTable.city,
+        cityPlaceId:         usersTable.cityPlaceId,
+        bio:                 usersTable.bio,
         _stripeSubId:        usersTable.stripeSubscriptionId,
         _testSessionId:      usersTable.testSessionId,
         sectorId:            testSessionsTable.confirmedSectorId,
@@ -156,6 +169,9 @@ profileRouter.get("/me", requireAuth, async (req, res) => {
       ...rest,
       isPremium: _stripeSubId != null,
       sectorName: resolvedSectorName ?? null,
+      city: row.city ?? null,
+      cityPlaceId: row.cityPlaceId ?? null,
+      bio: row.bio ?? null,
       objectives,
     };
 
