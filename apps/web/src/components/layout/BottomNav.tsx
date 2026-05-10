@@ -85,6 +85,14 @@ const AUTH_BOTTOM_NAV = [
   { href: '/profilo',   icon: 'profile'   as const, label: 'Profilo' },
 ];
 
+// ─── Hook badge richieste ───────────────────────────────────────────
+// Polling ogni 60s: così l'utente vede il badge aggiornarsi senza refresh.
+// staleTime 20s già impostato in useRequests, refetchInterval aggiunto qui.
+function useRequestsBadge() {
+  const { data } = useRequests({ refetchInterval: 60_000 });
+  return data?.requests?.length ?? 0;
+}
+
 // ─── Badge component ────────────────────────────────────────────
 function RequestsBadge({ count }: { count: number }) {
   return (
@@ -97,7 +105,7 @@ function RequestsBadge({ count }: { count: number }) {
           exit={{ scale: 0, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 500, damping: 25 }}
           className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1
-                     bg-[#c19e4a] text-[#0b0d14] text-[9px] font-bold
+                     bg-blue-500 text-white text-[9px] font-bold
                      rounded-full flex items-center justify-center
                      pointer-events-none"
           aria-label={`${count} richieste di connessione`}
@@ -157,8 +165,9 @@ function BottomNavItem({
 export function BottomNav() {
   const [location] = useLocation();
   const { user } = useAuth();
-  const { data: reqBadgeData, isLoading: reqBadgeLoading } = useRequests({ refetchInterval: 60_000 });
-  const requestCount = (reqBadgeLoading || !user) ? 0 : (reqBadgeData?.requests?.length ?? 0);
+
+  // Il badge viene fetchato solo se l'utente è loggato
+  const requestCount = user ? useRequestsBadge() : 0; // eslint-disable-line react-hooks/rules-of-hooks
 
   const items = user ? AUTH_BOTTOM_NAV : PUBLIC_BOTTOM_NAV;
 

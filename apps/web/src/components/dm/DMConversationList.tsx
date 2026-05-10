@@ -124,7 +124,7 @@ export function DMConversationList({
                   {conv.unreadCount > 0 && (
                     <span
                       className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5
-                                 bg-[#c19e4a]/30 rounded-full border border-[#0e1018]"
+                                 bg-blue-500 rounded-full border border-[#0e1018]"
                       aria-hidden="true"
                     />
                   )}
@@ -152,7 +152,7 @@ export function DMConversationList({
 
                 {conv.unreadCount > 0 && (
                   <span className="shrink-0 min-w-[18px] h-[18px] px-1
-                                   bg-[#c19e4a] text-[#0b0d14] text-[9px] font-bold
+                                   bg-blue-500 text-white text-[9px] font-bold
                                    rounded-full flex items-center justify-center">
                     {conv.unreadCount > 9 ? '9+' : conv.unreadCount}
                   </span>

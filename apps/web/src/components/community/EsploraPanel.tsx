@@ -4,21 +4,20 @@
  * Tab "Esplora" nella pagina /amici.
  * Funzionalità:
  *   - Search bar con debounce
- *   - Suggestion chips (settori)
+ *   - Suggestion chips (settori / interessi)
  *   - Griglia di profili suggeriti
  *   - Skeleton loading
  *   - Stato vuoto personalizzato
  *
- * Dati: useSuggestions() — GET /api/friends/suggestions
- *        useSearchUsers(q) — GET /api/friends/search?q=
- * Azioni: useSendRequest() — POST /api/friends/request/:id
+ * Dati: mock statici — sostituire con:
+ *   useQuery('/api/users/discover')    per i suggeriti
+ *   useQuery('/api/users/search?q=')   per la ricerca
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSuggestions, useSearchUsers, useSendRequest } from '@/hooks/useNetwork';
 
-// ─── Tipi locali (derivati dai dati API) ────────────────────────────────────────
+// ─── Tipi ─────────────────────────────────────────────────────────────────────
 export interface UtenteEsplora {
   id: string;
   nome: string;
@@ -28,37 +27,23 @@ export interface UtenteEsplora {
   bio?: string;
   connessioniInComune: number;
   isConnesso: boolean;
+  richiestaInviata: boolean;
 }
 
-function networkUserToUtente(
-  user: {
-    id: number;
-    name: string;
-    avatarUrl: string | null;
-    sectorName: string | null;
-    journeyType: string | null;
-    totalXp: number | null;
-    matchScore?: number;
-  },
-  { isConnesso = false }: { isConnesso?: boolean } = {},
-): UtenteEsplora {
-  const parts = user.name.trim().split(/\s+/);
-  const nome = parts[0] || '';
-  const cognome = parts.slice(1).join(' ') || '';
-  const connessioniInComune = user.matchScore ? Math.floor(user.matchScore / 20) : 0;
-  return {
-    id: String(user.id),
-    nome,
-    cognome,
-    ruolo: user.journeyType || '---',
-    settore: user.sectorName || '---',
-    bio: user.journeyType ? `${user.journeyType} · ~${user.totalXp ?? 0} XP` : undefined,
-    connessioniInComune,
-    isConnesso,
-  };
-}
+// ─── Mock data ────────────────────────────────────────────────────────────────
+const MOCK_UTENTI: UtenteEsplora[] = [
+  { id: 'e1',  nome: 'Davide',    cognome: 'Serra',      ruolo: 'iOS Developer',         settore: 'Tecnologia',  bio: 'App native su iOS da 5 anni. Swift e SwiftUI.',              connessioniInComune: 3, isConnesso: false, richiestaInviata: false },
+  { id: 'e2',  nome: 'Irene',     cognome: 'Barbieri',   ruolo: 'Brand Strategist',      settore: 'Marketing',   bio: 'Costruisco identità di brand per startup tech.',              connessioniInComune: 1, isConnesso: false, richiestaInviata: false },
+  { id: 'e3',  nome: 'Nicola',    cognome: 'Lombardi',   ruolo: 'Venture Analyst',       settore: 'Finance',     bio: 'Early stage VC. Cerco founder con visione.',                 connessioniInComune: 2, isConnesso: false, richiestaInviata: true  },
+  { id: 'e4',  nome: 'Beatrice',  cognome: 'Moretti',    ruolo: 'AI/ML Researcher',      settore: 'Data & AI',   bio: 'PhD in NLP. Ricercatrice Politecnico di Milano.',             connessioniInComune: 0, isConnesso: false, richiestaInviata: false },
+  { id: 'e5',  nome: 'Francesco', cognome: 'Silvestri',  ruolo: 'Agile Coach',           settore: 'Management',  bio: 'Aiuto team a lavorare meglio insieme.',                      connessioniInComune: 4, isConnesso: false, richiestaInviata: false },
+  { id: 'e6',  nome: 'Marta',     cognome: 'De Luca',    ruolo: 'Growth Hacker',         settore: 'Marketing',   bio: 'PLG, funnel, A/B test. Crescita organica e paid.',           connessioniInComune: 2, isConnesso: false, richiestaInviata: false },
+  { id: 'e7',  nome: 'Giovanni',  cognome: 'Esposito',   ruolo: 'Blockchain Developer',  settore: 'Web3',        bio: 'Solidity, DeFi, smart contract auditing.',                   connessioniInComune: 1, isConnesso: false, richiestaInviata: false },
+  { id: 'e8',  nome: 'Claudia',   cognome: 'Rinaldi',    ruolo: 'HR Business Partner',   settore: 'HR',          bio: 'Selezione e sviluppo talenti in aziende tech.',              connessioniInComune: 0, isConnesso: false, richiestaInviata: true  },
+  { id: 'e9',  nome: 'Tommaso',   cognome: 'Ferraro',    ruolo: 'SRE Engineer',          settore: 'Tecnologia',  bio: 'Kubernetes, Terraform, osservabilità.',                      connessioniInComune: 2, isConnesso: false, richiestaInviata: false },
+  { id: 'e10', nome: 'Sofia',     cognome: 'Palumbo',    ruolo: 'Product Designer',      settore: 'Design',      bio: 'Design system, prototipazione, ricerca utenti.',             connessioniInComune: 5, isConnesso: false, richiestaInviata: false },
+];
 
-// ─── Dati statici per suggerimenti settori ──────────────────────────────────────
 const SUGGERIMENTI_SETTORE = [
   'Tecnologia', 'Design', 'Marketing', 'Data & AI',
   'Finance', 'Web3', 'Management', 'HR', 'Coaching', 'Imprenditoria',
@@ -78,7 +63,7 @@ function avatarColor(id: string): string {
 }
 
 function getInitials(nome: string, cognome: string) {
-  return `${nome[0] ?? ''}${cognome[0] ?? ''}`.toUpperCase();
+  return `${nome[0]}${cognome[0]}`.toUpperCase();
 }
 
 // ─── Skeleton card ────────────────────────────────────────────────────────────
@@ -102,13 +87,20 @@ function SkeletonCard() {
 }
 
 // ─── Card utente ──────────────────────────────────────────────────────────────
-interface UtenteCardProps {
+function UtenteCard({
+  utente,
+  onConnetti,
+}: {
   utente: UtenteEsplora;
   onConnetti: (id: string) => void;
-  isLoading?: boolean;
-}
+}) {
+  const [localSent, setLocalSent] = useState(utente.richiestaInviata);
 
-function UtenteCard({ utente, onConnetti, isLoading = false }: UtenteCardProps) {
+  function handleConnetti() {
+    setLocalSent(true);
+    onConnetti(utente.id);
+  }
+
   return (
     <motion.div
       layout
@@ -167,16 +159,16 @@ function UtenteCard({ utente, onConnetti, isLoading = false }: UtenteCardProps) 
         >
           Connesso
         </span>
-      ) : isLoading ? (
+      ) : localSent ? (
         <span
           className="w-full py-2 text-xs font-medium rounded-lg text-center
                      bg-[#c19e4a]/8 text-[#c19e4a]/50 border border-[#c19e4a]/15"
         >
-          Invio…
+          Richiesta inviata
         </span>
       ) : (
         <button
-          onClick={() => onConnetti(utente.id)}
+          onClick={handleConnetti}
           className="tap-highlight-none w-full py-2 text-xs font-semibold rounded-lg
                      bg-[#c19e4a]/15 text-[#c19e4a]
                      hover:bg-[#c19e4a]/25 active:scale-[0.97]
@@ -218,11 +210,8 @@ export function EsploraPanel() {
   const [query, setQuery]           = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
   const [settoreFiltro, setSettore] = useState<string | null>(null);
-  const [invioInCorso, setInvioInCorso] = useState<Set<string>>(new Set());
-
-  const { data: suggeritiData, isLoading: suggeritiLoading } = useSuggestions();
-  const { data: ricercaData, isLoading: ricercaLoading } = useSearchUsers(debouncedQ);
-  const sendRequest = useSendRequest();
+  const [loading, setLoading]       = useState(false);
+  const [utenti, setUtenti]         = useState<UtenteEsplora[]>(MOCK_UTENTI);
 
   // Debounce ricerca 300ms
   useEffect(() => {
@@ -230,39 +219,30 @@ export function EsploraPanel() {
     return () => clearTimeout(t);
   }, [query]);
 
-  // Lista utenti da mostrare
-  const utentiBase: UtenteEsplora[] = debouncedQ
-    ? (ricercaData?.results ?? []).map((u) => networkUserToUtente(u))
-    : (suggeritiData?.suggestions ?? []).map((u) => networkUserToUtente(u));
+  // Simula fetch con loading skeleton
+  useEffect(() => {
+    if (debouncedQ === '' && settoreFiltro === null) return;
+    setLoading(true);
+    const t = setTimeout(() => setLoading(false), 500);
+    return () => clearTimeout(t);
+  }, [debouncedQ, settoreFiltro]);
 
-  // Filtro lato client per settore
-  const filtrati = utentiBase.filter((u) => {
-    if (settoreFiltro !== null && u.settore !== settoreFiltro) return false;
-    return true;
+  const handleConnetti = useCallback((id: string) => {
+    setUtenti((prev) =>
+      prev.map((u) => u.id === id ? { ...u, richiestaInviata: true } : u)
+    );
+  }, []);
+
+  // Filtro lato client
+  const filtrati = utenti.filter((u) => {
+    const matchQ =
+      debouncedQ === '' ||
+      `${u.nome} ${u.cognome} ${u.ruolo} ${u.settore} ${u.bio ?? ''}`
+        .toLowerCase()
+        .includes(debouncedQ.toLowerCase());
+    const matchS = settoreFiltro === null || u.settore === settoreFiltro;
+    return matchQ && matchS;
   });
-
-  const isLoading = suggeritiLoading || (debouncedQ.length >= 2 && ricercaLoading);
-
-  const handleConnetti = useCallback(async (userId: string) => {
-    if (invioInCorso.has(userId)) return;
-    setInvioInCorso((prev) => new Set(prev).add(userId));
-
-    try {
-      // Trova l'utente nella lista per ottenere l'id numerico
-      const utentiDisponibili =
-        debouncedQ ? (ricercaData?.results ?? []) : (suggeritiData?.suggestions ?? []);
-      const target = utentiDisponibili.find((u) => String(u.id) === userId);
-      if (target) {
-        sendRequest.mutate(target.id);
-      }
-    } finally {
-      setInvioInCorso((prev) => {
-        const next = new Set(prev);
-        next.delete(userId);
-        return next;
-      });
-    }
-  }, [sendRequest, ricercaData, suggeritiData, debouncedQ, invioInCorso]);
 
   return (
     <section aria-label="Esplora utenti">
@@ -276,7 +256,6 @@ export function EsploraPanel() {
         >
           <circle cx="11" cy="11" r="8" />
           <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          <line x1="8" y1="11" x2="14" y2="11" />
         </svg>
         <input
           type="search"
@@ -354,55 +333,44 @@ export function EsploraPanel() {
         {debouncedQ || settoreFiltro ? 'Risultati' : 'Suggeriti per te'}
       </p>
 
-      {/* Skeleton loading */}
-      {isLoading && (
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <motion.div
-              key={`sk-${i}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ delay: i * 0.05 }}
-            >
-              <SkeletonCard />
-            </motion.div>
-          ))}
-        </div>
-      )}
-
-      {/* Griglia risultati */}
-      {!isLoading && (
-        <div
-          className="grid gap-3
-                     grid-cols-1
-                     sm:grid-cols-2
-                     lg:grid-cols-3"
-        >
-          <AnimatePresence mode="popLayout">
-            {filtrati.length === 0 ? (
-              <EmptyRicerca query={debouncedQ || settoreFiltro || ''} />
-            ) : (
-              filtrati.map((u, i) => (
-                <motion.div
-                  key={u.id}
-                  layoutId={`user-${u.id}`}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ delay: i * 0.04, duration: 0.18 }}
-                >
-                  <UtenteCard
-                    utente={u}
-                    onConnetti={handleConnetti}
-                    isLoading={invioInCorso.has(u.id)}
-                  />
-                </motion.div>
-              ))
-            )}
-          </AnimatePresence>
-        </div>
-      )}
+      {/* Griglia */}
+      <div
+        className="grid gap-3
+                   grid-cols-1
+                   sm:grid-cols-2
+                   lg:grid-cols-3"
+      >
+        <AnimatePresence mode="popLayout">
+          {loading ? (
+            // Skeleton
+            Array.from({ length: 6 }).map((_, i) => (
+              <motion.div
+                key={`sk-${i}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ delay: i * 0.05 }}
+              >
+                <SkeletonCard />
+              </motion.div>
+            ))
+          ) : filtrati.length === 0 ? (
+            <EmptyRicerca query={debouncedQ || settoreFiltro || ''} />
+          ) : (
+            filtrati.map((u, i) => (
+              <motion.div
+                key={u.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ delay: i * 0.04, duration: 0.18 }}
+              >
+                <UtenteCard utente={u} onConnetti={handleConnetti} />
+              </motion.div>
+            ))
+          )}
+        </AnimatePresence>
+      </div>
     </section>
   );
 }

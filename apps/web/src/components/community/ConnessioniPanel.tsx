@@ -3,60 +3,43 @@
  *
  * Tab "Connessioni" nella pagina /amici.
  * Mostra la lista degli utenti con cui sei connesso (amici accettati).
+ * Ogni card ha: avatar, nome, ruolo/titolo, badge settore, azione
+ * "Invia messaggio" e menu contestuale per rimuovere connessione.
  *
- * Dati: useFriends() — GET /api/friends
- * Azioni: useRemoveFriend() — DELETE /api/friends/:id
+ * Dati: mock statici — sostituire con useQuery('/api/connections') in Step 4.
  */
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useFriends, useRemoveFriend } from '@/hooks/useNetwork';
 import { cn } from '@/lib/utils';
 
-// ─── Tipi locali (derivati dai dati API) ────────────────────────────────────────
+// ─── Tipi ─────────────────────────────────────────────────────────────────────
 export interface Connessione {
-  friendshipId: number;
-  id: string;          // userId come stringa per compatibilità UI
+  id: string;
   nome: string;
   cognome: string;
-  ruolo: string;       // journeyType
-  settore: string;     // sectorName
-  avatar?: string | null;
+  ruolo: string;
+  settore: string;
+  avatar?: string;
   online: boolean;
   connessoDal: string; // ISO date string
 }
 
-function networkUserToConnessione(friend: {
-  friendshipId: number;
-  since: string | null;
-  user: {
-    id: number;
-    name: string;
-    avatarUrl: string | null;
-    sectorName: string | null;
-    journeyType: string | null;
-    totalXp: number | null;
-  };
-}): Connessione {
-  const parts = friend.user.name.trim().split(/\s+/);
-  const nome = parts[0] || '';
-  const cognome = parts.slice(1).join(' ') || '';
-  return {
-    friendshipId: friend.friendshipId,
-    id: String(friend.user.id),
-    nome,
-    cognome,
-    ruolo: friend.user.journeyType || '---',
-    settore: friend.user.sectorName || '---',
-    avatar: friend.user.avatarUrl ?? undefined,
-    online: false,
-    connessoDal: friend.since ?? new Date().toISOString(),
-  };
-}
+// ─── Mock data (Step 4: sostituire con fetch) ─────────────────────────────────
+const MOCK_CONNESSIONI: Connessione[] = [
+  { id: '1', nome: 'Giulia',  cognome: 'Ferretti', ruolo: 'UX Designer',          settore: 'Design',        online: true,  connessoDal: '2026-03-10' },
+  { id: '2', nome: 'Marco',   cognome: 'Rossi',    ruolo: 'Backend Developer',    settore: 'Tecnologia',    online: false, connessoDal: '2026-02-14' },
+  { id: '3', nome: 'Sara',    cognome: 'Bianchi',  ruolo: 'Product Manager',      settore: 'Prodotto',      online: true,  connessoDal: '2026-04-01' },
+  { id: '4', nome: 'Luca',    cognome: 'Conti',    ruolo: 'Data Scientist',       settore: 'Data & AI',     online: false, connessoDal: '2026-01-22' },
+  { id: '5', nome: 'Chiara',  cognome: 'Gallo',    ruolo: 'Marketing Strategist', settore: 'Marketing',     online: false, connessoDal: '2026-03-28' },
+  { id: '6', nome: 'Andrea',  cognome: 'Marini',   ruolo: 'DevOps Engineer',      settore: 'Tecnologia',    online: true,  connessoDal: '2026-04-15' },
+  { id: '7', nome: 'Elena',   cognome: 'Romano',   ruolo: 'Graphic Designer',     settore: 'Design',        online: false, connessoDal: '2026-05-02' },
+  { id: '8', nome: 'Matteo',  cognome: 'Greco',    ruolo: 'Full Stack Developer',  settore: 'Tecnologia',    online: true,  connessoDal: '2026-05-05' },
+];
 
 // ─── Utilità ──────────────────────────────────────────────────────────────────
 function getInitials(nome: string, cognome: string) {
-  return `${nome[0] ?? ''}${cognome[0] ?? ''}`.toUpperCase();
+  return `${nome[0]}${cognome[0]}`.toUpperCase();
 }
 
 const AVATAR_COLORS = [
@@ -66,7 +49,7 @@ const AVATAR_COLORS = [
 
 function avatarColor(id: string): string {
   const idx = parseInt(id, 10) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[isNaN(idx) ? 0 : idx];
+  return AVATAR_COLORS[idx];
 }
 
 function formatData(iso: string): string {
@@ -75,25 +58,6 @@ function formatData(iso: string): string {
 
 // ─── Componente Avatar ────────────────────────────────────────────────────────
 function Avatar({ conn }: { conn: Connessione }) {
-  if (conn.avatar) {
-    return (
-      <div className="relative shrink-0">
-        <img
-          src={conn.avatar}
-          alt={`${conn.nome} ${conn.cognome}`}
-          className="w-10 h-10 rounded-full object-cover"
-        />
-        {conn.online && (
-          <span
-            className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full
-                       bg-[#4dbe87] border-2 border-[#0b0d14]"
-            aria-label="Online"
-          />
-        )}
-      </div>
-    );
-  }
-
   return (
     <div className="relative shrink-0">
       <div
@@ -104,6 +68,7 @@ function Avatar({ conn }: { conn: Connessione }) {
       >
         {getInitials(conn.nome, conn.cognome)}
       </div>
+      {/* Indicatore online */}
       {conn.online && (
         <span
           className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full
@@ -122,7 +87,7 @@ function ConnessioneCard({
   onMessaggio,
 }: {
   conn: Connessione;
-  onRimuovi: (friendshipId: number) => void;
+  onRimuovi: (id: string) => void;
   onMessaggio: (conn: Connessione) => void;
 }) {
   const [menuAperto, setMenuAperto] = useState(false);
@@ -200,6 +165,7 @@ function ConnessioneCard({
           <AnimatePresence>
             {menuAperto && (
               <>
+                {/* Overlay per chiudere */}
                 <div
                   className="fixed inset-0 z-10"
                   onClick={() => setMenuAperto(false)}
@@ -229,7 +195,7 @@ function ConnessioneCard({
                     Invia messaggio
                   </button>
                   <button
-                    onClick={() => { onRimuovi(conn.friendshipId); setMenuAperto(false); }}
+                    onClick={() => { onRimuovi(conn.id); setMenuAperto(false); }}
                     className="w-full text-left px-4 py-2.5 text-sm text-[#e57373]/80
                                hover:bg-[#e57373]/10 hover:text-[#e57373]
                                transition-colors flex items-center gap-2.5"
@@ -283,11 +249,8 @@ export function ConnessioniPanel({
 }: {
   onMessaggio?: (conn: Connessione) => void;
 }) {
-  const { data: friends = { friends: [] }, isLoading, error } = useFriends();
-  const removeFriend = useRemoveFriend();
+  const [connessioni, setConnessioni] = useState<Connessione[]>(MOCK_CONNESSIONI);
   const [filtro, setFiltro] = useState('');
-
-  const connessioni: Connessione[] = friends.friends.map(networkUserToConnessione);
 
   const filtrate = connessioni.filter(
     (c) =>
@@ -297,30 +260,12 @@ export function ConnessioniPanel({
         .includes(filtro.toLowerCase()),
   );
 
-  function handleRimuovi(friendshipId: number) {
-    removeFriend.mutate(friendshipId);
+  function handleRimuovi(id: string) {
+    setConnessioni((prev) => prev.filter((c) => c.id !== id));
   }
 
   function handleMessaggio(conn: Connessione) {
     onMessaggio?.(conn);
-  }
-
-  if (isLoading) {
-    return (
-      <div className="space-y-3 py-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-16 bg-[#1a1d2a] rounded-xl border border-[#c19e4a]/5 animate-pulse" />
-        ))}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-10 text-[#e57373]/70 text-sm">
-        Errore nel caricamento delle connessioni. Riprova più tardi.
-      </div>
-    );
   }
 
   return (
@@ -366,7 +311,7 @@ export function ConnessioniPanel({
         >
           <AnimatePresence mode="popLayout">
             {filtrate.map((conn) => (
-              <li key={conn.friendshipId} role="listitem">
+              <li key={conn.id} role="listitem">
                 <ConnessioneCard
                   conn={conn}
                   onRimuovi={handleRimuovi}

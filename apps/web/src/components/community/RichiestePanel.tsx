@@ -6,58 +6,61 @@
  *   - Ricevute: richieste in arrivo → accetta / rifiuta
  *   - Inviate:  richieste in uscita  → annulla
  *
- * Dati: useRequests() — GET /api/friends/requests
- *        useSentRequests() — GET /api/friends/requests/sent
- * Azioni: useAcceptRequest() — PUT /api/friends/:id/accept
- *         useRemoveFriend() — DELETE /api/friends/:id
+ * Dati: mock statici — sostituire con:
+ *   useQuery('/api/connections/pending')    per ricevute
+ *   useQuery('/api/connections/sent')       per inviate
  */
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useRequests, useSentRequests, useAcceptRequest, useRemoveFriend } from '@/hooks/useNetwork';
 
-// ─── Tipi locali (derivati dai dati API) ────────────────────────────────────────
+// ─── Tipi ─────────────────────────────────────────────────────────────────────
 export interface RichiestaConnessione {
-  friendshipId: number;
-  id: string;          // userId come stringa
+  id: string;
+  userId: string;
   nome: string;
   cognome: string;
   ruolo: string;
   settore: string;
-  avatar?: string | null;
+  avatar?: string;
   messaggio?: string;
   dataRichiesta: string; // ISO date
 }
 
-function networkUserToRichiesta(
-  req: {
-    friendshipId: number;
-    sentAt: string | null;
-    user: {
-      id: number;
-      name: string;
-      avatarUrl: string | null;
-      sectorName: string | null;
-      journeyType: string | null;
-      totalXp: number | null;
-    };
+// ─── Mock data ────────────────────────────────────────────────────────────────
+const MOCK_RICEVUTE: RichiestaConnessione[] = [
+  {
+    id: 'r1', userId: 'u10', nome: 'Federica', cognome: 'Neri',
+    ruolo: 'Career Coach', settore: 'Coaching',
+    messaggio: 'Ciao! Ho visto il tuo profilo e mi piacerebbe connettermi.',
+    dataRichiesta: '2026-05-09',
   },
-): RichiestaConnessione {
-  const parts = req.user.name.trim().split(/\s+/);
-  const nome = parts[0] || '';
-  const cognome = parts.slice(1).join(' ') || '';
-  return {
-    friendshipId: req.friendshipId,
-    id: String(req.user.id),
-    nome,
-    cognome,
-    ruolo: req.user.journeyType || '---',
-    settore: req.user.sectorName || '---',
-    avatar: req.user.avatarUrl ?? undefined,
+  {
+    id: 'r2', userId: 'u11', nome: 'Simone', cognome: 'Vitale',
+    ruolo: 'Startup Founder', settore: 'Imprenditoria',
     messaggio: undefined,
-    dataRichiesta: req.sentAt ?? new Date().toISOString(),
-  };
-}
+    dataRichiesta: '2026-05-08',
+  },
+  {
+    id: 'r3', userId: 'u12', nome: 'Alessia', cognome: 'Ferrari',
+    ruolo: 'Frontend Developer', settore: 'Tecnologia',
+    messaggio: 'Lavoriamo nello stesso settore, mi farebbe piacere restare in contatto!',
+    dataRichiesta: '2026-05-07',
+  },
+];
+
+const MOCK_INVIATE: RichiestaConnessione[] = [
+  {
+    id: 's1', userId: 'u20', nome: 'Roberto', cognome: 'Mancini',
+    ruolo: 'ML Engineer', settore: 'Data & AI',
+    dataRichiesta: '2026-05-06',
+  },
+  {
+    id: 's2', userId: 'u21', nome: 'Valentina', cognome: 'Costa',
+    ruolo: 'UX Researcher', settore: 'Design',
+    dataRichiesta: '2026-05-04',
+  },
+];
 
 // ─── Utilità ──────────────────────────────────────────────────────────────────
 const AVATAR_COLORS = [
@@ -72,7 +75,7 @@ function avatarColor(userId: string): string {
 }
 
 function getInitials(nome: string, cognome: string) {
-  return `${nome[0] ?? ''}${cognome[0] ?? ''}`.toUpperCase();
+  return `${nome[0]}${cognome[0]}`.toUpperCase();
 }
 
 function formatRelative(iso: string): string {
@@ -90,8 +93,8 @@ function CardRicevuta({
   onRifiuta,
 }: {
   richiesta: RichiestaConnessione;
-  onAccetta: (friendshipId: number) => void;
-  onRifiuta: (friendshipId: number) => void;
+  onAccetta: (id: string) => void;
+  onRifiuta: (id: string) => void;
 }) {
   return (
     <motion.div
@@ -104,22 +107,14 @@ function CardRicevuta({
                  bg-[#1a1d2a] rounded-xl border border-[#c19e4a]/10"
     >
       {/* Avatar */}
-      {richiesta.avatar ? (
-        <img
-          src={richiesta.avatar}
-          alt={`${richiesta.nome} ${richiesta.cognome}`}
-          className="w-10 h-10 rounded-full shrink-0 object-cover"
-        />
-      ) : (
-        <div
-          className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center
-                     text-xs font-bold text-[#e6e8ed]"
-          style={{ background: avatarColor(richiesta.id) }}
-          aria-hidden="true"
-        >
-          {getInitials(richiesta.nome, richiesta.cognome)}
-        </div>
-      )}
+      <div
+        className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center
+                   text-xs font-bold text-[#e6e8ed]"
+        style={{ background: avatarColor(richiesta.userId) }}
+        aria-hidden="true"
+      >
+        {getInitials(richiesta.nome, richiesta.cognome)}
+      </div>
 
       {/* Info + azioni */}
       <div className="flex-1 min-w-0">
@@ -154,7 +149,7 @@ function CardRicevuta({
         {/* Bottoni */}
         <div className="flex gap-2 mt-3">
           <button
-            onClick={() => onAccetta(richiesta.friendshipId)}
+            onClick={() => onAccetta(richiesta.id)}
             className="tap-highlight-none flex-1 py-2 text-xs font-semibold rounded-lg
                        bg-[#c19e4a] text-[#0b0d14]
                        hover:bg-[#d4aa52] active:scale-[0.97]
@@ -163,7 +158,7 @@ function CardRicevuta({
             Accetta
           </button>
           <button
-            onClick={() => onRifiuta(richiesta.friendshipId)}
+            onClick={() => onRifiuta(richiesta.id)}
             className="tap-highlight-none flex-1 py-2 text-xs font-semibold rounded-lg
                        border border-[#7db89a]/20 text-[#7db89a]/60
                        hover:border-[#e57373]/30 hover:text-[#e57373]/70
@@ -183,7 +178,7 @@ function CardInviata({
   onAnnulla,
 }: {
   richiesta: RichiestaConnessione;
-  onAnnulla: (friendshipId: number) => void;
+  onAnnulla: (id: string) => void;
 }) {
   return (
     <motion.div
@@ -195,22 +190,14 @@ function CardInviata({
       className="flex items-center gap-3 px-4 py-3
                  bg-[#1a1d2a] rounded-xl border border-[#c19e4a]/10"
     >
-      {richiesta.avatar ? (
-        <img
-          src={richiesta.avatar}
-          alt={`${richiesta.nome} ${richiesta.cognome}`}
-          className="w-9 h-9 rounded-full shrink-0 object-cover"
-        />
-      ) : (
-        <div
-          className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center
-                     text-xs font-bold text-[#e6e8ed]"
-          style={{ background: avatarColor(richiesta.id) }}
-          aria-hidden="true"
-        >
-          {getInitials(richiesta.nome, richiesta.cognome)}
-        </div>
-      )}
+      <div
+        className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center
+                   text-xs font-bold text-[#e6e8ed]"
+        style={{ background: avatarColor(richiesta.userId) }}
+        aria-hidden="true"
+      >
+        {getInitials(richiesta.nome, richiesta.cognome)}
+      </div>
 
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-[#e6e8ed] truncate">
@@ -224,7 +211,7 @@ function CardInviata({
           {formatRelative(richiesta.dataRichiesta)}
         </span>
         <button
-          onClick={() => onAnnulla(richiesta.friendshipId)}
+          onClick={() => onAnnulla(richiesta.id)}
           className="tap-highlight-none text-[10px] font-medium px-2.5 py-1 rounded-lg
                      border border-[#7db89a]/15 text-[#7db89a]/40
                      hover:border-[#e57373]/25 hover:text-[#e57373]/60
@@ -278,38 +265,21 @@ export function RichiestePanel({
 }: {
   onConnessioneAccettata?: (richiesta: RichiestaConnessione) => void;
 }) {
-  const { data: ricevuteData, isLoading: ricevuteLoading } = useRequests();
-  const { data: inviateData, isLoading: inviateLoading } = useSentRequests();
-  const acceptMutation = useAcceptRequest();
-  const removeMutation = useRemoveFriend();
+  const [ricevute, setRicevute] = useState<RichiestaConnessione[]>(MOCK_RICEVUTE);
+  const [inviate, setInviate]   = useState<RichiestaConnessione[]>(MOCK_INVIATE);
 
-  const ricevute: RichiestaConnessione[] = (ricevuteData?.requests ?? []).map(networkUserToRichiesta);
-  const inviate: RichiestaConnessione[] = (inviateData?.requests ?? []).map(networkUserToRichiesta);
-
-  const isLoading = ricevuteLoading || inviateLoading;
-
-  function handleAccetta(friendshipId: number) {
-    const richiesta = ricevute.find((r) => r.friendshipId === friendshipId);
-    acceptMutation.mutate(friendshipId);
+  function handleAccetta(id: string) {
+    const richiesta = ricevute.find((r) => r.id === id);
+    setRicevute((prev) => prev.filter((r) => r.id !== id));
     if (richiesta) onConnessioneAccettata?.(richiesta);
   }
 
-  function handleRifiuta(friendshipId: number) {
-    removeMutation.mutate(friendshipId);
+  function handleRifiuta(id: string) {
+    setRicevute((prev) => prev.filter((r) => r.id !== id));
   }
 
-  function handleAnnulla(friendshipId: number) {
-    removeMutation.mutate(friendshipId);
-  }
-
-  if (isLoading) {
-    return (
-      <div className="space-y-3 py-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-20 bg-[#1a1d2a] rounded-xl border border-[#c19e4a]/5 animate-pulse" />
-        ))}
-      </div>
-    );
+  function handleAnnulla(id: string) {
+    setInviate((prev) => prev.filter((r) => r.id !== id));
   }
 
   return (
@@ -322,7 +292,7 @@ export function RichiestePanel({
             <AnimatePresence mode="popLayout">
               {ricevute.map((r) => (
                 <CardRicevuta
-                  key={r.friendshipId}
+                  key={r.id}
                   richiesta={r}
                   onAccetta={handleAccetta}
                   onRifiuta={handleRifiuta}
@@ -341,7 +311,7 @@ export function RichiestePanel({
             <AnimatePresence mode="popLayout">
               {inviate.map((r) => (
                 <CardInviata
-                  key={r.friendshipId}
+                  key={r.id}
                   richiesta={r}
                   onAnnulla={handleAnnulla}
                 />

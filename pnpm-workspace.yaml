@@ -1,12 +1,8 @@
 packages:
-  - apps/*
   - artifacts/*
   - lib/*
   - lib/integrations/*
   - scripts
-
-allowBuilds:
-  esbuild: false
 
 autoInstallPeers: false
 

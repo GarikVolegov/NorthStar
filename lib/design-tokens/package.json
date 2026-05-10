@@ -1,0 +1,14 @@
+{
+  "name": "@workspace/design-tokens",
+  "version": "1.0.0",
+  "description": "NorthStar Design System — shared CSS tokens (Deep Navy Premium theme)",
+  "type": "module",
+  "exports": {
+    "./northstar-theme.css": "./northstar-theme.css",
+    "./tokens": "./tokens.ts"
+  },
+  "files": [
+    "northstar-theme.css",
+    "tokens.ts"
+  ]
+}

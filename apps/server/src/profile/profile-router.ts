@@ -176,7 +176,7 @@ profileRouter.get("/me", requireAuth, async (req, res) => {
     };
 
     await setProfileCache(uid, payload);
-    res.json({ user: payload });
+    res.json(payload);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Errore" });
   }

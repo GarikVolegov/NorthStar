@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Orientamento - Scopri la Tua Via"
+version = "1.0.0"
+id = "artifacts/orientamento"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21003
+
+[services.development]
+run = "pnpm --filter @workspace/orientamento run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/orientamento", "run", "build" ]
+publicDir = "artifacts/orientamento/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21003"
+BASE_PATH = "/"

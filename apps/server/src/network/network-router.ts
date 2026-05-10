@@ -303,34 +303,6 @@ networkRouter.get("/requests", async (req: Request, res: Response) => {
   }
 });
 
-// ── GET /api/friends/requests/sent — richieste inviate dall'utente ────────────
-
-networkRouter.get("/requests/sent", async (req: Request, res: Response) => {
-  try {
-    const me = uid(req);
-    const rows = await db
-      .select()
-      .from(friendshipsTable)
-      .where(
-        and(
-          eq(friendshipsTable.requesterId, me),
-          eq(friendshipsTable.status, "pending"),
-        ),
-      );
-
-    const requests = await Promise.all(
-      rows.map(async (f) => {
-        const user = await getPublicUser(f.receiverId);
-        return { friendshipId: f.id, sentAt: f.createdAt, user };
-      }),
-    );
-
-    res.json({ requests: requests.filter((r) => r.user !== null) });
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Errore" });
-  }
-});
-
 // ── GET /api/friends/suggestions — utenti suggeriti con matchScore ────────────
 
 networkRouter.get("/suggestions", async (req: Request, res: Response) => {

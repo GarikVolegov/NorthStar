@@ -1,0 +1,379 @@
+# NorthStar / Orientamento — UI & UX Improvement Instructions
+
+> Queste istruzioni descrivono miglioramenti prioritari da applicare al progetto **Orientamento** (`artifacts/orientamento/`).
+> Ogni sezione è autonoma e può essere assegnata come task separato all’agente Replit.
+
+-----
+
+## 1. 🎨 Design Token System unificato
+
+**Problema:** Il progetto mescola classi Tailwind bare con i token default di Radix UI, producendo incoerenze in border-radius, shadow, colori e spaziatura tra componenti nativi e custom.
+
+**Istruzione per l’agente:**
+
+Crea un file `artifacts/orientamento/src/styles/tokens.css` con CSS custom properties per:
+
+```css
+:root {
+  /* Brand colors */
+  --color-brand: oklch(55% 0.22 270);         /* violet — unico colore accent premium */
+  --color-brand-light: oklch(92% 0.08 270);
+  --color-brand-dark: oklch(38% 0.22 270);
+
+  /* Semantic colors */
+  --color-surface: oklch(98% 0 0);
+  --color-surface-elevated: oklch(100% 0 0);
+  --color-surface-sunken: oklch(95% 0 0);
+  --color-border: oklch(88% 0 0);
+  --color-text-primary: oklch(12% 0 0);
+  --color-text-secondary: oklch(45% 0 0);
+  --color-text-muted: oklch(65% 0 0);
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 3px oklch(0% 0 0 / 0.08);
+  --shadow-md: 0 4px 12px oklch(0% 0 0 / 0.10);
+  --shadow-lg: 0 8px 32px oklch(0% 0 0 / 0.12);
+}
+```
+
+Importa questo file in `artifacts/orientamento/src/main.tsx` o nel CSS globale.
+
+Sostituisci nei componenti esistenti i colori hardcoded `indigo-*`, `emerald-*`, `violet-*` per le feature premium con `var(--color-brand)` e le sue varianti. L’unico colore accent premium deve essere il violet/indigo definito sopra.
+
+-----
+
+## 2. 📐 Scala tipografica standardizzata
+
+**Problema:** Heading e body text usano classi `text-xl`, `text-2xl`, `text-lg` sparsi senza gerarchia coerente.
+
+**Istruzione per l’agente:**
+
+Aggiungi al `tailwind.config` (o al CSS globale se si usa Tailwind v4 con `@theme`) una type scale semantica:
+
+```css
+@layer base {
+  h1 { @apply text-4xl font-bold tracking-tight leading-tight; }
+  h2 { @apply text-2xl font-semibold tracking-tight leading-snug; }
+  h3 { @apply text-xl font-semibold leading-snug; }
+  h4 { @apply text-base font-semibold leading-normal; }
+  p  { @apply text-base leading-relaxed text-[var(--color-text-secondary)]; }
+  small { @apply text-sm leading-normal text-[var(--color-text-muted)]; }
+}
+```
+
+Applica queste classi semantiche in tutte le pagine: landing, risultati, settore, news, dashboard, roadmap. Rimuovi qualsiasi `font-bold` / `text-2xl` applicato inline che duplica queste regole.
+
+-----
+
+## 3. 🧩 Skeleton Loader unificato
+
+**Problema:** `UserDashboard` usa skeleton per le professioni, mentre altre sezioni (news, roadmap, wiki) usano spinner o placeholder diversi.
+
+**Istruzione per l’agente:**
+
+Crea un componente riusabile `artifacts/orientamento/src/components/ui/Skeleton.tsx`:
+
+```tsx
+import { cn } from "@/lib/utils";
+
+interface SkeletonProps {
+  className?: string;
+  lines?: number;
+  variant?: "text" | "card" | "avatar" | "badge";
+}
+
+export function Skeleton({ className, lines = 1, variant = "text" }: SkeletonProps) {
+  const base = "animate-pulse rounded bg-gray-100";
+
+  if (variant === "card") {
+    return (
+      <div className={cn("rounded-xl border border-gray-100 p-5 space-y-3", className)}>
+        <div className={cn(base, "h-5 w-2/3")} />
+        <div className={cn(base, "h-3 w-full")} />
+        <div className={cn(base, "h-3 w-4/5")} />
+      </div>
+    );
+  }
+
+  if (variant === "avatar") {
+    return <div className={cn(base, "h-10 w-10 rounded-full", className)} />;
+  }
+
+  if (variant === "badge") {
+    return <div className={cn(base, "h-5 w-16 rounded-full", className)} />;
+  }
+
+  return (
+    <div className={cn("space-y-2", className)}>
+      {Array.from({ length: lines }).map((_, i) => (
+        <div key={i} className={cn(base, "h-3", i === lines - 1 ? "w-3/5" : "w-full")} />
+      ))}
+    </div>
+  );
+}
+```
+
+Sostituisci tutti i loading state esistenti nel progetto con questo componente. Usa `variant="card"` per news e professions, `variant="text"` per descrizioni.
+
+-----
+
+## 4. 🔴 Pagina Risultati — Gerarchia visiva
+
+**Problema:** `/risultati/:id` mostra troppe informazioni sullo stesso livello visivo: RIASEC, Bussola Interiore, top 3 settori, AI analysis, professions, upsell. L’utente non sa dove guardare.
+
+**Istruzione per l’agente:**
+
+Ristruttura il layout della pagina `risultati.tsx` in tre sezioni visivamente distinte con separatori chiari:
+
+**Sezione 1 — Hero (above the fold):**
+
+- Nome utente + frase personalizzata basata su `dominantSpirit`
+- Top sector match in evidenza (card grande con match score animato 0→XX%)
+- CTA primaria: “Esplora questo settore →”
+
+**Sezione 2 — Il tuo profilo (scroll):**
+
+- RIASEC profile chart (Recharts radar o bar)
+- Bussola Interiore: 5 spirit bar in una card separata con sfondo leggermente colorato per distinguerla visivamente dal RIASEC
+
+**Sezione 3 — Altre direzioni:**
+
+- Settore #2 e #3 come card più piccole (secondary style)
+- Se loggato: AI professions section con `Skeleton variant="card"` durante il caricamento
+- Se non loggato: singolo banner “Salva i tuoi risultati” con CTA registrazione
+
+Aggiungi `position: sticky` alla top section con il match score principale in modo che rimanga visibile durante lo scroll.
+
+-----
+
+## 5. 🏠 Dashboard Hub — Entry point unico per le feature premium
+
+**Problema:** Le feature premium (Wiki, Roadmap, Grafo, News) sono raggiungibili solo da pagine specifiche o navigazione diretta, senza un hub centrale.
+
+**Istruzione per l’agente:**
+
+Nella pagina `dashboard.tsx`, dopo l’AI analysis section, aggiungi una sezione “I tuoi strumenti” con card navigate verso le feature premium. Struttura:
+
+```tsx
+const PREMIUM_TOOLS = [
+  {
+    href: `/wiki/${confirmedSectorId}`,
+    icon: MessageSquare,
+    title: "Wiki AI",
+    description: "Chiedi tutto sul tuo settore a un esperto AI",
+    color: "var(--color-brand)",
+  },
+  {
+    href: `/roadmap/${confirmedSectorId}`,
+    icon: Map,
+    title: "Roadmap Personalizzata",
+    description: "Percorsi formativi alternativi con fitScore",
+    color: "var(--color-brand)",
+  },
+  {
+    href: "/grafo",
+    icon: Network,
+    title: "Grafo della Conoscenza",
+    description: "Le tue note, skill e documenti collegati",
+    color: "var(--color-brand)",
+  },
+  {
+    href: "/news",
+    icon: Newspaper,
+    title: "News di Settore",
+    description: "Aggiornamenti live dal mondo del lavoro",
+    color: "var(--color-brand)",
+  },
+];
+```
+
+Tutte le card usano `var(--color-brand)` — **niente indigo/emerald/violet separati**.
+
+-----
+
+## 6. 🗺️ Grafo della Conoscenza — Onboarding e Mobile
+
+**Problema:** Il concetto di “knowledge graph personale Obsidian-like” è opaco per utenti non tecnici. Su mobile l’SVG canvas è inutilizzabile.
+
+**Istruzione per l’agente:**
+
+**A) Empty state con onboarding:**
+Nella pagina `grafo-conoscenza.tsx`, quando `nodes.length === 0`, mostra un overlay centrato invece del canvas vuoto:
+
+```tsx
+{nodes.length === 0 && (
+  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-center px-8">
+    <div className="text-5xl">🕸️</div>
+    <h2>Il tuo spazio di conoscenza è vuoto</h2>
+    <p className="text-muted max-w-xs">
+      Aggiungi note, skill, certificazioni e documenti. Collegali tra loro
+      per vedere come si costruisce il tuo percorso professionale.
+    </p>
+    <button onClick={handleAddFirstNode} className="btn-primary">
+      Aggiungi il primo nodo
+    </button>
+  </div>
+)}
+```
+
+**B) Mobile fallback:**
+Aggiungi un check `useMediaQuery("(max-width: 768px)")`. Se mobile, mostra una lista semplice dei nodi con titolo, tipo e numero di connessioni al posto del canvas SVG. Includi un banner: *“Per l’esperienza completa con drag & drop, apri da desktop.”*
+
+-----
+
+## 7. ⚡ Streaming SSE — Loading states coerenti
+
+**Problema:** Le tre feature SSE (Wiki AI, Roadmap, Grafo RAG) hanno probabilmente UI di loading differenti.
+
+**Istruzione per l’agente:**
+
+Crea un hook riusabile `artifacts/orientamento/src/hooks/useSSEStream.ts` che gestisce:
+
+- stato `isStreaming: boolean`
+- stato `content: string` (aggiornato in streaming)
+- stato `error: string | null`
+- cleanup dell’EventSource al unmount
+
+E un componente `StreamingIndicator.tsx`:
+
+```tsx
+export function StreamingIndicator({ isStreaming }: { isStreaming: boolean }) {
+  if (!isStreaming) return null;
+  return (
+    <div className="flex items-center gap-2 text-sm text-muted">
+      <span className="flex gap-0.5">
+        {[0, 1, 2].map(i => (
+          <span
+            key={i}
+            className="h-1.5 w-1.5 rounded-full bg-brand animate-bounce"
+            style={{ animationDelay: `${i * 0.15}s` }}
+          />
+        ))}
+      </span>
+      <span>Sto elaborando...</span>
+    </div>
+  );
+}
+```
+
+Usa `useSSEStream` + `StreamingIndicator` in `wiki.tsx`, `roadmap.tsx` e `grafo-conoscenza.tsx` per uniformare l’esperienza.
+
+-----
+
+## 8. 📊 Recharts — Theming coerente col brand
+
+**Problema:** I chart sulla pagina settore usano i colori di default di Recharts, non allineati alla palette brand.
+
+**Istruzione per l’agente:**
+
+Crea un file `artifacts/orientamento/src/lib/chart-theme.ts`:
+
+```ts
+export const CHART_COLORS = {
+  primary: "oklch(55% 0.22 270)",    // brand violet
+  secondary: "oklch(70% 0.15 270)",
+  muted: "oklch(80% 0.06 270)",
+  accent: "oklch(62% 0.18 200)",     // teal accent
+  neutral: "oklch(75% 0 0)",
+};
+
+export const CHART_DEFAULTS = {
+  strokeWidth: 2,
+  dot: false,
+  animationDuration: 600,
+  animationEasing: "ease-out" as const,
+};
+```
+
+Importa `CHART_COLORS` in tutti i componenti che usano Recharts (`LineChart`, `BarChart`, `RadarChart`) e passa i colori come prop `stroke` / `fill`.
+
+-----
+
+## 9. 🔒 Premium Badge — Pattern coerente
+
+**Problema:** Quattro sistemi di indicatori numerici diversi (confidence score, matchScore, fitScore, spirit bars) usano stili e nomi diversi per concetti simili (rilevanza personalizzata).
+
+**Istruzione per l’agente:**
+
+Crea un componente `MatchBadge.tsx` riusabile:
+
+```tsx
+interface MatchBadgeProps {
+  score: number; // 0–100
+  label?: string;
+  size?: "sm" | "md";
+}
+
+export function MatchBadge({ score, label = "Match", size = "md" }: MatchBadgeProps) {
+  const color =
+    score >= 80 ? "bg-green-50 text-green-700 border-green-200" :
+    score >= 60 ? "bg-brand-light text-brand border-brand/20" :
+                  "bg-gray-50 text-gray-600 border-gray-200";
+
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium ${color} ${size === "sm" ? "text-xs" : "text-sm"}`}>
+      {label} {score}%
+    </span>
+  );
+}
+```
+
+Usa `<MatchBadge score={matchScore} label="Match" />` nei settori,  
+`<MatchBadge score={fitScore} label="Fit" />` nella roadmap,  
+`<MatchBadge score={confidence * 100} label="Score" />` nell’admin review.
+
+-----
+
+## 10. 🧭 Navigazione — Pattern unico
+
+**Problema:** L’admin review usa sidebar navigation, il resto dell’app usa (presumibilmente) top navbar. Due pattern strutturali diversi nella stessa codebase.
+
+**Istruzione per l’agente:**
+
+Mantieni la sidebar nell’admin (è un backoffice e ha senso lì), ma assicurati che:
+
+1. La top navbar dell’app principale abbia sempre visibili: Logo | Test | Dashboard | News | Premium — con highlight attivo sulla route corrente (usando `useLocation` di Wouter).
+1. Nelle pagine premium (`/wiki/:id`, `/roadmap/:id`, `/grafo`) aggiungi un breadcrumb coerente:
+   
+   ```
+   Dashboard → [Nome Settore] → Wiki AI
+   ```
+1. Il link “← Torna alla Dashboard” sia sempre presente come prima voce del breadcrumb, non nascosto in fondo alla pagina.
+
+-----
+
+## Priorità di esecuzione consigliata
+
+|# |Task                        |Impatto|Effort|
+|--|----------------------------|-------|------|
+|1 |Design Token System         |🔴 Alto |Medio |
+|4 |Pagina Risultati — gerarchia|🔴 Alto |Medio |
+|5 |Dashboard Hub premium       |🔴 Alto |Basso |
+|3 |Skeleton unificato          |🟡 Medio|Basso |
+|6 |Grafo onboarding + mobile   |🟡 Medio|Medio |
+|7 |SSE streaming coerente      |🟡 Medio|Medio |
+|9 |MatchBadge unificato        |🟡 Medio|Basso |
+|2 |Scala tipografica           |🟡 Medio|Basso |
+|8 |Recharts theming            |🟢 Basso|Basso |
+|10|Navigazione unificata       |🟢 Basso|Alto  |
+
+-----
+
+*Generato il 06/05/2026 — Audit basato su `replit.md` del repository GarikVolegov/NorthStar*
