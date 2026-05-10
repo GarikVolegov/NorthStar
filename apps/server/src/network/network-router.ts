@@ -9,10 +9,16 @@
  * PUT    /api/friends/:id/accept   — accetta una richiesta ricevuta
  * DELETE /api/friends/:id          — rimuovi amico o rifiuta richiesta
  *
- * Algoritmo matchScore (0-100):
- *   - Stesso settore           → +50 pt
- *   - Stesso journeyType       → +30 pt
- *   - |deltaXP| <= 2000        → +20 * (1 - |deltaXP| / 2000) pt (lineare)
+ * Algoritmo matchScore (0-100, clamped):
+ *   1. Stesso settore           → +50 pt
+ *   2. Stesso journeyType       → +30 pt
+ *   3. |deltaXP| <= 2000        → +20 * (1 - |deltaXP| / 2000) pt (lineare)
+ *   4. Prossimità location      → +15 pt (stesso country-group)
+ *                                → +7  pt (stessa macro-region)
+ *                                → +0  pt (regioni diverse)
+ *
+ * Il segnale location (4) è inferito da usersTable.timezone (IANA tz string)
+ * senza nessuna migration aggiuntiva.
  *
  * Tutti gli endpoint richiedono autenticazione (requireAuth montato in index.ts).
  */
@@ -24,7 +30,7 @@ import {
   testSessionsTable,
   sectorsTable,
 } from "@workspace/db";
-import { eq, or, and, notInArray, ilike, sql } from "drizzle-orm";
+import { eq, or, and, notInArray, ilike } from "drizzle-orm";
 
 export const networkRouter = Router();
 
@@ -64,7 +70,7 @@ async function getPublicUser(userId: number): Promise<PublicUser | null> {
 }
 
 /**
- * Restituisce tutti gli ID già correlati all’utente (se stesso + connessioni
+ * Restituisce tutti gli ID già correlati all'utente (se stesso + connessioni
  * accepted/pending/blocked in entrambe le direzioni).
  * Usato per escludere utenti da suggestions e search.
  */
@@ -86,23 +92,124 @@ async function getExcludedIds(me: number): Promise<Set<number>> {
   return ids;
 }
 
-// ── Algoritmo matchScore ──────────────────────────────────────────────────────────
+// ── Location inference da IANA timezone ───────────────────────────────────────
 //
-// Segnali (totale max 100):
-//   1. sameSector    → 50 pt  — segnale più forte: stesso mondo lavorativo
-//   2. sameJourney   → 30 pt  — stesso tipo di percorso (es. entrambi "in_crescita")
-//   3. xpProximity   → 0-20pt — XP simile: se |delta| <= 2000 assegna punteggio
-//                               lineare (2000 delta = 0pt, 0 delta = 20pt)
+// Mappa una stringa IANA timezone (es. "Europe/Rome") in una coppia
+// { macroRegion, countryGroup } usata per calcolare la prossimità geografica.
+//
+// Granularità a 3 livelli:
+//   macroRegion  — continente o sotto-area ("Europe/South", "America/East")
+//   countryGroup — gruppo di paesi affini ("Eurozone/South", "LatAm/South")
+//
+// Se la timezone è null/unknown restituisce null → segnale vale 0.
+
+type LocationInfo = {
+  macroRegion: string;
+  countryGroup: string;
+};
+
+function timezoneToRegion(tz: string | null): LocationInfo | null {
+  if (!tz) return null;
+
+  // Europe
+  if (/^Europe\/(Rome|Vatican|Malta|San_Marino|Zurich|Vienna|Berlin|Brussels|Luxembourg|Amsterdam|Paris|Monaco|Andorra|Madrid|Lisbon|Gibraltar)$/i.test(tz)) {
+    return { macroRegion: "Europe/West", countryGroup: "Eurozone/South" };
+  }
+  if (/^Europe\/(London|Dublin|Guernsey|Jersey|Isle_of_Man|Lisbon)$/i.test(tz)) {
+    return { macroRegion: "Europe/West", countryGroup: "British_Isles" };
+  }
+  if (/^Europe\/(Warsaw|Prague|Budapest|Bratislava|Ljubljana|Zagreb|Sarajevo|Belgrade|Skopje|Podgorica|Tirane|Bucharest|Sofia|Athens|Nicosia|Helsinki|Tallinn|Riga|Vilnius|Kaliningrad|Minsk|Kiev|Chisinau|Mariehamn)$/i.test(tz)) {
+    return { macroRegion: "Europe/East", countryGroup: "EastEurope" };
+  }
+  if (/^Europe\/(Stockholm|Oslo|Copenhagen|Helsinki|Reykjavik)$/i.test(tz)) {
+    return { macroRegion: "Europe/North", countryGroup: "Scandinavia" };
+  }
+  if (/^Europe\//.test(tz)) {
+    return { macroRegion: "Europe/Other", countryGroup: "Europe/Other" };
+  }
+
+  // Americas
+  if (/^America\/(New_York|Toronto|Detroit|Indiana|Kentucky|Montreal|Ottawa|Halifax|Moncton|Glace_Bay|Goose_Bay)$/.test(tz)) {
+    return { macroRegion: "America/East", countryGroup: "NorthAm/East" };
+  }
+  if (/^America\/(Chicago|Winnipeg|Indiana|Knox|Tell_City|Menominee|Rainy_River|Rankin_Inlet|Resolute|Swift_Current|Regina)$/.test(tz)) {
+    return { macroRegion: "America/Central", countryGroup: "NorthAm/Central" };
+  }
+  if (/^America\/(Denver|Phoenix|Edmonton|Calgary|Yellowknife|Boise|Cambridge_Bay|Inuvik|Creston)$/.test(tz)) {
+    return { macroRegion: "America/Mountain", countryGroup: "NorthAm/Mountain" };
+  }
+  if (/^America\/(Los_Angeles|Vancouver|Tijuana|Dawson|Whitehorse)$/.test(tz)) {
+    return { macroRegion: "America/West", countryGroup: "NorthAm/West" };
+  }
+  if (/^America\/(Sao_Paulo|Fortaleza|Recife|Maceio|Belem|Bahia|Cuiaba|Porto_Velho|Manaus|Boa_Vista|Santarem|Noronha|Araguaina)$/.test(tz)) {
+    return { macroRegion: "America/SouthEast", countryGroup: "LatAm/Brazil" };
+  }
+  if (/^America\/(Argentina|Chile|Bolivia|Paraguay|Uruguay|Asuncion|Santiago|Lima|Bogota|Caracas|Guayaquil|La_Paz|Montevideo|Cayenne|Paramaribo|Guyana|Port_of_Spain|Barbados|Trinidad|Puerto_Rico|Jamaica|Havana|Panama|Costa_Rica|Managua|Tegucigalpa|Guatemala|El_Salvador|Belize|Mexico_City|Cancun|Hermosillo|Mazatlan|Chihuahua|Merida|Monterrey|Ojinaga|Bahia_Banderas|Matamoros|Mazatlan)/.test(tz)) {
+    return { macroRegion: "America/SouthWest", countryGroup: "LatAm/Other" };
+  }
+  if (/^America\//.test(tz)) {
+    return { macroRegion: "America/Other", countryGroup: "America/Other" };
+  }
+
+  // Asia
+  if (/^Asia\/(Tokyo|Seoul|Shanghai|Hong_Kong|Taipei|Macau|Singapore|Kuala_Lumpur|Jakarta|Manila|Bangkok|Ho_Chi_Minh|Saigon|Phnom_Penh|Vientiane|Yangon|Rangoon|Brunei|Makassar|Pontianak|Jayapura)$/.test(tz)) {
+    return { macroRegion: "Asia/East", countryGroup: "SEAsia" };
+  }
+  if (/^Asia\/(Kolkata|Calcutta|Colombo|Dhaka|Kathmandu|Karachi|Lahore|Kabul|Tashkent|Almaty|Bishkek|Dushanbe|Ashgabat|Yekaterinburg|Omsk|Novosibirsk|Krasnoyarsk|Irkutsk|Yakutsk|Vladivostok|Sakhalin|Magadan|Srednekolymsk|Kamchatka|Anadyr)/.test(tz)) {
+    return { macroRegion: "Asia/South", countryGroup: "SouthAsia" };
+  }
+  if (/^Asia\/(Dubai|Riyadh|Kuwait|Baghdad|Tehran|Baku|Yerevan|Tbilisi|Beirut|Jerusalem|Gaza|Hebron|Amman|Damascus|Nicosia|Istanbul|Muscat|Aden|Qatar|Bahrain)$/.test(tz)) {
+    return { macroRegion: "Asia/West", countryGroup: "MENA" };
+  }
+  if (/^Asia\//.test(tz)) {
+    return { macroRegion: "Asia/Other", countryGroup: "Asia/Other" };
+  }
+
+  // Africa
+  if (/^Africa\//.test(tz)) {
+    return { macroRegion: "Africa", countryGroup: "Africa" };
+  }
+
+  // Oceania
+  if (/^(Australia|Pacific)\//.test(tz)) {
+    return { macroRegion: "Oceania", countryGroup: "Oceania" };
+  }
+
+  return null;
+}
+
+/**
+ * Calcola un punteggio di prossimità geografica (0, 7, o 15).
+ *   countryGroup uguale → 15 pt  (stessa area geografica, es. entrambi Eurozone/South)
+ *   macroRegion uguale  → 7 pt   (stesso macro-continente, es. entrambi Europe/West)
+ *   altrimenti          → 0 pt
+ */
+function locationScore(tzA: string | null, tzB: string | null): number {
+  const a = timezoneToRegion(tzA);
+  const b = timezoneToRegion(tzB);
+  if (!a || !b) return 0;
+  if (a.countryGroup === b.countryGroup) return 15;
+  if (a.macroRegion === b.macroRegion) return 7;
+  return 0;
+}
+
+// ── Algoritmo matchScore ──────────────────────────────────────────────────────
+//
+// Segnali (totale grezzo max 115, clamped a 100):
+//   1. sameSector    → 50 pt  — stesso mondo lavorativo
+//   2. sameJourney   → 30 pt  — stesso tipo di percorso (es. "in_crescita")
+//   3. xpProximity   → 0-20pt — XP simile (|delta| <= 2000, lineare)
+//   4. location      → 0/7/15pt — prossimità geografica via timezone inference
 //
 // Note:
-//   - Se uno dei due utenti non ha sectorId/journeyType/totalXp
-//     il segnale vale 0 (non penalizza, non premia).
-//   - Il punteggio minimo restituito è 0, max 100.
+//   - Segnale mancante (null) vale 0, non penalizza.
+//   - Il punteggio finale è sempre in [0, 100].
 
 type MatchInput = {
   sectorId: number | null;
   journeyType: string | null;
   totalXp: number | null;
+  timezone: string | null;
 };
 
 function computeMatchScore(me: MatchInput, other: MatchInput): number {
@@ -129,6 +236,9 @@ function computeMatchScore(me: MatchInput, other: MatchInput): number {
       score += Math.round(20 * (1 - delta / 2000));
     }
   }
+
+  // Segnale 4: prossimità geografica via timezone (0, 7, o 15 pt)
+  score += locationScore(me.timezone, other.timezone);
 
   return Math.min(100, Math.max(0, score));
 }
@@ -200,12 +310,13 @@ networkRouter.get("/suggestions", async (req: Request, res: Response) => {
     const me = uid(req);
     const excludeIds = await getExcludedIds(me);
 
-    // Profilo dell’utente corrente per il calcolo del match
+    // Profilo dell'utente corrente per il calcolo del match
     const meRow = await db
       .select({
         testSessionId: usersTable.testSessionId,
         journeyType:   usersTable.journeyType,
         totalXp:       usersTable.totalXp,
+        timezone:      usersTable.timezone,
       })
       .from(usersTable)
       .where(eq(usersTable.id, me))
@@ -227,6 +338,7 @@ networkRouter.get("/suggestions", async (req: Request, res: Response) => {
       sectorId:    mySectorId,
       journeyType: meRow?.journeyType ?? null,
       totalXp:     meRow?.totalXp ?? null,
+      timezone:    meRow?.timezone ?? null,
     };
 
     const candidates = await db
@@ -236,6 +348,7 @@ networkRouter.get("/suggestions", async (req: Request, res: Response) => {
         avatarUrl:   usersTable.avatarUrl,
         journeyType: usersTable.journeyType,
         totalXp:     usersTable.totalXp,
+        timezone:    usersTable.timezone,
         sectorName:  sectorsTable.name,
         sectorId:    testSessionsTable.confirmedSectorId,
       })
@@ -248,9 +361,8 @@ networkRouter.get("/suggestions", async (req: Request, res: Response) => {
           notInArray(usersTable.id, [...excludeIds]),
         ),
       )
-      .limit(50); // recupera più candidati per calcolare meglio il ranking
+      .limit(50);
 
-    // Calcola matchScore per ogni candidato e ordina DESC
     const scored = candidates
       .map((c) => ({
         id:          c.id,
@@ -263,6 +375,7 @@ networkRouter.get("/suggestions", async (req: Request, res: Response) => {
           sectorId:    c.sectorId ?? null,
           journeyType: c.journeyType ?? null,
           totalXp:     c.totalXp ?? null,
+          timezone:    c.timezone ?? null,
         }),
       }))
       .sort((a, b) => b.matchScore - a.matchScore);
@@ -304,12 +417,13 @@ networkRouter.get("/search", async (req: Request, res: Response) => {
       30,
     );
 
-    // Profilo dell’utente corrente per il calcolo del match
+    // Profilo dell'utente corrente per il calcolo del match
     const meRow = await db
       .select({
         testSessionId: usersTable.testSessionId,
         journeyType:   usersTable.journeyType,
         totalXp:       usersTable.totalXp,
+        timezone:      usersTable.timezone,
       })
       .from(usersTable)
       .where(eq(usersTable.id, me))
@@ -331,6 +445,7 @@ networkRouter.get("/search", async (req: Request, res: Response) => {
       sectorId:    mySectorId,
       journeyType: meRow?.journeyType ?? null,
       totalXp:     meRow?.totalXp ?? null,
+      timezone:    meRow?.timezone ?? null,
     };
 
     const excludeIds = await getExcludedIds(me);
@@ -352,6 +467,7 @@ networkRouter.get("/search", async (req: Request, res: Response) => {
         avatarUrl:   usersTable.avatarUrl,
         journeyType: usersTable.journeyType,
         totalXp:     usersTable.totalXp,
+        timezone:    usersTable.timezone,
         sectorName:  sectorsTable.name,
         sectorId:    testSessionsTable.confirmedSectorId,
       })
@@ -364,7 +480,6 @@ networkRouter.get("/search", async (req: Request, res: Response) => {
     const hasMore = rows.length > limit;
     const results = rows.slice(0, limit);
 
-    // Ordina: match nome esatto > startsWith > parziale; a parità matchScore DESC
     const q = rawQ.toLowerCase();
     const scored = results
       .map((r) => ({
@@ -373,6 +488,7 @@ networkRouter.get("/search", async (req: Request, res: Response) => {
           sectorId:    r.sectorId ?? null,
           journeyType: r.journeyType ?? null,
           totalXp:     r.totalXp ?? null,
+          timezone:    r.timezone ?? null,
         }),
       }))
       .sort((a, b) => {
