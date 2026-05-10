@@ -1,17 +1,22 @@
-﻿/**
- * NotFoundPage — 404
- *
- * ⚠️  STUB — Implementare la pagina completa.
- * Per ora mostra un placeholder centrato.
- */
+import { Link } from "wouter";
+import { useTranslation } from "react-i18next";
+import { AlertCircle } from "lucide-react";
 
-export default function Page() {
+export default function NotFound() {
+  const { t } = useTranslation();
+
   return (
-    <main className="min-h-screen bg-[#0e1018] flex items-center justify-center px-4">
-      <div className="text-center">
-        <h1 className="text-xl font-bold text-[#c19e4a] mb-2"></h1>
-        <p className="text-sm text-[#7db89a]/60">Pagina in sviluppo</p>
+    <div className="min-h-screen w-full flex items-center justify-center bg-background">
+      <div className="w-full max-w-md mx-4 bg-card rounded-2xl border border-border p-8 text-center">
+        <div className="flex justify-center mb-4">
+          <AlertCircle className="h-12 w-12 text-destructive" />
+        </div>
+        <h1 className="text-2xl font-bold text-foreground mb-3">{t("notFound.title")}</h1>
+        <p className="text-sm text-muted-foreground mb-6">{t("notFound.subtitle")}</p>
+        <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80 transition-colors">
+          {t("notFound.goHome")}
+        </Link>
       </div>
-    </main>
+    </div>
   );
 }

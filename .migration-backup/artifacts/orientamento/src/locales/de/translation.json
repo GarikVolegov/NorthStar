@@ -1,0 +1,2482 @@
+{
+  "nav": {
+    "test": "Der Test",
+    "sectors": "Branchen",
+    "growth": "Wachstum",
+    "news": "Nachrichten",
+    "premium": "Premium",
+    "login": "Anmelden",
+    "startJourney": "Reise beginnen",
+    "back": "Zurück",
+    "startFreeTest": "Kostenlosen Test starten",
+    "myProfile": "Mein Profil",
+    "applications": "Bewerbungen",
+    "calendar": "Kalender",
+    "friends": "Freunde",
+    "logout": "Abmelden",
+    "language": "Sprache"
+  },
+  "footer": {
+    "tagline": "Ein Kompass für deine Zukunft. Wir sagen dir nicht, wohin du gehen sollst — wir zeigen dir die Möglichkeiten, damit du deinen Weg bewusst wählen kannst.",
+    "resources": "Ressourcen",
+    "product": "Produkt",
+    "links": {
+      "test": "Der RIASEC-Test",
+      "sectors": "Branchen erkunden",
+      "growth": "Persönliches Wachstum",
+      "news": "Branchennachrichten",
+      "premium": "Premium-Plan",
+      "contact": "Kontakt",
+      "about": "Über uns",
+      "howItWorks": "Wie es funktioniert",
+      "affiliation": "Partnerschaft",
+      "privacy": "Datenschutzrichtlinie",
+      "terms": "Nutzungsbedingungen",
+      "sitemap": "Sitemap"
+    },
+    "rights": "Alle Rechte vorbehalten.",
+    "privacy": "Datenschutz",
+    "terms": "Bedingungen",
+    "about": "Über uns"
+  },
+  "common": {
+    "back": "Zurück",
+    "loading": "Lädt…",
+    "error": "Fehler",
+    "retry": "Erneut versuchen",
+    "save": "Speichern",
+    "saved": "Gespeichert",
+    "cancel": "Abbrechen",
+    "confirm": "Bestätigen",
+    "close": "Schließen",
+    "explore": "Erkunden",
+    "readMore": "Lesen",
+    "learnMore": "Mehr erfahren",
+    "seeAll": "Alle anzeigen",
+    "goBack": "Zurück",
+    "search": "Suchen",
+    "filter": "Filtern",
+    "clearFilters": "Alle Filter entfernen",
+    "results": "Ergebnisse",
+    "notFound": "Nicht gefunden",
+    "networkError": "Netzwerkfehler. Bitte erneut versuchen.",
+    "compare": "Vergleichen",
+    "salary": "Gehalt",
+    "growth": "Wachstum",
+    "aiRisk": "KI-Risiko",
+    "trend": "Markttrend",
+    "min": "Min"
+  },
+  "home": {
+    "badge": "Entdecke dein Potenzial",
+    "title": "Finde deinen Weg,",
+    "titleHighlight": "mit Bewusstsein.",
+    "subtitle": "NorthStar sagt dir nicht, was du tun sollst. Es bietet dir einen Kompass, um die Branchen zu erkunden, die mit deiner Natur resonieren, und führt dich zu einer authentischen Wahl.",
+    "startTest": "Kostenlosen Test starten",
+    "reviewResults": "Ergebnisse ansehen",
+    "alreadyAccount": "Hast du bereits ein Konto? Anmelden",
+    "welcomeBack": "Willkommen zurück, {{name}} ✦",
+    "stats": {
+      "guided": "Begleitete Personen",
+      "sectors": "Analysierte Branchen",
+      "avgGrowth": "Durchschnittliches Wachstum"
+    },
+    "trending": {
+      "badge": "Branchen der Woche",
+      "title": "Gerade am meisten gefragt",
+      "subtitle": "Die Branchen mit dem größten Interesse unter den Nutzern, basierend auf echten Entscheidungen und Marktdaten.",
+      "exploreAll": "Alle 21 Branchen erkunden",
+      "topThisWeek": "Diese Woche am meisten gefragt",
+      "deepen": "Mehr erfahren",
+      "compareWith": "Mit einer anderen Branche vergleichen"
+    },
+    "personalized": {
+      "badge": "Personalisierte Empfehlungen",
+      "title": "Die am besten geeigneten Branchen für dein Profil",
+      "sortedBy": "Sortiert nach deiner Präferenz:",
+      "fullDetail": "Vollständige Details",
+      "chosen": "✓ Gewählt"
+    },
+    "news": {
+      "title": "Neuestes aus der Arbeitswelt",
+      "subtitle": "Aktuelle Nachrichten aus den relevanten Branchen."
+    },
+    "howItWorks": {
+      "badge": "Wie es funktioniert",
+      "title": "Drei Schritte zu deiner Richtung",
+      "step1Title": "Test machen",
+      "step1Desc": "17 schnelle Fragen, um deine RIASEC-Neigungen und deinen Inneren Kompass zu kartieren.",
+      "step2Title": "Profil entdecken",
+      "step2Desc": "Das System verarbeitet deine Antworten und zeigt dir die Branchen, die am besten zu deiner Persönlichkeit passen.",
+      "step3Title": "Weg aufbauen",
+      "step3Desc": "Erkunde empfohlene Branchen, vergleiche sie und wähle die, die wirklich mit dir resoniert.",
+      "startNow": "Jetzt starten"
+    }
+  },
+  "test": {
+    "back": "Zurück",
+    "questionOf": "Frage {{current}} von {{total}}",
+    "innerCompass": "Innerer Kompass",
+    "innerCompassCount": "Innerer Kompass · {{current}} von {{total}}",
+    "options": {
+      "1": "Überhaupt nicht",
+      "2": "Wenig",
+      "3": "Neutral",
+      "4": "Ziemlich",
+      "5": "Sehr viel"
+    },
+    "ctxCount": "Kalibrierung · {{current}} von {{total}}",
+    "ctxBadge": "Dein Ziel · {{current}} von {{total}}",
+    "transition": {
+      "badge": "Innerer Kompass",
+      "title": "Teil zwei: die Fünf Geister",
+      "intro": "Ausgezeichnete Analyse deiner äußeren Neigungen. Jetzt erkunden wir deine innere Energie durch die",
+      "fiveSpirits": "Fünf Geister",
+      "tradition": "der chinesischen Tradition.",
+      "details": "Du wirst <strong>15 Fragen</strong> beantworten — 3 pro Geist — um dein Gleichgewicht zwischen Präsenz, Vision, Instinkt, Analyse und Willen präzise zu kartieren. Es gibt keine richtigen oder falschen Antworten: Folge immer deinem ersten Instinkt.",
+      "startCompass": "Inneren Kompass starten",
+      "spirits": {
+        "presence": {
+          "name": "Präsenz",
+          "desc": "Bewusstsein"
+        },
+        "vision": {
+          "name": "Vision",
+          "desc": "Richtung"
+        },
+        "instinct": {
+          "name": "Instinkt",
+          "desc": "Energie"
+        },
+        "focus": {
+          "name": "Fokus",
+          "desc": "Analyse"
+        },
+        "tenacity": {
+          "name": "Zähigkeit",
+          "desc": "Wille"
+        }
+      }
+    },
+    "transition2": {
+      "badge": "Abschlusskalibrierung",
+      "title": "Fast geschafft — zwei letzte Fragen",
+      "subtitle": "Um deine Ergebnisse zu verfeinern, beantworte diese zwei Fragen zu deinem konkreten Ziel. Deine Antworten personalisieren die empfohlenen Branchen weiter.",
+      "card1Title": "Arbeitsstil",
+      "card1Desc": "Selbstständig, angestellt oder hybrid?",
+      "card2Title": "Karriererichtung",
+      "card2Desc": "Neuer Weg oder bestehenden ausbauen?",
+      "start": "Weiter"
+    },
+    "complete": {
+      "title": "Analyse abgeschlossen!",
+      "subtitle": "Wir haben dein RIASEC-Profil, deinen Inneren Kompass und deine Ziele analysiert. Wir sind bereit, dir die am besten geeigneten Branchen zu zeigen.",
+      "savedAccount": "Ergebnisse werden automatisch in deinem Konto gespeichert.",
+      "discoverResults": "Ergebnisse entdecken",
+      "processing": "Verarbeitung…",
+      "submitError": "Sendefehler. Bitte erneut versuchen."
+    },
+    "questions": {
+      "ctx": {
+        "ctx_1": "Wenn ich mir meinen idealen Berufsweg vorstelle, sehe ich mich als Freelancer oder Unternehmer — eher als Angestellten einer Organisation.",
+        "ctx_2": "Ich suche eine komplett neue berufliche Richtung, anders als das, was ich bereits im Sinn hatte — anstatt einen bereits klaren Weg weiter auszubauen."
+      },
+      "riasec": {
+        "q1": "Ich baue, repariere und arbeite gerne mit konkreten Werkzeugen.",
+        "q2": "Ich analysiere gerne Daten, löse logische Probleme und forsche.",
+        "q3": "Ich drücke mich gerne durch Kunst, Design, Schreiben oder Musik aus.",
+        "q4": "Ich helfe, unterrichte und kümmere mich gerne um andere.",
+        "q5": "Ich leite gerne Projekte, treffe Entscheidungen und starte neue Initiativen.",
+        "q6": "Ich organisiere und plane gerne und arbeite nach klar definierten Abläufen.",
+        "q7": "Ich arbeite gerne im Freien oder mit physischen Werkzeugen statt am Schreibtisch.",
+        "q8": "Ich verstehe gerne im Tiefgang, wie Dinge wirklich funktionieren.",
+        "q9": "Ich arbeite gerne in flexiblen, kreativ gestalteten Umgebungen ohne starre Strukturen.",
+        "q10": "Ich gestalte gerne meine Arbeit so, dass sie einen positiven Einfluss auf Menschen hat.",
+        "q11": "Ich überzeuge, verhandle und leite gerne Gruppen zu einem gemeinsamen Ziel.",
+        "q12": "Ich arbeite gerne präzise und achte sorgfältig auf jedes Detail."
+      },
+      "spirits": {
+        "shen_1": "Ich fühle mich oft klar und zentriert in meinen Emotionen, auch in schwierigen Momenten.",
+        "shen_2": "Ich bemerke leicht, wenn sich meine Stimmung verändert, und weiß, wie ich das Gleichgewicht wiederfinde.",
+        "shen_3": "Mir fällt es leicht, präsent zu sein und auf die Emotionen anderer einzugehen.",
+        "hun_1": "Mir ist es leicht, meine ideale Zukunft zu visualisieren und sie als wirklich erreichbar zu empfinden.",
+        "hun_2": "Ich begeistere mich oft für originelle Ideen, die mich dazu bringen, neue Wege zu erkunden.",
+        "hun_3": "Ich fühle mich von einem klaren Richtungsgefühl geleitet, auch wenn der Weg noch nicht vollständig definiert ist.",
+        "po_1": "Ich fühle mich voller Energie, wenn ich mich für etwas einsetze, das mich wirklich begeistert.",
+        "po_2": "Ich vertraue meinen körperlichen und instinktiven Empfindungen, um zu erkennen, ob eine Situation zu mir passt.",
+        "po_3": "Ich spüre sofort im Körper — noch bevor der Verstand es verarbeitet — ob eine Umgebung zu mir passt.",
+        "yi_1": "Mir fällt es leicht, meine Aufmerksamkeit lange auf Studium, Analyse oder Problemlösung zu konzentrieren.",
+        "yi_2": "Ich finde Befriedigung darin, ein komplexes Problem in einfachere Teile zu zerlegen und es Schritt für Schritt zu lösen.",
+        "yi_3": "Ich behalte wichtige Details gut im Gedächtnis und kann viele Informationen gleichzeitig präsent halten.",
+        "zhi_1": "Ich halte an meinen Entscheidungen fest, auch wenn sie schwierig werden oder Opfer erfordern.",
+        "zhi_2": "Mir fällt es natürlich, einen Weg weiterzumachen zu finden, auch wenn Hindernisse auftauchen.",
+        "zhi_3": "Ich bleibe meinen Zielen treu und arbeite stetig daran, auch in Momenten der Erschöpfung oder Entmutigung."
+      }
+    }
+  },
+  "results": {
+    "savedBanner": "Ergebnisse in deinem Konto gespeichert — du findest sie immer in deinem Profil, {{name}}.",
+    "riasecProfile": "Dein RIASEC-Profil",
+    "innerCompass": "Innerer Kompass",
+    "fiveSpirits": "Deine Fünf Geister · 15 Fragen, 3 pro Geist",
+    "dominantSpirit": "Dominanter Geist",
+    "yourSectors": "Deine empfohlenen Branchen",
+    "sectorCount": "{{count}} Branchen, die zu deinem Profil passen",
+    "workModeTitle": "Bevorzugter Arbeitsmodus",
+    "workModeSuggested": "Basierend auf deinem RIASEC-Profil empfehlen wir:",
+    "workModeQuestion": "Wie arbeitest du am liebsten?",
+    "workModeConfirmed": "Präferenz gespeichert",
+    "confirmSector": "Ich wähle diese Branche",
+    "confirmSectorDesc": "Bestätige deine Wahl, um Roadmaps und erweiterte Tools freizuschalten.",
+    "confirmedBadge": "✓ Deine Branche",
+    "sessionNotFound": "Sitzung nicht gefunden",
+    "sessionNotFoundDesc": "Wir konnten die Ergebnisse dieses Tests nicht laden.",
+    "retakeTest": "Test wiederholen",
+    "matchScore": "{{score}}% Kompatibilität",
+    "quickCompare": "Schnellvergleich deiner Wege",
+    "quickCompareBest": "Der grüne Punkt zeigt den besten Wert",
+    "deepCompare": "Detaillierter Vergleich:",
+    "vs": "vs",
+    "maxSalary": "Max. Gehalt",
+    "annualGrowth": "Jährliches Wachstum",
+    "marketTrend": "Markttrend",
+    "spirits": {
+      "shen": "Präsenz",
+      "hun": "Vision",
+      "po": "Instinkt",
+      "yi": "Fokus",
+      "zhi": "Zähigkeit",
+      "shen_desc": "Bewusstsein & Präsenz",
+      "hun_desc": "Vision & Richtung",
+      "po_desc": "Instinkt & Energie",
+      "yi_desc": "Konzentration & Analyse",
+      "zhi_desc": "Wille & Resilienz"
+    },
+    "workModes": {
+      "dipendente": "Angestellt",
+      "autonomo": "Selbstständig / Freelance",
+      "ibrido": "Hybrid",
+      "unknown": "Nicht definiert"
+    },
+    "trend": {
+      "booming": "Starkes Wachstum",
+      "growing": "Wachstum",
+      "stable": "Stabil",
+      "declining": "Rückläufig"
+    },
+    "risk": {
+      "low": "Niedrig",
+      "medium": "Mittel",
+      "high": "Hoch"
+    },
+    "bookmarkSave": "Sektor speichern",
+    "bookmarkRemove": "Aus Gespeicherten entfernen",
+    "sectorFallback": "Sektor {{n}}",
+    "alignment": {
+      "aligned": "✓ Ausgerichtet",
+      "partial": "~ Kompatibel",
+      "misaligned": "⚠ Nicht ausgerichtet"
+    },
+    "aiSection": {
+      "title": "Vertiefte KI-Analyse",
+      "loginDesc": "Anmelden um die personalisierte KI-Analyse freizuschalten",
+      "loadingDesc": "Der KI-Orchestrator verarbeitet dein Profil…",
+      "planFree": "Kostenloser Plan · {{count}} analysierte Berufe",
+      "planPremium": "Premium-Plan · {{count}} analysierte Berufe",
+      "genericDesc": "Personalisierte Analyse deines RIASEC-Profils",
+      "loginTitle": "Personalisierte KI-Analyse",
+      "loginBody": "Melde dich an um die KI-Analyse freizuschalten: Berufe, Bildungswege und empfohlene Arbeitsmodi für dein Profil.",
+      "loginBtn": "Anmelden oder Registrieren",
+      "loadingMsg": "KI-Analyse läuft — kann 20–30 Sekunden dauern…",
+      "errorMsg": "Die KI-Analyse ist derzeit nicht verfügbar. Bitte versuche es in einigen Sekunden erneut.",
+      "professionsTitle": "Empfohlene Berufe",
+      "freeLabel": "Kostenloser Plan · 3 Berufe",
+      "workModeTitle": "Optimaler Arbeitsmodus",
+      "premiumBadge": "Premium-Analyse",
+      "upsellTitle": "Vollständige Analyse freischalten",
+      "upsellDesc": "Mit Premium: 6 Berufe, optimaler Arbeitsmodus, personalisierte Bildungswege und Aktionskalender.",
+      "upsellBtn": "Freischalten",
+      "educationTitle": "Bildungswege",
+      "dashboardLink": "Zum vollständigen KI-Dashboard"
+    },
+    "statsFooterTitle": "Wusstest du?",
+    "statsFooterDesc": "{{count}} Personen haben den Test auf NorthStar abgeschlossen. Die beliebtesten Sektoren:"
+  },
+  "workModeSelector": {
+    "header": "Wie möchtest du arbeiten?",
+    "subtitle": "Deine Präferenz beeinflusst das Ranking der empfohlenen Branchen und die angezeigten Karrierewege.",
+    "riasecSuggests": "💡 Dein RIASEC-Profil schlägt vor:",
+    "compareTitle": "📊 Angestellt vs. Freiberufler Vergleich",
+    "riasecTendency": "Dein RIASEC-Profil neigt zu:",
+    "riasecNote": "Dies ist kein endgültiges Urteil — es ist ein Ausgangspunkt zur Reflexion. Die endgültige Entscheidung liegt bei dir.",
+    "dimensionHeader": "Dimension",
+    "confirmBtn": "Präferenz bestätigen",
+    "chooseAnyway": "Trotzdem wählen:",
+    "options": {
+      "dipendente_label": "Angestellt",
+      "dipendente_sublabel": "Arbeitnehmer",
+      "dipendente_desc": "Fester Vertrag, Monatsgehalt, strukturiertes Team und Karriere im Unternehmen.",
+      "autonomo_label": "Freiberufler / Selbstständig",
+      "autonomo_sublabel": "Freiberuflicher Profi",
+      "autonomo_desc": "Eigenständige Arbeit, mehrere Kunden, volle Freiheit bei Zeiten und Projekten.",
+      "ibrido_label": "Hybrid",
+      "ibrido_sublabel": "Gemischte Flexibilität",
+      "ibrido_desc": "Kombiniert Stabilität und Autonomie: Beratung, Teilzeit, flexible Verträge.",
+      "unknown_label": "Ich weiß es noch nicht",
+      "unknown_sublabel": "Hilf mir wählen",
+      "unknown_desc": "Noch nicht sicher? Wir zeigen dir einen Vergleich, der dir bei der Entscheidung hilft."
+    },
+    "compare": {
+      "freedom_dim": "Freiheit",
+      "freedom_emp": "Begrenzt — Zeiten und Projekte vom Unternehmen bestimmt",
+      "freedom_free": "Maximal — wähle Kunden, Zeiten und Modus",
+      "stability_dim": "Stabilität",
+      "stability_emp": "Hoch — festes Gehalt, automatische Beiträge",
+      "stability_free": "Variabel — hängt von Kunden und Markt ab",
+      "risk_dim": "Finanzielles Risiko",
+      "risk_emp": "Niedrig — vertragliche Absicherungen",
+      "risk_free": "Hoch — kein garantiertes Einkommen in ruhigen Phasen",
+      "clients_dim": "Kundenverwaltung",
+      "clients_emp": "Nicht nötig — das Unternehmen kümmert sich",
+      "clients_free": "Unverzichtbar — du musst Kunden finden und halten",
+      "schedule_dim": "Arbeitszeiten",
+      "schedule_emp": "Strukturiert — typischerweise 9-18 Uhr, Büro oder Homeoffice",
+      "schedule_free": "Flexibel — erfordert aber Selbstdisziplin",
+      "growth_dim": "Wirtschaftliches Wachstum",
+      "growth_emp": "Schrittweise — Gehaltserhöhungen und Beförderungen",
+      "growth_free": "Potenziell hoch — skaliert mit Kunden und Tarifen",
+      "admin_dim": "Admin-Komplexität",
+      "admin_emp": "Niedrig — Gehaltsabrechnung vom Unternehmen",
+      "admin_free": "Hoch — Rechnungen, Steuern, Beiträge",
+      "community_dim": "Gemeinschaft",
+      "community_emp": "Hoch — Kollegen, Team, Unternehmenskultur",
+      "community_free": "Liegt bei dir — Isolierungsrisiko ohne Aufwand"
+    }
+  },
+  "careerSteps": {
+    "freelance": {
+      "tech": {
+        "1": {
+          "title": "Öffentliches Portfolio aufbauen",
+          "desc": "Erstelle persönliche oder Open-Source-Projekte, die deine technischen Fähigkeiten zeigen."
+        },
+        "2": {
+          "title": "Spezialisierung definieren",
+          "desc": "Wähle eine Nische (z.B. Backend, Mobile), um dich im Markt abzuheben."
+        },
+        "3": {
+          "title": "Erste Kunden gewinnen",
+          "desc": "Starte auf Plattformen wie Upwork oder Fiverr, dann baue direkte Unternehmensbeziehungen auf."
+        },
+        "4": {
+          "title": "Steuerliche Aspekte regeln",
+          "desc": "Melde ein Gewerbe an und erfasse abzugsfähige Ausgaben."
+        },
+        "5": {
+          "title": "Zu Premium-Tarifen skalieren",
+          "desc": "Mit aufgebautem Ruf erhöhe die Stundensätze und wähle hochwertigere Kunden."
+        }
+      },
+      "health": {
+        "1": {
+          "title": "Notwendige Zertifizierungen erhalten",
+          "desc": "Gesundheitsberufe erfordern spezifische Zulassungen. Überprüfe die Anforderungen für deine Spezialisierung."
+        },
+        "2": {
+          "title": "Privatpraxis eröffnen",
+          "desc": "Registriere das Unternehmen, finde geeignete Räumlichkeiten und befolge lokale Gesundheitsvorschriften."
+        },
+        "3": {
+          "title": "Überweisungsnetzwerk aufbauen",
+          "desc": "Arbeite mit anderen Spezialisten zusammen, die Patienten an dich verweisen können."
+        },
+        "4": {
+          "title": "Verwaltungsmanagement",
+          "desc": "Berufshaftpflichtversicherung, Rechnungsstellung und Terminverwaltung sind im Selbstständigenleben unerlässlich."
+        },
+        "5": {
+          "title": "Wachstum und Spezialisierung",
+          "desc": "Hebe dich durch Weiterbildung ab und baue einen Online-Ruf auf."
+        }
+      },
+      "creative": {
+        "1": {
+          "title": "Kreative Marke aufbauen",
+          "desc": "Erstelle ein Online-Portfolio (Behance, persönliche Website), das deinen einzigartigen Stil zeigt."
+        },
+        "2": {
+          "title": "Plattformen auswählen",
+          "desc": "Finde heraus, wo deine idealen Kunden sind: Agenturen, Startups, Privatpersonen, internationale Märkte."
+        },
+        "3": {
+          "title": "Servicepakete definieren",
+          "desc": "Biete klare Pakete mit transparenten Preisen an, um endlose Verhandlungen zu vermeiden."
+        },
+        "4": {
+          "title": "Langfristige Beziehungen aufbauen",
+          "desc": "Ein loyaler Kunde ist weit mehr wert als zehn Einmalkunden. Pflege die Nachprojektbeziehung."
+        },
+        "5": {
+          "title": "Einkommensquellen diversifizieren",
+          "desc": "Ergänze Dienstleistungen durch digitale Produkte (Vorlagen, Kurse) für passives Einkommen."
+        }
+      },
+      "entrepreneur": {
+        "1": {
+          "title": "Geschäftsidee validieren",
+          "desc": "Teste den Markt mit einem MVP, bevor du erhebliche Ressourcen investierst."
+        },
+        "2": {
+          "title": "Rechtliche Struktur aufbauen",
+          "desc": "Wähle die passende Rechtsform (Einzelunternehmen, GmbH, UG) je nach Projekt."
+        },
+        "3": {
+          "title": "Erste Kunden oder Investoren finden",
+          "desc": "Bootstrapping oder Angel-Vorsaat-Finanzierung sind komplementäre Wege."
+        },
+        "4": {
+          "title": "Team aufbauen",
+          "desc": "Identifiziere fehlende Schlüsselrollen und rekrutiere Mitarbeiter oder Mitgründer."
+        },
+        "5": {
+          "title": "Skalieren und konsolidieren",
+          "desc": "Mit nachgewiesener Traktion suche institutionelle Finanzierung oder reinvestiere Gewinne."
+        }
+      },
+      "consulting": {
+        "1": {
+          "title": "Vertikale Spezialisierung aufbauen",
+          "desc": "Wähle einen Sektor oder ein spezifisches Problem, um der Experte der Wahl zu werden."
+        },
+        "2": {
+          "title": "Wertvolle Inhalte erstellen",
+          "desc": "Veröffentliche Einblicke auf LinkedIn und schreibe Artikel, um Autorität aufzubauen."
+        },
+        "3": {
+          "title": "Professionelles Netzwerk aufbauen",
+          "desc": "Networking ist in der Beratung unerlässlich. 70% der Aufträge kommen über Empfehlungen."
+        },
+        "4": {
+          "title": "Angebot strukturieren",
+          "desc": "Definiere klare Methoden, Liefergegenstände und Preise für jeden Service."
+        },
+        "5": {
+          "title": "Mit Mitarbeitern skalieren",
+          "desc": "Wenn die Nachfrage die Kapazität übersteigt, bringe Juniorberater oder Freelance-Spezialisten hinzu."
+        }
+      },
+      "data": {
+        "1": {
+          "title": "Technisches Fachwissen konsolidieren",
+          "desc": "Vertiefe ein spezifisches Gebiet (Data Engineering, ML, BI), um eine Referenz zu werden."
+        },
+        "2": {
+          "title": "Analyseportfolio aufbauen",
+          "desc": "Veröffentliche Analysen auf öffentlichen Datensätzen und nimm an Kaggle teil."
+        },
+        "3": {
+          "title": "Projektbasierte Beratung anbieten",
+          "desc": "Beginne mit kleinen Datenanalysemandaten für Unternehmen ohne internes Team."
+        },
+        "4": {
+          "title": "Mit SaaS-Tools automatisieren",
+          "desc": "Nutze Tools wie Metabase oder Tableau, um Analysen ohne Mehrarbeit zu skalieren."
+        },
+        "5": {
+          "title": "Zu monatlichen Retainern wechseln",
+          "desc": "Biete monatliche Abonnements für kontinuierliches Reporting an: wiederkehrendes Einkommen."
+        }
+      },
+      "hr": {
+        "1": {
+          "title": "Erfahrung im Unternehmen sammeln",
+          "desc": "Bevor du selbstständig wirst, sammle 3–5 Jahre Erfahrung in strukturierten Organisationen."
+        },
+        "2": {
+          "title": "Anerkannter Experte werden",
+          "desc": "Veröffentliche, halte Vorträge auf Konferenzen, baue einen Ruf in deinem Fachbereich auf."
+        },
+        "3": {
+          "title": "Teilzeit-Beratung starten",
+          "desc": "Behalte die Stabilität der Festanstellung, während du erste Kunden aufbaust."
+        },
+        "4": {
+          "title": "Geschäft formalisieren",
+          "desc": "Als Selbstständiger anmelden, Standardverträge definieren und Datenschutz (DSGVO) einhalten."
+        },
+        "5": {
+          "title": "Team aufbauen",
+          "desc": "Wenn das Volumen wächst, bringe spezialisierte Mitarbeiter hinzu, um Leistungen zu diversifizieren."
+        }
+      },
+      "default": {
+        "1": {
+          "title": "Schlüsselkompetenzen konsolidieren",
+          "desc": "Vertiefe die technischen und sozialen Kompetenzen, die im Sektor gefragt sind."
+        },
+        "2": {
+          "title": "Netzwerk aufbauen",
+          "desc": "Selbstständige Chancen kommen oft von Menschen, die du kennst. Investiere in Berufsbeziehungen."
+        },
+        "3": {
+          "title": "Mit Teilzeitprojekten beginnen",
+          "desc": "Teste den Markt und behalte die Sicherheit eines Festeinkommens."
+        },
+        "4": {
+          "title": "Geschäft formalisieren",
+          "desc": "Als Selbstständiger anmelden und die Buchhaltung führen."
+        },
+        "5": {
+          "title": "Skalieren und diversifizieren",
+          "desc": "Erhöhe die Preise, wähle bessere Kunden und füge ergänzende Leistungen hinzu."
+        }
+      }
+    },
+    "dipendente": {
+      "tech": {
+        "1": {
+          "title": "Technische Ausbildung",
+          "desc": "Informatik- oder Softwareingenieurstudium abschließen. Programmier- und Systemgrundlagen erwerben."
+        },
+        "2": {
+          "title": "Praktikum oder erste Juniorstelle",
+          "desc": "Als Junior-Entwickler in ein Unternehmen eintreten. Entwicklungszyklus lernen und Portfolio aufbauen."
+        },
+        "3": {
+          "title": "Technische Spezialisierung",
+          "desc": "Bereich wählen: Frontend, Backend, Cloud, DevOps oder Mobile. Frameworks und Tools vertiefen."
+        },
+        "4": {
+          "title": "Senior-Rolle und technische Führung",
+          "desc": "Nach 3–5 Jahren Senior Developer oder Tech Lead werden. Architekturentscheidungen treffen."
+        },
+        "5": {
+          "title": "Staff Engineer oder Engineering Manager",
+          "desc": "Zwischen technischem oder Management-Pfad wählen. Beide erfordern starken Ruf und strategische Vision."
+        }
+      },
+      "health": {
+        "1": {
+          "title": "Spezialisierte akademische Ausbildung",
+          "desc": "Medizin, Pflege oder Gesundheitsmanagement studieren. Digitale Kompetenzen ergänzen, wo relevant."
+        },
+        "2": {
+          "title": "Praktikum und erste Stelle",
+          "desc": "In Krankenhaus oder Gesundheitsunternehmen als Juniorarzt, Pfleger oder Analyst arbeiten."
+        },
+        "3": {
+          "title": "Klinische oder digitale Spezialisierung",
+          "desc": "Medizinische Spezialisierung wählen oder Karriere Richtung Digitale Gesundheit (EHR, Telemedizin) lenken."
+        },
+        "4": {
+          "title": "Senior-Kliniker oder Bereichsleiter",
+          "desc": "Senior-Spezialist oder Stationsleiter werden. Teams koordinieren und Behandlungspfade managen."
+        },
+        "5": {
+          "title": "Ärztlicher Direktor oder Gesundheitsdirektor",
+          "desc": "Klinische oder Managementführung auf Krankenhaus- oder Organisationsebene erreichen."
+        }
+      },
+      "creative": {
+        "1": {
+          "title": "Design-Ausbildung",
+          "desc": "Designschule besuchen oder spezialisierter Online-Kurs. Figma und Adobe Suite meistern."
+        },
+        "2": {
+          "title": "Junior Designer (Praktikum oder erste Stelle)",
+          "desc": "In Agentur oder Unternehmen als Junior Designer eintreten. Portfolio aufbauen und von Seniors lernen."
+        },
+        "3": {
+          "title": "Spezialisierung",
+          "desc": "Fokus wählen: Product Design, UX-Forschung, Motion Design, Brand Identity oder Design-Systeme."
+        },
+        "4": {
+          "title": "Senior Designer oder Design Lead",
+          "desc": "Kreative Richtung von Produkten führen. Junioren mentoren und mit Produktmanagern zusammenarbeiten."
+        },
+        "5": {
+          "title": "Head of Design oder Creative Director",
+          "desc": "Design auf Unternehmensebene leiten. Visuelle Sprache und UX-Strategie definieren."
+        }
+      },
+      "entrepreneur": {
+        "1": {
+          "title": "Management-Ausbildung",
+          "desc": "Wirtschaft, Management oder Ingenieurswesen studieren. Ein MBA beschleunigt den Zugang zu Schlüsselrollen."
+        },
+        "2": {
+          "title": "Analyst oder Junior in einem Unternehmen",
+          "desc": "Als Analyst oder Junior-Projektmanager einsteigen. Geschäftsprozesse von innen verstehen."
+        },
+        "3": {
+          "title": "Vertikales Fachwissen entwickeln",
+          "desc": "In einem Sektor oder einer Funktion spezialisieren. Tiefes Wissen öffnet Rollen mit höherer Verantwortung."
+        },
+        "4": {
+          "title": "Manager oder Bereichsleiter",
+          "desc": "Ein Team oder eine Unternehmensfunktion leiten. Verantwortung für Budget, Mitarbeiter und Ergebnisse."
+        },
+        "5": {
+          "title": "Director oder C-Suite",
+          "desc": "Führungsrollen erreichen: CEO, COO, CFO oder Director. Strategische Vision mit Umsetzung verbinden."
+        }
+      },
+      "consulting": {
+        "1": {
+          "title": "Akademische Höchstleistung",
+          "desc": "Wirtschaft oder Management an einer renommierten Universität studieren. GPA und Aktivitäten zählen."
+        },
+        "2": {
+          "title": "Analyst bei Big4 oder strategischer Boutique",
+          "desc": "Als Junior-Analyst/Consultant eintreten. Analysen, Benchmarking und C-Suite-Präsentationen erarbeiten."
+        },
+        "3": {
+          "title": "Senior Associate oder Consultant",
+          "desc": "Eigenständige Workstreams managen und Analystteams leiten. Vertikales Fachwissen aufbauen."
+        },
+        "4": {
+          "title": "Manager",
+          "desc": "Ganze Projekte und Kundenbeziehungen managen. Internes und externes Networking wird essenziell."
+        },
+        "5": {
+          "title": "Partner oder Director",
+          "desc": "Neues Geschäft einbringen, eine Praxis leiten und Beziehungen zu Schlüsselkunden aufbauen."
+        }
+      },
+      "data": {
+        "1": {
+          "title": "Analytische Ausbildung",
+          "desc": "Statistik, angewandte Mathematik, Python oder R studieren. Weg in Data Science oder Informatik."
+        },
+        "2": {
+          "title": "Junior Data Analyst",
+          "desc": "Mit echten Datensätzen arbeiten. SQL, BI-Tools lernen und Erkenntnisse an Entscheidungsträger kommunizieren."
+        },
+        "3": {
+          "title": "Spezialisierung in Data Science oder Engineering",
+          "desc": "Machine Learning oder Datenpipelines vertiefen. Die am besten passende Richtung wählen."
+        },
+        "4": {
+          "title": "Senior Data Scientist oder Data Engineer",
+          "desc": "Modellierungsprojekte oder komplexe Datenarchitekturen leiten. Mit Produkt und Business zusammenarbeiten."
+        },
+        "5": {
+          "title": "Head of Data oder Data Lead",
+          "desc": "Das Datenteam koordinieren, Datenstrategie definieren und Qualität und Governance sicherstellen."
+        }
+      },
+      "hr": {
+        "1": {
+          "title": "Psychologie oder Wirtschaftsstudium",
+          "desc": "Arbeitspsychologie oder Betriebswirtschaft studieren. Ein HR-Management-Master beschleunigt den Weg."
+        },
+        "2": {
+          "title": "HR-Assistent oder Junior-Recruiter",
+          "desc": "In einem Unternehmen oder einer Personalvermittlung arbeiten. Stellenanzeigen, Screening und Onboarding."
+        },
+        "3": {
+          "title": "HR-Spezialisierung",
+          "desc": "Vertikale wählen: Talent Acquisition, HRBP, L&D, Compensation oder People Analytics."
+        },
+        "4": {
+          "title": "HR-Manager oder HR Business Partner",
+          "desc": "HR-Funktion für einen Unternehmensbereich managen. Manager bei Personalentscheidungen unterstützen."
+        },
+        "5": {
+          "title": "HR-Direktor oder Chief People Officer",
+          "desc": "People-Strategie der Organisation leiten: Kultur, Talente, Bindung und Entwicklung."
+        }
+      },
+      "default": {
+        "1": {
+          "title": "Branchenausbildung",
+          "desc": "Die erforderlichen akademischen und beruflichen Qualifikationen im gewünschten Sektor erwerben."
+        },
+        "2": {
+          "title": "Erste Einstiegsposition",
+          "desc": "In einem Unternehmen in einer Juniorrolle beginnen. Prozesse lernen, Beziehungen aufbauen, Erfahrung sammeln."
+        },
+        "3": {
+          "title": "Kompetenzentwicklung",
+          "desc": "Technische und soziale Kompetenzen vertiefen. Mentoren und interne Wachstumschancen suchen."
+        },
+        "4": {
+          "title": "Senior- oder Spezialistenrolle",
+          "desc": "Mit solider Erfahrung in Senior- oder Spezialistenrollen wechseln. Junioren koordinieren oder Projekte leiten."
+        },
+        "5": {
+          "title": "Führung und Management",
+          "desc": "Verantwortungsrollen erreichen: Team Lead, Manager oder Director. Strategische Vision entwickeln."
+        }
+      }
+    }
+  },
+  "workModeAlignment": {
+    "aligned": "Entspricht deiner bevorzugten Arbeitsweise",
+    "partialHybrid": "Kompatibel mit deinem hybriden Modus, aber nicht optimal",
+    "misaligned": "Dieser Sektor ist hauptsächlich für {{modes}}"
+  },
+  "sectors": {
+    "title": "Branchen erkunden",
+    "badge": "{{count}} Berufsfelder",
+    "subtitle": "Weißt du noch nicht, was du machen willst? Stöbere durch alle Branchen, filtere nach deinem Stil und entdecke, wo du dich wohlfühlen könntest.",
+    "filterTitle": "Branchen filtern",
+    "searchPlaceholder": "Nach Name oder Beschreibung suchen…",
+    "personalityType": "Persönlichkeitstyp",
+    "automationRisk": "Automatisierungsrisiko (KI-Ersatz)",
+    "removeFilters": "Alle Filter entfernen",
+    "removeFiltersBtn": "Filter entfernen",
+    "allSectors": "{{count}} Branchen",
+    "filteredSectors": "{{filtered}} von {{total}} Branchen",
+    "noResults": "Keine Branchen gefunden",
+    "noResultsHint": "Versuche, die Filter oder die Suche zu ändern",
+    "discover": "Erkunden",
+    "compareSide": "Zwei Branchen nebeneinander vergleichen",
+    "ctaTitle": "Weißt du nicht, wo du anfangen sollst?",
+    "ctaDesc": "Mach den kostenlosen Test: 17 Fragen, um herauszufinden, welche Branchen am besten zu deiner Persönlichkeit und deinen Werten passen.",
+    "startFreeTest": "Kostenlosen Test starten",
+    "trend": {
+      "booming": "Starkes Wachstum",
+      "growing": "Wachstum",
+      "stable": "Stabil",
+      "declining": "Rückläufig"
+    },
+    "risk": {
+      "low": "Niedrig",
+      "medium": "Mittel",
+      "high": "Hoch"
+    }
+  },
+  "sector": {
+    "backToResults": "Zurück zu den Ergebnissen",
+    "annualSalary": "Durchschnittliches Jahresgehalt",
+    "growth": "Wachstum",
+    "annualGrowth": "+{{rate}}% jährlich",
+    "trainingTime": "Ausbildungszeit",
+    "automationRisk": "Automatisierungsrisiko",
+    "compareNotSure": "Nicht sicher? Vergleiche",
+    "compareDesc": "Vergleiche {{name}} mit einer anderen Branche nebeneinander",
+    "compare": "Vergleichen",
+    "premiumTools": "Premium-Tools",
+    "deepenWithAI": "Mit KI vertiefen",
+    "wikiAI": "KI-Wiki",
+    "wikiDesc": "Stelle spezifische Fragen zur Branche und erhalte personalisierte Antworten von der KI.",
+    "openChat": "Chat öffnen",
+    "roadmap": "Detaillierte Roadmap",
+    "roadmapDesc": "Ein schrittweiser Plan, der von der KI generiert wurde, um mit konkreten Ressourcen in die Branche einzusteigen.",
+    "generatePlan": "Plan generieren",
+    "knowledgeGraph": "Wissensgraph",
+    "graphDesc": "Visualisiere Rollen, Kompetenzen und Tools der Branche in einem interaktiven Graphen.",
+    "exploreGraph": "Graphen erkunden",
+    "tabs": {
+      "overview": "Überblick",
+      "career": "Karriereweg",
+      "skills": "Kompetenzen",
+      "data": "Daten & Trends"
+    },
+    "advantages": "Vorteile",
+    "disadvantages": "Nachteile",
+    "opportunities": "Zukünftige Chancen",
+    "keySkills": "Schlüsselkompetenzen",
+    "skillsDesc": "Um in dieser Branche erfolgreich zu sein, musst du diese Kompetenzgruppe entwickeln. Mach dir keine Sorgen, wenn du sie jetzt noch nicht alle hast — {{time}} ist die geschätzte Zeit, um sie zu erwerben.",
+    "careerPath": "Karriereweg",
+    "employed": "Angestellt",
+    "freelance": "Selbstständig / Freelance",
+    "employedDesc": "Typischer Weg für diejenigen, die als <strong>Angestellte</strong> in der Branche {{name}} arbeiten möchten. Stabil, strukturiert, mit klarer Entwicklung.",
+    "freelanceDesc": "Weg für diejenigen, die <strong>selbstständig oder als Freelancer</strong> in der Branche {{name}} arbeiten möchten. Mehr Freiheit, aber auch mehr Verantwortung im Geschäftsmanagement.",
+    "noEmployedPath": "Angestelltenweg noch nicht für diese Branche verfügbar.",
+    "noFreelancePath": "Freelance-Weg noch nicht für diese Branche verfügbar.",
+    "growthProjection": "Wachstumsprognose der Branche",
+    "platformStats": "Plattformstatistiken",
+    "shortTerm": "Kurzfristig",
+    "midTerm": "Mittelfristig",
+    "longTerm": "Langfristig",
+    "notFound": "Branche nicht gefunden",
+    "goHome": "Zurück zur Startseite",
+    "platformStatsUsers": "Von Nutzern gewählt",
+    "platformStatsMatch": "Durchschnittliche Übereinstimmung",
+    "readyTitle": "Bereit anzufangen?",
+    "readyDesc": "Wenn dieser Sektor zu dir passt, bestätige ihn in deinen Ergebnissen für eine detaillierte Roadmap.",
+    "backAndConfirm": "Zurück und bestätigen",
+    "noStats": "Statistische Daten momentan nicht verfügbar.",
+    "alignment": {
+      "aligned": "✓ Ausgerichtet",
+      "partial": "~ Kompatibel",
+      "misaligned": "⚠ Nicht ausgerichtet"
+    },
+    "trendValues": {
+      "growing": "Wachsend",
+      "booming": "Boomend",
+      "stable": "Stabil",
+      "declining": "Rückläufig"
+    },
+    "loadingTitle": "Berufsfeld",
+    "loadingDesc": "Entdecke Details, Gehälter, Wachstum und KI-Risiko dieses Berufsfelds auf NorthStar.",
+    "dataSourceNote": "Quelle: Italienische Arbeitsmarktdaten (ISTAT, EUROSTAT, INAPP). Gehaltsklassen und Wachstumsraten beziehen sich auf den italienischen Markt.",
+    "italianMarketNote": "Italienischer Markt"
+  },
+  "premium": {
+    "badge": "NorthStar Premium",
+    "title": "Entfalte dein volles Potenzial",
+    "subtitle": "Gehe über den kostenlosen Test hinaus. Mit Premium erhältst du erweiterte Tools, um deine Neigungen in einen konkreten Berufsweg zu verwandeln.",
+    "features": {
+      "wiki": {
+        "title": "Personalisiertes KI-Wiki",
+        "desc": "Greife auf eine intelligente Wissensdatenbank zu, die deine spezifischen Fragen zur gewählten Branche beantwortet."
+      },
+      "graph": {
+        "title": "Wissensgraph",
+        "desc": "Visualisiere Ausbildungswege, Kompetenzen und Verbindungen zwischen Berufsrollen interaktiv."
+      },
+      "roadmap": {
+        "title": "Detaillierte Roadmap",
+        "desc": "Erhalte einen personalisierten schrittweisen Plan, um in der geschätzten Zeit in deine ideale Branche einzusteigen."
+      },
+      "updates": {
+        "title": "Echtzeit-Updates",
+        "desc": "Aktuelle Marktdaten, Stellenangebote und frische Branchentrends."
+      }
+    },
+    "monthly": "Monatlich",
+    "yearly": "Jährlich",
+    "mostPopular": "Am beliebtesten",
+    "planName": "Premium-Plan",
+    "planAccess": "Vollständiger Zugang zu allen Funktionen",
+    "perMonth": "/Monat",
+    "perYear": "/Jahr",
+    "savingsMsg": "Entspricht €{{price}}/Monat · Spare 17%",
+    "includes": {
+      "wiki": "Personalisiertes KI-Wiki",
+      "graph": "Wissensgraph",
+      "roadmap": "Schritt-für-Schritt-Roadmap",
+      "liveData": "Live-Marktdaten",
+      "support": "Prioritätssupport",
+      "goals": "Unbegrenzte Ziele"
+    },
+    "waitlistTitle": "Zahlungen kommen bald",
+    "waitlistDesc": "Das Zahlungssystem wird gerade aktiviert. Hinterlasse deine E-Mail und wir benachrichtigen dich, sobald es verfügbar ist.",
+    "waitlistEmail": "Deine E-Mail",
+    "notifyMe": "Benachrichtige mich, wenn es bereit ist",
+    "joinedTitle": "Du bist auf der Liste!",
+    "joinedDesc": "Wir werden dich kontaktieren, sobald die Zahlung verfügbar ist.",
+    "guarantee": "14-tägige Geld-zurück-Garantie",
+    "cancelAnytime": "Jederzeit kündbar"
+  },
+  "auth": {
+    "login": "Anmelden",
+    "register": "Registrieren",
+    "titles": {
+      "login": "Willkommen zurück",
+      "register": "Konto erstellen",
+      "verify": "E-Mail bestätigen",
+      "forgot": "Passwort vergessen",
+      "forgotSent": "E-Mail prüfen",
+      "resetSent": "Passwort zurückgesetzt"
+    },
+    "descriptions": {
+      "login": "Melde dich an, um deinen Weg und deine Ergebnisse wiederzufinden.",
+      "register": "Registriere dich, um deinen Weg zu speichern und auf Premium-Inhalte zuzugreifen.",
+      "verify": "Gib den 6-stelligen Code ein, der an {{email}} gesendet wurde.",
+      "forgot": "Gib deine E-Mail ein und wir senden dir einen Link zum Zurücksetzen deines Passworts.",
+      "forgotSent": "Wir haben einen Link an {{email}} gesendet. Prüfe deinen Posteingang (und den Spam-Ordner).",
+      "resetSent": "Dein Passwort wurde zurückgesetzt. Du kannst dich jetzt anmelden."
+    },
+    "or": "oder",
+    "googleLoading": "Anmeldung mit Google läuft…",
+    "backToLogin": "Zurück zur Anmeldung",
+    "email": "E-Mail",
+    "emailPlaceholder": "deine@email.com",
+    "password": "Passwort",
+    "passwordPlaceholder": "••••••••",
+    "forgotPassword": "Passwort vergessen?",
+    "loginBtn": "Anmelden",
+    "noAccount": "Noch kein Konto?",
+    "name": "Name",
+    "namePlaceholder": "Dein Name",
+    "passwordMin": "Mind. 6 Zeichen",
+    "confirmPassword": "Passwort bestätigen",
+    "confirmPasswordPlaceholder": "Passwort wiederholen",
+    "passwordMismatch": "Passwörter stimmen nicht überein",
+    "createAccount": "Konto erstellen",
+    "hasAccount": "Hast du bereits ein Konto?",
+    "verifyCode": "Bestätigungscode",
+    "devMode": "Entwicklungsmodus — Code:",
+    "devToken": "Entwicklungsmodus — Reset-Token:",
+    "openReset": "Reset-Seite öffnen →",
+    "verifyBtn": "Konto bestätigen",
+    "noCodeReceived": "Code nicht erhalten?",
+    "resend": "Erneut senden",
+    "devCodeLabel": "Entwicklungscode:",
+    "forgotEmailLabel": "E-Mail deines Kontos",
+    "sendResetLink": "Reset-Link senden",
+    "backToLoginBtn": "Zurück zur Anmeldung",
+    "errors": {
+      "googleError": "Fehler mit Google. Bitte erneut versuchen.",
+      "networkError": "Netzwerkfehler. Bitte erneut versuchen.",
+      "loginError": "Anmeldefehler",
+      "registerError": "Registrierungsfehler",
+      "invalidCode": "Ungültiger Code",
+      "enterCode": "Gib den 6-stelligen Code ein",
+      "passwordsNoMatch": "Passwörter stimmen nicht überein",
+      "missingData": "Fehlende Daten"
+    }
+  },
+  "growth": {
+    "badge": "Persönliches Wachstum",
+    "title": "Die Bibliothek deiner",
+    "titleHighlight": "Entwicklung",
+    "subtitle": "Artikel, Leitfäden und praktische Übungen zu Gewohnheiten, Mindset, Motivation und beruflichem Wachstum. Kuratierte Inhalte für alle, die mit Absicht besser werden wollen.",
+    "stats": {
+      "articles": "Artikel",
+      "areas": "Themenbereiche",
+      "updated": "Kontinuierlich aktualisiert"
+    },
+    "forYou": "Für dich",
+    "forYouSubtitle": "Ausgewählt basierend auf deinem Profil",
+    "yourProfile": "Dein Profil",
+    "unlockContent": "Inhalte für dich freischalten",
+    "unlockDesc": "Mach den RIASEC-Test, um Wachstumsartikel zu erhalten, die auf dein Persönlichkeitsprofil abgestimmt sind.",
+    "takeTest": "Test machen",
+    "personalizedContent": "Personalisierte Inhalte für dein Profil",
+    "personalizedDesc": "Melde dich an oder registriere dich, um Artikel zu erhalten, die nach deinem RIASEC-Persönlichkeitstyp ausgewählt wurden.",
+    "login": "Anmelden",
+    "signup": "Registrieren",
+    "exploreByArea": "Nach Bereich erkunden",
+    "exploreByAreaDesc": "Wähle das Thema, an dem du jetzt arbeiten möchtest.",
+    "latestArticles": "Neueste Artikel",
+    "latestArticlesDesc": "Die zuletzt hinzugefügten Inhalte.",
+    "seeAll": "Alle anzeigen",
+    "ctaTitle": "Weißt du nicht, wo du anfangen sollst?",
+    "ctaDesc": "Mach den RIASEC + Fünf Geister Test: sich selbst zu kennen ist immer der erste Schritt.",
+    "startJourney": "Reise beginnen",
+    "recommended": "Für dich",
+    "article": "Artikel",
+    "articles": "Artikel",
+    "difficulty": {
+      "base": "Einsteiger",
+      "intermedio": "Mittel",
+      "avanzato": "Fortgeschritten"
+    },
+    "backToGrowth": "← Zurück zu Persönliches Wachstum",
+    "inThisArea": "Artikel in diesem Bereich",
+    "searchArticles": "Artikel suchen…",
+    "all": "Alle",
+    "noArticles": "Keine Artikel gefunden",
+    "noArticlesHint": "Versuche, die Filter zu ändern",
+    "tags": "Tags",
+    "otherAreas": "Andere Bereiche",
+    "readArticle": "Lesen",
+    "saveArticle": "Artikel speichern",
+    "savedArticle": "Artikel gespeichert",
+    "loginToSave": "Zum Speichern anmelden",
+    "updatedOn": "Aktualisiert am",
+    "details": "Details",
+    "category": "Kategorie",
+    "level": "Niveau",
+    "readTime": "Lesezeit",
+    "relatedArticles": "Auch lesen",
+    "allArticles": "Alle Artikel",
+    "saveThisArticle": "Diesen Artikel speichern",
+    "saveDesc": "Melde dich an, um Inhalte zu speichern und in deinem Profil wiederzufinden.",
+    "startJourney2": "Reise beginnen",
+    "discoverProfile": "Profil entdecken",
+    "discoverProfileDesc": "Mach den RIASEC-Test, um die richtige Richtung zu finden.",
+    "doTest": "Test machen",
+    "reads": "Aufrufe"
+  },
+  "news": {
+    "title": "Nachrichten aus der Arbeitswelt",
+    "badge": "Aktuelles aus der Arbeitswelt",
+    "subtitle": "Aktuelle Nachrichten aus den relevanten Berufsfeldern.",
+    "allNews": "Alle Nachrichten",
+    "savedNews": "Gespeichert",
+    "personalizedNews": "Für dich",
+    "savedEmpty": "Keine gespeicherten Nachrichten",
+    "savedEmptyDesc": "Speichere die Nachrichten, die dich interessieren, um sie hier wiederzufinden.",
+    "browseNews": "Nachrichten durchsuchen",
+    "personalizedEmpty": "Keine personalisierten Nachrichten",
+    "personalizedEmptyDesc": "Mach den Test, um Nachrichten basierend auf deinem Profil zu erhalten.",
+    "takeTest": "Test machen",
+    "loading": "Nachrichten laden…",
+    "errorLoad": "Fehler beim Laden der Nachrichten",
+    "loadError": "Nachrichten können gerade nicht geladen werden.",
+    "retry": "Erneut versuchen",
+    "noResults": "Keine Nachrichten gefunden",
+    "noResultsHint": "Versuche, die Filter oder Kategorie zu ändern.",
+    "sectorNewsTitle": "Nachrichten für dein Berufsfeld",
+    "sectorNewsDesc": "Aktuelles zu {{name}} — Trends, Chancen und Innovationen",
+    "yourSector": "Dein Berufsfeld",
+    "removeFromSaved": "Aus Gespeicherten entfernen",
+    "saveArticle": "Artikel speichern",
+    "sourceLabel": {
+      "live": "Echtzeit-aktualisierte Nachrichten",
+      "static": "Ausgewählter redaktioneller Inhalt"
+    },
+    "bookmarkHint": "Nutze das Lesezeichen 🔖 um Artikel in deinem Profil zu speichern",
+    "upgrade": {
+      "sectionTitle": "Nachrichten für dein Berufsfeld",
+      "title": "Berufsfeld-Nachrichten freischalten",
+      "desc": "Schließe den Test ab und bestätige dein Berufsfeld, um gezielte Nachrichten zu erhalten: Trends, Stellenangebote, Unternehmen und Zertifizierungen.",
+      "discoverPremium": "Premium entdecken",
+      "takeTest": "Test machen"
+    },
+    "categories": {
+      "general": "Überblick",
+      "technology": "Technologie",
+      "business": "Wirtschaft",
+      "science": "Wissenschaft",
+      "health": "Gesundheit",
+      "finance": "Finanzen",
+      "education": "Bildung"
+    },
+    "timeAgo": {
+      "lessThan1h": "vor weniger als 1 Stunde",
+      "1h": "vor 1 Stunde",
+      "hours": "vor {{h}} Stunden",
+      "yesterday": "gestern",
+      "days": "vor {{d}} Tagen"
+    },
+    "read": "Lesen",
+    "save": "Speichern",
+    "saved": "Gespeichert"
+  },
+  "profilo": {
+    "title": "Dein Profil",
+    "notLoggedIn": "Melde dich an, um dein Profil zu sehen.",
+    "accountInfo": "Kontoinformationen",
+    "name": "Name",
+    "email": "E-Mail",
+    "memberSince": "Mitglied seit",
+    "emailVerified": "E-Mail verifiziert",
+    "emailNotVerified": "E-Mail nicht verifiziert",
+    "changePassword": "Passwort ändern",
+    "currentPassword": "Aktuelles Passwort",
+    "newPassword": "Neues Passwort",
+    "confirmNewPassword": "Neues Passwort bestätigen",
+    "passwordUpdated": "Passwort erfolgreich aktualisiert",
+    "savePassword": "Passwort aktualisieren",
+    "privacy": "Profil-Sichtbarkeit",
+    "publicProfile": "Öffentliches Profil",
+    "privateProfile": "Privates Profil",
+    "publicDesc": "Andere Benutzer können dein Profil sehen.",
+    "privateDesc": "Dein Profil ist nur für dich sichtbar.",
+    "workMode": "Arbeitspräferenz",
+    "workModeDesc": "Wie arbeitest du am liebsten? Das beeinflusst die Empfehlungen.",
+    "favorites": "Favoriten",
+    "savedSectors": "Gespeicherte Branchen",
+    "savedNews": "Gespeicherte Nachrichten",
+    "noSavedSectors": "Keine gespeicherten Branchen",
+    "noSavedNews": "Keine gespeicherten Nachrichten",
+    "remove": "Entfernen",
+    "upcomingEvents": "Bevorstehende Ereignisse"
+  },
+  "register": {
+    "title": "Die Reise beginnt jetzt.",
+    "subtitle": "Registriere dich, um die Ergebnisse deines Tests zu speichern und eine personalisierte Roadmap zu erhalten.",
+    "benefits": {
+      "riasec": "Detaillierte Analyse deines RIASEC-Profils",
+      "stepByStep": "Schritt-für-Schritt-Leitfäden für die bestätigte Branche",
+      "track": "Verfolge dein Wachstum im Laufe der Zeit"
+    },
+    "formTitle": "Konto erstellen",
+    "formSubtitle": "Kostenlos, keine Karte erforderlich.",
+    "name": "Name",
+    "email": "E-Mail",
+    "createAccount": "Konto erstellen",
+    "registering": "Registrierung…",
+    "successTitle": "Willkommen an Bord, {{name}}!",
+    "successDesc": "Dein Profil wurde erfolgreich gespeichert. Wir haben dir eine E-Mail mit der detaillierten Roadmap für die von dir gewählte Branche gesendet.",
+    "backHome": "Zurück zur Startseite",
+    "errors": {
+      "missingData": "Fehlende Daten",
+      "missingDataDesc": "Gib deinen Namen und deine E-Mail ein, um fortzufahren.",
+      "registerError": "Registrierungsfehler",
+      "registerErrorDesc": "Bei der Registrierung ist ein Fehler aufgetreten. Bitte erneut versuchen."
+    }
+  },
+  "notFound": {
+    "title": "Seite nicht gefunden",
+    "subtitle": "Die Seite, die du suchst, existiert nicht oder wurde verschoben.",
+    "goHome": "Zurück zur Startseite"
+  },
+  "chiSiamo": {
+    "title": "Über uns",
+    "subtitle": "Ein digitaler Kompass für deine berufliche Zukunft",
+    "badge": "Unsere Geschichte",
+    "missionTitle": "Unsere Mission",
+    "missionDesc": "Berufliche Orientierung zugänglich, wissenschaftlich und zutiefst menschlich zu machen.",
+    "valuesTitle": "Unsere Werte",
+    "ourValues": "Unsere Werte",
+    "methodTitle": "Unsere Methode",
+    "ourMethod": "Unsere Methode",
+    "teamTitle": "Das Team",
+    "whatWeDo": "Was wir tun",
+    "whatWeDoCombines": "NorthStar kombiniert Persönlichkeitstests, Analyse von Berufsfeldern, aktuelle Nachrichten und persönliche Organisationstools in einem klaren, nützlichen und einfach zu bedienenden Raum.",
+    "whyWeExist": "Warum wir existieren",
+    "whyWeExistP1": "Millionen Menschen wählen jedes Jahr Studium oder Arbeit, ohne die Werkzeuge zu haben, um zu verstehen, ob diese Richtung wirklich zu ihnen passt.",
+    "whyWeExistP2": "Das Ergebnis ist Desorientierung, Unzufriedenheit und Wege, die sich ständig ändern, ohne einen klaren Kompass.",
+    "whyWeExistP3": "Unsere Mission ist es, diese Desorientierung in Klarheit umzuwandeln — indem wir konkrete Werkzeuge anbieten, um sich zwischen Möglichkeiten, Studium, Berufen und Karrierepfaden zu orientieren.",
+    "whoWeServe": "An wen wir uns richten",
+    "whoWeServeIntro": "NorthStar ist für alle gedacht, die sich an einem Scheideweg in ihrem beruflichen oder bildungsbezogenen Leben befinden:",
+    "values": [
+      {
+        "title": "Klarheit",
+        "desc": "Wir verwandeln Desorientierung in konkrete Richtung, ohne leere Versprechen."
+      },
+      {
+        "title": "Empathie",
+        "desc": "Jeder Mensch hat einen einzigartigen Weg: Wir respektieren und begleiten ihn."
+      },
+      {
+        "title": "Bewusstsein",
+        "desc": "Die besten Entscheidungen entstehen aus Selbsterkenntnis, nicht aus Zufall."
+      },
+      {
+        "title": "Echte Daten",
+        "desc": "Wir verwenden aktuelle Daten zu Branchen, Gehältern und Wachstum, um dich auf dem Markt zu orientieren."
+      },
+      {
+        "title": "Lernen",
+        "desc": "Wachstum ist kontinuierlich: Wir bieten Inhalte zum Lernen und zur ständigen Aktualisierung."
+      },
+      {
+        "title": "Innovation",
+        "desc": "Wir kombinieren Psychologie, KI und Marktdaten für die Zukunft der Orientierung."
+      }
+    ],
+    "methodSteps": [
+      {
+        "title": "RIASEC-Test + Fünf Geister",
+        "desc": "Entdecke dein externes Profil (Kompetenzen und Interessen) und inneres Profil (Energie, Vision, Instinkt) durch 17 Fragen."
+      },
+      {
+        "title": "Branchen-Matching",
+        "desc": "Das System gleicht dein Profil mit 21 Berufsfeldern ab und berechnet einen Kompatibilitätsscore basierend auf echten Daten."
+      },
+      {
+        "title": "Erkunde in der Tiefe",
+        "desc": "Jede Branche enthält Daten zu Gehalt, Wachstum, Automatisierungsrisiko, Schlüsselkompetenzen, Roadmap und Wissensgraph."
+      },
+      {
+        "title": "Baue deinen Weg",
+        "desc": "Speichere Präferenzen, verfolge Branchennews, setze Karriereziele und verfolge Fortschritte im Laufe der Zeit."
+      }
+    ],
+    "whatWeDoFeatures": [
+      {
+        "label": "RIASEC-Test + Fünf Geister",
+        "desc": "Verstehe deine Persönlichkeit in zwei Dimensionen: Interessen und tiefe Identität."
+      },
+      {
+        "label": "21 Berufsfelder",
+        "desc": "Jede Branche mit echten Daten zu Gehalt, Wachstum, Automatisierung und Kompetenzen."
+      },
+      {
+        "label": "Branchennews",
+        "desc": "Aktuelle Inhalte, filterbar nach den Branchen, die dich interessieren."
+      },
+      {
+        "label": "Roadmap und Wissensgraph",
+        "desc": "Visualisiere Kompetenzen, Rollen und Wege jeder Branche interaktiv."
+      }
+    ],
+    "whoWeServeItems": [
+      "Oberstufenschüler, die eine Universität wählen müssen",
+      "Studenten, die verstehen wollen, in welche Branche sie eintreten sollen",
+      "Arbeitnehmer, die einen Karrierewechsel erwägen",
+      "Menschen, die nach einer Pause ins Berufsleben zurückkehren",
+      "Menschen, die ihre Neigungen und Stärken besser verstehen wollen"
+    ],
+    "ctaTitle": "Bereit, deine Richtung zu finden?",
+    "ctaDesc": "Mach den kostenlosen Test in weniger als 10 Minuten und entdecke die Bereiche, die am besten zu deiner Persönlichkeit passen.",
+    "explorePremium": "Premium erkunden",
+    "readNews": "Nachrichten lesen",
+    "startFree": "Kostenlosen Test starten"
+  },
+  "comeFunziona": {
+    "title": "Wie NorthStar funktioniert",
+    "subtitle": "Drei Schritte, um deine berufliche Richtung mit echten Daten und validierten psychologischen Tools zu finden.",
+    "badge": "Die NorthStar-Methode",
+    "heroTitle": "Wie es funktioniert",
+    "heroSubtitle": "Ein dreistufiger Ansatz, der wissenschaftliche Psychologie, echte Marktdaten und einen inneren Kompass kombiniert, um dir zu helfen, bewusst zu wählen.",
+    "startTest": "Kostenlosen Test starten",
+    "stepsTitle": "Die Reise in drei Schritten",
+    "stepsSubtitle": "Jeder Schritt ist darauf ausgelegt, dir progressive Klarheit zu geben, ohne Leistungsangst.",
+    "steps": [
+      {
+        "title": "Mach den Test",
+        "subtitle": "12 Fragen, weniger als 3 Minuten",
+        "description": "Der NorthStar-Test kombiniert das RIASEC-Modell — wissenschaftlich validiert durch über 60 Jahre Forschung — mit dem Inneren Kompass der Fünf Geister. Es gibt keine richtigen oder falschen Antworten: Das System misst deine natürlichen Neigungen, nicht dein Wissen.",
+        "detail": "Die Fragen decken 6 Dimensionen der Berufspersönlichkeit ab (Realistisch, Investigativ, Künstlerisch, Sozial, Unternehmerisch, Konventionell) und 5 innere Qualitäten (Präsenz, Vision, Instinkt, Fokus, Ausdauer)."
+      },
+      {
+        "title": "Entdecke dein Profil",
+        "subtitle": "Deine berufliche DNA",
+        "description": "Das System verarbeitet deine Antworten und generiert ein einzigartiges RIASEC-Profil — eine Buchstabenkombination, die deine dominanten Fähigkeiten beschreibt — und eine Innere-Kompass-Karte mit deinen fünf ausgewogenen Geistern.",
+        "detail": "Das RIASEC-Profil wird von Universitäten, Fortune-500-Unternehmen und Arbeitsvermittlungen weltweit verwendet. Der Innere Kompass ist ein originales NorthStar-Modell."
+      },
+      {
+        "title": "Erkunde deine Branchen",
+        "subtitle": "3 personalisierte Empfehlungen mit echten Daten",
+        "description": "Der Algorithmus gleicht dein Profil mit Daten aus 21 Berufsfeldern ab: Gehälter, Marktwachstum, KI-Automatisierungsrisiko und Trends. Du erhältst 3 Branchen, in denen dein natürliches Talent auf eine echte Chance trifft.",
+        "detail": "Du kannst jede Branche vertiefen, sie vergleichen, deine Wahl bestätigen und auf Premium-Funktionen (Wiki, Roadmap, Wissensgraph) zugreifen, um deinen konkreten Weg zu planen."
+      }
+    ],
+    "riasec": [
+      {
+        "name": "Realistisch",
+        "desc": "Arbeitet gerne mit den Händen, Werkzeugen, Maschinen. Konkret, praktisch, handlungsorientiert."
+      },
+      {
+        "name": "Investigativ",
+        "desc": "Neugierig, analytisch, intellektuell. Liebt es, komplexe Probleme zu lösen und zu forschen."
+      },
+      {
+        "name": "Künstlerisch",
+        "desc": "Kreativ, ausdrucksstark, originell. Bevorzugt unstrukturierte Umgebungen und Ausdrucksfreiheit."
+      },
+      {
+        "name": "Sozial",
+        "desc": "Empathisch, kollaborativ, menschenorientiert. Findet Sinn darin, anderen zu helfen."
+      },
+      {
+        "name": "Unternehmerisch",
+        "desc": "Natürliche Führungsperson, überzeugend, ehrgeizig. Liebt es, zu führen, zu verkaufen, Projekte zu managen."
+      },
+      {
+        "name": "Konventionell",
+        "desc": "Organisiert, präzise, zuverlässig. Glänzt in strukturierten Umgebungen mit klaren Regeln."
+      }
+    ],
+    "spirits": [
+      {
+        "key": "Präsenz",
+        "desc": "Bewusstsein des Moments, Fähigkeit, in Arbeitssituationen vollständig präsent zu sein."
+      },
+      {
+        "key": "Vision",
+        "desc": "Fähigkeit, die Zukunft zu sehen, langfristig zu planen und Richtung zu geben."
+      },
+      {
+        "key": "Instinkt",
+        "desc": "Intuitive Energie, Entscheidungsschnelligkeit, Vertrauen in die eigenen Empfindungen."
+      },
+      {
+        "key": "Fokus",
+        "desc": "Tiefe Konzentration, genaue Analyse, Fähigkeit, ins Detail zu gehen."
+      },
+      {
+        "key": "Ausdauer",
+        "desc": "Wille, Resilienz, Entschlossenheit beim Verfolgen von Zielen auch unter Druck."
+      }
+    ],
+    "faq": [
+      {
+        "q": "Ist der Test kostenlos?",
+        "a": "Ja, der RIASEC + Innerer Kompass Test und die 3 Branchenempfehlungen sind völlig kostenlos. Es ist keine Registrierung erforderlich, um den Test abzuschließen."
+      },
+      {
+        "q": "Wie lange dauert es, den Test abzuschließen?",
+        "a": "Der vollständige Test dauert ca. 3-5 Minuten. Du kannst in deinem eigenen Tempo ohne Druck antworten."
+      },
+      {
+        "q": "Ist das RIASEC-Modell wissenschaftlich validiert?",
+        "a": "Ja. Das RIASEC-Modell wurde vom Psychologen John L. Holland in den 1950er Jahren entwickelt und ist eines der am meisten untersuchten und validierten Berufsorientiérungsmodelle der Welt."
+      },
+      {
+        "q": "Was sind die Fünf Geister?",
+        "a": "Der Innere Kompass der Fünf Geister ist ein originales NorthStar-Modell, das fünf grundlegende innere Qualitäten bei der Arbeit misst: Präsenz, Vision, Instinkt, Fokus und Ausdauer."
+      },
+      {
+        "q": "Sind meine Daten sicher?",
+        "a": "Absolut ja. Deine Testantworten sind standardmäßig anonym. Deine Daten werden niemals an Dritte verkauft."
+      },
+      {
+        "q": "Kann ich den Test mehrmals machen?",
+        "a": "Ja. Du kannst den Test jederzeit wiederholen. Menschen verändern sich im Laufe der Zeit und deine Neigungen können sich mit der Erfahrung weiterentwickeln."
+      },
+      {
+        "q": "Sind die Gehalts- und Wachstumsdaten aktuell?",
+        "a": "Die Marktdaten basieren auf jährlich aktualisierten Quellen. Die Gehaltsspannen stellen den typischen Bereich für Junior/Mid/Senior-Rollen dar."
+      }
+    ],
+    "privacyBadge": "Deine Daten sind sicher",
+    "privacyTitle": "Datenschutz und volle Kontrolle",
+    "privacyPoints": [
+      "Der Test ist standardmäßig anonym — keine Registrierung erforderlich",
+      "Deine Daten werden niemals an Dritte verkauft",
+      "Du kannst dein Konto und alle Daten jederzeit löschen",
+      "Testantworten werden nicht zum Training von KI-Modellen verwendet",
+      "Sichere HTTPS-Verbindung auf allen Geräten"
+    ],
+    "faqBadge": "Häufig gestellte Fragen",
+    "faqTitle": "Hast du noch Zweifel?",
+    "pageTitle": "Wie NorthStar funktioniert | Methode der Berufsorientierung",
+    "pageDesc": "Entdecke, wie NorthStar funktioniert: das RIASEC-Modell, der Innere Kompass der Fünf Geister, Marktdaten und häufig gestellte Fragen zu unserer Methode der Berufsorientierung.",
+    "ctaTitle": "Bereit, deinen Kompass zu entdecken?",
+    "ctaDesc": "Weniger als 5 Minuten. Keine Registrierung erforderlich. Null falsche Antworten.",
+    "startFree": "Kostenlosen Test starten — es ist gratis"
+  },
+  "contatti": {
+    "title": "Kontaktiere uns",
+    "subtitle": "Hast du Fragen, Feedback oder brauchst Hilfe? Schreib uns und wir antworten innerhalb von 24 Arbeitsstunden.",
+    "badge": "Wir sind für dich da",
+    "formTitle": "Nachricht senden",
+    "sendMessage": "Schick uns eine Nachricht",
+    "name": "Name",
+    "email": "E-Mail",
+    "message": "Nachricht",
+    "messagePlaceholder": "Beschreibe deine Anfrage im Detail…",
+    "subjectLabel": "Betreff",
+    "subjects": [
+      {
+        "value": "info",
+        "label": "Allgemeine Informationen"
+      },
+      {
+        "value": "supporto",
+        "label": "Technischer Support"
+      },
+      {
+        "value": "premium",
+        "label": "Pläne und Zahlungen"
+      },
+      {
+        "value": "privacy",
+        "label": "Datenschutz und persönliche Daten"
+      },
+      {
+        "value": "feedback",
+        "label": "Feedback und Vorschläge"
+      },
+      {
+        "value": "altro",
+        "label": "Sonstiges"
+      }
+    ],
+    "faq": [
+      {
+        "q": "Ist der Test wirklich kostenlos?",
+        "a": "Ja, der RIASEC + Fünf Geister Test ist völlig kostenlos. Du kannst ihn ohne Registrierung abschließen und sofort grundlegende Ergebnisse sehen."
+      },
+      {
+        "q": "Was beinhaltet der Premium-Plan?",
+        "a": "Premium schaltet KI-Wiki pro Branche, personalisierte Karriere-Roadmap, interaktiven Wissensgraph mit KI-Chat und unbegrenzte Karriereziele frei."
+      },
+      {
+        "q": "Kann ich mein Konto löschen?",
+        "a": "Ja. Du kannst die Löschung deines Kontos und aller zugehörigen Daten durch eine E-Mail an privacy@northstar.app beantragen."
+      },
+      {
+        "q": "Sind meine Daten sicher?",
+        "a": "Absolut ja. Daten sind verschlüsselt, werden nicht an Dritte verkauft und die Verarbeitung erfolgt gemäß der DSGVO. Lies unsere Datenschutzrichtlinie für alle Details."
+      }
+    ],
+    "send": "Senden",
+    "submit": "Nachricht senden",
+    "sending": "Wird gesendet…",
+    "sent": "Nachricht gesendet!",
+    "sentDesc": "Danke, dass du uns geschrieben hast. Wir antworten an die angegebene E-Mail-Adresse innerhalb von 24 Arbeitsstunden.",
+    "sendAnother": "Eine weitere Nachricht senden",
+    "contactInfo": "Kontaktinformationen",
+    "generalEmail": "Allgemeine E-Mail",
+    "privacyEmail": "Datenschutz und Daten",
+    "pageTitle": "Kontakt — NorthStar",
+    "pageDesc": "Kontaktiere das NorthStar-Team für Support, Informationen zu Premium-Plänen, Feedback oder Datenschutzfragen. Wir antworten innerhalb von 24 Stunden.",
+    "successTitle": "Nachricht gesendet!",
+    "successDesc": "Wir werden so bald wie möglich antworten."
+  },
+  "privacy": {
+    "title": "Datenschutzrichtlinie",
+    "lastUpdated": "Zuletzt aktualisiert",
+    "badge": "Transparenz und Datenschutz",
+    "intro": "Diese Richtlinie beschreibt, wie NorthStar die personenbezogenen Daten der Benutzer erhebt, verwendet und schutzt.",
+    "toc": "Inhaltsverzeichnis",
+    "ctaTitle": "Fragen zum Datenschutz?",
+    "ctaDesc": "Wir stehen fur jede Klarung zur Verarbeitung Ihrer personenbezogenen Daten zur Verfugung.",
+    "ctaBtn": "Kontakt aufnehmen",
+    "ctaLink": "Nutzungsbedingungen lesen",
+    "legalNote": "Rechtlicher Hinweis",
+    "legalNoteText": "Diese Richtlinie ist ein operativer Entwurf. Eine Validierung durch einen Rechtsanwalt wird vor der endgultigen Veroffentlichung empfohlen.",
+    "s1Title": "Verantwortliche Stelle",
+    "s1P1": "Die verantwortliche Stelle fur die Verarbeitung personenbezogener Daten ist NorthStar, erreichbar unter der dedizierten Datenschutz-E-Mail-Adresse.",
+    "s1P2": "Fur alle Anfragen zur Datenverarbeitung kontaktieren Sie uns unter:",
+    "s2Title": "Arten der erhobenen Daten",
+    "s2Intro": "NorthStar erhebt ausschliesslich fur den Betrieb des Dienstes notwendige Daten:",
+    "s2Items": [
+      "Registrierungsdaten: Name, E-Mail-Adresse, verschlusseltes Passwort.",
+      "Antworten auf Orientierungstests (RIASEC und Funf Geister) und Ergebnisse.",
+      "Gespeicherte Praferenzen: Lieblingssektoren, gespeicherte Artikel, Karriereziele.",
+      "Technische und Nutzungsdaten: IP-Adresse, Browsertyp, besuchte Seiten, Datum und Uhrzeit des Zugriffs.",
+      "Zahlungsdaten: sicher von Stripe verwaltet; NorthStar speichert keine Kartendaten."
+    ],
+    "s3Title": "Zwecke und Rechtsgrundlagen",
+    "s3Intro": "Wir verarbeiten Ihre Daten fur folgende Zwecke:",
+    "s3Bases": [
+      {
+        "base": "Vertragserfüllung",
+        "desc": "Erbringung des Dienstes, Kontoverwaltung, Speichern von Ergebnissen und Praferenzen."
+      },
+      {
+        "base": "Berechtigte Interessen",
+        "desc": "Verbesserung der Plattform, IT-Sicherheit, Betrugspravention."
+      },
+      {
+        "base": "Einwilligung",
+        "desc": "Versand von Marketingmitteilungen und Newslettern, wenn vom Benutzer ausdruck lich genehmigt."
+      },
+      {
+        "base": "Rechtliche Verpflichtung",
+        "desc": "Aufbewahrung von Buchhaltungs- und Steuerdaten gemas gesetzlicher Anforderungen."
+      }
+    ],
+    "s4Title": "Cookies und ahnliche Technologien",
+    "s4P1": "NorthStar verwendet technische Cookies, die fur den Betrieb der Plattform notwendig sind. Wir verwenden keine Profilierungscookies von Drittanbietern.",
+    "s4P2": "Technische Cookies erfordern keine Einwilligung. Sie konnen die Cookie-Einstellungen jederzeit uber Ihren Browser verwalten.",
+    "s4BoxTitle": "Verwendete Cookies",
+    "s4BoxText": "Sitzungscookies (Authentifizierung), UI-Praferenz-Cookies (Thema, Sprache). Keine Tracking- oder Marketing-Cookies von Drittanbietern.",
+    "s5Title": "Speichermethoden und -dauer",
+    "s5Intro": "Personenbezogene Daten werden mit angemessenen Sicherheitsmassnahmen verarbeitet und fur die notwendige Zeit aufbewahrt:",
+    "s5Items": [
+      "Kontodaten: bis zur Loschung des Kontos durch den Benutzer.",
+      "Testergebnisse: fur die gesamte Kontolaufzeit aufbewahrt, auf Anfrage geloscht.",
+      "Zahlungsdaten: gemas Stripes Richtlinien und geltenden Steuerverpflichtungen.",
+      "Technische Protokolle: maximal 90 Tage aufbewahrt."
+    ],
+    "s6Title": "Datenempfanger",
+    "s6Intro": "Personenbezogene Daten konnen nur in folgenden Fallen an Dritte weitergegeben werden:",
+    "s6Items": [
+      "Technische Dienstleister (Hosting, Datenbank, CDN), die durch Vertraulichkeitsvereinbarungen gebunden sind.",
+      "Stripe zur sicheren Zahlungsabwicklung.",
+      "Zustandige Behorden, sofern gesetzlich vorgeschrieben."
+    ],
+    "s6Footer": "Daten werden nicht fur kommerzielle Zwecke verkauft oder an Dritte weitergegeben.",
+    "s7Title": "Benutzerrechte",
+    "s7Intro": "Gemas DSGVO (EU-Verordnung 2016/679) haben Sie das Recht auf:",
+    "s7Rights": [
+      {
+        "right": "Auskunft",
+        "desc": "Erhalt einer Kopie Ihrer personenbezogenen Daten."
+      },
+      {
+        "right": "Berichtigung",
+        "desc": "Korrektur unrichtiger oder unvollstandiger Daten."
+      },
+      {
+        "right": "Loschung",
+        "desc": "Antrag auf Loschung Ihrer Daten."
+      },
+      {
+        "right": "Einschränkung",
+        "desc": "Einschränkung der Verarbeitung unter bestimmten Umstanden."
+      },
+      {
+        "right": "Datenubertagbarkeit",
+        "desc": "Erhalt von Daten in einem strukturierten, lesbaren Format."
+      },
+      {
+        "right": "Widerspruch",
+        "desc": "Widerspruch gegen die auf berechtigten Interessen oder Marketing gestutzte Verarbeitung."
+      }
+    ],
+    "s7Footer": "Um Ihre Rechte auszuuben, schreiben Sie an privacy@northstar.app. Sie haben auch das Recht, eine Beschwerde bei der Datenschutzbehorde einzureichen.",
+    "s8Title": "Aktualisierungen der Richtlinie",
+    "s8P1": "Diese Datenschutzrichtlinie kann periodisch aktualisiert werden, um regulatorische oder dienstliche Anderungen widerzuspiegeln.",
+    "s8P2": "Die aktualisierte Version ist immer auf dieser Seite mit dem Datum der letzten Aktualisierung verfugbar."
+  },
+  "terms": {
+    "title": "Nutzungsbedingungen",
+    "lastUpdated": "Zuletzt aktualisiert",
+    "badge": "Bedingungen zur Nutzung des Dienstes",
+    "intro": "Durch den Zugang zu oder die Nutzung von NorthStar akzeptiert der Benutzer vollstandig diese Nutzungsbedingungen.",
+    "toc": "Inhaltsverzeichnis",
+    "ctaTitle": "Fragen zu den Bedingungen?",
+    "ctaDesc": "Wir sind hier, um alle Fragen zur Nutzung der Plattform zu beantworten.",
+    "ctaBtn": "Kontakt aufnehmen",
+    "ctaLink": "Datenschutzrichtlinie lesen",
+    "legalNote": "Rechtlicher Hinweis",
+    "legalNoteText": "Diese Bedingungen stellen einen operativen Entwurf dar. Eine Validierung durch einen Rechtsanwalt wird empfohlen.",
+    "s1Title": "Leistungsbeschreibung",
+    "s1P1": "NorthStar ist eine SaaS-Plattform fur Orientierung und personliche Entwicklung.",
+    "s1P2": "Die von der Plattform bereitgestellten Informationen dienen ausschliesslich Informationszwecken. Bei wichtigen Entscheidungen wird die Konsultation qualifizierter Fachleute empfohlen.",
+    "s2Title": "Konto und Registrierung",
+    "s2Intro": "Fur den Zugang zu reservierten Funktionen ist die Erstellung eines Kontos erforderlich. Der Benutzer ist verantwortlich fur:",
+    "s2Items": [
+      "Vertraulichkeit der Anmeldedaten und Nichtweiterga be an Dritte.",
+      "Bereitstellung genauer und aktueller Informationen bei der Registrierung.",
+      "Sofortige Benachrichtigung von NorthStar bei unbefugtem Zugang zum Konto.",
+      "Einhaltung dieser Nutzungsbedingungen bei der Plattformnutzung."
+    ],
+    "s2Footer": "NorthStar behallt sich das Recht vor, Konten zu sperren oder zu loschen, die gegen diese Bedingungen verstossen.",
+    "s3Title": "Free- und Premium-Plane",
+    "s3FreePlan": "Free-Plan",
+    "s3PremiumPlan": "Premium-Plan",
+    "s3FreeItems": [
+      "RIASEC + Funf Geister Test",
+      "Grundlegende Ergebnisse und Personlichkeitsprofil",
+      "Zugang zu 21 Berufssektoren",
+      "Allgemeine und sektorspezifische News",
+      "Bis zu 5 Karriereziele",
+      "Grundlegende Praferenzspeicherung"
+    ],
+    "s3PremiumItems": [
+      "Alles aus dem Free-Plan",
+      "KI-Wiki fur jeden Sektor",
+      "Personalisierte Karriere-Roadmap",
+      "Interaktiver Wissensgraph",
+      "RAG-Chat mit dem Graphen",
+      "Unbegrenzte Karriereziele",
+      "Exklusive Premium-Inhalte"
+    ],
+    "s4Title": "Zahlungen und Verlangerungen",
+    "s4Intro": "Der Premium-Plan ist mit monatlichem oder jahrlichem Abonnement erhaltlich. Zahlungen werden sicher von Stripe verarbeitet.",
+    "s4Items": [
+      {
+        "t": "Automatische Verlangerung",
+        "d": "Das Abonnement verlangert sich automatisch am Ende des gewahlten Zeitraums, sofern nicht ausdruck lich gekundigt."
+      },
+      {
+        "t": "Kundigung",
+        "d": "Der Benutzer kann das Abonnement jederzeit aus seinem Profil kundigen."
+      },
+      {
+        "t": "Ruckerstattungen",
+        "d": "Ruckerstattungen werden innerhalb von 14 Tagen nach dem Kauf einzelfallbezogen bewertet."
+      },
+      {
+        "t": "Preisanderungen",
+        "d": "NorthStar behallt sich das Recht vor, Preise mit einer Ankundigungsfrist von mindestens 30 Tagen zu andern."
+      }
+    ],
+    "s5Title": "Erlaubte und verbotene Nutzung",
+    "s5Intro": "NorthStar ist fur den personlichen und nicht-kommerziellen Gebrauch bestimmt. Ausdruck lich verboten ist:",
+    "s5Items": [
+      "Nutzung der Plattform fur illegale, betruge rische oder fur Dritte schadliche Aktivitaten.",
+      "Versuch des unbefugten Zugangs zu Systemen, Konten oder Daten anderer.",
+      "Scraping, Reverse Engineering oder systematisches Kopieren von Inhalten.",
+      "Verbreitung beleidigender, diskriminierender Inhalte oder solcher, die Rechte Dritter verletzen.",
+      "Verwendung automatisierter Tools (Bots, Crawler) ohne ausdruck liche Genehmigung.",
+      "Weiterverkauf oder Unterlizenzierung des Plattformzugangs an Dritte."
+    ],
+    "s6Title": "Geistiges Eigentum",
+    "s6P1": "Alle Inhalte auf NorthStar sind ausschliessliches Eigentum von NorthStar oder seinen Lizenzgebern.",
+    "s6P2": "Die personliche und nicht-kommerzielle Nutzung von Inhalten ist erlaubt. Jede kommerzielle Nutzung erfordert vorherige schriftliche Genehmigung.",
+    "s6P3": "Vom Benutzer eingegebene Daten verbleiben im Eigentum des Benutzers.",
+    "s7Title": "Haftungsbeschrankung",
+    "s7Intro": "NorthStar stellt die Plattform wie besehen bereit und bietet keine Garantien fur:",
+    "s7Items": [
+      "Unterbrechungsfreie Dienstverfugbarkeit.",
+      "Absolute Genauigkeit von Sektor-, Gehalts- und Arbeitsmarktdaten.",
+      "Eignung der Testergebnisse fur jede individuelle Situation."
+    ],
+    "s7Footer": "NorthStar ist nicht verantwortlich fur personliche, berufliche oder finanzielle Entscheidungen, die auf Basis der Plattforminhalte getroffen werden.",
+    "s8Title": "Anwendbares Recht und Gerichtsstand",
+    "s8P1": "Diese Bedingungen unterliegen italienischem Recht. Fur Streitigkeiten ist das Gericht am Wohnort des Verbrauchers zustandig.",
+    "s8P2": "Vor rechtlichen Schritten ermutigt NorthStar Benutzer, unser Support-Team fur eine gutliche Einigung zu kontaktieren."
+  },
+  "sitemap": {
+    "title": "Sitemap",
+    "subtitle": "Alle NorthStar-Seiten an einem Ort.",
+    "nav": "Vollstandige Navigation",
+    "desc": "Alle NorthStar-Seiten an einem Ort.",
+    "pagesTotal": "{{count}} Seiten insgesamt",
+    "downloadXml": "Sitemap.xml herunterladen",
+    "pages": "Seiten",
+    "ctaTitle": "Wissen Sie nicht, wo Sie anfangen sollen?",
+    "ctaDesc": "Der Test fuhrt Sie in 10 Minuten zu den Sektoren, die am besten zu Ihrer Personlichkeit passen.",
+    "startTest": "Kostenlosen Test starten",
+    "sectorDesc": "Uberblick, Daten und Match",
+    "wikiDesc": "KI-vertiefende Inhalte",
+    "roadmapDesc": "Schritt-fur-Schritt-Pfad",
+    "grafoDesc": "Interaktive KI-Visualisierung",
+    "groups": {
+      "main": "Hauptmenu",
+      "sectors": "Sektoren erkunden",
+      "brand": "Produkt & Marke",
+      "sectorPages": "Berufssektoren",
+      "wiki": "Wiki nach Sektor",
+      "roadmap": "Karriere-Roadmap",
+      "grafo": "Wissensgraph"
+    },
+    "items": {
+      "home": {
+        "label": "Startseite",
+        "desc": "Ihr Kompass fur die Zukunft"
+      },
+      "test": {
+        "label": "Der Test",
+        "desc": "RIASEC + Funf Geister Test (17 Fragen)"
+      },
+      "news": {
+        "label": "News",
+        "desc": "Aktualisierte Artikel nach Sektor"
+      },
+      "premium": {
+        "label": "Premium",
+        "desc": "Plane und erweiterte Funktionen"
+      },
+      "profilo": {
+        "label": "Mein Profil",
+        "desc": "Konto, Ziele und Testverlauf"
+      },
+      "settori": {
+        "label": "Alle Sektoren",
+        "desc": "Raster von 21 Sektoren mit RIASEC- und KI-Filtern"
+      },
+      "confronta": {
+        "label": "Sektoren vergleichen",
+        "desc": "Nebeneinander-Vergleich mit teilbarer URL"
+      },
+      "chiSiamo": {
+        "label": "Uber uns",
+        "desc": "NorthStars Mission, Methode und Werte"
+      },
+      "comeFunziona": {
+        "label": "Wie es funktioniert",
+        "desc": "RIASEC, Funf Geister, FAQ und Datenschutz"
+      },
+      "contatti": {
+        "label": "Kontakt",
+        "desc": "Schreiben Sie an das NorthStar-Team"
+      },
+      "sitemapPage": {
+        "label": "Sitemap",
+        "desc": "Ubersicht aller Seiten"
+      },
+      "privacy": {
+        "label": "Datenschutzrichtlinie",
+        "desc": "Verarbeitung personenbezogener Daten (DSGVO)"
+      },
+      "termini": {
+        "label": "Nutzungsbedingungen",
+        "desc": "Plattform-Nutzungsbedingungen"
+      }
+    }
+  },
+  "wiki": {
+    "title": "KI-Wiki",
+    "subtitle": "Stelle spezifische Fragen zu dieser Branche und erhalte personalisierte Antworten.",
+    "placeholder": "Z.B. Was sind die Gehälter für einen Junior in dieser Branche?",
+    "send": "Senden",
+    "premiumRequired": "Premium-Funktion",
+    "premiumDesc": "Greife auf Premium zu, um das KI-Wiki zu nutzen und personalisierte Antworten zu deiner Branche zu erhalten.",
+    "upgrade": "Auf Premium upgraden",
+    "accessRequired": "Zugang erforderlich",
+    "accessRequiredDesc": "Registriere dich kostenlos, um auf das personalisierte KI-Wiki zuzugreifen.",
+    "registerFree": "Kostenlos registrieren",
+    "expertOf": "Experte für {{name}}",
+    "chatDesc": "Stelle beliebige Fragen zu dieser Branche: Ausbildungswege, erforderliche Kompetenzen, Gehälter, Chancen und vieles mehr.",
+    "newChat": "Neuer Chat",
+    "askPlaceholder": "Frage etwas über {{name}}…",
+    "inputHint": "Enter zum Senden · Shift+Enter für neue Zeile",
+    "errorMessage": "Kommunikationsfehler. Bitte versuche es in einem Moment erneut.",
+    "suggestedQuestions": [
+      "Welche Kompetenzen sind derzeit am meisten gefragt?",
+      "Wie kann ich mich in diesem Bereich von der Konkurrenz abheben?",
+      "Welcher Ausbildungsweg wird für den Einstieg empfohlen?",
+      "Wie verändert sich diese Branche durch KI?",
+      "Welche Zertifizierungen erhöhen das Gehalt?",
+      "Wie bereite ich mich am besten auf ein Vorstellungsgespräch vor?"
+    ]
+  },
+  "roadmap": {
+    "title": "Roadmap",
+    "subtitle": "Dein schrittweiser Plan, um in die Branche einzusteigen.",
+    "generate": "Roadmap generieren",
+    "generating": "Generierung…",
+    "premiumRequired": "Premium-Funktion",
+    "premiumDesc": "Greife auf Premium zu, um deine personalisierte Roadmap zu generieren.",
+    "upgrade": "Auf Premium upgraden",
+    "accessRequired": "Zugang erforderlich",
+    "accessRequiredDesc": "Registriere dich kostenlos, um deine personalisierte Roadmap zu generieren.",
+    "registerFree": "Kostenlos registrieren",
+    "phase": "Phase",
+    "concreteActions": "Konkrete Maßnahmen",
+    "recommendedResources": "Empfohlene Ressourcen",
+    "milestone": "Meilenstein",
+    "pathToward": "Dein Weg zu {{name}}",
+    "generateDesc": "Generiere einen personalisierten Schritt-für-Schritt-Plan mit Phasen, konkreten Maßnahmen, empfohlenen Ressourcen und messbaren Meilensteinen für den Einstieg in die Branche.",
+    "generateCta": "Meine Roadmap generieren",
+    "building": "Deine Roadmap wird erstellt…",
+    "buildingDesc": "Die KI analysiert die Branche und erstellt einen maßgeschneiderten Plan für dich",
+    "totalDuration": "Gesamtdauer",
+    "phasesCount": "Phasen des Weges",
+    "concreteActionsCount": "Konkrete Maßnahmen",
+    "phasesTimeline": "Die Phasen des Weges",
+    "salaryEvolution": "Gehaltsentwicklung",
+    "topRoles": "Rollen, auf die du abzielen kannst",
+    "keyTip": "Schlüsseltipp",
+    "regenerate": "Roadmap neu generieren",
+    "detailed": "Detaillierte Roadmap"
+  },
+  "grafo": {
+    "title": "Wissensgraph",
+    "subtitle": "Visualisiere Rollen, Kompetenzen und Tools der Branche.",
+    "generating": "Graphen wird generiert…",
+    "premiumRequired": "Premium-Funktion",
+    "upgrade": "Auf Premium upgraden",
+    "accessRequired": "Zugang erforderlich",
+    "accessRequiredDesc": "Registriere dich kostenlos, um den Wissensgraphen zu erkunden.",
+    "registerFree": "Kostenlos registrieren",
+    "downloadPng": "Als PNG herunterladen",
+    "exporting": "Exportieren…",
+    "regenerate": "Neu generieren",
+    "addNode": "Knoten hinzufügen",
+    "addNodeTitle": "Einen Knoten zum Graphen hinzufügen",
+    "nodeTypeLabel": "Typ",
+    "connectTo": "Verbinden mit (optional)",
+    "noConnection": "Keine Verbindung",
+    "nodeName": "Name *",
+    "nodeDescription": "Beschreibung (optional)",
+    "nodeDescPlaceholder": "Kurze Beschreibung...",
+    "errorResponse": "Fehler bei der Antwortgenerierung. Bitte versuche es erneut.",
+    "tabGraph": "Graph",
+    "tabChat": "Graph befragen",
+    "chatTitle": "Graph befragen",
+    "chatDesc": "Die KI antwortet mit den Graphknoten als Wissensbasis. Du kannst nach Rollen, Kompetenzen, Verbindungen oder Wegen fragen.",
+    "chatQuestion1": "Welche Kompetenzen sollte ich entwickeln, um eine Schlüsselrolle zu werden?",
+    "chatQuestion2": "Welche Tools sollte ich vorrangig erlernen?",
+    "chatQuestion3": "Welche Zertifizierungen sind am nützlichsten für den Brancheneinstieg?",
+    "chatPlaceholder": "Frage etwas über den Graphen…",
+    "generateGraph": "Graph generieren",
+    "buildingGraph": "Die KI erstellt den Graphen…",
+    "buildingGraphTime": "Dies kann 20-30 Sekunden dauern",
+    "notAvailable": "Der Graph ist noch nicht verfügbar",
+    "connection": "Verbindung",
+    "connections": "{{count}} Verbindungen",
+    "yourNode": "deiner",
+    "yourNodes": "deine Knoten",
+    "processing": "Verarbeitung…",
+    "generateFirst": "Generiere zuerst den Graphen, um Fragen basierend auf Knoten zu stellen.",
+    "nodeTypes": {
+      "role": "Rolle",
+      "skill": "Kompetenz",
+      "tool": "Tool",
+      "certification": "Zertifizierung"
+    }
+  },
+  "confronta": {
+    "title": "Branchen vergleichen",
+    "subtitle": "Vergleiche zwei Berufsfelder nebeneinander.",
+    "selectFirst": "Erste Branche wählen",
+    "selectSecond": "Zweite Branche wählen",
+    "compare": "Vergleichen",
+    "vs": "vs",
+    "metrics": {
+      "salary": "Gehalt",
+      "growth": "Wachstum",
+      "risk": "KI-Risiko",
+      "trend": "Trend"
+    },
+    "badgeLabel": "Branchenvergleich",
+    "headline": "Vergleichen",
+    "desc": "Wähle zwei Branchen und sieh die wichtigsten Unterschiede nebeneinander: Gehälter, Wachstum, Risiko und vieles mehr.",
+    "firstSector": "Erste Branche",
+    "secondSector": "Zweite Branche",
+    "pickerChangeHint": "Klicken zum Ändern",
+    "pickerChoose": "Eine Branche zum Vergleichen wählen",
+    "pickerSearch": "Branche suchen…",
+    "noResults": "Keine Ergebnisse",
+    "tie": "Unentschieden",
+    "best": "Besser",
+    "chooseBoth": "Wähle zwei Branchen um zu beginnen",
+    "chooseSecond": "Wähle auch die zweite Branche",
+    "placeholderDesc": "Wähle Branchen aus den Menüs oben und du siehst sofort die wichtigsten Unterschiede nebeneinander.",
+    "copyLink": "Vergleichslink kopieren",
+    "linkCopied": "Link kopiert!",
+    "annualSalary": "Durchschnittliches Bruttojahresgehalt",
+    "upTo": "bis zu €{{amount}}k",
+    "maximum": "Maximum: €{{amount}}k/Jahr",
+    "annualGrowth": "Jährliches Wachstum",
+    "automationRisk": "Automatisierungsrisiko",
+    "marketTrend": "Markttrend",
+    "timeToAutonomy": "Zeit bis zur selbstständigen Arbeit",
+    "riasecType": "Geeigneter Persönlichkeitstyp (RIASEC)",
+    "requiredSkills": "Erforderliche Kompetenzen",
+    "commonSkillsCount": "{{count}} gemeinsame Kompetenzen",
+    "commonSkillsHint": "grün hervorgehoben",
+    "advantages": "Vorteile",
+    "considerations": "Überlegungen",
+    "futureOpportunities": "Zukünftige Rollen und Möglichkeiten",
+    "deepen": "Mehr erfahren",
+    "notSure": "Nicht sicher?",
+    "takeFreeTest": "Kostenlosen Test machen",
+    "trend": {
+      "booming": "Stark wachsend",
+      "growing": "Wachsend",
+      "stable": "Stabil",
+      "declining": "Rückläufig"
+    },
+    "risk": {
+      "low": "Niedrig",
+      "medium": "Mittel",
+      "high": "Hoch"
+    },
+    "scale": {
+      "high": "Hoch",
+      "medium": "Mittel",
+      "low": "Niedrig"
+    }
+  },
+  "affiliazione": {
+    "title": "Partnerschaft",
+    "subtitle": "Bringen Sie NorthStar in Ihre Organisation.",
+    "schools": "Schulen",
+    "universities": "Universitaten",
+    "agencies": "Arbeitsvermittlungen",
+    "training": "Ausbildungszentren",
+    "contactUs": "Kontakt",
+    "learnMore": "Mehr erfahren",
+    "backTo": "Zuruck zur Partnerschaftsseite",
+    "requestDemo": "Kostenlose Demo anfordern",
+    "requestDemoShort": "Demo anfordern",
+    "heroBadge": "Partner- & Affiliate-Programm",
+    "howItWorks": "Wie es funktioniert",
+    "problemTitle": "Traditionelle Orientierung reicht nicht mehr aus",
+    "solutionTitle": "NorthStar: digitale Orientierung fur Institutionen",
+    "solutionDesc": "Eine vollstandige Plattform, die Sie innerhalb weniger Tage in Ihre Dienste integrieren konnen.",
+    "partnerTypesTitle": "Wer kann teilnehmen",
+    "institutionBenefitsTitle": "Vorteile fur die Institution",
+    "userBenefitsTitle": "Vorteile fur Ihre Nutzer",
+    "modelsTitle": "Kooperationsmodelle",
+    "modelsDesc": "Jede Institution ist anders. Gemeinsam wahlen wir das am besten geeignete Modell.",
+    "howFunctionTitle": "Wie es funktioniert",
+    "howFunctionDesc": "Vom ersten Anruf bis zur Aktivierung: ein einfacher und begleiteter Prozess.",
+    "contactTitle": "Werden Sie NorthStar-Partner",
+    "contactDesc": "Fullen Sie das Formular aus: Wir melden uns innerhalb von 24 Arbeitsstunden.",
+    "contactReply": "Antwort garantiert innerhalb von 24 Arbeitsstunden",
+    "contactFree": "Kostenlose Demo, keine Verpflichtung",
+    "contactGdpr": "Daten gemas DSGVO verarbeitet",
+    "usefulLinks": "Nutzliche Links",
+    "faqTitle": "Haufig gestellte Fragen",
+    "ctaTitle": "Bereit, NorthStar in Ihre Institution zu bringen?",
+    "ctaDesc": "Kostenlose Demo, keine Verpflichtung, Antwort in 24 Stunden.",
+    "ctaContact": "An das Team schreiben",
+    "formInstitution": "Name der Institution *",
+    "formPartnerType": "Partnertyp *",
+    "formUsers": "Geschatzte Nutzer",
+    "formName": "Ihr Name *",
+    "formEmail": "E-Mail *",
+    "formPhone": "Telefon",
+    "formMessage": "Nachricht",
+    "formSelect": "Auswahlen...",
+    "formUsersUnknown": "Noch nicht sicher",
+    "formSending": "Wird gesendet...",
+    "formSubmit": "Kostenlose Demo anfordern",
+    "formNote": "Keine Verpflichtung. Antwort innerhalb von 24 Arbeitsstunden.",
+    "formSuccessTitle": "Anfrage gesendet!",
+    "formSuccessDesc": "Wir melden uns innerhalb von 24 Arbeitsstunden, um eine personalisierte Demo zu arrangieren.",
+    "formErrorGeneric": "Unerwarteter Fehler",
+    "formErrorNetwork": "Netzwerkfehler. Bitte erneut versuchen.",
+    "formInstitutionPlaceholder": "z.B. Gymnasium Muster Berlin",
+    "formNamePlaceholder": "Vor- und Nachname",
+    "formEmailPlaceholder": "email@institution.de",
+    "formPhonePlaceholder": "+49 30 1234567",
+    "formMessagePlaceholder": "Beschreiben Sie kurz Ihren Kontext...",
+    "partnerTypes": {
+      "scuolaMedie": "Mittelschule",
+      "scuoleSuperiori": "Gymnasium / Berufsschule",
+      "universita": "Universitat / Fachhochschule",
+      "agenziaLavoro": "Arbeitsvermittlung",
+      "centroFormazione": "Berufsausbildungszentrum",
+      "entePubblico": "Offentlicher Trager / Kommune",
+      "orientatore": "Berufsberater / Individueller Berater",
+      "altro": "Sonstiges"
+    },
+    "userRanges": {
+      "lt100": "Weniger als 100",
+      "r100_500": "100 - 500",
+      "r500_2000": "500 - 2.000",
+      "gt2000": "Uber 2.000"
+    },
+    "scuole": {
+      "title": "NorthStar fur Schulen",
+      "desc": "Von der Mittelschule bis zum Gymnasium: digitale Orientierungswerkzeuge.",
+      "mTitle": "Mittelschulen",
+      "mDesc": "Erste Orientierung, Interessenentdeckung.",
+      "sTitle": "Gymnasien",
+      "sDesc": "Post-Abitur-Orientierung in Richtung Universitat, Berufsausbildung oder Arbeit.",
+      "benefitsTitle": "Was Ihre Schule bekommt",
+      "ctaTitle": "Bringen Sie NorthStar in Ihre Schule",
+      "ctaDesc": "Kostenlose 30-minutige Demo, Lehrmaterialien inklusive, keine Verpflichtung."
+    },
+    "universita": {
+      "title": "NorthStar fur Universitaten",
+      "desc": "Von der Erstsemesterorientierung bis zur Karriereplanung nach dem Abschluss.",
+      "usesTitle": "Wie Universitaten NorthStar nutzen",
+      "benefitsTitle": "Was die Universitat bekommt",
+      "ctaTitle": "Integrieren Sie NorthStar in Ihre Universitat",
+      "ctaDesc": "Massgefertigte institutionelle Lizenz, White-Label verfugbar, kostenlose Demo."
+    },
+    "agenzie": {
+      "title": "NorthStar fur Arbeitsvermittlungen",
+      "desc": "Verbessern Sie das Matching zwischen Kandidaten und Stellen.",
+      "usesTitle": "Wie Agenturen NorthStar nutzen",
+      "benefitsTitle": "Wettbewerbsvorteile fur Ihre Agentur",
+      "ctaTitle": "Starken Sie Ihren Vermittlungsservice",
+      "ctaDesc": "Empfehlungsprovision oder Multi-Berater-Lizenz. Kostenlose Demo in 30 Minuten."
+    },
+    "formazione": {
+      "title": "NorthStar fur Ausbildungszentren",
+      "desc": "Berufsschulen, Weiterbildungseinrichtungen: helfen Sie Ihren Teilnehmern.",
+      "contextsTitle": "Fur jeden Ausbildungszentrumtyp",
+      "featuresTitle": "Schlusselfu nktionen fur die Ausbildung",
+      "ctaTitle": "Bringen Sie NorthStar in Ihr Ausbildungszentrum",
+      "ctaDesc": "Kostenlose Demo, Empfehlungsmodell oder Volumenlizenz."
+    },
+    "heroTitle": "Bringen Sie Orientierung in Ihre Institution mit",
+    "heroDesc": "Eine digitale Plattform, die Studierenden, Kandidaten und Nutzern hilft, ihre Richtung mit personalisierten Tests, echten Sektordaten und konkreten Wegen zu finden.",
+    "partnerTypesDesc": "Das Programm steht allen Organisationen offen, die in den Bereichen Orientierung, Ausbildung und Arbeitsmarkt tatig sind.",
+    "quote": "NorthStar ersetzt nicht den Berufsberater, sondern starkt ihn mit Daten, digitalen Werkzeugen und einem strukturierten Weg, den der Nutzer eigenstandig erkunden kann.",
+    "formPrivacy": "Datenschutzrichtlinie"
+  },
+  "candidature": {
+    "title": "Deine Bewerbungen",
+    "empty": "Noch keine Bewerbungen",
+    "emptyDesc": "Beginne mit der Erkundung von Branchen und speichere die Möglichkeiten, die dich interessieren.",
+    "status": {
+      "saved": "Gespeichert",
+      "applied": "Beworben",
+      "interview": "Vorstellungsgespräch",
+      "offer": "Angebot",
+      "rejected": "Abgelehnt"
+    },
+    "loginRequired": "Melde dich an, um deine Bewerbungen zu sehen",
+    "loginRequiredDesc": "Verfolge alle deine Bewerbungen an einem Ort.",
+    "goHome": "Zur Startseite",
+    "myCandidatures": "Meine Bewerbungen",
+    "totalCount": "{{count}} Bewerbung",
+    "totalCountPlural": "{{count}} Bewerbungen insgesamt",
+    "noCandidatures": "Noch keine Bewerbungen",
+    "add": "Hinzufügen",
+    "kanban": "Kanban",
+    "statistics": "Statistiken",
+    "staleInterview_one": "Du hast 1 Vorstellungsgespräch ohne Updates seit mehr als 7 Tagen",
+    "staleInterview_other": "Du hast {{count}} Vorstellungsgespräche ohne Updates seit mehr als 7 Tagen",
+    "staleInterviewReminder": "Du erhältst eine E-Mail-Erinnerung. Klicke auf ein Gespräch, um seinen Status zu aktualisieren.",
+    "startTracking": "Beginne, deine Bewerbungen zu verfolgen",
+    "startTrackingDesc": "Füge Stellenangebote hinzu, die dich interessieren, und überwache jeden Schritt des Auswahlprozesses.",
+    "addFirst": "Erste Bewerbung hinzufügen",
+    "noApps": "Keine Bewerbungen",
+    "addTo": "Zu {{status}} hinzufügen",
+    "moveTo": "Zu {{status}} verschieben",
+    "editApp": "Bewerbung bearbeiten",
+    "newApp": "Neue Bewerbung",
+    "company": "Unternehmen *",
+    "role": "Rolle *",
+    "link": "Stellenangebot-Link",
+    "optional": "(optional)",
+    "location": "Ort",
+    "salary": "Gehalt / Vergütung",
+    "notes": "Notizen",
+    "notesPlaceholder": "Kontakte, Eindrücke, wichtige Details...",
+    "companyPlaceholder": "z.B. Google Deutschland",
+    "rolePlaceholder": "z.B. UX Designer",
+    "saveChanges": "Änderungen speichern",
+    "openOffer": "Angebot öffnen",
+    "closeDiary": "Tagebuch schließen",
+    "openDiary": "Notizentagebuch öffnen",
+    "noNotesYet": "Noch keine Notizen. Schreib die erste Aktualisierung!",
+    "addNotePlaceholder": "Z.B. HR angerufen, technisches Gespräch bestanden…",
+    "addNoteTitle": "Notiz hinzufügen (Enter)",
+    "addStatNote": "Füge Bewerbungen hinzu, um Statistiken zu sehen",
+    "totalLabel": "Gesamt",
+    "tracked": "verfolgte Bewerbungen",
+    "responseRate": "Antwortquote",
+    "responseRateDesc": "gesendet → Gespräch",
+    "inProgress": "In Bearbeitung",
+    "inProgressDesc": "wartet auf Antwort",
+    "totalNotes": "Notizen gesamt",
+    "perApp": "pro Bewerbung",
+    "funnelTitle": "Fortschrichtstrichter",
+    "successRate": "{{rate}}% Erfolg bei Gesprächen",
+    "conversionPct": "{{pct}}% Konversion",
+    "now": "Gerade eben",
+    "cancel": "Abbrechen",
+    "statusLbl": "Status",
+    "ofTotal": "des Gesamten",
+    "overTime": "Bewerbungen im Zeitverlauf",
+    "avgPerMonth": "Ø: {{avg}} Bewerbungen/Monat",
+    "requiredFields": "Unternehmen und Stelle sind erforderlich"
+  },
+  "amici": {
+    "title": "Freunde",
+    "search": "Benutzer suchen",
+    "pending": "Ausstehende Anfragen",
+    "yourFriends": "Deine Freunde",
+    "noFriends": "Du hast noch keine Freunde auf NorthStar.",
+    "sendRequest": "Anfrage senden",
+    "accept": "Annehmen",
+    "decline": "Ablehnen",
+    "remove": "Entfernen",
+    "loginRequired": "Melde dich an, um deine Freunde zu sehen",
+    "loginRequiredDesc": "Verbinde dich mit anderen NorthStar-Benutzern.",
+    "goHome": "Zur Startseite",
+    "tabs": {
+      "friends": "Freunde",
+      "requests": "Anfragen",
+      "search": "Suchen"
+    },
+    "friendsCount": "{{count}} Freunde auf NorthStar",
+    "connectWithOthers": "Verbinde dich mit anderen NorthStar-Benutzern",
+    "noFriendsYet": "Noch keine Freunde",
+    "noFriendsDesc": "Suche Benutzer mit öffentlichen Profilen und sende ihnen eine Freundschaftsanfrage.",
+    "incomingCount": "Eingehend ({{count}})",
+    "noIncoming": "Keine eingehenden Anfragen",
+    "outgoingCount": "Gesendet ({{count}})",
+    "noOutgoing": "Keine gesendeten Anfragen",
+    "waitingReply": "Wartet auf Antwort",
+    "searchPlaceholder": "Nach Name oder E-Mail suchen…",
+    "searchPublicHint": "Suche unter Benutzern mit öffentlichen Profilen.",
+    "minChars": "Mindestens 2 Zeichen zum Suchen eingeben",
+    "noResults": "Keine Ergebnisse",
+    "noResultsDesc": "Kein Benutzer für \"{{query}}\" gefunden. Nur öffentliche Profile erscheinen in den Ergebnissen.",
+    "publicProfile": "Öffentliches Profil",
+    "privateProfile": "Privates Profil",
+    "viewProfile": "Profil",
+    "alreadyFriends": "Freunde",
+    "waiting": "Ausstehend",
+    "add": "Hinzufügen",
+    "today": "Heute",
+    "yesterday": "Gestern"
+  },
+  "resetPassword": {
+    "title": "Passwort zurücksetzen",
+    "subtitle": "Gib dein neues Passwort ein.",
+    "newPassword": "Neues Passwort",
+    "confirmPassword": "Passwort bestätigen",
+    "reset": "Passwort zurücksetzen",
+    "success": "Passwort erfolgreich zurückgesetzt.",
+    "invalidToken": "Ungültiger oder abgelaufener Link.",
+    "invalidLinkTitle": "Ungültiger Link",
+    "invalidLinkDesc": "Der Link zum Zurücksetzen des Passworts ist ungültig oder wurde bereits verwendet.",
+    "goHome": "Zurück zur Startseite",
+    "successTitle": "Passwort zurückgesetzt!",
+    "successDesc": "Du kannst dich jetzt mit deinem neuen Passwort anmelden.",
+    "goLogin": "Zur Anmeldung",
+    "newPasswordLabel": "Neues Passwort",
+    "passwordPlaceholder": "Mind. 6 Zeichen",
+    "confirmPasswordLabel": "Passwort bestätigen",
+    "confirmPasswordPlaceholder": "Neues Passwort wiederholen",
+    "chooseNew": "Wähle ein neues Passwort für dein Konto.",
+    "passwordMismatch": "Passwörter stimmen nicht überein",
+    "resetError": "Fehler beim Zurücksetzen",
+    "networkError": "Netzwerkfehler. Bitte versuche es erneut.",
+    "resetting": "Wird zurückgesetzt…"
+  },
+  "premiumSuccess": {
+    "title": "Willkommen bei Premium!",
+    "subtitle": "Dein Konto wurde aktualisiert. Du hast Zugang zu allen Funktionen.",
+    "goHome": "Zum Dashboard",
+    "badge": "Willkommen bei Premium",
+    "activated": "Abonnement aktiviert!",
+    "desc": "Dein Premium-Zugang ist jetzt aktiv. Du kannst sofort mit der Erkundung des KI-Wikis, Wissensgraphen und deiner personalisierten Roadmap beginnen.",
+    "exploreNow": "Jetzt erkunden",
+    "retakeTest": "Test wiederholen"
+  },
+  "utente": {
+    "notFound": "Benutzer nicht gefunden",
+    "profile": "Profil",
+    "sectors": "Erkundete Branchen",
+    "noPublicInfo": "Dieses Profil ist privat.",
+    "notFoundDesc": "Dieses Profil existiert nicht oder ist nicht zugänglich.",
+    "backToFriends": "Zurück zu Freunden",
+    "publicProfile": "Öffentliches Profil",
+    "privateProfile": "Privates Profil",
+    "memberSince": "Auf NorthStar seit {{date}}",
+    "areFriends": "Ihr seid Freunde",
+    "removeFriend": "Entfernen",
+    "requestSent": "Anfrage gesendet",
+    "cancelRequest": "Abbrechen",
+    "acceptRequest": "Anfrage annehmen",
+    "rejectRequest": "Ablehnen",
+    "addFriend": "Als Freund hinzufügen",
+    "editProfile": "Dein Profil bearbeiten",
+    "privateContent": "Privater Inhalt",
+    "privateContentDesc": "Werde mit {{name}} befreundet, um sein vollständiges Profil zu sehen.",
+    "loginToAdd": "Melde dich bei NorthStar an, um eine Freundschaftsanfrage zu senden.",
+    "goHome": "Zur Startseite"
+  },
+  "workMode": {
+    "dipendente": "Angestellt",
+    "autonomo": "Selbstständig/Freelance",
+    "ibrido": "Hybrid"
+  },
+  "seo": {
+    "home": {
+      "title": "NorthStar — Entdecke deine berufliche Richtung",
+      "description": "Mach den kostenlosen RIASEC-Test und entdecke die Berufsfelder, die am besten zu deiner Persönlichkeit passen. Echte Daten zu Gehältern, Wachstum und KI-Risiko."
+    },
+    "test": {
+      "title": "Der Orientierungstest — NorthStar",
+      "description": "Beantworte 27 Fragen und entdecke die Berufsfelder, die am besten mit deiner RIASEC-Persönlichkeit und deinem Inneren Kompass kompatibel sind."
+    },
+    "sectors": {
+      "title": "21 Berufsfelder erkunden",
+      "description": "Stöbere durch alle Berufsfelder. Filtere nach RIASEC-Typ, KI-Automatisierungsrisiko und Markttrends."
+    },
+    "premium": {
+      "title": "NorthStar Premium — Erweiterte Orientierungstools",
+      "description": "Personalisiertes KI-Wiki, detaillierte Roadmaps, Wissensgraph und Live-Marktdaten."
+    },
+    "growth": {
+      "title": "Persönliches Wachstum — NorthStar",
+      "description": "Artikel, Leitfäden und praktische Übungen zu Gewohnheiten, Mindset, Motivation und beruflichem Wachstum."
+    },
+    "news": {
+      "title": "Nachrichten aus der Arbeitswelt — NorthStar",
+      "description": "Die neuesten Nachrichten zu Berufsfeldern: Technologie, Wirtschaft, Finanzen, Gesundheit und vieles mehr."
+    },
+    "sectorTitle": "{{name}} — Berufssektor",
+    "sectorDescSuffix": "Durchschnittsgehalt €{{min}}k–{{max}}k, jährliches Wachstum +{{rate}}%, {{trend}}, {{risk}}.",
+    "sectorImageAlt": "{{name}} — Sektordaten und -chancen auf NorthStar",
+    "sectorJsonLdSalary": "Jahresgehalt (Italien)"
+  },
+  "notifiche": {
+    "title": "Benachrichtigungen",
+    "newBadge": "{{count}} neue",
+    "markAllRead": "Alle gelesen",
+    "empty": "Keine Benachrichtigungen"
+  },
+  "dashboard": {
+    "yourJourney": "Dein Weg",
+    "welcome": "Willkommen zurück, {{name}} ✦",
+    "welcomeDesc": "Hier ist eine Zusammenfassung deines Weges und die nächsten empfohlenen Schritte.",
+    "confirmedPath": "Dein bestätigter Weg",
+    "confirmed": "Bestätigt",
+    "compatibility": "{{score}}% Kompatibilität",
+    "sectorRoadmap": "Sektor-Roadmap",
+    "competenceGraph": "Kompetenzgraph",
+    "yourProgress": "Dein Fortschritt",
+    "objectivesLoading": "Ziele",
+    "objectivesCompleted": "{{done}} / {{total}} Ziele erreicht",
+    "yourObjectives": "Deine Ziele",
+    "manage": "Verwalten",
+    "noObjectives": "Du hast noch keine Ziele. Erstelle eines in deinem Profil.",
+    "goToProfile": "Zum Profil",
+    "overallProgress": "Gesamtfortschritt",
+    "allDone": "Alle Ziele erreicht!",
+    "yourResults": "Deine Ergebnisse",
+    "fullDetail": "Vollständige Details",
+    "chosen": "✓ Gewählt",
+    "matchScore": "{{score}}% Match",
+    "recommendedGrowth": "Empfohlenes Wachstum",
+    "articlesForProfile": "Artikel für dein Profil",
+    "articlesComingSoon": "Personalisierte Artikel werden bald verfügbar sein.",
+    "exploreGrowth": "Wachstumsbereich erkunden",
+    "seeAll": "Alle anzeigen",
+    "yourProfile": "Dein Profil",
+    "profileDesc": "Kontoeinstellungen, Präferenzen und gespeicherte Sektoren",
+    "diffBase": "Grundlegend",
+    "diffIntermediate": "Mittel",
+    "diffAdvanced": "Fortgeschritten",
+    "read": "Lesen"
+  },
+  "cv": {
+    "myResume": "Mein Lebenslauf",
+    "uploadedAt": "Hochgeladen am {{date}}. Nutze ihn zur Generierung deines optimierten Lebenslaufs.",
+    "uploadedRecently": "Kürzlich hochgeladen. Nutze ihn zur Generierung deines optimierten Lebenslaufs.",
+    "generateCv": "Lebenslauf erstellen",
+    "generateWithout": "Ohne Lebenslauf erstellen",
+    "skillsDetected": "Erkannte Fähigkeiten ({{count}})",
+    "toolsCount": "Tools ({{count}})",
+    "expCount": "Erfahrung ({{count}})",
+    "lessExp": "Weniger Erfahrung",
+    "moreExp": "+{{count}} weitere",
+    "education": "Ausbildung",
+    "certifications": "Zertifikate",
+    "languages": "Sprachen",
+    "addToGraph": "Zum Wissensgraphen hinzufügen",
+    "suggestedNodes": "{{count}} vorgeschlagene Knoten aus deinem Lebenslauf",
+    "clickToAdd": "Klicke, um Knoten zum Sektorgraphen hinzuzufügen.",
+    "openGraph": "Graphen öffnen →",
+    "uploadDesc": "Lade deinen Lebenslauf hoch, um ihn mit dem Wissensgraphen zu integrieren.",
+    "uploadFile": "Datei hochladen",
+    "pasteText": "Text einfügen",
+    "dragHere": "Lebenslauf hier ablegen oder klicken zum Auswählen",
+    "fileLimit": "PDF oder TXT · Max 10 MB",
+    "analyzingAI": "KI-Analyse läuft…",
+    "extractingSkills": "Fähigkeiten, Erfahrung und Ausbildung werden extrahiert",
+    "pasteHere": "Lebenslauftext hier einfügen…",
+    "analyzeWithAI": "Mit KI analysieren",
+    "invalidFormat": "Format nicht unterstützt. Bitte PDF oder TXT verwenden.",
+    "uploadError": "Fehler beim Hochladen",
+    "addPlaceholder": "Hinzufügen...",
+    "featureGraph": "Graph-Integration",
+    "featureGraphDesc": "Schlägt Skill/Tool-Knoten für den Sektorgraphen vor",
+    "featureCv": "Optimierter Lebenslauf",
+    "featureCvDesc": "Erstellt einen professionellen Lebenslauf basierend auf Graph und RIASEC",
+    "featurePrint": "Drucken & Herunterladen",
+    "featurePrintDesc": "Exportiere den Lebenslauf als PDF mit einem Klick",
+    "personalInfo": "Persönliche Informationen",
+    "fullName": "Vollständiger Name",
+    "professionalTitle": "Berufsbezeichnung",
+    "email": "E-Mail",
+    "phone": "Telefon",
+    "cityCountry": "Stadt / Land",
+    "linkedinUrl": "LinkedIn-URL",
+    "website": "Website",
+    "professionalProfile": "Berufliches Profil",
+    "profilePlaceholder": "Schreibe eine berufliche Zusammenfassung...",
+    "experience": "Erfahrung",
+    "experienceN": "Erfahrung ({{count}})",
+    "experienceRow": "Erfahrung {{n}}",
+    "roleLabel": "Rolle *",
+    "companyLabel": "Unternehmen *",
+    "periodLabel": "Zeitraum *",
+    "locationLabel": "Ort",
+    "descriptionLabel": "Beschreibung",
+    "bulletHint": "Nutze → für Aufzählungspunkte: → Aktivitätsbeschreibung...",
+    "skillsLabel": "Fähigkeiten (Enter drücken)",
+    "addExperience": "Erfahrung hinzufügen",
+    "education2": "Ausbildung",
+    "educationN": "Ausbildung ({{count}})",
+    "educationRow": "Abschluss {{n}}",
+    "degreeLabel": "Abschluss *",
+    "institutionLabel": "Einrichtung *",
+    "yearLabel": "Jahr",
+    "eduNotes": "Hinweise (Note, Spezialisierung…)",
+    "addEducation": "Abschluss hinzufügen",
+    "skillsSection": "Fähigkeiten",
+    "toolsSection": "Tools",
+    "languagesSection": "Sprachen",
+    "langName": "Sprache",
+    "langLevel": "Niveau",
+    "addLanguage": "Sprache hinzufügen",
+    "certsSection": "Zertifikate",
+    "generatedTitle": "Mit NorthStar erstellter Lebenslauf",
+    "targetRole": "Ziel: {{role}}",
+    "savedAt": "Gespeichert {{when}}",
+    "unsavedChanges": "Ungespeicherte Änderungen",
+    "edit": "Bearbeiten",
+    "doneEdit": "Bearbeitung abgeschlossen",
+    "saving": "Speichern…",
+    "saved": "Gespeichert!",
+    "saveError": "Fehler",
+    "saveChanges": "Änderungen speichern",
+    "downloadPdf": "PDF herunterladen",
+    "downloadingPdf": "PDF…",
+    "print": "Drucken",
+    "generating": "Lebenslauf wird erstellt…",
+    "generatingDesc": "Wissensgraph{{cvSuffix}} mit RIASEC-Profil wird integriert",
+    "generatingDescWithCv": " und deinen Lebenslauf",
+    "errorGenerating": "Fehler bei der Erstellung",
+    "retry": "Erneut versuchen",
+    "livePreview": "Live-Vorschau →",
+    "noTabMobile": "Bearbeiten",
+    "previewTabMobile": "Vorschau",
+    "editCv": "Lebenslauf bearbeiten",
+    "savingFull": "Wird gespeichert…",
+    "savedFull": "Erfolgreich gespeichert!",
+    "saveErrorFull": "Fehler — erneut versuchen",
+    "unsavedNote": "Du hast ungespeicherte Änderungen",
+    "lastSaved": "Zuletzt gespeichert: {{when}}",
+    "adaptCvTitle": "Lebenslauf an Stellenanzeige anpassen",
+    "howItWorks": "Wie es funktioniert",
+    "tailorSteps": [
+      "Die KI analysiert den Text der Stellenanzeige",
+      "Schreibt das Profil und Beschreibungen um, um geforderte Fähigkeiten hervorzuheben",
+      "Ordnet Fähigkeiten und Tools für maximales ATS-Match neu",
+      "Erfindet KEINE Erfahrungen: arbeitet nur mit vorhandenen Inhalten"
+    ],
+    "jobPostingLabel": "Text der Stellenanzeige",
+    "jobPostingPlaceholder": "Vollständigen Text der Stellenanzeige hier einfügen...",
+    "chars": "Zeichen",
+    "charsMin": "— mindestens 30 erforderlich",
+    "adaptedSuccess": "Lebenslauf erfolgreich angepasst!",
+    "highlightedKeywords": "Hervorgehobene Keywords:",
+    "adaptedNote": "Prüfe den Lebenslauf in der Vorschau und speichere ihn dann.",
+    "adapting": "Wird angepasst…",
+    "adapt": "Lebenslauf anpassen",
+    "adaptAnother": "↩ Weitere Anzeige anpassen",
+    "aiRewriteNote": "Die KI schreibt den Lebenslauf unter Beibehaltung aller echten Erfahrungen um",
+    "savedVersions": "Gespeicherte Versionen",
+    "saveCurrentVersion": "Aktuelle Version speichern",
+    "noVersions": "Keine gespeicherten Versionen",
+    "noVersionsDesc": "Verwende das obige Formular, um eine Version des aktuellen Lebenslaufs zu speichern",
+    "versionSaved": "Gespeichert!",
+    "save": "Speichern",
+    "rename": "Umbenennen",
+    "load": "Laden",
+    "deleteVersion": "Version löschen",
+    "coverLetter": "Anschreiben",
+    "company": "Unternehmen",
+    "targetRoleLabel": "Gewünschte Stelle",
+    "jobPostingRequired": "Text der Stellenanzeige *",
+    "extraNotes": "Weitere Hinweise",
+    "optional": "(optional)",
+    "letterSteps": [
+      "Die KI liest deinen Lebenslauf und die Anforderungen der Stelle",
+      "Schreibt ein personalisiertes Anschreiben, das relevante Fähigkeiten hervorhebt",
+      "Passt den Ton an Branche und Stelle an"
+    ],
+    "generatingLetter": "Wird erstellt…",
+    "generateLetter": "Anschreiben erstellen",
+    "checkAndEdit": "Anschreiben fertig! Prüfen und bearbeiten.",
+    "paragraph": "Absatz {{n}}",
+    "generateAnother": "↩ Weiteres Anschreiben erstellen",
+    "copy": "Kopieren",
+    "copied": "Kopiert!",
+    "atsScoreTitle": "ATS-Kompatibilität analysieren",
+    "jobPostingLabelShort": "Stellenanzeigentext",
+    "jobPostingPlaceholderShort": "Text der Stellenanzeige einfügen...",
+    "analyzing": "Wird analysiert…",
+    "analyze": "Analysieren",
+    "sectionDetail": "Detailansicht",
+    "strengths": "Stärken",
+    "missingKeywords": "Fehlende Keywords",
+    "howToImprove": "Wie verbessern",
+    "useAdaptNote": "Nutze Anpassen an Stellenanzeige, um deinen Score automatisch zu verbessern",
+    "analyzeAnother": "↩ Weitere Anzeige analysieren",
+    "versionNamePlaceholder": "Versionsname (optional)",
+    "letterButton": "Anschreiben",
+    "versionsButton": "Versionen",
+    "regenerate": "Neu erstellen",
+    "tailorButton": "An Anzeige anpassen",
+    "atsButton": "ATS Score",
+    "letterJobPostingPlaceholder": "Vollständigen Text der Stellenanzeige einfügen...",
+    "letterCharsMin": "— mindestens 30 erforderlich",
+    "letterMotivations": "z.B. persönliche Motivation, Verfügbarkeit, hervorzuhebende Erfolge...",
+    "letterCopied": "Kopiert!",
+    "letterDownloadPdf": "PDF herunterladen",
+    "closeLetter": "Schließen",
+    "atsSectionDetail": "Detailansicht",
+    "atsStrengths": "Stärken",
+    "atsMissing": "Fehlende Keywords",
+    "atsImprove": "Wie verbessern",
+    "atsUseAdapt": "Nutze Anpassen für automatische Verbesserung",
+    "atsAnalyzeAnother": "↩ Weitere Anzeige analysieren",
+    "renameTitle": "Umbenennen",
+    "letterTitle": "Anschreiben",
+    "atsTitle": "ATS Compatibility Score",
+    "letterCompany": "Unternehmen",
+    "letterRole": "Gesuchte Position",
+    "letterRoleShort": "Position",
+    "letterJobPlaceholder": "Fügen Sie den vollständigen Stellenanzeigentext ein...\n\nDie KI analysiert die Anforderungen und verfasst ein personalisiertes Anschreiben, das Ihre relevantesten Kompetenzen hervorhebt.",
+    "extraNotesPlaceholder": "Z.B. persönliche Motivation, Verfügbarkeit, hervorzuhebende Erfolge...",
+    "letterGenerated": "Anschreiben erstellt! Sie können jeden Absatz bearbeiten.",
+    "letterReady": "Anschreiben fertig! Prüfen und bearbeiten.",
+    "subject": "Betreff",
+    "salutation": "Anrede",
+    "paragraphN": "Absatz {{n}}",
+    "closing": "Schluss",
+    "letterWriting": "Wird verfasst…",
+    "generatingShort": "Wird erstellt…",
+    "copyText": "Text kopieren",
+    "copyShort": "Kopieren",
+    "generateAnotherLetter": "Weiteres Anschreiben erstellen",
+    "atsJobPlaceholder": "Fügen Sie den Stellenanzeigentext ein...\n\nDie KI analysiert jeden CV-Abschnitt zur Berechnung der ATS-Kompatibilität.",
+    "atsJobShortPlaceholder": "Fügen Sie den Stellenanzeigentext ein...",
+    "jobPostingShort": "Stellenanzeigentext",
+    "jobPostingShortReq": "Stellenanzeigentext *",
+    "jobShortPlaceholder": "Fügen Sie hier den Stellenanzeigentext ein...",
+    "sectionBreakdown": "Detail nach Abschnitt",
+    "analyzeCompat": "Kompatibilität analysieren",
+    "atsTipUseTailor": "Verwende An Stelle anpassen, um deinen Score automatisch zu verbessern",
+    "atsSteps": [
+      "Die KI simuliert ein echtes ATS-System",
+      "Bewertet Keyword-Match, Erfahrung, Kompetenzen, Bildung",
+      "Zeigt, was fehlt und wie der Score verbessert werden kann"
+    ],
+    "cvAdaptedMobile": "CV angepasst! Prüfe die Vorschau.",
+    "tailorMobileDesc": "Die KI analysiert die Anzeige und schreibt den CV neu, um den ATS-Match zu maximieren, ohne Erfahrungen zu erfinden.",
+    "editCvShort": "CV bearbeiten",
+    "goToPreview": "Gehe zu Vorschau, um zu sehen",
+    "loadVersion": "Laden",
+    "footerUnsaved": "Ungespeicherte Änderungen — klicke \"Änderungen speichern\", um sie zu behalten",
+    "footerEditing": "Bearbeite die Felder — der CV wird in Echtzeit aktualisiert",
+    "footerSavedAt": "CV gespeichert am {{when}} · Beim Wiederöffnen findest du diese Version",
+    "footerHelp": "\"Bearbeiten\" zum Editieren · \"Drucken / PDF\" zum Exportieren · \"Speichern\" zum Beibehalten",
+    "companyPlaceholder": "Firmenname",
+    "periodPlaceholder": "Jan 2022 – Heute",
+    "locationPlaceholder": "Berlin",
+    "institutionPlaceholder": "Universität...",
+    "realPdfTitle": "Echtes PDF herunterladen (via Server)"
+  },
+  "calendar": {
+    "editEvent": "Ereignis bearbeiten",
+    "newEvent": "Neues Ereignis",
+    "title": "Titel *",
+    "titlePlaceholder": "z.B. Lernsitzung...",
+    "description": "Beschreibung",
+    "descPlaceholder": "Zusätzliche Notizen...",
+    "allDay": "Ganztägig",
+    "startDate": "Startdatum *",
+    "startTime": "Startzeit",
+    "endDate": "Enddatum *",
+    "endTime": "Endzeit",
+    "category": "Kategorie",
+    "priority": "Priorität",
+    "status": "Status",
+    "linkedSector": "Verknüpfter Sektor",
+    "noSector": "Kein Sektor",
+    "suggestedContent": "Vorgeschlagene Inhalte für {{name}}",
+    "wikiLabel": "Wiki-Artikel",
+    "roadmapLabel": "Sektor-Roadmap",
+    "growthLabel": "Wachstumspfade",
+    "premiumNote": "Upgrade auf Premium, um Wiki, Roadmap und Pfade für {{name}} zu sehen.",
+    "linkedGoal": "Verknüpftes Ziel",
+    "linkedGoalPlaceholder": "Mit einem Ziel verknüpfen...",
+    "noGoal": "Kein Ziel",
+    "addGoalsHint": "Füge Ziele in deinem Dashboard hinzu, um sie mit Ereignissen zu verknüpfen.",
+    "linkedGoalInput": "z.B. Einen Job im Tech-Sektor finden...",
+    "reminders": "Erinnerungen",
+    "premiumReminders": "10-Min.- und 24-Stunden-Erinnerungen sind für Premium-Nutzer verfügbar.",
+    "upgradePremium": "Upgrade auf Premium →",
+    "delete": "Löschen",
+    "cancel": "Abbrechen",
+    "saveChanges": "Änderungen speichern",
+    "createEvent": "Ereignis erstellen",
+    "freeLimitTitle": "Limit erreicht",
+    "premiumFeatureTitle": "Premium-Funktion",
+    "premiumFeatureDesc": "Upgrade auf Premium, um diese Erinnerungen zu nutzen.",
+    "errorTitle": "Fehler",
+    "networkError": "Netzwerkfehler",
+    "eventUpdated": "Ereignis aktualisiert",
+    "eventCreated": "Ereignis erstellt",
+    "errorSaving": "Fehler beim Speichern",
+    "categories": {
+      "study": "Lernen",
+      "training": "Training",
+      "interview": "Vorstellungsgespräch",
+      "deadline": "Frist",
+      "task": "Aufgabe",
+      "follow-up": "Nachverfolgung"
+    },
+    "priorities": {
+      "low": "Niedrig",
+      "medium": "Mittel",
+      "high": "Hoch"
+    },
+    "statuses": {
+      "todo": "Ausstehend",
+      "in-progress": "In Bearbeitung",
+      "done": "Erledigt",
+      "postponed": "Verschoben"
+    },
+    "remindersLabels": {
+      "10": "10 Min vorher",
+      "30": "30 Min vorher",
+      "120": "2 Std vorher",
+      "1440": "24 Std vorher"
+    }
+  },
+  "role": {
+    "notFound": "Rolle nicht gefunden",
+    "goHome": "Zur Startseite",
+    "back": "Zurück",
+    "salary": "Gehalt",
+    "growth": "Aussichten",
+    "autonomy": "Autonomie",
+    "stability": "Stabilität",
+    "skills": "Erforderliche Kompetenzen",
+    "educationPaths": "Bildungswege",
+    "steps": "Schritte",
+    "careerOutcomes": "Karrieremöglichkeiten",
+    "exploreSector": "Branche erkunden",
+    "exploreSectorDesc": "Entdecken Sie alle Möglichkeiten im Bereich {{sector}}",
+    "noRoles": "Keine Rollen für diese Branche verfügbar.",
+    "rolesTab": "Rollen",
+    "viewRole": "Mehr erfahren"
+  }
+}

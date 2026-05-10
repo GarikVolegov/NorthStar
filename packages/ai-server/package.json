@@ -1,0 +1,22 @@
+{
+  "name": "@workspace/ai-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./batch": "./src/batch/index.ts",
+    "./image": "./src/image/index.ts",
+    "./audio": "./src/audio/index.ts",
+    "./db": "./src/db/client.ts"
+  },
+  "dependencies": {
+    "openai": "^6.27.0",
+    "drizzle-orm": "^0.45.2",
+    "p-limit": "^7.3.0",
+    "p-retry": "^7.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  }
+}

@@ -1,234 +1,289 @@
+import { lazy, Suspense } from "react";
+import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
+import { useReducedMotion, easings } from "@/lib/motion";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { PageLoader } from "@/components/PageLoader";
+import { Navbar } from "@/components/layout/navbar";
+import { Footer } from "@/components/layout/footer";
+import { BackButton } from "@/components/layout/back-button";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { ProtectedRoute, PublicOnlyRoute } from "@/components/ProtectedRoute";
+
+const NotFound = lazy(() => import("@/pages/not-found"));
+const Home = lazy(() => import("@/pages/home"));
+const Test = lazy(() => import("@/pages/test"));
+const Results = lazy(() => import("@/pages/results"));
+const Sector = lazy(() => import("@/pages/sector"));
+const Register = lazy(() => import("@/pages/register"));
+const Premium = lazy(() => import("@/pages/premium"));
+const PremiumSuccess = lazy(() => import("@/pages/premium-success"));
+const News = lazy(() => import("@/pages/news"));
+const ResetPassword = lazy(() => import("@/pages/reset-password"));
+const Profilo = lazy(() => import("@/pages/profilo"));
+const Wiki = lazy(() => import("@/pages/wiki"));
+const Roadmap = lazy(() => import("@/pages/roadmap"));
+const Grafo = lazy(() => import("@/pages/grafo"));
+const Archivio = lazy(() => import("@/pages/grafo-conoscenza"));
+const Settori = lazy(() => import("@/pages/settori"));
+const Confronta = lazy(() => import("@/pages/confronta"));
+const Contatti = lazy(() => import("@/pages/contatti"));
+const AdminMessaggi = lazy(() => import("@/pages/admin-messaggi"));
+const AdminAffiliazione = lazy(() => import("@/pages/admin-affiliazione"));
+const AdminReview = lazy(() => import("@/pages/admin-review"));
+const SitemapPage = lazy(() => import("@/pages/sitemap"));
+const ChiSiamo = lazy(() => import("@/pages/chi-siamo"));
+const ComeFunziona = lazy(() => import("@/pages/come-funziona"));
+const PrivacyPolicy = lazy(() => import("@/pages/privacy-policy"));
+const TerminiDiServizio = lazy(() => import("@/pages/termini-di-servizio"));
+const Crescita = lazy(() => import("@/pages/crescita"));
+const CrescitaCategoria = lazy(() => import("@/pages/crescita-categoria"));
+const CrescitaArticolo = lazy(() => import("@/pages/crescita-articolo"));
+const Candidature = lazy(() => import("@/pages/candidature"));
+const Amici = lazy(() => import("@/pages/amici"));
+const Utente = lazy(() => import("@/pages/utente"));
+const Calendario = lazy(() => import("@/pages/Calendario"));
+const Ruolo = lazy(() => import("@/pages/ruolo"));
+const Ruoli = lazy(() => import("@/pages/ruoli"));
+const Affiliazione = lazy(() => import("@/pages/affiliazione"));
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const AffiliazioneScuole = lazy(() => import("@/pages/affiliazione-scuole"));
+const AffiliazioneUniversita = lazy(() => import("@/pages/affiliazione-universita"));
+const AffiliazioneAgenzie = lazy(() => import("@/pages/affiliazione-agenzie"));
+const AffiliazioneFormazione = lazy(() => import("@/pages/affiliazione-formazione"));
+// ── Fase 4: Dashboard affiliato (area privata) ─────────────────────────────
+const AffiliazioneDashboard = lazy(() => import("@/pages/affiliazione-dashboard"));
+const Colloquio = lazy(() => import("@/pages/colloquio"));
+const SkillsGap = lazy(() => import("@/pages/skills-gap"));
+const Coach = lazy(() => import("@/pages/coach"));
+const ValidatoreIdea = lazy(() => import("@/pages/validatore-idea"));
+const Percorso = lazy(() => import("@/pages/percorso"));
+const ScoreCard = lazy(() => import("@/pages/score-card"));
+const Lavori = lazy(() => import("@/pages/lavori"));
+const AdminMetriche = lazy(() => import("@/pages/admin-metriche"));
+const AdminStatus = lazy(() => import("@/pages/admin-status"));
+const AdminHome = lazy(() => import("@/pages/admin-home"));
+const AdminAgenti = lazy(() => import("@/pages/admin-agenti"));
+const AdminCataloghi = lazy(() => import("@/pages/admin-cataloghi"));
+const AdminCrescita = lazy(() => import("@/pages/admin-crescita"));
+const CertificatePage = lazy(() => import("@/pages/certificato"));
+
 /**
- * App.tsx — apps/web
- *
- * Estende LibApp (lib/api-client-react) aggiungendo le route
- * specifiche di questo deployment: /wendy e /affiliate.
- *
- * ⚠️  REGOLA DI ESTENSIONE:
- *   - NON modificare lib/api-client-react/src/App.tsx per aggiungere
- *     route specifiche di apps/web. Aggiungile qui.
- *   - Le route /wendy e /affiliate vanno PRIMA del catch-all 404
- *     che è in fondo al Switch della lib.
- *   - Se si aggiungono nuove route in futuro: lazy import in cima,
- *     AuthRoute/PremiumRoute per protezione, pw() per animazione.
- *
- * ARCHITETTURA:
- *   LibApp gestisce: Navbar, BottomNav, QueryClientProvider,
- *   AnimatePresence, tutti i PageWrapper, tutti i Route guards.
- *   Questo file inietta solo le Route aggiuntive tramite
- *   extraRoutes prop.
- *
- * data-auth-ready:
- *   Il <div> root espone data-auth-ready={String(!authLoading)}.
- *   Viene impostato a "true" quando useAuth() ha completato il fetch
- *   di /api/auth/me (isLoading → false).
- *   Usato da e2e/helpers/auth.ts → waitForAuthReady() come segnale
- *   deterministico che l'auth è pronta, invece del fragile networkidle.
- *   Impatto runtime: zero — attributo HTML inerte letto solo dai test.
+ * QueryClient ottimizzato:
+ * - staleTime 5 min: non refetcha se i dati sono freschi
+ * - gcTime 30 min: mantiene in cache anche le query non montate
+ * - refetchOnWindowFocus false: evita refetch inutili al cambio tab
  */
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error: unknown) => {
+        const status = (error as { status?: number })?.status;
+        if (status === 401 || status === 403 || status === 404) return false;
+        return failureCount < 2;
+      },
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: "always",
+    },
+  },
+});
 
-import { Route, Switch, useLocation } from 'wouter';
-import { lazy, Suspense, useEffect } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { queryClient } from '@/lib/queryClient';
-import { useAuth } from '@/hooks/useAuth';
-import { Navbar } from '@/components/layout/Navbar';
-import { BottomNav } from '@/components/layout/BottomNav';
-import { SmartSkeleton } from '@/components/ui/SmartSkeleton';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
+function AnimatedRoutes() {
+  const [location] = useLocation();
+  const prefersReduced = useReducedMotion();
 
-// ─── Lazy imports lib (copiati da lib/api-client-react) ───────────────────────
-const HomePage           = lazy(() => import('@/pages/home'));
-const TestPage           = lazy(() => import('@/pages/test'));
-const ResultsPage        = lazy(() => import('@/pages/results'));
-const DashboardPage      = lazy(() => import('@/pages/dashboard'));
-const SectorsPage        = lazy(() => import('@/pages/settori'));
-const SectorPage         = lazy(() => import('@/pages/sector'));
-const RoadmapPage        = lazy(() => import('@/pages/percorso'));
-const GraphPage          = lazy(() => import('@/pages/grafo'));
-const WikiPage           = lazy(() => import('@/pages/wiki'));
-const NewsPage           = lazy(() => import('@/pages/news'));
-const ProfilePage        = lazy(() => import('@/pages/profilo'));
-const LoginPage          = lazy(() => import('@/pages/login'));
-const RegisterPage       = lazy(() => import('@/pages/register'));
-const AdminHome          = lazy(() => import('@/pages/admin-home'));
-const NotFoundPage       = lazy(() => import('@/pages/not-found'));
-const PremiumPage        = lazy(() => import('@/pages/premium'));
-const LazyComeFunziona   = lazy(() => import('@/pages/come-funziona'));
-const LazyChiSiamo       = lazy(() => import('@/pages/chi-siamo'));
-const LazyContatti       = lazy(() => import('@/pages/contatti'));
-const LazyCalendario     = lazy(() => import('@/pages/Calendario'));
-const LazyCertificazioni = lazy(() => import('@/pages/certificato'));
-const LazyCandidature    = lazy(() => import('@/pages/candidature'));
-const LazyAmici          = lazy(() => import('@/pages/amici'));
-const LazyScoreCard      = lazy(() => import('@/pages/score-card'));
-const LazyCoach          = lazy(() => import('@/pages/coach'));
-const LazyColloquio      = lazy(() => import('@/pages/colloquio'));
-const LazySkillsGap      = lazy(() => import('@/pages/skills-gap'));
-const LazyValidatore     = lazy(() => import('@/pages/validatore-idea'));
-const LazyGrafoConoscenza= lazy(() => import('@/pages/grafo-conoscenza'));
+  const routes = (loc: string) => (
+    <Switch location={loc}>
+      <Route path="/" component={Home} />
+      <Route path="/test" component={Test} />
+      <Route path="/risultati/:id" component={Results} />
+      <Route path="/settore/:id" component={Sector} />
+      <Route path="/ruolo/:id" component={Ruolo} />
+      <Route path="/registra">
+        <PublicOnlyRoute component={Register} />
+      </Route>
+      <Route path="/reset-password">
+        <PublicOnlyRoute component={ResetPassword} />
+      </Route>
+      <Route path="/premium" component={Premium} />
+      <Route path="/premium/successo">
+        <ProtectedRoute component={PremiumSuccess} />
+      </Route>
+      <Route path="/news" component={News} />
+      <Route path="/profilo">
+        <ProtectedRoute component={Profilo} />
+      </Route>
+      <Route path="/candidature">
+        <ProtectedRoute component={Candidature} />
+      </Route>
+      <Route path="/calendario">
+        <ProtectedRoute component={Calendario} />
+      </Route>
+      <Route path="/amici">
+        <ProtectedRoute component={Amici} />
+      </Route>
+      <Route path="/utente/:id" component={Utente} />
+      <Route path="/wiki/:id">
+        <ProtectedRoute component={Wiki} />
+      </Route>
+      <Route path="/roadmap/:id">
+        <ProtectedRoute component={Roadmap} />
+      </Route>
+      {/* Archivio — new canonical routes */}
+      <Route path="/archivio">
+        <ProtectedRoute component={Archivio} />
+      </Route>
+      <Route path="/archivio/:id">
+        <ProtectedRoute component={Grafo} />
+      </Route>
+      {/* Legacy /grafo routes — permanent redirect to /archivio */}
+      <Route path="/grafo">
+        <Redirect to="/archivio" />
+      </Route>
+      <Route path="/grafo/:id">
+        {(params) => <Redirect to={`/archivio/${params.id}`} />}
+      </Route>
+      <Route path="/settori" component={Settori} />
+      <Route path="/ruoli" component={Ruoli} />
+      <Route path="/confronta" component={Confronta} />
+      <Route path="/contatti" component={Contatti} />
+      <Route path="/sitemap" component={SitemapPage} />
+      <Route path="/chi-siamo" component={ChiSiamo} />
+      <Route path="/come-funziona" component={ComeFunziona} />
+      <Route path="/privacy-policy" component={PrivacyPolicy} />
+      <Route path="/termini-di-servizio" component={TerminiDiServizio} />
+      <Route path="/crescita" component={Crescita} />
+      <Route path="/crescita/categoria/:cat" component={CrescitaCategoria} />
+      <Route path="/crescita/articolo/:slug" component={CrescitaArticolo} />
+      <Route path="/dashboard">
+        <ProtectedRoute component={Dashboard} />
+      </Route>
+      <Route path="/affiliazione" component={Affiliazione} />
+      <Route path="/affiliazione/scuole" component={AffiliazioneScuole} />
+      <Route path="/affiliazione/universita" component={AffiliazioneUniversita} />
+      <Route path="/affiliazione/agenzie-lavoro" component={AffiliazioneAgenzie} />
+      <Route path="/affiliazione/centri-formazione" component={AffiliazioneFormazione} />
+      {/* Fase 4: dashboard privata affiliato — DOPO le route pubbliche /affiliazione/* */}
+      <Route path="/affiliazione/dashboard">
+        <ProtectedRoute component={AffiliazioneDashboard} />
+      </Route>
+      <Route path="/colloquio/:id">
+        <ProtectedRoute component={Colloquio} />
+      </Route>
+      <Route path="/skills-gap/:id">
+        <ProtectedRoute component={SkillsGap} />
+      </Route>
+      <Route path="/coach" component={Coach} />
+      <Route path="/validatore-idea">
+        <ProtectedRoute component={ValidatoreIdea} />
+      </Route>
+      <Route path="/percorso">
+        <ProtectedRoute component={Percorso} />
+      </Route>
+      <Route path="/score/:userId" component={ScoreCard} />
+      <Route path="/lavori" component={Lavori} />
+      <Route component={NotFound} />
+    </Switch>
+  );
 
-// ─── Lazy imports apps/web — ROUTE SPECIFICHE DI QUESTO DEPLOYMENT ────────────
-const WendyRoute     = lazy(() => import('./pages/wendy'));
-const AffiliateRoute = lazy(() => import('./pages/affiliate'));
-
-// ─── PageWrapper ─────────────────────────────────────────────────────────────
-function PageWrapper({
-  children,
-  locationKey,
-}: {
-  children: React.ReactNode;
-  locationKey: string;
-}) {
-  return (
-    <motion.div
-      key={locationKey}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.25 }}
-    >
+  if (prefersReduced) {
+    return (
       <ErrorBoundary>
-        <Suspense fallback={<SmartSkeleton type="card" />}>
-          {children}
+        <Suspense fallback={<PageLoader />}>
+          {routes(location)}
         </Suspense>
       </ErrorBoundary>
-    </motion.div>
-  );
-}
-
-// ─── Route Guards ────────────────────────────────────────────────────────────
-function AuthRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      setLocation('/login?redirect=' + encodeURIComponent(window.location.pathname));
-    }
-  }, [user, isLoading, setLocation]);
-
-  if (isLoading) return <SmartSkeleton type="card" message="Verifica autenticazione..." />;
-  if (!user) return null;
-  return <Component />;
-}
-
-function PremiumRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      setLocation('/login?redirect=' + encodeURIComponent(window.location.pathname));
-      return;
-    }
-    if (!isLoading && user && !user.isPremium) {
-      setLocation('/premium');
-    }
-  }, [user, isLoading, setLocation]);
-
-  if (isLoading) return <SmartSkeleton type="card" />;
-  if (!user?.isPremium) return null;
-  return <Component />;
-}
-
-function AdminRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user } = useAuth();
-  if (!user?.isAdmin) {
-    return (
-      <Suspense fallback={<SmartSkeleton type="card" />}>
-        <NotFoundPage />
-      </Suspense>
     );
   }
-  return <Component />;
-}
-
-// ─── App ─────────────────────────────────────────────────────────────────────
-export default function App() {
-  const [location] = useLocation();
-
-  // ── data-auth-ready ────────────────────────────────────────────────────
-  // Espone lo stato di isLoading di useAuth() come attributo HTML sul nodo
-  // radice così Playwright può rilevarlo con:
-  //   page.waitForSelector('[data-auth-ready="true"]')
-  // Transizioni:
-  //   mount       → data-auth-ready="false"  (fetch /api/auth/me in corso)
-  //   fetch done  → data-auth-ready="true"   (user oppure null, non importa)
-  // Il segnale è deterministico anche con SSE aperte che tengono
-  // networkidle sospeso indefinitamente.
-  const { isLoading: authLoading } = useAuth();
-
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [location]);
-
-  const pw = (node: React.ReactNode) => (
-    <PageWrapper locationKey={location}>{node}</PageWrapper>
-  );
 
   return (
+    <ErrorBoundary>
+      <LazyMotion features={domAnimation} strict>
+        <AnimatePresence mode="sync" initial={false}>
+          <m.div
+            key={location}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0, transition: { duration: 0.12, ease: easings.easeOut } }}
+            exit={{ opacity: 0, y: -4, transition: { duration: 0.08, ease: easings.easeIn } }}
+          >
+            <Suspense fallback={<PageLoader />}>
+              {routes(location)}
+            </Suspense>
+          </m.div>
+        </AnimatePresence>
+      </LazyMotion>
+    </ErrorBoundary>
+  );
+}
+
+function Router() {
+  return (
+    <Switch>
+      <Route path="/admin/messaggi">
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminMessaggi /></Suspense></ErrorBoundary>
+      </Route>
+      <Route path="/admin/affiliazione">
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminAffiliazione /></Suspense></ErrorBoundary>
+      </Route>
+      <Route path="/admin/review">
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminReview /></Suspense></ErrorBoundary>
+      </Route>
+      <Route path="/admin/metriche">
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminMetriche /></Suspense></ErrorBoundary>
+      </Route>
+      <Route path="/admin/status">
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminStatus /></Suspense></ErrorBoundary>
+      </Route>
+      <Route path="/admin/agenti">
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminAgenti /></Suspense></ErrorBoundary>
+      </Route>
+      <Route path="/admin/cataloghi">
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminCataloghi /></Suspense></ErrorBoundary>
+      </Route>
+      <Route path="/admin/crescita">
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminCrescita /></Suspense></ErrorBoundary>
+      </Route>
+      <Route path="/admin">
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminHome /></Suspense></ErrorBoundary>
+      </Route>
+      <Route path="/certificato/:hash">
+        <ErrorBoundary><Suspense fallback={<PageLoader />}><CertificatePage /></Suspense></ErrorBoundary>
+      </Route>
+      <Route>
+        <div className="flex flex-col min-h-[100dvh]">
+          <Navbar />
+          <main className="flex-1 pb-16 md:pb-0">
+            <BackButton />
+            <AnimatedRoutes />
+          </main>
+          <div className="hidden md:block"><Footer /></div>
+          <MobileBottomNav />
+        </div>
+      </Route>
+    </Switch>
+  );
+}
+
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
-      <div
-        className="min-h-screen bg-[#0e1018] text-[#e6e8ed] pb-20 md:pb-0"
-        data-auth-ready={String(!authLoading)}
-      >
-        <Navbar />
-
-        <main className="relative">
-          <AnimatePresence mode="wait">
-            <Switch>
-              {/* ── Pubblico ─────────────────────────────────────────────── */}
-              <Route path="/"                  component={() => pw(<HomePage />)} />
-              <Route path="/test"              component={() => pw(<TestPage />)} />
-              <Route path="/risultati"         component={() => pw(<ResultsPage />)} />
-              <Route path="/login"             component={() => pw(<LoginPage />)} />
-              <Route path="/register"          component={() => pw(<RegisterPage />)} />
-              <Route path="/premium"           component={() => pw(<PremiumPage />)} />
-              <Route path="/come-funziona"     component={() => pw(<LazyComeFunziona />)} />
-              <Route path="/chi-siamo"         component={() => pw(<LazyChiSiamo />)} />
-              <Route path="/contatti"          component={() => pw(<LazyContatti />)} />
-              <Route path="/score/:userId"     component={() => pw(<LazyScoreCard />)} />
-
-              {/* ── Autenticato ──────────────────────────────────────────── */}
-              <Route path="/dashboard"         component={() => pw(<AuthRoute component={DashboardPage} />)} />
-              <Route path="/settori"           component={() => pw(<AuthRoute component={SectorsPage} />)} />
-              <Route path="/settore/:id"       component={() => pw(<AuthRoute component={SectorPage} />)} />
-              <Route path="/profilo"           component={() => pw(<AuthRoute component={ProfilePage} />)} />
-              <Route path="/profilo/:id"       component={() => pw(<AuthRoute component={ProfilePage} />)} />
-              <Route path="/calendario"        component={() => pw(<AuthRoute component={LazyCalendario} />)} />
-              <Route path="/certificazioni"    component={() => pw(<AuthRoute component={LazyCertificazioni} />)} />
-              <Route path="/candidature"       component={() => pw(<AuthRoute component={LazyCandidature} />)} />
-              <Route path="/amici"             component={() => pw(<AuthRoute component={LazyAmici} />)} />
-
-              {/* ── apps/web — Route specifiche ──────────────────────────── */}
-              <Route path="/wendy"             component={() => pw(<AuthRoute component={WendyRoute} />)} />
-              <Route path="/affiliate"         component={() => pw(<AuthRoute component={AffiliateRoute} />)} />
-
-              {/* ── Premium ──────────────────────────────────────────────── */}
-              <Route path="/percorso"          component={() => pw(<PremiumRoute component={RoadmapPage} />)} />
-              <Route path="/mappa"             component={() => pw(<PremiumRoute component={GraphPage} />)} />
-              <Route path="/wiki"              component={() => pw(<PremiumRoute component={WikiPage} />)} />
-              <Route path="/news"              component={() => pw(<PremiumRoute component={NewsPage} />)} />
-              <Route path="/coach"             component={() => pw(<PremiumRoute component={LazyCoach} />)} />
-              <Route path="/colloquio"         component={() => pw(<PremiumRoute component={LazyColloquio} />)} />
-              <Route path="/skills-gap"        component={() => pw(<PremiumRoute component={LazySkillsGap} />)} />
-              <Route path="/validatore-idea"   component={() => pw(<PremiumRoute component={LazyValidatore} />)} />
-              <Route path="/grafo-conoscenza"  component={() => pw(<PremiumRoute component={LazyGrafoConoscenza} />)} />
-
-              {/* ── Admin ────────────────────────────────────────────────── */}
-              <Route path="/admin"             component={() => pw(<AdminRoute component={AdminHome} />)} />
-              <Route path="/admin/:section"    component={() => pw(<AdminRoute component={AdminHome} />)} />
-
-              {/* ── 404 ─────────────────────────────────────────────────── */}
-              <Route component={() => pw(<NotFoundPage />)} />
-            </Switch>
-          </AnimatePresence>
-        </main>
-
-        <BottomNav />
-      </div>
+      <AuthProvider>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
+
+export default App;

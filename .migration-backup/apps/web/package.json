@@ -1,0 +1,38 @@
+{
+  "name": "@northstar/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev":       "vite --port 5173 --host",
+    "build":     "vite build",
+    "preview":   "vite preview --port 5173",
+    "typecheck": "tsc --noEmit",
+    "analyze":   "ANALYZE=true vite build"
+  },
+  "dependencies": {
+    "@tanstack/react-query":  "catalog:",
+    "class-variance-authority": "catalog:",
+    "clsx":                   "catalog:",
+    "framer-motion":          "catalog:",
+    "lucide-react":           "catalog:",
+    "react":                  "catalog:",
+    "react-dom":              "catalog:",
+    "tailwind-merge":         "catalog:",
+    "web-vitals":             "^5.0.0",
+    "wouter":                 "catalog:",
+    "zod":                    "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite":       "catalog:",
+    "@types/node":             "catalog:",
+    "@types/react":            "catalog:",
+    "@types/react-dom":        "catalog:",
+    "@vitejs/plugin-react":    "catalog:",
+    "rollup-plugin-visualizer": "^5.12.0",
+    "tailwindcss":             "catalog:",
+    "typescript":              "~5.9.2",
+    "vite":                    "catalog:",
+    "vite-plugin-pwa":         "^0.21.0"
+  }
+}

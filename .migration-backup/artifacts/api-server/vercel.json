@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "installCommand": "cd ../.. && pnpm install",
+  "buildCommand": "cd ../.. && pnpm --filter @workspace/api-server build",
+  "builds": [
+    {
+      "src": "api/index.mjs",
+      "use": "@vercel/node"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.mjs"
+    }
+  ]
+}

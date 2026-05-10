@@ -1,14 +1,46 @@
-/**
- * ErrorBoundary.tsx — apps/web
- *
- * Catch JavaScript errors nei sottoalberi React,
- * mostra un fallback UI ed evita che l'intera app crashi.
- *
- * Nota: in produzione sostituire con un componente più sofisticato
- * o con react-error-boundary.
- */
+import { Component, type ReactNode, type ErrorInfo } from "react";
+import { AlertTriangle, RefreshCw, Home } from "lucide-react";
 
-import { Component, type ReactNode } from 'react';
+/* ── StreamErrorBoundary ──────────────────────────────────────────────────────
+ * Boundary leggero per aree di streaming SSE.
+ * Cattura errori di render e mostra un bottone "Riprova" inline
+ * che resetta il boundary senza ricaricare la pagina.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+interface StreamBoundaryProps {
+  children: ReactNode;
+  label?: string;
+}
+
+interface StreamBoundaryState {
+  hasError: boolean;
+}
+
+export class StreamErrorBoundary extends Component<StreamBoundaryProps, StreamBoundaryState> {
+  state: StreamBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): StreamBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[StreamErrorBoundary]", error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError)
+      return (
+        <button
+          onClick={() => this.setState({ hasError: false })}
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-muted hover:bg-muted/80 border border-border transition-colors"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          {this.props.label ?? "Riprova"}
+        </button>
+      );
+    return this.props.children;
+  }
+}
 
 interface Props {
   children: ReactNode;
@@ -30,42 +62,56 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: { componentStack: string }) {
-    // Log dell'errore (sostituire con Sentry / log remoto in produzione)
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[ErrorBoundary]", error, info.componentStack);
   }
+
+  handleReset = () => {
+    this.setState({ hasError: false, error: null });
+  };
 
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
 
       return (
-        <div
-          role="alert"
-          className="flex flex-col items-center justify-center h-full text-center px-4"
-        >
-          <h2 className="text-lg font-semibold text-[#e57373] mb-2">
-            Qualcosa è andato storto
-          </h2>
-          <p className="text-sm text-[#7db89a]/60 mb-4">
-            Si è verificato un errore imprevisto. Ricarica la pagina per riprovare.
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 text-sm font-medium rounded-lg
-                       bg-[#c19e4a] text-[#0b0d14]
-                       hover:bg-[#d4aa52] transition-colors"
-          >
-            Ricarica
-          </button>
-          {this.state.error && (
-            <details className="mt-4 text-xs text-[#7db89a]/40 max-w-md">
-              <summary className="cursor-pointer">Dettagli errore</summary>
-              <pre className="mt-2 text-left overflow-x-auto">
-                {this.state.error.message}
-              </pre>
-            </details>
-          )}
+        <div className="min-h-[50vh] flex items-center justify-center p-6">
+          <div className="max-w-md w-full text-center space-y-6">
+            <div className="flex justify-center">
+              <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <AlertTriangle className="w-8 h-8 text-red-500" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                Qualcosa è andato storto
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Si è verificato un errore inaspettato. Puoi riprovare o tornare alla home.
+              </p>
+              {this.state.error && (
+                <p className="text-xs font-mono text-red-400 bg-red-50 dark:bg-red-900/20 rounded p-2 mt-2 break-all">
+                  {this.state.error.message}
+                </p>
+              )}
+            </div>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={this.handleReset}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Riprova
+              </button>
+              <a
+                href="/"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <Home className="w-4 h-4" />
+                Torna alla Home
+              </a>
+            </div>
+          </div>
         </div>
       );
     }
@@ -73,3 +119,5 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
+
+export default ErrorBoundary;
