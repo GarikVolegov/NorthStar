@@ -3,17 +3,18 @@
  *
  * Struttura:
  *   - Header con titolo + contatore
- *   - 3 Tab: Connessioni | Richieste (badge) | Esplora
+ *   - 4 Tab: Connessioni | Richieste (badge) | Esplora | Messaggi (badge DM)
+ *   - Tab Messaggi: lista conversazioni + finestra chat inline
  *   - Tab Esplora: barra di ricerca con debounce 300ms + filtro settore
- *   - Contenuto animato con framer-motion (stagger cards)
+ *   - Contenuto animato con framer-motion
  *   - Skeleton loader durante il caricamento
  *   - Empty state curato per ogni tab
  *
  * Dipendenze:
  *   - useFriends (hook locale)
- *   - framer-motion (già in progetto — App.tsx)
- *   - Lucide icons (già in progetto)
- *   - Tailwind CSS
+ *   - useDirectMessages (hook locale)
+ *   - useNotificationsSnapshot (badge DM non letti)
+ *   - framer-motion, lucide-react, tailwind
  */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "wouter";
@@ -21,11 +22,24 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, UserPlus, Compass, UserCheck, UserX, Clock,
   Star, Zap, Search, X, Loader2, SlidersHorizontal,
+  MessageCircle, Send, Trash2, ArrowLeft, ChevronUp,
 } from "lucide-react";
 import { useFriends, type Friend, type FriendRequest, type Suggestion } from "@/hooks/useFriends";
+import {
+  useConversations,
+  useMessages,
+  useSendMessage,
+  useDeleteMessage,
+  useDMStream,
+  type DMConversation,
+  type DMMessage,
+} from "@/hooks/useDirectMessages";
+import { useNotificationsSnapshot } from "@/hooks/useNotifications";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
-// ── Tipi ──────────────────────────────────────────────────────────────────────
-type Tab = "connessioni" | "richieste" | "esplora";
+// ── Tipi ─────────────────────────────────────────────────────────────────────
+
+type Tab = "connessioni" | "richieste" | "esplora" | "messaggi";
 
 type SearchResult = {
   id: number;
@@ -42,7 +56,8 @@ type SearchState =
   | { status: "done"; results: SearchResult[]; query: string; hasMore: boolean }
   | { status: "error"; message: string };
 
-// ── Costanti animazione ───────────────────────────────────────────────────────
+// ── Costanti animazione ──────────────────────────────────────────────────────────
+
 const listVariants = {
   hidden: {},
   visible: { transition: { staggerChildren: 0.06 } },
@@ -53,7 +68,8 @@ const cardVariants = {
   exit:    { opacity: 0, scale: 0.96, transition: { duration: 0.18 } },
 };
 
-// ── Hook: useSearch ───────────────────────────────────────────────────────────
+// ── Hook: useSearch ──────────────────────────────────────────────────────────────
+
 function useSearch() {
   const [query, setQuery]         = useState("");
   const [sectorFilter, setSector] = useState<number | null>(null);
@@ -123,7 +139,7 @@ function useSearch() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function Avatar({ user }: { user: { name: string; avatarUrl: string | null } }) {
+function Avatar({ user, size = "md" }: { user: { name: string; avatarUrl: string | null }; size?: "sm" | "md" }) {
   const initials = user.name
     .split(" ")
     .map((w) => w[0])
@@ -131,21 +147,25 @@ function Avatar({ user }: { user: { name: string; avatarUrl: string | null } }) 
     .join("")
     .toUpperCase();
 
+  const cls = size === "sm"
+    ? "w-8 h-8 rounded-full text-xs"
+    : "w-11 h-11 rounded-full text-sm";
+
   if (user.avatarUrl) {
     return (
       <img
         src={user.avatarUrl}
         alt={user.name}
-        width={44}
-        height={44}
+        width={size === "sm" ? 32 : 44}
+        height={size === "sm" ? 32 : 44}
         loading="lazy"
-        className="w-11 h-11 rounded-full object-cover flex-shrink-0 ring-2 ring-white/5"
+        className={`${cls} object-cover flex-shrink-0 ring-2 ring-white/5`}
       />
     );
   }
   return (
-    <div className="w-11 h-11 rounded-full bg-[#1e2333] flex items-center justify-center flex-shrink-0 ring-2 ring-white/5">
-      <span className="text-sm font-semibold text-[#7c8db5]">{initials}</span>
+    <div className={`${cls} bg-[#1e2333] flex items-center justify-center flex-shrink-0 ring-2 ring-white/5`}>
+      <span className="font-semibold text-[#7c8db5]">{initials}</span>
     </div>
   );
 }
@@ -166,7 +186,20 @@ function JourneyBadge({ type }: { type: string | null }) {
   );
 }
 
-// ── Skeleton ──────────────────────────────────────────────────────────────────
+function formatTime(iso: string) {
+  const d = new Date(iso);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  if (isToday) {
+    return d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return "Ieri";
+  return d.toLocaleDateString("it-IT", { day: "numeric", month: "short" });
+}
+
+// ── Skeleton ────────────────────────────────────────────────────────────────────
 
 function SkeletonCard() {
   return (
@@ -189,7 +222,7 @@ function SkeletonList({ count = 4 }: { count?: number }) {
   );
 }
 
-// ── Empty states ──────────────────────────────────────────────────────────────
+// ── Empty states ────────────────────────────────────────────────────────────────
 
 function EmptyState({
   icon: Icon,
@@ -229,26 +262,17 @@ function EmptyState({
   );
 }
 
-// ── Schede ────────────────────────────────────────────────────────────────────
+// ── Schede network ────────────────────────────────────────────────────────────────
 
 function FriendCard({
-  friend,
-  onRemove,
-  removing,
-}: {
-  friend: Friend;
-  onRemove: () => void;
-  removing: boolean;
-}) {
+  friend, onRemove, removing,
+}: { friend: Friend; onRemove: () => void; removing: boolean }) {
   const sinceDate = new Date(friend.since).toLocaleDateString("it-IT", {
-    month: "short",
-    year: "numeric",
+    month: "short", year: "numeric",
   });
-
   return (
     <motion.div
-      variants={cardVariants}
-      layout
+      variants={cardVariants} layout
       className="flex items-center gap-3 p-4 rounded-xl bg-[#0d1421] border border-white/[0.06]
                  hover:border-white/10 transition-all group"
     >
@@ -257,18 +281,14 @@ function FriendCard({
       </Link>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <Link
-            href={`/profilo/${friend.user.id}`}
-            className="text-[14px] font-semibold text-[#dce6f5] truncate hover:text-[#7eb3ff] transition-colors"
-          >
+          <Link href={`/profilo/${friend.user.id}`}
+            className="text-[14px] font-semibold text-[#dce6f5] truncate hover:text-[#7eb3ff] transition-colors">
             {friend.user.name}
           </Link>
           <JourneyBadge type={friend.user.journeyType} />
         </div>
         <div className="flex items-center gap-3 text-[12px] text-[#7c8db5]">
-          {friend.user.sectorName && (
-            <span className="truncate">{friend.user.sectorName}</span>
-          )}
+          {friend.user.sectorName && <span className="truncate">{friend.user.sectorName}</span>}
           {friend.user.totalXp != null && (
             <span className="flex items-center gap-1">
               <Zap className="w-3 h-3 text-amber-400" />
@@ -281,14 +301,10 @@ function FriendCard({
           <span>Connessi da {sinceDate}</span>
         </div>
       </div>
-      <button
-        onClick={onRemove}
-        disabled={removing}
-        aria-label="Rimuovi connessione"
+      <button onClick={onRemove} disabled={removing} aria-label="Rimuovi connessione"
         className="opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-lg
                    hover:bg-red-500/10 text-[#4a5a75] hover:text-red-400
-                   disabled:opacity-50 disabled:cursor-not-allowed"
-      >
+                   disabled:opacity-50 disabled:cursor-not-allowed">
         <UserX className="w-4 h-4" />
       </button>
     </motion.div>
@@ -296,22 +312,11 @@ function FriendCard({
 }
 
 function RequestCard({
-  request,
-  onAccept,
-  onDecline,
-  accepting,
-  declining,
-}: {
-  request: FriendRequest;
-  onAccept: () => void;
-  onDecline: () => void;
-  accepting: boolean;
-  declining: boolean;
-}) {
+  request, onAccept, onDecline, accepting, declining,
+}: { request: FriendRequest; onAccept: () => void; onDecline: () => void; accepting: boolean; declining: boolean }) {
   return (
     <motion.div
-      variants={cardVariants}
-      layout
+      variants={cardVariants} layout
       className="flex items-center gap-3 p-4 rounded-xl bg-[#0d1421] border border-[#1a3a6b]/40
                  hover:border-[#1a3a6b]/70 transition-all"
     >
@@ -320,10 +325,8 @@ function RequestCard({
       </Link>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <Link
-            href={`/profilo/${request.user.id}`}
-            className="text-[14px] font-semibold text-[#dce6f5] truncate hover:text-[#7eb3ff] transition-colors"
-          >
+          <Link href={`/profilo/${request.user.id}`}
+            className="text-[14px] font-semibold text-[#dce6f5] truncate hover:text-[#7eb3ff] transition-colors">
             {request.user.name}
           </Link>
         </div>
@@ -333,29 +336,19 @@ function RequestCard({
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
-        <button
-          onClick={onDecline}
-          disabled={declining || accepting}
-          aria-label="Rifiuta richiesta"
+        <button onClick={onDecline} disabled={declining || accepting} aria-label="Rifiuta richiesta"
           className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[#7c8db5]
                      hover:bg-red-500/10 hover:text-red-400 transition-colors
-                     disabled:opacity-50 disabled:cursor-not-allowed"
-        >
+                     disabled:opacity-50 disabled:cursor-not-allowed">
           Rifiuta
         </button>
-        <button
-          onClick={onAccept}
-          disabled={accepting || declining}
-          aria-label="Accetta richiesta"
+        <button onClick={onAccept} disabled={accepting || declining} aria-label="Accetta richiesta"
           className="px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white
                      bg-[#1a3a6b] hover:bg-[#1f4480] transition-colors
-                     disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-        >
-          {accepting ? (
-            <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <UserCheck className="w-3.5 h-3.5" />
-          )}
+                     disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
+          {accepting
+            ? <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            : <UserCheck className="w-3.5 h-3.5" />}
           Accetta
         </button>
       </div>
@@ -364,18 +357,11 @@ function RequestCard({
 }
 
 function SuggestionCard({
-  suggestion,
-  onConnect,
-  sending,
-}: {
-  suggestion: Suggestion;
-  onConnect: () => void;
-  sending: boolean;
-}) {
+  suggestion, onConnect, sending,
+}: { suggestion: Suggestion; onConnect: () => void; sending: boolean }) {
   return (
     <motion.div
-      variants={cardVariants}
-      layout
+      variants={cardVariants} layout
       className="flex items-center gap-3 p-4 rounded-xl bg-[#0d1421] border border-white/[0.06]
                  hover:border-white/10 transition-all"
     >
@@ -384,10 +370,8 @@ function SuggestionCard({
       </Link>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <Link
-            href={`/profilo/${suggestion.id}`}
-            className="text-[14px] font-semibold text-[#dce6f5] truncate hover:text-[#7eb3ff] transition-colors"
-          >
+          <Link href={`/profilo/${suggestion.id}`}
+            className="text-[14px] font-semibold text-[#dce6f5] truncate hover:text-[#7eb3ff] transition-colors">
             {suggestion.name}
           </Link>
         </div>
@@ -402,40 +386,25 @@ function SuggestionCard({
         </div>
         <JourneyBadge type={suggestion.journeyType} />
       </div>
-      <button
-        onClick={onConnect}
-        disabled={sending}
-        aria-label={`Connettiti con ${suggestion.name}`}
+      <button onClick={onConnect} disabled={sending} aria-label={`Connettiti con ${suggestion.name}`}
         className="px-3 py-1.5 rounded-lg text-[12px] font-semibold text-[#7eb3ff]
                    bg-[#1a3a6b]/60 hover:bg-[#1a3a6b] transition-colors
-                   disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-      >
-        {sending ? (
-          <span className="w-3.5 h-3.5 border-2 border-[#7eb3ff]/30 border-t-[#7eb3ff] rounded-full animate-spin" />
-        ) : (
-          <UserPlus className="w-3.5 h-3.5" />
-        )}
+                   disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
+        {sending
+          ? <span className="w-3.5 h-3.5 border-2 border-[#7eb3ff]/30 border-t-[#7eb3ff] rounded-full animate-spin" />
+          : <UserPlus className="w-3.5 h-3.5" />}
         Connetti
       </button>
     </motion.div>
   );
 }
 
-// ── SearchResultCard ──────────────────────────────────────────────────────────
-
 function SearchResultCard({
-  user,
-  onConnect,
-  status,
-}: {
-  user: SearchResult;
-  onConnect: () => void;
-  status: "idle" | "sending" | "sent";
-}) {
+  user, onConnect, status,
+}: { user: SearchResult; onConnect: () => void; status: "idle" | "sending" | "sent" }) {
   return (
     <motion.div
-      variants={cardVariants}
-      layout
+      variants={cardVariants} layout
       className="flex items-center gap-3 p-4 rounded-xl bg-[#0d1421] border border-white/[0.06]
                  hover:border-white/10 transition-all"
     >
@@ -444,10 +413,8 @@ function SearchResultCard({
       </Link>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <Link
-            href={`/profilo/${user.id}`}
-            className="text-[14px] font-semibold text-[#dce6f5] truncate hover:text-[#7eb3ff] transition-colors"
-          >
+          <Link href={`/profilo/${user.id}`}
+            className="text-[14px] font-semibold text-[#dce6f5] truncate hover:text-[#7eb3ff] transition-colors">
             {user.name}
           </Link>
         </div>
@@ -460,32 +427,19 @@ function SearchResultCard({
             </span>
           )}
         </div>
-        {user.journeyType && (
-          <div className="mt-1">
-            <JourneyBadge type={user.journeyType} />
-          </div>
-        )}
+        {user.journeyType && <div className="mt-1"><JourneyBadge type={user.journeyType} /></div>}
       </div>
-
       {status === "sent" ? (
         <span className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-emerald-400 bg-emerald-400/10 flex items-center gap-1.5">
           <UserCheck className="w-3.5 h-3.5" />
           Inviata
         </span>
       ) : (
-        <button
-          onClick={onConnect}
-          disabled={status === "sending"}
-          aria-label={`Connettiti con ${user.name}`}
+        <button onClick={onConnect} disabled={status === "sending"} aria-label={`Connettiti con ${user.name}`}
           className="px-3 py-1.5 rounded-lg text-[12px] font-semibold text-[#7eb3ff]
                      bg-[#1a3a6b]/60 hover:bg-[#1a3a6b] transition-colors
-                     disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-        >
-          {status === "sending" ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <UserPlus className="w-3.5 h-3.5" />
-          )}
+                     disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
+          {status === "sending" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
           Connetti
         </button>
       )}
@@ -493,53 +447,26 @@ function SearchResultCard({
   );
 }
 
-// ── SearchBar ─────────────────────────────────────────────────────────────────
-
 function SearchBar({
-  query,
-  onChange,
-  onClear,
-  isSearching,
-}: {
-  query: string;
-  onChange: (v: string) => void;
-  onClear: () => void;
-  isSearching: boolean;
-}) {
+  query, onChange, onClear, isSearching,
+}: { query: string; onChange: (v: string) => void; onClear: () => void; isSearching: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
-
   return (
     <div className="relative">
       <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#4a5a75] pointer-events-none">
-        {isSearching
-          ? <Loader2 className="w-4 h-4 animate-spin" />
-          : <Search className="w-4 h-4" />
-        }
+        {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
       </div>
-      <input
-        ref={inputRef}
-        type="search"
-        value={query}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Cerca per nome…"
-        autoComplete="off"
-        spellCheck={false}
+      <input ref={inputRef} type="search" value={query} onChange={(e) => onChange(e.target.value)}
+        placeholder="Cerca per nome…" autoComplete="off" spellCheck={false}
         aria-label="Cerca utenti per nome"
-        className="
-          w-full pl-10 pr-10 py-2.5 rounded-xl
-          bg-[#0d1421] border border-white/[0.08]
-          text-[14px] text-[#dce6f5] placeholder:text-[#4a5a75]
-          focus:outline-none focus:border-[#2a4a8b]/70 focus:ring-1 focus:ring-[#2a4a8b]/40
-          transition-all
-        "
-      />
+        className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#0d1421] border border-white/[0.08]
+                   text-[14px] text-[#dce6f5] placeholder:text-[#4a5a75]
+                   focus:outline-none focus:border-[#2a4a8b]/70 focus:ring-1 focus:ring-[#2a4a8b]/40
+                   transition-all" />
       {query.length > 0 && (
-        <button
-          onClick={onClear}
-          aria-label="Cancella ricerca"
+        <button onClick={onClear} aria-label="Cancella ricerca"
           className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded text-[#4a5a75]
-                     hover:text-[#7c8db5] transition-colors"
-        >
+                     hover:text-[#7c8db5] transition-colors">
           <X className="w-3.5 h-3.5" />
         </button>
       )}
@@ -547,148 +474,79 @@ function SearchBar({
   );
 }
 
-// ── TabEsplora ────────────────────────────────────────────────────────────────
+// ── TabEsplora ──────────────────────────────────────────────────────────────────
 
 function TabEsplora({
-  suggestions,
-  pendingFriendIds,
-  onConnectSuggestion,
-}: {
-  suggestions: Suggestion[];
-  pendingFriendIds: Record<string, string>;
-  onConnectSuggestion: (id: string) => void;
-}) {
+  suggestions, pendingFriendIds, onConnectSuggestion,
+}: { suggestions: Suggestion[]; pendingFriendIds: Record<string, string>; onConnectSuggestion: (id: string) => void }) {
   const search = useSearch();
 
   async function handleConnectSearch(user: SearchResult) {
     search.markSending(user.id);
     try {
       const res = await fetch(`/api/friends/request/${user.id}`, {
-        method: "POST",
-        credentials: "include",
+        method: "POST", credentials: "include",
       });
-      if (res.ok || res.status === 409) {
-        search.markSent(user.id);
-      } else {
-        search.markSending(user.id);
-      }
-    } catch {
-      // ignora
-    }
+      if (res.ok || res.status === 409) search.markSent(user.id);
+      else search.markSending(user.id);
+    } catch { /* ignora */ }
   }
 
   const isActiveSearch = search.query.trim().length >= 2;
 
   return (
     <div className="space-y-4">
-      <SearchBar
-        query={search.query}
-        onChange={search.setQuery}
-        onClear={search.clear}
-        isSearching={search.state.status === "searching"}
-      />
+      <SearchBar query={search.query} onChange={search.setQuery}
+        onClear={search.clear} isSearching={search.state.status === "searching"} />
 
       <AnimatePresence mode="wait">
         {isActiveSearch ? (
-          <motion.div
-            key="search-results"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
+          <motion.div key="search-results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
             {search.state.status === "searching" && <SkeletonList count={3} />}
-
             {search.state.status === "error" && (
-              <div className="text-center py-8 text-[#7c8db5] text-[13px]">
-                <p>{search.state.message}</p>
-              </div>
+              <div className="text-center py-8 text-[#7c8db5] text-[13px]"><p>{search.state.message}</p></div>
             )}
-
             {search.state.status === "done" && (
               <>
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-[12px] text-[#4a5a75]">
                     {search.state.results.length === 0
                       ? `Nessun risultato per "${search.state.query}"`
-                      : `${search.state.results.length}${
-                          search.state.hasMore ? "+" : ""
-                        } risultat${search.state.results.length === 1 ? "o" : "i"} per "${search.state.query}"`
-                    }
+                      : `${search.state.results.length}${search.state.hasMore ? "+" : ""} risultat${search.state.results.length === 1 ? "o" : "i"} per "${search.state.query}"`}
                   </p>
                 </div>
-
                 {search.state.results.length === 0 ? (
-                  <EmptyState
-                    icon={Search}
-                    title="Nessun utente trovato"
-                    description={`Non ci sono utenti pubblici con il nome "${search.state.query}"`}
-                  />
+                  <EmptyState icon={Search} title="Nessun utente trovato" description={`Non ci sono utenti pubblici con il nome "${search.state.query}"`} />
                 ) : (
-                  <motion.div
-                    variants={listVariants}
-                    initial="hidden"
-                    animate="visible"
-                    className="space-y-3"
-                  >
+                  <motion.div variants={listVariants} initial="hidden" animate="visible" className="space-y-3">
                     {search.state.results.map((u) => (
-                      <SearchResultCard
-                        key={u.id}
-                        user={u}
-                        status={
-                          search.pendingIds[u.id] === "sent"
-                            ? "sent"
-                            : search.pendingIds[u.id] === "sending"
-                            ? "sending"
-                            : "idle"
-                        }
-                        onConnect={() => handleConnectSearch(u)}
-                      />
+                      <SearchResultCard key={u.id} user={u}
+                        status={search.pendingIds[u.id] === "sent" ? "sent" : search.pendingIds[u.id] === "sending" ? "sending" : "idle"}
+                        onConnect={() => handleConnectSearch(u)} />
                     ))}
                   </motion.div>
                 )}
-
                 {search.state.hasMore && (
-                  <p className="text-center text-[11px] text-[#4a5a75] mt-3">
-                    Affina la ricerca per trovare risultati più specifici
-                  </p>
+                  <p className="text-center text-[11px] text-[#4a5a75] mt-3">Affina la ricerca per trovare risultati più specifici</p>
                 )}
               </>
             )}
           </motion.div>
         ) : (
-          <motion.div
-            key="suggestions"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
+          <motion.div key="suggestions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
             {suggestions.length === 0 ? (
-              <EmptyState
-                icon={Compass}
-                title="Nessun suggerimento al momento"
-                description="Completa il tuo profilo per essere trovato da altri utenti"
-              />
+              <EmptyState icon={Compass} title="Nessun suggerimento al momento" description="Completa il tuo profilo per essere trovato da altri utenti" />
             ) : (
               <>
                 <p className="text-[12px] text-[#4a5a75] mb-4 flex items-center gap-1.5">
                   <Star className="w-3.5 h-3.5 text-amber-400/60" />
                   Persone con il tuo stesso settore o percorso
                 </p>
-                <motion.div
-                  variants={listVariants}
-                  initial="hidden"
-                  animate="visible"
-                  className="space-y-3"
-                >
+                <motion.div variants={listVariants} initial="hidden" animate="visible" className="space-y-3">
                   {suggestions.map((s) => (
-                    <SuggestionCard
-                      key={s.id}
-                      suggestion={s}
+                    <SuggestionCard key={s.id} suggestion={s}
                       sending={pendingFriendIds[s.id] === "sending"}
-                      onConnect={() => onConnectSuggestion(s.id)}
-                    />
+                      onConnect={() => onConnectSuggestion(s.id)} />
                   ))}
                 </motion.div>
               </>
@@ -700,24 +558,375 @@ function TabEsplora({
   );
 }
 
-// ── Pagina principale ─────────────────────────────────────────────────────────
+// ── ChatWindow ───────────────────────────────────────────────────────────────────
+
+function ChatWindow({
+  conversation,
+  myId,
+  onBack,
+}: {
+  conversation: DMConversation;
+  myId: number;
+  onBack: () => void;
+}) {
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
+    useMessages(conversation.participant.id);
+  const sendMsg   = useSendMessage();
+  const deleteMsg = useDeleteMessage();
+
+  const [text, setText] = useState("");
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
+
+  // Colleziona tutti i messaggi dalle pagine (ordine cronologico)
+  const allMessages: DMMessage[] = data?.pages
+    .flatMap((p) => p.messages)
+    .filter((m) => !m.isDeleted) ?? [];
+
+  // SSE stream per nuovi messaggi in tempo reale
+  useDMStream(conversation.participant.id, () => {
+    // Scroll to bottom solo se già in fondo
+    if (isAtBottomRef.current) {
+      requestAnimationFrame(() =>
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+      );
+    }
+  });
+
+  // Auto-scroll al fondo all'apertura e quando arrivano nuovi messaggi
+  useEffect(() => {
+    if (!isLoading && allMessages.length > 0 && isAtBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "instant" });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allMessages.length, isLoading]);
+
+  // Traccia se l'utente è in fondo alla chat
+  function handleScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    isAtBottomRef.current = distFromBottom < 60;
+  }
+
+  async function handleSend() {
+    const content = text.trim();
+    if (!content || sendMsg.isPending) return;
+    setText("");
+    isAtBottomRef.current = true;
+    await sendMsg.mutateAsync({ userId: conversation.participant.id, content });
+    requestAnimationFrame(() =>
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+    );
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void handleSend();
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+      className="flex flex-col h-[540px] rounded-2xl bg-[#0a111e] border border-white/[0.06] overflow-hidden"
+    >
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] flex-shrink-0">
+        <button
+          onClick={onBack}
+          aria-label="Torna alle conversazioni"
+          className="p-1.5 rounded-lg text-[#7c8db5] hover:text-[#dce6f5] hover:bg-white/[0.05] transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+        <Avatar user={conversation.participant} size="sm" />
+        <div className="flex-1 min-w-0">
+          <p className="text-[14px] font-semibold text-[#dce6f5] truncate">
+            {conversation.participant.name}
+          </p>
+        </div>
+        <Link
+          href={`/profilo/${conversation.participant.id}`}
+          className="text-[11px] text-[#4a5a75] hover:text-[#7eb3ff] transition-colors"
+        >
+          Vedi profilo
+        </Link>
+      </div>
+
+      {/* Messaggi */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-2 scroll-smooth"
+      >
+        {/* Load older */}
+        {hasNextPage && (
+          <div className="flex justify-center mb-2">
+            <button
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              className="flex items-center gap-1.5 text-[12px] text-[#4a5a75] hover:text-[#7c8db5]
+                         px-3 py-1.5 rounded-lg hover:bg-white/[0.04] transition-colors"
+            >
+              {isFetchingNextPage
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <ChevronUp className="w-3.5 h-3.5" />}
+              Carica messaggi precedenti
+            </button>
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="flex flex-col gap-2">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className={`flex ${i % 2 === 0 ? "justify-end" : "justify-start"}`}>
+                <div className="h-8 w-40 rounded-2xl bg-[#1e2c42] animate-pulse" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!isLoading && allMessages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-center py-8">
+            <Avatar user={conversation.participant} />
+            <p className="mt-3 text-[14px] font-semibold text-[#c5cee0]">
+              {conversation.participant.name}
+            </p>
+            <p className="mt-1 text-[12px] text-[#4a5a75] max-w-[24ch]">
+              Inizia la conversazione con un messaggio
+            </p>
+          </div>
+        )}
+
+        {allMessages.map((msg) => {
+          const isMe = msg.senderId === myId;
+          return (
+            <div
+              key={msg.id}
+              className={`flex items-end gap-2 group ${
+                isMe ? "justify-end" : "justify-start"
+              }`}
+              onMouseEnter={() => setHoveredId(msg.id)}
+              onMouseLeave={() => setHoveredId(null)}
+            >
+              {/* Delete button — solo sui propri messaggi al hover */}
+              {isMe && hoveredId === msg.id && (
+                <button
+                  onClick={() => deleteMsg.mutate({ messageId: msg.id })}
+                  aria-label="Elimina messaggio"
+                  className="p-1 rounded text-[#4a5a75] hover:text-red-400 hover:bg-red-400/10 transition-colors flex-shrink-0"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              )}
+
+              <div
+                className={`
+                  max-w-[75%] px-3 py-2 rounded-2xl text-[13px] leading-relaxed break-words
+                  ${
+                    isMe
+                      ? "bg-[#1a3a6b] text-[#dce6f5] rounded-br-sm"
+                      : "bg-[#131929] text-[#c5cee0] rounded-bl-sm border border-white/[0.04]"
+                  }
+                `}
+              >
+                {msg.content}
+              </div>
+
+              <span className="text-[10px] text-[#3a4a65] flex-shrink-0 mb-0.5">
+                {formatTime(msg.createdAt)}
+              </span>
+            </div>
+          );
+        })}
+
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div className="px-4 py-3 border-t border-white/[0.06] flex-shrink-0">
+        <div className="flex items-end gap-2">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Scrivi un messaggio…"
+            rows={1}
+            maxLength={2000}
+            aria-label="Scrivi un messaggio"
+            className="
+              flex-1 resize-none rounded-xl px-3 py-2.5
+              bg-[#131929] border border-white/[0.08]
+              text-[13px] text-[#dce6f5] placeholder:text-[#4a5a75]
+              focus:outline-none focus:border-[#2a4a8b]/60 focus:ring-1 focus:ring-[#2a4a8b]/30
+              transition-all min-h-[40px] max-h-[120px] overflow-y-auto
+              leading-relaxed
+            "
+            style={{ height: "auto" }}
+            onInput={(e) => {
+              const t = e.currentTarget;
+              t.style.height = "auto";
+              t.style.height = `${Math.min(t.scrollHeight, 120)}px`;
+            }}
+          />
+          <button
+            onClick={handleSend}
+            disabled={!text.trim() || sendMsg.isPending}
+            aria-label="Invia messaggio"
+            className="
+              p-2.5 rounded-xl bg-[#1a3a6b] text-[#7eb3ff]
+              hover:bg-[#1f4480] disabled:opacity-40 disabled:cursor-not-allowed
+              transition-colors flex-shrink-0
+            "
+          >
+            {sendMsg.isPending
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <Send className="w-4 h-4" />}
+          </button>
+        </div>
+        <p className="text-[10px] text-[#2a3a55] mt-1.5 text-right">
+          {text.length > 0 ? `${text.length}/2000` : "Invio con Enter, nuova riga con Shift+Enter"}
+        </p>
+      </div>
+    </motion.div>
+  );
+}
+
+// ── ConversationList ─────────────────────────────────────────────────────────────
+
+function ConversationList({
+  onSelect,
+}: {
+  onSelect: (conv: DMConversation) => void;
+}) {
+  const { data, isLoading } = useConversations();
+  const conversations = data ?? [];
+
+  if (isLoading) return <SkeletonList count={3} />;
+
+  if (conversations.length === 0) {
+    return (
+      <EmptyState
+        icon={MessageCircle}
+        title="Nessuna conversazione"
+        description="Inizia una chat con una delle tue connessioni visitando il loro profilo"
+      />
+    );
+  }
+
+  return (
+    <motion.div variants={listVariants} initial="hidden" animate="visible" className="space-y-2">
+      {conversations.map((conv) => (
+        <motion.button
+          key={conv.conversationId}
+          variants={cardVariants}
+          onClick={() => onSelect(conv)}
+          className="
+            w-full flex items-center gap-3 p-3.5 rounded-xl text-left
+            bg-[#0d1421] border border-white/[0.06]
+            hover:border-white/10 hover:bg-[#0f1828] transition-all
+          "
+        >
+          <div className="relative flex-shrink-0">
+            <Avatar user={conv.participant} />
+            {conv.unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1
+                               rounded-full bg-blue-500 text-[10px] font-bold text-white
+                               flex items-center justify-center">
+                {conv.unreadCount > 9 ? "9+" : conv.unreadCount}
+              </span>
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-0.5">
+              <span className={`text-[14px] font-semibold truncate ${
+                conv.unreadCount > 0 ? "text-[#dce6f5]" : "text-[#a8b8d0]"
+              }`}>
+                {conv.participant.name}
+              </span>
+              {conv.lastMessage && (
+                <span className="text-[11px] text-[#3a4a65] flex-shrink-0 ml-2">
+                  {formatTime(conv.lastMessage.createdAt)}
+                </span>
+              )}
+            </div>
+            {conv.lastMessage && (
+              <p className={`text-[12px] truncate ${
+                conv.unreadCount > 0 ? "text-[#7c8db5]" : "text-[#4a5a75]"
+              }`}>
+                {conv.lastMessage.content}
+              </p>
+            )}
+          </div>
+        </motion.button>
+      ))}
+    </motion.div>
+  );
+}
+
+// ── TabMessaggi ───────────────────────────────────────────────────────────────────
+
+function TabMessaggi({ myId }: { myId: number }) {
+  const [selectedConv, setSelectedConv] = useState<DMConversation | null>(null);
+
+  return (
+    <AnimatePresence mode="wait">
+      {selectedConv ? (
+        <ChatWindow
+          key={`chat-${selectedConv.conversationId}`}
+          conversation={selectedConv}
+          myId={myId}
+          onBack={() => setSelectedConv(null)}
+        />
+      ) : (
+        <motion.div
+          key="conv-list"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+        >
+          <ConversationList onSelect={setSelectedConv} />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ── Pagina principale ───────────────────────────────────────────────────────────────
 
 export default function AmiciPage() {
   const [activeTab, setActiveTab] = useState<Tab>("connessioni");
-  const {
-    friends,
-    requests,
-    suggestions,
-    loading,
-    error,
-    pendingIds,
-    actions,
-  } = useFriends();
+  const { friends, requests, suggestions, loading, error, pendingIds, actions } = useFriends();
 
-  const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number }[] = [
-    { id: "connessioni", label: "Connessioni", icon: Users,    badge: friends.length || undefined },
-    { id: "richieste",   label: "Richieste",   icon: UserPlus, badge: requests.length || undefined },
+  // Conteggio DM non letti per il badge tab Messaggi
+  const { data: notifData } = useNotificationsSnapshot();
+  const dmBadge = notifData?.unreadMessagesCount && notifData.unreadMessagesCount > 0
+    ? notifData.unreadMessagesCount
+    : undefined;
+
+  // ID utente corrente per distinguere i propri messaggi nella chat
+  const { user } = useCurrentUser();
+  const myId = user?.id ?? 0;
+
+  const tabs: {
+    id: Tab;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    badge?: number;
+  }[] = [
+    { id: "connessioni", label: "Connessioni", icon: Users,          badge: friends.length || undefined },
+    { id: "richieste",   label: "Richieste",   icon: UserPlus,       badge: requests.length || undefined },
     { id: "esplora",     label: "Esplora",     icon: Compass },
+    { id: "messaggi",    label: "Messaggi",    icon: MessageCircle,  badge: dmBadge },
   ];
 
   return (
@@ -755,13 +964,13 @@ export default function AmiciPage() {
                   ml-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-bold
                   flex items-center justify-center
                   ${
-                    tab.id === "richieste"
+                    tab.id === "richieste" || tab.id === "messaggi"
                       ? "bg-blue-500 text-white"
                       : "bg-white/10 text-[#7eb3ff]"
                   }
                 `}
               >
-                {tab.badge}
+                {tab.badge > 99 ? "99+" : tab.badge}
               </span>
             )}
           </button>
@@ -770,49 +979,30 @@ export default function AmiciPage() {
 
       {/* Contenuto tab */}
       <AnimatePresence mode="wait">
-        {loading ? (
+        {loading && activeTab !== "messaggi" ? (
           <motion.div key="skeleton" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <SkeletonList />
           </motion.div>
-        ) : error ? (
-          <motion.div
-            key="error"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-12 text-[#7c8db5] text-sm"
-          >
+        ) : error && activeTab !== "messaggi" ? (
+          <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className="text-center py-12 text-[#7c8db5] text-sm">
             <p>Errore nel caricamento.</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-3 text-[#7eb3ff] hover:underline"
-            >
+            <button onClick={() => window.location.reload()} className="mt-3 text-[#7eb3ff] hover:underline">
               Riprova
             </button>
           </motion.div>
         ) : activeTab === "connessioni" ? (
           <motion.div key="connessioni" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {friends.length === 0 ? (
-              <EmptyState
-                icon={Users}
-                title="Ancora nessuna connessione"
+              <EmptyState icon={Users} title="Ancora nessuna connessione"
                 description="Esplora i profili e connettiti con persone nel tuo settore"
-                cta="Scopri persone"
-                onCta={() => setActiveTab("esplora")}
-              />
+                cta="Scopri persone" onCta={() => setActiveTab("esplora")} />
             ) : (
-              <motion.div
-                variants={listVariants}
-                initial="hidden"
-                animate="visible"
-                className="space-y-3"
-              >
+              <motion.div variants={listVariants} initial="hidden" animate="visible" className="space-y-3">
                 {friends.map((f) => (
-                  <FriendCard
-                    key={f.friendshipId}
-                    friend={f}
+                  <FriendCard key={f.friendshipId} friend={f}
                     removing={pendingIds[f.friendshipId] === "removing"}
-                    onRemove={() => actions.remove(f.friendshipId)}
-                  />
+                    onRemove={() => actions.remove(f.friendshipId)} />
                 ))}
               </motion.div>
             )}
@@ -820,38 +1010,28 @@ export default function AmiciPage() {
         ) : activeTab === "richieste" ? (
           <motion.div key="richieste" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {requests.length === 0 ? (
-              <EmptyState
-                icon={UserPlus}
-                title="Nessuna richiesta in attesa"
-                description="Quando qualcuno ti invierà una richiesta, apparirà qui"
-              />
+              <EmptyState icon={UserPlus} title="Nessuna richiesta in attesa"
+                description="Quando qualcuno ti invierà una richiesta, apparirà qui" />
             ) : (
-              <motion.div
-                variants={listVariants}
-                initial="hidden"
-                animate="visible"
-                className="space-y-3"
-              >
+              <motion.div variants={listVariants} initial="hidden" animate="visible" className="space-y-3">
                 {requests.map((r) => (
-                  <RequestCard
-                    key={r.friendshipId}
-                    request={r}
+                  <RequestCard key={r.friendshipId} request={r}
                     accepting={pendingIds[r.friendshipId] === "accepting"}
                     declining={pendingIds[r.friendshipId] === "removing"}
                     onAccept={() => actions.acceptRequest(r.friendshipId, r.user.id)}
-                    onDecline={() => actions.remove(r.friendshipId)}
-                  />
+                    onDecline={() => actions.remove(r.friendshipId)} />
                 ))}
               </motion.div>
             )}
           </motion.div>
-        ) : (
+        ) : activeTab === "esplora" ? (
           <motion.div key="esplora" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <TabEsplora
-              suggestions={suggestions}
-              pendingFriendIds={pendingIds}
-              onConnectSuggestion={(id) => actions.sendRequest(id)}
-            />
+            <TabEsplora suggestions={suggestions} pendingFriendIds={pendingIds}
+              onConnectSuggestion={(id) => actions.sendRequest(id)} />
+          </motion.div>
+        ) : (
+          <motion.div key="messaggi" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <TabMessaggi myId={myId} />
           </motion.div>
         )}
       </AnimatePresence>
