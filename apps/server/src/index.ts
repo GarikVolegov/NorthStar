@@ -63,6 +63,14 @@
  *   POST /api/notifications/friend-request/:id/accept  — accetta da notifica
  *   POST /api/notifications/friend-request/:id/decline — rifiuta da notifica
  *
+ *   ── Dashboard ─────────────────────────────────────────────────────────────
+ *   GET  /api/dashboard/stats                 — XP, livello, streak, obiettivi completati
+ *   GET  /api/dashboard/objectives            — obiettivi attivi + completati recenti
+ *   GET  /api/dashboard/revenue               — revenue mensile (proxy, per autonomi)
+ *
+ *   ── Leaderboard ───────────────────────────────────────────────────────────
+ *   GET  /api/leaderboard/sector              — top 10 utenti per XP nello stesso settore
+ *
  * MIDDLEWARE STACK (ordine):
  *   1. helmet()           — security headers
  *   2. cors()             — CORS configurato da ALLOWED_ORIGINS
@@ -97,6 +105,8 @@ import { profileRouter as networkProfileRouter } from "./network/profile-router"
 import { dmRouter }                    from "./network/dm-router";
 import { notificationsRouter }         from "./notifications/notifications-router";
 import { cityRouter }                  from "./city/city-router";
+import { dashboardRouter }             from "./dashboard/dashboard-router";
+import { leaderboardRouter }           from "./dashboard/leaderboard-router";
 
 // ── App ───────────────────────────────────────────────────────────────────────
 
@@ -162,6 +172,8 @@ app.use("/api/growth-agent/onboarding", requireAuth, onboardingRouter);
 app.use("/api/friends",                 requireAuth, networkRouter);
 app.use("/api/dm",                      requireAuth, dmRouter);
 app.use("/api/notifications",           requireAuth, notificationsRouter);
+app.use("/api/dashboard",               requireAuth, dashboardRouter);
+app.use("/api/leaderboard",             requireAuth, leaderboardRouter);
 
 // ── Public routes (optional auth) ─────────────────────────────────────────────
 
