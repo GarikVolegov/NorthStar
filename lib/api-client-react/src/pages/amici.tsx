@@ -5,7 +5,7 @@
  *   - Header con titolo + contatore
  *   - 4 Tab: Connessioni | Richieste (badge) | Esplora | Messaggi (badge DM)
  *   - Tab Messaggi: lista conversazioni + finestra chat inline
- *   - Tab Esplora: barra di ricerca con debounce 300ms + filtro settore
+ *   - Tab Esplora: barra di ricerca con debounce 300ms
  *   - Contenuto animato con framer-motion
  *   - Skeleton loader durante il caricamento
  *   - Empty state curato per ogni tab
@@ -14,6 +14,7 @@
  *   - useFriends (hook locale)
  *   - useDirectMessages (hook locale)
  *   - useNotificationsSnapshot (badge DM non letti)
+ *   - apiClient per /auth/me (ID utente corrente)
  *   - framer-motion, lucide-react, tailwind
  */
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -21,9 +22,10 @@ import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, UserPlus, Compass, UserCheck, UserX, Clock,
-  Star, Zap, Search, X, Loader2, SlidersHorizontal,
+  Star, Zap, Search, X, Loader2,
   MessageCircle, Send, Trash2, ArrowLeft, ChevronUp,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useFriends, type Friend, type FriendRequest, type Suggestion } from "@/hooks/useFriends";
 import {
   useConversations,
@@ -35,7 +37,21 @@ import {
   type DMMessage,
 } from "@/hooks/useDirectMessages";
 import { useNotificationsSnapshot } from "@/hooks/useNotifications";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { apiClient } from "@/lib/api-client";
+
+// ── Hook: useMyId ─────────────────────────────────────────────────────────────
+// Legge l'utente autenticato dall'endpoint standard /auth/me.
+// Fallback a 0 se non disponibile (non causa errori nella UI).
+
+function useMyId(): number {
+  const { data } = useQuery({
+    queryKey: ["auth", "me"],
+    queryFn: () => apiClient.get<{ id: number; name: string }>("/auth/me"),
+    staleTime: Infinity,
+    retry: false,
+  });
+  return data?.id ?? 0;
+}
 
 // ── Tipi ─────────────────────────────────────────────────────────────────────
 
@@ -56,7 +72,7 @@ type SearchState =
   | { status: "done"; results: SearchResult[]; query: string; hasMore: boolean }
   | { status: "error"; message: string };
 
-// ── Costanti animazione ──────────────────────────────────────────────────────────
+// ── Costanti animazione ──────────────────────────────────────────────────────
 
 const listVariants = {
   hidden: {},
@@ -68,13 +84,13 @@ const cardVariants = {
   exit:    { opacity: 0, scale: 0.96, transition: { duration: 0.18 } },
 };
 
-// ── Hook: useSearch ──────────────────────────────────────────────────────────────
+// ── Hook: useSearch ───────────────────────────────────────────────────────────
 
 function useSearch() {
   const [query, setQuery]         = useState("");
   const [sectorFilter, setSector] = useState<number | null>(null);
   const [state, setState]         = useState<SearchState>({ status: "idle" });
-  const [pendingIds, setPending]  = useState<Record<number, "sending" | "sent">>({}); 
+  const [pendingIds, setPending]  = useState<Record<number, "sending" | "sent">>({});
   const debounceRef               = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef                  = useRef<AbortController | null>(null);
 
@@ -199,7 +215,7 @@ function formatTime(iso: string) {
   return d.toLocaleDateString("it-IT", { day: "numeric", month: "short" });
 }
 
-// ── Skeleton ────────────────────────────────────────────────────────────────────
+// ── Skeleton ──────────────────────────────────────────────────────────────────
 
 function SkeletonCard() {
   return (
@@ -222,7 +238,7 @@ function SkeletonList({ count = 4 }: { count?: number }) {
   );
 }
 
-// ── Empty states ────────────────────────────────────────────────────────────────
+// ── Empty states ───────────────────────────────────────────────────────────────
 
 function EmptyState({
   icon: Icon,
@@ -262,7 +278,7 @@ function EmptyState({
   );
 }
 
-// ── Schede network ────────────────────────────────────────────────────────────────
+// ── Schede network ─────────────────────────────────────────────────────────────
 
 function FriendCard({
   friend, onRemove, removing,
@@ -474,7 +490,7 @@ function SearchBar({
   );
 }
 
-// ── TabEsplora ──────────────────────────────────────────────────────────────────
+// ── TabEsplora ─────────────────────────────────────────────────────────────────
 
 function TabEsplora({
   suggestions, pendingFriendIds, onConnectSuggestion,
@@ -516,7 +532,7 @@ function TabEsplora({
                   </p>
                 </div>
                 {search.state.results.length === 0 ? (
-                  <EmptyState icon={Search} title="Nessun utente trovato" description={`Non ci sono utenti pubblici con il nome "${search.state.query}"`} />
+                  <EmptyState icon={Search} title="Nessun utente trovato" description={`Non ci sono utenti con il nome "${search.state.query}"`} />
                 ) : (
                   <motion.div variants={listVariants} initial="hidden" animate="visible" className="space-y-3">
                     {search.state.results.map((u) => (
@@ -527,7 +543,7 @@ function TabEsplora({
                   </motion.div>
                 )}
                 {search.state.hasMore && (
-                  <p className="text-center text-[11px] text-[#4a5a75] mt-3">Affina la ricerca per trovare risultati più specifici</p>
+                  <p className="text-center text-[11px] text-[#4a5a75] mt-3">Affina la ricerca per risultati più specifici</p>
                 )}
               </>
             )}
@@ -558,7 +574,7 @@ function TabEsplora({
   );
 }
 
-// ── ChatWindow ───────────────────────────────────────────────────────────────────
+// ── ChatWindow ─────────────────────────────────────────────────────────────────
 
 function ChatWindow({
   conversation,
@@ -574,11 +590,11 @@ function ChatWindow({
   const sendMsg   = useSendMessage();
   const deleteMsg = useDeleteMessage();
 
-  const [text, setText] = useState("");
+  const [text, setText]         = useState("");
   const [hoveredId, setHoveredId] = useState<number | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const isAtBottomRef = useRef(true);
+  const bottomRef               = useRef<HTMLDivElement>(null);
+  const scrollRef               = useRef<HTMLDivElement>(null);
+  const isAtBottomRef           = useRef(true);
 
   // Colleziona tutti i messaggi dalle pagine (ordine cronologico)
   const allMessages: DMMessage[] = data?.pages
@@ -587,7 +603,6 @@ function ChatWindow({
 
   // SSE stream per nuovi messaggi in tempo reale
   useDMStream(conversation.participant.id, () => {
-    // Scroll to bottom solo se già in fondo
     if (isAtBottomRef.current) {
       requestAnimationFrame(() =>
         bottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -595,7 +610,7 @@ function ChatWindow({
     }
   });
 
-  // Auto-scroll al fondo all'apertura e quando arrivano nuovi messaggi
+  // Auto-scroll al fondo all'apertura
   useEffect(() => {
     if (!isLoading && allMessages.length > 0 && isAtBottomRef.current) {
       bottomRef.current?.scrollIntoView({ behavior: "instant" });
@@ -603,7 +618,6 @@ function ChatWindow({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allMessages.length, isLoading]);
 
-  // Traccia se l'utente è in fondo alla chat
   function handleScroll() {
     const el = scrollRef.current;
     if (!el) return;
@@ -666,7 +680,7 @@ function ChatWindow({
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto px-4 py-4 space-y-2 scroll-smooth"
       >
-        {/* Load older */}
+        {/* Carica messaggi precedenti */}
         {hasNextPage && (
           <div className="flex justify-center mb-2">
             <button
@@ -706,17 +720,15 @@ function ChatWindow({
         )}
 
         {allMessages.map((msg) => {
-          const isMe = msg.senderId === myId;
+          const isMe = myId > 0 && msg.senderId === myId;
           return (
             <div
               key={msg.id}
-              className={`flex items-end gap-2 group ${
-                isMe ? "justify-end" : "justify-start"
-              }`}
+              className={`flex items-end gap-2 group ${isMe ? "justify-end" : "justify-start"}`}
               onMouseEnter={() => setHoveredId(msg.id)}
               onMouseLeave={() => setHoveredId(null)}
             >
-              {/* Delete button — solo sui propri messaggi al hover */}
+              {/* Pulsante elimina — solo sui propri messaggi */}
               {isMe && hoveredId === msg.id && (
                 <button
                   onClick={() => deleteMsg.mutate({ messageId: msg.id })}
@@ -799,7 +811,7 @@ function ChatWindow({
   );
 }
 
-// ── ConversationList ─────────────────────────────────────────────────────────────
+// ── ConversationList ───────────────────────────────────────────────────────────
 
 function ConversationList({
   onSelect,
@@ -872,7 +884,7 @@ function ConversationList({
   );
 }
 
-// ── TabMessaggi ───────────────────────────────────────────────────────────────────
+// ── TabMessaggi ────────────────────────────────────────────────────────────────
 
 function TabMessaggi({ myId }: { myId: number }) {
   const [selectedConv, setSelectedConv] = useState<DMConversation | null>(null);
@@ -901,21 +913,20 @@ function TabMessaggi({ myId }: { myId: number }) {
   );
 }
 
-// ── Pagina principale ───────────────────────────────────────────────────────────────
+// ── Pagina principale ──────────────────────────────────────────────────────────
 
 export default function AmiciPage() {
   const [activeTab, setActiveTab] = useState<Tab>("connessioni");
   const { friends, requests, suggestions, loading, error, pendingIds, actions } = useFriends();
 
-  // Conteggio DM non letti per il badge tab Messaggi
+  // Badge DM non letti
   const { data: notifData } = useNotificationsSnapshot();
-  const dmBadge = notifData?.unreadMessagesCount && notifData.unreadMessagesCount > 0
-    ? notifData.unreadMessagesCount
+  const dmBadge = (notifData?.unreadMessagesCount ?? 0) > 0
+    ? notifData!.unreadMessagesCount
     : undefined;
 
-  // ID utente corrente per distinguere i propri messaggi nella chat
-  const { user } = useCurrentUser();
-  const myId = user?.id ?? 0;
+  // ID utente corrente — usato da ChatWindow per colorare i propri messaggi
+  const myId = useMyId();
 
   const tabs: {
     id: Tab;
@@ -923,10 +934,10 @@ export default function AmiciPage() {
     icon: React.ComponentType<{ className?: string }>;
     badge?: number;
   }[] = [
-    { id: "connessioni", label: "Connessioni", icon: Users,          badge: friends.length || undefined },
-    { id: "richieste",   label: "Richieste",   icon: UserPlus,       badge: requests.length || undefined },
+    { id: "connessioni", label: "Connessioni", icon: Users,         badge: friends.length || undefined },
+    { id: "richieste",   label: "Richieste",   icon: UserPlus,      badge: requests.length || undefined },
     { id: "esplora",     label: "Esplora",     icon: Compass },
-    { id: "messaggi",    label: "Messaggi",    icon: MessageCircle,  badge: dmBadge },
+    { id: "messaggi",    label: "Messaggi",    icon: MessageCircle, badge: dmBadge },
   ];
 
   return (
