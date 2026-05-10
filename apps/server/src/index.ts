@@ -27,6 +27,7 @@
  *   POST /api/users/me/objectives             — aggiunge obiettivo
  *   GET  /api/users/me/progress               — XP, streak, timeline
  *   POST /api/users/me/progress/xp            — assegna XP
+ *   GET  /api/users/:id/public                — profilo pubblico per /profilo/:id
  *   GET  /api/u/:username                     — profilo pubblico (opzionale auth)
  *   GET  /api/riasec/session/:sessionId       — RIASEC profile
  *
@@ -38,9 +39,20 @@
  *   GET    /api/friends                       — lista amici accettati
  *   GET    /api/friends/requests              — richieste ricevute
  *   GET    /api/friends/suggestions           — utenti suggeriti
+ *   GET    /api/friends/search                — ricerca utenti
  *   POST   /api/friends/request/:id           — invia richiesta
  *   PUT    /api/friends/:id/accept            — accetta richiesta
  *   DELETE /api/friends/:id                   — rimuovi / rifiuta
+ *
+ *   ── Network — Profili pubblici ────────────────────────────────────────────
+ *   GET  /api/users/:id/public                — profilo pubblico + connectionStatus
+ *
+ *   ── DM Chat (Step 5) ──────────────────────────────────────────────────────
+ *   GET    /api/dm/conversations              — lista conversazioni
+ *   GET    /api/dm/conversations/:userId      — messaggi con un utente
+ *   POST   /api/dm/conversations/:userId      — invia messaggio
+ *   DELETE /api/dm/messages/:messageId        — elimina messaggio
+ *   GET    /api/dm/conversations/:userId/stream — SSE nuovi messaggi
  *
  *   ── Notifications ─────────────────────────────────────────────────────────
  *   GET  /api/notifications                   — snapshot JSON
@@ -78,6 +90,8 @@ import { riasecRouter }                from "./profile/riasec-router";
 import { onboardingRouter }            from "./growth-agent/onboarding-router";
 import { stripeWebhookRouter }         from "./stripe/stripe-webhook-router";
 import { networkRouter }               from "./network/network-router";
+import { profileRouter as networkProfileRouter } from "./network/profile-router";
+import { dmRouter }                    from "./network/dm-router";
 import { notificationsRouter }         from "./notifications/notifications-router";
 
 // ── App ───────────────────────────────────────────────────────────────────────
@@ -135,9 +149,11 @@ app.use("/api/auth", requireAuth, profileRouter);
 app.use("/api/affiliate",               requireAuth, affiliateRouter);
 app.use("/api/users/me",                requireAuth, profileRouter);
 app.use("/api/users/me/progress",       requireAuth, progressRouter);
+app.use("/api/users",                   optionalAuth, networkProfileRouter);
 app.use("/api/riasec",                  requireAuth, riasecRouter);
 app.use("/api/growth-agent/onboarding", requireAuth, onboardingRouter);
 app.use("/api/friends",                 requireAuth, networkRouter);
+app.use("/api/dm",                      requireAuth, dmRouter);
 app.use("/api/notifications",           requireAuth, notificationsRouter);
 
 // ── Public routes (optional auth) ─────────────────────────────────────────────
