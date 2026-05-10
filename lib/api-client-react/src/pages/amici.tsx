@@ -1,6 +1,12 @@
 /**
  * amici.tsx — Pagina /amici (Network Section)
  *
+ * Step 3: notifiche real-time
+ *   - useNotificationsStream al posto di useNotificationsSnapshot
+ *   - refetch automatico useFriends quando arriva friend_request via SSE
+ *   - Toast in-page per nuove richieste amicizia
+ *   - Invalidazione cache DM quando arriva new_message
+ *
  * Struttura:
  *   - Header con titolo + contatore
  *   - 4 Tab: Connessioni | Richieste (badge) | Esplora | Messaggi (badge DM)
@@ -9,13 +15,6 @@
  *   - Contenuto animato con framer-motion
  *   - Skeleton loader durante il caricamento
  *   - Empty state curato per ogni tab
- *
- * Dipendenze:
- *   - useFriends (hook locale)
- *   - useDirectMessages (hook locale)
- *   - useNotificationsSnapshot (badge DM non letti)
- *   - apiClient per /auth/me (ID utente corrente)
- *   - framer-motion, lucide-react, tailwind
  */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "wouter";
@@ -23,9 +22,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, UserPlus, Compass, UserCheck, UserX, Clock,
   Star, Zap, Search, X, Loader2,
-  MessageCircle, Send, Trash2, ArrowLeft, ChevronUp,
+  MessageCircle, Send, Trash2, ArrowLeft, ChevronUp, Bell,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFriends, type Friend, type FriendRequest, type Suggestion } from "@/hooks/useFriends";
 import {
   useConversations,
@@ -33,15 +32,19 @@ import {
   useSendMessage,
   useDeleteMessage,
   useDMStream,
+  dmKeys,
   type DMConversation,
   type DMMessage,
 } from "@/hooks/useDirectMessages";
-import { useNotificationsSnapshot } from "@/hooks/useNotifications";
+import {
+  useNotificationsStream,
+  useAcceptFriendRequest,
+  useDeclineFriendRequest,
+  type FriendRequestNotification,
+} from "@/hooks/useNotifications";
 import { apiClient } from "@/lib/api-client";
 
 // ── Hook: useMyId ─────────────────────────────────────────────────────────────
-// Legge l'utente autenticato dall'endpoint standard /auth/me.
-// Fallback a 0 se non disponibile (non causa errori nella UI).
 
 function useMyId(): number {
   const { data } = useQuery({
@@ -83,6 +86,191 @@ const cardVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } },
   exit:    { opacity: 0, scale: 0.96, transition: { duration: 0.18 } },
 };
+
+// ── Toast notifica richiesta amicizia ─────────────────────────────────────────
+//
+// Mostrato in basso a destra quando arriva una nuova richiesta via SSE.
+// Si auto-chiude dopo 6s. Bottoni Accetta/Rifiuta inline.
+
+function FriendRequestToast({
+  notif,
+  onClose,
+}: {
+  notif: FriendRequestNotification;
+  onClose: () => void;
+}) {
+  const accept  = useAcceptFriendRequest();
+  const decline = useDeclineFriendRequest();
+  const [progress, setProgress] = useState(100);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Barra di progresso + auto-close
+  useEffect(() => {
+    const DURATION = 6000;
+    const TICK     = 50;
+    let elapsed    = 0;
+
+    intervalRef.current = setInterval(() => {
+      elapsed += TICK;
+      setProgress(Math.max(0, 100 - (elapsed / DURATION) * 100));
+      if (elapsed >= DURATION) onClose();
+    }, TICK);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [onClose]);
+
+  const stopTimer = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+  };
+
+  async function handleAccept() {
+    stopTimer();
+    await accept.mutateAsync(notif.friendshipId);
+    onClose();
+  }
+
+  async function handleDecline() {
+    stopTimer();
+    await decline.mutateAsync(notif.friendshipId);
+    onClose();
+  }
+
+  const initials = notif.from.name
+    .split(" ")
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0,  scale: 1 }}
+      exit={{    opacity: 0, y: 16, scale: 0.95 }}
+      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+      onMouseEnter={stopTimer}
+      className="
+        w-[320px] rounded-2xl overflow-hidden
+        bg-[#0d1421] border border-[#1a3a6b]/60
+        shadow-[0_8px_32px_rgba(0,0,0,0.4)]
+      "
+      role="alert"
+      aria-live="polite"
+    >
+      {/* Barra progresso */}
+      <div className="h-0.5 bg-[#1a2d4f]">
+        <motion.div
+          className="h-full bg-[#4a8bff]"
+          style={{ width: `${progress}%` }}
+          transition={{ duration: 0.05 }}
+        />
+      </div>
+
+      <div className="p-4">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Bell className="w-3.5 h-3.5 text-[#4a8bff]" />
+            <span className="text-[11px] font-semibold text-[#4a8bff] uppercase tracking-wide">
+              Nuova richiesta
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Chiudi notifica"
+            className="p-0.5 rounded text-[#4a5a75] hover:text-[#7c8db5] transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Utente */}
+        <div className="flex items-center gap-3 mb-3">
+          {notif.from.avatarUrl ? (
+            <img
+              src={notif.from.avatarUrl}
+              alt={notif.from.name}
+              width={40}
+              height={40}
+              loading="lazy"
+              className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-2 ring-white/5"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-[#1e2333] flex items-center justify-center flex-shrink-0 ring-2 ring-white/5">
+              <span className="text-xs font-semibold text-[#7c8db5]">{initials}</span>
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="text-[14px] font-semibold text-[#dce6f5] truncate">
+              {notif.from.name}
+            </p>
+            {notif.from.sectorName && (
+              <p className="text-[12px] text-[#7c8db5] truncate">{notif.from.sectorName}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Azioni */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDecline}
+            disabled={accept.isPending || decline.isPending}
+            className="
+              flex-1 py-1.5 rounded-lg text-[12px] font-medium
+              text-[#7c8db5] hover:bg-white/[0.05] hover:text-[#a8b8d0]
+              transition-colors disabled:opacity-50
+            "
+          >
+            Rifiuta
+          </button>
+          <button
+            onClick={handleAccept}
+            disabled={accept.isPending || decline.isPending}
+            className="
+              flex-1 py-1.5 rounded-lg text-[12px] font-semibold
+              bg-[#1a3a6b] text-[#7eb3ff] hover:bg-[#1f4480]
+              transition-colors disabled:opacity-50
+              flex items-center justify-center gap-1.5
+            "
+          >
+            {accept.isPending
+              ? <span className="w-3 h-3 border-2 border-[#7eb3ff]/30 border-t-[#7eb3ff] rounded-full animate-spin" />
+              : <UserCheck className="w-3.5 h-3.5" />}
+            Accetta
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ── ToastContainer ─────────────────────────────────────────────────────────────
+// Stack di toast in basso a destra, max 3 contemporanei.
+
+function ToastContainer({ toasts, onDismiss }: {
+  toasts: FriendRequestNotification[];
+  onDismiss: (id: string) => void;
+}) {
+  if (toasts.length === 0) return null;
+  return (
+    <div
+      className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 items-end"
+      aria-label="Notifiche"
+    >
+      <AnimatePresence mode="sync">
+        {toasts.slice(-3).map((n) => (
+          <FriendRequestToast
+            key={n.id}
+            notif={n}
+            onClose={() => onDismiss(n.id)}
+          />
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 // ── Hook: useSearch ───────────────────────────────────────────────────────────
 
@@ -494,7 +682,7 @@ function SearchBar({
 
 function TabEsplora({
   suggestions, pendingFriendIds, onConnectSuggestion,
-}: { suggestions: Suggestion[]; pendingFriendIds: Record<string, string>; onConnectSuggestion: (id: string) => void }) {
+}: { suggestions: Suggestion[]; pendingFriendIds: Record<string, string>; onConnectSuggestion: (id: number) => void }) {
   const search = useSearch();
 
   async function handleConnectSearch(user: SearchResult) {
@@ -590,18 +778,16 @@ function ChatWindow({
   const sendMsg   = useSendMessage();
   const deleteMsg = useDeleteMessage();
 
-  const [text, setText]         = useState("");
+  const [text, setText]           = useState("");
   const [hoveredId, setHoveredId] = useState<number | null>(null);
-  const bottomRef               = useRef<HTMLDivElement>(null);
-  const scrollRef               = useRef<HTMLDivElement>(null);
-  const isAtBottomRef           = useRef(true);
+  const bottomRef                 = useRef<HTMLDivElement>(null);
+  const scrollRef                 = useRef<HTMLDivElement>(null);
+  const isAtBottomRef             = useRef(true);
 
-  // Colleziona tutti i messaggi dalle pagine (ordine cronologico)
   const allMessages: DMMessage[] = data?.pages
     .flatMap((p) => p.messages)
     .filter((m) => !m.isDeleted) ?? [];
 
-  // SSE stream per nuovi messaggi in tempo reale
   useDMStream(conversation.participant.id, () => {
     if (isAtBottomRef.current) {
       requestAnimationFrame(() =>
@@ -610,7 +796,6 @@ function ChatWindow({
     }
   });
 
-  // Auto-scroll al fondo all'apertura
   useEffect(() => {
     if (!isLoading && allMessages.length > 0 && isAtBottomRef.current) {
       bottomRef.current?.scrollIntoView({ behavior: "instant" });
@@ -651,7 +836,6 @@ function ChatWindow({
       transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
       className="flex flex-col h-[540px] rounded-2xl bg-[#0a111e] border border-white/[0.06] overflow-hidden"
     >
-      {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] flex-shrink-0">
         <button
           onClick={onBack}
@@ -674,13 +858,11 @@ function ChatWindow({
         </Link>
       </div>
 
-      {/* Messaggi */}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto px-4 py-4 space-y-2 scroll-smooth"
       >
-        {/* Carica messaggi precedenti */}
         {hasNextPage && (
           <div className="flex justify-center mb-2">
             <button
@@ -728,7 +910,6 @@ function ChatWindow({
               onMouseEnter={() => setHoveredId(msg.id)}
               onMouseLeave={() => setHoveredId(null)}
             >
-              {/* Pulsante elimina — solo sui propri messaggi */}
               {isMe && hoveredId === msg.id && (
                 <button
                   onClick={() => deleteMsg.mutate({ messageId: msg.id })}
@@ -738,7 +919,6 @@ function ChatWindow({
                   <Trash2 className="w-3 h-3" />
                 </button>
               )}
-
               <div
                 className={`
                   max-w-[75%] px-3 py-2 rounded-2xl text-[13px] leading-relaxed break-words
@@ -751,7 +931,6 @@ function ChatWindow({
               >
                 {msg.content}
               </div>
-
               <span className="text-[10px] text-[#3a4a65] flex-shrink-0 mb-0.5">
                 {formatTime(msg.createdAt)}
               </span>
@@ -762,7 +941,6 @@ function ChatWindow({
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       <div className="px-4 py-3 border-t border-white/[0.06] flex-shrink-0">
         <div className="flex items-end gap-2">
           <textarea
@@ -856,7 +1034,6 @@ function ConversationList({
               </span>
             )}
           </div>
-
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-0.5">
               <span className={`text-[14px] font-semibold truncate ${
@@ -917,15 +1094,48 @@ function TabMessaggi({ myId }: { myId: number }) {
 
 export default function AmiciPage() {
   const [activeTab, setActiveTab] = useState<Tab>("connessioni");
-  const { friends, requests, suggestions, loading, error, pendingIds, actions } = useFriends();
+  const queryClient = useQueryClient();
 
-  // Badge DM non letti
-  const { data: notifData } = useNotificationsSnapshot();
+  const { friends, requests, suggestions, loading, error, pendingIds, actions, refetch } = useFriends();
+
+  // Toast state: coda di FriendRequestNotification da mostrare
+  const [toasts, setToasts] = useState<FriendRequestNotification[]>([]);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  // ── SSE notifiche in tempo reale ─────────────────────────────────────────
+  //
+  // useNotificationsStream apre UNA SOLA connessione SSE a /api/notifications/stream.
+  // Se la navbar monta già questo hook, le query key coincidono e
+  // React Query deduplicerà il fetch — non ci saranno connessioni duplicate.
+  //
+  // onFriendRequest: aggiorna lista richieste senza reload
+  // onNewDM: invalida cache conversazioni (badge aggiornato)
+
+  const { data: notifData } = useNotificationsStream({
+    onFriendRequest: useCallback((notif: FriendRequestNotification) => {
+      // Aggiorna la lista richieste nel tab
+      void refetch();
+      // Mostra toast in-page
+      setToasts((prev) => [
+        ...prev.filter((t) => t.id !== notif.id), // evita duplicati
+        notif,
+      ]);
+    }, [refetch]),
+
+    onNewDM: useCallback(() => {
+      // Invalida lista conversazioni → badge DM si aggiorna
+      queryClient.invalidateQueries({ queryKey: dmKeys.conversations() });
+    }, [queryClient]),
+  });
+
+  // Badge tab
   const dmBadge = (notifData?.unreadMessagesCount ?? 0) > 0
     ? notifData!.unreadMessagesCount
     : undefined;
 
-  // ID utente corrente — usato da ChatWindow per colorare i propri messaggi
   const myId = useMyId();
 
   const tabs: {
@@ -941,111 +1151,116 @@ export default function AmiciPage() {
   ];
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <>
+      <div className="max-w-2xl mx-auto px-4 py-8">
 
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[#dce6f5] tracking-tight">Network</h1>
-        <p className="mt-1 text-[13px] text-[#7c8db5]">
-          Connettiti con persone nel tuo stesso percorso professionale
-        </p>
-      </div>
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-[#dce6f5] tracking-tight">Network</h1>
+          <p className="mt-1 text-[13px] text-[#7c8db5]">
+            Connettiti con persone nel tuo stesso percorso professionale
+          </p>
+        </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 p-1 rounded-xl bg-[#0d1421] border border-white/[0.06] mb-6">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`
-              relative flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg
-              text-[13px] font-medium transition-all duration-200
-              ${
-                activeTab === tab.id
-                  ? "bg-[#1a2d4f] text-[#dce6f5] shadow-sm"
-                  : "text-[#7c8db5] hover:text-[#a8b8d0] hover:bg-white/[0.03]"
-              }
-            `}
-          >
-            <tab.icon className="w-4 h-4" />
-            <span className="hidden sm:inline">{tab.label}</span>
-            {tab.badge != null && tab.badge > 0 && (
-              <span
-                className={`
-                  ml-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-bold
-                  flex items-center justify-center
-                  ${
-                    tab.id === "richieste" || tab.id === "messaggi"
-                      ? "bg-blue-500 text-white"
-                      : "bg-white/10 text-[#7eb3ff]"
-                  }
-                `}
-              >
-                {tab.badge > 99 ? "99+" : tab.badge}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Contenuto tab */}
-      <AnimatePresence mode="wait">
-        {loading && activeTab !== "messaggi" ? (
-          <motion.div key="skeleton" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <SkeletonList />
-          </motion.div>
-        ) : error && activeTab !== "messaggi" ? (
-          <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="text-center py-12 text-[#7c8db5] text-sm">
-            <p>Errore nel caricamento.</p>
-            <button onClick={() => window.location.reload()} className="mt-3 text-[#7eb3ff] hover:underline">
-              Riprova
+        {/* Tabs */}
+        <div className="flex gap-1 p-1 rounded-xl bg-[#0d1421] border border-white/[0.06] mb-6">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`
+                relative flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg
+                text-[13px] font-medium transition-all duration-200
+                ${
+                  activeTab === tab.id
+                    ? "bg-[#1a2d4f] text-[#dce6f5] shadow-sm"
+                    : "text-[#7c8db5] hover:text-[#a8b8d0] hover:bg-white/[0.03]"
+                }
+              `}
+            >
+              <tab.icon className="w-4 h-4" />
+              <span className="hidden sm:inline">{tab.label}</span>
+              {tab.badge != null && tab.badge > 0 && (
+                <span
+                  className={`
+                    ml-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-bold
+                    flex items-center justify-center
+                    ${
+                      tab.id === "richieste" || tab.id === "messaggi"
+                        ? "bg-blue-500 text-white"
+                        : "bg-white/10 text-[#7eb3ff]"
+                    }
+                  `}
+                >
+                  {tab.badge > 99 ? "99+" : tab.badge}
+                </span>
+              )}
             </button>
-          </motion.div>
-        ) : activeTab === "connessioni" ? (
-          <motion.div key="connessioni" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {friends.length === 0 ? (
-              <EmptyState icon={Users} title="Ancora nessuna connessione"
-                description="Esplora i profili e connettiti con persone nel tuo settore"
-                cta="Scopri persone" onCta={() => setActiveTab("esplora")} />
-            ) : (
-              <motion.div variants={listVariants} initial="hidden" animate="visible" className="space-y-3">
-                {friends.map((f) => (
-                  <FriendCard key={f.friendshipId} friend={f}
-                    removing={pendingIds[f.friendshipId] === "removing"}
-                    onRemove={() => actions.remove(f.friendshipId)} />
-                ))}
-              </motion.div>
-            )}
-          </motion.div>
-        ) : activeTab === "richieste" ? (
-          <motion.div key="richieste" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {requests.length === 0 ? (
-              <EmptyState icon={UserPlus} title="Nessuna richiesta in attesa"
-                description="Quando qualcuno ti invierà una richiesta, apparirà qui" />
-            ) : (
-              <motion.div variants={listVariants} initial="hidden" animate="visible" className="space-y-3">
-                {requests.map((r) => (
-                  <RequestCard key={r.friendshipId} request={r}
-                    accepting={pendingIds[r.friendshipId] === "accepting"}
-                    declining={pendingIds[r.friendshipId] === "removing"}
-                    onAccept={() => actions.acceptRequest(r.friendshipId, r.user.id)}
-                    onDecline={() => actions.remove(r.friendshipId)} />
-                ))}
-              </motion.div>
-            )}
-          </motion.div>
-        ) : activeTab === "esplora" ? (
-          <motion.div key="esplora" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <TabEsplora suggestions={suggestions} pendingFriendIds={pendingIds}
-              onConnectSuggestion={(id) => actions.sendRequest(id)} />
-          </motion.div>
-        ) : (
-          <motion.div key="messaggi" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <TabMessaggi myId={myId} />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+          ))}
+        </div>
+
+        {/* Contenuto tab */}
+        <AnimatePresence mode="wait">
+          {loading && activeTab !== "messaggi" ? (
+            <motion.div key="skeleton" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <SkeletonList />
+            </motion.div>
+          ) : error && activeTab !== "messaggi" ? (
+            <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="text-center py-12 text-[#7c8db5] text-sm">
+              <p>Errore nel caricamento.</p>
+              <button onClick={() => window.location.reload()} className="mt-3 text-[#7eb3ff] hover:underline">
+                Riprova
+              </button>
+            </motion.div>
+          ) : activeTab === "connessioni" ? (
+            <motion.div key="connessioni" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              {friends.length === 0 ? (
+                <EmptyState icon={Users} title="Ancora nessuna connessione"
+                  description="Esplora i profili e connettiti con persone nel tuo settore"
+                  cta="Scopri persone" onCta={() => setActiveTab("esplora")} />
+              ) : (
+                <motion.div variants={listVariants} initial="hidden" animate="visible" className="space-y-3">
+                  {friends.map((f) => (
+                    <FriendCard key={f.friendshipId} friend={f}
+                      removing={pendingIds[f.friendshipId] === "removing"}
+                      onRemove={() => actions.remove(f.friendshipId)} />
+                  ))}
+                </motion.div>
+              )}
+            </motion.div>
+          ) : activeTab === "richieste" ? (
+            <motion.div key="richieste" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              {requests.length === 0 ? (
+                <EmptyState icon={UserPlus} title="Nessuna richiesta in attesa"
+                  description="Quando qualcuno ti invierà una richiesta, apparirà qui" />
+              ) : (
+                <motion.div variants={listVariants} initial="hidden" animate="visible" className="space-y-3">
+                  {requests.map((r) => (
+                    <RequestCard key={r.friendshipId} request={r}
+                      accepting={pendingIds[r.friendshipId] === "accepting"}
+                      declining={pendingIds[r.friendshipId] === "removing"}
+                      onAccept={() => actions.acceptRequest(r.friendshipId, r.user.id)}
+                      onDecline={() => actions.remove(r.friendshipId)} />
+                  ))}
+                </motion.div>
+              )}
+            </motion.div>
+          ) : activeTab === "esplora" ? (
+            <motion.div key="esplora" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <TabEsplora suggestions={suggestions} pendingFriendIds={pendingIds}
+                onConnectSuggestion={(id) => actions.sendRequest(id)} />
+            </motion.div>
+          ) : (
+            <motion.div key="messaggi" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <TabMessaggi myId={myId} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Toast container — fuori dal max-w-2xl per posizionamento fixed */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+    </>
   );
 }
