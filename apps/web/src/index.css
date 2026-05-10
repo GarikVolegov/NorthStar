@@ -1,0 +1,148 @@
+/* Tailwind 4 — import unico, nessun @tailwind directive */
+@import "tailwindcss";
+
+/* ─── NorthStar Design Tokens ────────────────────────────────────────────── */
+:root {
+  --color-bg:        #0e1018;
+  --color-surface:   #1a1d2a;
+  --color-gold:      #c19e4a;
+  --color-text:      #e6e8ed;
+  --color-muted:     #7db89a;
+  --color-border:    rgba(193, 158, 74, 0.2);
+
+  /* ─── Phase 1: Touch & Mobile tokens ─────────────────────────────────── */
+  /* Tap target minimo secondo WCAG 2.5.5 e Apple HIG: 44×44px */
+  --touch-target-min: 44px;
+
+  /* Padding base mobile-first (aumenta ai breakpoint superiori) */
+  --spacing-page-x: 1rem;     /* 16px su mobile */
+  --spacing-page-y: 1.25rem;  /* 20px su mobile */
+
+  /* Bottom nav safe area (iPhone notch/home indicator) */
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-top:    env(safe-area-inset-top, 0px);
+}
+
+/* Breakpoint mobile-first — da usare sempre partendo dal più piccolo */
+/* sm:  ≥ 480px  — phone landscape, piccoli tablet */
+/* md:  ≥ 768px  — tablet portrait                */
+/* lg:  ≥ 1024px — tablet landscape, desktop      */
+/* xl:  ≥ 1280px — desktop ampio                  */
+/* 2xl: ≥ 1536px — monitor grande                 */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+
+  /* Phase 1: previene overflow orizzontale su mobile */
+  overflow-x: hidden;
+}
+
+/* ─── Phase 1: Touch Utilities globali ───────────────────────────────────── */
+
+/*
+ * .touch-target
+ * Garantisce dimensione minima 44×44px per qualsiasi elemento interattivo.
+ * Usare su: bottoni solo-icona, link nella nav, elementi cliccabili piccoli.
+ * Esempio: <button className="touch-target">...</button>
+ */
+.touch-target {
+  min-height: var(--touch-target-min);
+  min-width:  var(--touch-target-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/*
+ * .touch-target-full
+ * Come touch-target ma a tutta larghezza (bottoni CTA, voci di lista).
+ */
+.touch-target-full {
+  min-height: var(--touch-target-min);
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+/*
+ * .tap-highlight-none
+ * Rimuove il flash blu su tap in Android/Chrome.
+ * Usare su: bottoni custom, card cliccabili.
+ */
+.tap-highlight-none {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * .momentum-scroll
+ * Scroll fluido nativo su iOS dentro container overflow.
+ * Usare su: drawer, modal, liste scorrevoli.
+ */
+.momentum-scroll {
+  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;
+}
+
+/*
+ * .no-select
+ * Previene la selezione accidentale del testo durante i gesture di tap/swipe.
+ * Usare su: card interattive, elementi drag, BottomNav.
+ */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/*
+ * .page-padding
+ * Padding orizzontale mobile-first per contenitori pagina.
+ * Aumenta automaticamente a breakpoint superiori.
+ */
+.page-padding {
+  padding-left:  var(--spacing-page-x);
+  padding-right: var(--spacing-page-x);
+}
+@media (min-width: 768px) {
+  .page-padding {
+    padding-left:  1.5rem;  /* 24px */
+    padding-right: 1.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  .page-padding {
+    padding-left:  2rem;    /* 32px */
+    padding-right: 2rem;
+  }
+}
+
+/* ─── Phase 1: Performance — disabilita blur costosi su mobile ────────────── */
+/*
+ * La regola proibisce backdrop-filter > blur(12px) su elementi in lista
+ * (FRONTEND_RULES.md §3.3). Su mobile disabilitiamo del tutto il blur
+ * su .glass-panel per evitare jank su GPU deboli.
+ */
+@media (max-width: 767px) {
+  .glass-panel {
+    backdrop-filter: none !important;
+    background: rgba(26, 29, 42, 0.95);
+  }
+}
+
+/* ─── Safe area padding per bottom nav (iPhone notch) ────────────────────── */
+.pb-safe {
+  padding-bottom: calc(var(--safe-area-bottom) + 4rem);
+}
+
+/* ─── Scrollbar custom — match dark theme ────────────────────────────────── */
+::-webkit-scrollbar        { width: 6px; }
+::-webkit-scrollbar-track  { background: var(--color-surface); }
+::-webkit-scrollbar-thumb  { background: var(--color-gold); border-radius: 3px; }
