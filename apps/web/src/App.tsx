@@ -8,7 +8,7 @@ import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import { useReducedMotion, easings } from "@/lib/motion";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageLoader } from "@/components/PageLoader";
-import { Navbar } from "@/components/layout/navbar";
+import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/footer";
 import { BackButton } from "@/components/layout/back-button";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
