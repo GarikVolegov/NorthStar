@@ -13,6 +13,6 @@
     "tsx": "catalog:"
   },
   "dependencies": {
-    "stripe": "^17.7.0"
+    "stripe": "^22.1.0"
   }
 }

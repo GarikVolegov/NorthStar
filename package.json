@@ -4,35 +4,35 @@
   "license": "MIT",
   "scripts": {
     "preinstall": "node scripts/preinstall.js",
-    "// ── DEV ─────────────────────────────────────────────": "---",
+    "// ── DEV ─────────────────────────────────────────": "---",
     "dev": "pnpm run dev:all",
     "dev:server": "pnpm --filter @northstar/server run dev",
     "dev:web": "pnpm --filter @workspace/orientamento run dev",
     "dev:orientamento": "pnpm --filter @workspace/orientamento run dev",
     "dev:all": "concurrently -n server,web -c cyan,magenta \"pnpm run dev:server\" \"pnpm run dev:web\"",
-    "// ── BUILD ──────────────────────────────────────────": "---",
+    "// ── BUILD ─────────────────────────────────────────": "---",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "build:server": "pnpm --filter @northstar/server run build",
     "start:server": "pnpm --filter @northstar/server run start",
-    "// ── TYPE ──────────────────────────────────────────": "---",
+    "// ── TYPE ─────────────────────────────────────────": "---",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
-    "// ── LINT ──────────────────────────────────────────": "---",
+    "// ── LINT ─────────────────────────────────────────": "---",
     "lint": "pnpm run lint:server",
     "lint:server": "pnpm --filter @northstar/server run lint",
     "lint:all": "pnpm -r --if-present run lint",
-    "// ── DB ────────────────────────────────────────────": "---",
+    "// ── DB ──────────────────────────────────────────": "---",
     "db:generate": "pnpm --filter @workspace/db run generate",
     "db:migrate": "pnpm --filter @workspace/db exec tsx migrate.ts",
     "db:push": "pnpm --filter @workspace/db run push",
-    "// ── SECRETS ──────────────────────────────────────": "---",
+    "// ── SECRETS ─────────────────────────────────────": "---",
     "secrets": "bash scripts/generate-secrets.sh",
     "secrets:env": "bash scripts/generate-secrets.sh --env",
-    "// ── TEST ──────────────────────────────────────────": "---",
+    "// ── TEST ─────────────────────────────────────────": "---",
     "test:e2e": "playwright test e2e/api.spec.ts",
     "test:e2e:browser": "playwright test e2e/auth.spec.ts e2e/test-riasec.spec.ts e2e/admin.spec.ts e2e/objectives.spec.ts",
     "test:e2e:all": "playwright test",
-    "// ── CLEAN ─────────────────────────────────────────": "---",
+    "// ── CLEAN ────────────────────────────────────────": "---",
     "clean": "find . -name dist -not -path '*/node_modules/*' -exec rm -rf {} + ; find . -name .turbo -exec rm -rf {} +"
   },
   "private": true,
@@ -48,8 +48,5 @@
     "prettier": "^3.8.1",
     "typescript": "~5.9.2"
   },
-  "dependencies": {
-    "stripe": "^22.1.0",
-    "stripe-replit-sync": "^1.0.0"
-  }
+  "dependencies": {}
 }

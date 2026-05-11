@@ -20,6 +20,25 @@ Prima di modificare qualsiasi area del progetto, apri **sempre** il file di rego
 
 ---
 
+## 🐍 Python AI Server
+
+Il progetto include un server AI scritto in Python (utilizzando FastAPI) situato nella directory radice. Questo server è utilizzato per elaborare compiti AI specifici e può essere eseguito indipendentemente. I file correlati sono:
+
+- `main.py`: punto di ingresso del server
+- `pyproject.toml`: definisce le dipendenze e i metadati del progetto
+- `uv.lock`: file di blocco delle dipendenze generato da `uv`
+- `.python-version`: specifica la versione di Python da utilizzare
+
+Per eseguire il server AI:
+```bash
+uv pip install -r pyproject.toml
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+Nota: Il server AI è opzionale e non è richiesto per l'esecuzione dell'applicazione principale (TypeScript/Node.js).
+
+---
+
 ## 🚀 Setup in 3 comandi
 
 ```bash
