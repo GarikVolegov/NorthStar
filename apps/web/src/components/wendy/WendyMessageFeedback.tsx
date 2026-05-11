@@ -65,29 +65,41 @@ export function WendyMessageFeedback({
         <div style={styles.row}>
           <span style={styles.label}>Risposta utile?</span>
 
-          <button
-            type="button"
-            aria-label="Risposta utile"
-            onClick={() => handleVote('up')}
-            style={{
-              ...styles.btn,
-              ...(currentFeedback === 'up' ? styles.btnActive : {}),
-            }}
-          >
-            👍
-          </button>
+            <button
+              type="button"
+              aria-label="Risposta utile"
+              onClick={() => handleVote('up')}
+              style={{
+                ...styles.btn,
+                ...(currentFeedback === 'up' ? styles.btnActive : {}),
+              }}
+            >
+              👍
+            </button>
 
-          <button
-            type="button"
-            aria-label="Risposta non utile"
-            onClick={() => handleVote('down')}
-            style={{
-              ...styles.btn,
-              ...(currentFeedback === 'down' ? styles.btnActive : {}),
-            }}
-          >
-            👎
-          </button>
+            <button
+              type="button"
+              aria-label="Risposta non utile"
+              onClick={() => handleVote('down')}
+              style={{
+                ...styles.btn,
+                ...(currentFeedback === 'down' ? styles.btnActive : {}),
+              }}
+            >
+              👎
+            </button>
+
+           <button
+             type="button"
+             aria-label="Risposta non utile"
+             onClick={() => handleVote('down')}
+             style={{
+               ...styles.btn,
+               ...((currentFeedback ?? '') === 'down' ? styles.btnActive : {}),
+             }}
+           >
+             👎
+           </button>
         </div>
       ) : (
         <div style={styles.noteWrap}>

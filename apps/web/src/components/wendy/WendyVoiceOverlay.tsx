@@ -26,7 +26,7 @@ import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { UseVoiceChatReturn, VoiceChatPhase, VoiceChatMessage } from '../../hooks/useVoiceChat.js';
 import { useVoiceChat } from '../../hooks/useVoiceChat.js';
-import { WendyAvatar } from '../wendy-avatar.js';
+import { WendyAvatar, AvatarState } from '@/components/wendy-avatar';
 
 const PHASE_LABEL: Record<VoiceChatPhase, string> = {
   idle:      'Premi il microfono per parlare',
@@ -83,10 +83,16 @@ export function WendyVoiceOverlay({
     return () => window.removeEventListener('keydown', handler);
   }, [open, onClose, vc]);
 
-  const isListening = vc.phase === 'listening';
-  const isThinking  = vc.phase === 'thinking';
-  const isSpeaking  = vc.phase === 'speaking';
-  const isIdle      = vc.phase === 'idle';
+   const isListening = vc.phase === 'listening';
+   const isThinking  = vc.phase === 'thinking';
+   const isSpeaking  = vc.phase === 'speaking';
+   const isIdle      = vc.phase === 'idle';
+
+   // Map voice chat phase to WendyAvatar state and phase
+   const avatarState: AvatarState = vc.phase === 'speaking' ? 'celebrating' :
+                                 vc.phase === 'listening' ? 'curious' : 'reflective';
+   const avatarPhase: 0 | 1 | 2 = vc.phase === 'thinking' ? 1 :
+                                 vc.phase === 'speaking' ? 2 : 0;
 
   if (!vc.isSupported) return null;
 
@@ -141,12 +147,12 @@ export function WendyVoiceOverlay({
                 isListening ? 'bg-primary'     :
                 isThinking  ? 'bg-amber-400'   : 'bg-muted',
               ].join(' ')} />
-              <WendyAvatar
-                size={96}
-                speaking={isSpeaking}
-                listening={isListening}
-                className="relative z-10 drop-shadow-xl"
-              />
+               <WendyAvatar
+                 size={96}
+                 state={avatarState}
+                 phase={avatarPhase}
+                 className="relative z-10 drop-shadow-xl"
+               />
             </motion.div>
 
             {/* Phase label */}

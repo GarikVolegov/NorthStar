@@ -21,23 +21,41 @@ const PAD_LFO_FREQ = 0.08;
 
 // ── Stato mute globale ─────────────────────────────────────────────────
 let _muted = false;
+const _mutedListeners: Set<(muted: boolean) => void> = new Set();
 
 export function isMuted(): boolean { return _muted; }
+export const getMuted = isMuted; // Alias for backward compatibility
 
 export function setMuted(value: boolean): void {
-  _muted = value;
-  if (value) {
-    if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
-    if (activePad) {
-      activePad.masterGain.gain.cancelScheduledValues(activePad.ctx.currentTime);
-      activePad.masterGain.gain.linearRampToValueAtTime(0, activePad.ctx.currentTime + 0.3);
-    }
-  } else {
-    if (activePad) {
-      activePad.masterGain.gain.cancelScheduledValues(activePad.ctx.currentTime);
-      activePad.masterGain.gain.linearRampToValueAtTime(PAD_GAIN, activePad.ctx.currentTime + 0.6);
-    }
-  }
+   if (_muted === value) return;
+   _muted = value;
+   _mutedListeners.forEach(listener => listener(_muted));
+   
+   if (value) {
+     if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
+     if (activePad) {
+       activePad.masterGain.gain.cancelScheduledValues(activePad.ctx.currentTime);
+       activePad.masterGain.gain.linearRampToValueAtTime(0, activePad.ctx.currentTime + 0.3);
+     }
+   } else {
+     if (activePad) {
+       activePad.masterGain.gain.cancelScheduledValues(activePad.ctx.currentTime);
+       activePad.masterGain.gain.linearRampToValueAtTime(PAD_GAIN, activePad.ctx.currentTime + 0.6);
+     }
+   }
+}
+
+export function toggleMuted(): void {
+   setMuted(!_muted);
+}
+
+export function subscribe(listener: (muted: boolean) => void): () => void {
+   _mutedListeners.add(listener);
+   // Call immediately with current state
+   listener(_muted);
+   return () => {
+     _mutedListeners.delete(listener);
+   };
 }
 
 // ── Selezione voce ─────────────────────────────────────────────────────

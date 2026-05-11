@@ -11,10 +11,12 @@
     "./db": "./src/db/client.ts"
   },
   "dependencies": {
-    "openai": "catalog:",
     "drizzle-orm": "catalog:",
+    "openai": "catalog:",
     "p-limit": "catalog:",
-    "p-retry": "catalog:"
+    "p-retry": "catalog:",
+    "pdf-parse": "^2.4.5",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@types/node": "catalog:"

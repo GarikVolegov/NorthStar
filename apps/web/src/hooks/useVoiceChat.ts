@@ -136,14 +136,16 @@ export function useVoiceChat({
 
   const voice = useWendyVoice({ onSend: handleSend, lang });
 
-  // When TTS finishes speaking → back to idle
-  useEffect(() => {
-    if (phase === 'speaking' && !voice.isSpeaking) {
-      // small delay so the bubble stays visible a moment
-      const t = setTimeout(() => setPhase('idle'), 600);
-      return () => clearTimeout(t);
-    }
-  }, [phase, voice.isSpeaking]);
+   // When TTS finishes speaking → back to idle
+   useEffect(() => {
+     let timeoutId: NodeJS.Timeout | null = null;
+     if (phase === 'speaking' && !voice.isSpeaking) {
+       timeoutId = setTimeout(() => setPhase('idle'), 600);
+     }
+     return () => {
+       if (timeoutId) clearTimeout(timeoutId);
+     };
+   }, [phase, voice.isSpeaking]);
 
   // Mirror STT phase
   useEffect(() => {

@@ -48,13 +48,16 @@ export function OnboardingModal({ sessionId, recommendations, riasecTypes, domin
   const [objectiveSaved, setObjectiveSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    const done = localStorage.getItem("northstar_onboarding_done");
-    if (!done) {
-      const timer = setTimeout(() => setOpen(true), 1200);
-      return () => clearTimeout(timer);
-    }
-  }, []);
+   useEffect(() => {
+     const done = localStorage.getItem("northstar_onboarding_done");
+     let timer: NodeJS.Timeout | null = null;
+     if (!done) {
+       timer = setTimeout(() => setOpen(true), 1200);
+     }
+     return () => {
+       if (timer) clearTimeout(timer);
+     };
+   }, []);
 
   function finish() {
     localStorage.setItem("northstar_onboarding_done", "1");
@@ -83,7 +86,7 @@ export function OnboardingModal({ sessionId, recommendations, riasecTypes, domin
   const spirit = SPIRIT_META[dominantSpirit];
 
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
+         <Dialog open={open} onOpenChange={(open) => { if (!open) finish(); }}>
       <DialogContent className="max-w-lg p-0 gap-0 overflow-hidden" onPointerDownOutside={(e) => e.preventDefault()}>
         {/* Progress bar */}
         <div className="h-1 bg-muted">
