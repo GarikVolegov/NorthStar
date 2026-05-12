@@ -120,5 +120,5 @@ export type AgentSuggestion = typeof agentSuggestionsTable.$inferSelect;
 export type InsertAgentSuggestion = typeof agentSuggestionsTable.$inferInsert;
 export type ReviewQueueItem = typeof reviewQueueTable.$inferSelect;
 export type InsertReviewQueueItem = typeof reviewQueueTable.$inferInsert;
-export type AuditLog = typeof auditLogsTable.$inferSelect;
-export type InsertAuditLog = typeof auditLogsTable.$inferInsert;
+// AuditLog types moved to auditLog.ts (canonical source).
+// import { AuditLog, InsertAuditLog } from "./auditLog";

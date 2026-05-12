@@ -30,6 +30,10 @@ echo ""
 echo "  Generazione JWT_SECRET..."
 JWT_SECRET=$(openssl rand -hex 48)
 
+# ── IP_HASH_SALT ──────────────────────────────────────────────────
+echo "  Generazione IP_HASH_SALT (GDPR — IP pseudonimizzazione)..."
+IP_HASH_SALT=$(openssl rand -hex 32)
+
 # ── ADMIN_KEY ─────────────────────────────────────────────────────
 echo "  Generazione ADMIN_KEY..."
 ADMIN_KEY=$(openssl rand -hex 32)
@@ -55,6 +59,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo "JWT_SECRET=$JWT_SECRET"
 echo "ADMIN_KEY=$ADMIN_KEY"
+echo "IP_HASH_SALT=$IP_HASH_SALT"
 echo "VAPID_PUBLIC_KEY=$VAPID_PUBLIC"
 echo "VAPID_PRIVATE_KEY=$VAPID_PRIVATE"
 echo "VAPID_EMAIL=support@example.com   # <-- sostituisci con il tuo indirizzo"
@@ -93,6 +98,7 @@ if [[ "$SAVE_ENV" == true ]]; then
 
   update_env "JWT_SECRET"       "$JWT_SECRET"
   update_env "ADMIN_KEY"        "$ADMIN_KEY"
+  update_env "IP_HASH_SALT"     "$IP_HASH_SALT"
   update_env "VAPID_PUBLIC_KEY" "$VAPID_PUBLIC"
   update_env "VAPID_PRIVATE_KEY" "$VAPID_PRIVATE"
 

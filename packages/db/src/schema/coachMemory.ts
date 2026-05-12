@@ -29,8 +29,9 @@
  */
 import {
   pgTable, serial, integer, text, varchar,
-  timestamp, real, uniqueIndex, index,
+  timestamp, real, uniqueIndex, index, check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { usersTable } from "./users";
 
 // ── Table 1: Biographical facts ──────────────────────────────────────────────
@@ -81,6 +82,7 @@ export const coachMemoryPatternsTable = pgTable(
   (t) => ({
     userIdx: index("coach_memory_patterns_user_idx").on(t.userId),
     typeIdx: index("coach_memory_patterns_type_idx").on(t.patternType),
+    confidenceCheck: check("confidence_range", sql`${t.confidence} >= 0 AND ${t.confidence} <= 1`),
   }),
 );
 

@@ -24,7 +24,30 @@
  * Retention: 7 anni (requisito GDPR per dati finanziari).
  * Anonimizzazione: actorId/targetId impostati a null 90 giorni dopo
  * cancellazione account (gestito da cron job GDPR).
+ *
+ * ⚠️  GDPR: gli IP sono dati personali. Usa sempre hashIp() prima
+ * di salvare in ipAddress. Mai IP in chiaro in produzione.
  */
+
+import { createHash } from "node:crypto";
+
+/**
+ * Hash an IP address with SHA-256 + salt before storing in audit_log.
+ * Use this at every call site instead of passing req.ip directly.
+ *
+ *   await db.insert(auditLogTable).values({
+ *     ipAddress: hashIp(req.ip),
+ *     ...
+ *   });
+ *
+ * The salt comes from IP_HASH_SALT env var (generated with pnpm secrets).
+ * Returns null for falsy input (system actions, webhooks).
+ */
+export function hashIp(ip: string | null | undefined): string | null {
+  if (!ip) return null;
+  const salt = process.env.IP_HASH_SALT ?? "default-dev-salt-change-me";
+  return createHash("sha256").update(ip + salt).digest("hex");
+}
 import {
   pgTable,
   serial,

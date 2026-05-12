@@ -8,7 +8,7 @@ import {
   check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { users } from './users';
+import { usersTable as users } from './users';
 
 // ── Tipi condivisi ───────────────────────────────────────────────────────────────
 

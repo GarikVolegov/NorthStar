@@ -10,6 +10,7 @@
   "dependencies": {
     "ws": "^8.18.0",
     "jsonwebtoken": "catalog:",
+    "drizzle-orm": "catalog:",
     "@workspace/db": "workspace:*",
     "@workspace/api-zod": "workspace:*"
   },

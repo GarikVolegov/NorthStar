@@ -5,6 +5,11 @@
  * Qualsiasi aggiunta di tabella, colonna, indice o relazione
  * richiede la Pre-Flight Checklist presente in DB_RULES.md.
  * Non esistono modifiche "piccole" che non richiedano quel controllo.
+ *
+ * ⚠️  DUAL SERVER NOTA: api-server (8080) e northstar-server (3001) condividono
+ * lo stesso DB. Le migrazioni Drizzle devono essere eseguite da UN SOLO
+ * processo alla volta. Usa pg_advisory_lock() nel migration runner.
+ * Vedi packages/db/README.md per il codice di esempio.
  */
 
 export * from "./users";
@@ -19,7 +24,10 @@ export * from "./knowledge";
 export * from "./newsArticles";
 export * from "./growthArticles";
 export * from "./agentReview";
-export * from "./agentLogs";
+// agentLogs.ts removed — table merged into agentReview.ts as agentRunsTable.
+// Run the following SQL to backfill and drop the old table if it still exists:
+//   INSERT INTO agent_runs SELECT * FROM agent_logs;
+//   DROP TABLE agent_logs;
 // ── Affiliate system ──────────────────────────────────────────────────
 export * from "./affiliateAccounts";
 export * from "./affiliateCommissions";
