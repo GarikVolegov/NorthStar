@@ -4,8 +4,12 @@
     {
       "label": "dev:web",
       "type": "shell",
-      "command": "pnpm",
-      "args": ["run", "dev:web"],
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$p = netstat -ano | findstr ':5173.*LISTENING'; if ($p) { $pid = ($p -split '\\s+')[-1]; Stop-Process -Id $pid -Force }; pnpm run dev:web"
+      ],
       "group": {
         "kind": "build",
         "isDefault": true

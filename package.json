@@ -6,7 +6,7 @@
     "preinstall": "node scripts/preinstall.js",
     "// ── DEV ─────────────────────────────────────────": "---",
     "dev": "pnpm run dev:all",
-    "dev:server": "echo 'ℹ️  Server not implemented yet. Use an existing server or create apps/server/'",
+    "dev:server": "pnpm --filter @northstar/server run dev",
     "dev:web": "pnpm --filter @northstar/web run dev",
     "dev:orientamento": "pnpm --filter @northstar/web run dev",
     "dev:all": "pnpm run dev:web",

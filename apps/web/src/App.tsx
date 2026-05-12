@@ -1,5 +1,11 @@
 import { lazy, Suspense } from "react";
-import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
+import {
+  Switch,
+  Route,
+  Router as WouterRouter,
+  useLocation,
+  Redirect,
+} from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -40,23 +46,29 @@ const ChiSiamo = lazy(() => import("@/pages/chi-siamo"));
 const ComeFunziona = lazy(() => import("@/pages/come-funziona"));
 const PrivacyPolicy = lazy(() => import("@/pages/privacy-policy"));
 const TerminiDiServizio = lazy(() => import("@/pages/termini-di-servizio"));
-const Crescita = lazy(() => import("@/pages/crescita"));
+const Crescita = lazy(() => import("@/pages/growth"));
 const CrescitaCategoria = lazy(() => import("@/pages/crescita-categoria"));
 const CrescitaArticolo = lazy(() => import("@/pages/crescita-articolo"));
-const Candidature = lazy(() => import("@/pages/candidature"));
+const Candidature = lazy(() => import("@/pages/applications"));
 const Amici = lazy(() => import("@/pages/amici"));
 const Utente = lazy(() => import("@/pages/utente"));
-const Calendario = lazy(() => import("@/pages/Calendario"));
+const Calendario = lazy(() => import("@/pages/calendar"));
 const Ruolo = lazy(() => import("@/pages/ruolo"));
 const Ruoli = lazy(() => import("@/pages/ruoli"));
 const Affiliazione = lazy(() => import("@/pages/affiliazione"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const AffiliazioneScuole = lazy(() => import("@/pages/affiliazione-scuole"));
-const AffiliazioneUniversita = lazy(() => import("@/pages/affiliazione-universita"));
+const AffiliazioneUniversita = lazy(
+  () => import("@/pages/affiliazione-universita"),
+);
 const AffiliazioneAgenzie = lazy(() => import("@/pages/affiliazione-agenzie"));
-const AffiliazioneFormazione = lazy(() => import("@/pages/affiliazione-formazione"));
+const AffiliazioneFormazione = lazy(
+  () => import("@/pages/affiliazione-formazione"),
+);
 // ── Fase 4: Dashboard affiliato (area privata) ─────────────────────────────
-const AffiliazioneDashboard = lazy(() => import("@/pages/affiliazione-dashboard"));
+const AffiliazioneDashboard = lazy(
+  () => import("@/pages/affiliazione-dashboard"),
+);
 const Colloquio = lazy(() => import("@/pages/colloquio"));
 const SkillsGap = lazy(() => import("@/pages/skills-gap"));
 const Coach = lazy(() => import("@/pages/coach"));
@@ -167,9 +179,18 @@ function AnimatedRoutes() {
       </Route>
       <Route path="/affiliazione" component={Affiliazione} />
       <Route path="/affiliazione/scuole" component={AffiliazioneScuole} />
-      <Route path="/affiliazione/universita" component={AffiliazioneUniversita} />
-      <Route path="/affiliazione/agenzie-lavoro" component={AffiliazioneAgenzie} />
-      <Route path="/affiliazione/centri-formazione" component={AffiliazioneFormazione} />
+      <Route
+        path="/affiliazione/universita"
+        component={AffiliazioneUniversita}
+      />
+      <Route
+        path="/affiliazione/agenzie-lavoro"
+        component={AffiliazioneAgenzie}
+      />
+      <Route
+        path="/affiliazione/centri-formazione"
+        component={AffiliazioneFormazione}
+      />
       {/* Fase 4: dashboard privata affiliato — DOPO le route pubbliche /affiliazione/* */}
       <Route path="/affiliazione/dashboard">
         <ProtectedRoute component={AffiliazioneDashboard} />
@@ -196,9 +217,7 @@ function AnimatedRoutes() {
   if (prefersReduced) {
     return (
       <ErrorBoundary>
-        <Suspense fallback={<PageLoader />}>
-          {routes(location)}
-        </Suspense>
+        <Suspense fallback={<PageLoader />}>{routes(location)}</Suspense>
       </ErrorBoundary>
     );
   }
@@ -210,12 +229,18 @@ function AnimatedRoutes() {
           <m.div
             key={location}
             initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0, transition: { duration: 0.12, ease: easings.easeOut } }}
-            exit={{ opacity: 0, y: -4, transition: { duration: 0.08, ease: easings.easeIn } }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              transition: { duration: 0.12, ease: easings.easeOut },
+            }}
+            exit={{
+              opacity: 0,
+              y: -4,
+              transition: { duration: 0.08, ease: easings.easeIn },
+            }}
           >
-            <Suspense fallback={<PageLoader />}>
-              {routes(location)}
-            </Suspense>
+            <Suspense fallback={<PageLoader />}>{routes(location)}</Suspense>
           </m.div>
         </AnimatePresence>
       </LazyMotion>
@@ -227,34 +252,74 @@ function Router() {
   return (
     <Switch>
       <Route path="/admin/messaggi">
-        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminMessaggi /></Suspense></ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminMessaggi />
+          </Suspense>
+        </ErrorBoundary>
       </Route>
       <Route path="/admin/affiliazione">
-        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminAffiliazione /></Suspense></ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminAffiliazione />
+          </Suspense>
+        </ErrorBoundary>
       </Route>
       <Route path="/admin/review">
-        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminReview /></Suspense></ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminReview />
+          </Suspense>
+        </ErrorBoundary>
       </Route>
       <Route path="/admin/metriche">
-        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminMetriche /></Suspense></ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminMetriche />
+          </Suspense>
+        </ErrorBoundary>
       </Route>
       <Route path="/admin/status">
-        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminStatus /></Suspense></ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminStatus />
+          </Suspense>
+        </ErrorBoundary>
       </Route>
       <Route path="/admin/agenti">
-        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminAgenti /></Suspense></ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminAgenti />
+          </Suspense>
+        </ErrorBoundary>
       </Route>
       <Route path="/admin/cataloghi">
-        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminCataloghi /></Suspense></ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminCataloghi />
+          </Suspense>
+        </ErrorBoundary>
       </Route>
       <Route path="/admin/crescita">
-        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminCrescita /></Suspense></ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminCrescita />
+          </Suspense>
+        </ErrorBoundary>
       </Route>
       <Route path="/admin">
-        <ErrorBoundary><Suspense fallback={<PageLoader />}><AdminHome /></Suspense></ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminHome />
+          </Suspense>
+        </ErrorBoundary>
       </Route>
       <Route path="/certificato/:hash">
-        <ErrorBoundary><Suspense fallback={<PageLoader />}><CertificatePage /></Suspense></ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <CertificatePage />
+          </Suspense>
+        </ErrorBoundary>
       </Route>
       <Route>
         <div className="flex flex-col min-h-[100dvh]">
@@ -263,7 +328,9 @@ function Router() {
             <BackButton />
             <AnimatedRoutes />
           </main>
-          <div className="hidden md:block"><Footer /></div>
+          <div className="hidden md:block">
+            <Footer />
+          </div>
           <MobileBottomNav />
         </div>
       </Route>
