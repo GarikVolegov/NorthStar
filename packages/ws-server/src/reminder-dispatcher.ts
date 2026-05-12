@@ -15,7 +15,7 @@ import {
   eventRemindersTable,
   calendarEventsTable,
 } from "@workspace/db";
-import { and, eq, isNull, lte, gte, sql } from "drizzle-orm";
+import { isNull, sql } from "drizzle-orm";
 import type { NorthStarWss } from "./index";
 
 const POLL_INTERVAL_MS = 60_000; // check every 60 seconds
