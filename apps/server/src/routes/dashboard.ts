@@ -56,6 +56,7 @@ router.get("/", requireAuth, async (req, res) => {
       name: req.user!.name,
       email: req.user!.email,
       isPremium: !!req.user!.stripeSubscriptionId,
+      onboardingCompleted: req.user!.onboardingCompleted,
     },
     session: latestSession ?? null,
     objectives: objectives.map((o) => ({

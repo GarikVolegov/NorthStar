@@ -85,6 +85,9 @@ export const usersTable = pgTable("users", {
    */
   isAffiliate: boolean("is_affiliate").notNull().default(false),
 
+  // ── Onboarding completato ──────────────────────────────────────
+  onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
+
   // ── Network Step 2: Posizione + Bio ────────────────────────────────
   /**
    * Città dell'utente — label human-readable (es. "Roma, Lazio, Italia").

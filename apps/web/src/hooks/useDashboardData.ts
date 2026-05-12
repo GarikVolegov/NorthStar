@@ -37,6 +37,7 @@ export interface DashboardData {
     name: string;
     email: string;
     isPremium: boolean;
+    onboardingCompleted: boolean;
   };
   session: DashboardSession | null;
   objectives: DashboardObjective[];

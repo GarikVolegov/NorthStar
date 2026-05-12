@@ -20,12 +20,14 @@ import calendarRouter from "./routes/calendar";
 import dashboardRouter from "./routes/dashboard";
 import coachRouter from "./routes/coach";
 import wendyRouter from "./routes/wendy";
+import usersRouter from "./routes/users";
 
 app.use("/api/objectives", objectivesRouter);
 app.use("/api/calendar", calendarRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/coach", coachRouter);
 app.use("/api/wendy", wendyRouter);
+app.use("/api/users", usersRouter);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

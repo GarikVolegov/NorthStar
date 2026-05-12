@@ -37,6 +37,8 @@ export interface AuthUser {
   isPublic?: boolean;
   /** Fase 4: accesso dashboard affiliazione — viene da users.is_affiliate */
   isAffiliate?: boolean;
+  /** Onboarding completato — viene da users.onboarding_completed */
+  onboardingCompleted?: boolean;
 }
 
 const JOURNEY_CACHE_KEY = "ns_journey";

@@ -15,6 +15,7 @@ declare global {
         stripeSubscriptionId: string | null;
         journeyType: string | null;
         testSessionId: number | null;
+        onboardingCompleted: boolean;
       };
     }
   }
@@ -49,6 +50,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
         stripeSubscriptionId: usersTable.stripeSubscriptionId,
         journeyType: usersTable.journeyType,
         testSessionId: usersTable.testSessionId,
+        onboardingCompleted: usersTable.onboardingCompleted,
       })
       .from(usersTable)
       .where(eq(usersTable.id, payload.userId))
