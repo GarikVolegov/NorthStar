@@ -14,12 +14,14 @@
  * Logging is fire-and-forget (à la void) — never blocks the response stream.
  * If DB is unavailable, the insert is silently skipped.
  *
- * EVALUATION DIMENSIONS (unchanged from v1)
+ * EVALUATION DIMENSIONS (v3 — dynamic weights per intent)
  * ───────────────────────────────────────────
- *  actionability × 0.35 | platitude_free × 0.25 | length_ok × 0.20 | on_topic × 0.20
+ *  Weights vary by Intent (plan/vent/reflect/etc).
+ *  Short messages (<8 words) halve onTopic component.
+ *  onTopic returns 0.85 when Jaccard has <3 user tokens (short msgs).
  *  pass threshold: >= 0.70
  */
-import { openai } from "../client";
+import { getLLM } from "../llm/client";
 import { db } from "../db/client";
 import { supervisorLogs } from "../db/schema";
 import type { Domain, Intent } from "./router-agent";
@@ -54,11 +56,24 @@ export interface SupervisorEvalInput {
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const PASS_THRESHOLD = 0.70;
-const WEIGHTS = {
-  actionability: 0.35,
-  platitudeFree: 0.25,
-  lengthOk:      0.20,
-  onTopic:       0.20,
+const WEIGHTS_FALLBACK = {
+  actionability: 0.35, platitudeFree: 0.25, lengthOk: 0.20, onTopic: 0.20,
+};
+
+interface SupervisorWeights {
+  actionability: number;
+  platitudeFree: number;
+  lengthOk: number;
+  onTopic: number;
+}
+
+const WEIGHTS_BY_INTENT: Record<string, SupervisorWeights> = {
+  plan:          { actionability: 0.45, platitudeFree: 0.25, lengthOk: 0.15, onTopic: 0.15 },
+  problem_solve: { actionability: 0.40, platitudeFree: 0.25, lengthOk: 0.20, onTopic: 0.15 },
+  explore:       { actionability: 0.20, platitudeFree: 0.30, lengthOk: 0.25, onTopic: 0.25 },
+  reflect:       { actionability: 0.05, platitudeFree: 0.35, lengthOk: 0.30, onTopic: 0.30 },
+  vent:          { actionability: 0.00, platitudeFree: 0.40, lengthOk: 0.30, onTopic: 0.30 },
+  ask_info:      { actionability: 0.10, platitudeFree: 0.20, lengthOk: 0.25, onTopic: 0.45 },
 };
 
 // Learned from DB + hard-coded initial set.
@@ -119,7 +134,7 @@ function scoreOnTopic(userMessage: string, draft: string): number {
     new Set(s.toLowerCase().match(/[a-z\u00e0-\u00fc]{4,}/g)?.filter((w) => !STOP.has(w)) ?? []);
   const uTokens = tokenize(userMessage);
   const dTokens = tokenize(draft);
-  if (uTokens.size === 0) return 0.80;
+  if (uTokens.size < 3) return 0.85;
   const intersection = [...uTokens].filter((w) => dTokens.has(w)).length;
   const jaccard = intersection / (uTokens.size + dTokens.size - intersection);
   if (jaccard >= 0.12) return 1.0;
@@ -140,11 +155,19 @@ export class SupervisorAgent {
       lengthOk:      scoreLengthOk(draft),
       onTopic:       scoreOnTopic(userMessage, draft),
     };
+    const weights = WEIGHTS_BY_INTENT[input.intent] ?? WEIGHTS_FALLBACK;
+    let { onTopic: onTopicWeight } = weights;
+
+    const words = input.userMessage.trim().split(/\s+/).length;
+    if (words < 8) {
+      onTopicWeight *= 0.5;
+    }
+
     const score = Math.round((
-      dimensions.actionability * WEIGHTS.actionability +
-      dimensions.platitudeFree * WEIGHTS.platitudeFree +
-      dimensions.lengthOk      * WEIGHTS.lengthOk      +
-      dimensions.onTopic       * WEIGHTS.onTopic
+      dimensions.actionability * weights.actionability +
+      dimensions.platitudeFree * weights.platitudeFree +
+      dimensions.lengthOk      * weights.lengthOk      +
+      dimensions.onTopic       * onTopicWeight
     ) * 100) / 100;
     const pass = score >= PASS_THRESHOLD;
     const reasons: string[] = [];
@@ -195,18 +218,23 @@ REGOLE DI RISCRITTURA:
 
     let rewritten = draft; // safe fallback
     try {
-      const res = await openai.chat.completions.create({
-        model:       "gpt-4o-mini",
-        messages: [
+      rewritten = await getLLM().chatOnce(
+        [
           { role: "system", content: systemPrompt },
           { role: "user",   content: `DOMANDA UTENTE:\n${userMessage}\n\nBOZZA:\n${draft}` },
         ],
-        temperature: 0.50,
-        max_tokens:  700,
-      });
-      rewritten = res.choices[0]?.message?.content?.trim() ?? draft;
+        { model: "gpt-4o-mini", temperature: 0.50, maxTokens: 700 },
+      );
     } catch (err) {
       console.warn("[supervisor] rewrite failed, using original draft:", err);
+    }
+
+    // ── Re-evaluate post-rewrite ─────────────────────────────────────
+    const rewrittenResult = this.evaluate({ ...input, draft: rewritten });
+    if (rewrittenResult.score < failResult.score) {
+      console.warn(
+        `[supervisor] rewrite degraded quality (${rewrittenResult.score} < ${failResult.score}) — keeping original`,
+      );
     }
 
     // ── Fire-and-forget DB log ───────────────────────────────────────
@@ -220,13 +248,14 @@ REGOLE DI RISCRITTURA:
         draft,
         finalText:   finalText ?? rewritten,
         scoreBefore: failResult.score,
+        scoreAfter:  rewrittenResult.score,
         reasons:     JSON.stringify(failResult.reasons),
       }).catch((err: unknown) => {
         console.warn("[supervisor] DB log failed (non-blocking):", err);
       });
     }
 
-    return rewritten;
+    return rewrittenResult.score >= failResult.score ? rewritten : draft;
   }
 }
 

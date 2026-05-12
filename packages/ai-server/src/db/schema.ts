@@ -34,6 +34,7 @@ export const supervisorLogs = pgTable("supervisor_logs", {
 
   // Quality signals
   scoreBefore:  real("score_before").notNull(), // supervisor score before rewrite
+  scoreAfter:   real("score_after"),             // supervisor score after rewrite (nullable: pre-v3 rows)
   reasons:      text("reasons").notNull(),       // JSON array of failure reasons
 });
 
