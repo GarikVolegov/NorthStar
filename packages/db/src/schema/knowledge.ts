@@ -51,6 +51,8 @@ export const knowledgeNodesTable = pgTable(
     // jsonb embedding — used by JS fallback retriever
     embedding: jsonb("embedding").$type<number[] | null>(),
     embeddedText: text("embedded_text"),
+    /** Metadata for platform_content: externalId, chunkIndex, source, contentType, tags, url */
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     // pgvector column — populated by add-pgvector.sql migration + backfill
     // Used by SQL retriever when PGVECTOR=true
     embeddingVec: vector("embedding_vec"),

@@ -3,7 +3,8 @@ packages:
   - packages/*
   - scripts
 allowBuilds:
-  better-sqlite3: set this to true or false
+  better-sqlite3: true
+  protobufjs: true
 catalog:
   "@replit/vite-plugin-cartographer": ^0.5.1
   "@replit/vite-plugin-dev-banner": ^0.1.2

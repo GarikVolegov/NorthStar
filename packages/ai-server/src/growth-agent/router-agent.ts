@@ -1,16 +1,12 @@
 /**
- * RouterAgent v4 — multi-domain detection + adaptive threshold.
+ * RouterAgent v5 — multi-domain detection + adaptive threshold + LLM provider.
  *
- * CHANGES v4 (Phase 9)
- * ────────────────────
- * Added two new domains:
- *   - finance:       finanza personale, budget, investimenti, risparmio
- *   - relationships: networking, comunicazione, mentorship, relazioni professionali
- *
- * These are registered via their specialist agents in specialists/finance-agent.ts
- * and specialists/relationships-agent.ts.
+ * CHANGES v5:
+ * - Uses getLLM() provider instead of hardcoded openai client
+ * - Injects routing memory (commit-style) for cross-session consistency
  */
-import { openai } from "../client";
+import { getLLM, type LLMMessage } from "../llm/client";
+import { commitRoute, loadRoutingContext } from "./router-memory";
 import type { ChatMessage } from "./agent";
 
 // ── Types ─────────────────────────────────────────────────────────────────────────
@@ -154,19 +150,24 @@ export class RouterAgent {
       ? `Contesto conversazione:\n${contextLines}\n\nMessaggio attuale: ${userMessage}`
       : `Messaggio: ${userMessage}`;
 
-    try {
-      const res = await openai.chat.completions.create({
-        model:           "gpt-4o-mini",
-        messages: [
-          { role: "system", content: ROUTER_SYSTEM },
-          { role: "user",   content: userContent },
-        ],
-        temperature:     0.1,
-        max_tokens:      300,
-        response_format: { type: "json_object" },
-      });
+    // Inject routing memory context for cross-session consistency
+    const userId = (history as unknown as { userId?: number })?.userId ?? 0;
+    const routingContext = loadRoutingContext(userId);
+    const systemWithMemory = routingContext
+      ? `${ROUTER_SYSTEM}\n\n${routingContext}`
+      : ROUTER_SYSTEM;
 
-      const raw    = res.choices[0]?.message?.content ?? "{}";
+    try {
+      const llm = getLLM();
+      const result = await llm.chatOnce(
+        [
+          { role: "system", content: systemWithMemory },
+          { role: "user", content: userContent },
+        ],
+        { model: "gpt-4o-mini", temperature: 0.1, maxTokens: 300 },
+      );
+
+      const raw = result ?? "{}";
       const parsed = JSON.parse(raw) as RawRouteResponse;
 
       const domain: Domain    = (parsed.domain as Domain) ?? "general";
@@ -195,7 +196,7 @@ export class RouterAgent {
         console.log(`[router v4] multi-domain: ${domain}(${confidence.toFixed(2)}) + ${secDomain}(${secConfidence.toFixed(2)})`);
       }
 
-      return {
+      const decision: RouteDecision = {
         domain,
         intent:         (parsed.intent as Intent) ?? "explore",
         confidence,
@@ -204,6 +205,18 @@ export class RouterAgent {
         handoffContext: parsed.handoffContext  ?? userMessage,
         secondaryRoute,
       };
+
+      // Commit routing decision for future context
+      if (userId > 0) {
+        commitRoute(userId, {
+          domain: decision.domain,
+          intent: decision.intent,
+          confidence: decision.confidence,
+          reasoning: decision.reasoning,
+        }, userMessage);
+      }
+
+      return decision;
     } catch (err) {
       console.warn("[router v4] classification failed, falling back to general:", err);
       return {

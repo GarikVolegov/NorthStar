@@ -1,3 +1,4 @@
+import "./tracing";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -18,15 +19,32 @@ import objectivesRouter from "./routes/objectives";
 import calendarRouter from "./routes/calendar";
 import dashboardRouter from "./routes/dashboard";
 import coachRouter from "./routes/coach";
+import wendyRouter from "./routes/wendy";
 
 app.use("/api/objectives", objectivesRouter);
 app.use("/api/calendar", calendarRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/coach", coachRouter);
+app.use("/api/wendy", wendyRouter);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
+});
+
+// Database pool health check
+app.get("/api/health/db", async (req, res) => {
+  try {
+    const { pool } = await import("@workspace/db");
+    const poolStats = {
+      totalCount: pool.totalCount,
+      idleCount: pool.idleCount,
+      waitingCount: pool.waitingCount,
+    };
+    res.json({ status: "ok", pool: poolStats });
+  } catch (err) {
+    res.status(503).json({ status: "error", message: String(err) });
+  }
 });
 
 // Root endpoint

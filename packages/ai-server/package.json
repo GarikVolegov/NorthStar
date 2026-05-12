@@ -14,6 +14,7 @@
   "dependencies": {
     "@workspace/db": "workspace:*",
     "drizzle-orm": "catalog:",
+    "groq-sdk": "^0.5.0",
     "openai": "catalog:",
     "p-limit": "catalog:",
     "p-retry": "catalog:",

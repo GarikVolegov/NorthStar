@@ -30,9 +30,9 @@ if (!DATABASE_URL) {
 // is synchronous and single-threaded, so there is no race condition here.
 const _pool = new Pool({
   connectionString: DATABASE_URL,
-  max: 10,
-  idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 5_000,
+  max: parseInt(process.env.DB_POOL_MAX ?? "10"),
+  idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT ?? "30000"),
+  connectionTimeoutMillis: parseInt(process.env.DB_POOL_CONNECT_TIMEOUT ?? "5000"),
 });
 const _db = drizzle(_pool, { schema });
 

@@ -24,6 +24,13 @@
     "zod": "catalog:",
     "dotenv": "^17.4.2"
   },
+  "optionalDependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/sdk-node": "^0.52.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.52.0",
+    "@opentelemetry/instrumentation-http": "^0.52.0",
+    "@opentelemetry/instrumentation-express": "^0.41.0"
+  },
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/cors": "^2.8.17",
