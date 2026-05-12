@@ -620,7 +620,7 @@ export default function Profilo() {
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline" size="sm"
-            className="rounded-full gap-2 text-xs border-[#0077B5]/30 text-[#0077B5] hover:bg-[#0077B5]/10"
+            className="rounded-full gap-2 text-xs border-[#0077B5]/30 text-[#0077B5] hover:bg-[#0077B5]/10 /* LinkedIn brand blue */"
             onClick={() => setLinkedinWizardOpen(true)}
           >
             <Linkedin className="w-3.5 h-3.5" /> Importa da LinkedIn

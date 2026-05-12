@@ -188,7 +188,7 @@ export default function AdminAgenti() {
     .slice(-14)
     .map(([day, agents]) => ({ day: day.slice(5), ...agents }));
 
-  const COLORS = ["#6366f1", "#22d3ee", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#ec4899"];
+  const COLORS = ["hsl(var(--chart-4))", "#22d3ee", "#f59e0b", "hsl(var(--chart-2))", "hsl(var(--chart-5))", "hsl(var(--chart-4))", "#ec4899"];
 
   const healthy = data?.agents.filter((a) => a.status === "healthy").length ?? 0;
   const degraded = data?.agents.filter((a) => a.status === "degraded").length ?? 0;

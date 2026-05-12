@@ -1,9 +1,13 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
 import { useWendyOpenAITTS } from '../hooks/useWendyOpenAITTS';
 
+export type WendyPhase = 'idle' | 'thinking' | 'speaking' | 'listening';
+
 interface WendyContextValue {
   isOpen: boolean;
   isSpeaking: boolean;
+  phase: WendyPhase;
+  setPhase: (p: WendyPhase) => void;
   open: () => void;
   close: () => void;
   toggle: () => void;
@@ -20,10 +24,16 @@ export function useWendy(): WendyContextValue {
   return ctx;
 }
 
-function WendyTTSBridge({ onSpeakingChange }: { onSpeakingChange: (v: boolean) => void }) {
+function WendyTTSBridge({ onSpeakingChange, onPhaseChange }: { onSpeakingChange: (v: boolean) => void; onPhaseChange: (p: WendyPhase) => void }) {
   const { play } = useWendyOpenAITTS({
-    onStart: () => onSpeakingChange(true),
-    onEnd: () => onSpeakingChange(false),
+    onStart: () => {
+      onSpeakingChange(true);
+      onPhaseChange('speaking');
+    },
+    onEnd: () => {
+      onSpeakingChange(false);
+      onPhaseChange('idle');
+    },
   });
 
   const speakRef = useRef(play);
@@ -43,6 +53,7 @@ function WendyTTSBridge({ onSpeakingChange }: { onSpeakingChange: (v: boolean) =
 export function WendyProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [phase, setPhase] = useState<WendyPhase>('idle');
   const pendingAskRef = useRef<string | null>(null);
 
   const open = useCallback(() => setIsOpen(true), []);
@@ -60,9 +71,9 @@ export function WendyProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <WendyContext.Provider value={{ isOpen, isSpeaking, open, close, toggle, speak, ask, setIsSpeaking }}>
+    <WendyContext.Provider value={{ isOpen, isSpeaking, phase, setPhase, open, close, toggle, speak, ask, setIsSpeaking }}>
       {children}
-      <WendyTTSBridge onSpeakingChange={setIsSpeaking} />
+      <WendyTTSBridge onSpeakingChange={setIsSpeaking} onPhaseChange={setPhase} />
     </WendyContext.Provider>
   );
 }

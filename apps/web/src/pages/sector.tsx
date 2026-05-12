@@ -256,9 +256,9 @@ export default function Sector() {
                     className="inline-block w-1.5 h-1.5 rounded-full"
                     style={{
                       backgroundColor:
-                        alignment.type === "aligned" ? "rgb(16 185 129)" :
-                        alignment.type === "partial"  ? "rgb(217 119 6)" :
-                                                        "rgb(220 38 38)",
+                        alignment.type === "aligned" ? "hsl(var(--chart-2))" :
+                        alignment.type === "partial"  ? "hsl(var(--chart-1))" :
+                                                        "hsl(var(--chart-5))",
                     }}
                   />
                   {alignment.type === "aligned" ? t("sector.alignment.aligned") :

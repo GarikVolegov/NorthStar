@@ -279,7 +279,7 @@ function PhaseOverlay({ phase, label, emoji, description, onDone }: PhaseOverlay
       >
         <motion.div variants={item}
           className="text-7xl sm:text-8xl leading-none select-none"
-          style={{ filter: "drop-shadow(0 0 24px rgba(255,255,255,0.25))" }}
+          style={{ filter: "drop-shadow(0 0 24px hsl(var(--foreground) / 0.25))" }}
         >
           {emoji}
         </motion.div>

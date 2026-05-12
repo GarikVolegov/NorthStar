@@ -34,12 +34,24 @@ export const wendyLlmTokensTotal = new promClient.Counter({
   registers: [register],
 });
 
+export const wendyRouterConfidenceHistogram = new promClient.Histogram({
+  name: "wendy_router_confidence_histogram",
+  help: "Distribution of router confidence scores by domain and intent",
+  labelNames: ["domain", "intent"] as const,
+  buckets: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+  registers: [register],
+});
+
 export function recordRequest(domain: Domain, intent: Intent): void {
   wendyRequestsTotal.inc({ domain, intent });
 }
 
 export function recordSupervisorRewrite(domain: Domain): void {
   wendySupervisorRewritesTotal.inc({ domain });
+}
+
+export function recordRouterConfidence(domain: Domain, intent: Intent, confidence: number): void {
+  wendyRouterConfidenceHistogram.observe({ domain, intent }, confidence);
 }
 
 export function recordLlmTokens(model: string, chars: number): void {

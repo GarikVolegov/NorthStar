@@ -27,6 +27,7 @@ import { supervisorLogs } from "../db/schema";
 import type { Domain, Intent } from "./router-agent";
 import { logger, type LoggerFields } from "../logger";
 import { recordSupervisorRewrite } from "../metrics";
+import { withTimeout } from "../utils";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -246,7 +247,7 @@ REGOLE DI RISCRITTURA:
 
     // ── Fire-and-forget DB log ───────────────────────────────────────
     if (db) {
-      db.insert(supervisorLogs).values({
+      const logPromise = db.insert(supervisorLogs).values({
         userId:      userId ?? null,
         sessionId:   sessionId ?? null,
         domain,
@@ -257,8 +258,9 @@ REGOLE DI RISCRITTURA:
         scoreBefore: failResult.score,
         scoreAfter:  rewrittenResult.score,
         reasons:     JSON.stringify(failResult.reasons),
-      }).catch((err: unknown) => {
-        logger.warn({ err, ...logFields }, "supervisor DB log failed");
+      });
+      withTimeout(logPromise, 3000, "supervisor DB log").catch((err: unknown) => {
+        logger.warn({ err, ...logFields }, "supervisor DB log failed/timed out");
       });
     }
 

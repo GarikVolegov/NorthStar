@@ -20,6 +20,7 @@ import { logger, type LoggerFields } from "../logger";
 import { recordRequest, recordLlmTokens } from "../metrics";
 import { wendyLatencySeconds } from "../metrics";
 import { FF } from "../feature-flags";
+import { withTimeout } from "../utils";
 
 import "./specialists/career-agent";
 import "./specialists/mindset-agent";
@@ -99,11 +100,13 @@ export async function* runGrowthAgent(
         ];
         (async () => {
           try {
-            const extracted = await extractMemory(turns);
+            const extracted = await withTimeout(extractMemory(turns), 5000, "extractMemory");
             if (extracted && (extracted.facts.length > 0 || extracted.patterns.length > 0)) {
-              await mergeMemory(userId, sessionId, extracted);
+              await withTimeout(mergeMemory(userId, sessionId, extracted), 3000, "mergeMemory");
             }
-          } catch { /* non-critical */ }
+          } catch (err) {
+            logger.warn({ err, ...logFields }, "voice memory save failed/timed out");
+          }
         })();
       }
     } catch (err) {
@@ -144,6 +147,12 @@ export async function* runGrowthAgent(
     isFallback: routeDecision.isFallback,
   }, "route decision");
 
+  Object.assign(logFields, {
+    domain: routeDecision.domain,
+    intent: routeDecision.intent,
+    routeConfidence: routeDecision.confidence,
+  });
+
   const memorySection   = buildMemorySection(userMemory);
   const enrichedContext: UserContext & { memorySection?: string } = {
     ...userContext,
@@ -168,7 +177,7 @@ export async function* runGrowthAgent(
     ];
     (async () => {
       try {
-        const extracted = await extractMemory(turns);
+        const extracted = await withTimeout(extractMemory(turns), 5000, "extractMemory");
         if (!extracted) return;
 
         // If this exchange was a plan, save a pending_follow_up for next session
@@ -183,11 +192,11 @@ export async function* runGrowthAgent(
         }
 
         if (extracted.facts.length > 0 || extracted.patterns.length > 0) {
-          await mergeMemory(userId, sid, extracted);
+          await withTimeout(mergeMemory(userId, sid, extracted), 3000, "mergeMemory");
           logger.info({ ...logFields, factCount: extracted.facts.length, patternCount: extracted.patterns.length }, "memory saved");
         }
       } catch (err) {
-        logger.warn({ err, ...logFields }, "memory save failed");
+        logger.warn({ err, ...logFields }, "memory save failed/timed out");
       }
     })();
   }

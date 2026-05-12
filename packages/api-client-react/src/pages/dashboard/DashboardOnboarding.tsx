@@ -23,14 +23,14 @@ export default function DashboardOnboarding() {
         transition={{ duration: 0.4 }}
         className="text-center mb-10"
       >
-        <div className="w-16 h-16 rounded-2xl bg-[#0d1421] border border-white/[0.06]
+        <div className="w-16 h-16 rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06]
                         flex items-center justify-center mx-auto mb-4">
-          <Compass className="w-8 h-8 text-[#4a8bff]" />
+          <Compass className="w-8 h-8 text-[hsl(var(--chart-3))]" />
         </div>
-        <h1 className="text-[22px] font-bold text-[#dce6f5] mb-2">
+        <h1 className="text-[22px] font-bold text-[hsl(var(--foreground))] mb-2">
           Benvenuto su NorthStar
         </h1>
-        <p className="text-[14px] text-[#7c8db5] max-w-[38ch] mx-auto leading-relaxed">
+        <p className="text-[14px] text-[hsl(var(--muted-foreground))] max-w-[38ch] mx-auto leading-relaxed">
           Per mostrarti la dashboard giusta, dobbiamo capire
           in quale momento del tuo percorso professionale sei.
         </p>
@@ -48,17 +48,17 @@ export default function DashboardOnboarding() {
             initial={{ opacity: 0, x: -16 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.1 + i * 0.08 }}
-            className="flex items-start gap-4 p-4 rounded-2xl bg-[#0d1421] border border-white/[0.06]"
+            className="flex items-start gap-4 p-4 rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06]"
           >
-            <div className="w-8 h-8 rounded-full bg-[#1a2035] flex items-center justify-center
-                            flex-shrink-0 text-[11px] font-bold text-[#4a8bff]">
+            <div className="w-8 h-8 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center
+                            flex-shrink-0 text-[11px] font-bold text-[hsl(var(--chart-3))]">
               {step.num}
             </div>
             <div className="flex-1">
-              <p className="text-[14px] font-semibold text-[#c5cee0] mb-0.5">{step.title}</p>
-              <p className="text-[12px] text-[#7c8db5]">{step.desc}</p>
+              <p className="text-[14px] font-semibold text-[hsl(var(--foreground))] mb-0.5">{step.title}</p>
+              <p className="text-[12px] text-[hsl(var(--muted-foreground))]">{step.desc}</p>
             </div>
-            <step.icon className="w-4 h-4 text-[#4a5a75] flex-shrink-0 mt-0.5" />
+            <step.icon className="w-4 h-4 text-[hsl(var(--muted-foreground))] flex-shrink-0 mt-0.5" />
           </motion.div>
         ))}
       </motion.div>
@@ -72,7 +72,7 @@ export default function DashboardOnboarding() {
         <Link href="/test"
           className="
             inline-flex items-center gap-2.5 px-6 py-3 rounded-xl
-            bg-[#4a8bff] hover:bg-[#5a97ff]
+            bg-[hsl(var(--chart-3))] hover:bg-[hsl(var(--chart-3))]
             text-[14px] font-semibold text-white
             transition-colors shadow-lg shadow-blue-500/20
           ">

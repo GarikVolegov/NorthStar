@@ -109,7 +109,7 @@ function StatSkeleton() {
   return (
     <div className="flex gap-4">
       {[1, 2, 3].map((i) => (
-        <div key={i} className="flex-1 h-20 rounded-2xl bg-[#131929] animate-pulse" />
+        <div key={i} className="flex-1 h-20 rounded-2xl bg-[hsl(var(--card))] animate-pulse" />
       ))}
     </div>
   );
@@ -127,19 +127,19 @@ function StatsRow({ stats }: { stats: UserStats }) {
 
       {/* XP */}
       <motion.div variants={fadeUp}
-        className="col-span-2 rounded-2xl bg-[#0d1421] border border-white/[0.06] p-4">
+        className="col-span-2 rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06] p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
             <Zap className="w-4 h-4 text-amber-400" />
-            <span className="text-[12px] font-semibold text-[#7c8db5] uppercase tracking-wide">Esperienza</span>
+            <span className="text-[12px] font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">Esperienza</span>
           </div>
-          <span className="text-[11px] text-[#4a5a75]">Lv. {stats.level}</span>
+          <span className="text-[11px] text-[hsl(var(--muted-foreground))]">Lv. {stats.level}</span>
         </div>
-        <p className="text-[22px] font-bold text-[#dce6f5] tabular-nums">
+        <p className="text-[22px] font-bold text-[hsl(var(--foreground))] tabular-nums">
           {stats.totalXp.toLocaleString('it-IT')}
-          <span className="text-[13px] font-normal text-[#7c8db5] ml-1">XP</span>
+          <span className="text-[13px] font-normal text-[hsl(var(--muted-foreground))] ml-1">XP</span>
         </p>
-        <div className="mt-2 h-1.5 rounded-full bg-[#1a2035] overflow-hidden">
+        <div className="mt-2 h-1.5 rounded-full bg-[hsl(var(--muted))] overflow-hidden">
           <motion.div
             className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-400"
             initial={{ width: 0 }}
@@ -147,23 +147,23 @@ function StatsRow({ stats }: { stats: UserStats }) {
             transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
           />
         </div>
-        <p className="mt-1 text-[10px] text-[#3a4a65]">
+        <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">
           {(xpForNextLevel - (stats.totalXp % 500)).toLocaleString('it-IT')} XP al prossimo livello
         </p>
       </motion.div>
 
       {/* Streak */}
       <motion.div variants={fadeUp}
-        className="rounded-2xl bg-[#0d1421] border border-white/[0.06] p-4 flex flex-col items-center justify-center">
+        className="rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06] p-4 flex flex-col items-center justify-center">
         <Flame className={`w-6 h-6 mb-1 ${
-          stats.currentStreak > 0 ? 'text-orange-400' : 'text-[#3a4a65]'
+          stats.currentStreak > 0 ? 'text-orange-400' : 'text-[hsl(var(--muted-foreground))]'
         }`} />
-        <p className="text-[22px] font-bold text-[#dce6f5] tabular-nums leading-none">
+        <p className="text-[22px] font-bold text-[hsl(var(--foreground))] tabular-nums leading-none">
           {stats.currentStreak}
         </p>
-        <p className="text-[11px] text-[#7c8db5] mt-0.5">Streak</p>
+        <p className="text-[11px] text-[hsl(var(--muted-foreground))] mt-0.5">Streak</p>
         {stats.currentStreak > 0 && (
-          <p className="text-[10px] text-[#4a5a75] mt-0.5">
+          <p className="text-[10px] text-[hsl(var(--muted-foreground))] mt-0.5">
             max {stats.longestStreak}gg
           </p>
         )}
@@ -190,8 +190,8 @@ function AzioniRapide() {
             `}>
             <a.icon className={`w-5 h-5 ${a.accent}`} />
             <div>
-              <p className="text-[14px] font-semibold text-[#dce6f5]">{a.label}</p>
-              <p className="text-[12px] text-[#7c8db5] leading-snug">{a.desc}</p>
+              <p className="text-[14px] font-semibold text-[hsl(var(--foreground))]">{a.label}</p>
+              <p className="text-[12px] text-[hsl(var(--muted-foreground))] leading-snug">{a.desc}</p>
             </div>
             <ArrowRight className={`w-3.5 h-3.5 ${a.accent} mt-auto self-end`} />
           </Link>
@@ -209,12 +209,12 @@ function SettoriConsigliati({ sectors }: { sectors: Sector[] }) {
   return (
     <motion.div variants={fadeUp}>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[14px] font-semibold text-[#a8b8d0] flex items-center gap-2">
+        <h2 className="text-[14px] font-semibold text-[hsl(var(--muted-foreground))] flex items-center gap-2">
           <Star className="w-4 h-4 text-amber-400" />
           Settori da esplorare
         </h2>
         <Link href="/settori"
-          className="text-[12px] text-[#4a8bff] hover:text-[#7eb3ff] transition-colors flex items-center gap-1">
+          className="text-[12px] text-[hsl(var(--chart-3))] hover:text-[hsl(var(--chart-3))] transition-colors flex items-center gap-1">
           Tutti <ChevronRight className="w-3.5 h-3.5" />
         </Link>
       </div>
@@ -223,15 +223,15 @@ function SettoriConsigliati({ sectors }: { sectors: Sector[] }) {
           <Link key={s.id} href={`/settore/${s.id}`}
             className="
               group flex items-center gap-2.5 p-3 rounded-xl
-              bg-[#0d1421] border border-white/[0.06]
-              hover:border-white/[0.12] hover:bg-[#0f1828]
+              bg-[hsl(var(--background))] border border-white/[0.06]
+              hover:border-white/[0.12] hover:bg-[hsl(var(--muted))]
               transition-all
             ">
-            <div className="w-7 h-7 rounded-lg bg-[#1a2035] flex items-center justify-center flex-shrink-0">
-              <Briefcase className="w-3.5 h-3.5 text-[#4a8bff]" />
+            <div className="w-7 h-7 rounded-lg bg-[hsl(var(--muted))] flex items-center justify-center flex-shrink-0">
+              <Briefcase className="w-3.5 h-3.5 text-[hsl(var(--chart-3))]" />
             </div>
-            <span className="text-[13px] font-medium text-[#c5cee0] truncate
-                             group-hover:text-[#dce6f5] transition-colors">
+            <span className="text-[13px] font-medium text-[hsl(var(--foreground))] truncate
+                             group-hover:text-[hsl(var(--foreground))] transition-colors">
               {s.name}
             </span>
           </Link>
@@ -250,8 +250,8 @@ function RuoliEsplorabili() {
   return (
     <motion.div variants={fadeUp}>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[14px] font-semibold text-[#a8b8d0] flex items-center gap-2">
-          <Briefcase className="w-4 h-4 text-[#4a8bff]" />
+        <h2 className="text-[14px] font-semibold text-[hsl(var(--muted-foreground))] flex items-center gap-2">
+          <Briefcase className="w-4 h-4 text-[hsl(var(--chart-3))]" />
           Cosa fa un professionista?
         </h2>
       </div>
@@ -262,18 +262,18 @@ function RuoliEsplorabili() {
             <motion.div key={r.label} variants={fadeUp} layout
               className="
                 flex items-center gap-3 p-3.5 rounded-xl
-                bg-[#0d1421] border border-white/[0.06]
-                hover:border-white/[0.1] hover:bg-[#0f1828]
+                bg-[hsl(var(--background))] border border-white/[0.06]
+                hover:border-white/[0.1] hover:bg-[hsl(var(--muted))]
                 transition-all cursor-default
               ">
-              <div className="w-9 h-9 rounded-xl bg-[#1a2035] flex items-center justify-center flex-shrink-0">
-                <r.icon className="w-4 h-4 text-[#7c8db5]" />
+              <div className="w-9 h-9 rounded-xl bg-[hsl(var(--muted))] flex items-center justify-center flex-shrink-0">
+                <r.icon className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-[#c5cee0]">{r.label}</p>
-                <p className="text-[12px] text-[#7c8db5] truncate">{r.desc}</p>
+                <p className="text-[13px] font-semibold text-[hsl(var(--foreground))]">{r.label}</p>
+                <p className="text-[12px] text-[hsl(var(--muted-foreground))] truncate">{r.desc}</p>
               </div>
-              <span className="text-[11px] text-[#3a4a65] bg-[#1a2035] px-2 py-0.5 rounded-full flex-shrink-0">
+              <span className="text-[11px] text-[hsl(var(--muted-foreground))] bg-[hsl(var(--muted))] px-2 py-0.5 rounded-full flex-shrink-0">
                 {r.settore}
               </span>
             </motion.div>
@@ -285,9 +285,9 @@ function RuoliEsplorabili() {
         onClick={() => setExpanded((v) => !v)}
         className="
           mt-3 w-full py-2 rounded-xl text-[12px] font-medium
-          text-[#4a5a75] hover:text-[#7c8db5]
+          text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--muted-foreground))]
           border border-white/[0.04] hover:border-white/[0.08]
-          bg-[#0d1421] hover:bg-[#0f1828]
+          bg-[hsl(var(--background))] hover:bg-[hsl(var(--muted))]
           transition-all
         ">
         {expanded ? 'Mostra meno ↑' : `Mostra altri ${RUOLI_ESPLORABILI.length - 4} ruoli ↓`}
@@ -305,7 +305,7 @@ function BannerAvanzamento({ hasCompletedTest }: { hasCompletedTest: boolean }) 
     <motion.div variants={fadeUp}
       className="
         relative overflow-hidden rounded-2xl p-5
-        bg-gradient-to-br from-violet-600/15 via-[#0d1421] to-blue-600/10
+        bg-gradient-to-br from-violet-600/15 via-[hsl(var(--background))] to-blue-600/10
         border border-violet-500/20
       ">
       <div className="absolute top-0 right-0 w-32 h-32 rounded-full
@@ -315,10 +315,10 @@ function BannerAvanzamento({ hasCompletedTest }: { hasCompletedTest: boolean }) 
           <Sparkles className="w-5 h-5 text-violet-400" />
         </div>
         <div className="flex-1">
-          <p className="text-[14px] font-semibold text-[#dce6f5] mb-1">
+          <p className="text-[14px] font-semibold text-[hsl(var(--foreground))] mb-1">
             Inizia con il test di orientamento
           </p>
-          <p className="text-[12px] text-[#7c8db5] leading-relaxed mb-3">
+          <p className="text-[12px] text-[hsl(var(--muted-foreground))] leading-relaxed mb-3">
             Scopri qual è il percorso più adatto a te in base alle tue inclinazioni,
             interessi e obiettivi. Richiede solo 5 minuti.
           </p>
@@ -355,25 +355,25 @@ function ObiettivoGiorno() {
 
   return (
     <motion.div variants={fadeUp}
-      className="rounded-2xl bg-[#0d1421] border border-white/[0.06] p-4">
+      className="rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06] p-4">
       <div className="flex items-center gap-2 mb-3">
-        <Target className="w-4 h-4 text-[#4a8bff]" />
-        <span className="text-[12px] font-semibold text-[#7c8db5] uppercase tracking-wide">
+        <Target className="w-4 h-4 text-[hsl(var(--chart-3))]" />
+        <span className="text-[12px] font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">
           Obiettivo del giorno
         </span>
       </div>
       <div className="flex items-start gap-3">
         <div className={`
           w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors
-          ${done ? 'bg-emerald-500/20' : 'bg-[#1a2035]'}
+          ${done ? 'bg-emerald-500/20' : 'bg-[hsl(var(--muted))]'}
         `}>
           {done
             ? <Trophy className="w-4 h-4 text-emerald-400" />
-            : <obj.icon className="w-4 h-4 text-[#4a8bff]" />}
+            : <obj.icon className="w-4 h-4 text-[hsl(var(--chart-3))]" />}
         </div>
         <div className="flex-1">
           <p className={`text-[13px] leading-snug transition-all ${
-            done ? 'line-through text-[#4a5a75]' : 'text-[#c5cee0]'
+            done ? 'line-through text-[hsl(var(--muted-foreground))]' : 'text-[hsl(var(--foreground))]'
           }`}>
             {obj.text}
           </p>
@@ -384,7 +384,7 @@ function ObiettivoGiorno() {
             {!done && (
               <button
                 onClick={() => setDone(true)}
-                className="text-[11px] text-[#4a8bff] hover:text-[#7eb3ff] transition-colors">
+                className="text-[11px] text-[hsl(var(--chart-3))] hover:text-[hsl(var(--chart-3))] transition-colors">
                 Segna come fatto
               </button>
             )}
@@ -433,18 +433,18 @@ export default function DashboardIndeciso() {
       >
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-[13px] text-[#7c8db5] mb-0.5">{greeting}, {name} 👋</p>
-            <h1 className="text-[22px] font-bold text-[#dce6f5] tracking-tight">
+            <p className="text-[13px] text-[hsl(var(--muted-foreground))] mb-0.5">{greeting}, {name} 👋</p>
+            <h1 className="text-[22px] font-bold text-[hsl(var(--foreground))] tracking-tight">
               Stai esplorando
             </h1>
-            <p className="text-[13px] text-[#4a5a75] mt-1 max-w-[40ch]">
+            <p className="text-[13px] text-[hsl(var(--muted-foreground))] mt-1 max-w-[40ch]">
               Non sai ancora quale direzione prendere — ed è perfettamente normale.
               Inizia a esplorare.
             </p>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-[#0d1421] border border-white/[0.06]
+          <div className="w-12 h-12 rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06]
                           flex items-center justify-center flex-shrink-0">
-            <Compass className="w-6 h-6 text-[#4a8bff]" />
+            <Compass className="w-6 h-6 text-[hsl(var(--chart-3))]" />
           </div>
         </div>
       </motion.div>
@@ -467,7 +467,7 @@ export default function DashboardIndeciso() {
         animate={{ opacity: 1 }}
         transition={{ delay: 0.2 }}
       >
-        <h2 className="text-[13px] font-semibold text-[#7c8db5] uppercase tracking-wide mb-3"
+        <h2 className="text-[13px] font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-3"
           aria-label="Azioni rapide">
           Da dove iniziare
         </h2>

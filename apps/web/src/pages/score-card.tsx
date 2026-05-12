@@ -24,12 +24,12 @@ function ScoreRing({ score }: { score: number }) {
   const r = 70;
   const circ = 2 * Math.PI * r;
   const dash = (score / 100) * circ;
-  const color = score >= 85 ? "#4ade80" : score >= 65 ? "#4ade80" : score >= 45 ? "#fbbf24" : "#fb923c";
+  const color = score >= 85 ? "hsl(var(--chart-2))" : score >= 65 ? "hsl(var(--chart-2))" : score >= 45 ? "hsl(var(--chart-1))" : "hsl(25 95% 55%)";
 
   return (
     <div className="relative w-48 h-48 flex items-center justify-center mx-auto">
       <svg className="absolute inset-0 -rotate-90" width="192" height="192">
-        <circle cx="96" cy="96" r={r} stroke="#ffffff0a" strokeWidth="10" fill="none" />
+        <circle cx="96" cy="96" r={r} stroke="hsl(var(--foreground) / 0.04)" strokeWidth="10" fill="none" />
         <circle
           cx="96" cy="96" r={r}
           stroke={color} strokeWidth="10" fill="none"

@@ -31,9 +31,9 @@ const TEMPLATES: Array<{
   id: CvTemplate; label: string; desc: string;
   accent: string; bg: string; border: string; dot1: string; dot2: string;
 }> = [
-  { id: "classic", label: "Classic", desc: "Verde scuro · 2 colonne", accent: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-300", dot1: "bg-[#1a2e1a]", dot2: "bg-[#2d5a2d]" },
+  { id: "classic", label: "Classic", desc: "Verde scuro · 2 colonne", accent: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-300", dot1: "bg-growth/20", dot2: "bg-growth/30" },
   { id: "minimal", label: "Minimal", desc: "Bianco · 1 colonna",    accent: "text-gray-700",    bg: "bg-gray-50",    border: "border-gray-300",    dot1: "bg-gray-800",    dot2: "bg-gray-400" },
-  { id: "bold",    label: "Bold",    desc: "Navy · Arancio",       accent: "text-orange-600",  bg: "bg-orange-50",  border: "border-orange-300",  dot1: "bg-[#0f172a]",  dot2: "bg-[#f97316]" },
+  { id: "bold",    label: "Bold",    desc: "Navy · Arancio",       accent: "text-orange-600",  bg: "bg-orange-50",  border: "border-orange-300",  dot1: "bg-card",  dot2: "bg-chart-1" },
 ];
 
 const LS_KEY = "ns_cv_template";

@@ -5,6 +5,8 @@ import { writeFile, unlink, readFile } from "fs/promises";
 import { randomUUID } from "crypto";
 import { tmpdir } from "os";
 import { join } from "path";
+import pRetry from "p-retry";
+import { logger } from "../logger";
 
 if (!process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
   throw new Error(
@@ -229,13 +231,21 @@ export async function wendyTextToSpeech(
     "Ritmo moderato, articolazione chiara, niente enfasi teatrale. " +
     "Sii rassicurante e concreta, con un sorriso nella voce, come una career coach che si prende davvero cura della persona.";
 
-  const response = await openai.audio.speech.create({
-    model: "gpt-4o-mini-tts",
-    voice,
-    input: text,
-    instructions: styleInstructions,
-    response_format: (responseFormat === "pcm16" ? "pcm" : responseFormat) as "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm",
-  });
+  const response = await pRetry(
+    () => openai.audio.speech.create({
+      model: "gpt-4o-mini-tts",
+      voice,
+      input: text,
+      instructions: styleInstructions,
+      response_format: (responseFormat === "pcm16" ? "pcm" : responseFormat) as "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm",
+    }),
+    {
+      retries: 1,
+      onFailedAttempt: (err) => {
+        logger.warn({ err, attempt: err.attemptNumber }, "TTS retry");
+      },
+    },
+  );
 
   return Buffer.from(await response.arrayBuffer());
 }

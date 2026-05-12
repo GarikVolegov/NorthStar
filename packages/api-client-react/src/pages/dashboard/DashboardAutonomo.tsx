@@ -147,7 +147,7 @@ const fadeUp  = { hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0, tr
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
 function Sk({ className = '' }: { className?: string }) {
-  return <div className={`rounded-xl bg-[#131929] animate-pulse ${className}`} />;
+  return <div className={`rounded-xl bg-[hsl(var(--card))] animate-pulse ${className}`} />;
 }
 
 // ── Revenue Widget ────────────────────────────────────────────────────────────
@@ -162,7 +162,7 @@ function RevenueCard({ stats }: { stats: RevenueStats }) {
 
   return (
     <motion.div variants={fadeUp}
-      className="rounded-2xl bg-[#0d1421] border border-emerald-500/20 p-5 relative overflow-hidden">
+      className="rounded-2xl bg-[hsl(var(--background))] border border-emerald-500/20 p-5 relative overflow-hidden">
       <div className="absolute top-0 right-0 w-44 h-44 rounded-full bg-emerald-500/5 blur-3xl pointer-events-none" />
 
       <div className="flex items-start justify-between">
@@ -173,7 +173,7 @@ function RevenueCard({ stats }: { stats: RevenueStats }) {
               Revenue questo mese
             </span>
           </div>
-          <p className="text-[28px] font-bold text-[#dce6f5] tabular-nums leading-none">
+          <p className="text-[28px] font-bold text-[hsl(var(--foreground))] tabular-nums leading-none">
             {stats.currency}{fmt(stats.currentMonth)}
           </p>
           <div className={`flex items-center gap-1 mt-1.5 text-[12px] font-semibold ${
@@ -183,7 +183,7 @@ function RevenueCard({ stats }: { stats: RevenueStats }) {
               ? <TrendingUp className="w-3.5 h-3.5" />
               : <TrendingDown className="w-3.5 h-3.5" />}
             {up ? '+' : ''}{pct}% vs mese scorso
-            <span className="font-normal text-[#4a5a75] ml-1">
+            <span className="font-normal text-[hsl(var(--muted-foreground))] ml-1">
               ({up ? '+' : ''}{stats.currency}{fmt(delta)})
             </span>
           </div>
@@ -191,12 +191,12 @@ function RevenueCard({ stats }: { stats: RevenueStats }) {
 
         <div className="space-y-2 text-right">
           <div>
-            <p className="text-[20px] font-bold text-[#dce6f5] tabular-nums">{stats.activeClients}</p>
-            <p className="text-[11px] text-[#4a5a75]">Clienti attivi</p>
+            <p className="text-[20px] font-bold text-[hsl(var(--foreground))] tabular-nums">{stats.activeClients}</p>
+            <p className="text-[11px] text-[hsl(var(--muted-foreground))]">Clienti attivi</p>
           </div>
           <div>
             <p className="text-[20px] font-bold text-amber-400 tabular-nums">{stats.pendingProposals}</p>
-            <p className="text-[11px] text-[#4a5a75]">Proposte aperte</p>
+            <p className="text-[11px] text-[hsl(var(--muted-foreground))]">Proposte aperte</p>
           </div>
         </div>
       </div>
@@ -227,12 +227,12 @@ function PipelineBoard({ clients }: { clients: PipelineClient[] }) {
   return (
     <motion.div variants={fadeUp}>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[14px] font-semibold text-[#a8b8d0] flex items-center gap-2">
+        <h2 className="text-[14px] font-semibold text-[hsl(var(--muted-foreground))] flex items-center gap-2">
           <Users className="w-4 h-4 text-blue-400" />
           Pipeline clienti
         </h2>
         <Link href="/clienti"
-          className="text-[12px] text-[#4a8bff] hover:text-[#7eb3ff] transition-colors flex items-center gap-1">
+          className="text-[12px] text-[hsl(var(--chart-3))] hover:text-[hsl(var(--chart-3))] transition-colors flex items-center gap-1">
           Gestisci <ChevronRight className="w-3.5 h-3.5" />
         </Link>
       </div>
@@ -243,8 +243,8 @@ function PipelineBoard({ clients }: { clients: PipelineClient[] }) {
           onClick={() => setActiveStage('tutti')}
           className={`flex-shrink-0 text-[11px] font-semibold px-3 py-1 rounded-full transition-all ${
             activeStage === 'tutti'
-              ? 'bg-[#1a3a6b] text-[#7eb3ff]'
-              : 'bg-[#1a2035] text-[#4a5a75] hover:text-[#7c8db5]'
+              ? 'bg-[hsl(var(--muted))] text-[hsl(var(--chart-3))]'
+              : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--muted-foreground))]'
           }`}>
           Tutti ({clients.length})
         </button>
@@ -257,7 +257,7 @@ function PipelineBoard({ clients }: { clients: PipelineClient[] }) {
               className={`flex-shrink-0 text-[11px] font-semibold px-3 py-1 rounded-full transition-all ${
                 activeStage === s.key
                   ? `${s.bg} ${s.color}`
-                  : 'bg-[#1a2035] text-[#4a5a75] hover:text-[#7c8db5]'
+                  : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--muted-foreground))]'
               }`}>
               {s.label} ({count})
             </button>
@@ -267,10 +267,10 @@ function PipelineBoard({ clients }: { clients: PipelineClient[] }) {
 
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center py-8 text-center">
-          <Users className="w-7 h-7 text-[#3a4a65] mb-2" />
-          <p className="text-[13px] text-[#7c8db5]">Nessun cliente in questa fase</p>
+          <Users className="w-7 h-7 text-[hsl(var(--muted-foreground))] mb-2" />
+          <p className="text-[13px] text-[hsl(var(--muted-foreground))]">Nessun cliente in questa fase</p>
           <Link href="/clienti"
-            className="mt-3 text-[12px] text-[#4a8bff] hover:underline">
+            className="mt-3 text-[12px] text-[hsl(var(--chart-3))] hover:underline">
             + Aggiungi cliente
           </Link>
         </div>
@@ -283,14 +283,14 @@ function PipelineBoard({ clients }: { clients: PipelineClient[] }) {
               return (
                 <motion.div key={client.id} layout variants={fadeUp}
                   exit={{ opacity: 0, scale: 0.97 }}
-                  className="flex items-center gap-3 p-3.5 rounded-xl bg-[#0d1421]
+                  className="flex items-center gap-3 p-3.5 rounded-xl bg-[hsl(var(--background))]
                              border border-white/[0.06] hover:border-white/10 transition-all">
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${stage.bg}`}>
                     <StageIcon className={`w-3.5 h-3.5 ${stage.color}`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-[#c5cee0] truncate">{client.name}</p>
-                    <p className="text-[11px] text-[#4a5a75] truncate">
+                    <p className="text-[13px] font-semibold text-[hsl(var(--foreground))] truncate">{client.name}</p>
+                    <p className="text-[11px] text-[hsl(var(--muted-foreground))] truncate">
                       {client.company ?? 'Privato'} · {relTime(client.updatedAt)}
                     </p>
                   </div>
@@ -341,10 +341,10 @@ function ValidatoreIdea() {
 
   return (
     <motion.div variants={fadeUp}
-      className="rounded-2xl bg-[#0d1421] border border-violet-500/20 p-5">
+      className="rounded-2xl bg-[hsl(var(--background))] border border-violet-500/20 p-5">
       <div className="flex items-center gap-2 mb-3">
         <Lightbulb className="w-4 h-4 text-violet-400" />
-        <h2 className="text-[14px] font-semibold text-[#a8b8d0]">Valida la tua idea</h2>
+        <h2 className="text-[14px] font-semibold text-[hsl(var(--muted-foreground))]">Valida la tua idea</h2>
         <span className="text-[10px] font-bold text-violet-400 bg-violet-400/10 px-2 py-0.5 rounded-full">
           AI
         </span>
@@ -356,8 +356,8 @@ function ValidatoreIdea() {
           onChange={(e) => setIdea(e.target.value)}
           placeholder="Descrivi la tua idea di business o il servizio che vuoi offrire…"
           rows={3}
-          className="w-full px-3 py-2.5 rounded-xl bg-[#131929] border border-white/[0.08]
-                     text-[13px] text-[#c5cee0] placeholder:text-[#3a4a65]
+          className="w-full px-3 py-2.5 rounded-xl bg-[hsl(var(--card))] border border-white/[0.08]
+                     text-[13px] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]
                      focus:outline-none focus:border-violet-500/40 resize-none
                      transition-colors leading-relaxed"
         />
@@ -384,11 +384,11 @@ function ValidatoreIdea() {
             className="mt-4 p-4 rounded-xl bg-violet-500/5 border border-violet-500/15">
             <div className="flex items-start gap-2">
               <Sparkles className="w-3.5 h-3.5 text-violet-400 mt-0.5 flex-shrink-0" />
-              <p className="text-[13px] text-[#c5cee0] leading-relaxed">{feedback}</p>
+              <p className="text-[13px] text-[hsl(var(--foreground))] leading-relaxed">{feedback}</p>
             </div>
             <button
               onClick={() => { setFeedback(null); setIdea(''); }}
-              className="mt-2 text-[11px] text-[#4a5a75] hover:text-[#7c8db5] transition-colors">
+              className="mt-2 text-[11px] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--muted-foreground))] transition-colors">
               Valuta un'altra idea →
             </button>
           </motion.div>
@@ -418,7 +418,7 @@ function NewsFeed({ news }: { news: SectorNews[] }) {
   return (
     <motion.div variants={fadeUp}>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[14px] font-semibold text-[#a8b8d0] flex items-center gap-2">
+        <h2 className="text-[14px] font-semibold text-[hsl(var(--muted-foreground))] flex items-center gap-2">
           <Newspaper className="w-4 h-4 text-blue-400" />
           News del settore
         </h2>
@@ -429,7 +429,7 @@ function NewsFeed({ news }: { news: SectorNews[] }) {
         <button
           onClick={() => setTag(null)}
           className={`flex-shrink-0 flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all ${
-            tag === null ? 'bg-[#1a3a6b] text-[#7eb3ff]' : 'bg-[#1a2035] text-[#4a5a75] hover:text-[#7c8db5]'
+            tag === null ? 'bg-[hsl(var(--muted))] text-[hsl(var(--chart-3))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--muted-foreground))]'
           }`}>
           Tutto
         </button>
@@ -438,7 +438,7 @@ function NewsFeed({ news }: { news: SectorNews[] }) {
             key={t}
             onClick={() => setTag(t === tag ? null : t)}
             className={`flex-shrink-0 flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all ${
-              tag === t ? 'bg-[#1a3a6b] text-[#7eb3ff]' : 'bg-[#1a2035] text-[#4a5a75] hover:text-[#7c8db5]'
+              tag === t ? 'bg-[hsl(var(--muted))] text-[hsl(var(--chart-3))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--muted-foreground))]'
             }`}>
             <Tag className="w-2.5 h-2.5" />{t}
           </button>
@@ -456,25 +456,25 @@ function NewsFeed({ news }: { news: SectorNews[] }) {
               layout
               variants={fadeUp}
               exit={{ opacity: 0 }}
-              className="block p-4 rounded-xl bg-[#0d1421] border border-white/[0.06]
+              className="block p-4 rounded-xl bg-[hsl(var(--background))] border border-white/[0.06]
                          hover:border-white/10 transition-all group">
               <div className="flex items-start justify-between gap-2">
-                <h3 className="text-[13px] font-semibold text-[#c5cee0] leading-snug
-                               group-hover:text-[#dce6f5] transition-colors">
+                <h3 className="text-[13px] font-semibold text-[hsl(var(--foreground))] leading-snug
+                               group-hover:text-[hsl(var(--foreground))] transition-colors">
                   {item.title}
                 </h3>
-                <ExternalLink className="w-3.5 h-3.5 text-[#3a4a65] group-hover:text-[#4a8bff]
+                <ExternalLink className="w-3.5 h-3.5 text-[hsl(var(--muted-foreground))] group-hover:text-[hsl(var(--chart-3))]
                                          transition-colors flex-shrink-0 mt-0.5" />
               </div>
-              <p className="text-[12px] text-[#7c8db5] mt-1.5 leading-snug">{item.summary}</p>
+              <p className="text-[12px] text-[hsl(var(--muted-foreground))] mt-1.5 leading-snug">{item.summary}</p>
               <div className="flex items-center gap-3 mt-2.5">
-                <span className="text-[11px] text-[#4a5a75]">{item.source}</span>
-                <span className="text-[#2a3a50]">·</span>
-                <span className="text-[11px] text-[#4a5a75]">{relTime(item.publishedAt)}</span>
+                <span className="text-[11px] text-[hsl(var(--muted-foreground))]">{item.source}</span>
+                <span className="text-[hsl(var(--muted-foreground))]">·</span>
+                <span className="text-[11px] text-[hsl(var(--muted-foreground))]">{relTime(item.publishedAt)}</span>
                 <div className="flex gap-1 ml-auto">
                   {item.tags.slice(0, 2).map((t) => (
                     <span key={t}
-                      className="text-[10px] text-[#4a5a75] bg-[#1a2035] px-1.5 py-0.5 rounded-full">
+                      className="text-[10px] text-[hsl(var(--muted-foreground))] bg-[hsl(var(--muted))] px-1.5 py-0.5 rounded-full">
                       {t}
                     </span>
                   ))}
@@ -506,8 +506,8 @@ function AzioniRapide() {
             `}>
             <a.icon className={`w-5 h-5 ${a.accent}`} />
             <div>
-              <p className="text-[13px] font-semibold text-[#dce6f5]">{a.label}</p>
-              <p className="text-[11px] text-[#7c8db5] leading-snug">{a.desc}</p>
+              <p className="text-[13px] font-semibold text-[hsl(var(--foreground))]">{a.label}</p>
+              <p className="text-[11px] text-[hsl(var(--muted-foreground))] leading-snug">{a.desc}</p>
             </div>
           </Link>
         </motion.div>
@@ -548,11 +548,11 @@ export default function DashboardAutonomo() {
       >
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-[13px] text-[#7c8db5] mb-0.5">{greeting}, {name} 🚀</p>
-            <h1 className="text-[22px] font-bold text-[#dce6f5] tracking-tight">
+            <p className="text-[13px] text-[hsl(var(--muted-foreground))] mb-0.5">{greeting}, {name} 🚀</p>
+            <h1 className="text-[22px] font-bold text-[hsl(var(--foreground))] tracking-tight">
               Il tuo business
             </h1>
-            <p className="text-[13px] text-[#4a5a75] mt-1 max-w-[40ch]">
+            <p className="text-[13px] text-[hsl(var(--muted-foreground))] mt-1 max-w-[40ch]">
               Sei il tuo capo. Ogni azione che fai oggi è un investimento nel tuo futuro.
             </p>
           </div>
@@ -577,7 +577,7 @@ export default function DashboardAutonomo() {
 
       {/* ── Azioni rapide ──────────────────────────────────────────────── */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
-        <h2 className="text-[13px] font-semibold text-[#7c8db5] uppercase tracking-wide mb-3">
+        <h2 className="text-[13px] font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-3">
           Strumenti
         </h2>
         <AzioniRapide />

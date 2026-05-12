@@ -11,24 +11,9 @@ import {
   ExternalLink, Gem, Clock, User, Sparkles,
 } from "lucide-react";
 import { useState } from "react";
+import { CERTIFICATE_CATEGORY_COLORS, CATEGORY_LABELS } from "@/lib/constants";
 
 const BASE = import.meta.env.BASE_URL || "/";
-
-const CATEGORY_LABELS: Record<string, string> = {
-  carriera: "Carriera", formazione: "Formazione", salute: "Salute",
-  finanza: "Finanza", relazioni: "Relazioni", progetto: "Progetto",
-  abitudine: "Abitudine", altro: "Traguardo",
-};
-const CATEGORY_COLORS: Record<string, { accent: string; bg: string }> = {
-  carriera:   { accent: "#D4AF37", bg: "rgba(212,175,55,0.08)"  },
-  formazione: { accent: "#60a5fa", bg: "rgba(96,165,250,0.08)"  },
-  salute:     { accent: "#34d399", bg: "rgba(52,211,153,0.08)"  },
-  finanza:    { accent: "#fbbf24", bg: "rgba(251,191,36,0.08)"  },
-  relazioni:  { accent: "#c084fc", bg: "rgba(192,132,252,0.08)" },
-  progetto:   { accent: "#f472b6", bg: "rgba(244,114,182,0.08)" },
-  abitudine:  { accent: "#2dd4bf", bg: "rgba(45,212,191,0.08)"  },
-  altro:      { accent: "#D4AF37", bg: "rgba(212,175,55,0.08)"  },
-};
 
 interface VerifyResult {
   valid: boolean;
@@ -80,7 +65,7 @@ export default function CertificatePage() {
   });
 
   const cert = data?.certificate;
-  const colors = cert ? (CATEGORY_COLORS[cert.category] ?? CATEGORY_COLORS.altro) : CATEGORY_COLORS.altro;
+  const colors = cert ? (CERTIFICATE_CATEGORY_COLORS[cert.category] ?? CERTIFICATE_CATEGORY_COLORS.altro) : CERTIFICATE_CATEGORY_COLORS.altro;
   const label = cert ? (CATEGORY_LABELS[cert.category] ?? "Traguardo") : "";
 
   return (

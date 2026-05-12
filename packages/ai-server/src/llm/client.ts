@@ -12,6 +12,8 @@
 
 import OpenAI from "openai";
 import Groq from "groq-sdk";
+import pRetry from "p-retry";
+import { logger } from "../logger";
 
 export interface LLMMessage {
   role: "system" | "user" | "assistant";
@@ -29,6 +31,39 @@ export interface LLMProvider {
   chatOnce(messages: LLMMessage[], config?: LLMConfig): Promise<string>;
 }
 
+// ── Retry + timeout helpers ───────────────────────────────────────
+
+function isTransientError(err: unknown): boolean {
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase();
+    return (
+      msg.includes("rate limit") ||
+      msg.includes("timeout") ||
+      msg.includes("5") ||
+      msg.includes("network") ||
+      msg.includes("econnrefused") ||
+      msg.includes("econnreset") ||
+      msg.includes("etimedout") ||
+      msg.includes("internal server error") ||
+      msg.includes("service unavailable") ||
+      msg.includes("bad gateway")
+    );
+  }
+  return false;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, rej) =>
+      setTimeout(() => rej(new Error(`${label} timeout after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
+const CHAT_TIMEOUT = 30_000;
+const CHAT_ONCE_TIMEOUT = 15_000;
+
 // ── OpenAI Provider ────────────────────────────────────────────────
 
 function createOpenAIProvider(): LLMProvider {
@@ -41,13 +76,25 @@ function createOpenAIProvider(): LLMProvider {
 
   return {
     async chat(messages, config = {}) {
-      const stream = await client.chat.completions.create({
-        model: config.model ?? "gpt-4o-mini",
-        messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
-        stream: true,
-        temperature: config.temperature ?? 0.7,
-        max_tokens: config.maxTokens ?? 800,
-      });
+      const stream = await pRetry(
+        () => withTimeout(
+          client.chat.completions.create({
+            model: config.model ?? "gpt-4o-mini",
+            messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+            stream: true,
+            temperature: config.temperature ?? 0.7,
+            max_tokens: config.maxTokens ?? 800,
+          }),
+          CHAT_TIMEOUT,
+          "openai chat stream",
+        ),
+        {
+          retries: 2,
+          onFailedAttempt: (err) => {
+            logger.warn({ err, attempt: err.attemptNumber }, "LLM chat retry");
+          },
+        },
+      );
 
       return {
         async *[Symbol.asyncIterator]() {
@@ -60,12 +107,24 @@ function createOpenAIProvider(): LLMProvider {
     },
 
     async chatOnce(messages, config = {}) {
-      const res = await client.chat.completions.create({
-        model: config.model ?? "gpt-4o-mini",
-        messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
-        temperature: config.temperature ?? 0.7,
-        max_tokens: config.maxTokens ?? 800,
-      });
+      const res = await pRetry(
+        () => withTimeout(
+          client.chat.completions.create({
+            model: config.model ?? "gpt-4o-mini",
+            messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+            temperature: config.temperature ?? 0.7,
+            max_tokens: config.maxTokens ?? 800,
+          }),
+          CHAT_ONCE_TIMEOUT,
+          "openai chatOnce",
+        ),
+        {
+          retries: 2,
+          onFailedAttempt: (err) => {
+            logger.warn({ err, attempt: err.attemptNumber }, "LLM chatOnce retry");
+          },
+        },
+      );
       return res.choices[0]?.message?.content ?? "";
     },
   };
@@ -88,13 +147,25 @@ function createGroqProvider(): LLMProvider {
   return {
     async chat(messages, config = {}) {
       const model = GROQ_MODEL_MAP[config.model ?? ""] ?? "llama-3.3-70b-versatile";
-      const stream = await client.chat.completions.create({
-        model,
-        messages: messages as Groq.Chat.ChatCompletionMessageParam[],
-        stream: true,
-        temperature: config.temperature ?? 0.7,
-        max_tokens: config.maxTokens ?? 800,
-      });
+      const stream = await pRetry(
+        () => withTimeout(
+          client.chat.completions.create({
+            model,
+            messages: messages as Groq.Chat.ChatCompletionMessageParam[],
+            stream: true,
+            temperature: config.temperature ?? 0.7,
+            max_tokens: config.maxTokens ?? 800,
+          }),
+          CHAT_TIMEOUT,
+          "groq chat stream",
+        ),
+        {
+          retries: 2,
+          onFailedAttempt: (err) => {
+            logger.warn({ err, attempt: err.attemptNumber }, "Groq chat retry");
+          },
+        },
+      );
 
       return {
         async *[Symbol.asyncIterator]() {
@@ -108,12 +179,24 @@ function createGroqProvider(): LLMProvider {
 
     async chatOnce(messages, config = {}) {
       const model = GROQ_MODEL_MAP[config.model ?? ""] ?? "llama-3.3-70b-versatile";
-      const res = await client.chat.completions.create({
-        model,
-        messages: messages as Groq.Chat.ChatCompletionMessageParam[],
-        temperature: config.temperature ?? 0.7,
-        max_tokens: config.maxTokens ?? 800,
-      });
+      const res = await pRetry(
+        () => withTimeout(
+          client.chat.completions.create({
+            model,
+            messages: messages as Groq.Chat.ChatCompletionMessageParam[],
+            temperature: config.temperature ?? 0.7,
+            max_tokens: config.maxTokens ?? 800,
+          }),
+          CHAT_ONCE_TIMEOUT,
+          "groq chatOnce",
+        ),
+        {
+          retries: 2,
+          onFailedAttempt: (err) => {
+            logger.warn({ err, attempt: err.attemptNumber }, "Groq chatOnce retry");
+          },
+        },
+      );
       return res.choices[0]?.message?.content ?? "";
     },
   };

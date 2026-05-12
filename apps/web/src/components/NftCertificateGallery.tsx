@@ -3,29 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-fetch";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { CERTIFICATE_CATEGORY_COLORS, CATEGORY_LABELS } from "@/lib/constants";
 import {
   Award, ExternalLink, Copy, Check, Shield, Sparkles,
   Gem, Clock, ChevronRight, Info,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL || "/";
-
-const CATEGORY_COLORS: Record<string, { accent: string; bg: string }> = {
-  carriera:   { accent: "#D4AF37", bg: "rgba(212,175,55,0.08)"  },
-  formazione: { accent: "#60a5fa", bg: "rgba(96,165,250,0.08)"  },
-  salute:     { accent: "#34d399", bg: "rgba(52,211,153,0.08)"  },
-  finanza:    { accent: "#fbbf24", bg: "rgba(251,191,36,0.08)"  },
-  relazioni:  { accent: "#c084fc", bg: "rgba(192,132,252,0.08)" },
-  progetto:   { accent: "#f472b6", bg: "rgba(244,114,182,0.08)" },
-  abitudine:  { accent: "#2dd4bf", bg: "rgba(45,212,191,0.08)"  },
-  altro:      { accent: "#D4AF37", bg: "rgba(212,175,55,0.08)"  },
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  carriera: "Carriera", formazione: "Formazione", salute: "Salute",
-  finanza: "Finanza", relazioni: "Relazioni", progetto: "Progetto",
-  abitudine: "Abitudine", altro: "Traguardo",
-};
 
 interface NftCert {
   id: number;
@@ -57,7 +41,7 @@ function CopyButton({ text }: { text: string }) {
 }
 
 function NftCard({ cert }: { cert: NftCert }) {
-  const colors = CATEGORY_COLORS[cert.category] ?? CATEGORY_COLORS.altro;
+  const colors = CERTIFICATE_CATEGORY_COLORS[cert.category] ?? CERTIFICATE_CATEGORY_COLORS.altro;
   const label = CATEGORY_LABELS[cert.category] ?? "Traguardo";
   const date = new Date(cert.mintedAt).toLocaleDateString("it-IT", {
     day: "2-digit", month: "short", year: "numeric",

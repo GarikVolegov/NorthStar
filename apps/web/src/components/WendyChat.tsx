@@ -194,6 +194,7 @@ export function WendyChat({
                 </div>
               ) : (
                 <div
+                  data-testid={msg.role === 'assistant' ? 'wendy-message-assistant' : undefined}
                   className={[
                     'max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap',
                     msg.role === 'user'
@@ -229,6 +230,7 @@ export function WendyChat({
         <form onSubmit={handleSubmit} className="flex items-end gap-2 px-3 pb-3 pt-2 border-t border-border">
           <textarea
             ref={inputRef}
+            data-testid="wendy-chat-input"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -282,6 +284,7 @@ export function WendyChat({
           ) : (
             <button
               type="submit"
+              data-testid="wendy-send-btn"
               disabled={!inputValue.trim()}
               title="Invia messaggio"
               aria-label="Invia messaggio"

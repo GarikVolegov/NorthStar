@@ -3,6 +3,7 @@ import { commitRoute, loadRoutingContext, logRouteDecision } from "./router-memo
 import { loadMemory } from "./memory-manager";
 import type { ChatMessage } from "./agent";
 import { logger, type LoggerFields } from "../logger";
+import { recordRouterConfidence } from "../metrics";
 
 // ── Types ─────────────────────────────────────────────────────────────────────────
 
@@ -272,6 +273,8 @@ export class RouterAgent {
         handoffContext: parsed.handoffContext  ?? userMessage,
         secondaryRoute,
       };
+
+      recordRouterConfidence(decision.domain, decision.intent, decision.confidence);
 
       if (userId > 0) {
         commitRoute(userId, {

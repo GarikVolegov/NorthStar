@@ -3,6 +3,7 @@ import { useSSEStream } from './useSSEStream.js';
 import { useTTS } from './useTTS.js';
 import { useSTT } from './useSTT.js';
 import { useWendyOpenAITTS } from './useWendyOpenAITTS.js';
+import { useWendy } from '../contexts/WendyProvider';
 
 /**
  * useWendyChat — orchestratore stato completo chat Wendy
@@ -116,6 +117,10 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
   const stt = useSTT({ lang: sttLang });
   const openaiTts = useWendyOpenAITTS();
 
+  // Global Wendy phase
+  let _setPhase: ((p: 'idle' | 'thinking' | 'speaking' | 'listening') => void) | null = null;
+  try { _setPhase = useWendy().setPhase; } catch {}
+
   // ─── SSE stream ──────────────────────────────────────────────────────────────
 
   const { start: startStream, stop: stopStream, isStreaming } = useSSEStream({
@@ -194,6 +199,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       setThinking({ active: false, label: THINKING_LABELS[0], startedAt: 0 });
       retriesRef.current = 0;
 
+      if (_setPhase) _setPhase('idle');
       if (ttsEnabled) {
         openaiTts.play(finalContent).catch(() => {
           if (tts.supported) tts.speak(finalContent, sttLang);
@@ -209,6 +215,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
         setTimeout(() => _doStream(lastUserMessageRef.current), 1000 * retriesRef.current);
         return;
       }
+      if (_setPhase) _setPhase('idle');
       setStreamError(err);
       setThinking({ active: false, label: THINKING_LABELS[0], startedAt: 0 });
       setMessages((prev) => [
@@ -247,6 +254,8 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     const labelIdx = Math.floor(Math.random() * THINKING_LABELS.length);
     setThinking({ active: true, label: THINKING_LABELS[labelIdx], startedAt: Date.now() });
     setStreamError(null);
+
+    if (_setPhase) _setPhase('thinking');
 
     await startStream(apiUrl, {
       method:      'POST',

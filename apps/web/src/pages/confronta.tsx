@@ -345,7 +345,7 @@ export default function Confronta() {
               <div className="grid grid-cols-2 gap-8">
                 {[
                   { s: left, color: "hsl(var(--primary))", side: "left" as const },
-                  { s: right, color: "#7c3aed", side: "right" as const },
+                  { s: right, color: "hsl(var(--chart-4))", side: "right" as const },
                 ].map(({ s, color, side }) => (
                   <div key={side}>
                     <div className="flex items-baseline justify-between mb-2">

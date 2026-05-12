@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo, useTransition 
 import { Link } from "wouter";
 import {
   ArrowLeft, Plus, Save, Trash2, Link2, X, Search, Sparkles, Loader2,
-  StickyNote, Lightbulb, FileText, Target, Briefcase, Wrench, Award,
-  Network, Globe, MessageCircleQuestion, Send, ChevronRight,
+  FileText,
+  Network, MessageCircleQuestion, Send, ChevronRight,
   Upload, Wand2, Check, ChevronDown, Maximize2, Copy, Map,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
 import { useSSEStream } from "@/hooks/useSSEStream";
+import { TYPE_META, ALL_TYPES } from "@/components/knowledge-graph/types";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -81,20 +82,6 @@ interface EdgeLabelEdit {
   screenX: number;
   screenY: number;
 }
-
-const TYPE_META: Record<NodeType, { label: string; color: string; bg: string; border: string; Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }> }> = {
-  note:          { label: "Nota",          color: "#0891b2", bg: "#ecfeff", border: "#67e8f9", Icon: StickyNote },
-  skill:         { label: "Competenza",    color: "#10b981", bg: "#ecfdf5", border: "#6ee7b7", Icon: Lightbulb },
-  document:      { label: "Documento",     color: "#f59e0b", bg: "#fffbeb", border: "#fcd34d", Icon: FileText },
-  sector:        { label: "Settore",       color: "#1a3a2a", bg: "#f0fdf4", border: "#86efac", Icon: Target },
-  role:          { label: "Ruolo",         color: "#6366f1", bg: "#eef2ff", border: "#a5b4fc", Icon: Briefcase },
-  tool:          { label: "Strumento",     color: "#ea580c", bg: "#fff7ed", border: "#fdba74", Icon: Wrench },
-  certification: { label: "Certificazione", color: "#8b5cf6", bg: "#f5f3ff", border: "#c4b5fd", Icon: Award },
-  concept:       { label: "Idea",          color: "#db2777", bg: "#fdf2f8", border: "#f9a8d4", Icon: Network },
-  link:          { label: "Link",          color: "#0284c7", bg: "#f0f9ff", border: "#7dd3fc", Icon: Globe },
-};
-
-const ALL_TYPES: NodeType[] = ["note", "skill", "document", "role", "tool", "certification", "concept", "link"];
 
 function api<T>(path: string, init?: RequestInit): Promise<T> {
   return apiFetch(`${BASE}api/knowledge${path}`, init).then(async (r) => {
@@ -238,7 +225,7 @@ const Minimap = memo(function Minimap({ nodes, view, svgRef, onPan }: MinimapPro
               <rect
                 x={vpRect.x} y={vpRect.y}
                 width={Math.max(4, vpRect.w)} height={Math.max(4, vpRect.h)}
-                fill="none" stroke="#6366f1" strokeWidth={1.5}
+                fill="none" stroke="hsl(var(--chart-4))" strokeWidth={1.5}
                 strokeDasharray="3 2" rx={2} opacity={0.7}
               />
             )}
@@ -1019,7 +1006,7 @@ export default function Archivio() {
         )}
 
         {!isMobile && (
-          <div className="flex-1 relative bg-[radial-gradient(circle,#e5e7eb_1px,transparent_1px)] [background-size:24px_24px] overflow-hidden">
+          <div className="flex-1 relative bg-[radial-gradient(circle,hsl(var(--border))_1px,transparent_1px)] [background-size:24px_24px] overflow-hidden">
             {data.nodes.length === 0 && (
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <EmptyState onAdd={handleAddNode} onImport={() => fileInputRef.current?.click()} />
@@ -1031,10 +1018,10 @@ export default function Archivio() {
             >
               <defs>
                 <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-                  <path d="M0,0 L10,5 L0,10 Z" fill="#94a3b8" />
+                  <path d="M0,0 L10,5 L0,10 Z" fill="hsl(var(--muted-foreground))" />
                 </marker>
                 <filter id="node-shadow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#00000015" />
+                  <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="hsl(var(--foreground) / 0.08)" />
                 </filter>
               </defs>
               <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}
@@ -1051,7 +1038,7 @@ export default function Archivio() {
                   return (
                     <g key={edge.id} opacity={dimmed ? 0.15 : 0.9}>
                       <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                        stroke="#94a3b8" strokeWidth={1.4} markerEnd="url(#arrow)"
+                        stroke="hsl(var(--muted-foreground))" strokeWidth={1.4} markerEnd="url(#arrow)"
                         data-source={edge.sourceId} data-target={edge.targetId} />
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -1067,7 +1054,7 @@ export default function Archivio() {
                               data-edge-mid-target={edge.targetId}
                             />
                             {edge.label ? (
-                              <text x={mx} y={my - 4} textAnchor="middle" fontSize={9} fill="#64748b"
+                              <text x={mx} y={my - 4} textAnchor="middle" fontSize={9} fill="hsl(var(--muted-foreground))"
                                 style={{ pointerEvents: "none" }}
                                 data-edge-mid-source={edge.sourceId}
                                 data-edge-mid-target={edge.targetId}
@@ -1076,7 +1063,7 @@ export default function Archivio() {
                                 {edge.label}
                               </text>
                             ) : (
-                              <text x={mx} y={my - 4} textAnchor="middle" fontSize={8} fill="#94a3b8"
+                              <text x={mx} y={my - 4} textAnchor="middle" fontSize={8} fill="hsl(var(--muted-foreground))"
                                 style={{ pointerEvents: "none" }} opacity={0.4}
                                 data-edge-mid-source={edge.sourceId}
                                 data-edge-mid-target={edge.targetId}

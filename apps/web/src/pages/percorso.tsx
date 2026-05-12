@@ -34,9 +34,9 @@ const PERSONAS: Persona[] = [
     description:
       "Stai cercando la tua strada. Hai curiosità, idee confuse o semplicemente vuoi capire cosa ti appassiona davvero e dove potresti eccellere.",
     tools: ["Test di personalità", "Esplora settori", "Consulente AI", "Confronta carriere"],
-    color: "from-[#1c1810] to-[#2a2418]",
-    accent: "text-[#D4AF37]",
-    border: "border-[#D4AF37]/40",
+    color: "from-[hsl(43 20% 9%)] to-[hsl(43 15% 13%)]",
+    accent: "text-primary",
+    border: "border-primary/40",
   },
   {
     id: "dipendente",
@@ -46,7 +46,7 @@ const PERSONAS: Persona[] = [
     description:
       "Sei impiegato e vuoi fare carriera, cambiare ruolo o passare a un settore migliore. Hai bisogno di strumenti concreti per crescere.",
     tools: ["Analisi competenze", "Simulatore colloquio", "Roadmap di carriera", "Candidature"],
-    color: "from-[#0f1f18] to-[#162914]",
+    color: "from-growth/5 to-growth/10",
     accent: "text-growth",
     border: "border-growth/40",
   },
@@ -58,9 +58,9 @@ const PERSONAS: Persona[] = [
     description:
       "Sei freelance, imprenditore o professionista autonomo. Vuoi scalare il tuo business, trovare nuovi clienti o validare un'idea.",
     tools: ["Validatore Idea", "Analisi mercato", "Roadmap business", "Coach AI"],
-    color: "from-[#1c1810] to-[#201c0f]",
-    accent: "text-[#D4AF37]",
-    border: "border-[#D4AF37]/40",
+    color: "from-[hsl(43 20% 9%)] to-[hsl(43 18% 11%)]",
+    accent: "text-primary",
+    border: "border-primary/40",
   },
   {
     id: "azienda",
@@ -70,7 +70,7 @@ const PERSONAS: Persona[] = [
     description:
       "Sei HR, recruiter o manager. Stai cercando i profili giusti per il tuo team e vuoi capire il mercato dei talenti italiano.",
     tools: ["Profili RIASEC", "Settori in crescita", "Analisi competenze", "Affilazione"],
-    color: "from-[#0f1f18] to-[#1c1810]",
+    color: "from-growth/5 to-[hsl(43 20% 9%)]",
     accent: "text-growth",
     border: "border-growth/40",
   },
@@ -82,9 +82,9 @@ const PERSONAS: Persona[] = [
     description:
       "Sei un investitore,           investitore o fondo. Vuoi capire i settori in crescita, i trend del mercato del lavoro italiano e le opportunità.",
     tools: ["Settori in crescita", "Analisi trend", "Report mercato", "Knowledge Graph"],
-    color: "from-[#201c0f] to-[#2a2418]",
-    accent: "text-[#D4AF37]",
-    border: "border-[#D4AF37]/40",
+    color: "from-[hsl(43 18% 11%)] to-[hsl(43 15% 13%)]",
+    accent: "text-primary",
+    border: "border-primary/40",
   },
 ];
 
@@ -176,7 +176,7 @@ export default function Percorso() {
               >
                 {isSelected && (
                   <div className="absolute top-3 right-3">
-                    <CheckCircle2 className="w-5 h-5 text-[#D4AF37]" />
+                    <CheckCircle2 className="w-5 h-5 text-primary" />
                   </div>
                 )}
 

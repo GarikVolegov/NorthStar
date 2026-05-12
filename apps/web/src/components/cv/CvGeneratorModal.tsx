@@ -64,12 +64,12 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
       style={{ width: "210mm", minHeight: "297mm", fontFamily: "system-ui, -apple-system, sans-serif" }}
     >
       {/* Header */}
-      <div style={{ background: "#1a3a2a", padding: "32px 40px 28px", color: "#ffffff" }}>
+      <div       style={{ background: "hsl(var(--growth))", padding: "32px 40px 28px", color: "#ffffff" }}>
         <h1 style={{ margin: 0, fontSize: "28px", fontWeight: "700", letterSpacing: "-0.5px", fontFamily: "Georgia, serif" }}>
           {cv.personalInfo.name || "Nome Cognome"}
         </h1>
         {cv.personalInfo.title && (
-          <p style={{ margin: "6px 0 0", fontSize: "14px", color: "#86efac", fontWeight: "500" }}>
+          <p style={{ margin: "6px 0 0", fontSize: "14px", color: "hsl(var(--chart-2))", fontWeight: "500" }}>
             {cv.personalInfo.title}
           </p>
         )}
@@ -89,12 +89,12 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
             <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)" }}>⌖ {cv.personalInfo.location}</span>
           )}
           {cv.personalInfo.linkedin && (
-            <span style={{ fontSize: "12px", color: "#86efac" }}>
+            <span style={{ fontSize: "12px", color: "hsl(var(--chart-2))" }}>
               in {cv.personalInfo.linkedin.replace(/https?:\/\/(www\.)?linkedin\.com\/in\//, "")}
             </span>
           )}
           {cv.personalInfo.website && (
-            <span style={{ fontSize: "12px", color: "#86efac" }}>⌘ {cv.personalInfo.website}</span>
+            <span style={{ fontSize: "12px", color: "hsl(var(--chart-2))" }}>⌘ {cv.personalInfo.website}</span>
           )}
         </div>
       </div>
@@ -102,12 +102,12 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
       {/* Two-column body */}
       <div style={{ display: "flex" }}>
         {/* Left column */}
-        <div style={{ width: "38%", background: "#f8faf9", borderRight: "1px solid #e5e7eb", padding: "28px 24px", flexShrink: 0 }}>
+        <div style={{ width: "38%", background: "hsl(var(--card))", borderRight: "1px solid hsl(var(--border))", padding: "28px 24px", flexShrink: 0 }}>
           {cv.skills.length > 0 && (
             <CvSection title="Competenze">
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                 {cv.skills.map((s) => (
-                  <span key={s} style={{ fontSize: "11px", background: "#dcfce7", color: "#15803d", border: "1px solid #bbf7d0", borderRadius: "999px", padding: "3px 10px", fontWeight: "500" }}>{s}</span>
+                  <span key={s} style={{ fontSize: "11px", background: "hsl(var(--chart-2) / 0.15)", color: "hsl(var(--chart-2))", border: "1px solid hsl(var(--chart-2) / 0.3)", borderRadius: "999px", padding: "3px 10px", fontWeight: "500" }}>{s}</span>
                 ))}
               </div>
             </CvSection>
@@ -116,7 +116,7 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
             <CvSection title="Strumenti">
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                 {cv.tools.map((t) => (
-                  <span key={t} style={{ fontSize: "11px", background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a", borderRadius: "999px", padding: "3px 10px", fontWeight: "500" }}>{t}</span>
+                  <span key={t} style={{ fontSize: "11px", background: "hsl(var(--primary) / 0.1)", color: "hsl(var(--primary))", border: "1px solid hsl(var(--primary) / 0.3)", borderRadius: "999px", padding: "3px 10px", fontWeight: "500" }}>{t}</span>
                 ))}
               </div>
             </CvSection>
@@ -125,8 +125,8 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
             <CvSection title="Lingue">
               {cv.languages.map((l) => (
                 <div key={l.language} style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-                  <span style={{ fontSize: "12px", fontWeight: "600", color: "#374151" }}>{l.language}</span>
-                  <span style={{ fontSize: "11px", color: "#6b7280", background: "#f3f4f6", borderRadius: "999px", padding: "2px 8px" }}>{l.level}</span>
+                  <span style={{ fontSize: "12px", fontWeight: "600", color: "hsl(var(--foreground))" }}>{l.language}</span>
+                  <span style={{ fontSize: "11px", color: "hsl(var(--muted-foreground))", background: "hsl(var(--muted))", borderRadius: "999px", padding: "2px 8px" }}>{l.level}</span>
                 </div>
               ))}
             </CvSection>
@@ -134,15 +134,15 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
           {cv.certifications.length > 0 && (
             <CvSection title="Certificazioni">
               {cv.certifications.map((c) => (
-                <div key={c} style={{ display: "flex", gap: "8px", marginBottom: "6px" }}>
-                  <span style={{ color: "#1a3a2a", fontSize: "14px" }}>✦</span>
-                  <span style={{ fontSize: "12px", color: "#374151", lineHeight: "1.5" }}>{c}</span>
+                  <div key={c} style={{ display: "flex", gap: "8px", marginBottom: "6px" }}>
+                  <span style={{ color: "hsl(var(--growth))", fontSize: "14px" }}>✦</span>
+                  <span style={{ fontSize: "12px", color: "hsl(var(--foreground))", lineHeight: "1.5" }}>{c}</span>
                 </div>
               ))}
             </CvSection>
           )}
-          <div style={{ padding: "12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", marginTop: "24px" }}>
-            <p style={{ margin: 0, fontSize: "10px", color: "#15803d", textAlign: "center", fontWeight: "500" }}>✦ Generato con NorthStar</p>
+          <div style={{ padding: "12px", background: "hsl(var(--chart-2) / 0.1)", border: "1px solid hsl(var(--chart-2) / 0.3)", borderRadius: "10px", marginTop: "24px" }}>
+            <p style={{ margin: 0, fontSize: "10px", color: "hsl(var(--chart-2))", textAlign: "center", fontWeight: "500" }}>✦ Generato con NorthStar</p>
           </div>
         </div>
 
@@ -150,7 +150,7 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
         <div style={{ flex: 1, padding: "28px 32px" }}>
           {cv.summary && (
             <CvSection title="Profilo Professionale">
-              <p style={{ fontSize: "13px", color: "#4b5563", lineHeight: "1.7", margin: 0 }}>{cv.summary}</p>
+              <p style={{ fontSize: "13px", color: "hsl(var(--muted-foreground))", lineHeight: "1.7", margin: 0 }}>{cv.summary}</p>
             </CvSection>
           )}
           {cv.experience.length > 0 && (
@@ -159,18 +159,18 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
                 <div key={e.id} style={{ marginBottom: "18px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
                     <div>
-                      <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "#111827" }}>{e.title}</p>
-                      <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6b7280" }}>
+                      <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "hsl(var(--foreground))" }}>{e.title}</p>
+                      <p style={{ margin: "2px 0 0", fontSize: "12px", color: "hsl(var(--muted-foreground))" }}>
                         {e.company}{e.location ? ` · ${e.location}` : ""}
                       </p>
                     </div>
-                    <span style={{ fontSize: "11px", color: "#9ca3af", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "999px", padding: "2px 10px", flexShrink: 0 }}>{e.period}</span>
+                    <span style={{ fontSize: "11px", color: "hsl(var(--muted-foreground))", background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))", borderRadius: "999px", padding: "2px 10px", flexShrink: 0 }}>{e.period}</span>
                   </div>
                   {e.description && (
-                    <div style={{ fontSize: "12px", color: "#4b5563", lineHeight: "1.7", marginTop: "6px" }}>
+                    <div style={{ fontSize: "12px", color: "hsl(var(--muted-foreground))", lineHeight: "1.7", marginTop: "6px" }}>
                       {e.description.split("\n").map((line, i) => (
                         <p key={i} style={{ margin: "3px 0" }}>
-                          {line.startsWith("→") ? <><span style={{ color: "#1a3a2a" }}>→</span> {line.slice(1).trim()}</> : line}
+                          {line.startsWith("→") ? <><span style={{ color: "hsl(var(--growth))" }}>→</span> {line.slice(1).trim()}</> : line}
                         </p>
                       ))}
                     </div>
@@ -178,7 +178,7 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
                   {e.skills.length > 0 && (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "8px" }}>
                       {e.skills.map((s) => (
-                        <span key={s} style={{ fontSize: "10px", background: "#f3f4f6", color: "#6b7280", borderRadius: "999px", padding: "2px 8px" }}>{s}</span>
+                        <span key={s} style={{ fontSize: "10px", background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))", borderRadius: "999px", padding: "2px 8px" }}>{s}</span>
                       ))}
                     </div>
                   )}
@@ -191,11 +191,11 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
               {cv.education.map((e) => (
                 <div key={e.id} style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
                   <div>
-                    <p style={{ margin: 0, fontSize: "13px", fontWeight: "700", color: "#111827" }}>{e.degree}</p>
-                    <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6b7280" }}>{e.institution}</p>
-                    {e.description && <p style={{ margin: "3px 0 0", fontSize: "11px", color: "#9ca3af" }}>{e.description}</p>}
+                    <p style={{ margin: 0, fontSize: "13px", fontWeight: "700", color: "hsl(var(--foreground))" }}>{e.degree}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: "12px", color: "hsl(var(--muted-foreground))" }}>{e.institution}</p>
+                    {e.description && <p style={{ margin: "3px 0 0", fontSize: "11px", color: "hsl(var(--muted-foreground))" }}>{e.description}</p>}
                   </div>
-                  <span style={{ fontSize: "11px", color: "#9ca3af", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "999px", padding: "2px 10px", flexShrink: 0 }}>{e.year}</span>
+                    <span style={{ fontSize: "11px", color: "hsl(var(--muted-foreground))", background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))", borderRadius: "999px", padding: "2px 10px", flexShrink: 0 }}>{e.year}</span>
                 </div>
               ))}
             </CvSection>
@@ -209,7 +209,7 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
 function CvSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: "24px" }}>
-      <h3 style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1.5px", textTransform: "uppercase", color: "#1a3a2a", marginBottom: "10px", borderBottom: "2px solid #1a3a2a", paddingBottom: "6px", margin: "0 0 10px 0" }}>
+      <h3 style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1.5px", textTransform: "uppercase", color: "hsl(var(--growth))", marginBottom: "10px", borderBottom: "2px solid hsl(var(--growth))", paddingBottom: "6px", margin: "0 0 10px 0" }}>
         {title}
       </h3>
       {children}
@@ -1547,7 +1547,7 @@ export function CvGeneratorModal({
 
               {/* ── ATS Score panel (desktop) ── */}
               {showAts && (() => {
-                const scoreColor = (s: number) => s >= 80 ? "#16a34a" : s >= 60 ? "#d97706" : "#dc2626";
+                const scoreColor = (s: number) => s >= 80 ? "hsl(var(--chart-2))" : s >= 60 ? "hsl(var(--primary))" : "hsl(var(--chart-5))";
                 const scoreBg = (s: number) => s >= 80 ? "bg-emerald-50 border-emerald-200 text-emerald-800" : s >= 60 ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-red-50 border-red-200 text-red-800";
                 const R = 45; const CX = 60; const CY = 60;
                 const CIRC = 2 * Math.PI * R;
@@ -1603,7 +1603,7 @@ export function CvGeneratorModal({
                           {/* Score gauge */}
                           <div className="flex flex-col items-center py-2">
                             <svg width="120" height="120" viewBox="0 0 120 120">
-                              <circle cx={CX} cy={CY} r={R} fill="none" stroke="#e5e7eb" strokeWidth="10" />
+                              <circle cx={CX} cy={CY} r={R} fill="none" stroke="hsl(var(--border))" strokeWidth="10" />
                               <circle
                                 cx={CX} cy={CY} r={R}
                                 fill="none"
@@ -1615,7 +1615,7 @@ export function CvGeneratorModal({
                                 style={{ transition: "stroke-dasharray 0.8s ease" }}
                               />
                               <text x={CX} y={CY + 8} textAnchor="middle" fontSize="22" fontWeight="bold" fill={scoreColor(atsResult.score)}>{atsResult.score}</text>
-                              <text x={CX} y={CY + 22} textAnchor="middle" fontSize="9" fill="#6b7280">/100</text>
+                              <text x={CX} y={CY + 22} textAnchor="middle" fontSize="9" fill="hsl(var(--muted-foreground))">/100</text>
                             </svg>
                             <span className={cn("text-sm font-bold px-3 py-1 rounded-full border mt-1", scoreBg(atsResult.score))}>
                               {atsResult.label}
@@ -1631,7 +1631,7 @@ export function CvGeneratorModal({
                                   <span className="text-xs font-medium text-foreground">{sec.name}</span>
                                   <span className="text-xs font-bold" style={{ color: scoreColor(sec.score) }}>{sec.score}%</span>
                                 </div>
-                                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-1">
+                                <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-1">
                                   <div
                                     className="h-full rounded-full transition-all duration-700"
                                     style={{ width: `${sec.score}%`, backgroundColor: scoreColor(sec.score) }}
@@ -1711,7 +1711,7 @@ export function CvGeneratorModal({
               })()}
 
               {/* Preview */}
-              <div id="cv-preview-scroll" className="flex-1 overflow-auto py-8 px-6 bg-gray-100">
+              <div id="cv-preview-scroll" className="flex-1 overflow-auto py-8 px-6 bg-muted/30">
                 <CvDocument cv={generated} />
               </div>
             </div>
@@ -1760,10 +1760,10 @@ export function CvGeneratorModal({
                           <div className="flex items-center gap-4 p-3 rounded-xl border bg-muted/30">
                             {(() => {
                               const R = 32; const CX = 36; const CY = 36; const CIRC = 2 * Math.PI * R;
-                              const color = atsResult.score >= 80 ? "#16a34a" : atsResult.score >= 60 ? "#d97706" : "#dc2626";
+                              const color = atsResult.score >= 80 ? "hsl(var(--chart-2))" : atsResult.score >= 60 ? "hsl(var(--primary))" : "hsl(var(--chart-5))";
                               return (
                                 <svg width="72" height="72" viewBox="0 0 72 72">
-                                  <circle cx={CX} cy={CY} r={R} fill="none" stroke="#e5e7eb" strokeWidth="8" />
+                                  <circle cx={CX} cy={CY} r={R} fill="none" stroke="hsl(var(--border))" strokeWidth="8" />
                                   <circle cx={CX} cy={CY} r={R} fill="none" stroke={color} strokeWidth="8" strokeLinecap="round"
                                     strokeDasharray={`${CIRC * atsResult.score / 100} ${CIRC}`}
                                     transform={`rotate(-90 ${CX} ${CY})`} />
@@ -1773,20 +1773,20 @@ export function CvGeneratorModal({
                             })()}
                             <div>
                               <p className="text-lg font-bold text-foreground">{atsResult.score}/100</p>
-                              <p className="text-sm font-semibold" style={{ color: atsResult.score >= 80 ? "#16a34a" : atsResult.score >= 60 ? "#d97706" : "#dc2626" }}>{atsResult.label}</p>
+                              <p className="text-sm font-semibold" style={{ color: atsResult.score >= 80 ? "hsl(var(--chart-2))" : atsResult.score >= 60 ? "hsl(var(--primary))" : "hsl(var(--chart-5))" }}>{atsResult.label}</p>
                             </div>
                           </div>
                           {/* Sections */}
                           <div className="space-y-2">
                             {atsResult.sections.map((sec) => {
-                              const color = sec.score >= 80 ? "#16a34a" : sec.score >= 60 ? "#d97706" : "#dc2626";
+                              const color = sec.score >= 80 ? "hsl(var(--chart-2))" : sec.score >= 60 ? "hsl(var(--primary))" : "hsl(var(--chart-5))";
                               return (
                                 <div key={sec.name}>
                                   <div className="flex justify-between mb-0.5">
                                     <span className="text-xs font-medium">{sec.name}</span>
                                     <span className="text-xs font-bold" style={{ color }}>{sec.score}%</span>
                                   </div>
-                                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                                     <div className="h-full rounded-full" style={{ width: `${sec.score}%`, backgroundColor: color }} />
                                   </div>
                                 </div>
@@ -2024,7 +2024,7 @@ export function CvGeneratorModal({
                   )}
                 </div>
               ) : (
-                <div id="cv-preview-scroll" className="flex-1 overflow-auto py-4 px-2 bg-gray-100">
+                <div id="cv-preview-scroll" className="flex-1 overflow-auto py-4 px-2 bg-muted/30">
                   <div className="scale-[0.45] origin-top-left" style={{ width: "222%", transformOrigin: "top left" }}>
                     <CvDocument cv={generated} />
                   </div>

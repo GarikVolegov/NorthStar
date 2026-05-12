@@ -42,10 +42,10 @@ interface ChatMessage {
 }
 
 const NODE_CONFIG = {
-  role:          { color: "#6366f1", bg: "#eef2ff", border: "#a5b4fc", label: "Ruolo",          emoji: "👤" },
-  skill:         { color: "#10b981", bg: "#ecfdf5", border: "#6ee7b7", label: "Competenza",      emoji: "⚡" },
-  tool:          { color: "#f59e0b", bg: "#fffbeb", border: "#fcd34d", label: "Strumento",       emoji: "🔧" },
-  certification: { color: "#8b5cf6", bg: "#f5f3ff", border: "#c4b5fd", label: "Certificazione",  emoji: "🏅" },
+  role:          { color: "hsl(var(--chart-4))", bg: "hsl(var(--chart-4) / 0.1)", border: "hsl(var(--chart-4) / 0.4)", label: "Ruolo",          emoji: "👤" },
+  skill:         { color: "hsl(var(--chart-2))", bg: "hsl(var(--chart-2) / 0.1)", border: "hsl(var(--chart-2) / 0.4)", label: "Competenza",      emoji: "⚡" },
+  tool:          { color: "hsl(var(--chart-1))", bg: "hsl(var(--chart-1) / 0.1)", border: "hsl(var(--chart-1) / 0.4)", label: "Strumento",       emoji: "🔧" },
+  certification: { color: "hsl(var(--chart-4))", bg: "hsl(var(--chart-4) / 0.1)", border: "hsl(var(--chart-4) / 0.4)", label: "Certificazione",  emoji: "🏅" },
 };
 
 const TYPE_OPTIONS = [
@@ -253,16 +253,16 @@ export default function Grafo() {
       const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
       bgRect.setAttribute("width", "1000");
       bgRect.setAttribute("height", "800");
-      bgRect.setAttribute("fill", "#ffffff");
+      bgRect.setAttribute("fill", "hsl(var(--background))");
       cloned.insertBefore(bgRect, cloned.firstChild);
 
       // Build legend rows inside SVG at the bottom
       const legendY = 760;
       const legendItems = [
-        { color: "#6366f1", label: "Ruolo" },
-        { color: "#10b981", label: "Competenza" },
-        { color: "#f59e0b", label: "Strumento" },
-        { color: "#8b5cf6", label: "Certificazione" },
+        { color: "hsl(var(--chart-4))", label: "Ruolo" },
+        { color: "hsl(var(--chart-2))", label: "Competenza" },
+        { color: "hsl(var(--chart-1))", label: "Strumento" },
+        { color: "hsl(var(--chart-4))", label: "Certificazione" },
       ];
       const legendG = document.createElementNS("http://www.w3.org/2000/svg", "g");
       let lx = 30;
@@ -278,7 +278,7 @@ export default function Grafo() {
         text.setAttribute("x", String(lx + 10));
         text.setAttribute("y", String(legendY + 4));
         text.setAttribute("font-size", "10");
-        text.setAttribute("fill", "#64748b");
+        text.setAttribute("fill", "hsl(var(--muted-foreground))");
         text.setAttribute("font-family", "system-ui, sans-serif");
         text.textContent = label;
         legendG.appendChild(text);
@@ -292,7 +292,7 @@ export default function Grafo() {
       brand.setAttribute("y", String(legendY + 4));
       brand.setAttribute("text-anchor", "end");
       brand.setAttribute("font-size", "9");
-      brand.setAttribute("fill", "#cbd5e1");
+      brand.setAttribute("fill", "hsl(var(--border))");
       brand.setAttribute("font-family", "system-ui, sans-serif");
       brand.textContent = "NorthStar · Grafo della Conoscenza";
       legendG.appendChild(brand);
@@ -313,7 +313,7 @@ export default function Grafo() {
           canvas.width = W;
           canvas.height = H;
           const ctx = canvas.getContext("2d")!;
-          ctx.fillStyle = "#ffffff";
+          ctx.fillStyle = "hsl(var(--background))";
           ctx.fillRect(0, 0, W, H);
           ctx.drawImage(img, 0, 0, W, H);
           URL.revokeObjectURL(svgUrl);
@@ -654,7 +654,7 @@ export default function Grafo() {
                     <line
                       key={i}
                       x1={f.x} y1={f.y} x2={t.x} y2={t.y}
-                      stroke={active ? "#6366f1" : edge.userAdded ? "#94a3b8" : "#e2e8f0"}
+                      stroke={active ? "hsl(var(--chart-4))" : edge.userAdded ? "hsl(var(--muted-foreground))" : "hsl(var(--border))"}
                       strokeWidth={active ? 1.5 : 1}
                       strokeDasharray={active ? undefined : edge.userAdded ? "6 4" : "4 3"}
                       opacity={hoveredNode && !active ? 0.15 : 1}
@@ -664,11 +664,11 @@ export default function Grafo() {
                 })}
 
                 {/* Center */}
-                <circle cx={CX} cy={CY} r={50} fill="#f8fafc" stroke="#e2e8f0" strokeWidth={1.5} />
-                <text x={CX} y={CY - 6} textAnchor="middle" fontSize="11" fontWeight="600" fill="#64748b" className="select-none">
+                <circle cx={CX} cy={CY} r={50} fill="hsl(var(--background))" stroke="hsl(var(--border))" strokeWidth={1.5} />
+                <text x={CX} y={CY - 6} textAnchor="middle" fontSize="11" fontWeight="600" fill="hsl(var(--muted-foreground))" className="select-none">
                   {sector?.icon ?? "🏢"}
                 </text>
-                <text x={CX} y={CY + 10} textAnchor="middle" fontSize="9" fill="#94a3b8" className="select-none">
+                <text x={CX} y={CY + 10} textAnchor="middle" fontSize="9" fill="hsl(var(--muted-foreground))" className="select-none">
                   {(sector?.name ?? "").split(" ").slice(0, 2).join(" ")}
                 </text>
 
@@ -687,8 +687,8 @@ export default function Grafo() {
                     >
                       <circle
                         r={r}
-                        fill={active ? cfg.bg : "#f8fafc"}
-                        stroke={active ? cfg.border : "#e2e8f0"}
+                        fill={active ? cfg.bg : "hsl(var(--background))"}
+                        stroke={active ? cfg.border : "hsl(var(--border))"}
                         strokeWidth={hoveredNode?.id === node.id ? 2.5 : 1.5}
                         strokeDasharray={isUser ? "4 2" : undefined}
                         className="transition-all duration-200"
@@ -703,12 +703,12 @@ export default function Grafo() {
                         {cfg.emoji}
                       </text>
                       {isUser && (
-                        <circle cx={r - 5} cy={-(r - 5)} r={5} fill="#6366f1" opacity={hoveredNode && !active ? 0.4 : 1} />
+                        <circle cx={r - 5} cy={-(r - 5)} r={5} fill="hsl(var(--chart-4))" opacity={hoveredNode && !active ? 0.4 : 1} />
                       )}
                       <text
                         y={r + 12} textAnchor="middle" fontSize="9"
                         fontWeight={hoveredNode?.id === node.id ? "600" : "400"}
-                        fill={active ? cfg.color : "#94a3b8"}
+                        fill={active ? cfg.color : "hsl(var(--muted-foreground))"}
                         className="select-none"
                         opacity={hoveredNode && !active ? 0.4 : 1}
                       >

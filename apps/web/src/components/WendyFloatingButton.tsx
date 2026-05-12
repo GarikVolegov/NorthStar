@@ -9,6 +9,7 @@ export function WendyFloatingButton() {
   return (
     <button
       onClick={toggle}
+      data-testid="wendy-fab"
       className="fixed bottom-6 right-6 z-50 flex items-center justify-center rounded-full shadow-xl transition-transform hover:scale-105 active:scale-95"
       aria-label="Apri Wendy"
       style={{ width: 64, height: 64 }}

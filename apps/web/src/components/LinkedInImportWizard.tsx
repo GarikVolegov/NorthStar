@@ -150,7 +150,7 @@ export function LinkedInImportWizard({ open, onClose }: LinkedInImportWizardProp
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-background border-border">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-foreground">
-            <Linkedin className="h-5 w-5 text-[#0077B5]" />
+            <Linkedin className="h-5 w-5 text-[#0077B5]" /* LinkedIn brand blue */ />
             Importa da LinkedIn
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
@@ -238,7 +238,7 @@ export function LinkedInImportWizard({ open, onClose }: LinkedInImportWizardProp
             <div className="relative mx-auto w-16 h-16">
               <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
               <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-              <Linkedin className="absolute inset-0 m-auto h-7 w-7 text-[#0077B5]" />
+              <Linkedin className="absolute inset-0 m-auto h-7 w-7 text-[#0077B5]" /* LinkedIn brand blue */ />
             </div>
             <div>
               <p className="font-semibold text-foreground">Analisi in corso…</p>

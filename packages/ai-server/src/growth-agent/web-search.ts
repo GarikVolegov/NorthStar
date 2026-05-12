@@ -10,6 +10,7 @@
 import type { RetrievedChunk } from "./retriever";
 import { logger } from "../logger";
 import { withTimeout } from "../utils";
+import pRetry from "p-retry";
 
 const TAVILY_URL = "https://api.tavily.com/search";
 const MIN_LOCAL_CHUNKS = 3;
@@ -34,28 +35,37 @@ export async function searchWeb(
   }
 
   try {
-    const res = await withTimeout(
-      fetch(TAVILY_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          api_key: apiKey,
-          query,
-          search_depth: "advanced",
-          max_results: maxResults,
-          include_raw_content: false,
-        }),
-      }),
-      10000,
-      "Tavily",
+    const data = await pRetry(
+      async () => {
+        const res = await withTimeout(
+          fetch(TAVILY_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              api_key: apiKey,
+              query,
+              search_depth: "advanced",
+              max_results: maxResults,
+              include_raw_content: false,
+            }),
+          }),
+          10000,
+          "Tavily",
+        );
+
+        if (!res.ok) {
+          throw new Error(`Tavily returned ${res.status}`);
+        }
+
+        return (await res.json()) as { results: WebSearchResult[] };
+      },
+      {
+        retries: 1,
+        onFailedAttempt: (err) => {
+          logger.warn({ err, attempt: err.attemptNumber }, "Tavily retry");
+        },
+      },
     );
-
-    if (!res.ok) {
-      logger.error({ status: res.status }, "Tavily search error");
-      return [];
-    }
-
-    const data = (await res.json()) as { results: WebSearchResult[] };
 
     return (data.results ?? []).map((r) => ({
       id: -1,

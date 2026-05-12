@@ -104,7 +104,7 @@ const fadeUp   = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, t
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
 function Sk({ className = '' }: { className?: string }) {
-  return <div className={`rounded-xl bg-[#131929] animate-pulse ${className}`} />;
+  return <div className={`rounded-xl bg-[hsl(var(--card))] animate-pulse ${className}`} />;
 }
 
 // ── Header XP ────────────────────────────────────────────────────────────────
@@ -121,7 +121,7 @@ function XpCard({ stats, sectorName }: { stats: UserStats; sectorName: string })
 
   return (
     <motion.div variants={fadeUp}
-      className="rounded-2xl bg-[#0d1421] border border-amber-500/20 p-5 relative overflow-hidden">
+      className="rounded-2xl bg-[hsl(var(--background))] border border-amber-500/20 p-5 relative overflow-hidden">
       <div className="absolute top-0 right-0 w-40 h-40 rounded-full
                       bg-amber-500/5 blur-3xl pointer-events-none" />
       <div className="flex items-start justify-between mb-4">
@@ -132,25 +132,25 @@ function XpCard({ stats, sectorName }: { stats: UserStats; sectorName: string })
               Livello {stats.level}
             </span>
           </div>
-          <h2 className="text-[20px] font-bold text-[#dce6f5]">
+          <h2 className="text-[20px] font-bold text-[hsl(var(--foreground))]">
             {levelLabel[Math.min(stats.level, 10)] ?? 'Maestro'}
           </h2>
-          <p className="text-[12px] text-[#7c8db5] mt-0.5">{sectorName}</p>
+          <p className="text-[12px] text-[hsl(var(--muted-foreground))] mt-0.5">{sectorName}</p>
         </div>
         <div className="text-right">
-          <p className="text-[22px] font-bold text-[#dce6f5] tabular-nums">
+          <p className="text-[22px] font-bold text-[hsl(var(--foreground))] tabular-nums">
             {stats.totalXp.toLocaleString('it-IT')}
           </p>
-          <p className="text-[11px] text-[#4a5a75]">XP totale</p>
+          <p className="text-[11px] text-[hsl(var(--muted-foreground))]">XP totale</p>
         </div>
       </div>
 
       <div className="space-y-1.5">
         <div className="flex justify-between text-[11px]">
-          <span className="text-[#4a5a75]">{xpInLevel.toLocaleString('it-IT')} / {xpNeeded} XP</span>
+          <span className="text-[hsl(var(--muted-foreground))]">{xpInLevel.toLocaleString('it-IT')} / {xpNeeded} XP</span>
           <span className="text-amber-400/70">{Math.round(progress)}%</span>
         </div>
-        <div className="h-2 rounded-full bg-[#1a2035] overflow-hidden">
+        <div className="h-2 rounded-full bg-[hsl(var(--muted))] overflow-hidden">
           <motion.div
             className="h-full rounded-full bg-gradient-to-r from-amber-600 to-amber-400"
             initial={{ width: 0 }}
@@ -158,7 +158,7 @@ function XpCard({ stats, sectorName }: { stats: UserStats; sectorName: string })
             transition={{ duration: 0.9, ease: 'easeOut', delay: 0.2 }}
           />
         </div>
-        <p className="text-[10px] text-[#3a4a65]">
+        <p className="text-[10px] text-[hsl(var(--muted-foreground))]">
           {(xpNeeded - xpInLevel).toLocaleString('it-IT')} XP al livello {stats.level + 1}
         </p>
       </div>
@@ -180,16 +180,16 @@ function StreakCard({ streak, longest }: { streak: number; longest: number }) {
 
   return (
     <motion.div variants={fadeUp}
-      className="rounded-2xl bg-[#0d1421] border border-white/[0.06] p-4">
+      className="rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06] p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Flame className={`w-4 h-4 ${streak > 0 ? 'text-orange-400' : 'text-[#3a4a65]'}`} />
-          <span className="text-[12px] font-semibold text-[#7c8db5] uppercase tracking-wide">
+          <Flame className={`w-4 h-4 ${streak > 0 ? 'text-orange-400' : 'text-[hsl(var(--muted-foreground))]'}`} />
+          <span className="text-[12px] font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">
             Streak attivo
           </span>
         </div>
-        <span className="text-[13px] font-bold text-[#dce6f5] tabular-nums">
-          {streak} <span className="text-[11px] font-normal text-[#4a5a75]">gg</span>
+        <span className="text-[13px] font-bold text-[hsl(var(--foreground))] tabular-nums">
+          {streak} <span className="text-[11px] font-normal text-[hsl(var(--muted-foreground))]">gg</span>
         </span>
       </div>
 
@@ -205,19 +205,19 @@ function StreakCard({ streak, longest }: { streak: number; longest: number }) {
                   : activeDays.has(i)
                   ? 'bg-orange-500/30 text-orange-400'
                   : i === todayIdx
-                  ? 'bg-[#1a2035] text-[#4a8bff] ring-1 ring-[#4a8bff]/30'
-                  : 'bg-[#131929] text-[#3a4a65]'
+                  ? 'bg-[hsl(var(--muted))] text-[hsl(var(--chart-3))] ring-1 ring-[#4a8bff]/30'
+                  : 'bg-[hsl(var(--card))] text-[hsl(var(--muted-foreground))]'
               }
             `}>
               {activeDays.has(i) ? '✓' : ''}
             </div>
-            <span className="text-[9px] text-[#3a4a65]">{label}</span>
+            <span className="text-[9px] text-[hsl(var(--muted-foreground))]">{label}</span>
           </div>
         ))}
       </div>
 
       {longest > 0 && (
-        <p className="text-[11px] text-[#4a5a75] mt-2.5 text-center">
+        <p className="text-[11px] text-[hsl(var(--muted-foreground))] mt-2.5 text-center">
           Record personale: <span className="text-amber-400/70 font-semibold">{longest} giorni</span>
         </p>
       )}
@@ -239,34 +239,34 @@ function ObjectiveCard({ obj }: { obj: Objective }) {
         ${
           obj.completed
             ? 'bg-emerald-500/5 border-emerald-500/20'
-            : 'bg-[#0d1421] border-white/[0.06] hover:border-white/10'
+            : 'bg-[hsl(var(--background))] border-white/[0.06] hover:border-white/10'
         }
       `}>
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex-shrink-0">
           {obj.completed
             ? <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            : <Circle className="w-4 h-4 text-[#4a5a75]" />}
+            : <Circle className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />}
         </div>
         <div className="flex-1 min-w-0">
           <p className={`text-[13px] font-semibold ${
-            obj.completed ? 'line-through text-[#4a5a75]' : 'text-[#c5cee0]'
+            obj.completed ? 'line-through text-[hsl(var(--muted-foreground))]' : 'text-[hsl(var(--foreground))]'
           }`}>
             {obj.title}
           </p>
           {obj.description && (
-            <p className="text-[12px] text-[#7c8db5] mt-0.5 leading-snug">{obj.description}</p>
+            <p className="text-[12px] text-[hsl(var(--muted-foreground))] mt-0.5 leading-snug">{obj.description}</p>
           )}
 
           {!obj.completed && (
             <div className="mt-2">
               <div className="flex justify-between text-[11px] mb-1">
-                <span className="text-[#4a5a75]">
+                <span className="text-[hsl(var(--muted-foreground))]">
                   {obj.currentValue}{obj.unit ? ` ${obj.unit}` : ''} / {obj.targetValue}{obj.unit ? ` ${obj.unit}` : ''}
                 </span>
-                <span className="text-[#4a8bff]">{Math.round(obj.progress)}%</span>
+                <span className="text-[hsl(var(--chart-3))]">{Math.round(obj.progress)}%</span>
               </div>
-              <div className="h-1.5 rounded-full bg-[#1a2035] overflow-hidden">
+              <div className="h-1.5 rounded-full bg-[hsl(var(--muted))] overflow-hidden">
                 <motion.div
                   className="h-full rounded-full bg-gradient-to-r from-blue-600 to-blue-400"
                   initial={{ width: 0 }}
@@ -278,7 +278,7 @@ function ObjectiveCard({ obj }: { obj: Objective }) {
           )}
         </div>
         {dueLabel && !obj.completed && (
-          <div className="flex items-center gap-1 text-[11px] text-[#4a5a75] flex-shrink-0">
+          <div className="flex items-center gap-1 text-[11px] text-[hsl(var(--muted-foreground))] flex-shrink-0">
             <Clock className="w-3 h-3" />
             {dueLabel}
           </div>
@@ -297,17 +297,17 @@ function ObiettiviAttivi({ objectives, loading }: { objectives: Objective[]; loa
   return (
     <motion.div variants={fadeUp}>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[14px] font-semibold text-[#a8b8d0] flex items-center gap-2">
-          <Target className="w-4 h-4 text-[#4a8bff]" />
+        <h2 className="text-[14px] font-semibold text-[hsl(var(--muted-foreground))] flex items-center gap-2">
+          <Target className="w-4 h-4 text-[hsl(var(--chart-3))]" />
           Obiettivi attivi
           {active.length > 0 && (
-            <span className="ml-1 text-[11px] bg-[#1a2035] text-[#4a8bff] px-2 py-0.5 rounded-full">
+            <span className="ml-1 text-[11px] bg-[hsl(var(--muted))] text-[hsl(var(--chart-3))] px-2 py-0.5 rounded-full">
               {active.length}
             </span>
           )}
         </h2>
         <Link href="/percorso"
-          className="text-[12px] text-[#4a8bff] hover:text-[#7eb3ff] transition-colors flex items-center gap-1">
+          className="text-[12px] text-[hsl(var(--chart-3))] hover:text-[hsl(var(--chart-3))] transition-colors flex items-center gap-1">
           Tutti <ChevronRight className="w-3.5 h-3.5" />
         </Link>
       </div>
@@ -319,11 +319,11 @@ function ObiettiviAttivi({ objectives, loading }: { objectives: Objective[]; loa
       ) : active.length === 0 ? (
         <div className="flex flex-col items-center py-10 text-center">
           <CheckCircle2 className="w-8 h-8 text-emerald-400 mb-3" />
-          <p className="text-[14px] font-semibold text-[#c5cee0] mb-1">Tutti gli obiettivi completati!</p>
-          <p className="text-[12px] text-[#7c8db5] max-w-[28ch]">Imposta nuovi traguardi dal tuo percorso</p>
+          <p className="text-[14px] font-semibold text-[hsl(var(--foreground))] mb-1">Tutti gli obiettivi completati!</p>
+          <p className="text-[12px] text-[hsl(var(--muted-foreground))] max-w-[28ch]">Imposta nuovi traguardi dal tuo percorso</p>
           <Link href="/percorso"
-            className="mt-4 px-4 py-2 rounded-lg bg-[#1a3a6b] text-[#7eb3ff] text-[12px] font-medium
-                       hover:bg-[#1f4480] transition-colors">
+            className="mt-4 px-4 py-2 rounded-lg bg-[hsl(var(--muted))] text-[hsl(var(--chart-3))] text-[12px] font-medium
+                       hover:bg-[hsl(var(--muted))] transition-colors">
             Vai al percorso
           </Link>
         </div>
@@ -336,15 +336,15 @@ function ObiettiviAttivi({ objectives, loading }: { objectives: Objective[]; loa
           {active.length > 3 && (
             <button
               onClick={() => setShowAll((v) => !v)}
-              className="w-full py-2 rounded-xl text-[12px] font-medium text-[#4a5a75]
-                         hover:text-[#7c8db5] border border-white/[0.04] hover:border-white/[0.08]
-                         bg-[#0d1421] hover:bg-[#0f1828] transition-all">
+              className="w-full py-2 rounded-xl text-[12px] font-medium text-[hsl(var(--muted-foreground))]
+                         hover:text-[hsl(var(--muted-foreground))] border border-white/[0.04] hover:border-white/[0.08]
+                         bg-[hsl(var(--background))] hover:bg-[hsl(var(--muted))] transition-all">
               {showAll ? 'Mostra meno ↑' : `Mostra altri ${active.length - 3} obiettivi ↓`}
             </button>
           )}
 
           {completed.length > 0 && (
-            <p className="text-[11px] text-[#3a4a65] text-center pt-1">
+            <p className="text-[11px] text-[hsl(var(--muted-foreground))] text-center pt-1">
               {completed.length} obiettiv{completed.length === 1 ? 'o' : 'i'} completat{completed.length === 1 ? 'o' : 'i'} di recente ✅
             </p>
           )}
@@ -360,12 +360,12 @@ function CertificazioniCard() {
   return (
     <motion.div variants={fadeUp}>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[14px] font-semibold text-[#a8b8d0] flex items-center gap-2">
+        <h2 className="text-[14px] font-semibold text-[hsl(var(--muted-foreground))] flex items-center gap-2">
           <Award className="w-4 h-4 text-emerald-400" />
           Certificazioni consigliate
         </h2>
         <Link href="/certificazioni"
-          className="text-[12px] text-[#4a8bff] hover:text-[#7eb3ff] transition-colors flex items-center gap-1">
+          className="text-[12px] text-[hsl(var(--chart-3))] hover:text-[hsl(var(--chart-3))] transition-colors flex items-center gap-1">
           Tutte <ChevronRight className="w-3.5 h-3.5" />
         </Link>
       </div>
@@ -373,14 +373,14 @@ function CertificazioniCard() {
       <div className="space-y-2">
         {CERT_MOCK.map((cert, i) => (
           <motion.div key={cert.id} variants={fadeUp}
-            className="flex items-center gap-3 p-3.5 rounded-xl bg-[#0d1421]
+            className="flex items-center gap-3 p-3.5 rounded-xl bg-[hsl(var(--background))]
                        border border-white/[0.06] hover:border-white/10 transition-all">
-            <div className="w-9 h-9 rounded-xl bg-[#1a2035] flex items-center justify-center flex-shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-[hsl(var(--muted))] flex items-center justify-center flex-shrink-0">
               <GraduationCap className="w-4 h-4 text-emerald-400" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <p className="text-[13px] font-semibold text-[#c5cee0] truncate">{cert.name}</p>
+                <p className="text-[13px] font-semibold text-[hsl(var(--foreground))] truncate">{cert.name}</p>
                 {cert.hot && (
                   <span className="text-[10px] font-bold text-orange-400 bg-orange-400/10
                                    px-1.5 py-0.5 rounded-full flex-shrink-0">
@@ -388,7 +388,7 @@ function CertificazioniCard() {
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-3 mt-0.5 text-[11px] text-[#7c8db5]">
+              <div className="flex items-center gap-3 mt-0.5 text-[11px] text-[hsl(var(--muted-foreground))]">
                 <span>{cert.provider}</span>
                 <span>·</span>
                 <span>{cert.hours}h</span>
@@ -396,7 +396,7 @@ function CertificazioniCard() {
                 <span>{cert.level}</span>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 text-[#3a4a65] flex-shrink-0" />
+            <ChevronRight className="w-4 h-4 text-[hsl(var(--muted-foreground))] flex-shrink-0" />
           </motion.div>
         ))}
       </div>
@@ -415,13 +415,13 @@ function LeaderboardPreview({ entries, loading }: { entries: LeaderboardEntry[];
 
   return (
     <motion.div variants={fadeUp}
-      className="rounded-2xl bg-[#0d1421] border border-white/[0.06] p-4">
+      className="rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06] p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[14px] font-semibold text-[#a8b8d0] flex items-center gap-2">
+        <h2 className="text-[14px] font-semibold text-[hsl(var(--muted-foreground))] flex items-center gap-2">
           <Star className="w-4 h-4 text-amber-400" />
           Ranking nel settore
         </h2>
-        <span className="text-[11px] text-[#4a5a75]">Top del mese</span>
+        <span className="text-[11px] text-[hsl(var(--muted-foreground))]">Top del mese</span>
       </div>
 
       <div className="space-y-2">
@@ -431,13 +431,13 @@ function LeaderboardPreview({ entries, loading }: { entries: LeaderboardEntry[];
               flex items-center gap-3 p-2.5 rounded-lg transition-all
               ${
                 entry.isCurrentUser
-                  ? 'bg-[#1a3a6b]/30 border border-[#1a3a6b]/50'
+                  ? 'bg-[hsl(var(--muted))]/30 border border-[#1a3a6b]/50'
                   : 'hover:bg-white/[0.02]'
               }
             `}>
             <div className={`
               w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0
-              ${entry.rank <= 3 ? `${medalBg[entry.rank - 1]} ${medalColors[entry.rank - 1]}` : 'text-[#4a5a75]'}
+              ${entry.rank <= 3 ? `${medalBg[entry.rank - 1]} ${medalColors[entry.rank - 1]}` : 'text-[hsl(var(--muted-foreground))]'}
             `}>
               {entry.rank}
             </div>
@@ -446,20 +446,20 @@ function LeaderboardPreview({ entries, loading }: { entries: LeaderboardEntry[];
                 width={28} height={28} loading="lazy"
                 className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
             ) : (
-              <div className="w-7 h-7 rounded-full bg-[#1a2035] flex items-center justify-center flex-shrink-0">
-                <span className="text-[10px] font-bold text-[#7c8db5]">
+              <div className="w-7 h-7 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center flex-shrink-0">
+                <span className="text-[10px] font-bold text-[hsl(var(--muted-foreground))]">
                   {entry.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
                 </span>
               </div>
             )}
             <span className={`flex-1 text-[13px] truncate ${
-              entry.isCurrentUser ? 'font-semibold text-[#7eb3ff]' : 'text-[#c5cee0]'
+              entry.isCurrentUser ? 'font-semibold text-[hsl(var(--chart-3))]' : 'text-[hsl(var(--foreground))]'
             }`}>
               {entry.name}{entry.isCurrentUser ? ' (tu)' : ''}
             </span>
             <span className="text-[12px] font-semibold text-amber-400/80 tabular-nums flex-shrink-0">
               {entry.totalXp.toLocaleString('it-IT')}
-              <span className="text-[10px] font-normal text-[#4a5a75] ml-0.5">XP</span>
+              <span className="text-[10px] font-normal text-[hsl(var(--muted-foreground))] ml-0.5">XP</span>
             </span>
           </div>
         ))}
@@ -486,8 +486,8 @@ function AzioniRapide() {
             `}>
             <a.icon className={`w-5 h-5 ${a.accent}`} />
             <div>
-              <p className="text-[13px] font-semibold text-[#dce6f5]">{a.label}</p>
-              <p className="text-[11px] text-[#7c8db5] leading-snug">{a.desc}</p>
+              <p className="text-[13px] font-semibold text-[hsl(var(--foreground))]">{a.label}</p>
+              <p className="text-[11px] text-[hsl(var(--muted-foreground))] leading-snug">{a.desc}</p>
             </div>
           </Link>
         </motion.div>
@@ -541,11 +541,11 @@ export default function DashboardCrescita() {
       >
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-[13px] text-[#7c8db5] mb-0.5">{greeting}, {name} 🙌</p>
-            <h1 className="text-[22px] font-bold text-[#dce6f5] tracking-tight">
+            <p className="text-[13px] text-[hsl(var(--muted-foreground))] mb-0.5">{greeting}, {name} 🙌</p>
+            <h1 className="text-[22px] font-bold text-[hsl(var(--foreground))] tracking-tight">
               Stai crescendo
             </h1>
-            <p className="text-[13px] text-[#4a5a75] mt-1 max-w-[40ch]">
+            <p className="text-[13px] text-[hsl(var(--muted-foreground))] mt-1 max-w-[40ch]">
               Sai già dove sei. Ogni giorno che passi qui ti porta più in alto nel tuo settore.
             </p>
           </div>
@@ -578,19 +578,19 @@ export default function DashboardCrescita() {
 
         {/* Mini KPI completati */}
         <motion.div variants={fadeUp}
-          className="rounded-2xl bg-[#0d1421] border border-white/[0.06] p-4
+          className="rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06] p-4
                      flex flex-col justify-between">
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span className="text-[12px] font-semibold text-[#7c8db5] uppercase tracking-wide">
+            <span className="text-[12px] font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">
               Completati
             </span>
           </div>
           <div>
-            <p className="text-[32px] font-bold text-[#dce6f5] tabular-nums leading-none">
+            <p className="text-[32px] font-bold text-[hsl(var(--foreground))] tabular-nums leading-none">
               {loadingStats ? '–' : (stats?.completedObjectives ?? 0).toLocaleString('it-IT')}
             </p>
-            <p className="text-[12px] text-[#4a5a75] mt-1">Obiettivi totali</p>
+            <p className="text-[12px] text-[hsl(var(--muted-foreground))] mt-1">Obiettivi totali</p>
             <div className="mt-3 flex items-center gap-1.5">
               <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
               <span className="text-[11px] text-emerald-400">
@@ -603,7 +603,7 @@ export default function DashboardCrescita() {
 
       {/* ── Azioni rapide ──────────────────────────────────────────────── */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
-        <h2 className="text-[13px] font-semibold text-[#7c8db5] uppercase tracking-wide mb-3">
+        <h2 className="text-[13px] font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-3">
           Strumenti di crescita
         </h2>
         <AzioniRapide />

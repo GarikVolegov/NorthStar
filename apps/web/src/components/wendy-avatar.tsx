@@ -12,9 +12,9 @@ interface WendyAvatarProps {
 }
 
 const PHASE_PALETTE = [
-  { bg: "#EFF6FF", bgDark: "#1E3A5F", accent: "#3B82F6", skin: "#FDDCB5", hair: "#2D1B00" },
-  { bg: "#F5F3FF", bgDark: "#2E1B5F", accent: "#7C3AED", skin: "#FDDCB5", hair: "#1A0A2E" },
-  { bg: "#FFFBEB", bgDark: "#451A03", accent: "#D97706", skin: "#FDDCB5", hair: "#1C1008" },
+  { bg: "#EFF6FF", bgDark: "#1E3A5F", accent: "hsl(var(--chart-3))", skin: "#FDDCB5", hair: "#2D1B00" },
+  { bg: "#F5F3FF", bgDark: "#2E1B5F", accent: "hsl(var(--chart-4))", skin: "#FDDCB5", hair: "#1A0A2E" },
+  { bg: "#FFFBEB", bgDark: "#451A03", accent: "hsl(var(--chart-1))", skin: "#FDDCB5", hair: "#1C1008" },
 ] as const;
 
 const MOUTH_PATHS: Record<AvatarState, string> = {
@@ -48,6 +48,8 @@ export function WendyAvatar({ state, phase, reduced = false, className, size = 1
 
   return (
     <motion.div
+      data-testid="wendy-avatar"
+      data-state={state}
       className={cn("relative flex items-center justify-center rounded-2xl overflow-hidden", className)}
       style={{ width: size, height: size, background: p.bg }}
       animate={reduced ? {} : { rotate: [0, tilt, 0] }}
@@ -92,8 +94,8 @@ export function WendyAvatar({ state, phase, reduced = false, className, size = 1
           animate={reduced ? {} : { cx: state === "curious" ? 59 : 58 }}
           transition={{ duration: 0.4 }}
         />
-        <circle cx="42" cy="48" r="1.4" fill="#111" />
-        <circle cx="58" cy="48" r="1.4" fill="#111" />
+        <circle cx="42" cy="48" r="1.4" fill="hsl(var(--foreground))" />
+        <circle cx="58" cy="48" r="1.4" fill="hsl(var(--foreground))" />
         <circle cx="43.5" cy="46.5" r="0.8" fill="white" opacity="0.9" />
         <circle cx="59.5" cy="46.5" r="0.8" fill="white" opacity="0.9" />
         <path d="M37 44 Q38 42 40 43" stroke={p.hair} strokeWidth="1" strokeLinecap="round" />

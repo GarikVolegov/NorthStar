@@ -54,8 +54,8 @@ export function ShareProfileButton({
       <button
         onClick={() => setOpen((v) => !v)}
         style={{
-          background: "linear-gradient(135deg, #F5C842 0%, #E8A800 100%)",
-          color: "#0A1628",
+          background: "linear-gradient(135deg, hsl(var(--primary)) 0%, var(--brand) 100%)",
+          color: "hsl(var(--card))",
           border: "none",
           borderRadius: "10px",
           padding: "12px 24px",
@@ -63,7 +63,7 @@ export function ShareProfileButton({
           fontWeight: "700",
           cursor: "pointer",
           letterSpacing: "0.3px",
-          boxShadow: "0 4px 16px rgba(245,200,66,0.35)",
+          boxShadow: "0 4px 16px hsl(var(--primary) / 0.35)",
           transition: "transform 0.15s, box-shadow 0.15s",
         }}
         onMouseEnter={(e) => { (e.currentTarget.style.transform = "translateY(-1px)"); }}
@@ -80,8 +80,8 @@ export function ShareProfileButton({
             top: "calc(100% + 12px)",
             left: "50%",
             transform: "translateX(-50%)",
-            background: "#0D1F3C",
-            border: "1px solid #1E3A5F",
+            background: "hsl(var(--card))",
+            border: "1px solid hsl(var(--muted))",
             borderRadius: "16px",
             padding: "24px",
             width: "360px",
@@ -98,7 +98,7 @@ export function ShareProfileButton({
               right: "14px",
               background: "transparent",
               border: "none",
-              color: "#8BA3CC",
+              color: "hsl(var(--muted-foreground))",
               fontSize: "20px",
               cursor: "pointer",
               lineHeight: 1,
@@ -107,7 +107,7 @@ export function ShareProfileButton({
             ×
           </button>
 
-          <p style={{ margin: "0 0 14px", color: "#C5D8F0", fontWeight: 700, fontSize: "16px" }}>
+          <p style={{ margin: "0 0 14px", color: "hsl(var(--foreground))", fontWeight: 700, fontSize: "16px" }}>
             Condividi il tuo profilo
           </p>
 
@@ -115,25 +115,25 @@ export function ShareProfileButton({
           {!publicReady && (
             <div
               style={{
-                background: "#0A1628",
-                border: "1px solid #F5C842",
+                background: "hsl(var(--background))",
+                border: "1px solid hsl(var(--primary))",
                 borderRadius: "10px",
                 padding: "12px 14px",
                 marginBottom: "16px",
               }}
             >
-              <p style={{ margin: "0 0 10px", color: "#F5C842", fontSize: "13px", fontWeight: 600 }}>
+              <p style={{ margin: "0 0 10px", color: "hsl(var(--primary))", fontSize: "13px", fontWeight: 600 }}>
                 ⚠️ Il tuo profilo è privato
               </p>
-              <p style={{ margin: "0 0 12px", color: "#8BA3CC", fontSize: "12px" }}>
+              <p style={{ margin: "0 0 12px", color: "hsl(var(--muted-foreground))", fontSize: "12px" }}>
                 Per condividere la card, rendilo pubblico prima.
               </p>
               <button
                 onClick={handleMakePublic}
                 disabled={making}
                 style={{
-                  background: "linear-gradient(135deg, #F5C842 0%, #E8A800 100%)",
-                  color: "#0A1628",
+                  background: "linear-gradient(135deg, hsl(var(--primary)) 0%, var(--brand) 100%)",
+                  color: "hsl(var(--card))",
                   border: "none",
                   borderRadius: "8px",
                   padding: "8px 18px",
@@ -150,7 +150,7 @@ export function ShareProfileButton({
 
           {/* Live preview */}
           {publicReady && (
-            <div style={{ marginBottom: "16px", borderRadius: "10px", overflow: "hidden", border: "1px solid #1E3A5F" }}>
+            <div style={{ marginBottom: "16px", borderRadius: "10px", overflow: "hidden", border: "1px solid hsl(var(--muted))" }}>
               <img
                 src={ogImageUrl}
                 alt={`Profilo di ${userName}`}
@@ -193,11 +193,11 @@ export function ShareProfileButton({
             onClick={handleCopy}
             style={{
               width: "100%",
-              background: copied ? "#0D2A14" : "#0A1628",
-              border: `1px solid ${copied ? "#25D366" : "#1E3A5F"}`,
+              background: copied ? "hsl(var(--chart-2) / 0.1)" : "hsl(var(--background))",
+              border: `1px solid ${copied ? "hsl(var(--chart-2))" : "hsl(var(--muted))"}`,
               borderRadius: "8px",
               padding: "10px",
-              color: copied ? "#25D366" : "#8BA3CC",
+              color: copied ? "hsl(var(--chart-2))" : "hsl(var(--muted-foreground))",
               fontSize: "13px",
               cursor: "pointer",
               transition: "all 0.2s",

@@ -19,11 +19,11 @@ const SPIRIT_LABELS: Record<string, string> = {
 };
 
 const SPIRIT_COLORS: Record<string, string> = {
-  shen: "hsl(43, 44%, 57%)",
-  hun: "hsl(152, 26%, 62%)",
-  po: "hsl(210, 55%, 58%)",
-  yi: "hsl(268, 38%, 60%)",
-  zhi: "hsl(4, 52%, 56%)",
+  shen: "hsl(var(--chart-1))",
+  hun: "hsl(var(--chart-2))",
+  po: "hsl(var(--chart-3))",
+  yi: "hsl(var(--chart-4))",
+  zhi: "hsl(var(--chart-5))",
 };
 
 export function DashboardPersonality({
@@ -46,7 +46,7 @@ export function DashboardPersonality({
     ? Object.entries(spiritScores).map(([k, v]) => ({
         name: SPIRIT_LABELS[k] ?? k,
         valore: Math.round((v ?? 0) * 100),
-        fill: SPIRIT_COLORS[k] ?? "hsl(43, 44%, 57%)",
+        fill: SPIRIT_COLORS[k] ?? "hsl(var(--chart-1))",
       }))
     : [];
 

@@ -27,12 +27,12 @@ function ScoreArc({ score }: { score: number }) {
   const r = 44;
   const circ = 2 * Math.PI * r;
   const dash = (score / 100) * circ;
-  const color = score >= 85 ? "#4ade80" : score >= 65 ? "#4ade80" : score >= 45 ? "#fbbf24" : score >= 25 ? "#fb923c" : "#94a3b8";
+  const color = score >= 85 ? "hsl(var(--chart-2))" : score >= 65 ? "hsl(var(--chart-2))" : score >= 45 ? "hsl(var(--chart-1))" : score >= 25 ? "hsl(var(--chart-5) / 0.7)" : "hsl(var(--muted-foreground))";
 
   return (
     <div className="relative w-28 h-28 flex items-center justify-center">
       <svg className="absolute inset-0 -rotate-90" width="112" height="112">
-        <circle cx="56" cy="56" r={r} stroke="#ffffff0d" strokeWidth="7" fill="none" />
+        <circle cx="56" cy="56" r={r} stroke="hsl(var(--foreground) / 0.05)" strokeWidth="7" fill="none" />
         <circle
           cx="56" cy="56" r={r}
           stroke={color} strokeWidth="7" fill="none"

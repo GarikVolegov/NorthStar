@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw, Users, Crown, TrendingUp, BarChart3, FlaskConical, Loader2 } from "lucide-react";
+import { RefreshCw, Users, Crown, TrendingUp, BarChart3, FlaskConical, Loader2, Brain, MessageSquare, GitBranch } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell,
@@ -18,6 +18,15 @@ interface Metrics {
   topSectors: Array<{ sectorId: number; name: string; count: number }>;
   dailySignups: Array<{ day: string; count: number }>;
   revenue: { mrr: number; total: number; currency: string } | null;
+  generatedAt: string;
+}
+
+interface WendyMetrics {
+  volumeByDomain: Record<string, number>;
+  totalRequests: number;
+  totalRewrites: number;
+  rewriteRate: number;
+  latencyByPhase: Record<string, { sum: number; count: number }>;
   generatedAt: string;
 }
 
@@ -40,6 +49,7 @@ export default function AdminMetriche() {
   const [adminKey, setAdminKey] = useState(() => localStorage.getItem("northstar_admin_key") ?? "");
   const [keyInput, setKeyInput] = useState("");
   const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [wendyMetrics, setWendyMetrics] = useState<WendyMetrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
@@ -48,13 +58,18 @@ export default function AdminMetriche() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${BASE}api/admin/metrics`, {
-        headers: { "x-admin-key": key },
-      });
-      if (res.status === 401) { setError("Chiave admin non valida."); return; }
-      if (!res.ok) throw new Error("Errore server");
-      const data = await res.json();
-      setMetrics(data);
+      const [metricsRes, wendyRes] = await Promise.all([
+        fetch(`${BASE}api/admin/metrics`, { headers: { "x-admin-key": key } }),
+        fetch(`${BASE}api/admin/wendy-metrics`, { headers: { "x-admin-key": key } }),
+      ]);
+      if (metricsRes.status === 401) { setError("Chiave admin non valida."); return; }
+      if (!metricsRes.ok) throw new Error("Errore server");
+      const metricsData = await metricsRes.json();
+      setMetrics(metricsData);
+      if (wendyRes.ok) {
+        const wendyData = await wendyRes.json();
+        setWendyMetrics(wendyData);
+      }
       setLastRefresh(new Date());
     } catch (e) {
       setError("Impossibile caricare le metriche.");
@@ -195,7 +210,7 @@ export default function AdminMetriche() {
                       <Tooltip formatter={(v: number) => [v, "Scelte"]} />
                       <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                         {metrics.topSectors.map((_, i) => (
-                          <Cell key={i} fill={`hsl(${220 + i * 20}, 70%, ${55 + i * 3}%)`} />
+                          <Cell key={i} fill={`hsl(var(--chart-${(i % 5) + 1}))`} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -205,6 +220,98 @@ export default function AdminMetriche() {
             )}
           </>
         ) : null}
+
+        {/* ── Wendy AI Metrics ─────────────────────────────────────────────── */}
+        {wendyMetrics && (
+          <section className="space-y-4">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <Brain className="w-5 h-5" />
+              Wendy AI — Metriche
+            </h2>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <KpiCard
+                label="Richieste Totali"
+                value={wendyMetrics.totalRequests.toLocaleString("it-IT")}
+                icon={<MessageSquare className="w-4 h-4" />}
+              />
+              <KpiCard
+                label="Rewrite Rate"
+                value={`${(wendyMetrics.rewriteRate * 100).toFixed(1)}%`}
+                sub={`${wendyMetrics.totalRewrites} rewrites su ${wendyMetrics.totalRequests} richieste`}
+                icon={<GitBranch className="w-4 h-4" />}
+              />
+              {Object.entries(wendyMetrics.latencyByPhase ?? {}).slice(0, 2).map(([phase, data]) => (
+                <KpiCard
+                  key={phase}
+                  label={`Tempo medio — ${phase}`}
+                  value={`${data.count > 0 ? ((data.sum / data.count) * 1000).toFixed(0) : "—"}ms`}
+                  sub={`${data.count} campioni`}
+                  icon={<BarChart3 className="w-4 h-4" />}
+                />
+              ))}
+            </div>
+
+            {/* Volume per domain */}
+            {Object.keys(wendyMetrics.volumeByDomain ?? {}).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Volume per Dominio</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart
+                      data={Object.entries(wendyMetrics.volumeByDomain).map(([domain, count]) => ({
+                        domain,
+                        count,
+                      }))}
+                      layout="vertical"
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <YAxis type="category" dataKey="domain" tick={{ fontSize: 11 }} width={100} />
+                      <Tooltip formatter={(v: number) => [v, "Richieste"]} />
+                      <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                        {Object.keys(wendyMetrics.volumeByDomain).map((_, i) => (
+                          <Cell key={i} fill={`hsl(${140 + i * 30}, 60%, ${50 + i * 5}%)`} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Latency per phase */}
+            {Object.keys(wendyMetrics.latencyByPhase ?? {}).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Tempi Medi per Fase (ms)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart
+                      data={Object.entries(wendyMetrics.latencyByPhase).map(([phase, data]) => ({
+                        phase,
+                        avgMs: data.count > 0 ? Math.round((data.sum / data.count) * 1000) : 0,
+                      }))}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="phase" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} unit="ms" />
+                      <Tooltip formatter={(v: number) => [`${v}ms`, "Media"]} />
+                      <Bar dataKey="avgMs" radius={[4, 4, 0, 0]}>
+                        {Object.keys(wendyMetrics.latencyByPhase).map((_, i) => (
+                          <Cell key={i} fill={`hsl(${260 + i * 40}, 65%, ${55 + i * 5}%)`} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+          </section>
+        )}
       </div>
     </div>
   );

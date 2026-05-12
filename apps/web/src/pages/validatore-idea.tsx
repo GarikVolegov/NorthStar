@@ -76,14 +76,14 @@ interface BusinessIdea {
 function ScoreRing({ score }: { score: number }) {
   const pct = (score / 10) * 100;
   const color = score >= 7 ? "text-emerald-400" : score >= 5 ? "text-amber-400" : "text-rose-400";
-  const strokeColor = score >= 7 ? "#34d399" : score >= 5 ? "#fbbf24" : "#f87171";
+  const strokeColor = score >= 7 ? "hsl(var(--chart-2))" : score >= 5 ? "hsl(var(--chart-1))" : "hsl(var(--chart-5))";
   const r = 28;
   const circ = 2 * Math.PI * r;
   const dash = (pct / 100) * circ;
   return (
     <div className="relative w-20 h-20 flex items-center justify-center">
       <svg className="absolute inset-0 -rotate-90" width="80" height="80">
-        <circle cx="40" cy="40" r={r} stroke="#ffffff10" strokeWidth="5" fill="none" />
+        <circle cx="40" cy="40" r={r} stroke="hsl(var(--foreground) / 0.05)" strokeWidth="5" fill="none" />
         <circle
           cx="40" cy="40" r={r}
           stroke={strokeColor} strokeWidth="5" fill="none"

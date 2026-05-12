@@ -54,8 +54,8 @@ interface RiasecScores {
 }
 
 const RIASEC_COLORS: Record<keyof RiasecScores, string> = {
-  R: '#f97316', I: '#6366f1', A: '#ec4899',
-  S: '#22c55e', E: '#f59e0b', C: '#06b6d4',
+  R: 'hsl(var(--chart-1))', I: 'hsl(var(--chart-4))', A: '#ec4899',
+  S: 'hsl(var(--chart-2))', E: 'hsl(var(--chart-1))', C: 'hsl(var(--chart-3))',
 };
 const RIASEC_LABELS: Record<keyof RiasecScores, string> = {
   R: 'Realistico', I: 'Investigativo', A: 'Artistico',

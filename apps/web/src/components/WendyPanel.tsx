@@ -33,6 +33,7 @@ export function WendyPanel() {
       />
       <div
         ref={panelRef}
+        data-testid="wendy-panel"
         className={`fixed z-50 flex flex-col bg-white/95 dark:bg-gray-950/95 shadow-2xl transition-all duration-300
           md:right-4 md:top-4 md:bottom-4 md:w-[420px] md:max-w-[90vw] md:rounded-2xl md:border md:border-gray-200 md:dark:border-gray-800
           inset-x-0 bottom-0 top-0 rounded-t-2xl md:rounded-t-2xl
@@ -59,6 +60,7 @@ export function WendyPanel() {
           </div>
           <button
             onClick={close}
+            data-testid="wendy-close-btn"
             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
             aria-label="Chiudi"
           >

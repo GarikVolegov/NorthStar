@@ -199,11 +199,11 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
     [0, 1], [0, 2], [1, 2],
   ].filter(([a, b]) => a < cols.length && b < cols.length);
 
-  const ACCENT = ["hsl(var(--primary))", "#7c3aed", "#0891b2"];
+  const ACCENT = ["hsl(var(--primary))", "hsl(var(--chart-4))", "hsl(var(--chart-3))"];
   const ACCENT_CLS = [
     "bg-primary/10 text-primary border-primary/20",
-    "bg-violet-500/10 text-violet-400 border-violet-500/20",
-    "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+    "bg-[hsl(var(--chart-4)/0.1)] text-[hsl(var(--chart-4))] border-[hsl(var(--chart-4)/0.2)]",
+    "bg-[hsl(var(--chart-3)/0.1)] text-[hsl(var(--chart-3))] border-[hsl(var(--chart-3)/0.2)]",
   ];
 
   function Cell({ val, isWinner, className }: { val: string; isWinner: boolean; className?: string }) {
@@ -651,7 +651,7 @@ export default function Results() {
                                 "bg-rose-500/10 text-rose-400 border-rose-500/20"
                               )}>
                                 <span className="inline-block w-1.5 h-1.5 rounded-full mr-0.5" style={{
-                                  backgroundColor: heroAlignment.type === "aligned" ? "rgb(16 185 129)" : heroAlignment.type === "partial" ? "rgb(217 119 6)" : "rgb(220 38 38)"
+                                  backgroundColor: heroAlignment.type === "aligned" ? "hsl(var(--chart-2))" : heroAlignment.type === "partial" ? "hsl(var(--chart-1))" : "hsl(var(--chart-5))"
                                 }} />
                                 {heroAlignment.type === "aligned" ? t("results.alignment.aligned") :
                                  heroAlignment.type === "partial" ? t("results.alignment.partial") :
@@ -765,7 +765,7 @@ export default function Results() {
                                   "bg-rose-500/10 text-rose-400 border-rose-500/20"
                                 )}>
                                   <span className="inline-block w-1.5 h-1.5 rounded-full" style={{
-                                    backgroundColor: alignment.type === "aligned" ? "rgb(16 185 129)" : alignment.type === "partial" ? "rgb(217 119 6)" : "rgb(220 38 38)"
+                                    backgroundColor: alignment.type === "aligned" ? "hsl(var(--chart-2))" : alignment.type === "partial" ? "hsl(var(--chart-1))" : "hsl(var(--chart-5))"
                                   }} />
                                   {alignment.type === "aligned" ? t("results.alignment.aligned") :
                                    alignment.type === "partial" ? t("results.alignment.partial") :

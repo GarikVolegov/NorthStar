@@ -32,6 +32,7 @@ export function WendyThinkingIndicator({ thinking, className = '' }: WendyThinki
 
   return (
     <div
+      data-testid="wendy-thinking"
       role="status"
       aria-live="polite"
       aria-label={thinking.label}
