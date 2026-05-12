@@ -5,12 +5,14 @@
  *  - Exponential backoff reconnection (up to MAX_DELAY_MS)
  *  - Automatic ping every PING_INTERVAL_MS to keep the connection alive
  *  - Typed event dispatch via onMessage callback
+ *  - Auth via first message (no token in URL)
  *  - Cleans up on unmount
  *
  * Usage:
  *
  *   const { send, readyState } = useWebSocket({
- *     url: `wss://api.example.com/ws?token=${jwt}`,
+ *     url: `wss://api.example.com/ws`,
+ *     authToken: jwt,
  *     onMessage: (event) => console.log(event),
  *   });
  */
@@ -20,8 +22,10 @@ import { useEffect, useRef, useCallback, useState } from "react";
 export type WsReadyState = "connecting" | "open" | "closing" | "closed";
 
 export interface UseWebSocketOptions<TEvent = unknown> {
-  /** Full WebSocket URL, including auth token in query string. */
+  /** Full WebSocket URL (without auth token in query string). */
   url: string | null;
+  /** JWT sent as first message for authentication (never in URL). */
+  authToken?: string | null;
   /** Called with every parsed JSON message from the server. */
   onMessage?: (event: TEvent) => void;
   /** Called when the socket opens. */
@@ -40,6 +44,7 @@ const PING_INTERVAL_MS = 25_000;
 
 export function useWebSocket<TEvent = unknown>({
   url,
+  authToken,
   onMessage,
   onOpen,
   onClose,
@@ -53,15 +58,17 @@ export function useWebSocket<TEvent = unknown>({
   const isMountedRef = useRef(true);
   const [readyState, setReadyState] = useState<WsReadyState>("closed");
 
-  // Keep callbacks in refs so reconnect closure always has latest version
+  // Keep callbacks/values in refs so reconnect closure always has latest version
   const onMessageRef = useRef(onMessage);
   const onOpenRef = useRef(onOpen);
   const onCloseRef = useRef(onClose);
   const onErrorRef = useRef(onError);
+  const authTokenRef = useRef(authToken);
   useEffect(() => { onMessageRef.current = onMessage; }, [onMessage]);
   useEffect(() => { onOpenRef.current = onOpen; }, [onOpen]);
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
   useEffect(() => { onErrorRef.current = onError; }, [onError]);
+  useEffect(() => { authTokenRef.current = authToken; }, [authToken]);
 
   const clearPing = useCallback(() => {
     if (pingTimerRef.current) {
@@ -90,6 +97,10 @@ export function useWebSocket<TEvent = unknown>({
       if (!isMountedRef.current) { ws.close(); return; }
       retryCountRef.current = 0;
       setReadyState("open");
+      const token = authTokenRef.current;
+      if (token) {
+        ws.send(JSON.stringify({ type: "auth", token }));
+      }
       startPing(ws);
       onOpenRef.current?.();
     };
@@ -97,8 +108,8 @@ export function useWebSocket<TEvent = unknown>({
     ws.onmessage = (ev) => {
       try {
         const data = JSON.parse(ev.data as string) as TEvent;
-        // Suppress pong from triggering app logic
-        if ((data as Record<string, unknown>)["type"] === "pong") return;
+        const msg = data as Record<string, unknown>;
+        if (msg["type"] === "pong" || msg["type"] === "auth_ok") return;
         onMessageRef.current?.(data);
       } catch {
         // Ignore non-JSON frames

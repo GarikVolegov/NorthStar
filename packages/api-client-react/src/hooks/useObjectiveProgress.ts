@@ -44,16 +44,14 @@ export function useObjectiveProgress({
     setObjectives(initialObjectives);
   }, [initialObjectives]);
 
-  const wsUrl = jwt
-    ? (() => {
-        const base =
-          wsBaseUrl ??
-          (typeof window !== "undefined"
-            ? `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`
-            : "");
-        return `${base}/ws?token=${encodeURIComponent(jwt)}`;
-      })()
-    : null;
+  const wsUrl = (() => {
+    const base =
+      wsBaseUrl ??
+      (typeof window !== "undefined"
+        ? `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`
+        : "");
+    return base ? `${base}/ws` : null;
+  })();
 
   const handleMessage = useCallback((event: ServerWsEvent) => {
     if (event.type !== "objective:progress") return;
@@ -72,7 +70,7 @@ export function useObjectiveProgress({
     );
   }, []);
 
-  useWebSocket<ServerWsEvent>({ url: wsUrl, onMessage: handleMessage });
+  useWebSocket<ServerWsEvent>({ url: jwt ? wsUrl : null, authToken: jwt, onMessage: handleMessage });
 
   return { objectives };
 }

@@ -71,7 +71,7 @@ export function WendyMessageFeedback({
               onClick={() => handleVote('up')}
               style={{
                 ...styles.btn,
-                ...(currentFeedback === 'up' ? styles.btnActive : {}),
+                ...(false ? styles.btnActive : {}),
               }}
             >
               👍

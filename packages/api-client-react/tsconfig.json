@@ -6,7 +6,8 @@
     "emitDeclarationOnly": true,
     "outDir": "dist",
     "rootDir": "src",
+    "jsx": "react-jsx",
     "lib": ["dom", "es2022"]
   },
-  "include": ["src"]
+  "include": ["src/generated", "src/custom-fetch.ts", "src/index.ts"]
 }

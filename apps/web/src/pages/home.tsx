@@ -815,11 +815,9 @@ export default function Home() {
   useEffect(() => {
     if (!isLoggedIn || !user || isLatestLoading) return;
     const done = localStorage.getItem(ONBOARDING_KEY);
-    if (!done) {
-      // Small delay so the page renders first
-      const t = setTimeout(() => setShowOnboarding(true), 600);
-      return () => clearTimeout(t);
-    }
+    if (done) return;
+    const t = setTimeout(() => setShowOnboarding(true), 600);
+    return () => clearTimeout(t);
   }, [isLoggedIn, user, isLatestLoading]);
 
   if (isLoggedIn && user && isLatestLoading) {

@@ -39,6 +39,17 @@ export interface AuthUser {
   isAffiliate?: boolean;
 }
 
+/** Dati minimi salvati in localStorage per UI pre-mount. */
+interface UserCache {
+  id: number;
+  name: string;
+  avatarUrl?: string | null;
+}
+
+function cacheUser(u: AuthUser): UserCache {
+  return { id: u.id, name: u.name, avatarUrl: u.avatarUrl };
+}
+
 interface AuthContextValue {
   user: AuthUser | null;
   login: (user: AuthUser, token: string) => void;
@@ -61,8 +72,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const [user, setUser] = useState<AuthUser | null>(() => {
     try {
-      const raw = localStorage.getItem(USER_STORAGE_KEY);
-      return raw ? (JSON.parse(raw) as AuthUser) : null;
+      const raw = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+      // If no token in sessionStorage, don't restore user — require fresh auth
+      if (!raw) return null;
+      const cached = localStorage.getItem(USER_STORAGE_KEY);
+      if (!cached) return null;
+      const parsed = JSON.parse(cached) as UserCache;
+      // Partial user — full data fetched via /api/auth/me on mount
+      return { id: parsed.id, name: parsed.name, avatarUrl: parsed.avatarUrl ?? null } as AuthUser;
     } catch {
       return null;
     }
@@ -70,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const [token, setToken] = useState<string | null>(() => {
     try {
-      return localStorage.getItem(TOKEN_STORAGE_KEY);
+      return sessionStorage.getItem(TOKEN_STORAGE_KEY);
     } catch {
       return null;
     }
@@ -89,19 +106,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!prev) return prev;
       const next = { ...prev, ...updates };
       try {
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(next));
-      } catch { /* storage full or private mode */ }
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(cacheUser(next)));
+      } catch {}
       return next;
     });
   }, []);
 
   useEffect(() => {
     if (user && token) {
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(cacheUser(user)));
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
     } else {
       localStorage.removeItem(USER_STORAGE_KEY);
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
     }
     setAuthTokenGetter(token ? () => token : null);
   }, [user, token]);
@@ -130,7 +147,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
       .then(async (res) => {
         if (res.ok) {
-          // fresh include isAffiliate dal DB aggiornato
           const fresh = (await res.json()) as AuthUser;
           setUser((prev) => (prev ? { ...prev, ...fresh } : fresh));
         } else if (res.status === 401) {
@@ -151,9 +167,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     (u: AuthUser, t: string) => {
       try {
-        localStorage.setItem(TOKEN_STORAGE_KEY, t);
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(u));
-      } catch { /* ignore */ }
+        sessionStorage.setItem(TOKEN_STORAGE_KEY, t);
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(cacheUser(u)));
+      } catch {}
 
       setAuthTokenGetter(() => t);
       setUser(u);

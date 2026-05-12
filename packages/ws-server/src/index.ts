@@ -7,8 +7,13 @@
  *   const httpServer = app.listen(PORT);
  *   const wss = createWsServer(httpServer);
  *
- * Clients connect to  ws(s)://host/ws  with a JWT in the
- * query string:  ?token=<jwt>
+ * Clients connect to  ws(s)://host/ws  without a token in the URL.
+ * Authentication is performed via the first message:
+ *
+ *   { "type": "auth", "token": "<jwt>" }
+ *
+ * The server verifies the JWT signature via jsonwebtoken.
+ * See JWT_SECRET env var.
  *
  * After authentication, each user gets a private channel stored in
  * activeConnections. Other parts of the server push events by calling:
@@ -18,33 +23,27 @@
 
 import { IncomingMessage, Server } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
+import { verify, type JwtPayload } from "jsonwebtoken";
 import { ServerWsEvent, ClientWsEvent } from "@workspace/api-zod/ws-events";
 
 // ─── JWT verification ─────────────────────────────────────────────────────
-// We keep a lightweight inline verifier to avoid forcing a specific JWT
-// library on the server package. Replace with your actual jwt.verify call.
+
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.warn("[ws] JWT_SECRET is not set — WebSocket authentication is disabled.");
+}
 
 function extractUserIdFromToken(token: string): number | null {
+  if (!JWT_SECRET) return null;
   try {
-    // Standard JWT: header.payload.signature (base64url)
-    const [, payloadB64] = token.split(".");
-    if (!payloadB64) return null;
-    const json = Buffer.from(payloadB64, "base64url").toString("utf8");
-    const payload = JSON.parse(json) as { sub?: string | number; userId?: number };
-    const raw = payload.userId ?? payload.sub;
-    const id = typeof raw === "string" ? parseInt(raw, 10) : raw;
-    return id && !isNaN(id) ? id : null;
+    const payload = verify(token, JWT_SECRET) as JwtPayload & { userId?: number };
+    return payload.userId ?? null;
   } catch {
     return null;
   }
 }
 
 function getTokenFromRequest(req: IncomingMessage): string | null {
-  const url = new URL(req.url ?? "/", "http://localhost");
-  // Priority 1: query string  ?token=<jwt>
-  const qToken = url.searchParams.get("token");
-  if (qToken) return qToken;
-  // Priority 2: Authorization: Bearer <jwt>
   const auth = req.headers["authorization"];
   if (auth?.startsWith("Bearer ")) return auth.slice(7);
   return null;
@@ -52,8 +51,8 @@ function getTokenFromRequest(req: IncomingMessage): string | null {
 
 // ─── Connection registry ──────────────────────────────────────────────────
 
-// One userId → Set of sockets (same user, multiple tabs)
 const activeConnections = new Map<number, Set<WebSocket>>();
+const pendingAuth = new Set<WebSocket>();
 
 function addConnection(userId: number, ws: WebSocket): void {
   if (!activeConnections.has(userId)) {
@@ -72,13 +71,9 @@ function removeConnection(userId: number, ws: WebSocket): void {
 // ─── Public API ───────────────────────────────────────────────────────────
 
 export interface NorthStarWss {
-  /** Send a typed event to all open sockets of a given user. */
   emit(userId: number, event: ServerWsEvent): void;
-  /** Returns true if the user has at least one active connection. */
   isOnline(userId: number): boolean;
-  /** Total number of active connections (for metrics). */
   connectionCount(): number;
-  /** Underlying ws WebSocketServer (for advanced use). */
   raw: WebSocketServer;
 }
 
@@ -89,8 +84,10 @@ export function createWsServer(httpServer: Server): NorthStarWss {
   const HEARTBEAT_INTERVAL = 30_000;
   const heartbeat = setInterval(() => {
     wss.clients.forEach((ws) => {
-      const annotated = ws as WebSocket & { _alive?: boolean };
+      const annotated = ws as WebSocket & { _alive?: boolean; _userId?: number };
       if (annotated._alive === false) {
+        if (annotated._userId) removeConnection(annotated._userId, ws);
+        pendingAuth.delete(ws);
         ws.terminate();
         return;
       }
@@ -103,24 +100,76 @@ export function createWsServer(httpServer: Server): NorthStarWss {
 
   // ── New connection ───────────────────────────────────────────────────────
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
-    const token = getTokenFromRequest(req);
-    const userId = token ? extractUserIdFromToken(token) : null;
-
-    if (!userId) {
-      ws.close(4001, "Unauthorized: invalid or missing token");
+    // Check Authorization header first (server-side clients)
+    const headerToken = getTokenFromRequest(req);
+    if (headerToken) {
+      const userId = extractUserIdFromToken(headerToken);
+      if (!userId) {
+        ws.close(4001, "Unauthorized: invalid token");
+        return;
+      }
+      const annotated = ws as WebSocket & { _alive?: boolean; _userId?: number };
+      annotated._alive = true;
+      annotated._userId = userId;
+      addConnection(userId, ws);
+      ws.send(JSON.stringify({ type: "pong" }));
+      setupMessageHandler(ws, userId);
       return;
     }
 
+    // Browser clients: wait for auth message
+    pendingAuth.add(ws);
     const annotated = ws as WebSocket & { _alive?: boolean; _userId?: number };
     annotated._alive = true;
-    annotated._userId = userId;
 
-    addConnection(userId, ws);
+    let authenticated = false;
 
-    // Send initial pong to confirm handshake
-    ws.send(JSON.stringify({ type: "pong" }));
+    ws.on("message", function onFirstMessage(data: Buffer) {
+      try {
+        const raw = JSON.parse(data.toString()) as Record<string, unknown>;
+        if (raw?.type === "auth" && typeof raw?.token === "string") {
+          const userId = extractUserIdFromToken(raw.token);
+          if (!userId) {
+            ws.close(4001, "Unauthorized: invalid token");
+            return;
+          }
+          authenticated = true;
+          annotated._userId = userId;
+          pendingAuth.delete(ws);
+          addConnection(userId, ws);
+          ws.send(JSON.stringify({ type: "auth_ok" }));
+          ws.removeListener("message", onFirstMessage);
+          setupMessageHandler(ws, userId);
+        } else {
+          ws.close(4001, "Unauthorized: send auth first");
+        }
+      } catch {
+        ws.close(4001, "Unauthorized: invalid message");
+      }
+    });
 
-    // ── Incoming messages from client ──────────────────────────────────────
+    // Timeout: if no auth within 10s, close
+    const authTimeout = setTimeout(() => {
+      if (!authenticated) {
+        pendingAuth.delete(ws);
+        ws.close(4001, "Unauthorized: auth timeout");
+      }
+    }, 10_000);
+
+    ws.once("close", () => {
+      clearTimeout(authTimeout);
+      pendingAuth.delete(ws);
+      if (annotated._userId) removeConnection(annotated._userId, ws);
+    });
+
+    ws.on("error", () => {
+      clearTimeout(authTimeout);
+      pendingAuth.delete(ws);
+      if (annotated._userId) removeConnection(annotated._userId, ws);
+    });
+  });
+
+  function setupMessageHandler(ws: WebSocket, userId: number) {
     ws.on("message", (data) => {
       try {
         const raw = JSON.parse(data.toString()) as unknown;
@@ -135,6 +184,7 @@ export function createWsServer(httpServer: Server): NorthStarWss {
     });
 
     ws.on("pong", () => {
+      const annotated = ws as WebSocket & { _alive?: boolean };
       annotated._alive = true;
     });
 
@@ -142,11 +192,10 @@ export function createWsServer(httpServer: Server): NorthStarWss {
       removeConnection(userId, ws);
     });
 
-    ws.on("error", (err) => {
-      console.error(`[ws] socket error for userId=${userId}:`, err.message);
+    ws.on("error", () => {
       removeConnection(userId, ws);
     });
-  });
+  }
 
   // ── NorthStarWss implementation ──────────────────────────────────────────
   return {
@@ -178,5 +227,4 @@ export function createWsServer(httpServer: Server): NorthStarWss {
   };
 }
 
-// Re-export event types for convenience
 export type { ServerWsEvent, ClientWsEvent } from "@workspace/api-zod/ws-events";

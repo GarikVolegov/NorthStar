@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useReducedMotion, easings } from "@/lib/motion";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "@/lib/api-fetch";
-import { WendyAvatar } from "@/components/wendy-avatar";
+import { WendyAvatar, type AvatarState } from "@/components/wendy-avatar";
 import { SCENARIOS } from "@/lib/test-scenarios";
 import { speak, stopSpeech, startAmbientPad, stopAmbientPad, setMuted, isMuted } from "@/lib/wendy-voice";
 
@@ -485,7 +485,7 @@ function WelcomeScreen({ userName, reduced, muted, onStart, speechText, speechCh
 // ── WendyMobileStrip ────────────────────────────────────────────────────────
 interface WendyMobileStripProps {
   phase: 0 | 1 | 2;
-  avatarState: string;
+  avatarState: AvatarState;
   reduced: boolean;
   avatarIntro: string | undefined;
   captionActive: boolean;
@@ -572,8 +572,10 @@ export default function Test() {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>(() => {
     const jt = user?.journeyType;
-    if (!jt || !JOURNEY_CTX1_DEFAULTS[jt]) return {};
-    return { ctx_1: JOURNEY_CTX1_DEFAULTS[jt] };
+    if (!jt) return {} as Record<string, number>;
+    const val = JOURNEY_CTX1_DEFAULTS[jt];
+    if (val === undefined) return {} as Record<string, number>;
+    return { ctx_1: val } as Record<string, number>;
   });
   const [direction, setDirection] = useState<1 | -1>(1);
   const [justSelected, setJustSelected] = useState<string | null>(null);

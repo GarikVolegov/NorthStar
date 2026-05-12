@@ -82,7 +82,7 @@ interface EdgeLabelEdit {
   screenY: number;
 }
 
-const TYPE_META: Record<NodeType, { label: string; color: string; bg: string; border: string; Icon: React.ComponentType<{ className?: string }> }> = {
+const TYPE_META: Record<NodeType, { label: string; color: string; bg: string; border: string; Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }> }> = {
   note:          { label: "Nota",          color: "#0891b2", bg: "#ecfeff", border: "#67e8f9", Icon: StickyNote },
   skill:         { label: "Competenza",    color: "#10b981", bg: "#ecfdf5", border: "#6ee7b7", Icon: Lightbulb },
   document:      { label: "Documento",     color: "#f59e0b", bg: "#fffbeb", border: "#fcd34d", Icon: FileText },
@@ -151,7 +151,7 @@ const MINI_H = 100;
 interface MinimapProps {
   nodes: KNode[];
   view: { x: number; y: number; k: number };
-  svgRef: React.RefObject<SVGSVGElement>;
+  svgRef: React.RefObject<SVGSVGElement | null>;
   onPan: (x: number, y: number) => void;
 }
 
@@ -382,7 +382,7 @@ export default function Archivio() {
   } | null>(null);
 
   const rafId = useRef<number | null>(null);
-  const pendingPositions = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pendingPositions = useRef<Map<number, { x: number; y: number }>>(new globalThis.Map());
   const flushTimer = useRef<number | null>(null);
 
   const [view, setView] = useState({ x: 0, y: 0, k: 1 });
@@ -491,7 +491,7 @@ export default function Archivio() {
     const map = pendingPositions.current;
     if (map.size === 0) return;
     const positions = Array.from(map.entries()).map(([id, p]) => ({ id, x: p.x, y: p.y }));
-    pendingPositions.current = new Map();
+    pendingPositions.current = new globalThis.Map();
     void apiFetch(`${BASE}api/knowledge/nodes/positions`, {
       method: "POST",
       body: JSON.stringify({ positions }),

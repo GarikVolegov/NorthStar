@@ -34,7 +34,7 @@ export const affiliateCommissionsTable = pgTable(
      *   locked       → ha riempito lockedBalance (verso i 29€)
      *   withdrawable → lockedBalance già pieno, va in withdrawableBalance
      */
-    appliedTo: text("applied_to", { enum: ["locked", "withdrawable", null as unknown as string] }),
+    appliedTo: text("applied_to", { enum: ["locked", "withdrawable"] }),
 
     status: text("status", { enum: ["pending", "applied", "void"] })
       .notNull()

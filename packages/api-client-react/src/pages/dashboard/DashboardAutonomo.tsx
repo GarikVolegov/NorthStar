@@ -101,7 +101,7 @@ const NEWS_MOCK: SectorNews[] = [
     url: '#',
     publishedAt: new Date(Date.now() - 3_600_000).toISOString(),
     tags: ['pricing', 'freelance', 'mercato'],
-    summary: 'Un'indagine rivela che il 62% dei lavoratori autonomi ha aumentato le tariffe di almeno il 15% rispetto all'anno scorso.',
+    summary: "Un'indagine rivela che il 62% dei lavoratori autonomi ha aumentato le tariffe di almeno il 15% rispetto all'anno scorso.",
   },
   {
     id: 2,
@@ -119,7 +119,7 @@ const NEWS_MOCK: SectorNews[] = [
     url: '#',
     publishedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
     tags: ['fisco', 'partita IVA', 'regime forfettario'],
-    summary: 'Le novità sull'aliquota e i nuovi limiti di reddito per restare nel regime agevolato.',
+    summary: "Le novità sull'aliquota e i nuovi limiti di reddito per restare nel regime agevolato.",
   },
   {
     id: 4,

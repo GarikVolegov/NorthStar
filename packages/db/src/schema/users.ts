@@ -10,6 +10,7 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { relations } from "drizzle-orm";
+import { voiceSessionsTable } from "./voiceSessions";
 
 export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -83,19 +84,11 @@ export const usersTable = pgTable("users", {
    * Impostata tramite CityAutocomplete su Nominatim (OpenStreetMap).
    * DEFAULT null: tutti gli utenti esistenti non hanno città.
    */
-  city:        text("city").default(null as unknown as string),
+  city:        text("city"),
 
-  /**
-   * Place ID Nominatim (osm_id + osm_type, es. "R365331").
-   * Permette ricerche future per prossimità senza geocoding ripetuto.
-   */
-  cityPlaceId: text("city_place_id").default(null as unknown as string),
+  cityPlaceId: text("city_place_id"),
 
-  /**
-   * Bio breve — max 300 char. Mostrata nel profilo pubblico e nelle card
-   * della sezione Esplora del network.
-   */
-  bio: text("bio").default(null as unknown as string),
+  bio: text("bio"),
 }, (t) => ({
   usernameIdx:        uniqueIndex("users_username_idx").on(t.username),
   referredByIdx:      index("users_referred_by_idx").on(t.referredByAffiliateId),
@@ -136,7 +129,7 @@ export type JobApplication = typeof jobApplicationsTable.$inferSelect;
 
 export const usersRelations = relations(usersTable, ({ many }) => ({
   jobApplications: many(jobApplicationsTable),
-  voiceSessions: many("voiceSessionsTable" as any),
+  voiceSessions: many(voiceSessionsTable),
 }));
 
 /** Produce "mario-rossi-42" da name="Mario Rossi", id=42 */

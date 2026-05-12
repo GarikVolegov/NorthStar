@@ -1,0 +1,307 @@
+<h1>🌟 NorthStar</h1>
+<blockquote>
+<p>Piattaforma SaaS di orientamento professionale con AI agent, test RIASEC, CV builder e sistema di affiliazione.</p>
+</blockquote>
+<hr>
+<h2>⚠️ Regola 0 — quale RULES leggere PRIMA di toccare codice</h2>
+<p>Prima di modificare qualsiasi area del progetto, apri <strong>sempre</strong> il file di regole specifico.</p>
+<table>
+<thead>
+<tr>
+<th>Area di lavoro</th>
+<th>File da leggere</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Backend API / Express / router / middleware / auth</td>
+<td><a href="./API_RULES.md"><code>API_RULES.md</code></a></td>
+</tr>
+<tr>
+<td>Database / Drizzle ORM / migrations / seed</td>
+<td><a href="./DB_RULES.md"><code>DB_RULES.md</code></a></td>
+</tr>
+<tr>
+<td>Frontend React / UI / Tailwind / Vite</td>
+<td><a href="./FRONTEND_RULES.md"><code>FRONTEND_RULES.md</code></a></td>
+</tr>
+<tr>
+<td>AI agent / OpenAI / Wendy / prompt</td>
+<td><a href="./AI_RULES.md"><code>AI_RULES.md</code></a></td>
+</tr>
+<tr>
+<td>Git / branching / commit / PR</td>
+<td><a href="./GIT_RULES.md"><code>GIT_RULES.md</code></a></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>🏗️ Architettura di NorthStar</h2>
+<p>NorthStar è una piattaforma SaaS modulare composta da:</p>
+<h3>Servizi Principali</h3>
+<ul>
+<li><strong>PostgreSQL</strong> — Database principale (postgres:16-alpine)</li>
+<li><strong>Redis</strong> — Cache per endpoint frequenti (redis:7-alpine)</li>
+<li><strong>AI Agents</strong> — Microservizio Python per compiti AI specifici (porta 8000)</li>
+<li><strong>API Server Legacy</strong> — Express server in <code>artifacts/</code> (porta 8080)</li>
+<li><strong>NorthStar Server</strong> — Express server moderno in <code>apps/server/</code> (porta 3001)</li>
+<li><strong>Frontend</strong> — React/Vite applicazione (porta 5173)</li>
+<li><strong>Jaeger</strong> — UI per distributed tracing (porta 16686)</li>
+</ul>
+<h3>Comunicazione tra Servizi</h3>
+<ul>
+<li>I servizi comunicano tramite rete interna Docker</li>
+<li>Variabili d&#39;ambiente configurano gli endpoint (es. <code>AI_AGENTS_URL=http://ai-agents:8000</code>)</li>
+<li>Health checks assicurano che i servizi siano pronti prima del dipendenza</li>
+</ul>
+<hr>
+<h2>🔧 Setup e Configurazione</h2>
+<h3>Prerequisiti</h3>
+<ul>
+<li>Docker e Docker Compose</li>
+<li>Git</li>
+<li>Node.js (v20+) e pnpm (v10+) — per sviluppo locale</li>
+<li>Python 3.11+ — per il microservizio AI</li>
+</ul>
+<h3>Setup in 3 comandi</h3>
+<pre><code class="language-bash">cp .env.example .env   # compila i valori in .env
+pnpm install            # installa dipendenze
+pnpm dev                # avvia northstar-server :3001 + frontend :5173
+</code></pre>
+<h3>Variabili d&#39;Ambiente</h3>
+<p>Copiare <code>.env.example</code> in <code>.env</code> e compilare:</p>
+<pre><code class="language-bash">cp .env.example .env
+</code></pre>
+<p>Le variabili necessarie includono:</p>
+<ul>
+<li><code>OPENAI_API_KEY</code> — Chiave API OpenAI</li>
+<li><code>JWT_SECRET</code> — Segreto per firme JWT</li>
+<li><code>DATABASE_URL</code> — Connessione PostgreSQL</li>
+</ul>
+<p>Opzionali:</p>
+<ul>
+<li><code>TAVILY_API_KEY</code> — Chiave API Tavily</li>
+<li><code>ADMIN_KEY</code> — Chiave per amministrazione</li>
+<li><code>STRIPE_SECRET_KEY</code> — Chiave segreta Stripe</li>
+<li><code>RESEND_API_KEY</code> — Chiave API Resend per email</li>
+<li><code>GNEWS_API_KEY</code> — Chiave API GNews</li>
+</ul>
+<blockquote>
+<p>⚠️ <strong>NESSUNA</strong> di queste chiavi deve essere committata nel repository.</p>
+</blockquote>
+<h3>Regole di Sicurezza (vedi <code>GIT_RULES.md</code>)</h3>
+<ul>
+<li>Controlli pre-commit impediscono l&#39;aggiunta di segreti</li>
+<li>Usare <code>git diff --staged -- README.md | grep -iE &#39;(sk-|password|secret|key)=.&#39;</code> per verificare</li>
+</ul>
+<hr>
+<h2>🐳 Docker Compose</h2>
+<h3>Servizi Definiti</h3>
+<p>Vedere <a href="./docker-compose.yml"><code>docker-compose.yml</code></a> per la configurazione completa.</p>
+<h3>Comandi Utili</h3>
+<pre><code class="language-bash"># Avvia solo il database (per sviluppo locale)
+docker compose up postgres
+
+# Avvio completo con build
+docker compose up --build
+
+# Avvio specifico servizi
+docker compose up postgres northstar-server
+
+# Visualizza logs
+docker compose logs -f
+
+# Arresta e rimuovi tutto
+docker compose down -v
+</code></pre>
+<h3>Health Checks</h3>
+<p>Ogni servizio ha un health check configurato:</p>
+<ul>
+<li>PostgreSQL: <code>pg_isready -U northstar</code></li>
+<li>Redis: <code>redis-cli ping</code></li>
+<li>AI Agents: <code>curl -f http://localhost:8000/health</code></li>
+<li>API Server: <code>curl -f http://localhost:8080/api/health</code></li>
+<li>NorthStar Server: <code>curl -f http://localhost:3001/api/health</code></li>
+</ul>
+<hr>
+<h2>🐍 Microservizio Python AI</h2>
+<h3>Posizione</h3>
+<p>Il microservizio AI si trova nella radice del progetto come server FastAPI indipendente.</p>
+<h3>File Correlati</h3>
+<ul>
+<li><code>main.py</code>: punto di ingresso del server</li>
+<li><code>pyproject.toml</code>: definisce le dipendenze e i metadati</li>
+<li><code>uv.lock</code>: file di blocco delle dipendenze generato da <code>uv</code></li>
+<li><code>.python-version</code>: specifica la versione di Python (3.11)</li>
+</ul>
+<h3>Dipendenze Principali</h3>
+<ul>
+<li>fastapi, uvicorn — web framework</li>
+<li>langchain, langchain-openai, langgraph — AI orchestration</li>
+<li>openai — OpenAI API client</li>
+<li>scikit-learn, numpy, pandas — ML/data</li>
+<li>torch, tensorflow — deep learning (opzionali)</li>
+</ul>
+<h3>Esecuzione</h3>
+<pre><code class="language-bash"># Con uv (raccomandato)
+uv pip install -r pyproject.toml
+uvicorn main:app --host 0.0.0.0 --port 8000
+
+# Oppure con pip tradizionale
+pip install -r pyproject.toml
+uvicorn main:app --host 0.0.0.0 --port 8000
+</code></pre>
+<h3>Endpoints Disponibili</h3>
+<ul>
+<li><code>GET /</code> — Informazioni sul servizio</li>
+<li><code>GET /health</code> — Health check</li>
+<li><code>POST /train</code> — Avvia training modello ML in background</li>
+<li><code>GET /train/{task_id}</code> — Controlla stato training</li>
+<li><code>POST /predict</code> — Effettua predizioni</li>
+<li><code>GET /models</code> — Lista modelli disponibili</li>
+<li><code>GET /models/{model_id}</code> — Info su modello specifico</li>
+<li><code>POST /models/{model_id}/load</code> — Carica modello pre-addestrato</li>
+<li><code>POST /models/{model_id}/save</code> — Salva modello su disco</li>
+</ul>
+<p>Documentazione API interattiva disponibile su <code>http://localhost:8000/docs</code> quando il server è in esecuzione.</p>
+<blockquote>
+<p>ℹ️ Il server AI è opzionale e non richiesto per l&#39;esecuzione dell&#39;applicazione principale.</p>
+</blockquote>
+<hr>
+<h2>💾 Database e Migrazioni</h2>
+<h3>Struttura</h3>
+<p>Il database utilizza PostgreSQL con schema gestito da Drizzle ORM.</p>
+<h3>Eseguire Migrazioni</h3>
+<pre><code class="language-bash"># Genera nuova migrazione
+pnpm db:generate
+
+# Applica migrazioni al database
+pnpm db:migrate
+
+# Esegui seed iniziali
+pnpm db:seed
+</code></pre>
+<h3>Gestione Dati</h3>
+<ul>
+<li>I seed iniziali contengono dati di esempio per sviluppo</li>
+<li><strong>NON</strong> eseguire i seed in produzione senza cautela</li>
+<li>Per evitare sovrascritture in produzione, usare file di seed diversi o controllare l&#39;ambiente</li>
+</ul>
+<h3>Backup e Ripristino</h3>
+<pre><code class="language-bash"># Backup database
+docker exec -t northstar-postgres-1 pg_dump -U northstar northstar &gt; backup.sql
+
+# Ripristino database
+cat backup.sql | docker exec -i northstar-postgres-1 psql -U northstar northstar
+</code></pre>
+<hr>
+<h2>📦 Script Disponibili</h2>
+<pre><code class="language-bash">pnpm dev               # sviluppo completo (server + frontend)
+pnpm dev:web           # solo frontend Vite
+pnpm dev:server        # solo northstar-server
+pnpm build             # build per produzione
+pnpm typecheck         # controlla tipi TypeScript
+pnpm lint              # esegue ESLint
+pnpm test:e2e          # test end-to-end
+pnpm db:generate       # genera migrazioni Drizzle
+pnpm db:migrate        # applica migrazioni
+pnpm db:seed           # esegue seed dati
+pnpm secrets           # genera JWT_SECRET e ADMIN_KEY
+</code></pre>
+<hr>
+<h2>🤖 AI Agent e Task End-to-End</h2>
+<h3>Architettura degli AI Agent</h3>
+<p>Gli agenti AI seguono un pattern modulare:</p>
+<ol>
+<li><strong>Input</strong> — Richiesta da frontend o altro servizio</li>
+<li><strong>Processing</strong> — Logica agente in <code>packages/ai-server/src/*-agent/</code></li>
+<li><strong>Output</strong> — Risposta strutturata o azione eseguita</li>
+<li><strong>Memory</strong> — Utilizzo di <code>memory-manager.ts</code> per contesto</li>
+<li><strong>Evaluation</strong> — <code>self-evaluator.ts</code> per auto-valutazione qualità</li>
+</ol>
+<h3>Aggiungere un Nuovo Task AI</h3>
+<ol>
+<li>Crea nuovo agente in <code>packages/ai-server/src/[nome]-agent/</code></li>
+<li>Implementa logica principale in <code>[nome]-agent.ts</code></li>
+<li>Aggiungi endpoint in <code>router-agent.ts</code> se necessario</li>
+<li>Aggiorna <code>index.ts</code> per esportare nuovo agente</li>
+<li>Testa con script dedicati o tramite API</li>
+</ol>
+<h3>Esempio di Flusso End-to-End</h3>
+<pre><code>Frontend → NorthStar Server (Express) → AI Agent (Python)
+→ Elaborazione → Risposta → Frontend
+</code></pre>
+<hr>
+<h2>📊 Monitoraggio e Tracing</h2>
+<h3>Jaeger</h3>
+<ul>
+<li>UI disponibile su <code>http://localhost:16686</code> quando eseguito via Docker Compose</li>
+<li>Configurato per ricevere tracce OTLP sulla porta 4318</li>
+<li>Abilitato tramite variabili d&#39;ambiente:<ul>
+<li><code>OTEL_SERVICE_NAME=northstar-api</code></li>
+<li><code>OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318</code></li>
+</ul>
+</li>
+</ul>
+<h3>Metriche e Logging</h3>
+<ul>
+<li>Strutturato logging in tutti i servizi</li>
+<li>Health check endpoints per monitoring esterno</li>
+<li>Tracing distribuito tramite OpenTelemetry</li>
+</ul>
+<hr>
+<h2>🔄 Migrazione e Aggiornamenti</h2>
+<h3>Quando Cambiare Architettura</h3>
+<p>Se si modificano componenti fondamentali:</p>
+<ol>
+<li>Aggiornare questo file per riflettere i cambiamenti</li>
+<li>Testare completamente in ambiente di sviluppo prima del deploy</li>
+</ol>
+<h3>Script di Migrazione</h3>
+<p>Gli script in <code>scripts/</code> gestiscono:</p>
+<ul>
+<li>Migrazione struttura file</li>
+<li>Aggiornamento configurazioni</li>
+<li>Pulizia file obsoleti</li>
+</ul>
+<hr>
+<h2>🚨 Risoluzione Problemi Comuni</h2>
+<h3>&quot;pnpm non disponibile&quot;</h3>
+<ul>
+<li>Alcuni ambienti potrebbero non avere pnpm disponibile</li>
+<li>Soluzione: Usare configurazione Nix che installa pnpm globalmente</li>
+</ul>
+<h3>Problemi di Connessione Database</h3>
+<ul>
+<li>Verificare che il servizio PostgreSQL sia sano: <code>docker compose ps postgres</code></li>
+<li>Controllare logs: <code>docker compose logs postgres</code></li>
+<li>Assicurarsi che le variabili d&#39;ambiente <code>DATABASE_URL</code> siano corrette</li>
+</ul>
+<h3>Microservizio AI Non Risponde</h3>
+<ul>
+<li>Controllare health endpoint: <code>curl http://localhost:8000/health</code></li>
+<li>Verificare logs: <code>docker compose logs ai-agents</code></li>
+<li>Assicurarsi che le variabili d&#39;ambiente necessarie siano impostate (es. <code>OPENAI_API_KEY</code>)</li>
+</ul>
+<h3>Porte già in Uso</h3>
+<ul>
+<li>Cambiare le porte mappate in <code>docker-compose.yml</code> se necessario</li>
+<li>Esempio: cambiare <code>&quot;8000:8000&quot;</code> in <code>&quot;8001:8000&quot;</code> per evitare conflitti</li>
+</ul>
+<hr>
+<h2>📝 Note Importanti</h2>
+<ol>
+<li><strong>Documentazione Vivente</strong> — Questo file deve essere aggiornato ogni volta che cambia l&#39;architettura o il setup</li>
+<li><strong>Zero Segreti</strong> — Mai committare chiavi API, password o token in questo file o qualsiasi altro file nel repository</li>
+<li><strong>Ambienti Diversi</strong> — Le configurazioni possono variare tra sviluppo, staging e produzione</li>
+<li><strong>Controlli Automatici</strong> — Usare gli script di migrazione e i controlli pre-commit per mantenere la qualità</li>
+</ol>
+<hr>
+<h2>📚 Risorse Correlate</h2>
+<ul>
+<li><a href="./API_RULES.md"><code>API_RULES.md</code></a> — Dettagli su autenticazione, rate limiting, struttura rotte</li>
+<li><a href="./DB_RULES.md"><code>DB_RULES.md</code></a> — Schema DB, convenzioni naming, indicazioni su migrazioni</li>
+<li><a href="./FRONTEND_RULES.md"><code>FRONTEND_RULES.md</code></a> — Componenti UI, stato globale, styling guidelines</li>
+<li><a href="./AI_RULES.md"><code>AI_RULES.md</code></a> — Prompt engineering, modelli utilizzati, gestione costo</li>
+<li><a href="./GIT_RULES.md"><code>GIT_RULES.md</code></a> — Convenzioni commit, strategie branching, PR template</li>
+<li><a href="./docker-compose.yml"><code>docker-compose.yml</code></a> — Configurazione Docker completa</li>
+<li><a href="./packages/api-spec/openapi.yaml">OpenAPI Spec</a> — Specifica API</li>
+</ul>

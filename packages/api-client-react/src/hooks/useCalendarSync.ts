@@ -63,16 +63,14 @@ export function useCalendarSync({
     setEvents(initialEvents);
   }, [initialEvents]);
 
-  const wsUrl = jwt
-    ? (() => {
-        const base =
-          wsBaseUrl ??
-          (typeof window !== "undefined"
-            ? `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`
-            : "");
-        return `${base}/ws?token=${encodeURIComponent(jwt)}`;
-      })()
-    : null;
+  const wsUrl = (() => {
+    const base =
+      wsBaseUrl ??
+      (typeof window !== "undefined"
+        ? `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`
+        : "");
+    return base ? `${base}/ws` : null;
+  })();
 
   const handleMessage = useCallback((event: ServerWsEvent) => {
     switch (event.type) {
@@ -105,7 +103,7 @@ export function useCalendarSync({
     }
   }, []);
 
-  useWebSocket<ServerWsEvent>({ url: wsUrl, onMessage: handleMessage });
+  useWebSocket<ServerWsEvent>({ url: jwt ? wsUrl : null, authToken: jwt, onMessage: handleMessage });
 
   const clearReminder = useCallback(() => setPendingReminder(null), []);
 

@@ -7,6 +7,7 @@ import { useState, useRef, useCallback, useTransition } from "react";
 
 interface UseSSEStreamOptions {
   onComplete?: (finalContent: string) => void;
+  onRawChunk?: (raw: string) => boolean;
   onError?: (error: Error) => void;
   flushIntervalMs?: number; // default 50ms
 }

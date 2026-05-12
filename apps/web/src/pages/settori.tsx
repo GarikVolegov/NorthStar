@@ -14,11 +14,12 @@ import {
 } from "lucide-react";
 import { WorkModeBadge } from "@/components/WorkModeSelector";
 import type { Sector as ApiSector } from "@workspace/api-client-react";
+
 import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
-type Sector = ApiSector;
+type Sector = ApiSector & { workMode?: Array<"dipendente" | "autonomo" | "ibrido"> };
 
 const TREND_COLOR: Record<string, string> = {
   booming:  "text-emerald-700 bg-emerald-50 border-emerald-200",

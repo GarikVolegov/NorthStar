@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { useRegisterUser } from "@workspace/api-client-react";
+import { useRegisterUser, type RegisterUserBody } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,7 +40,7 @@ export default function Register() {
 
   const onSubmit = (data: RegisterFormData) => {
     registerUser.mutate(
-      { data: { name: data.name, email: data.email, testSessionId: sessionId, workPreference: pendingWorkMode ?? undefined } },
+      { data: { name: data.name, email: data.email, testSessionId: sessionId, workPreference: pendingWorkMode ?? undefined } as RegisterUserBody & { workPreference?: string } },
       {
         onSuccess: (res) => {
           const { token, ...user } = res as typeof res & { token: string };

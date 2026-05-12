@@ -166,10 +166,13 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       );
 
       // Aggiorna history per la prossima richiesta
-      historyRef.current = [
-        ...historyRef.current,
+      const newEntries: Array<{ role: 'user' | 'assistant'; content: string }> = [
         { role: 'user',      content: lastUserMessageRef.current },
         { role: 'assistant', content: finalContent },
+      ];
+      historyRef.current = [
+        ...historyRef.current,
+        ...newEntries,
       ].slice(-40); // max 20 coppie
 
       pendingCitationsRef.current = [];

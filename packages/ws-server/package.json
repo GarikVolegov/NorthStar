@@ -9,10 +9,12 @@
   },
   "dependencies": {
     "ws": "^8.18.0",
+    "jsonwebtoken": "catalog:",
     "@workspace/db": "workspace:*",
     "@workspace/api-zod": "workspace:*"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.9",
     "@types/ws": "^8.5.13",
     "typescript": "^5.8.3"
   }

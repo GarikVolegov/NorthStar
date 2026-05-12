@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useParams, Link } from "wouter";
-import { useGetSector, useGetSectorStats, useGetSectorRoles } from "@workspace/api-client-react";
+import { useGetSector, useGetSectorStats, useGetSectorRoles, type Sector as SectorBase } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -66,6 +66,12 @@ const GrowthChart = React.memo(function GrowthChart({ data }: { data: ChartEntry
 // Switching dipendente <-> autonomo only re-renders the active list,
 // not the entire Sector component tree.
 interface CareerStep { step: number; title: string; description: string }
+
+type SectorExtended = SectorBase & {
+  workMode?: Array<"dipendente" | "autonomo" | "ibrido">;
+  dipendentiSteps?: CareerStep[];
+  freelanceSteps?: CareerStep[];
+};
 interface CareerStepListProps {
   steps: CareerStep[];
   stepGroup: string;
@@ -129,9 +135,10 @@ export default function Sector() {
     }
   }, [workPreference]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { data: sector, isLoading: isLoadingSector, error: sectorError } = useGetSector(id, {
+  const { data: _sector, isLoading: isLoadingSector, error: sectorError } = useGetSector(id, {
     query: { enabled: !!id, queryKey: ["sector", id] },
   });
+  const sector = _sector as SectorExtended | undefined;
 
   const { data: stats, isLoading: isLoadingStats } = useGetSectorStats(id, {
     query: { enabled: !!id, queryKey: ["sectorStats", id] },
