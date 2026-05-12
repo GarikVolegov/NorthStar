@@ -92,17 +92,34 @@ async function dispatchDueReminders(
       ),
     );
 
-  for (const r of dueReminders) {
-    // Mark as sent immediately to prevent duplicates
-    await db
-      .update(eventRemindersTable)
-      .set({ sentAt: now })
-      .where(eq(eventRemindersTable.id, r.reminderId));
+  // Atomic claim: only the first instance gets the row (race-condition safe)
+  const claimed = await db
+    .update(eventRemindersTable)
+    .set({ sentAt: now })
+    .where(
+      and(
+        eq(eventRemindersTable.enabled, true),
+        isNull(eventRemindersTable.sentAt),
+        lte(
+          sql`${calendarEventsTable.startAt} - ${eventRemindersTable.minutesBefore} * interval '1 minute'`,
+          windowEnd,
+        ),
+        gte(
+          sql`${calendarEventsTable.startAt} - ${eventRemindersTable.minutesBefore} * interval '1 minute'`,
+          now,
+        ),
+      ),
+    )
+    .returning();
 
-    const { userId, eventId, eventTitle, startAt, minutesBefore } = r;
+  for (const row of claimed) {
+    // Fetch the corresponding calendar event
+    const event = dueReminders.find((r) => r.reminderId === row.id);
+    if (!event) continue;
+
+    const { userId, eventId, eventTitle, startAt, minutesBefore } = event;
 
     if (wss.isOnline(userId)) {
-      // Real-time delivery via WebSocket
       wss.emit(userId, {
         type: "calendar:reminder",
         payload: {
@@ -113,7 +130,6 @@ async function dispatchDueReminders(
         },
       });
     } else if (options.onFallbackPush) {
-      // Fallback: browser push notification
       await options.onFallbackPush({ userId, eventId, eventTitle, startAt, minutesBefore });
     }
   }
