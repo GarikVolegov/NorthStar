@@ -114,4 +114,39 @@ router.post("/ask", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+const voiceSchema = z.object({
+  text: z.string().min(1).max(5000),
+  voice: z.enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]).optional(),
+  format: z.enum(["mp3", "opus", "aac", "flac", "wav", "pcm16"]).optional(),
+  instructions: z.string().max(2000).optional(),
+});
+
+router.post("/voice", requireAuth, async (req: Request, res: Response) => {
+  const data = voiceSchema.parse(req.body);
+
+  try {
+    const { wendyTextToSpeech } = await import("@workspace/ai-server/audio");
+    const audioBuffer = await wendyTextToSpeech(
+      data.text,
+      data.voice ?? "nova",
+      data.format ?? "opus",
+      data.instructions,
+    );
+
+    const contentType = data.format === "mp3" ? "audio/mpeg"
+      : data.format === "opus" ? "audio/ogg"
+      : data.format === "wav" ? "audio/wav"
+      : data.format === "flac" ? "audio/flac"
+      : data.format === "aac" ? "audio/aac"
+      : "audio/ogg";
+
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Length", audioBuffer.length.toString());
+    res.send(audioBuffer);
+  } catch (err) {
+    console.error("[wendy] voice error:", err);
+    res.status(500).json({ error: "TTS generation failed", message: String(err) });
+  }
+});
+
 export default router;

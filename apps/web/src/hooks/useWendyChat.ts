@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useSSEStream } from './useSSEStream.js';
 import { useTTS } from './useTTS.js';
 import { useSTT } from './useSTT.js';
+import { useWendyOpenAITTS } from './useWendyOpenAITTS.js';
 
 /**
  * useWendyChat — orchestratore stato completo chat Wendy
@@ -79,6 +80,7 @@ export interface UseWendyChatReturn {
   tts:                     ReturnType<typeof useTTS>;
   ttsEnabled:              boolean;
   toggleTts:               () => void;
+  openaiTts:               ReturnType<typeof useWendyOpenAITTS>;
   stt:                     ReturnType<typeof useSTT>;
   commitSTT:               () => void;
 }
@@ -111,6 +113,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
 
   const tts = useTTS();
   const stt = useSTT({ lang: sttLang });
+  const openaiTts = useWendyOpenAITTS();
 
   // ─── SSE stream ──────────────────────────────────────────────────────────────
 
@@ -179,7 +182,11 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       setThinking({ active: false, label: THINKING_LABELS[0], startedAt: 0 });
       retriesRef.current = 0;
 
-      if (ttsEnabled && tts.supported) tts.speak(finalContent, sttLang);
+      if (ttsEnabled) {
+        openaiTts.play(finalContent).catch(() => {
+          if (tts.supported) tts.speak(finalContent, sttLang);
+        });
+      }
       onMessageComplete?.(completedMsg);
     },
 
@@ -250,12 +257,13 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     lastUserMessageRef.current = trimmed;
     retriesRef.current = 0;
     tts.stop();
+    openaiTts.stop();
     setMessages((prev) => [
       ...prev,
       { id: `user-${Date.now()}`, role: 'user', content: trimmed, timestamp: Date.now() },
     ]);
     await _doStream(trimmed);
-  }, [isStreaming, tts]);
+  }, [isStreaming, tts, openaiTts]);
 
   /**
    * Invia un'azione contestuale: mostra il prefillText nella chat
@@ -264,6 +272,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
   const sendContextualMessage = useCallback(async (action: ContextualAction) => {
     if (isStreaming) return;
     tts.stop();
+    openaiTts.stop();
     lastUserMessageRef.current = action.prompt;
     retriesRef.current = 0;
 
@@ -276,7 +285,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
 
     // Stream con il prompt completo (invisibile all'utente)
     await _doStream(visibleText, action.prompt);
-  }, [isStreaming, tts]);
+  }, [isStreaming, tts, openaiTts]);
 
   /**
    * Invia il feedback 👍/👎 per un messaggio specifico.
@@ -328,15 +337,16 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
   const clearHistory = useCallback(() => {
     stopStream();
     tts.stop();
+    openaiTts.stop();
     setMessages([]);
     historyRef.current = [];
     setStreamError(null);
     setThinking({ active: false, label: THINKING_LABELS[0], startedAt: 0 });
-  }, [stopStream, tts]);
+  }, [stopStream, tts, openaiTts]);
 
   const toggleTts = useCallback(() => {
-    setTtsEnabled((v) => { if (v) tts.stop(); return !v; });
-  }, [tts]);
+    setTtsEnabled((v) => { if (v) { tts.stop(); openaiTts.stop(); } return !v; });
+  }, [tts, openaiTts]);
 
   const commitSTT = useCallback(() => {
     const text = (stt.transcript + stt.interimTranscript).trim();
@@ -350,6 +360,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     sendMessage, sendContextualMessage, sendFeedback,
     stopStream, clearHistory, retryLast,
     tts, ttsEnabled, toggleTts,
+    openaiTts,
     stt, commitSTT,
   };
 }

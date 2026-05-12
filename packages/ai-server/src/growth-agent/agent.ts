@@ -209,7 +209,7 @@ export async function* runGrowthAgent(
     retrieve(userMessage, userId, { topK: 3, minScore: 0.30, sourceTypes: ["persona_example"] }),
     retrieve(userMessage, userId, { topK: 5, minScore: 0.35, sourceTypes: ["document", "user_note"] }),
     retrieve(userMessage, userId, { topK: 3, minScore: 0.30, sourceTypes: ["platform_content"] }),
-    runChainOfThought(userMessage, conversationSummary),
+    runChainOfThought(userId, userMessage, conversationSummary),
   ]);
 
   let webResults: RetrievedChunk[] = [];

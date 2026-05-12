@@ -89,8 +89,8 @@ export function WendyVoiceOverlay({
    const isIdle      = vc.phase === 'idle';
 
    // Map voice chat phase to WendyAvatar state and phase
-   const avatarState: AvatarState = vc.phase === 'speaking' ? 'celebrating' :
-                                 vc.phase === 'listening' ? 'curious' : 'reflective';
+   const avatarState: AvatarState = vc.phase === 'speaking' ? 'speaking' :
+                                  vc.phase === 'listening' ? 'curious' : 'reflective';
    const avatarPhase: 0 | 1 | 2 = vc.phase === 'thinking' ? 1 :
                                  vc.phase === 'speaking' ? 2 : 0;
 

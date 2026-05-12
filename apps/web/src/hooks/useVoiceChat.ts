@@ -19,6 +19,7 @@
  */
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useWendyVoice } from './useWendyVoice.js';
+import { useWendyOpenAITTS } from './useWendyOpenAITTS.js';
 
 export type VoiceChatPhase = 'idle' | 'listening' | 'thinking' | 'speaking' | 'error';
 
@@ -120,8 +121,8 @@ export function useVoiceChat({
       setLastReply(replyBuffer);
       setPhase('speaking');
 
-      // ── 3. TTS auto-play ─────────────────────────────────────────────────
-      voice.speak(replyBuffer);
+      // ── 3. TTS auto-play — OpenAI TTS primary, Web Speech fallback ──────
+      openaiTts.play(replyBuffer).catch(() => voice.speak(replyBuffer));
 
     } catch (err: unknown) {
       if ((err as Error).name === 'AbortError') {
@@ -135,17 +136,18 @@ export function useVoiceChat({
   }, [apiUrl, historyRef]);
 
   const voice = useWendyVoice({ onSend: handleSend, lang });
+  const openaiTts = useWendyOpenAITTS();
 
    // When TTS finishes speaking → back to idle
    useEffect(() => {
      let timeoutId: NodeJS.Timeout | null = null;
-     if (phase === 'speaking' && !voice.isSpeaking) {
+     if (phase === 'speaking' && !voice.isSpeaking && !openaiTts.isSpeaking) {
        timeoutId = setTimeout(() => setPhase('idle'), 600);
      }
      return () => {
        if (timeoutId) clearTimeout(timeoutId);
      };
-   }, [phase, voice.isSpeaking]);
+   }, [phase, voice.isSpeaking, openaiTts.isSpeaking]);
 
   // Mirror STT phase
   useEffect(() => {
@@ -168,9 +170,10 @@ export function useVoiceChat({
   const cancelAll = useCallback(() => {
     abortRef.current?.abort();
     voice.cancelSpeech();
+    openaiTts.stop();
     SpeechRecognition_stop();
     setPhase('idle');
-  }, [voice]);
+  }, [voice, openaiTts]);
 
   return {
     phase,

@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-export type AvatarState = "curious" | "reflective" | "focused" | "celebrating";
+export type AvatarState = "curious" | "reflective" | "focused" | "celebrating" | "speaking";
 
 interface WendyAvatarProps {
   state: AvatarState;
@@ -22,6 +22,7 @@ const MOUTH_PATHS: Record<AvatarState, string> = {
   reflective:  "M 44 69 Q 50 71 56 69",
   focused:     "M 44 67 Q 50 73 56 67",
   celebrating: "M 42 66 Q 50 76 58 66",
+  speaking:    "M 42 68 Q 50 74 58 68",
 };
 
 const BROW_OFFSETS: Record<AvatarState, { lY: number; rY: number; lRotate: number; rRotate: number }> = {
@@ -29,6 +30,7 @@ const BROW_OFFSETS: Record<AvatarState, { lY: number; rY: number; lRotate: numbe
   reflective:  { lY: 1,  rY: 1,  lRotate: 0,  rRotate: 0  },
   focused:     { lY: 0,  rY: 0,  lRotate: -3, rRotate: 3  },
   celebrating: { lY: -3, rY: -3, lRotate: 5,  rRotate: -5 },
+  speaking:    { lY: -1, rY: -1, lRotate: 0,  rRotate: 0  },
 };
 
 const HEAD_TILT: Record<AvatarState, number> = {
@@ -36,6 +38,7 @@ const HEAD_TILT: Record<AvatarState, number> = {
   reflective:  0,
   focused:     0,
   celebrating: -5,
+  speaking:    2,
 };
 
 export function WendyAvatar({ state, phase, reduced = false, className, size = 120 }: WendyAvatarProps) {
@@ -116,6 +119,38 @@ export function WendyAvatar({ state, phase, reduced = false, className, size = 1
             <ellipse cx="64" cy="56" rx="5" ry="3" fill={p.accent} opacity="0.18" />
           </>
         )}
+        {state === "speaking" && (
+          <>
+            {[0, 1, 2].map((i) => (
+              <motion.rect
+                key={i}
+                x={30 + i * 6}
+                y={56}
+                width={3}
+                height={8}
+                rx={1.5}
+                fill={p.accent}
+                opacity={0.6}
+                animate={reduced ? {} : { height: [6, 14, 6] }}
+                transition={{ duration: 0.4 + i * 0.08, repeat: Infinity, ease: "easeInOut" }}
+              />
+            ))}
+            {[0, 1, 2].map((i) => (
+              <motion.rect
+                key={`r-${i}`}
+                x={67 + i * 6}
+                y={56}
+                width={3}
+                height={8}
+                rx={1.5}
+                fill={p.accent}
+                opacity={0.6}
+                animate={reduced ? {} : { height: [6, 14, 6] }}
+                transition={{ duration: 0.4 + i * 0.08, repeat: Infinity, ease: "easeInOut" }}
+              />
+            ))}
+          </>
+        )}
         <path d="M38 76 L44 83 L50 78 L56 83 L62 76" stroke={p.accent} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
 
@@ -123,7 +158,7 @@ export function WendyAvatar({ state, phase, reduced = false, className, size = 1
         className="absolute bottom-2 right-2 w-2.5 h-2.5 rounded-full"
         style={{ background: p.accent }}
         animate={reduced ? {} : { scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
-        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        transition={{ duration: state === "speaking" ? 0.6 : 2, repeat: Infinity, ease: "easeInOut" }}
       />
     </motion.div>
   );

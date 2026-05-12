@@ -216,6 +216,30 @@ export async function textToSpeechStream(
   })();
 }
 
+/** Wendy TTS — OpenAI gpt-4o-mini-tts with voice style instructions. */
+export async function wendyTextToSpeech(
+  text: string,
+  voice: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer" = "nova",
+  responseFormat: "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm16" = "opus",
+  instructions?: string,
+): Promise<Buffer> {
+  const styleInstructions =
+    instructions ??
+    "Parla in italiano con una voce femminile giovane, tono elegante e professionale ma amichevole. " +
+    "Ritmo moderato, articolazione chiara, niente enfasi teatrale. " +
+    "Sii rassicurante e concreta, con un sorriso nella voce, come una career coach che si prende davvero cura della persona.";
+
+  const response = await openai.audio.speech.create({
+    model: "gpt-4o-mini-tts",
+    voice,
+    input: text,
+    instructions: styleInstructions,
+    response_format: (responseFormat === "pcm16" ? "pcm" : responseFormat) as "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm",
+  });
+
+  return Buffer.from(await response.arrayBuffer());
+}
+
 /** Speech-to-Text using gpt-4o-mini-transcribe. */
 export async function speechToText(
   audioBuffer: Buffer,
