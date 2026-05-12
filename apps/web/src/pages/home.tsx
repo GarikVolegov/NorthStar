@@ -108,8 +108,8 @@ const PERSONAS: Persona[] = [
     ctaLabel: "Analizza le mie skill",
     ctaHref: "/test",
     tools: ["Skill Gap", "Simulatore colloquio", "Roadmap"],
-    accentClass: "text-[#A8D5BA]",
-    borderClass: "hover:border-[#A8D5BA]/50",
+    accentClass: "text-growth",
+    borderClass: "hover:border-growth/50",
   },
   {
     id: "autonomo",
@@ -130,8 +130,8 @@ const PERSONAS: Persona[] = [
     ctaLabel: "Esplora i profili",
     ctaHref: "/settori",
     tools: ["Profili RIASEC", "Settori in crescita", "Affilazione"],
-    accentClass: "text-[#A8D5BA]",
-    borderClass: "hover:border-[#A8D5BA]/50",
+    accentClass: "text-growth",
+    borderClass: "hover:border-growth/50",
   },
   {
     id: "investitore",
@@ -148,9 +148,9 @@ const PERSONAS: Persona[] = [
 
 const JOURNEY_LABELS: Record<JourneyId, { label: string; Icon: React.ElementType; accentClass: string }> = {
   indeciso:    { label: "Indeciso",     Icon: HelpCircle,  accentClass: "text-primary" },
-  dipendente:  { label: "Dipendente",   Icon: TrendingUp,  accentClass: "text-[#A8D5BA]" },
+  dipendente:  { label: "Dipendente",   Icon: TrendingUp,  accentClass: "text-growth" },
   autonomo:    { label: "Autonomo",     Icon: Rocket,      accentClass: "text-primary" },
-  azienda:     { label: "Azienda",      Icon: Building2,   accentClass: "text-[#A8D5BA]" },
+  azienda:     { label: "Azienda",      Icon: Building2,   accentClass: "text-growth" },
   investitore: { label: "Investitore",  Icon: BarChart3,   accentClass: "text-primary" },
 };
 
@@ -938,7 +938,7 @@ export default function Home() {
                   desc: "17 domande RIASEC per mappare la tua personalità professionale e preferenze di lavoro.",
                   href: "/test",
                   label: "Inizia il test gratuito",
-                  accent: "bg-[#A8D5BA]/10 text-[#A8D5BA] border-[#A8D5BA]/20",
+                  accent: "bg-growth/10 text-growth border-growth/20",
                 },
                 {
                   step: "03", icon: Bot,

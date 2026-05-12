@@ -102,6 +102,7 @@ export const usersTable = pgTable("users", {
   referredByCodeIdx:  index("users_referred_by_code_idx").on(t.referredByCode),
   isAffiliateIdx:     index("users_is_affiliate_idx").on(t.isAffiliate),
   cityIdx:            index("users_city_idx").on(t.city),
+  testSessionIdIdx:   index("users_test_session_id_idx").on(t.testSessionId),
 }));
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({
@@ -142,10 +143,12 @@ export const usersRelations = relations(usersTable, ({ many }) => ({
 /** Produce "mario-rossi-42" da name="Mario Rossi", id=42 */
 export function generateUsername(name: string, id: number): string {
   const slug = name
+    .normalize("NFKD")
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
+    .replace(/[^\w\s-]/g, "")
     .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-_]+|[-_]+$/g, "")
     .slice(0, 30)
     || "utente";
   return `${slug}-${id}`;

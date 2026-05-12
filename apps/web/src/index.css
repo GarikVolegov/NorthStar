@@ -45,6 +45,12 @@
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
 
+  --color-growth: hsl(var(--growth));
+  --color-growth-light: hsl(var(--growth-light));
+  --color-growth-dark: hsl(var(--growth-dark));
+  --color-growth-border: hsl(var(--growth-border));
+  --color-growth-fg: hsl(var(--growth-fg));
+
   --font-sans: var(--app-font-sans);
   --font-serif: var(--app-font-serif);
   --font-mono: var(--app-font-mono);
@@ -147,12 +153,12 @@
   --brand-border: hsl(43 44% 44%);
   --brand-fg:     hsl(224 24% 7%);
 
-  /* Growth / Sage Green token */
-  --growth:        hsl(152 26% 62%);
-  --growth-light:  hsl(152 26% 78%);
-  --growth-dark:   hsl(152 26% 40%);
-  --growth-border: hsl(152 26% 36%);
-  --growth-fg:     hsl(224 24% 7%);
+  /* Growth / Sage Green token (matching #A8D5BA) */
+  --growth:        145 35% 75%;
+  --growth-light:  145 35% 85%;
+  --growth-dark:   145 35% 55%;
+  --growth-border: 145 35% 50%;
+  --growth-fg:     224 24% 7%;
 
   /* Hero dark surface — deep navy */
   --hero-dark:   hsl(224 24% 9%);

@@ -29,8 +29,7 @@
 import { db } from "@workspace/db";
 import { knowledgeNodesTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { embedText } from "./embedder";
-import { chunkText } from "./ingest"; // reuse existing chunker
+import { embedText, chunkText } from "./embedder";
 
 export type PlatformContentType = "course" | "article" | "career_card" | "resource";
 

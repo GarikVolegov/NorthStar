@@ -29,7 +29,8 @@
  */
 import { db } from "@workspace/db";
 import { discoveryItemsTable, discoverySourcesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { eq, sql } from "drizzle-orm";
 import type { NewDiscoveryItem } from "@workspace/db";
 
 // ── Types ────────────────────────────────────────────────────────────────────────
@@ -53,7 +54,7 @@ interface RawItem {
 // ── URL hash ─────────────────────────────────────────────────────────────────────
 
 function hashUrl(url: string): string {
-  return Buffer.from(url.slice(0, 200)).toString("base64").replace(/[^a-zA-Z0-9]/g, "").slice(0, 64);
+  return createHash("sha256").update(url).digest("hex");
 }
 
 // ── RSS/Atom parser (no external deps) ───────────────────────────────────────────
@@ -515,6 +516,22 @@ export async function runCollector(): Promise<CollectorResult> {
   const errors:   string[] = [];
   const allItems: RawItem[] = [];
 
+  // Distributed lock: prevent concurrent runs
+  try {
+    const existing = await db.execute(
+      sql`SELECT pg_try_advisory_lock(${COLLECTOR_LOCK_KEY}) AS locked`
+    );
+    const locked = existing.rows[0]?.locked;
+    if (!locked) {
+      const msg = "[collector] Another run is already in progress — skipping";
+      console.warn(msg);
+      return { totalCollected: 0, totalInserted: 0, bySource, errors: [msg], durationMs: 0 };
+    }
+  } catch {
+    // pg_try_advisory_lock not available (e.g. SQLite fallback) — proceed without lock
+    console.warn("[collector] Advisory lock not available, proceeding without lock");
+  }
+
   const sources: Array<{ name: string; fn: () => Promise<RawItem[]> }> = [
     { name: "hackernews",          fn: collectHackerNews },
     { name: "devto",               fn: collectDevTo },
@@ -545,5 +562,14 @@ export async function runCollector(): Promise<CollectorResult> {
   const totalInserted = await bulkInsert(allItems);
   const result: CollectorResult = { totalCollected: allItems.length, totalInserted, bySource, errors, durationMs: Date.now() - startedAt };
   console.log(`[collector] run complete:`, result);
+
+  // Release advisory lock
+  try {
+    await db.execute(sql`SELECT pg_advisory_unlock(1937832947)`);
+  } catch { /* ignore */ }
+
   return result;
 }
+
+// Advisory lock key as stable int64 hash of "discovery_collector_running"
+const COLLECTOR_LOCK_KEY = 1937832947;

@@ -24,7 +24,7 @@ function getOpenAI(): OpenAI {
 }
 
 export const openai = new Proxy({} as OpenAI, {
-  get(_t, prop) {
-    return (getOpenAI() as any)[prop];
+  get<T extends keyof OpenAI>(_t: object, prop: T): OpenAI[T] {
+    return getOpenAI()[prop];
   },
 });

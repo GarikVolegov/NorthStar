@@ -126,10 +126,10 @@ async function retrieveWithJs(
     .map((n) => ({
       id: n.id,
       content: n.content ?? "",
-      source: (n.metadata as Record<string, unknown>)?.["source"] as string ?? "unknown",
+      source: n.title ?? n.url ?? "unknown",
       sourceType: (n.type as SourceType) ?? "document",
       score: cosine(queryEmbedding, n.embedding as number[]),
-      metadata: (n.metadata as Record<string, unknown>) ?? {},
+      metadata: {},
     }))
     .filter((n) => n.score >= minScore)
     .sort((a, b) => b.score - a.score)

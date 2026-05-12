@@ -208,7 +208,7 @@ async function callGPT(item: DiscoveryItem): Promise<EnrichmentResult> {
     journeyTypes: Array.isArray(parsed.journeyTypes)
       ? parsed.journeyTypes.map(String)
       : ["general"],
-    difficulty: (["easy", "medium", "advanced"] as const).includes(parsed.difficulty as string)
+    difficulty: (["easy", "medium", "advanced"] as const).includes(parsed.difficulty!)
       ? (parsed.difficulty as "easy" | "medium" | "advanced")
       : null,
   };

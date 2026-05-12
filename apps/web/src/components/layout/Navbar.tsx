@@ -55,7 +55,7 @@ const JOURNEY_LABELS: Record<string, { label: string; color: string }> = {
   },
   dipendente: {
     label: "Dipendente",
-    color: "text-[#A8D5BA] bg-[#A8D5BA]/10 border-[#A8D5BA]/30",
+    color: "text-growth bg-growth/10 border-growth/30",
   },
   autonomo: {
     label: "Autonomo",
@@ -63,7 +63,7 @@ const JOURNEY_LABELS: Record<string, { label: string; color: string }> = {
   },
   azienda: {
     label: "Azienda",
-    color: "text-[#A8D5BA] bg-[#A8D5BA]/10 border-[#A8D5BA]/30",
+    color: "text-growth bg-growth/10 border-growth/30",
   },
   investitore: {
     label: "Investitore",

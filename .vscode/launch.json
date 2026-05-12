@@ -17,7 +17,7 @@
       "request": "launch",
       "name": "Debug Server (Node.js)",
       "program": "${workspaceFolder}/apps/server/src/index.ts",
-      "cwd": "${workspaceFolder}/apps/server",
+      "cwd": "${workspaceFolder}",
       "runtimeExecutable": "tsx",
       "skipFiles": ["<node_internals>/**"],
       "env": {

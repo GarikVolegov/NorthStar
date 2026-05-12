@@ -21,7 +21,17 @@
         "panel": "shared"
       },
       "isBackground": true,
-      "problemMatcher": []
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^(.*)$",
+          "file": 1
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "Local:.*http://localhost:5173"
+        }
+      }
     },
     {
       "label": "dev:orientamento",

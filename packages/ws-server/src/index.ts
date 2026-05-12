@@ -30,7 +30,8 @@ import { ServerWsEvent, ClientWsEvent } from "@workspace/api-zod/ws-events";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
-  console.warn("[ws] JWT_SECRET is not set — WebSocket authentication is disabled.");
+  console.error("[ws] JWT_SECRET not configured — cannot start server");
+  process.exit(1);
 }
 
 function extractUserIdFromToken(token: string): number | null {

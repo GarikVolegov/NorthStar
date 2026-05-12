@@ -29,11 +29,16 @@ export async function ingestPdf(
 ): Promise<IngestResult> {
   // Dynamic import so the module is only loaded when actually needed
   // (pdf-parse has a large dependency tree)
-  const pdfParse = (await import("pdf-parse")).default;
+  const { PDFParse } = await import("pdf-parse");
 
-  let data: { text: string; numpages: number };
+  let text: string;
+  let numpages = 0;
   try {
-    data = await pdfParse(buffer);
+    const parser = new PDFParse({ data: buffer });
+    const result = await parser.getText();
+    text = result.text;
+    numpages = result.total;
+    await parser.destroy();
   } catch (err) {
     throw new Error(
       `[pdf-parser] Failed to parse PDF "${opts.sourceName}": ${
@@ -42,7 +47,7 @@ export async function ingestPdf(
     );
   }
 
-  const rawText = data.text
+  const rawText = text
     // pdf-parse often inserts excessive whitespace/newlines
     .replace(/\n{3,}/g, "\n\n")
     .replace(/[ \t]{2,}/g, " ")
@@ -59,7 +64,7 @@ export async function ingestPdf(
     sourceType: "document",
     ...opts,
     metadata: {
-      pdfPages: data.numpages,
+      pdfPages: numpages,
       ...opts.metadata,
     },
   });

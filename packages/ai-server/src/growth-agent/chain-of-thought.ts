@@ -105,14 +105,14 @@ export async function runChainOfThought(
     });
 
     const raw = response.choices[0]?.message?.content ?? "{}";
-    const parsed = JSON.parse(raw) as Partial<CoTResult>;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
 
     return {
-      limitingPattern:    parsed.limiting_pattern     ?? "non identificato",
-      controllableActions: parsed.controllable_actions ?? [],
-      blindSpot:          parsed.blind_spot           ?? "non identificato",
-      confidence:         parsed.confidence           ?? 0.5,
-    } as unknown as CoTResult;
+      limitingPattern:    (parsed.limiting_pattern as string)     ?? "non identificato",
+      controllableActions: (parsed.controllable_actions as string[]) ?? [],
+      blindSpot:          (parsed.blind_spot as string)           ?? "non identificato",
+      confidence:         (parsed.confidence as number)           ?? 0.5,
+    };
   } catch (err) {
     // CoT failure is non-fatal — the agent continues without it
     console.warn("[CoT] failed:", err instanceof Error ? err.message : err);

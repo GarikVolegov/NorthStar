@@ -1,6 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-fetch";
 import { useAgentAnalysis } from "@/hooks/useAgentAnalysis";
@@ -15,8 +15,9 @@ import {
   Loader2, ArrowRight, CheckCircle2, Sparkles, AlertTriangle,
   DollarSign, Clock, MessageSquare, Map, Network, Newspaper,
   Target, BrainCircuit, Mic2, Trophy, HelpCircle, Rocket,
-  Building2, BarChart3, MapPin, ChevronRight,
+  Building2, BarChart3, MapPin, ChevronRight, LayoutGrid,
 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -70,9 +71,9 @@ const JOURNEY_META: Record<JourneyId, {
   subline: string;
 }> = {
   indeciso:    { label: "Indeciso",   Icon: HelpCircle,  color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30",      headline: "Scopri la tua strada",           subline: "Inizia con il test RIASEC per capire il tuo profilo professionale" },
-  dipendente:  { label: "Dipendente", Icon: TrendingUp,  color: "text-[#A8D5BA]",    bgColor: "bg-[#A8D5BA]/10",    borderColor: "border-[#A8D5BA]/30",    headline: "Accelera la tua carriera",        subline: "Analizza le tue skill, allenati per i colloqui, ottieni un piano di crescita" },
+  dipendente:  { label: "Dipendente", Icon: TrendingUp,  color: "text-growth",    bgColor: "bg-growth/10",    borderColor: "border-growth/30",    headline: "Accelera la tua carriera",        subline: "Analizza le tue skill, allenati per i colloqui, ottieni un piano di crescita" },
   autonomo:    { label: "Autonomo",   Icon: Rocket,      color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30",      headline: "Scala il tuo business",          subline: "Valida idee, trova mercati, costruisci il tuo piano strategico con l'AI" },
-  azienda:     { label: "Azienda",    Icon: Building2,   color: "text-[#A8D5BA]",    bgColor: "bg-[#A8D5BA]/10",    borderColor: "border-[#A8D5BA]/30",    headline: "Trova i profili giusti",          subline: "Esplora i profili RIASEC, pubblica le tue opportunità, analizza il mercato" },
+  azienda:     { label: "Azienda",    Icon: Building2,   color: "text-growth",    bgColor: "bg-growth/10",    borderColor: "border-growth/30",    headline: "Trova i profili giusti",          subline: "Esplora i profili RIASEC, pubblica le tue opportunità, analizza il mercato" },
   investitore: { label: "Investitore",Icon: BarChart3,   color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30",      headline: "Analizza le opportunità",         subline: "Settori in crescita, trend di mercato e analisi delle competenze richieste" },
 };
 
@@ -159,7 +160,7 @@ function ProfessionCard({ p, index }: { p: ProfessionResult; index: number }) {
           <p className="text-xs text-muted-foreground mt-0.5">{p.sector}</p>
         </div>
         {p.growthOutlook && (
-          <span className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-[#A8D5BA] bg-[#A8D5BA]/10 border border-[#A8D5BA]/20 rounded-full px-2.5 py-0.5">
+          <span className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-growth bg-growth/10 border border-growth/20 rounded-full px-2.5 py-0.5">
             <TrendingUp className="w-3 h-3" /> {p.growthOutlook}
           </span>
         )}
@@ -237,9 +238,9 @@ function EducationCard({ e }: { e: EducationResult }) {
 /* ── Work mode panel ─────────────────────────────────── */
 function WorkModePanel({ wm, isPremium }: { wm: WorkModeResult; isPremium: boolean }) {
   const colorMap: Record<string, string> = {
-    dipendente: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-    autonomo:   "text-violet-400 bg-violet-400/10 border-violet-400/20",
-    ibrido:     "text-[#A8D5BA] bg-[#A8D5BA]/10 border-[#A8D5BA]/20",
+    dipendente: "text-chart-3 bg-chart-3/10 border-chart-3/20",
+    autonomo:   "text-chart-4 bg-chart-4/10 border-chart-4/20",
+    ibrido:     "text-growth bg-growth/10 border-growth/20",
   };
   const labelMap: Record<string, string> = {
     dipendente: "Dipendente",
@@ -281,24 +282,26 @@ function WorkModePanel({ wm, isPremium }: { wm: WorkModeResult; isPremium: boole
 
 /* ── AI loading skeleton ─────────────────────────────── */
 function AgentLoadingSkeleton() {
+  const LOADING_MESSAGES = [
+    "Analizzo il tuo profilo RIASEC…",
+    "Confronto con 28 settori di mercato…",
+    "Calcolo le professioni più adatte…",
+    "Valuto i percorsi formativi…",
+    "Preparo i tuoi insights personalizzati…",
+  ];
+  const [msgIndex, setMsgIndex] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setMsgIndex(i => (i + 1) % LOADING_MESSAGES.length), 4000);
+    return () => clearInterval(t);
+  }, []);
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3 text-primary animate-pulse">
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 text-primary">
         <Loader2 className="w-5 h-5 animate-spin" />
-        <span className="text-sm font-medium">Analisi AI in corso — potrebbe richiedere 20–30 secondi…</span>
+        <span className="text-sm font-medium transition-all">{LOADING_MESSAGES[msgIndex]}</span>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="rounded-2xl border p-5 space-y-3">
-            <Skeleton className="h-4 w-20 rounded-full" />
-            <Skeleton className="h-5 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-            <div className="flex gap-2">
-              <Skeleton className="h-6 w-16 rounded-full" />
-              <Skeleton className="h-6 w-20 rounded-full" />
-            </div>
-          </div>
-        ))}
+      <div className="h-1 bg-primary/10 rounded-full overflow-hidden">
+        <div className="h-full bg-primary rounded-full animate-[grow_25s_ease-in-out_forwards]" />
       </div>
     </div>
   );
@@ -444,11 +447,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Persona tools ───────────────────────────── */}
+      {/* ── Strumenti unificati ──────────────────────── */}
       <section>
         <div className="flex items-center gap-3 mb-5">
           <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
-            <Sparkles className="w-4 h-4" />
+            <LayoutGrid className="w-4 h-4" />
           </div>
           <div>
             <h2 className="font-bold text-xl text-foreground">I tuoi strumenti</h2>
@@ -457,7 +460,42 @@ export default function Dashboard() {
             </p>
           </div>
         </div>
-        <JourneyToolsSection journeyType={journeyType} sessionId={sessionId} sectorId={topSectorId} />
+        <Tabs defaultValue="personalizzati">
+          <TabsList className="mb-5">
+            <TabsTrigger value="personalizzati">Per te</TabsTrigger>
+            <TabsTrigger value="avanzati">Approfondisci</TabsTrigger>
+          </TabsList>
+          <TabsContent value="personalizzati">
+            <JourneyToolsSection journeyType={journeyType} sessionId={sessionId} sectorId={topSectorId} />
+          </TabsContent>
+          <TabsContent value="avanzati">
+            {sessionId ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { href: `${BASE}wiki/${topSectorId ?? ""}`,    icon: MessageSquare, title: "Wiki AI",           desc: "Chiedi tutto sul tuo settore a un esperto AI" },
+                  { href: `${BASE}roadmap/${topSectorId ?? ""}`, icon: Map,           title: "Roadmap",           desc: "Percorso formativo con fit score personalizzato" },
+                  { href: `/grafo`,                              icon: Network,       title: "Knowledge Graph",   desc: "Note, skill e documenti collegati" },
+                  { href: "/news",                               icon: Newspaper,     title: "News di Settore",   desc: "Aggiornamenti live dal mondo del lavoro" },
+                ].map(({ href, icon: Icon, title, desc }) => (
+                  <Link key={title} href={href}>
+                    <div className="group rounded-2xl border border-border bg-card p-5 flex flex-col gap-3 hover:border-primary/30 transition-all duration-200 cursor-pointer h-full">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 group-hover:bg-primary/15 transition-colors">
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground text-sm">{title}</p>
+                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{desc}</p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 mt-auto self-end text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Completa il test per sbloccare strumenti avanzati.</p>
+            )}
+          </TabsContent>
+        </Tabs>
       </section>
 
       {/* ── AI Analysis ─────────────────────────────── */}
@@ -538,7 +576,7 @@ export default function Dashboard() {
             {isPremium && educationPaths.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <GraduationCap className="w-4 h-4 text-[#A8D5BA]" />
+                  <GraduationCap className="w-4 h-4 text-growth" />
                   <h3 className="font-semibold text-foreground">Percorsi formativi</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -551,42 +589,6 @@ export default function Dashboard() {
           </div>
         )}
       </section>
-
-      {/* ── All tools hub ───────────────────────────── */}
-      {sessionId && (
-        <section>
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
-              <Map className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="font-bold text-xl text-foreground">Esplora tutti gli strumenti</h2>
-              <p className="text-xs text-muted-foreground">Approfondisci il tuo settore e pianifica la crescita</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { href: `${BASE}wiki/${topSectorId ?? ""}`,    icon: MessageSquare, title: "Wiki AI",           desc: "Chiedi tutto sul tuo settore a un esperto AI" },
-              { href: `${BASE}roadmap/${topSectorId ?? ""}`, icon: Map,           title: "Roadmap",           desc: "Percorso formativo con fit score personalizzato" },
-              { href: `/grafo`,                              icon: Network,       title: "Knowledge Graph",   desc: "Note, skill e documenti collegati" },
-              { href: "/news",                               icon: Newspaper,     title: "News di Settore",   desc: "Aggiornamenti live dal mondo del lavoro" },
-            ].map(({ href, icon: Icon, title, desc }) => (
-              <Link key={title} href={href}>
-                <div className="group rounded-2xl border border-border bg-card p-5 flex flex-col gap-3 hover:border-primary/30 transition-all duration-200 cursor-pointer h-full">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 group-hover:bg-primary/15 transition-colors">
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-foreground text-sm">{title}</p>
-                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{desc}</p>
-                  </div>
-                  <ArrowRight className="w-4 h-4 mt-auto self-end text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* ── Bottom actions ──────────────────────────── */}
       <div className="pt-2 flex flex-col sm:flex-row gap-3 border-t border-border pt-6">

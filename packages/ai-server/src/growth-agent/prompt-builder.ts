@@ -104,11 +104,14 @@ export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {
 
   // ── Chain of Thought ──────────────────────────────────────────────────────
   if (cot) {
+    const actions = cot.controllableActions
+      .map((a, i) => `   ${i + 1}. ${a}`)
+      .join("\n");
     sections.push(
       `## Ragionamento preliminare\n` +
-      `Domanda classificata come: ${cot.category}\n` +
-      `Analisi: ${cot.analysis}\n` +
-      `Approccio suggerito: ${cot.approach}`
+      `Pattern rilevato: ${cot.limitingPattern}\n` +
+      `Angolo cieco: ${cot.blindSpot}\n` +
+      `Azioni suggerite:\n${actions}`
     );
   }
 

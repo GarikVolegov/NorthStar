@@ -8,11 +8,15 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "seed-products": "tsx ./src/seed-products.ts"
   },
+  "dependencies": {
+    "@workspace/db": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "pg": "^8.20.0",
+    "stripe": "^22.1.0"
+  },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/pg": "^8.18.0",
     "tsx": "catalog:"
-  },
-  "dependencies": {
-    "stripe": "^22.1.0"
   }
 }

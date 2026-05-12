@@ -47,8 +47,8 @@ const PERSONAS: Persona[] = [
       "Sei impiegato e vuoi fare carriera, cambiare ruolo o passare a un settore migliore. Hai bisogno di strumenti concreti per crescere.",
     tools: ["Analisi skill gap", "Simulatore colloquio", "Roadmap di carriera", "Candidature"],
     color: "from-[#0f1f18] to-[#162914]",
-    accent: "text-[#A8D5BA]",
-    border: "border-[#A8D5BA]/40",
+    accent: "text-growth",
+    border: "border-growth/40",
   },
   {
     id: "autonomo",
@@ -71,8 +71,8 @@ const PERSONAS: Persona[] = [
       "Sei HR, recruiter o manager. Stai cercando i profili giusti per il tuo team e vuoi capire il mercato dei talenti italiano.",
     tools: ["Profili RIASEC", "Settori in crescita", "Analisi competenze", "Affilazione"],
     color: "from-[#0f1f18] to-[#1c1810]",
-    accent: "text-[#A8D5BA]",
-    border: "border-[#A8D5BA]/40",
+    accent: "text-growth",
+    border: "border-growth/40",
   },
   {
     id: "investitore",

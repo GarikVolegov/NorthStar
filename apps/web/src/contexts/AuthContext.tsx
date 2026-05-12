@@ -39,15 +39,18 @@ export interface AuthUser {
   isAffiliate?: boolean;
 }
 
+const JOURNEY_CACHE_KEY = "ns_journey";
+
 /** Dati minimi salvati in localStorage per UI pre-mount. */
 interface UserCache {
   id: number;
   name: string;
   avatarUrl?: string | null;
+  journeyType?: string | null;
 }
 
 function cacheUser(u: AuthUser): UserCache {
-  return { id: u.id, name: u.name, avatarUrl: u.avatarUrl };
+  return { id: u.id, name: u.name, avatarUrl: u.avatarUrl, journeyType: u.journeyType };
 }
 
 interface AuthContextValue {
@@ -70,13 +73,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => {
     try {
       const raw = sessionStorage.getItem(TOKEN_STORAGE_KEY);
-      // If no token in sessionStorage, don't restore user — require fresh auth
       if (!raw) return null;
       const cached = localStorage.getItem(USER_STORAGE_KEY);
       if (!cached) return null;
       const parsed = JSON.parse(cached) as UserCache;
-      // Partial user — full data fetched via /api/auth/me on mount
-      return { id: parsed.id, name: parsed.name, avatarUrl: parsed.avatarUrl ?? null } as AuthUser;
+      const cachedJourney = localStorage.getItem(JOURNEY_CACHE_KEY);
+      return {
+        id: parsed.id,
+        name: parsed.name,
+        avatarUrl: parsed.avatarUrl ?? null,
+        journeyType: parsed.journeyType ?? cachedJourney ?? null,
+      } as AuthUser;
     } catch {
       return null;
     }
@@ -104,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const next = { ...prev, ...updates };
       try {
         localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(cacheUser(next)));
+        if (next.journeyType) localStorage.setItem(JOURNEY_CACHE_KEY, next.journeyType);
       } catch {}
       return next;
     });
@@ -179,6 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(async (res) => {
         if (res.ok) {
           const fresh = (await res.json()) as AuthUser;
+          if (fresh.journeyType) localStorage.setItem(JOURNEY_CACHE_KEY, fresh.journeyType);
           setUser((prev) => (prev ? { ...prev, ...fresh } : fresh));
         } else if (res.status === 401) {
           setUser(null);
@@ -200,6 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         sessionStorage.setItem(TOKEN_STORAGE_KEY, t);
         localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(cacheUser(u)));
+        if (u.journeyType) localStorage.setItem(JOURNEY_CACHE_KEY, u.journeyType);
       } catch {}
 
       setAuthTokenGetter(() => t);

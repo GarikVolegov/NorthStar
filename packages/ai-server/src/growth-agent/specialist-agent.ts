@@ -41,6 +41,8 @@ const DOMAIN_STATUS_ICONS: Record<Domain, string> = {
   mindset: "🧠",
   habits:  "🌱",
   trading: "📈",
+  finance: "💰",
+  relationships: "🤝",
   general: "✨",
 };
 
@@ -49,6 +51,8 @@ const DOMAIN_LABELS: Record<Domain, string> = {
   mindset: "profilo mindset",
   habits:  "profilo abitudini",
   trading: "profilo trading",
+  finance: "profilo finanziario",
+  relationships: "profilo relazionale",
   general: "profilo",
 };
 
