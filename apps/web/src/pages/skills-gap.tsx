@@ -74,7 +74,7 @@ const PROGRESS_TEXTS = [
   "Confrontando con i requisiti del settore…",
   "Calcolando i gap prioritari…",
   "Elaborando il piano d'azione…",
-  "Generando il report finale…",
+  "Preparazione del rapporto finale…",
 ];
 
 export default function SkillsGap() {
@@ -262,7 +262,7 @@ export default function SkillsGap() {
                   value={customSkill}
                   onChange={(e) => setCustomSkill(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addCustomSkill()}
-                  placeholder="Aggiungi skill personalizzata…"
+                  placeholder="Aggiungi competenza…"
                   className="flex-1 rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
                 <Button size="sm" variant="outline" onClick={addCustomSkill} disabled={!customSkill.trim()}>

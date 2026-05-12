@@ -96,7 +96,7 @@ const PERSONAS: Persona[] = [
     tagline: "Non so ancora cosa fare",
     ctaLabel: "Fai il test gratuito",
     ctaHref: "/test",
-    tools: ["Test RIASEC", "Esplora settori", "Coach AI"],
+    tools: ["Test di personalità", "Esplora settori", "Consulente AI"],
     accentClass: "text-primary",
     borderClass: "hover:border-primary/50",
   },
@@ -107,7 +107,7 @@ const PERSONAS: Persona[] = [
     tagline: "Ho un lavoro e voglio crescere",
     ctaLabel: "Analizza le mie skill",
     ctaHref: "/test",
-    tools: ["Skill Gap", "Simulatore colloquio", "Roadmap"],
+    tools: ["Competenze", "Simulatore colloquio", "Piano di crescita"],
     accentClass: "text-growth",
     borderClass: "hover:border-growth/50",
   },
@@ -118,7 +118,7 @@ const PERSONAS: Persona[] = [
     tagline: "Lavoro in proprio e voglio scalare",
     ctaLabel: "Valida la mia idea",
     ctaHref: "/validatore-idea",
-    tools: ["Validatore Idea", "Roadmap business", "Coach AI"],
+    tools: ["Analisi idea", "Piano attività", "Consulente AI"],
     accentClass: "text-primary",
     borderClass: "hover:border-primary/50",
   },
@@ -129,7 +129,7 @@ const PERSONAS: Persona[] = [
     tagline: "Cerco il profilo giusto",
     ctaLabel: "Esplora i profili",
     ctaHref: "/settori",
-    tools: ["Profili RIASEC", "Settori in crescita", "Affilazione"],
+    tools: ["Profili personalità", "Settori in crescita", "Affiliazione"],
     accentClass: "text-growth",
     borderClass: "hover:border-growth/50",
   },
@@ -140,7 +140,7 @@ const PERSONAS: Persona[] = [
     tagline: "Valuto opportunità di mercato",
     ctaLabel: "Vedi i trend",
     ctaHref: "/settori",
-    tools: ["Settori in crescita", "Analisi trend", "Knowledge Graph"],
+    tools: ["Settori in crescita", "Analisi andamento", "Mappa conoscenze"],
     accentClass: "text-primary",
     borderClass: "hover:border-primary/50",
   },
@@ -556,11 +556,11 @@ function LoggedInHero({
   const hasTest = !!latestResult?.recommendations?.length;
 
   const NEXT_STEP: Record<JourneyId, { label: string; desc: string; href: string; icon: React.ElementType }> = {
-    indeciso:    { label: "Fai il test RIASEC",        desc: "Scopri la tua personalità professionale",          href: "/test",             icon: Zap },
-    dipendente:  { label: "Analizza il tuo gap",        desc: "Identifica le competenze che ti mancano",          href: "/dashboard",        icon: TrendingUp },
-    autonomo:    { label: "Valida la tua idea",         desc: "Ricevi una valutazione AI del tuo business",       href: "/validatore-idea",  icon: Rocket },
-    azienda:     { label: "Esplora i profili",          desc: "Trova i profili RIASEC più adatti al tuo team",    href: "/settori",          icon: Building2 },
-    investitore: { label: "Vedi i settori in crescita", desc: "Analizza trend e opportunità del mercato italiano", href: "/settori",          icon: BarChart3 },
+    indeciso:    { label: "Fai il test",        desc: "Scopri la tua personalità professionale",          href: "/test",             icon: Zap },
+    dipendente:  { label: "Analizza le competenze",        desc: "Identifica le competenze che ti mancano",          href: "/dashboard",        icon: TrendingUp },
+    autonomo:    { label: "Valida la tua idea",         desc: "Ricevi una valutazione della tua attività",       href: "/validatore-idea",  icon: Rocket },
+    azienda:     { label: "Esplora i profili",          desc: "Trova i profili più adatti al tuo team",    href: "/settori",          icon: Building2 },
+    investitore: { label: "Vedi i settori in crescita", desc: "Analizza andamento e opportunità del mercato italiano", href: "/settori",          icon: BarChart3 },
   };
 
   const nextStep = journeyType ? NEXT_STEP[journeyType as JourneyId] : null;
@@ -722,34 +722,34 @@ function QuickToolsSection({ journeyType, sessionId }: { journeyType: string | n
 
   const ALL_TOOLS: Record<string, ToolDef[]> = {
     indeciso: [
-      { href: "/test",       icon: Zap,        title: "Test RIASEC",       desc: "17 domande per mappare la tua personalità" },
+      { href: "/test",       icon: Zap,        title: "Test di personalità", desc: "17 domande per mappare la tua personalità" },
       { href: "/settori",    icon: TrendingUp,  title: "Esplora settori",   desc: "28 settori con stipendi e crescita" },
-      { href: "/coach",      icon: Bot,         title: "Coach AI",          desc: "Sessioni di coaching personalizzato", badge: "Premium" },
-      { href: "/news",       icon: Newspaper,   title: "News del lavoro",   desc: "Ultime notizie dal mercato" },
+      { href: "/coach",      icon: Bot,         title: "Consulente AI",     desc: "Sessioni di consulenza personalizzate", badge: "Pro" },
+      { href: "/news",       icon: Newspaper,   title: "Notizie lavoro",    desc: "Ultime notizie dal mercato" },
     ],
     dipendente: [
-      { href: sessionId ? `/skills-gap/${sessionId}` : "/dashboard", icon: Zap, title: "Gap Competenze", desc: "Skill mancanti per il tuo ruolo", badge: "AI" },
+      { href: sessionId ? `/skills-gap/${sessionId}` : "/dashboard", icon: Zap, title: "Competenze da sviluppare", desc: "Identifica cosa ti manca", badge: "AI" },
       { href: sessionId ? `/colloquio/${sessionId}` : "/dashboard",  icon: TrendingUp, title: "Simulatore Colloquio", desc: "Allenati con domande reali", badge: "AI" },
-      { href: "/coach",      icon: Bot,         title: "Career Coach AI",   desc: "Percorso di crescita personalizzato" },
+      { href: "/coach",      icon: Bot,         title: "Consulente di carriera", desc: "Piano di crescita personalizzato" },
       { href: "/candidature",icon: Briefcase,   title: "Le mie candidature",desc: "Gestisci le tue richieste di lavoro" },
     ],
     autonomo: [
-      { href: "/validatore-idea", icon: Rocket, title: "Valida la tua idea", desc: "Score AI su 10 con report dettagliato", badge: "AI" },
-      { href: "/coach",           icon: Bot,    title: "Business Coach AI",  desc: "Consigli strategici per il tuo business" },
-      { href: "/settori",         icon: TrendingUp, title: "Mercati in crescita", desc: "Trova il settore più profittevole" },
-      { href: "/news",            icon: Newspaper, title: "News business",  desc: "Ultime notizie imprenditoria" },
+      { href: "/validatore-idea", icon: Rocket, title: "Analisi idea", desc: "Valutazione con AI dettagliata", badge: "AI" },
+      { href: "/coach",           icon: Bot,    title: "Consulente per la tua attività", desc: "Consigli strategici" },
+      { href: "/settori",         icon: TrendingUp, title: "Mercati in crescita", desc: "Trova il settore più adatto" },
+      { href: "/news",            icon: Newspaper, title: "Notizie imprese", desc: "Ultime novità" },
     ],
     azienda: [
-      { href: "/settori",    icon: TrendingUp,  title: "Profili RIASEC",    desc: "Trova il profilo psicologico ideale" },
+      { href: "/settori",    icon: TrendingUp,  title: "Profili personalità", desc: "Trova il profilo psicologico ideale" },
       { href: "/affiliazione",icon: Building2,  title: "Affiliazione",      desc: "Pubblica la tua opportunità" },
-      { href: "/news",       icon: Newspaper,   title: "News HR",           desc: "Tendenze del mercato del lavoro" },
-      { href: "/crescita",   icon: Sparkles,    title: "Crescita aziendale",desc: "Articoli su cultura e team building" },
+      { href: "/news",       icon: Newspaper,   title: "Notizie HR",        desc: "Tendenze del mercato del lavoro" },
+      { href: "/crescita",   icon: Sparkles,    title: "Crescita aziendale",desc: "Articoli su cultura e team" },
     ],
     investitore: [
-      { href: "/settori",    icon: BarChart3,   title: "Settori in crescita", desc: "Analisi trend del mercato italiano" },
-      { href: "/news",       icon: Newspaper,   title: "News mercati",      desc: "Ultime notizie economia e finanza" },
-      { href: "/crescita",   icon: TrendingUp,  title: "Report di crescita", desc: "Dati e insight per investire" },
-      { href: sessionId ? `/grafo` : "/settori", icon: Sparkles, title: "Knowledge Graph", desc: "Rete di connessioni tra settori" },
+      { href: "/settori",    icon: BarChart3,   title: "Settori in crescita", desc: "Analisi andamento del mercato italiano" },
+      { href: "/news",       icon: Newspaper,   title: "Notizie mercati",   desc: "Ultime notizie economia e finanza" },
+      { href: "/crescita",   icon: TrendingUp,  title: "Crescita settori",  desc: "Dati e analisi per investire" },
+      { href: sessionId ? `/grafo` : "/settori", icon: Sparkles, title: "Mappa delle conoscenze", desc: "Collegamenti tra settori" },
     ],
   };
 
@@ -942,8 +942,8 @@ export default function Home() {
                 },
                 {
                   step: "03", icon: Bot,
-                  title: "Ottieni strumenti AI",
-                  desc: "Roadmap personalizzate, skill gap analysis, simulazione colloqui, business validator e coach AI.",
+                  title: "Strumenti con AI",
+                  desc: "Piani personalizzati, analisi competenze, simulazione colloqui e guida AI.",
                   href: "/premium",
                   label: "Scopri gli strumenti",
                   accent: "bg-primary/10 text-primary border-primary/20",

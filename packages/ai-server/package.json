@@ -8,7 +8,8 @@
     "./batch": "./src/batch/index.ts",
     "./image": "./src/image/index.ts",
     "./audio": "./src/audio/index.ts",
-    "./db": "./src/db/client.ts"
+    "./db": "./src/db/client.ts",
+    "./growth-agent": "./src/growth-agent/index.ts"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",

@@ -61,6 +61,7 @@ export const sectorsTable = pgTable("sectors", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }),
 });
 
 export const insertSectorSchema = createInsertSchema(sectorsTable).omit({

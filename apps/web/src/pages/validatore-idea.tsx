@@ -361,7 +361,7 @@ function IdeaDetail({ idea, onDelete }: { idea: BusinessIdea; onDelete: () => vo
       {current.status === "validating" && (
         <div className="flex items-center gap-3 py-10 justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <span className="text-muted-foreground">L'AI sta analizzando la tua idea…</span>
+          <span className="text-muted-foreground">L'intelligenza artificiale sta analizzando la tua idea…</span>
         </div>
       )}
 
@@ -527,7 +527,7 @@ export default function ValidatoreIdea() {
             </div>
             <h1 className="font-bold text-4xl text-foreground mb-3">Valida la tua idea</h1>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              L'AI analizza la tua idea, la struttura, la critica e la migliora — poi cerca incubatori e funding reali in Italia e in Europa.
+              L'intelligenza artificiale analizza la tua idea, la struttura, la critica e la migliora — poi cerca incubatori e finanziamenti reali in Italia e in Europa.
             </p>
           </div>
         </div>
@@ -607,7 +607,7 @@ export default function ValidatoreIdea() {
               <div className="bg-card border border-border rounded-2xl p-6">
                 <h3 className="font-bold text-foreground mb-1">Descrivi la tua idea</h3>
                 <p className="text-sm text-muted-foreground mb-5">
-                  Scrivi liberamente — l'AI la struttura, valida e migliora. Più dettagli dai, migliore sarà l'analisi.
+                  Scrivi liberamente — l'intelligenza artificiale la struttura, valida e migliora. Più dettagli dai, migliore sarà l'analisi.
                 </p>
 
                 <div className="space-y-4">
@@ -670,7 +670,7 @@ export default function ValidatoreIdea() {
                     >
                       {submitMut.isPending
                         ? <><Loader2 className="h-4 w-4 animate-spin" />Invio…</>
-                        : <><Sparkles className="h-4 w-4" />Valida con AI</>
+                        : <><Sparkles className="h-4 w-4" />Analizza</>
                       }
                     </Button>
                     {ideas.length > 0 && (

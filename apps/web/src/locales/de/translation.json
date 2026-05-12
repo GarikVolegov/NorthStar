@@ -4,7 +4,7 @@
     "sectors": "Branchen",
     "growth": "Wachstum",
     "news": "Nachrichten",
-    "premium": "Premium",
+    "premium": "Pro",
     "login": "Anmelden",
     "startJourney": "Reise beginnen",
     "back": "Zurück",
@@ -762,8 +762,8 @@
     "wikiAI": "KI-Wiki",
     "wikiDesc": "Stelle spezifische Fragen zur Branche und erhalte personalisierte Antworten von der KI.",
     "openChat": "Chat öffnen",
-    "roadmap": "Detaillierte Roadmap",
-    "roadmapDesc": "Ein schrittweiser Plan, der von der KI generiert wurde, um mit konkreten Ressourcen in die Branche einzusteigen.",
+    "roadmap": "Wachstumsplan",
+    "roadmapDesc": "Detaillierter KI-generierter Plan für den Einstieg in die Branche mit konkreten Ressourcen.",
     "generatePlan": "Plan generieren",
     "knowledgeGraph": "Wissensgraph",
     "graphDesc": "Visualisiere Rollen, Kompetenzen und Tools der Branche in einem interaktiven Graphen.",
@@ -825,7 +825,7 @@
         "desc": "Greife auf eine intelligente Wissensdatenbank zu, die deine spezifischen Fragen zur gewählten Branche beantwortet."
       },
       "graph": {
-        "title": "Wissensgraph",
+        "title": "Wissenskarte",
         "desc": "Visualisiere Ausbildungswege, Kompetenzen und Verbindungen zwischen Berufsrollen interaktiv."
       },
       "roadmap": {
@@ -1612,7 +1612,7 @@
         "desc": "Aktualisierte Artikel nach Sektor"
       },
       "premium": {
-        "label": "Premium",
+        "label": "Pro",
         "desc": "Plane und erweiterte Funktionen"
       },
       "profilo": {
@@ -1680,8 +1680,8 @@
     ]
   },
   "roadmap": {
-    "title": "Roadmap",
-    "subtitle": "Dein schrittweiser Plan, um in die Branche einzusteigen.",
+    "title": "Wachstumsplan",
+    "subtitle": "Dein detaillierter Plan, um in die Branche einzusteigen.",
     "generate": "Roadmap generieren",
     "generating": "Generierung…",
     "premiumRequired": "Premium-Funktion",
@@ -1710,7 +1710,7 @@
     "detailed": "Detaillierte Roadmap"
   },
   "grafo": {
-    "title": "Wissensgraph",
+    "title": "Wissenskarte",
     "subtitle": "Visualisiere Rollen, Kompetenzen und Tools der Branche.",
     "generating": "Graphen wird generiert…",
     "premiumRequired": "Premium-Funktion",

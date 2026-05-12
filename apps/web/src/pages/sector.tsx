@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { SectorFreshnessBadge } from "@/components/sector/SectorFreshnessBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft, Clock, DollarSign, Bot, Sparkles, TrendingUp, Target,
@@ -313,6 +314,13 @@ export default function Sector() {
         </div>
       </div>
 
+      {/* Data Freshness */}
+      {sector && (
+        <div className="flex justify-end mb-4">
+          <SectorFreshnessBadge updatedAt={(sector as Record<string, unknown>).updatedAt as string | undefined} />
+        </div>
+      )}
+
       {/* Compare CTA */}
       <div className="mb-8 flex items-center justify-between gap-4 p-4 rounded-2xl border border-dashed border-border bg-muted/30">
         <div className="flex items-center gap-3">
@@ -386,7 +394,7 @@ export default function Sector() {
               </div>
               <h4 className="font-semibold mb-1.5 text-sm">Simulatore Colloquio</h4>
               <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-                Preparati con mock interview AI nel tuo settore
+                Preparati al colloquio con AI nel tuo settore
               </p>
               <div className="flex items-center text-orange-600 text-xs font-medium">
                 Inizia colloquio <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />

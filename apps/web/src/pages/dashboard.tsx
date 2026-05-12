@@ -1,12 +1,12 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-fetch";
+import { useDashboardData } from "@/hooks/useDashboardData";
 import { useAgentAnalysis } from "@/hooks/useAgentAnalysis";
 import type { ProfessionResult, EducationResult, WorkModeResult } from "@/hooks/useAgentAnalysis";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { usePageMeta } from "@/lib/seo";
@@ -14,11 +14,22 @@ import {
   Bot, Briefcase, GraduationCap, TrendingUp, Zap, Crown, Lock,
   Loader2, ArrowRight, CheckCircle2, Sparkles, AlertTriangle,
   DollarSign, Clock, MessageSquare, Map, Network, Newspaper,
-  Target, BrainCircuit, Mic2, Trophy, HelpCircle, Rocket,
+  Target, BrainCircuit, Mic2, HelpCircle, Rocket,
   Building2, BarChart3, MapPin, ChevronRight, LayoutGrid,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+
+// Dashboard components
+import { DashboardHero } from "@/components/dashboard/DashboardHero";
+import { DashboardObjectives } from "@/components/dashboard/DashboardObjectives";
+import { DashboardPersonality } from "@/components/dashboard/DashboardPersonality";
+import { DashboardCareerPipeline } from "@/components/dashboard/DashboardCareerPipeline";
+import { DashboardIdeaValidator } from "@/components/dashboard/DashboardIdeaValidator";
+import { DashboardCandidateSearch } from "@/components/dashboard/DashboardCandidateSearch";
+import { DashboardMarketInsights } from "@/components/dashboard/DashboardMarketInsights";
+import { DashboardCalendar } from "@/components/dashboard/DashboardCalendar";
+import { DashboardGrowth } from "@/components/dashboard/DashboardGrowth";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -87,34 +98,34 @@ function JourneyToolsSection({ journeyType, sessionId, sectorId }: {
 
   const TOOLS_BY_JOURNEY: Record<JourneyId, ToolItem[]> = {
     indeciso: [
-      { href: "/test",                          icon: Zap,         title: "Test RIASEC",           desc: "Mappa la tua personalità professionale",               badge: "Gratuito" },
-      { href: "/settori",                       icon: Target,      title: "Esplora settori",        desc: "28 settori con stipendi, crescita e dati AI" },
-      { href: `${BASE}coach`,                   icon: BrainCircuit,title: "Career Coach AI",        desc: "Sessioni di coaching personalizzate",                  badge: "AI" },
-      { href: "/news",                          icon: Newspaper,   title: "News lavoro",            desc: "Ultime notizie dal mercato del lavoro" },
+      { href: "/test",                          icon: Zap,         title: "Test di personalità",    desc: "Mappa la tua personalità professionale",               badge: "Gratuito" },
+      { href: "/settori",                       icon: Target,      title: "Esplora settori",        desc: "28 settori con stipendi, crescita e dati" },
+      { href: `${BASE}coach`,                   icon: BrainCircuit,title: "Consulente di carriera",  desc: "Sessioni di consulenza personalizzate",                badge: "AI" },
+      { href: "/news",                          icon: Newspaper,   title: "Notizie lavoro",         desc: "Ultime notizie dal mercato del lavoro" },
     ],
     dipendente: [
-      { href: sectorId ? `${BASE}skills-gap/${sectorId}` : "/dashboard", icon: Target,     title: "Gap Competenze",          desc: "Identifica le skill che ti mancano per salire di livello", badge: "AI" },
+      { href: sectorId ? `${BASE}skills-gap/${sectorId}` : "/dashboard", icon: Target,     title: "Competenze da sviluppare",desc: "Identifica cosa ti manca per salire di livello",             badge: "AI" },
       { href: sectorId ? `${BASE}colloquio/${sectorId}` : "/dashboard",  icon: Mic2,       title: "Simulatore Colloquio",    desc: "Allenati con domande reali del tuo settore",               badge: "AI" },
-      { href: `${BASE}coach`,                                              icon: BrainCircuit,title: "Career Coach AI",        desc: "Piano di crescita personalizzato per la tua carriera",     badge: "AI" },
+      { href: `${BASE}coach`,                                              icon: BrainCircuit,title: "Consulente di carriera",  desc: "Piano di crescita personalizzato per la tua carriera",     badge: "AI" },
       { href: "/candidature",                                              icon: Briefcase,  title: "Le mie candidature",     desc: "Gestisci le tue richieste e traccia i progressi" },
     ],
     autonomo: [
       { href: "/validatore-idea",               icon: Rocket,      title: "Valida la tua idea",     desc: "Score AI + analisi su 12 dimensioni + incubatori",     badge: "AI" },
-      { href: `${BASE}coach`,                   icon: BrainCircuit,title: "Business Coach AI",      desc: "Consigli strategici per far crescere il business",     badge: "AI" },
+      { href: `${BASE}coach`,                   icon: BrainCircuit,title: "Consulente per la tua attività", desc: "Consigli strategici per far crescere la tua attività",  badge: "AI" },
       { href: "/settori",                       icon: TrendingUp,  title: "Mercati in crescita",    desc: "Scopri i settori più profittevoli in Italia" },
-      { href: `/grafo`,                         icon: Network,     title: "Knowledge Graph",        desc: "Mappa le connessioni tra settori e competenze" },
+      { href: `/grafo`,                         icon: Network,     title: "Mappa delle conoscenze", desc: "Mappa le connessioni tra settori e competenze" },
     ],
     azienda: [
-      { href: "/settori",                       icon: Building2,   title: "Profili RIASEC",         desc: "Esplora i profili psicologici per ogni settore" },
+      { href: "/settori",                       icon: Building2,   title: "Profili personalità",    desc: "Esplora i profili psicologici per ogni settore" },
       { href: "/affiliazione",                  icon: Briefcase,   title: "Pubblica offerta",       desc: "Raggiungi i candidati qualificati sulla piattaforma" },
       { href: "/crescita",                      icon: Sparkles,    title: "Crescita aziendale",     desc: "Articoli su cultura, team building e leadership" },
       { href: "/news",                          icon: Newspaper,   title: "News HR & Lavoro",       desc: "Tendenze del mercato del lavoro italiano" },
     ],
     investitore: [
       { href: "/settori",                       icon: BarChart3,   title: "Settori in crescita",    desc: "Analisi approfondita dei settori più dinamici" },
-      { href: "/news",                          icon: Newspaper,   title: "News mercati",           desc: "Ultime notizie economia, finanza e business" },
-      { href: "/crescita",                      icon: TrendingUp,  title: "Report di crescita",    desc: "Dati e insight per decisioni di investimento" },
-      { href: "/grafo",                         icon: Network,     title: "Knowledge Graph",        desc: "Rete di connessioni tra settori e competenze" },
+      { href: "/news",                          icon: Newspaper,   title: "Notizie mercati",        desc: "Ultime notizie economia, finanza e mercati" },
+      { href: "/crescita",                      icon: TrendingUp,  title: "Crescita di settore",   desc: "Dati e analisi per decisioni di investimento" },
+      { href: "/grafo",                         icon: Network,     title: "Mappa delle conoscenze", desc: "Rete di connessioni tra settori e competenze" },
     ],
   };
 
@@ -346,7 +357,54 @@ export default function Dashboard() {
   const educationPaths = summary?.educationPaths ?? [];
   const workMode = summary?.workMode;
 
-  if (!authReady || sessionLoading) {
+  /* ── Dashboard data (objectives, events) ────────── */
+  const { data: dashData, isLoading: dashLoading } = useDashboardData();
+  const objectives = dashData?.objectives ?? [];
+  const objectivesProgress = dashData?.objectivesProgress ?? { done: 0, total: 0, percent: 0 };
+  const upcomingEvents = dashData?.upcomingEvents ?? [];
+
+  /* ── Objective mutations ────────────────────────── */
+  const queryClient = useQueryClient();
+
+  const toggleObjective = async (id: number, current: boolean) => {
+    try {
+      await apiFetch(`${BASE}api/objectives/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed: !current }),
+      });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
+    } catch {}
+  };
+
+  const deleteObjective = async (id: number) => {
+    try {
+      await apiFetch(`${BASE}api/objectives/${id}`, { method: "DELETE" });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
+    } catch {}
+  };
+
+  const createObjective = async (text: string) => {
+    try {
+      await apiFetch(`${BASE}api/objectives`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
+    } catch {}
+  };
+
+  /* ── Seed objectives if none exist ──────────────── */
+  useEffect(() => {
+    if (dashData && objectives.length === 0 && journeyType) {
+      apiFetch(`${BASE}api/objectives/seed`, { method: "POST" })
+        .then(() => queryClient.invalidateQueries({ queryKey: ["dashboard-data"] }))
+        .catch(() => {});
+    }
+  }, [dashData, objectives.length, journeyType]);
+
+  if (!authReady || sessionLoading || dashLoading) {
     return (
       <div className="container mx-auto px-4 py-20 max-w-5xl">
         <Skeleton className="h-10 w-72 mb-3" />
@@ -367,9 +425,9 @@ export default function Dashboard() {
         <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mx-auto mb-5 border border-primary/20">
           <Bot className="w-8 h-8" />
         </div>
-        <h1 className="text-3xl font-bold mb-3 text-foreground">Dashboard AI</h1>
+        <h1 className="text-3xl font-bold mb-3 text-foreground">Pannello di controllo</h1>
         <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
-          Completa il test di orientamento per sbloccare l'analisi AI personalizzata e tutti gli strumenti.
+          Completa il test di orientamento per sbloccare l'analisi personalizzata e tutti gli strumenti.
         </p>
         <Button asChild size="lg" className="rounded-full">
           <Link href="/test"><Sparkles className="w-4 h-4 mr-2" />Inizia il test gratuito</Link>
@@ -388,66 +446,21 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10 md:py-14 space-y-10">
+    <div className="max-w-5xl mx-auto px-4 py-10 md:py-14 space-y-8">
 
-      {/* ── Journey type banner ─────────────────────── */}
-      <div className="rounded-2xl border overflow-hidden" style={{ borderColor: journeyMeta ? undefined : "hsl(var(--border))" }}>
-        <div className="hero-navy px-6 py-5 flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex items-center gap-3 flex-1">
-            {journeyMeta && JourneyIcon ? (
-              <>
-                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", journeyMeta.bgColor, "border", journeyMeta.borderColor)}>
-                  <JourneyIcon className={cn("w-5 h-5", journeyMeta.color)} />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-white/50 uppercase tracking-wide">Percorso</p>
-                  <h2 className="font-bold text-white text-lg">{journeyMeta.headline}</h2>
-                  <p className="text-xs text-white/60">{journeyMeta.subline}</p>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center shrink-0 border border-primary/30">
-                  <Bot className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <h2 className="font-bold text-white text-lg">La tua dashboard AI</h2>
-                  <p className="text-xs text-white/60">Scegli il tuo percorso per personalizzare gli strumenti</p>
-                </div>
-              </>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {!journeyType && (
-              <Link href="/percorso">
-                <div className="inline-flex items-center gap-2 bg-primary text-primary-foreground font-bold text-xs rounded-full px-4 py-2 hover:bg-primary/90 transition-all">
-                  <MapPin className="w-3.5 h-3.5" /> Scegli il percorso
-                </div>
-              </Link>
-            )}
-            {journeyType && (
-              <Link href="/percorso">
-                <div className="inline-flex items-center gap-1.5 border border-white/20 text-white/70 text-xs rounded-full px-3 py-1.5 hover:border-white/30 hover:text-white transition-all">
-                  <MapPin className="w-3 h-3" /> Cambia percorso
-                </div>
-              </Link>
-            )}
-            {isPremium ? (
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary bg-primary/15 border border-primary/30 rounded-full px-3 py-1.5">
-                <Crown className="w-3 h-3" /> Premium
-              </span>
-            ) : (
-              <Link href="/premium">
-                <div className="inline-flex items-center gap-1.5 border border-white/15 text-white/60 text-xs rounded-full px-3 py-1.5 hover:border-primary/40 hover:text-primary transition-all">
-                  <Crown className="w-3 h-3" /> Premium
-                </div>
-              </Link>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* ── Hero ──────────────────────────────────── */}
+      <DashboardHero journeyType={journeyType} session={sessionDetail ?? null} isPremium={isPremium} />
 
-      {/* ── Strumenti unificati ──────────────────────── */}
+      {/* ── Objectives ────────────────────────────── */}
+      <DashboardObjectives
+        objectives={objectives}
+        progress={objectivesProgress}
+        onToggle={toggleObjective}
+        onDelete={deleteObjective}
+        onCreate={createObjective}
+      />
+
+      {/* ── Strumenti unificati ───────────────────── */}
       <section>
         <div className="flex items-center gap-3 mb-5">
           <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
@@ -472,10 +485,10 @@ export default function Dashboard() {
             {sessionId ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { href: `${BASE}wiki/${topSectorId ?? ""}`,    icon: MessageSquare, title: "Wiki AI",           desc: "Chiedi tutto sul tuo settore a un esperto AI" },
-                  { href: `${BASE}roadmap/${topSectorId ?? ""}`, icon: Map,           title: "Roadmap",           desc: "Percorso formativo con fit score personalizzato" },
-                  { href: `/grafo`,                              icon: Network,       title: "Knowledge Graph",   desc: "Note, skill e documenti collegati" },
-                  { href: "/news",                               icon: Newspaper,     title: "News di Settore",   desc: "Aggiornamenti live dal mondo del lavoro" },
+                  { href: `${BASE}wiki/${topSectorId ?? ""}`,    icon: MessageSquare, title: "Guida AI",          desc: "Chiedi tutto sul tuo settore" },
+                  { href: `${BASE}roadmap/${topSectorId ?? ""}`, icon: Map,           title: "Piano di crescita", desc: "Percorso formativo personalizzato" },
+                  { href: `/grafo`,                              icon: Network,       title: "Mappa delle conoscenze", desc: "Note, competenze e documenti collegati" },
+                  { href: "/news",                               icon: Newspaper,     title: "Notizie del settore",   desc: "Aggiornamenti live dal mondo del lavoro" },
                 ].map(({ href, icon: Icon, title, desc }) => (
                   <Link key={title} href={href}>
                     <div className="group rounded-2xl border border-border bg-card p-5 flex flex-col gap-3 hover:border-primary/30 transition-all duration-200 cursor-pointer h-full">
@@ -498,16 +511,67 @@ export default function Dashboard() {
         </Tabs>
       </section>
 
-      {/* ── AI Analysis ─────────────────────────────── */}
+      {/* ── Sezione personalizzata per persona ─────── */}
+      {journeyType === "indeciso" && sessionDetail && (
+        <section>
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+              <BrainCircuit className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="font-bold text-xl text-foreground">Il tuo profilo</h2>
+              <p className="text-xs text-muted-foreground">Scopri le tue inclinazioni professionali</p>
+            </div>
+            {sessionId && (
+              <Link href={`/risultati/${sessionId}`} className="ml-auto">
+                <div className="inline-flex items-center gap-1.5 text-sm text-primary font-semibold hover:gap-2 transition-all">
+                  Dettaglio <ArrowRight className="w-3.5 h-3.5" />
+                </div>
+              </Link>
+            )}
+          </div>
+          <DashboardPersonality
+            riasecScores={sessionDetail.riasecScores}
+            spiritScores={sessionDetail.spiritScores}
+            primaryTypes={sessionDetail.primaryTypes}
+          />
+        </section>
+      )}
+
+      {journeyType === "dipendente" && (
+        <section>
+          <DashboardCareerPipeline />
+        </section>
+      )}
+
+      {journeyType === "autonomo" && (
+        <section>
+          <DashboardIdeaValidator userId={user.id} />
+        </section>
+      )}
+
+      {journeyType === "azienda" && (
+        <section>
+          <DashboardCandidateSearch />
+        </section>
+      )}
+
+      {journeyType === "investitore" && (
+        <section>
+          <DashboardMarketInsights />
+        </section>
+      )}
+
+      {/* ── AI Analysis ───────────────────────────── */}
       <section>
         <div className="flex items-center gap-3 mb-5">
           <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
             <Bot className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="font-bold text-xl text-foreground">Analisi AI personalizzata</h2>
+            <h2 className="font-bold text-xl text-foreground">Analisi personalizzata</h2>
             <p className="text-xs text-muted-foreground">
-              {isPremium ? "Analisi completa basata sul tuo profilo RIASEC" : "Piano gratuito — aggiorna per l'analisi completa"}
+              {isPremium ? "Analisi completa basata sul tuo profilo" : "Piano gratuito — aggiorna per l'analisi completa"}
             </p>
           </div>
           {sessionId && (
@@ -526,7 +590,7 @@ export default function Dashboard() {
             <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
             <div>
               <p className="font-semibold text-destructive text-sm mb-1">Analisi non disponibile</p>
-              <p className="text-sm text-muted-foreground">Non è stato possibile eseguire l'analisi AI. Riprova tra qualche minuto.</p>
+              <p className="text-sm text-muted-foreground">Non è stato possibile eseguire l'analisi. Riprova tra qualche minuto.</p>
             </div>
           </div>
         )}
@@ -563,7 +627,7 @@ export default function Dashboard() {
                 <div className="flex-1">
                   <p className="font-semibold text-foreground text-sm">Modalità lavorativa + Percorsi formativi</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Con Premium l'AI consiglia la modalità di lavoro ottimale e i percorsi di studio più adatti al tuo profilo.
+                    Con Pro l'intelligenza artificiale consiglia la modalità di lavoro ottimale e i percorsi di studio più adatti al tuo profilo.
                   </p>
                 </div>
                 <Button asChild size="sm" variant="outline" className="shrink-0 rounded-full border-primary/30 text-primary hover:bg-primary/5">
@@ -590,8 +654,14 @@ export default function Dashboard() {
         )}
       </section>
 
+      {/* ── Calendar widget ────────────────────────── */}
+      <DashboardCalendar events={upcomingEvents} />
+
+      {/* ── Growth articles ────────────────────────── */}
+      <DashboardGrowth />
+
       {/* ── Bottom actions ──────────────────────────── */}
-      <div className="pt-2 flex flex-col sm:flex-row gap-3 border-t border-border pt-6">
+      <div className="flex flex-col sm:flex-row gap-3 border-t border-border pt-6">
         {sessionId && (
           <Button asChild variant="outline" className="rounded-full">
             <Link href={`/risultati/${sessionId}`}><ArrowRight className="w-4 h-4 mr-2" />Risultati completi</Link>
@@ -604,3 +674,4 @@ export default function Dashboard() {
     </div>
   );
 }
+

@@ -103,7 +103,7 @@ export default function CertificatePage() {
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 text-xs text-muted-foreground bg-card border border-border rounded-full px-4 py-2 mb-6">
             <Shield className="h-3.5 w-3.5 text-primary" />
-            Verifica Certificato NFT
+            Verifica Certificato
           </div>
           <h1 className="text-3xl font-serif font-bold text-foreground mb-2">
             Attestato di completamento
@@ -161,7 +161,7 @@ export default function CertificatePage() {
             <div className="rounded-2xl overflow-hidden border border-border shadow-xl">
               <img
                 src={imageUrl}
-                alt="Certificato NFT"
+                alt="Certificato"
                 className="w-full"
               />
             </div>

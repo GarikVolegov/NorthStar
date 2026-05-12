@@ -4,7 +4,7 @@
     "sectors": "Sectores",
     "growth": "Crecimiento",
     "news": "Noticias",
-    "premium": "Premium",
+    "premium": "Pro",
     "login": "Iniciar sesión",
     "startJourney": "Empieza tu camino",
     "back": "Atrás",
@@ -762,8 +762,8 @@
     "wikiAI": "Wiki IA",
     "wikiDesc": "Haz preguntas específicas sobre el sector y recibe respuestas personalizadas de la IA.",
     "openChat": "Abrir el chat",
-    "roadmap": "Hoja de ruta detallada",
-    "roadmapDesc": "Plan paso a paso generado por la IA para entrar en el sector con recursos concretos.",
+    "roadmap": "Plan de crecimiento",
+    "roadmapDesc": "Plan detallado generado por IA para entrar en el sector con recursos concretos.",
     "generatePlan": "Generar el plan",
     "knowledgeGraph": "Gráfico del conocimiento",
     "graphDesc": "Visualiza roles, competencias y herramientas del sector en un gráfico interactivo.",
@@ -825,7 +825,7 @@
         "desc": "Accede a una base de conocimiento inteligente que responde a tus preguntas específicas sobre el sector elegido."
       },
       "graph": {
-        "title": "Gráfico del conocimiento",
+        "title": "Mapa de conocimientos",
         "desc": "Visualiza rutas de formación, competencias y conexiones entre roles profesionales de forma interactiva."
       },
       "roadmap": {
@@ -1612,7 +1612,7 @@
         "desc": "Articulos actualizados por sector"
       },
       "premium": {
-        "label": "Premium",
+        "label": "Pro",
         "desc": "Planes y funciones avanzadas"
       },
       "profilo": {
@@ -1680,8 +1680,8 @@
     ]
   },
   "roadmap": {
-    "title": "Hoja de ruta",
-    "subtitle": "Tu plan paso a paso para entrar en el sector.",
+    "title": "Plan de crecimiento",
+    "subtitle": "Tu plan detallado para entrar en el sector.",
     "generate": "Generar hoja de ruta",
     "generating": "Generando…",
     "premiumRequired": "Función Premium",
@@ -1710,7 +1710,7 @@
     "detailed": "Hoja de ruta Detallada"
   },
   "grafo": {
-    "title": "Gráfico del conocimiento",
+    "title": "Mapa de conocimientos",
     "subtitle": "Visualiza roles, competencias y herramientas del sector.",
     "generating": "Generando gráfico…",
     "premiumRequired": "Función Premium",

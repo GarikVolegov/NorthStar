@@ -100,7 +100,7 @@ export default function Lavori() {
         <Briefcase className="h-12 w-12 text-primary" />
         <h1 className="text-2xl font-bold text-foreground">Job Board NorthStar</h1>
         <p className="text-muted-foreground max-w-md">
-          Accedi per vedere le offerte di lavoro ordinate per match con il tuo profilo RIASEC.
+          Accedi per vedere le offerte di lavoro ordinate per compatibilità con il tuo profilo.
         </p>
         <Link href="/">
           <Button className="rounded-full px-8">Accedi</Button>
@@ -131,7 +131,7 @@ export default function Lavori() {
             {data?.basedOnSector && (
               <div className="shrink-0 flex items-center gap-1.5 bg-primary/10 border border-primary/20 rounded-full px-3 py-1.5">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs font-semibold text-primary">AI Match</span>
+                <span className="text-xs font-semibold text-primary">Compatibilità AI</span>
               </div>
             )}
           </div>
@@ -181,7 +181,7 @@ export default function Lavori() {
           <div className="mt-8 rounded-2xl border border-dashed border-border p-8 text-center">
             <Sparkles className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-muted-foreground text-sm mb-4">
-              Completa il test di orientamento per ricevere offerte con match personalizzato
+              Completa il test di orientamento per ricevere proposte personalizzate
             </p>
             <Link href="/test">
               <Button variant="outline" className="rounded-full">Fai il test RIASEC →</Button>

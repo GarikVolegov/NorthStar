@@ -26,7 +26,7 @@ const SPIRIT_DISPLAY: Record<string, { emoji: string; name: string; desc: string
   presence:  { emoji: "✨", name: "Consapevolezza", desc: "Come percepisci te stessa" },
   vision:    { emoji: "🌙", name: "Visione",         desc: "Come proietti il futuro" },
   instinct:  { emoji: "⚡", name: "Energia",         desc: "Come agisci sotto pressione" },
-  focus:     { emoji: "🔮", name: "Focus",           desc: "Come gestisci le priorità" },
+  focus:     { emoji: "🔮",           name: "Concentrazione",           desc: "Come gestisci le priorità" },
   tenacity:  { emoji: "🔥", name: "Determinazione", desc: "Come perseveri negli ostacoli" },
 };
 

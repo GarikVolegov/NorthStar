@@ -13,6 +13,17 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
+// Routes
+import objectivesRouter from "./routes/objectives";
+import calendarRouter from "./routes/calendar";
+import dashboardRouter from "./routes/dashboard";
+import coachRouter from "./routes/coach";
+
+app.use("/api/objectives", objectivesRouter);
+app.use("/api/calendar", calendarRouter);
+app.use("/api/dashboard", dashboardRouter);
+app.use("/api/coach", coachRouter);
+
 // Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });

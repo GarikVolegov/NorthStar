@@ -33,7 +33,7 @@ const PERSONAS: Persona[] = [
     tagline: "Non so ancora cosa fare",
     description:
       "Stai cercando la tua strada. Hai curiosità, idee confuse o semplicemente vuoi capire cosa ti appassiona davvero e dove potresti eccellere.",
-    tools: ["Test RIASEC", "Esplora settori", "Coach AI", "Confronta carriere"],
+    tools: ["Test di personalità", "Esplora settori", "Consulente AI", "Confronta carriere"],
     color: "from-[#1c1810] to-[#2a2418]",
     accent: "text-[#D4AF37]",
     border: "border-[#D4AF37]/40",
@@ -45,7 +45,7 @@ const PERSONAS: Persona[] = [
     tagline: "Ho un lavoro e voglio avanzare",
     description:
       "Sei impiegato e vuoi fare carriera, cambiare ruolo o passare a un settore migliore. Hai bisogno di strumenti concreti per crescere.",
-    tools: ["Analisi skill gap", "Simulatore colloquio", "Roadmap di carriera", "Candidature"],
+    tools: ["Analisi competenze", "Simulatore colloquio", "Roadmap di carriera", "Candidature"],
     color: "from-[#0f1f18] to-[#162914]",
     accent: "text-growth",
     border: "border-growth/40",
@@ -80,7 +80,7 @@ const PERSONAS: Persona[] = [
     label: "Investitore",
     tagline: "Valuto opportunità di mercato",
     description:
-      "Sei un investitore, business angel o VC. Vuoi capire i settori in crescita, i trend del mercato del lavoro italiano e le opportunità.",
+      "Sei un investitore,           investitore o fondo. Vuoi capire i settori in crescita, i trend del mercato del lavoro italiano e le opportunità.",
     tools: ["Settori in crescita", "Analisi trend", "Report mercato", "Knowledge Graph"],
     color: "from-[#201c0f] to-[#2a2418]",
     accent: "text-[#D4AF37]",

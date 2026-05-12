@@ -308,7 +308,7 @@ export function Navbar() {
                       onMouseEnter={() => prefetchRoute("/coach")}
                       className="cursor-pointer"
                     >
-                      <BrainCircuit className="h-4 w-4 mr-2" /> Coach AI
+                      <BrainCircuit className="h-4 w-4 mr-2" /> Consulente AI
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setLocation("/validatore-idea")}

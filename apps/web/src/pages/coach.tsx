@@ -58,7 +58,7 @@ function MessageContent({ content }: { content: string }) {
 }
 
 const QUICK_STARTS = [
-  "Analizza il mio profilo RIASEC e dimmi i miei punti di forza",
+  "Analizza il mio profilo e dimmi i miei punti di forza",
   "Aiutami a definire i prossimi passi nella mia carriera",
   "Preparami per un colloquio di lavoro",
   "Cosa dovrei studiare per entrare nel mio settore target?",
@@ -83,7 +83,7 @@ export default function Coach() {
     return (
       <div className="max-w-lg mx-auto px-4 py-20 text-center">
         <BrainCircuit className="w-12 h-12 text-primary mx-auto mb-4" />
-        <h1 className="text-2xl font-bold mb-2">Career Coach AI</h1>
+        <h1 className="text-2xl font-bold mb-2">Consulente di carriera</h1>
         <p className="text-muted-foreground mb-6">Accedi per iniziare a usare il tuo coach personale.</p>
         <Button onClick={() => setLocation("/registra")}>Accedi o registrati</Button>
       </div>
@@ -231,7 +231,7 @@ export default function Coach() {
       <aside className="w-64 border-r bg-muted/20 flex flex-col shrink-0 hidden md:flex">
         <div className="p-4 border-b flex items-center gap-2">
           <BrainCircuit className="w-5 h-5 text-primary" />
-          <span className="font-semibold text-sm">Coach AI</span>
+          <span className="font-semibold text-sm">Consulente AI</span>
           <Badge variant="outline" className="ml-auto text-xs">Beta</Badge>
         </div>
 
@@ -283,7 +283,7 @@ export default function Coach() {
         {/* Header */}
         <div className="px-6 py-3 border-b flex items-center gap-3 shrink-0">
           <BrainCircuit className="w-5 h-5 text-primary md:hidden" />
-          <h1 className="font-semibold">Il tuo Career Coach AI</h1>
+          <h1 className="font-semibold">Il tuo Consulente di carriera</h1>
           <Badge variant="outline" className="text-xs">Beta</Badge>
           {/* Mobile new session */}
           <Button size="sm" variant="outline" className="ml-auto md:hidden" onClick={() => createSession.mutate()} disabled={createSession.isPending}>
@@ -302,7 +302,7 @@ export default function Coach() {
                 </div>
                 <h2 className="text-xl font-bold mb-2">Cosa posso fare per te oggi?</h2>
                 <p className="text-sm text-muted-foreground">
-                  Sono il tuo coach personale. Conosco il tuo profilo RIASEC, i tuoi obiettivi e il mercato del lavoro italiano.
+                  Sono il tuo consulente personale. Conosco il tuo profilo, i tuoi obiettivi e il mercato del lavoro italiano.
                 </p>
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
@@ -370,7 +370,7 @@ export default function Coach() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Scrivi un messaggio al tuo coach… (Invio per inviare)"
+                placeholder="Scrivi un messaggio al tuo consulente… (Invio per inviare)"
                 rows={2}
                 disabled={isStreaming}
                 className="flex-1 resize-none rounded-xl border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"

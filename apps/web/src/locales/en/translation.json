@@ -4,7 +4,7 @@
     "sectors": "Sectors",
     "growth": "Growth",
     "news": "News",
-    "premium": "Premium",
+    "premium": "Pro",
     "login": "Sign in",
     "startJourney": "Start your journey",
     "back": "Back",
@@ -25,7 +25,7 @@
       "sectors": "Explore sectors",
       "growth": "Personal Growth",
       "news": "Sector News",
-      "premium": "Premium Plan",
+      "premium": "Pro Plan",
       "contact": "Contact",
       "about": "About us",
       "howItWorks": "How it works",
@@ -63,7 +63,7 @@
     "compare": "Compare",
     "salary": "Salary",
     "growth": "Growth",
-    "aiRisk": "AI Risk",
+    "aiRisk": "Automation Risk",
     "trend": "Market trend",
     "min": "min"
   },
@@ -757,7 +757,7 @@
     "compareNotSure": "Not sure? Compare",
     "compareDesc": "Compare {{name}} with another sector side by side",
     "compare": "Compare",
-    "premiumTools": "Premium Tools",
+    "premiumTools": "Pro Tools",
     "deepenWithAI": "Go deeper with AI",
     "wikiAI": "AI Wiki",
     "wikiDesc": "Ask specific questions about the sector and receive personalized answers from AI.",
@@ -811,12 +811,12 @@
       "declining": "Declining"
     },
     "loadingTitle": "Professional sector",
-    "loadingDesc": "Discover details, salaries, growth and AI risk of this professional sector on NorthStar.",
+    "loadingDesc": "Discover details, salaries, growth and automation risk of this professional sector on NorthStar.",
     "dataSourceNote": "Source: Italian labor market data (ISTAT, EUROSTAT, INAPP). Salary ranges and growth rates refer to the Italian market.",
     "italianMarketNote": "Italian market"
   },
   "premium": {
-    "badge": "NorthStar Premium",
+    "badge": "NorthStar Pro",
     "title": "Unlock your full potential",
     "subtitle": "Go beyond the free test. With Premium you get advanced tools to turn your inclinations into a concrete professional path.",
     "features": {
@@ -840,7 +840,7 @@
     "monthly": "Monthly",
     "yearly": "Yearly",
     "mostPopular": "Most Popular",
-    "planName": "Premium Plan",
+    "planName": "Pro Plan",
     "planAccess": "Full access to all features",
     "perMonth": "/month",
     "perYear": "/year",
@@ -1297,7 +1297,7 @@
       },
       {
         "q": "Are salary and growth data up to date?",
-        "a": "Market data (average salaries, growth rate, AI risk) is based on annually updated sources (ISTAT, EUROSTAT, sector reports). Salary ranges represent the typical range for entry/mid/senior roles."
+        "a": "Market data (average salaries, growth rate, automation risk) is based on annually updated sources (ISTAT, EUROSTAT, sector reports). Salary ranges represent the typical range for entry/mid/senior roles."
       }
     ],
     "privacyBadge": "Your data is safe",
@@ -1658,9 +1658,9 @@
     "subtitle": "Ask specific questions about this sector and receive personalized answers.",
     "placeholder": "E.g. What are the salaries for a junior in this sector?",
     "send": "Send",
-    "premiumRequired": "Premium Feature",
-    "premiumDesc": "Access Premium to use the AI Wiki and receive personalized answers about your sector.",
-    "upgrade": "Upgrade to Premium",
+    "premiumRequired": "Pro Feature",
+    "premiumDesc": "Access Pro to use the AI guide and receive personalized answers about your sector.",
+    "upgrade": "Upgrade to Pro",
     "accessRequired": "Access required",
     "accessRequiredDesc": "Sign up for free to access the personalized AI Wiki.",
     "registerFree": "Sign up for free",
@@ -1684,9 +1684,9 @@
     "subtitle": "Your step-by-step plan to enter the sector.",
     "generate": "Generate roadmap",
     "generating": "Generating…",
-    "premiumRequired": "Premium Feature",
-    "premiumDesc": "Access Premium to generate your personalized roadmap.",
-    "upgrade": "Upgrade to Premium",
+    "premiumRequired": "Pro Feature",
+    "premiumDesc": "Access Pro to generate your personalized growth plan.",
+    "upgrade": "Upgrade to Pro",
     "accessRequired": "Access required",
     "accessRequiredDesc": "Sign up for free to generate your personalized roadmap.",
     "registerFree": "Sign up for free",
@@ -1713,8 +1713,8 @@
     "title": "Knowledge Graph",
     "subtitle": "Visualize roles, skills, and tools in the sector.",
     "generating": "Generating graph…",
-    "premiumRequired": "Premium Feature",
-    "upgrade": "Upgrade to Premium",
+    "premiumRequired": "Pro Feature",
+    "upgrade": "Upgrade to Pro",
     "accessRequired": "Access required",
     "accessRequiredDesc": "Sign up for free to explore the knowledge graph.",
     "registerFree": "Sign up for free",
@@ -1765,7 +1765,7 @@
     "metrics": {
       "salary": "Salary",
       "growth": "Growth",
-      "risk": "AI Risk",
+      "risk": "Automation Risk",
       "trend": "Trend"
     },
     "badgeLabel": "Sector comparison",
@@ -2065,12 +2065,9 @@
     "resetting": "Resetting…"
   },
   "premiumSuccess": {
-    "title": "Welcome to Premium!",
-    "subtitle": "Your account is now upgraded. You have access to all features.",
-    "goHome": "Go to dashboard",
-    "badge": "Welcome to Premium",
-    "activated": "Subscription activated!",
-    "desc": "Your Premium access is now active. You can start exploring the AI Wiki, knowledge graph, and your personalized roadmap.",
+    "title": "Welcome to Pro!",
+    "badge": "Welcome to Pro",
+    "desc": "Your Pro access is now active. You can start exploring the AI guide, knowledge map, and your personalized growth plan.",
     "exploreNow": "Explore now",
     "retakeTest": "Retake the test"
   },
@@ -2105,7 +2102,7 @@
   "seo": {
     "home": {
       "title": "NorthStar — Discover your professional direction",
-      "description": "Take the free RIASEC test and discover the professional sectors best suited to your personality. Real data on salaries, growth, and AI risk."
+      "description": "Take the free test and discover the professional sectors best suited to your personality. Real data on salaries, growth, and automation risk."
     },
     "test": {
       "title": "The Orientation Test — NorthStar",
@@ -2116,7 +2113,7 @@
       "description": "Browse all professional sectors. Filter by RIASEC type, AI automation risk, and market trends."
     },
     "premium": {
-      "title": "NorthStar Premium — Advanced orientation tools",
+      "title": "NorthStar Pro — Advanced orientation tools",
       "description": "Personalized AI wiki, detailed roadmaps, knowledge graph, and live market data."
     },
     "growth": {

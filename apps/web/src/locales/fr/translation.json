@@ -4,7 +4,7 @@
     "sectors": "Secteurs",
     "growth": "Croissance",
     "news": "Actualités",
-    "premium": "Premium",
+    "premium": "Pro",
     "login": "Se connecter",
     "startJourney": "Commencer le parcours",
     "back": "Retour",
@@ -762,8 +762,8 @@
     "wikiAI": "Wiki IA",
     "wikiDesc": "Posez des questions spécifiques sur le secteur et recevez des réponses personnalisées de l'IA.",
     "openChat": "Ouvrir le chat",
-    "roadmap": "Feuille de route détaillée",
-    "roadmapDesc": "Plan étape par étape généré par l'IA pour entrer dans le secteur avec des ressources concrètes.",
+    "roadmap": "Plan de croissance",
+    "roadmapDesc": "Plan détaillé généré par l'IA pour entrer dans le secteur avec des ressources concrètes.",
     "generatePlan": "Générer le plan",
     "knowledgeGraph": "Graphe de connaissances",
     "graphDesc": "Visualisez les rôles, compétences et outils du secteur dans un graphe interactif.",
@@ -2061,7 +2061,7 @@
         "desc": "Articles mis a jour par secteur"
       },
       "premium": {
-        "label": "Premium",
+        "label": "Pro",
         "desc": "Plans et fonctionnalites avancees"
       },
       "profilo": {
