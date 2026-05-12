@@ -39,6 +39,7 @@ import {
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { openai } from "../client";
+import { embedText } from "./embedder";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,37 @@ function computeConfidence(observedCount: number): number {
   if (observedCount === 3) return 0.80;
   if (observedCount === 2) return 0.65;
   return 0.50;
+}
+
+// ── Semantic similarity ─────────────────────────────────────────────────────
+
+const SIMILARITY_THRESHOLD = 0.85;
+const patternEmbeddingCache = new Map<number, number[]>();
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-10);
+}
+
+async function getPatternEmbedding(
+  id: number,
+  description: string,
+): Promise<number[]> {
+  const cached = patternEmbeddingCache.get(id);
+  if (cached) return cached;
+  const emb = await embedText(description);
+  patternEmbeddingCache.set(id, emb);
+  // Keep cache bounded
+  if (patternEmbeddingCache.size > 500) {
+    const firstKey = patternEmbeddingCache.keys().next().value;
+    if (firstKey !== undefined) patternEmbeddingCache.delete(firstKey);
+  }
+  return emb;
 }
 
 // ── EXTRACT: GPT-4o-mini analyzes the conversation ───────────────────────────
@@ -162,82 +194,121 @@ export async function extractMemory(
  * - Facts: UPSERT on (userId, key) — updates value + increments confirmedCount
  * - Patterns: match by description similarity (exact string for now),
  *   increment observedCount and recompute confidence
+ *
+ * OPTIMIZATION: loads all existing facts/patterns in 2 queries total,
+ * then batch processes in memory, then executes 2-3 writes.
  */
 export async function mergeMemory(
   userId: number,
   sessionId: number,
   extracted: ExtractedMemory,
 ): Promise<void> {
-  // ── Upsert facts ──────────────────────────────────────────────────────────
-  for (const fact of extracted.facts) {
-    if (!fact.key?.trim() || !fact.value?.trim()) continue;
-
-    const existing = await db
+  // ── Load ALL existing data for this user in 2 queries ────────────
+  const [allExistingFacts, allExistingPatterns] = await Promise.all([
+    db
       .select()
       .from(coachMemoryFactsTable)
-      .where(
-        and(
-          eq(coachMemoryFactsTable.userId, userId),
-          eq(coachMemoryFactsTable.key, fact.key),
-        ),
-      )
-      .limit(1);
+      .where(eq(coachMemoryFactsTable.userId, userId)),
+    db
+      .select()
+      .from(coachMemoryPatternsTable)
+      .where(eq(coachMemoryPatternsTable.userId, userId)),
+  ]);
 
-    if (existing.length > 0) {
-      await db
+  const existingFactsMap = new Map(allExistingFacts.map((f) => [f.key, f]));
+
+  // ── Upsert facts ──────────────────────────────────────────────────
+  const factUpdates: Array<{ key: string; value: string }> = [];
+  const factInserts: Array<{
+    userId: number;
+    key: string;
+    value: string;
+    sourceSessionId: number;
+  }> = [];
+
+  for (const fact of extracted.facts) {
+    if (!fact.key?.trim() || !fact.value?.trim()) continue;
+    const existing = existingFactsMap.get(fact.key);
+    if (existing) {
+      existingFactsMap.set(fact.key, {
+        ...existing,
+        value: fact.value,
+        confirmedCount: existing.confirmedCount + 1,
+      });
+      factUpdates.push({ key: fact.key, value: fact.value });
+    } else {
+      factInserts.push({
+        userId,
+        key: fact.key,
+        value: fact.value,
+        sourceSessionId: sessionId,
+      });
+    }
+  }
+
+  await Promise.all([
+    ...factUpdates.map((f) => {
+      const existing = existingFactsMap.get(f.key)!;
+      return db
         .update(coachMemoryFactsTable)
         .set({
-          value: fact.value,
-          confirmedCount: existing[0].confirmedCount + 1,
+          value: f.value,
+          confirmedCount: existing.confirmedCount,
           updatedAt: new Date(),
         })
         .where(
           and(
             eq(coachMemoryFactsTable.userId, userId),
-            eq(coachMemoryFactsTable.key, fact.key),
+            eq(coachMemoryFactsTable.key, f.key),
           ),
         );
-    } else {
-      await db.insert(coachMemoryFactsTable).values({
-        userId,
-        key: fact.key,
-        value: fact.value,
-        sourceSessionId: sessionId,
-        confirmedCount: 1,
-      });
-    }
-  }
+    }),
+    factInserts.length > 0
+      ? db.insert(coachMemoryFactsTable).values(factInserts)
+      : Promise.resolve(),
+  ]);
 
-  // ── Upsert patterns ───────────────────────────────────────────────────────
+  // ── Upsert patterns ───────────────────────────────────────────────
+  const patternUpdates: Array<{
+    id: number;
+    observedCount: number;
+    sessionIds: number[];
+  }> = [];
+  const patternInserts: Array<{
+    userId: number;
+    patternType: string;
+    description: string;
+    confidence: number;
+    observedCount: number;
+    sessionIds: number[];
+  }> = [];
+
   for (const pattern of extracted.patterns) {
     if (!pattern.description?.trim()) continue;
 
-    // Match existing pattern by type + description (first 80 chars)
-    const descKey = pattern.description.slice(0, 80);
-    const existing = await db
-      .select()
-      .from(coachMemoryPatternsTable)
-      .where(eq(coachMemoryPatternsTable.userId, userId));
+    const newEmbedding = await embedText(pattern.description);
+    let bestMatch: (typeof allExistingPatterns)[0] | undefined;
+    let bestScore = 0;
 
-    const match = existing.find(
-      (p) =>
-        p.patternType === pattern.patternType &&
-        p.description.slice(0, 80) === descKey,
-    );
+    for (const existing of allExistingPatterns) {
+      if (existing.patternType !== pattern.patternType) continue;
+      const existingEmb = await getPatternEmbedding(existing.id, existing.description);
+      const score = cosineSimilarity(newEmbedding, existingEmb);
+      if (score > bestScore && score >= SIMILARITY_THRESHOLD) {
+        bestMatch = existing;
+        bestScore = score;
+      }
+    }
 
-    if (match) {
-      const newCount = match.observedCount + 1;
-      await db
-        .update(coachMemoryPatternsTable)
-        .set({
-          observedCount: newCount,
-          confidence: computeConfidence(newCount),
-          sessionIds: [...(match.sessionIds ?? []), sessionId],
-          updatedAt: new Date(),
-        })
-        .where(eq(coachMemoryPatternsTable.id, match.id));
+    if (bestMatch) {
+      const newCount = bestMatch.observedCount + 1;
+      patternUpdates.push({
+        id: bestMatch.id,
+        observedCount: newCount,
+        sessionIds: [...(bestMatch.sessionIds ?? []), sessionId],
+      });
     } else {
-      await db.insert(coachMemoryPatternsTable).values({
+      patternInserts.push({
         userId,
         patternType: pattern.patternType,
         description: pattern.description,
@@ -247,6 +318,23 @@ export async function mergeMemory(
       });
     }
   }
+
+  await Promise.all([
+    ...patternUpdates.map((u) =>
+      db
+        .update(coachMemoryPatternsTable)
+        .set({
+          observedCount: u.observedCount,
+          confidence: computeConfidence(u.observedCount),
+          sessionIds: u.sessionIds,
+          updatedAt: new Date(),
+        })
+        .where(eq(coachMemoryPatternsTable.id, u.id)),
+    ),
+    patternInserts.length > 0
+      ? db.insert(coachMemoryPatternsTable).values(patternInserts)
+      : Promise.resolve(),
+  ]);
 }
 
 // ── LOAD: Read memory for prompt injection ───────────────────────────────────

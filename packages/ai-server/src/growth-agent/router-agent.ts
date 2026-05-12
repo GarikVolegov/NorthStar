@@ -7,6 +7,7 @@
  */
 import { getLLM, type LLMMessage } from "../llm/client";
 import { commitRoute, loadRoutingContext } from "./router-memory";
+import { loadMemory } from "./memory-manager";
 import type { ChatMessage } from "./agent";
 
 // ── Types ─────────────────────────────────────────────────────────────────────────
@@ -153,8 +154,37 @@ export class RouterAgent {
     // Inject routing memory context for cross-session consistency
     const userId = (history as unknown as { userId?: number })?.userId ?? 0;
     const routingContext = loadRoutingContext(userId);
-    const systemWithMemory = routingContext
-      ? `${ROUTER_SYSTEM}\n\n${routingContext}`
+
+    // Load persistent behavioral patterns from memory
+    let behaviorContext = "";
+    if (userId > 0) {
+      try {
+        const userMemory = await loadMemory(userId);
+        const highConfidence = userMemory.patterns.filter(
+          (p) => p.confidence >= 0.80,
+        );
+        if (highConfidence.length > 0) {
+          behaviorContext =
+            "## Pattern comportamentali noti dell'utente\n" +
+            highConfidence
+              .map(
+                (p) =>
+                  `- [${p.patternType}] ${p.description}`,
+              )
+              .join("\n") +
+            "\n\nUsa questi pattern per adattare la classificazione del dominio.";
+        }
+      } catch {
+        // Non-critical
+      }
+    }
+
+    const memoryContext = [routingContext, behaviorContext]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const systemWithMemory = memoryContext
+      ? `${ROUTER_SYSTEM}\n\n${memoryContext}`
       : ROUTER_SYSTEM;
 
     try {

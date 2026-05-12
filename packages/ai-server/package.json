@@ -9,7 +9,8 @@
     "./image": "./src/image/index.ts",
     "./audio": "./src/audio/index.ts",
     "./db": "./src/db/client.ts",
-    "./growth-agent": "./src/growth-agent/index.ts"
+    "./growth-agent": "./src/growth-agent/index.ts",
+    "./llm/client": "./src/llm/client.ts"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",

@@ -2,21 +2,12 @@ import { Router, type Request, type Response } from "express";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, coachSessionsTable } from "@workspace/db";
-import OpenAI from "openai";
 import { requireAuth } from "../middleware/auth";
+import { getLLM } from "@workspace/ai-server/llm/client";
 
 const router = Router();
 
 const JWT_SECRET: string = process.env.JWT_SECRET ?? "";
-
-function getOpenAI(): OpenAI {
-  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-  if (!baseURL || !apiKey) {
-    throw new Error("AI_INTEGRATIONS env vars not configured");
-  }
-  return new OpenAI({ apiKey, baseURL });
-}
 
 const createSessionSchema = z.object({
   title: z.string().min(1).max(100).default("Nuova sessione"),
@@ -154,12 +145,6 @@ router.post("/sessions/:id/ask", requireAuth, async (req, res) => {
     content: m.content,
   }));
 
-  const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: systemContent },
-    ...history.slice(-20),
-    { role: "user", content: data.message },
-  ];
-
   // ── SSE headers ────────────────────────────────────────────
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -167,22 +152,20 @@ router.post("/sessions/:id/ask", requireAuth, async (req, res) => {
   res.setHeader("X-Accel-Buffering", "no");
 
   try {
-    const openai = getOpenAI();
-    const stream = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: openaiMessages,
-      stream: true,
-      temperature: 0.72,
-      max_tokens: 800,
-    });
+    const llm = getLLM();
+    const stream = await llm.chat(
+      [
+        { role: "system" as const, content: systemContent },
+        ...history.slice(-20),
+        { role: "user" as const, content: data.message },
+      ],
+      { model: "gpt-4o-mini", temperature: 0.72, maxTokens: 800 },
+    );
 
     const tokenBuffer: string[] = [];
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content;
-      if (delta) {
-        tokenBuffer.push(delta);
-        res.write(`data: ${JSON.stringify({ type: "token", value: delta })}\n\n`);
-      }
+    for await (const delta of stream) {
+      tokenBuffer.push(delta);
+      res.write(`data: ${JSON.stringify({ type: "token", value: delta })}\n\n`);
     }
 
     const fullResponse = tokenBuffer.join("");
