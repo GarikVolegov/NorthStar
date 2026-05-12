@@ -39,6 +39,36 @@ export interface CoTResult {
   confidence: number;           // 0-1
 }
 
+// ── In-session cache ──────────────────────────────────────────────────────────
+
+interface CachedCoT {
+  result: CoTResult;
+  userTokens: Set<string>;
+  timestamp: number;
+}
+
+const cotCache = new Map<number, CachedCoT>();
+const CACHE_TTL_MS = 300_000; // 5 minutes
+
+function tokenizeForCoT(s: string): Set<string> {
+  return new Set(s.toLowerCase().match(/[a-z\u00e0-\u00fc]{4,}/g) ?? []);
+}
+
+function shouldReuseCached(userId: number, newTokens: Set<string>): CoTResult | null {
+  const cached = cotCache.get(userId);
+  if (!cached) return null;
+  if (Date.now() - cached.timestamp > CACHE_TTL_MS) {
+    cotCache.delete(userId);
+    return null;
+  }
+  if (cached.result.confidence < 0.75) return null;
+  if (newTokens.size === 0 || cached.userTokens.size === 0) return null;
+  const intersection = [...newTokens].filter((t) => cached.userTokens.has(t)).length;
+  const overlap = intersection / Math.max(newTokens.size, cached.userTokens.size);
+  if (overlap < 0.60) return null;
+  return cached.result;
+}
+
 const COT_SYSTEM = `
 Sei il layer di ragionamento interno di un coach di crescita personale.
 Il tuo output è JSON — non viene mai mostrato all'utente.
@@ -81,12 +111,23 @@ function shouldSkipCoT(message: string): boolean {
 /**
  * Runs the hidden CoT reasoning pass.
  * Returns null if the message is too short/simple to warrant analysis.
+ * Uses an in-session cache: if the user's new message has ≥60% token overlap
+ * with the previous one and the cached confidence was ≥0.75, reuses the cached
+ * result to avoid an expensive GPT-4o call.
  */
 export async function runChainOfThought(
+  userId: number,
   userMessage: string,
   conversationSummary?: string, // optional: last 2-3 exchanges for context
 ): Promise<CoTResult | null> {
   if (shouldSkipCoT(userMessage)) return null;
+
+  const tokens = tokenizeForCoT(userMessage);
+  const cached = shouldReuseCached(userId, tokens);
+  if (cached) {
+    console.log(`[CoT] cache hit for user ${userId}`);
+    return cached;
+  }
 
   const userContent = conversationSummary
     ? `Contesto recente:\n${conversationSummary}\n\nMessaggio attuale: ${userMessage}`
@@ -107,12 +148,15 @@ export async function runChainOfThought(
     const raw = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(raw) as Record<string, unknown>;
 
-    return {
+    const result: CoTResult = {
       limitingPattern:    (parsed.limiting_pattern as string)     ?? "non identificato",
       controllableActions: (parsed.controllable_actions as string[]) ?? [],
       blindSpot:          (parsed.blind_spot as string)           ?? "non identificato",
       confidence:         (parsed.confidence as number)           ?? 0.5,
     };
+
+    cotCache.set(userId, { result, userTokens: tokens, timestamp: Date.now() });
+    return result;
   } catch (err) {
     // CoT failure is non-fatal — the agent continues without it
     console.warn("[CoT] failed:", err instanceof Error ? err.message : err);

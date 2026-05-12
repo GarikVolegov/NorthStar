@@ -21,6 +21,7 @@
  * └──────────────────────────────────────────────────────────────────────────────┘
  */
 import { openai } from "../client";
+import { getLLM } from "../llm/client";
 import { getSpecialist } from "./specialist-agent";
 import type { SpecialistRunOptions, SpecialistEvent } from "./specialist-agent";
 import type { RouteDecision, Domain } from "./router-agent";
@@ -152,6 +153,44 @@ Sintetizza le due bozze in una risposta unica, coerente e di alta qualità.
   return res.choices[0]?.message?.content ?? primary.text;
 }
 
+/**
+ * Micro-fusion for the large-delta case.
+ * Instead of appending the full loser text (which creates a disjointed UX),
+ * extracts 3-5 key points from the loser that aren't redundant with the winner.
+ */
+async function extractKeyDifferences(
+  primary: SpecialistResult,
+  secondary: SpecialistResult,
+  userMessage: string,
+): Promise<string> {
+  const prompt = `Messaggio utente: "${userMessage}"
+
+Bozza primaria (${primary.domain}):
+${primary.text}
+
+Bozza secondaria (${secondary.domain}):
+${secondary.text}
+
+Estrai 3-5 punti chiave dalla bozza secondaria che NON siano già coperti nella bozza primaria.
+Output: un bullet point per riga, massimo 15 parole ciascuno. Nessun preambolo.`;
+
+  try {
+    const res = await getLLM().chatOnce(
+      [
+        {
+          role: "system",
+          content: "Sei un assistente che estrae informazioni non ridondanti. Output solo bullet points, uno per riga.",
+        },
+        { role: "user", content: prompt },
+      ],
+      { model: "gpt-4o-mini", temperature: 0.3, maxTokens: 200 },
+    );
+    return res.trim();
+  } catch {
+    return secondary.text.slice(0, 200);
+  }
+}
+
 // ── Helper: stream text token-by-token ────────────────────────────────────────────
 
 function* streamText(text: string): Generator<ParallelHandoffEvent> {
@@ -245,16 +284,14 @@ export async function* runParallelHandoff(
       yield { type: "status", value: "🧩 Fusione delle prospettive in corso..." };
       finalText = await fuseResponses(pResult, sResult, userMessage).catch(() => pResult.text);
     } else {
-      // ── Large delta: stream winner first, append loser with separator ─────────
-      // This way user gets SOMETHING immediately instead of waiting for both.
+      // ── Large delta: stream winner + key differences extracted from loser ──
+      // Avoids appending the full raw loser text which creates a disjointed UX.
       const [first, second] = winner.domain === primaryRoute.domain
         ? [pResult, sResult]
         : [sResult, pResult];
-      finalText = (
-        first.text +
-        `\n\n---\n*Prospettiva aggiuntiva (${second.domain}):*\n\n` +
-        second.text
-      );
+      yield { type: "status", value: `💡 Estraendo insight da ${second.domain}...` };
+      const keyPoints = await extractKeyDifferences(first, second, userMessage);
+      finalText = `${first.text}\n\n---\n*💡 Punti chiave dal coach (${second.domain}):*\n${keyPoints}`;
     }
   } else if (primaryOk) {
     finalText = pResult.text;

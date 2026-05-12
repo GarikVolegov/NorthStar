@@ -114,7 +114,8 @@ async function retrieveWithJs(
         eq(knowledgeNodesTable.userId, userId),
         isNotNull(knowledgeNodesTable.embedding),
       ),
-    );
+    )
+    .limit(500);
 
   return nodes
     .filter((n) => {
@@ -134,6 +135,18 @@ async function retrieveWithJs(
     .filter((n) => n.score >= minScore)
     .sort((a, b) => b.score - a.score)
     .slice(0, topK);
+}
+
+/**
+ * Safety wrapper: rejects if the inner promise takes longer than `ms`.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, rej) =>
+      setTimeout(() => rej(new Error(`retriever timeout after ${ms}ms`)), ms),
+    ),
+  ]);
 }
 
 /**
@@ -166,5 +179,13 @@ export async function retrieve(
       needsPlatform ? PLATFORM_USER_ID : undefined,
     );
   }
-  return retrieveWithJs(queryEmbedding, userId, topK, minScore, sourceTypes);
+  try {
+    return await withTimeout(
+      retrieveWithJs(queryEmbedding, userId, topK, minScore, sourceTypes),
+      3000,
+    );
+  } catch {
+    console.warn("[retriever] JS fallback timeout/error — returning empty");
+    return [];
+  }
 }

@@ -125,7 +125,7 @@ export abstract class SpecialistAgent {
     const [personaExamples, documentChunks, cot] = await Promise.all([
       retrieve(userMessage, userId, { topK: 3, minScore: 0.30, sourceTypes: ["persona_example"] }),
       retrieve(userMessage, userId, { topK: 6, minScore: 0.35, sourceTypes: ["document", "user_note"] }),
-      runChainOfThought(userMessage, conversationSummary),
+      runChainOfThought(userId, userMessage, conversationSummary),
     ]);
 
     // ── 2. Web fallback ───────────────────────────────────────────────────────
@@ -213,7 +213,7 @@ export abstract class SpecialistAgent {
         cot, evalResult, routeDecision, supervisorResult,
       };
 
-      // ── 8. Fire-and-forget memory save ──────────────────────────────────────
+      // ── 8. Fire-and-forget memory save (with timeout) ─────────────────────────
       const sessionId = Date.now();
       const turns = [
         ...history.slice(-8),
@@ -221,14 +221,22 @@ export abstract class SpecialistAgent {
         { role: "assistant", content: finalText },
       ];
       (async () => {
+        const timeout = new Promise<void>((_, rej) =>
+          setTimeout(() => rej(new Error("timeout")), 8000),
+        );
         try {
-          const extracted = await extractMemory(turns);
-          if (extracted && (extracted.facts.length > 0 || extracted.patterns.length > 0)) {
-            await mergeMemory(userId, sessionId, extracted);
-            console.log(`[memory:${this.DOMAIN}] saved ${extracted.facts.length} facts + ${extracted.patterns.length} patterns`);
-          }
+          await Promise.race([
+            (async () => {
+              const extracted = await extractMemory(turns);
+              if (extracted && (extracted.facts.length > 0 || extracted.patterns.length > 0)) {
+                await mergeMemory(userId, sessionId, extracted);
+                console.log(`[memory:${this.DOMAIN}] saved ${extracted.facts.length} facts + ${extracted.patterns.length} patterns`);
+              }
+            })(),
+            timeout,
+          ]);
         } catch (err) {
-          console.warn(`[memory:${this.DOMAIN}] save failed:`, err instanceof Error ? err.message : err);
+          console.warn(`[memory:${this.DOMAIN}] save failed/timeout:`, err instanceof Error ? err.message : err);
         }
       })();
 
