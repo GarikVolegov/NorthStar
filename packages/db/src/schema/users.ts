@@ -66,6 +66,13 @@ export const usersTable = pgTable("users", {
    * Viene impostato da processPostPaymentReferral() dopo invoice.paid.
    * NULL se l'utente non è ancora convertito o non ha usato un referral.
    */
+  /**
+   * FK verso affiliate_accounts.id. Aggiungi il constraint SQL separatamente
+   * in una migration per evitare circular import con affiliateAccounts.ts:
+   *   ALTER TABLE users ADD CONSTRAINT fk_referred_by_affiliate
+   *     FOREIGN KEY (referred_by_affiliate_id) REFERENCES affiliate_accounts(id)
+   *     ON DELETE SET NULL;
+   */
   referredByAffiliateId: integer("referred_by_affiliate_id"),
 
   /** Timestamp del primo pagamento: marca la conversione del referral. */

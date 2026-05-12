@@ -4,13 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { VitePWA } from "vite-plugin-pwa";
 
-const rawPort = process.env.PORT;
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
+const rawPort = process.env.VITE_PORT || process.env.PORT || "5173";
 
 const port = Number(rawPort);
 
@@ -34,14 +28,20 @@ export default defineConfig({
       manifest: {
         name: "NorthStar — Orientamento e Crescita Personale",
         short_name: "NorthStar",
-        description: "Scopri la tua via. Test RIASEC + Cinque Spiriti, matching con settori professionali e strumenti per la tua carriera.",
+        description:
+          "Scopri la tua via. Test RIASEC + Cinque Spiriti, matching con settori professionali e strumenti per la tua carriera.",
         theme_color: "#0d1520",
         background_color: "#0d1520",
         display: "standalone",
         lang: "it",
         start_url: "/",
         icons: [
-          { src: "/favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" },
+          {
+            src: "/favicon.svg",
+            sizes: "any",
+            type: "image/svg+xml",
+            purpose: "any maskable",
+          },
         ],
       },
       workbox: {
@@ -80,7 +80,12 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
-      "@assets": path.resolve(import.meta.dirname, "..", "..", "attached_assets"),
+      "@assets": path.resolve(
+        import.meta.dirname,
+        "..",
+        "..",
+        "attached_assets",
+      ),
     },
     dedupe: ["react", "react-dom"],
   },
@@ -102,7 +107,11 @@ export default defineConfig({
         hashCharacters: "base36",
         manualChunks: (id) => {
           // React core
-          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/") || id.includes("node_modules/wouter/")) {
+          if (
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/react-dom/") ||
+            id.includes("node_modules/wouter/")
+          ) {
             return "vendor-react";
           }
           // Animazioni — chunk separato: non serve su tutte le pagine
@@ -110,7 +119,10 @@ export default defineConfig({
             return "vendor-motion";
           }
           // Charts — pesante, lazy separato
-          if (id.includes("node_modules/recharts/") || id.includes("node_modules/d3")) {
+          if (
+            id.includes("node_modules/recharts/") ||
+            id.includes("node_modules/d3")
+          ) {
             return "vendor-charts";
           }
           // Radix UI
@@ -122,7 +134,11 @@ export default defineConfig({
             return "vendor-query";
           }
           // Forms
-          if (id.includes("node_modules/react-hook-form/") || id.includes("node_modules/@hookform/") || id.includes("node_modules/zod/")) {
+          if (
+            id.includes("node_modules/react-hook-form/") ||
+            id.includes("node_modules/@hookform/") ||
+            id.includes("node_modules/zod/")
+          ) {
             return "vendor-forms";
           }
           // Icone
@@ -130,7 +146,10 @@ export default defineConfig({
             return "vendor-ui";
           }
           // i18n
-          if (id.includes("node_modules/i18next") || id.includes("node_modules/react-i18next")) {
+          if (
+            id.includes("node_modules/i18next") ||
+            id.includes("node_modules/react-i18next")
+          ) {
             return "vendor-i18n";
           }
         },

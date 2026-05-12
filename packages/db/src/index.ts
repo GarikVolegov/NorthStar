@@ -28,7 +28,12 @@ if (!DATABASE_URL) {
 // ── Eager singleton init ──────────────────────────────────────────────────────
 // Initialised once when the module is first imported. Node.js module loading
 // is synchronous and single-threaded, so there is no race condition here.
-const _pool = new Pool({ connectionString: DATABASE_URL });
+const _pool = new Pool({
+  connectionString: DATABASE_URL,
+  max: 10,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+});
 const _db = drizzle(_pool, { schema });
 
 // ── Graceful shutdown ─────────────────────────────────────────────────────────

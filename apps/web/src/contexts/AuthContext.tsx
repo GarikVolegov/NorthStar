@@ -17,7 +17,7 @@ import {
   type ReactNode,
 } from "react";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
-import { AUTH_EXPIRED_EVENT } from "@/lib/api-fetch";
+import { AUTH_EXPIRED_EVENT, TOKEN_STORAGE_KEY, USER_STORAGE_KEY } from "@/lib/storage-keys";
 import { useQueryClient } from "@tanstack/react-query";
 
 export interface AuthUser {
@@ -61,9 +61,6 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-const USER_STORAGE_KEY = "northstar_user";
-const TOKEN_STORAGE_KEY = "northstar_token";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -127,6 +124,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener(AUTH_EXPIRED_EVENT, logout);
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, logout);
   }, [logout]);
+
+  // Silent token refresh: decode exp claim and refresh 5 min before expiry
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!token) return;
+    try {
+      const payloadB64 = token.split(".")[1];
+      if (!payloadB64) return;
+      const payload = JSON.parse(atob(payloadB64)) as { exp?: number };
+      const exp = payload.exp;
+      if (!exp) return;
+      const expiresInMs = exp * 1000 - Date.now();
+      const refreshAtMs = Math.max(0, expiresInMs - 5 * 60 * 1000);
+      refreshTimerRef.current = setTimeout(async () => {
+        try {
+          const res = await fetch(`${BASE}api/auth/refresh`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const body = (await res.json()) as { token?: string };
+            if (body.token) {
+              sessionStorage.setItem(TOKEN_STORAGE_KEY, body.token);
+              setToken(body.token);
+              setAuthTokenGetter(() => body.token!);
+            }
+          }
+        } catch {}
+      }, refreshAtMs);
+    } catch {}
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
+  }, [token]);
 
   // Valida il token cached al mount e aggiorna i dati freschi (incluso isAffiliate)
   const didMountValidate = useRef(false);

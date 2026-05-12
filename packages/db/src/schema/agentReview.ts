@@ -99,9 +99,16 @@ export const reviewQueueTable = pgTable("review_queue", {
     .defaultNow(),
 });
 
+/**
+ * @deprecated Usa auditLogTable da "./auditLog" con category="agent_action".
+ * Questa tabella (audit_logs) è stata sostituita da audit_log unificato.
+ * Migration: INSERT INTO audit_log (actor_id, action, category, metadata)
+ *   SELECT user_id, action, 'agent_action', jsonb_build_object('targetType', target_type, 'targetId', target_id, 'metadata', metadata_json)
+ *   FROM audit_logs;
+ * Poi: DROP TABLE audit_logs;
+ */
 export const auditLogsTable = pgTable("audit_logs", {
   id: serial("id").primaryKey(),
-  // FIXED: was `text` — now integer to match usersTable.id and enable typed JOINs
   userId: integer("user_id").references(() => usersTable.id, {
     onDelete: "set null",
   }),

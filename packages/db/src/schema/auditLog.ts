@@ -87,6 +87,16 @@ export const auditLogTable = pgTable(
     action: text('action').notNull(),
 
     /**
+     * Categoria per distinguere i tipi di audit.
+     *   financial    — commissioni, pagamenti, rimborsi
+     *   agent_action — esecuzioni AI agent
+     *   admin_action — azioni amministrative manuali
+     *   auth         — login, logout, refresh token
+     *   system       — cron job, webhook automatici
+     */
+    category: text('category'),
+
+    /**
      * Payload JSON con tutti i dettagli rilevanti.
      * Esempi:
      *   commission_applied: { affiliateId, referredUserId, month, amountCents, appliedTo }
@@ -98,7 +108,7 @@ export const auditLogTable = pgTable(
     /**
      * IP del richiedente — per correlazione con eventi di sicurezza.
      * null per azioni di sistema.
-     * NON loggare in chiaro in produzione — hasha con SHA-256 se necessario.
+     * Usa sempre hashIp() prima di salvare.
      */
     ipAddress: text('ip_address'),
 
@@ -115,6 +125,7 @@ export const auditLogTable = pgTable(
     actorIdx: index('audit_actor_idx').on(t.actorId),
     targetIdx: index('audit_target_idx').on(t.targetId),
     actionIdx: index('audit_action_idx').on(t.action),
+    categoryIdx: index('audit_category_idx').on(t.category),
     /** Indice su createdAt per query di range (es. ultimi 30 giorni) */
     createdIdx: index('audit_created_idx').on(t.createdAt),
   }),
