@@ -23,7 +23,9 @@
 
 import { IncomingMessage, Server } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
-import { verify, type JwtPayload } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
+const { verify } = jwt;
+import type { JwtPayload } from "jsonwebtoken";
 import { ServerWsEvent, ClientWsEvent } from "@workspace/api-zod/ws-events";
 
 // ─── JWT verification ─────────────────────────────────────────────────────

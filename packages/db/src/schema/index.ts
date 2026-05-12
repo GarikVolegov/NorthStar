@@ -55,3 +55,5 @@ export * from "./pageContextSnapshots";
 export * from "./responseFeedback";
 export * from "./sessionSummaries";
 export * from "./voiceSessions";
+export * from "./routingLogs";
+export * from "./qualityMetrics";

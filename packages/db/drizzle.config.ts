@@ -1,11 +1,10 @@
 import { defineConfig } from "drizzle-kit";
-import path from "path";
 
 export default defineConfig({
-  schema: path.join(__dirname, "./src/schema/index.ts"),
-  out: path.join(__dirname, "./drizzle"),
-  dialect: "sqlite",
+  schema: "./src/schema/index.ts",
+  out: "./drizzle",
+  dialect: "postgresql",
   dbCredentials: {
-    url: "./sqlite.db",
+    url: process.env.DATABASE_URL ?? "postgresql://localhost:5432/northstar",
   },
 });

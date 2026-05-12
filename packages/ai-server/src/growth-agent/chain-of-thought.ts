@@ -31,6 +31,7 @@
  * the CoT is skipped (returns null) to avoid wasting tokens.
  */
 import { openai } from "../client";
+import { logger } from "../logger";
 
 export interface CoTResult {
   limitingPattern: string;      // e.g. "all-or-nothing thinking"
@@ -125,7 +126,7 @@ export async function runChainOfThought(
   const tokens = tokenizeForCoT(userMessage);
   const cached = shouldReuseCached(userId, tokens);
   if (cached) {
-    console.log(`[CoT] cache hit for user ${userId}`);
+    logger.debug({ userId }, "CoT cache hit");
     return cached;
   }
 
@@ -159,7 +160,7 @@ export async function runChainOfThought(
     return result;
   } catch (err) {
     // CoT failure is non-fatal — the agent continues without it
-    console.warn("[CoT] failed:", err instanceof Error ? err.message : err);
+    logger.warn({ err }, "CoT failed");
     return null;
   }
 }

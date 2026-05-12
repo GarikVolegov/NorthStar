@@ -7,9 +7,11 @@ import {
   Redirect,
 } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { WendyProvider } from "@/contexts/WendyProvider";
+import { WendyFloatingButton } from "@/components/WendyFloatingButton";
+import { WendyPanel } from "@/components/WendyPanel";
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import { useReducedMotion, easings } from "@/lib/motion";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -343,10 +345,14 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-          </WouterRouter>
-          <Toaster />
+          <WendyProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
+            <Toaster />
+            <WendyFloatingButton />
+            <WendyPanel />
+          </WendyProvider>
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>

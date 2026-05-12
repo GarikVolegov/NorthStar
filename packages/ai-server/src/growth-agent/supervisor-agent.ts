@@ -25,6 +25,8 @@ import { getLLM } from "../llm/client";
 import { db } from "../db/client";
 import { supervisorLogs } from "../db/schema";
 import type { Domain, Intent } from "./router-agent";
+import { logger, type LoggerFields } from "../logger";
+import { recordSupervisorRewrite } from "../metrics";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -226,16 +228,21 @@ REGOLE DI RISCRITTURA:
         { model: "gpt-4o-mini", temperature: 0.50, maxTokens: 700 },
       );
     } catch (err) {
-      console.warn("[supervisor] rewrite failed, using original draft:", err);
+      logger.warn({ err, domain, intent }, "rewrite failed — using original draft");
     }
 
     // ── Re-evaluate post-rewrite ─────────────────────────────────────
     const rewrittenResult = this.evaluate({ ...input, draft: rewritten });
-    if (rewrittenResult.score < failResult.score) {
-      console.warn(
-        `[supervisor] rewrite degraded quality (${rewrittenResult.score} < ${failResult.score}) — keeping original`,
+    const degraded = rewrittenResult.score < failResult.score;
+    const logFields: LoggerFields = { userId, sessionId, domain, intent, supervisorScore: rewrittenResult.score };
+    if (degraded) {
+      logger.warn(
+        { ...logFields, originalScore: failResult.score, rewriteScore: rewrittenResult.score },
+        "rewrite degraded quality — keeping original",
       );
     }
+
+    recordSupervisorRewrite(domain);
 
     // ── Fire-and-forget DB log ───────────────────────────────────────
     if (db) {
@@ -251,11 +258,13 @@ REGOLE DI RISCRITTURA:
         scoreAfter:  rewrittenResult.score,
         reasons:     JSON.stringify(failResult.reasons),
       }).catch((err: unknown) => {
-        console.warn("[supervisor] DB log failed (non-blocking):", err);
+        logger.warn({ err, ...logFields }, "supervisor DB log failed");
       });
     }
 
-    return rewrittenResult.score >= failResult.score ? rewritten : draft;
+    logger.info({ ...logFields, originalScore: failResult.score, degraded }, "supervisor rewrite completed");
+
+    return degraded ? draft : rewritten;
   }
 }
 

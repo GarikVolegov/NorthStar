@@ -20,6 +20,7 @@ import { db } from "@workspace/db";
 import { sessionSummariesTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import type { ChatMessage } from "./agent";
+import { logger } from "../logger";
 
 const SUMMARIZER_SYSTEM = `
 Sei un assistente che produce riepiloghi concisi di sessioni di coaching.
@@ -67,7 +68,7 @@ export async function summarizeSession(
     const parsed = JSON.parse(raw) as Partial<SummaryResponse>;
 
     if (!parsed.summary) {
-      console.warn("[session-summarizer] empty summary returned, skipping save");
+      logger.warn({ userId, sessionId }, "empty summary returned, skipping save");
       return;
     }
 
@@ -81,9 +82,9 @@ export async function summarizeSession(
                    : "neutral",
     });
 
-    console.log(`[session-summarizer] session ${sessionId} summarized for user ${userId}`);
+    logger.info({ userId, sessionId }, "session summarized");
   } catch (err) {
-    console.warn("[session-summarizer] failed:", err);
+    logger.warn({ err, userId, sessionId }, "session summarizer failed");
   }
 }
 

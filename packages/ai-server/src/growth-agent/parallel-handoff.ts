@@ -31,6 +31,7 @@ import type { EvalResult } from "./self-evaluator";
 import type { SupervisorResult } from "./supervisor-agent";
 import type { ChatMessage } from "./agent";
 import type { UserContext } from "./prompt-builder";
+import { logger } from "../logger";
 
 // How long to wait (ms) after the first specialist finishes before giving up
 // on fusion and switching to sequential append mode.
@@ -40,14 +41,17 @@ const CHUNK_SIZE       = 4;
 // ── Types ────────────────────────────────────────────────────────────────────────
 
 export interface ParallelHandoffOptions {
-  userId:          number;
-  userContext:     UserContext & { memorySection?: string };
-  history:         ChatMessage[];
-  userMessage:     string;
-  primaryRoute:    RouteDecision;
-  secondaryRoute:  RouteDecision;
-  memoryFactCount: number;
-  maxHistory?:     number;
+  userId:                number;
+  userContext:           UserContext & { memorySection?: string };
+  history:               ChatMessage[];
+  userMessage:           string;
+  primaryRoute:          RouteDecision;
+  secondaryRoute:        RouteDecision;
+  memoryFactCount:       number;
+  maxHistory?:           number;
+  requestId?:            string;
+  behavioralPatterns?:   Array<{ patternType: string; description: string; confidence: number }>;
+  routingHistorySummary?: string;
 }
 
 export type ParallelHandoffEvent =
@@ -207,6 +211,7 @@ export async function* runParallelHandoff(
   const {
     userId, userContext, history, userMessage,
     primaryRoute, secondaryRoute, memoryFactCount, maxHistory = 12,
+    behavioralPatterns, routingHistorySummary,
   } = opts;
 
   const primarySpecialist   = getSpecialist(primaryRoute.domain);
@@ -219,7 +224,7 @@ export async function* runParallelHandoff(
 
   yield { type: "status", value: `⚡ Attivo ${primaryRoute.domain} + ${secondaryRoute.domain} in parallelo...` };
 
-  const sharedOpts = { userId, userContext, history, memoryFactCount, maxHistory };
+  const sharedOpts: Omit<SpecialistRunOptions, 'routeDecision' | 'userMessage'> = { userId, userContext, history, memoryFactCount, maxHistory, behavioralPatterns, routingHistorySummary };
   const startedAt  = Date.now();
 
   // ── Phase 8: race both drains ───────────────────────────────────────────────────
@@ -313,7 +318,7 @@ export async function* runParallelHandoff(
     if (!seenSources.has(key)) { seenSources.add(key); mergedSources.push(s); }
   }
 
-  console.log(`[parallel-handoff v2] total latency: ${Date.now() - startedAt}ms | strategy: ${ primaryOk && secondaryOk ? (delta <= FUSION_WINDOW_MS ? "fuse" : "append") : "single" }`);
+  logger.info({ strategy: primaryOk && secondaryOk ? (delta <= FUSION_WINDOW_MS ? "fuse" : "append") : "single", latencyMs: Date.now() - startedAt }, "parallel handoff complete");
 
   yield {
     type:             "done",

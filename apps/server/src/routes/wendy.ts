@@ -1,13 +1,8 @@
-/**
- * Wendy RAG endpoint — POST /api/wendy/ask
- *
- * Accepts a user message, retrieves relevant context from knowledge_nodes,
- * and streams an AI response via SSE.
- */
 import { Router, type Request, type Response } from "express";
 import { z } from "zod/v4";
 import OpenAI from "openai";
 import { requireAuth } from "../middleware/auth";
+import type { LoggerFields } from "@workspace/ai-server/logger";
 
 const router = Router();
 
@@ -18,7 +13,7 @@ const askSchema = z.object({
 
 const WENDY_SYSTEM = `Sei Wendy, coach di crescita personale e orientamento professionale di NorthStar.
 Sei empatica, diretta, competente. Rispondi sempre in italiano.
-Usa un tono caldo ma concreto — mai vago o generico.
+Usa un tono calmo ma concreto — mai vago o generico.
 Se non sei sicura, dillo esplicitamente piuttosto che inventare.
 
 Hai accesso a una knowledge base con documenti, esempi e risorse.
@@ -35,8 +30,11 @@ function getOpenAI(): OpenAI {
 }
 
 router.post("/ask", requireAuth, async (req: Request, res: Response) => {
+  const requestId = req.requestId;
   const userId = req.user!.id;
   const data = askSchema.parse(req.body);
+  const logger = (await import("@workspace/ai-server/logger")).logger;
+  const logFields: LoggerFields = { userId, requestId };
 
   // ── RAG retrieval ──────────────────────────────────────────
   let chunks: Array<{ content: string; source: string; score: number }> = [];
@@ -48,7 +46,7 @@ router.post("/ask", requireAuth, async (req: Request, res: Response) => {
       sourceTypes: ["platform_content", "document", "persona_example"],
     });
   } catch (err) {
-    console.warn("[wendy] RAG retrieval failed:", err);
+    logger.warn({ err, ...logFields }, "wendy RAG retrieval failed");
   }
 
   // ── Build context ──────────────────────────────────────────
@@ -108,7 +106,7 @@ router.post("/ask", requireAuth, async (req: Request, res: Response) => {
     res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
     res.end();
   } catch (err) {
-    console.error("[wendy] ask error:", err);
+    logger.error({ err, ...logFields }, "wendy ask error");
     res.write(`data: ${JSON.stringify({ type: "error", message: "Errore durante la generazione della risposta" })}\n\n`);
     res.end();
   }
@@ -122,7 +120,9 @@ const voiceSchema = z.object({
 });
 
 router.post("/voice", requireAuth, async (req: Request, res: Response) => {
+  const requestId = req.requestId;
   const data = voiceSchema.parse(req.body);
+  const logger = (await import("@workspace/ai-server/logger")).logger;
 
   try {
     const { wendyTextToSpeech } = await import("@workspace/ai-server/audio");
@@ -144,7 +144,7 @@ router.post("/voice", requireAuth, async (req: Request, res: Response) => {
     res.setHeader("Content-Length", audioBuffer.length.toString());
     res.send(audioBuffer);
   } catch (err) {
-    console.error("[wendy] voice error:", err);
+    logger.error({ err, requestId }, "wendy voice error");
     res.status(500).json({ error: "TTS generation failed", message: String(err) });
   }
 });

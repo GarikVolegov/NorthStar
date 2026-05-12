@@ -34,6 +34,7 @@ export interface ChatMessage {
   citations?:   RagCitation[];   // fonti KB alleggate al messaggio
   feedback?:    'up' | 'down';   // voto utente
   context?:     string;          // prompt contestuale usato (debug)
+  uiTool?:      { name: string; args: Record<string, unknown> };
 }
 
 export interface ThinkingPhase {
@@ -124,7 +125,6 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
         const data = JSON.parse(raw);
         if (data?.type === 'rag_citations' && Array.isArray(data.citations)) {
           pendingCitationsRef.current = data.citations as RagCitation[];
-          // Attacca subito le citations al messaggio assistant in corso
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantMsgIdRef.current
@@ -132,9 +132,21 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
                 : m,
             ),
           );
-          return true; // segnala: non passare a onChunk
+          return true;
         }
-        // Primo chunk di testo: chiudi thinking phase
+        if (data?.type === 'ui_tool' && data?.name) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgIdRef.current
+                ? {
+                    ...m,
+                    uiTool: { name: data.name as string, args: data.args as Record<string, unknown> },
+                  }
+                : m,
+            ),
+          );
+          return true;
+        }
         if (data?.choices?.[0]?.delta?.content !== undefined && !firstChunkReceivedRef.current) {
           firstChunkReceivedRef.current = true;
           setThinking({ active: false, label: THINKING_LABELS[0], startedAt: 0 });

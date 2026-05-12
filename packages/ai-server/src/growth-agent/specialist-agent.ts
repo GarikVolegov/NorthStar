@@ -22,16 +22,17 @@ import { retrieve } from "./retriever";
 import { searchWeb, MIN_LOCAL_CHUNKS } from "./web-search";
 import { runChainOfThought } from "./chain-of-thought";
 import { evaluateSelf } from "./self-evaluator";
-import { buildSystemPrompt } from "./prompt-builder";
+import { buildSystemPrompt, type UserContext } from "./prompt-builder";
 import { supervisorAgent } from "./supervisor-agent";
-import { loadMemory, buildMemorySection, extractMemory, mergeMemory } from "./memory-manager";
 import type { SupervisorResult } from "./supervisor-agent";
-import type { UserContext } from "./prompt-builder";
 import type { ChatMessage } from "./agent";
+import { logger } from "../logger";
+import { loadMemory, buildMemorySection, extractMemory, mergeMemory } from "./memory-manager";
 import type { RetrievedChunk } from "./retriever";
 import type { CoTResult } from "./chain-of-thought";
 import type { EvalResult } from "./self-evaluator";
 import type { Domain, RouteDecision } from "./router-agent";
+import type { MemoryPattern } from "./memory-manager";
 
 export const SPECIALIST_MODEL = "gpt-4o";
 
@@ -57,13 +58,16 @@ const DOMAIN_LABELS: Record<Domain, string> = {
 };
 
 export interface SpecialistRunOptions {
-  userId:           number;
-  userContext:      UserContext & { memorySection?: string };
-  history:          ChatMessage[];
-  userMessage:      string;
-  routeDecision:    RouteDecision;
-  memoryFactCount?: number;
-  maxHistory?:      number;
+  userId:                number;
+  userContext:           UserContext & { memorySection?: string };
+  history:               ChatMessage[];
+  userMessage:           string;
+  routeDecision:         RouteDecision;
+  memoryFactCount?:      number;
+  maxHistory?:           number;
+  requestId?:            string;
+  behavioralPatterns?:   Array<{ patternType: string; description: string; confidence: number }>;
+  routingHistorySummary?: string;
 }
 
 export type SpecialistEvent =
@@ -110,7 +114,7 @@ export abstract class SpecialistAgent {
         resolvedMemorySection = buildMemorySection(userMemory);
         memoryFactCount     = userMemory.facts.length;
       } catch (err) {
-        console.warn(`[specialist:${this.DOMAIN}] memory load failed:`, err instanceof Error ? err.message : err);
+        logger.warn({ err, domain: this.DOMAIN }, "specialist memory load failed");
       }
     }
 
@@ -151,7 +155,21 @@ export abstract class SpecialistAgent {
       domainSection,
     ].filter(Boolean).join("\n");
 
-    const combinedMemory = [resolvedMemorySection, domainHeader].filter(Boolean).join("\n\n");
+    // Add behavioral patterns to domain header
+    const bp = opts.behavioralPatterns;
+    let patternsLine = "";
+    if (bp && bp.length > 0) {
+      patternsLine = "\n**Pattern comportamentali**: " +
+        bp.slice(0, 3).map((p) => `${p.description} (${(p.confidence * 100).toFixed(0)}%)`).join("; ");
+    }
+    if (opts.routingHistorySummary) {
+      patternsLine += "\n**Routing recente**: " + opts.routingHistorySummary;
+    }
+    const domainHeaderWithPatterns = patternsLine
+      ? domainHeader + "\n" + patternsLine
+      : domainHeader;
+
+    const combinedMemory = [resolvedMemorySection, domainHeaderWithPatterns].filter(Boolean).join("\n\n");
     const enrichedContext: UserContext & { memorySection?: string } = {
       ...userContext,
       memorySection: combinedMemory,
@@ -195,11 +213,11 @@ export abstract class SpecialistAgent {
 
       if (!supervisorResult.pass) {
         yield { type: "status", value: "🔄 Revisione qualità in corso..." };
-        console.log(`[supervisor] FAIL (score=${supervisorResult.score})`);
+        logger.info({ domain: this.DOMAIN, supervisorScore: supervisorResult.score }, "specialist supervisor FAIL");
         finalText        = await supervisorAgent.rewrite(supervisorInput, supervisorResult);
         supervisorResult = { ...supervisorResult, rewritten: true };
       } else {
-        console.log(`[supervisor] PASS (score=${supervisorResult.score})`);
+        logger.info({ domain: this.DOMAIN, supervisorScore: supervisorResult.score }, "specialist supervisor PASS");
       }
 
       // ── 7. Stream final text ────────────────────────────────────────────────
@@ -230,13 +248,13 @@ export abstract class SpecialistAgent {
               const extracted = await extractMemory(turns);
               if (extracted && (extracted.facts.length > 0 || extracted.patterns.length > 0)) {
                 await mergeMemory(userId, sessionId, extracted);
-                console.log(`[memory:${this.DOMAIN}] saved ${extracted.facts.length} facts + ${extracted.patterns.length} patterns`);
+                logger.info({ domain: this.DOMAIN, facts: extracted.facts.length, patterns: extracted.patterns.length }, "specialist memory saved");
               }
             })(),
             timeout,
           ]);
         } catch (err) {
-          console.warn(`[memory:${this.DOMAIN}] save failed/timeout:`, err instanceof Error ? err.message : err);
+          logger.warn({ err, domain: this.DOMAIN }, "specialist memory save failed/timeout");
         }
       })();
 
@@ -252,7 +270,7 @@ const registry = new Map<Domain, SpecialistAgent>();
 
 export function registerSpecialist(agent: SpecialistAgent): void {
   registry.set(agent.DOMAIN, agent);
-  console.log(`[specialist-registry] registered: ${agent.DOMAIN}`);
+  logger.info({ domain: agent.DOMAIN }, "specialist registered");
 }
 
 export function getSpecialist(domain: Domain): SpecialistAgent | null {

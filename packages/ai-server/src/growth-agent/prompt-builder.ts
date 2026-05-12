@@ -1,16 +1,8 @@
-/**
- * prompt-builder v2 — platform content section.
- *
- * CHANGES:
- * - buildSystemPrompt() accepts optional platformChunks.
- *   If present and non-empty, injects a dedicated '## Contenuti NorthStar'
- *   section BEFORE the RAG documents section.
- *   This makes platform content authoritative and easily distinguishable
- *   from user documents and web results in the model's context.
- */
 import type { RetrievedChunk } from "./retriever";
 import type { CoTResult }      from "./chain-of-thought";
 import type { EvalResult }     from "./self-evaluator";
+import type { RouteDecision }  from "./router-agent";
+import { buildToneSection }    from "./tone-adapter";
 
 export interface UserContext {
   name?:         string;
@@ -20,28 +12,45 @@ export interface UserContext {
   sectorName?:   string;
   pageContext?:  Record<string, unknown>;
   memorySection?: string;
+  locale?:       string;
 }
 
 export interface BuildSystemPromptOptions {
-  userContext:      UserContext & { memorySection?: string };
-  personaExamples:  RetrievedChunk[];
-  documentChunks:   RetrievedChunk[];
-  webResults:       RetrievedChunk[];
-  cot:              CoTResult | null;
-  userMessage:      string;
-  evalResult:       EvalResult;
-  platformChunks?:  RetrievedChunk[]; // ← v2: optional platform content
+  userContext:            UserContext & { memorySection?: string };
+  personaExamples:        RetrievedChunk[];
+  documentChunks:         RetrievedChunk[];
+  webResults:             RetrievedChunk[];
+  cot:                    CoTResult | null;
+  userMessage:            string;
+  evalResult:             EvalResult;
+  platformChunks?:        RetrievedChunk[];
+  routeDecision?:         RouteDecision;
+  behaviorPatterns?:      Array<{ patternType: string; description: string; confidence: number }>;
+  routingHistorySummary?: string;
+  fallbackInstruction?:   string;
+  sessionMessageCount?:   number;
+  hasSessionGoal?:        boolean;
+  pendingFollowUp?:       string;
 }
 
 const BASE_SYSTEM = `Sei Wendy, coach di crescita personale e orientamento professionale di NorthStar.
 Sei empatica, diretta, competente. Rispondi sempre in italiano.
 Usa un tono caldo ma concreto — mai vago o generico.
-Se non sei sicura, dillo esplicitamente piuttosto che inventare.`;
+Se non sei sicura, dillo esplicitamente piuttosto che inventare.
+
+Struttura standard delle tue risposte:
+1. Riconosci:  mostra che hai capito il messaggio e il contesto
+2. Analizza:   dai la tua prospettiva, usa la memoria se pertinente
+3. Proponi:    1-3 passi concreti che l'utente può fare
+Adatta la struttura in base all'intento (vent salta il passo 3, plan enfatizza azioni).`;
 
 export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {
   const {
     userContext, personaExamples, documentChunks, webResults,
     cot, userMessage, evalResult, platformChunks = [],
+    routeDecision, behaviorPatterns, routingHistorySummary,
+    fallbackInstruction, sessionMessageCount = 0, hasSessionGoal,
+    pendingFollowUp,
   } = opts;
 
   const sections: string[] = [BASE_SYSTEM];
@@ -70,7 +79,72 @@ export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {
     sections.push(userContext.memorySection);
   }
 
-  // ── Platform content (authoritative NorthStar content) — v2 ─────────────
+  // ── Behavioral patterns + routing history ────────────────────────────────
+  const patternLines: string[] = [];
+  if (behaviorPatterns && behaviorPatterns.length > 0) {
+    const top = behaviorPatterns.slice(0, 5);
+    top.forEach((p) => {
+      patternLines.push(`  - [${p.patternType}] ${p.description} (confidenza: ${(p.confidence * 100).toFixed(0)}%)`);
+    });
+  }
+  if (routingHistorySummary) {
+    patternLines.push("", routingHistorySummary);
+  }
+  if (patternLines.length > 0) {
+    sections.push(
+      "## Pattern di comportamento rilevati\n" +
+      "L'utente mostra pattern ricorrenti nelle conversazioni:\n" +
+      patternLines.join("\n") +
+      "\n\nSe l'utente è in modalità 'vent' da più turni consecutivi, riconosci lo sfogo ma proponi delicatamente di passare a un piano concreto." +
+      "\nSe l'utente torna sullo stesso tema più volte, sottolinealo con naturalezza (es. 'Ogni volta che parliamo di X torni su questo punto…')."
+    );
+  }
+
+  // ── Tone section (adaptive voice) ─────────────────────────────────────────
+  if (userContext.journeyType) {
+    sections.push(buildToneSection(userContext.journeyType));
+  }
+
+  // ── Session goal — ask if not set ─────────────────────────────────────────
+  if (hasSessionGoal === false && sessionMessageCount <= 3) {
+    sections.push(
+      "## Obiettivo di sessione non ancora impostato\n" +
+      "L'utente non ha ancora dichiarato cosa vuole ottenere oggi. " +
+      "Se questa è una delle prime interazioni e non sembra uno sfogo, " +
+      "chiedi gentilmente: 'In una frase, cosa vorresti ottenere oggi?' " +
+      "NON forzare — se l'utente è in vent/reflect, aspetta."
+    );
+  }
+
+  // ── Goal progress check (every ~5 messages) ──────────────────────────────
+  if (hasSessionGoal === true && sessionMessageCount > 0 && sessionMessageCount % 5 === 0) {
+    sections.push(
+      "## Verifica progresso obiettivo\n" +
+      "Sono passati alcuni messaggi. Se pertinente, fai un breve check: " +
+      "riconosci i progressi e chiedi se la conversazione è sulla strada giusta. " +
+      "Sii breve — 1-2 frasi."
+    );
+  }
+
+  // ── Pending follow-up ────────────────────────────────────────────────────
+  if (pendingFollowUp) {
+    sections.push(
+      "## Follow-up in sospeso\n" +
+      `Nella sessione precedente l'utente stava lavorando su: "${pendingFollowUp}". ` +
+      "Se appropriato e l'argomento è ancora attuale, chiedi com'è andata. " +
+      "Non forzare — se l'utente è passato ad altro, lascia perdere."
+    );
+  }
+
+  // ── Fallback instruction ──────────────────────────────────────────────────
+  if (fallbackInstruction) {
+    sections.push(
+      "## Istruzione speciale\n" +
+      fallbackInstruction
+    );
+  }
+
+  // ── Platform content (authoritative NorthStar content) ───────────────────
   if (platformChunks.length > 0) {
     const platformText = platformChunks
       .map((c, i) => `[PIATTAFORMA ${i + 1}] (${c.source})\n${c.content}`)

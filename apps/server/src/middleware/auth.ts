@@ -1,5 +1,6 @@
 import { type Request, type Response, type NextFunction } from "express";
-import { verify } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
+const { verify } = jwt;
 import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";

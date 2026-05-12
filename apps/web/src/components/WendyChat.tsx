@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useCallback, FormEvent, KeyboardEvent } fr
 import { useWendyChat } from '../hooks/useWendyChat.js';
 import { WendyThinkingIndicator } from './WendyThinkingIndicator.js';
 import { WendyVoiceOverlay } from './wendy/WendyVoiceOverlay.js';
+import { UiToolRenderer } from './wendy/UiToolRenderer.js';
 import type { VoiceChatMessage } from '../hooks/useVoiceChat.js';
 import { StreamErrorBoundary } from './ErrorBoundary.js';
 
@@ -201,7 +202,11 @@ export function WendyChat({
                     msg.isStreaming ? 'after:content-["|_"] after:animate-pulse' : '',
                   ].join(' ')}
                 >
-                  {msg.content || (msg.isStreaming ? '' : '…')}
+                  {msg.uiTool ? (
+                    <UiToolRenderer name={msg.uiTool.name} args={msg.uiTool.args} />
+                  ) : (
+                    msg.content || (msg.isStreaming ? '' : '…')
+                  )}
                 </div>
               )}
             </div>

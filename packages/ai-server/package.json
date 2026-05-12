@@ -10,7 +10,11 @@
     "./audio": "./src/audio/index.ts",
     "./db": "./src/db/client.ts",
     "./growth-agent": "./src/growth-agent/index.ts",
-    "./llm/client": "./src/llm/client.ts"
+    "./llm/client": "./src/llm/client.ts",
+    "./logger": "./src/logger.ts",
+    "./metrics": "./src/metrics.ts",
+    "./feature-flags": "./src/feature-flags.ts",
+    "./utils": "./src/utils.ts"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",
@@ -20,9 +24,16 @@
     "p-limit": "catalog:",
     "p-retry": "catalog:",
     "pdf-parse": "^2.4.5",
-    "postgres": "^3.4.9"
+    "postgres": "^3.4.9",
+    "pino": "^9.6.0",
+    "prom-client": "^15.1.3"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
-    "@types/node": "catalog:"
+    "@types/node": "catalog:",
+    "vitest": "^3.1.2"
   }
 }

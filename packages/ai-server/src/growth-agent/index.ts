@@ -15,3 +15,9 @@ export { getSpecialist, registerSpecialist, SpecialistAgent } from "./specialist
 // Supervisor
 export { supervisorAgent, SupervisorAgent } from "./supervisor-agent";
 export type { SupervisorResult, SupervisorDimensions } from "./supervisor-agent";
+
+// Memory manager
+export { loadMemory, buildMemorySection, extractMemory, mergeMemory, type UserMemory, type MemoryFact, type MemoryPattern, type ExtractedMemory } from "./memory-manager";
+
+// DB schemas (re-exported for admin routes)
+export { supervisorLogs, qualityMetrics } from "../db/schema";

@@ -16,6 +16,7 @@ import { eq, and, isNotNull } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { embedText } from "./embedder";
 import { EMBEDDING_DIMS } from "./embedder";
+import { logger } from "../logger";
 
 export type SourceType =
   | "document"
@@ -117,6 +118,10 @@ async function retrieveWithJs(
     )
     .limit(500);
 
+  if (nodes.length >= 500) {
+    logger.warn({ userId, sourceTypes }, "JS retriever hit 500-row limit — results may be incomplete");
+  }
+
   return nodes
     .filter((n) => {
       const emb = n.embedding as number[] | null;
@@ -184,8 +189,8 @@ export async function retrieve(
       retrieveWithJs(queryEmbedding, userId, topK, minScore, sourceTypes),
       3000,
     );
-  } catch {
-    console.warn("[retriever] JS fallback timeout/error — returning empty");
+  } catch (err) {
+    logger.warn({ err }, "JS fallback timeout/error — returning empty");
     return [];
   }
 }

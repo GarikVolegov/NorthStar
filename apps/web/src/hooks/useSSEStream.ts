@@ -105,15 +105,16 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
           const raw = line.slice(6).trim();
           if (raw === "[DONE]") return;
           try {
-            const parsed = JSON.parse(raw) as {
-              choices?: Array<{ delta?: { content?: string } }>;
-              content?: string;
-              text?: string;
-            };
+            const parsed = JSON.parse(raw) as Record<string, unknown>;
+            // Custom event types (ui_tool, status, rag_citations, etc.)
+            if (parsed.type && parsed.type !== "token") {
+              onRawChunk?.(raw);
+              return;
+            }
             const chunk =
-              parsed.choices?.[0]?.delta?.content ??
-              parsed.content ??
-              parsed.text ??
+              (parsed as { choices?: Array<{ delta?: { content?: string } }> }).choices?.[0]?.delta?.content ??
+              (parsed.content as string) ??
+              (parsed.text as string) ??
               "";
             if (chunk) {
               bufferRef.current += chunk;

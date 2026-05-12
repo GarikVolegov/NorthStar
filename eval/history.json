@@ -1,0 +1,4 @@
+{
+  "runs": [],
+  "description": "Storico evaluation runs. Ogni run contiene timestamp, metriche aggregate, e confronto con run precedenti."
+}

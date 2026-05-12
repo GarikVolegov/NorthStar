@@ -125,6 +125,9 @@ router.post("/sessions/:id/ask", requireAuth, async (req, res) => {
     return;
   }
 
+  const requestId = req.requestId;
+  const logger = (await import("@workspace/ai-server/logger")).logger;
+
   // ── Load memory ────────────────────────────────────────────
   let memorySection = "";
   try {
@@ -132,7 +135,7 @@ router.post("/sessions/:id/ask", requireAuth, async (req, res) => {
     const userMemory = await loadMemory(userId);
     memorySection = buildMemorySection(userMemory);
   } catch (err) {
-    console.warn("[coach] memory load failed:", err);
+    logger.warn({ err, userId, requestId }, "coach memory load failed");
   }
 
   // ── Build messages array ────────────────────────────────────
@@ -204,17 +207,17 @@ router.post("/sessions/:id/ask", requireAuth, async (req, res) => {
         );
         if (extracted && (extracted.facts.length > 0 || extracted.patterns.length > 0)) {
           await mergeMemory(userId, id, extracted);
-          console.log(`[coach] memory saved: ${extracted.facts.length} facts + ${extracted.patterns.length} patterns`);
+          logger.info({ userId, requestId, facts: extracted.facts.length, patterns: extracted.patterns.length }, "coach memory saved");
         }
       } catch (err) {
-        console.warn("[coach] memory save failed:", err);
+        logger.warn({ err, userId, requestId }, "coach memory save failed");
       }
     })();
 
     res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
     res.end();
   } catch (err) {
-    console.error("[coach] ask error:", err);
+    logger.error({ err, userId, requestId }, "coach ask error");
     res.write(`data: ${JSON.stringify({ type: "error", message: "Errore durante la generazione" })}\n\n`);
     res.end();
   }

@@ -40,6 +40,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import { openai } from "../client";
 import { embedText } from "./embedder";
+import { logger } from "../logger";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -182,7 +183,7 @@ export async function extractMemory(
       patterns: Array.isArray(parsed.patterns) ? parsed.patterns : [],
     };
   } catch (err) {
-    console.warn("[memory] extraction failed:", err instanceof Error ? err.message : err);
+    logger.warn({ err }, "memory extraction failed");
     return null;
   }
 }
@@ -377,6 +378,18 @@ export function buildMemorySection(memory: UserMemory): string {
 
   const lines: string[] = ["## Memoria persistente — quello che sai già di questo utente"];
 
+  // ── Session goals banner ──────────────────────────────────────────────
+  const mainGoal = memory.facts.find((f) => f.key === "goal_main");
+  const secondaryGoal = memory.facts.find((f) => f.key === "goal_secondary");
+  if (mainGoal) {
+    lines.push(
+      "",
+      `### Obiettivo principale di sessione: ${mainGoal.value}`,
+      secondaryGoal ? `Obiettivo secondario: ${secondaryGoal.value}` : "",
+      "Tieni la risposta allineata a questi obiettivi. Se l'utente si allontana, riconducilo gentilmente.",
+    );
+  }
+
   if (hasFacts) {
     lines.push("\n### Fatti biografici (dichiarati dall'utente in sessioni precedenti)");
     for (const f of memory.facts) {
@@ -398,7 +411,9 @@ export function buildMemorySection(memory: UserMemory): string {
 
   lines.push(
     "\nUSA questa memoria per personalizzare la risposta." ,
-    "Non citare mai esplicitamente 'ricordo che mi hai detto' — incorpora naturalmente.",
+    "Se pertinente e c'è una connessione chiara, cita 1-2 fatti della memoria dell'utente per mostrare che ricordi la sua storia.",
+    "Esempi di citazione naturale: 'So che stavi lavorando su X…', 'La scorsa sessione mi dicevi che…', 'Visto che il tuo obiettivo è Y…'",
+    "Non esagerare — basta 1 citazione per risposta, solo quando aggiunge valore.",
   );
 
   return lines.join("\n");

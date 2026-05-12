@@ -1,0 +1,10 @@
+[
+  {
+    "id": 1,
+    "message": "Non ce la faccio più, il lavoro mi sta distruggendo",
+    "domain": "career",
+    "intent": "vent",
+    "humanRating": 4,
+    "humanNotes": "Wendy ha riconosciuto lo sfogo, non ha dato soluzioni forzate"
+  }
+]
