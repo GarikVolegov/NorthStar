@@ -237,7 +237,7 @@ export function Navbar() {
                       whileTap={prefersReduced ? {} : { scale: 0.98 }}
                     >
                       <User className="h-3.5 w-3.5 text-primary" />
-                      <span className="max-w-[80px] truncate">{user.name}</span>
+                      <span className="max-w-20 truncate">{user.name}</span>
                     </m.button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent

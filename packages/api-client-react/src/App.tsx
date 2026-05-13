@@ -148,7 +148,7 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] pb-20 md:pb-0">
+      <div className="min-h-screen bg-background text-foreground pb-20 md:pb-0">
         <Navbar />
 
         <main className="relative">

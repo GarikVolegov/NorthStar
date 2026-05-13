@@ -85,7 +85,7 @@ export function TrendingMobileStrip({
                 className="w-44 rounded-2xl border border-border bg-card hover:border-primary/35 active:scale-[0.97] transition-all duration-200 overflow-hidden"
               >
                 {/* Top accent stripe */}
-                <div className="h-0.5 w-full bg-gradient-to-r from-primary/40 via-primary/70 to-primary/40" />
+                <div className="h-0.5 w-full bg-linear-to-r from-primary/40 via-primary/70 to-primary/40" />
 
                 <div className="p-3.5 flex flex-col gap-2.5">
                   {/* Icon + rank */}
@@ -160,7 +160,7 @@ export function TrendingMobileStrip({
 
         {/* "Explore all" card at the end */}
         <Link href="/settori" className="shrink-0">
-          <div className="w-28 h-full min-h-[152px] rounded-2xl border border-dashed border-border/60 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:border-primary/30 transition-all active:scale-[0.97]">
+          <div className="w-28 h-full min-h-38 rounded-2xl border border-dashed border-border/60 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:border-primary/30 transition-all active:scale-[0.97]">
             <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
               <ArrowRight className="w-4 h-4" />
             </div>

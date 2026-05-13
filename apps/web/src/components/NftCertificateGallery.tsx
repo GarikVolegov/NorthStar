@@ -5,8 +5,16 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CERTIFICATE_CATEGORY_COLORS, CATEGORY_LABELS } from "@/lib/constants";
 import {
-  Award, ExternalLink, Copy, Check, Shield, Sparkles,
-  Gem, Clock, ChevronRight, Info,
+  Award,
+  ExternalLink,
+  Copy,
+  Check,
+  Shield,
+  Sparkles,
+  Gem,
+  Clock,
+  ChevronRight,
+  Info,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -35,18 +43,27 @@ function CopyButton({ text }: { text: string }) {
       }}
       className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
     >
-      {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+      {copied ? (
+        <Check className="h-3 w-3 text-green-400" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
     </button>
   );
 }
 
 function NftCard({ cert }: { cert: NftCert }) {
-  const colors = CERTIFICATE_CATEGORY_COLORS[cert.category] ?? CERTIFICATE_CATEGORY_COLORS.altro;
+  const colors =
+    CERTIFICATE_CATEGORY_COLORS[cert.category] ??
+    CERTIFICATE_CATEGORY_COLORS.altro;
   const label = CATEGORY_LABELS[cert.category] ?? "Traguardo";
   const date = new Date(cert.mintedAt).toLocaleDateString("it-IT", {
-    day: "2-digit", month: "short", year: "numeric",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
-  const shortHash = cert.certificateHash.slice(0, 8) + "…" + cert.certificateHash.slice(-6);
+  const shortHash =
+    cert.certificateHash.slice(0, 8) + "…" + cert.certificateHash.slice(-6);
   const verifyUrl = `${window.location.origin}/certificato/${cert.certificateHash}`;
   const imageUrl = `${BASE}api/nft-certificates/image/${cert.certificateHash}.png`;
 
@@ -59,14 +76,14 @@ function NftCard({ cert }: { cert: NftCert }) {
       }}
     >
       {/* Certificate image preview */}
-      <div className="relative w-full aspect-[1200/630] overflow-hidden bg-card">
+      <div className="relative w-full aspect-1200/630 overflow-hidden bg-card">
         <img
           src={imageUrl}
           alt={`Certificato: ${cert.objectiveText}`}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           loading="lazy"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-between p-3">
+        <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-between p-3">
           <a
             href={verifyUrl}
             target="_blank"
@@ -93,7 +110,11 @@ function NftCard({ cert }: { cert: NftCert }) {
         <div className="flex items-center justify-between">
           <span
             className="text-[11px] font-bold tracking-widest px-2.5 py-1 rounded-full uppercase"
-            style={{ color: colors.accent, background: colors.bg, border: `1px solid ${colors.accent}30` }}
+            style={{
+              color: colors.accent,
+              background: colors.bg,
+              border: `1px solid ${colors.accent}30`,
+            }}
           >
             {label}
           </span>
@@ -113,12 +134,16 @@ function NftCard({ cert }: { cert: NftCert }) {
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
               <Shield className="h-3 w-3 text-muted-foreground shrink-0" />
-              <span className="text-[11px] font-mono text-muted-foreground truncate">{shortHash}</span>
+              <span className="text-[11px] font-mono text-muted-foreground truncate">
+                {shortHash}
+              </span>
               <CopyButton text={cert.certificateHash} />
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-[11px] text-green-400 font-semibold">Verificato</span>
+              <span className="text-[11px] text-green-400 font-semibold">
+                Verificato
+              </span>
             </div>
           </div>
         </div>
@@ -131,19 +156,26 @@ function NftCard({ cert }: { cert: NftCert }) {
             rel="noopener noreferrer"
             className="flex-1"
           >
-            <Button variant="outline" size="sm" className="w-full rounded-full gap-1.5 text-xs h-8 border-border">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full rounded-full gap-1.5 text-xs h-8 border-border"
+            >
               <ExternalLink className="h-3 w-3" /> Verifica
             </Button>
           </a>
           <Button
-            variant="ghost" size="sm"
+            variant="ghost"
+            size="sm"
             className="flex-1 rounded-full gap-1.5 text-xs h-8"
             onClick={() => {
-              navigator.share?.({
-                title: "Il mio certificato NorthStar NFT",
-                text: `Ho completato: "${cert.objectiveText}" — verifica il mio certificato NFT`,
-                url: verifyUrl,
-              }).catch(() => navigator.clipboard.writeText(verifyUrl));
+              navigator
+                .share?.({
+                  title: "Il mio certificato NorthStar NFT",
+                  text: `Ho completato: "${cert.objectiveText}" — verifica il mio certificato NFT`,
+                  url: verifyUrl,
+                })
+                .catch(() => navigator.clipboard.writeText(verifyUrl));
             }}
           >
             <Sparkles className="h-3 w-3" /> Condividi
@@ -154,7 +186,9 @@ function NftCard({ cert }: { cert: NftCert }) {
   );
 }
 
-interface Props { userId: number }
+interface Props {
+  userId: number;
+}
 
 export function NftCertificateGallery({ userId }: Props) {
   const qc = useQueryClient();
@@ -175,11 +209,16 @@ export function NftCertificateGallery({ userId }: Props) {
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <Gem className="h-4 w-4 text-primary" />
-          <h2 className="font-semibold text-base text-foreground">I miei NFT</h2>
+          <h2 className="font-semibold text-base text-foreground">
+            I miei NFT
+          </h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[1, 2].map((i) => (
-            <div key={i} className="rounded-2xl border border-border bg-card h-52 animate-pulse" />
+            <div
+              key={i}
+              className="rounded-2xl border border-border bg-card h-52 animate-pulse"
+            />
           ))}
         </div>
       </div>
@@ -194,7 +233,9 @@ export function NftCertificateGallery({ userId }: Props) {
           <h2 className="font-semibold text-base text-foreground">
             Certificati NFT
             {certs.length > 0 && (
-              <span className="ml-2 text-xs text-primary font-bold bg-primary/10 rounded-full px-2 py-0.5">{certs.length}</span>
+              <span className="ml-2 text-xs text-primary font-bold bg-primary/10 rounded-full px-2 py-0.5">
+                {certs.length}
+              </span>
             )}
           </h2>
         </div>
@@ -210,10 +251,14 @@ export function NftCertificateGallery({ userId }: Props) {
             <Gem className="h-7 w-7 text-primary/60" />
           </div>
           <div>
-            <p className="font-semibold text-foreground text-sm">Nessun certificato ancora</p>
+            <p className="font-semibold text-foreground text-sm">
+              Nessun certificato ancora
+            </p>
             <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-              Completa i tuoi obiettivi per ricevere certificati NFT verificabili su blockchain.
-              <br />Ogni traguardo diventa un attestato unico e condivisibile.
+              Completa i tuoi obiettivi per ricevere certificati NFT
+              verificabili su blockchain.
+              <br />
+              Ogni traguardo diventa un attestato unico e condivisibile.
             </p>
           </div>
           <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground mt-2">
@@ -226,7 +271,9 @@ export function NftCertificateGallery({ userId }: Props) {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {certs.map((cert) => <NftCard key={cert.id} cert={cert} />)}
+          {certs.map((cert) => (
+            <NftCard key={cert.id} cert={cert} />
+          ))}
         </div>
       )}
     </div>

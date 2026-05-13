@@ -7,8 +7,10 @@
       "command": "powershell",
       "args": [
         "-NoProfile",
-        "-Command",
-        "$p = netstat -ano | findstr ':5173.*LISTENING'; if ($p) { $pid = ($p -split '\\s+')[-1]; Stop-Process -Id $pid -Force }; pnpm run dev:web"
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/kill-port.ps1"
       ],
       "group": {
         "kind": "build",
@@ -28,7 +30,7 @@
         },
         "background": {
           "activeOnStart": true,
-          "beginsPattern": ".",
+          "beginsPattern": "VITE",
           "endsPattern": "Local:.*http://localhost:5173"
         }
       }

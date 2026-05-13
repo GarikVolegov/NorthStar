@@ -20,22 +20,26 @@ if (!isDisabled) {
   (async () => {
     try {
       const { NodeSDK } = await import("@opentelemetry/sdk-node");
-      const { OTLPTraceExporter } = await import("@opentelemetry/exporter-trace-otlp-http");
-      const { getNodeAutoInstrumentations } = await import("@opentelemetry/instrumentation-http");
-      const { ExpressInstrumentation } = await import("@opentelemetry/instrumentation-express");
-      const { diag, DiagConsoleLogger, DiagLogLevel } = await import("@opentelemetry/api");
+      const { OTLPTraceExporter } =
+        await import("@opentelemetry/exporter-trace-otlp-http");
+      const getNodeAutoInstrumentations =
+        (await import("@opentelemetry/auto-instrumentations-node"))
+          .getNodeAutoInstrumentations || (() => []);
+      const { ExpressInstrumentation } =
+        await import("@opentelemetry/instrumentation-express");
+      const { diag, DiagConsoleLogger, DiagLogLevel } =
+        await import("@opentelemetry/api");
 
       diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.WARN);
 
       const sdk = new NodeSDK({
-        serviceName: process.env.OTEL_SERVICE_NAME ?? "northstar-server",
         traceExporter: new OTLPTraceExporter({
           url: `${
             process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4318"
           }/v1/traces`,
         }),
         instrumentations: [
-          getNodeAutoInstrumentations(),
+          ...getNodeAutoInstrumentations(),
           new ExpressInstrumentation(),
         ],
       });
@@ -50,7 +54,10 @@ if (!isDisabled) {
         sdk.shutdown().catch(() => {});
       });
     } catch (err) {
-      console.warn("[tracing] OpenTelemetry not available — tracing disabled:", (err as Error).message);
+      console.warn(
+        "[tracing] OpenTelemetry not available — tracing disabled:",
+        (err as Error).message,
+      );
     }
   })();
 }

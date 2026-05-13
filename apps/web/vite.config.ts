@@ -46,6 +46,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,jpg,woff2}"],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
         // Aumentato staleWhileRevalidate a 7 giorni per asset statici
         runtimeCaching: [
           {

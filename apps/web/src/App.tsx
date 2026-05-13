@@ -7,6 +7,7 @@ import {
   Redirect,
 } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { WendyProvider } from "@/contexts/WendyProvider";
@@ -324,7 +325,7 @@ function Router() {
         </ErrorBoundary>
       </Route>
       <Route>
-        <div className="flex flex-col min-h-[100dvh]">
+        <div className="flex flex-col min-h-dvh">
           <Navbar />
           <main className="flex-1 pb-16 md:pb-0">
             <BackButton />

@@ -5,12 +5,41 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
-  X, Loader2, Printer, RefreshCw, Sparkles, AlertCircle,
-  Pencil, Eye, Plus, Trash2, ChevronDown, ChevronUp, Check,
-  User, Briefcase, GraduationCap, Wrench, Award, Globe,
-  Save, CheckCircle2, Clock, History, FolderOpen, PenLine, Download,
-  Crosshair, FileSearch, Lightbulb, Mail, Copy, ClipboardCheck,
-  BarChart2, TrendingUp, Zap,
+  X,
+  Loader2,
+  Printer,
+  RefreshCw,
+  Sparkles,
+  AlertCircle,
+  Pencil,
+  Eye,
+  Plus,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  User,
+  Briefcase,
+  GraduationCap,
+  Wrench,
+  Award,
+  Globe,
+  Save,
+  CheckCircle2,
+  Clock,
+  History,
+  FolderOpen,
+  PenLine,
+  Download,
+  Crosshair,
+  FileSearch,
+  Lightbulb,
+  Mail,
+  Copy,
+  ClipboardCheck,
+  BarChart2,
+  TrendingUp,
+  Zap,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -20,23 +49,39 @@ import { useTranslation } from "react-i18next";
 const BASE = import.meta.env.BASE_URL || "/";
 
 interface GraphNode {
-  id: string; label: string;
+  id: string;
+  label: string;
   type: "role" | "skill" | "tool" | "certification";
-  description: string; userAdded?: boolean;
+  description: string;
+  userAdded?: boolean;
 }
 
 export interface GeneratedCv {
   personalInfo: {
-    name: string; email?: string; phone?: string; location?: string;
-    linkedin?: string; website?: string; title?: string;
+    name: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    linkedin?: string;
+    website?: string;
+    title?: string;
   };
   summary: string;
   experience: Array<{
-    id: string; title: string; company: string; period: string;
-    location?: string; description: string; skills: string[];
+    id: string;
+    title: string;
+    company: string;
+    period: string;
+    location?: string;
+    description: string;
+    skills: string[];
   }>;
   education: Array<{
-    id: string; degree: string; institution: string; year: string; description?: string;
+    id: string;
+    degree: string;
+    institution: string;
+    year: string;
+    description?: string;
   }>;
   skills: string[];
   tools: string[];
@@ -61,40 +106,90 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
     <div
       id="cv-document"
       className="bg-white text-gray-900 shadow-2xl mx-auto"
-      style={{ width: "210mm", minHeight: "297mm", fontFamily: "system-ui, -apple-system, sans-serif" }}
+      style={{
+        width: "210mm",
+        minHeight: "297mm",
+        fontFamily: "system-ui, -apple-system, sans-serif",
+      }}
     >
       {/* Header */}
-      <div       style={{ background: "hsl(var(--growth))", padding: "32px 40px 28px", color: "hsl(var(--foreground))" }}>
-        <h1 style={{ margin: 0, fontSize: "28px", fontWeight: "700", letterSpacing: "-0.5px", fontFamily: "Georgia, serif" }}>
+      <div
+        style={{
+          background: "hsl(var(--growth))",
+          padding: "32px 40px 28px",
+          color: "hsl(var(--foreground))",
+        }}
+      >
+        <h1
+          style={{
+            margin: 0,
+            fontSize: "28px",
+            fontWeight: "700",
+            letterSpacing: "-0.5px",
+            fontFamily: "Georgia, serif",
+          }}
+        >
           {cv.personalInfo.name || "Nome Cognome"}
         </h1>
         {cv.personalInfo.title && (
-          <p style={{ margin: "6px 0 0", fontSize: "14px", color: "hsl(var(--chart-2))", fontWeight: "500" }}>
+          <p
+            style={{
+              margin: "6px 0 0",
+              fontSize: "14px",
+              color: "hsl(var(--chart-2))",
+              fontWeight: "500",
+            }}
+          >
             {cv.personalInfo.title}
           </p>
         )}
         {cv.targetRole && cv.targetRole !== cv.personalInfo.title && (
-          <p style={{ margin: "4px 0 0", fontSize: "12px", color: "rgba(255,255,255,0.5)" }}>
+          <p
+            style={{
+              margin: "4px 0 0",
+              fontSize: "12px",
+              color: "rgba(255,255,255,0.5)",
+            }}
+          >
             Target: {cv.targetRole}
           </p>
         )}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", marginTop: "16px" }}>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "16px",
+            marginTop: "16px",
+          }}
+        >
           {cv.personalInfo.email && (
-            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)" }}>✉ {cv.personalInfo.email}</span>
+            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)" }}>
+              ✉ {cv.personalInfo.email}
+            </span>
           )}
           {cv.personalInfo.phone && (
-            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)" }}>✆ {cv.personalInfo.phone}</span>
+            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)" }}>
+              ✆ {cv.personalInfo.phone}
+            </span>
           )}
           {cv.personalInfo.location && (
-            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)" }}>⌖ {cv.personalInfo.location}</span>
+            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)" }}>
+              ⌖ {cv.personalInfo.location}
+            </span>
           )}
           {cv.personalInfo.linkedin && (
             <span style={{ fontSize: "12px", color: "hsl(var(--chart-2))" }}>
-              in {cv.personalInfo.linkedin.replace(/https?:\/\/(www\.)?linkedin\.com\/in\//, "")}
+              in{" "}
+              {cv.personalInfo.linkedin.replace(
+                /https?:\/\/(www\.)?linkedin\.com\/in\//,
+                "",
+              )}
             </span>
           )}
           {cv.personalInfo.website && (
-            <span style={{ fontSize: "12px", color: "hsl(var(--chart-2))" }}>⌘ {cv.personalInfo.website}</span>
+            <span style={{ fontSize: "12px", color: "hsl(var(--chart-2))" }}>
+              ⌘ {cv.personalInfo.website}
+            </span>
           )}
         </div>
       </div>
@@ -102,12 +197,33 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
       {/* Two-column body */}
       <div style={{ display: "flex" }}>
         {/* Left column */}
-        <div style={{ width: "38%", background: "hsl(var(--card))", borderRight: "1px solid hsl(var(--border))", padding: "28px 24px", flexShrink: 0 }}>
+        <div
+          style={{
+            width: "38%",
+            background: "hsl(var(--card))",
+            borderRight: "1px solid hsl(var(--border))",
+            padding: "28px 24px",
+            flexShrink: 0,
+          }}
+        >
           {cv.skills.length > 0 && (
             <CvSection title="Competenze">
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                 {cv.skills.map((s) => (
-                  <span key={s} style={{ fontSize: "11px", background: "hsl(var(--chart-2) / 0.15)", color: "hsl(var(--chart-2))", border: "1px solid hsl(var(--chart-2) / 0.3)", borderRadius: "999px", padding: "3px 10px", fontWeight: "500" }}>{s}</span>
+                  <span
+                    key={s}
+                    style={{
+                      fontSize: "11px",
+                      background: "hsl(var(--chart-2) / 0.15)",
+                      color: "hsl(var(--chart-2))",
+                      border: "1px solid hsl(var(--chart-2) / 0.3)",
+                      borderRadius: "999px",
+                      padding: "3px 10px",
+                      fontWeight: "500",
+                    }}
+                  >
+                    {s}
+                  </span>
                 ))}
               </div>
             </CvSection>
@@ -116,7 +232,20 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
             <CvSection title="Strumenti">
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                 {cv.tools.map((t) => (
-                  <span key={t} style={{ fontSize: "11px", background: "hsl(var(--primary) / 0.1)", color: "hsl(var(--primary))", border: "1px solid hsl(var(--primary) / 0.3)", borderRadius: "999px", padding: "3px 10px", fontWeight: "500" }}>{t}</span>
+                  <span
+                    key={t}
+                    style={{
+                      fontSize: "11px",
+                      background: "hsl(var(--primary) / 0.1)",
+                      color: "hsl(var(--primary))",
+                      border: "1px solid hsl(var(--primary) / 0.3)",
+                      borderRadius: "999px",
+                      padding: "3px 10px",
+                      fontWeight: "500",
+                    }}
+                  >
+                    {t}
+                  </span>
                 ))}
               </div>
             </CvSection>
@@ -124,9 +253,34 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
           {cv.languages.length > 0 && (
             <CvSection title="Lingue">
               {cv.languages.map((l) => (
-                <div key={l.language} style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-                  <span style={{ fontSize: "12px", fontWeight: "600", color: "hsl(var(--foreground))" }}>{l.language}</span>
-                  <span style={{ fontSize: "11px", color: "hsl(var(--muted-foreground))", background: "hsl(var(--muted))", borderRadius: "999px", padding: "2px 8px" }}>{l.level}</span>
+                <div
+                  key={l.language}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginBottom: "6px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: "600",
+                      color: "hsl(var(--foreground))",
+                    }}
+                  >
+                    {l.language}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      color: "hsl(var(--muted-foreground))",
+                      background: "hsl(var(--muted))",
+                      borderRadius: "999px",
+                      padding: "2px 8px",
+                    }}
+                  >
+                    {l.level}
+                  </span>
                 </div>
               ))}
             </CvSection>
@@ -134,15 +288,48 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
           {cv.certifications.length > 0 && (
             <CvSection title="Certificazioni">
               {cv.certifications.map((c) => (
-                  <div key={c} style={{ display: "flex", gap: "8px", marginBottom: "6px" }}>
-                  <span style={{ color: "hsl(var(--growth))", fontSize: "14px" }}>✦</span>
-                  <span style={{ fontSize: "12px", color: "hsl(var(--foreground))", lineHeight: "1.5" }}>{c}</span>
+                <div
+                  key={c}
+                  style={{ display: "flex", gap: "8px", marginBottom: "6px" }}
+                >
+                  <span
+                    style={{ color: "hsl(var(--growth))", fontSize: "14px" }}
+                  >
+                    ✦
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      color: "hsl(var(--foreground))",
+                      lineHeight: "1.5",
+                    }}
+                  >
+                    {c}
+                  </span>
                 </div>
               ))}
             </CvSection>
           )}
-          <div style={{ padding: "12px", background: "hsl(var(--chart-2) / 0.1)", border: "1px solid hsl(var(--chart-2) / 0.3)", borderRadius: "10px", marginTop: "24px" }}>
-            <p style={{ margin: 0, fontSize: "10px", color: "hsl(var(--chart-2))", textAlign: "center", fontWeight: "500" }}>✦ Generato con NorthStar</p>
+          <div
+            style={{
+              padding: "12px",
+              background: "hsl(var(--chart-2) / 0.1)",
+              border: "1px solid hsl(var(--chart-2) / 0.3)",
+              borderRadius: "10px",
+              marginTop: "24px",
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: "10px",
+                color: "hsl(var(--chart-2))",
+                textAlign: "center",
+                fontWeight: "500",
+              }}
+            >
+              ✦ Generato con NorthStar
+            </p>
           </div>
         </div>
 
@@ -150,35 +337,112 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
         <div style={{ flex: 1, padding: "28px 32px" }}>
           {cv.summary && (
             <CvSection title="Profilo Professionale">
-              <p style={{ fontSize: "13px", color: "hsl(var(--muted-foreground))", lineHeight: "1.7", margin: 0 }}>{cv.summary}</p>
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: "hsl(var(--muted-foreground))",
+                  lineHeight: "1.7",
+                  margin: 0,
+                }}
+              >
+                {cv.summary}
+              </p>
             </CvSection>
           )}
           {cv.experience.length > 0 && (
             <CvSection title="Esperienza Professionale">
               {cv.experience.map((e) => (
                 <div key={e.id} style={{ marginBottom: "18px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "4px",
+                    }}
+                  >
                     <div>
-                      <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "hsl(var(--foreground))" }}>{e.title}</p>
-                      <p style={{ margin: "2px 0 0", fontSize: "12px", color: "hsl(var(--muted-foreground))" }}>
-                        {e.company}{e.location ? ` · ${e.location}` : ""}
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: "14px",
+                          fontWeight: "700",
+                          color: "hsl(var(--foreground))",
+                        }}
+                      >
+                        {e.title}
+                      </p>
+                      <p
+                        style={{
+                          margin: "2px 0 0",
+                          fontSize: "12px",
+                          color: "hsl(var(--muted-foreground))",
+                        }}
+                      >
+                        {e.company}
+                        {e.location ? ` · ${e.location}` : ""}
                       </p>
                     </div>
-                    <span style={{ fontSize: "11px", color: "hsl(var(--muted-foreground))", background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))", borderRadius: "999px", padding: "2px 10px", flexShrink: 0 }}>{e.period}</span>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        color: "hsl(var(--muted-foreground))",
+                        background: "hsl(var(--muted))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "999px",
+                        padding: "2px 10px",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {e.period}
+                    </span>
                   </div>
                   {e.description && (
-                    <div style={{ fontSize: "12px", color: "hsl(var(--muted-foreground))", lineHeight: "1.7", marginTop: "6px" }}>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "hsl(var(--muted-foreground))",
+                        lineHeight: "1.7",
+                        marginTop: "6px",
+                      }}
+                    >
                       {e.description.split("\n").map((line, i) => (
                         <p key={i} style={{ margin: "3px 0" }}>
-                          {line.startsWith("→") ? <><span style={{ color: "hsl(var(--growth))" }}>→</span> {line.slice(1).trim()}</> : line}
+                          {line.startsWith("→") ? (
+                            <>
+                              <span style={{ color: "hsl(var(--growth))" }}>
+                                →
+                              </span>{" "}
+                              {line.slice(1).trim()}
+                            </>
+                          ) : (
+                            line
+                          )}
                         </p>
                       ))}
                     </div>
                   )}
                   {e.skills.length > 0 && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "8px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "4px",
+                        marginTop: "8px",
+                      }}
+                    >
                       {e.skills.map((s) => (
-                        <span key={s} style={{ fontSize: "10px", background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))", borderRadius: "999px", padding: "2px 8px" }}>{s}</span>
+                        <span
+                          key={s}
+                          style={{
+                            fontSize: "10px",
+                            background: "hsl(var(--muted))",
+                            color: "hsl(var(--muted-foreground))",
+                            borderRadius: "999px",
+                            padding: "2px 8px",
+                          }}
+                        >
+                          {s}
+                        </span>
                       ))}
                     </div>
                   )}
@@ -189,13 +453,59 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
           {cv.education.length > 0 && (
             <CvSection title="Formazione">
               {cv.education.map((e) => (
-                <div key={e.id} style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
+                <div
+                  key={e.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginBottom: "12px",
+                  }}
+                >
                   <div>
-                    <p style={{ margin: 0, fontSize: "13px", fontWeight: "700", color: "hsl(var(--foreground))" }}>{e.degree}</p>
-                    <p style={{ margin: "2px 0 0", fontSize: "12px", color: "hsl(var(--muted-foreground))" }}>{e.institution}</p>
-                    {e.description && <p style={{ margin: "3px 0 0", fontSize: "11px", color: "hsl(var(--muted-foreground))" }}>{e.description}</p>}
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: "13px",
+                        fontWeight: "700",
+                        color: "hsl(var(--foreground))",
+                      }}
+                    >
+                      {e.degree}
+                    </p>
+                    <p
+                      style={{
+                        margin: "2px 0 0",
+                        fontSize: "12px",
+                        color: "hsl(var(--muted-foreground))",
+                      }}
+                    >
+                      {e.institution}
+                    </p>
+                    {e.description && (
+                      <p
+                        style={{
+                          margin: "3px 0 0",
+                          fontSize: "11px",
+                          color: "hsl(var(--muted-foreground))",
+                        }}
+                      >
+                        {e.description}
+                      </p>
+                    )}
                   </div>
-                    <span style={{ fontSize: "11px", color: "hsl(var(--muted-foreground))", background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))", borderRadius: "999px", padding: "2px 10px", flexShrink: 0 }}>{e.year}</span>
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      color: "hsl(var(--muted-foreground))",
+                      background: "hsl(var(--muted))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "999px",
+                      padding: "2px 10px",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {e.year}
+                  </span>
                 </div>
               ))}
             </CvSection>
@@ -206,10 +516,28 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
   );
 }
 
-function CvSection({ title, children }: { title: string; children: React.ReactNode }) {
+function CvSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div style={{ marginBottom: "24px" }}>
-      <h3 style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1.5px", textTransform: "uppercase", color: "hsl(var(--growth))", marginBottom: "10px", borderBottom: "2px solid hsl(var(--growth))", paddingBottom: "6px", margin: "0 0 10px 0" }}>
+      <h3
+        style={{
+          fontSize: "11px",
+          fontWeight: "700",
+          letterSpacing: "1.5px",
+          textTransform: "uppercase",
+          color: "hsl(var(--growth))",
+          marginBottom: "10px",
+          borderBottom: "2px solid hsl(var(--growth))",
+          paddingBottom: "6px",
+          margin: "0 0 10px 0",
+        }}
+      >
         {title}
       </h3>
       {children}
@@ -218,21 +546,38 @@ function CvSection({ title, children }: { title: string; children: React.ReactNo
 }
 
 // ── Tag input ──────────────────────────────────────────────────────────
-function TagInput({ items, onChange, placeholder }: { items: string[]; onChange: (items: string[]) => void; placeholder?: string }) {
+function TagInput({
+  items,
+  onChange,
+  placeholder,
+}: {
+  items: string[];
+  onChange: (items: string[]) => void;
+  placeholder?: string;
+}) {
   const { t } = useTranslation();
   const [input, setInput] = useState("");
   function add() {
     const val = input.trim();
-    if (val && !items.includes(val)) { onChange([...items, val]); }
+    if (val && !items.includes(val)) {
+      onChange([...items, val]);
+    }
     setInput("");
   }
   return (
     <div>
-      <div className="flex flex-wrap gap-1.5 mb-2 min-h-[28px]">
+      <div className="flex flex-wrap gap-1.5 mb-2 min-h-7">
         {items.map((item) => (
-          <span key={item} className="flex items-center gap-1 text-xs bg-primary/8 text-primary border border-primary/20 rounded-full px-2.5 py-0.5 font-medium">
+          <span
+            key={item}
+            className="flex items-center gap-1 text-xs bg-primary/8 text-primary border border-primary/20 rounded-full px-2.5 py-0.5 font-medium"
+          >
             {item}
-            <button type="button" onClick={() => onChange(items.filter((i) => i !== item))} className="hover:text-destructive ml-0.5">
+            <button
+              type="button"
+              onClick={() => onChange(items.filter((i) => i !== item))}
+              className="hover:text-destructive ml-0.5"
+            >
               <X className="w-2.5 h-2.5" />
             </button>
           </span>
@@ -242,11 +587,22 @@ function TagInput({ items, onChange, placeholder }: { items: string[]; onChange:
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
           placeholder={placeholder || t("cv.addPlaceholder")}
           className="h-8 text-xs rounded-lg"
         />
-        <Button type="button" size="sm" variant="outline" className="h-8 rounded-lg px-2.5" onClick={add}>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-8 rounded-lg px-2.5"
+          onClick={add}
+        >
           <Plus className="w-3.5 h-3.5" />
         </Button>
       </div>
@@ -255,8 +611,16 @@ function TagInput({ items, onChange, placeholder }: { items: string[]; onChange:
 }
 
 // ── Edit Section wrapper ──────────────────────────────────────────────
-function EditBlock({ icon: Icon, title, children, defaultOpen = true }: {
-  icon: React.ElementType; title: string; children: React.ReactNode; defaultOpen?: boolean;
+function EditBlock({
+  icon: Icon,
+  title,
+  children,
+  defaultOpen = true,
+}: {
+  icon: React.ElementType;
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -267,9 +631,14 @@ function EditBlock({ icon: Icon, title, children, defaultOpen = true }: {
         className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-muted/40 hover:bg-muted/70 transition-colors text-left"
       >
         <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <Icon className="w-4 h-4 text-primary" />{title}
+          <Icon className="w-4 h-4 text-primary" />
+          {title}
         </span>
-        {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        {open ? (
+          <ChevronUp className="w-4 h-4 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+        )}
       </button>
       {open && <div className="p-4 space-y-3 bg-background">{children}</div>}
     </div>
@@ -277,53 +646,106 @@ function EditBlock({ icon: Icon, title, children, defaultOpen = true }: {
 }
 
 // ── Full Edit Panel ───────────────────────────────────────────────────
-function EditPanel({ cv, onChange }: { cv: GeneratedCv; onChange: (cv: GeneratedCv) => void }) {
+function EditPanel({
+  cv,
+  onChange,
+}: {
+  cv: GeneratedCv;
+  onChange: (cv: GeneratedCv) => void;
+}) {
   const { t } = useTranslation();
-  const set = useCallback((patch: Partial<GeneratedCv>) => onChange({ ...cv, ...patch }), [cv, onChange]);
+  const set = useCallback(
+    (patch: Partial<GeneratedCv>) => onChange({ ...cv, ...patch }),
+    [cv, onChange],
+  );
   const setPI = (patch: Partial<GeneratedCv["personalInfo"]>) =>
     set({ personalInfo: { ...cv.personalInfo, ...patch } });
 
   // Experience helpers
-  const updateExp = (id: string, patch: Partial<GeneratedCv["experience"][0]>) =>
-    set({ experience: cv.experience.map((e) => e.id === id ? { ...e, ...patch } : e) });
-  const addExp = () => set({
-    experience: [...cv.experience, {
-      id: `exp-${Date.now()}`, title: "", company: "", period: "", location: "", description: "", skills: [],
-    }],
-  });
-  const delExp = (id: string) => set({ experience: cv.experience.filter((e) => e.id !== id) });
+  const updateExp = (
+    id: string,
+    patch: Partial<GeneratedCv["experience"][0]>,
+  ) =>
+    set({
+      experience: cv.experience.map((e) =>
+        e.id === id ? { ...e, ...patch } : e,
+      ),
+    });
+  const addExp = () =>
+    set({
+      experience: [
+        ...cv.experience,
+        {
+          id: `exp-${Date.now()}`,
+          title: "",
+          company: "",
+          period: "",
+          location: "",
+          description: "",
+          skills: [],
+        },
+      ],
+    });
+  const delExp = (id: string) =>
+    set({ experience: cv.experience.filter((e) => e.id !== id) });
 
   // Education helpers
   const updateEdu = (id: string, patch: Partial<GeneratedCv["education"][0]>) =>
-    set({ education: cv.education.map((e) => e.id === id ? { ...e, ...patch } : e) });
-  const addEdu = () => set({
-    education: [...cv.education, { id: `edu-${Date.now()}`, degree: "", institution: "", year: "" }],
-  });
-  const delEdu = (id: string) => set({ education: cv.education.filter((e) => e.id !== id) });
+    set({
+      education: cv.education.map((e) =>
+        e.id === id ? { ...e, ...patch } : e,
+      ),
+    });
+  const addEdu = () =>
+    set({
+      education: [
+        ...cv.education,
+        { id: `edu-${Date.now()}`, degree: "", institution: "", year: "" },
+      ],
+    });
+  const delEdu = (id: string) =>
+    set({ education: cv.education.filter((e) => e.id !== id) });
 
   // Language helpers
-  const updateLang = (i: number, patch: Partial<{ language: string; level: string }>) =>
-    set({ languages: cv.languages.map((l, idx) => idx === i ? { ...l, ...patch } : l) });
-  const addLang = () => set({ languages: [...cv.languages, { language: "", level: "" }] });
-  const delLang = (i: number) => set({ languages: cv.languages.filter((_, idx) => idx !== i) });
+  const updateLang = (
+    i: number,
+    patch: Partial<{ language: string; level: string }>,
+  ) =>
+    set({
+      languages: cv.languages.map((l, idx) =>
+        idx === i ? { ...l, ...patch } : l,
+      ),
+    });
+  const addLang = () =>
+    set({ languages: [...cv.languages, { language: "", level: "" }] });
+  const delLang = (i: number) =>
+    set({ languages: cv.languages.filter((_, idx) => idx !== i) });
 
   return (
     <div className="space-y-3">
-
       {/* Personal info */}
       <EditBlock icon={User} title={t("cv.personalInfo")}>
         <div className="grid grid-cols-2 gap-2">
-          {([
-            ["name", t("cv.fullName")],
-            ["title", t("cv.professionalTitle")],
-            ["email", t("cv.email")],
-            ["phone", t("cv.phone")],
-            ["location", t("cv.cityCountry")],
-            ["linkedin", t("cv.linkedinUrl")],
-            ["website", t("cv.website")],
-          ] as [keyof GeneratedCv["personalInfo"], string][]).map(([field, label]) => (
-            <div key={field} className={field === "title" || field === "linkedin" ? "col-span-2" : ""}>
-              <Label className="text-[11px] text-muted-foreground mb-1 block">{label}</Label>
+          {(
+            [
+              ["name", t("cv.fullName")],
+              ["title", t("cv.professionalTitle")],
+              ["email", t("cv.email")],
+              ["phone", t("cv.phone")],
+              ["location", t("cv.cityCountry")],
+              ["linkedin", t("cv.linkedinUrl")],
+              ["website", t("cv.website")],
+            ] as [keyof GeneratedCv["personalInfo"], string][]
+          ).map(([field, label]) => (
+            <div
+              key={field}
+              className={
+                field === "title" || field === "linkedin" ? "col-span-2" : ""
+              }
+            >
+              <Label className="text-[11px] text-muted-foreground mb-1 block">
+                {label}
+              </Label>
               <Input
                 value={(cv.personalInfo[field] as string) ?? ""}
                 onChange={(e) => setPI({ [field]: e.target.value })}
@@ -340,121 +762,274 @@ function EditPanel({ cv, onChange }: { cv: GeneratedCv; onChange: (cv: Generated
         <Textarea
           value={cv.summary}
           onChange={(e) => set({ summary: e.target.value })}
-          className="text-xs rounded-lg min-h-[100px] resize-none"
+          className="text-xs rounded-lg min-h-25 resize-none"
           placeholder={t("cv.profilePlaceholder")}
         />
       </EditBlock>
 
       {/* Experience */}
-      <EditBlock icon={Briefcase} title={t("cv.experienceN", { count: cv.experience.length })} defaultOpen={cv.experience.length > 0}>
+      <EditBlock
+        icon={Briefcase}
+        title={t("cv.experienceN", { count: cv.experience.length })}
+        defaultOpen={cv.experience.length > 0}
+      >
         <div className="space-y-4">
           {cv.experience.map((exp, idx) => (
-            <div key={exp.id} className="border rounded-lg p-3 space-y-2 bg-muted/20">
+            <div
+              key={exp.id}
+              className="border rounded-lg p-3 space-y-2 bg-muted/20"
+            >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("cv.experienceRow", { n: idx + 1 })}</span>
-                <button onClick={() => delExp(exp.id)} className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {t("cv.experienceRow", { n: idx + 1 })}
+                </span>
+                <button
+                  onClick={() => delExp(exp.id)}
+                  className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="col-span-2">
-                  <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.roleLabel")}</Label>
-                  <Input value={exp.title} onChange={(e) => updateExp(exp.id, { title: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="es. Software Engineer" />
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">
+                    {t("cv.roleLabel")}
+                  </Label>
+                  <Input
+                    value={exp.title}
+                    onChange={(e) =>
+                      updateExp(exp.id, { title: e.target.value })
+                    }
+                    className="h-8 text-xs rounded-lg"
+                    placeholder="es. Software Engineer"
+                  />
                 </div>
                 <div>
-                  <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.companyLabel")}</Label>
-                  <Input value={exp.company} onChange={(e) => updateExp(exp.id, { company: e.target.value })} className="h-8 text-xs rounded-lg" placeholder={t("cv.companyPlaceholder")} />
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">
+                    {t("cv.companyLabel")}
+                  </Label>
+                  <Input
+                    value={exp.company}
+                    onChange={(e) =>
+                      updateExp(exp.id, { company: e.target.value })
+                    }
+                    className="h-8 text-xs rounded-lg"
+                    placeholder={t("cv.companyPlaceholder")}
+                  />
                 </div>
                 <div>
-                  <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.periodLabel")}</Label>
-                  <Input value={exp.period} onChange={(e) => updateExp(exp.id, { period: e.target.value })} className="h-8 text-xs rounded-lg" placeholder={t("cv.periodPlaceholder")} />
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">
+                    {t("cv.periodLabel")}
+                  </Label>
+                  <Input
+                    value={exp.period}
+                    onChange={(e) =>
+                      updateExp(exp.id, { period: e.target.value })
+                    }
+                    className="h-8 text-xs rounded-lg"
+                    placeholder={t("cv.periodPlaceholder")}
+                  />
                 </div>
                 <div>
-                  <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.locationLabel")}</Label>
-                  <Input value={exp.location ?? ""} onChange={(e) => updateExp(exp.id, { location: e.target.value })} className="h-8 text-xs rounded-lg" placeholder={t("cv.locationPlaceholder")} />
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">
+                    {t("cv.locationLabel")}
+                  </Label>
+                  <Input
+                    value={exp.location ?? ""}
+                    onChange={(e) =>
+                      updateExp(exp.id, { location: e.target.value })
+                    }
+                    className="h-8 text-xs rounded-lg"
+                    placeholder={t("cv.locationPlaceholder")}
+                  />
                 </div>
               </div>
               <div>
-                <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.descriptionLabel")}</Label>
+                <Label className="text-[11px] text-muted-foreground mb-1 block">
+                  {t("cv.descriptionLabel")}
+                </Label>
                 <Textarea
                   value={exp.description}
-                  onChange={(e) => updateExp(exp.id, { description: e.target.value })}
-                  className="text-xs rounded-lg min-h-[72px] resize-none"
+                  onChange={(e) =>
+                    updateExp(exp.id, { description: e.target.value })
+                  }
+                  className="text-xs rounded-lg min-h-18 resize-none"
                   placeholder={t("cv.bulletHint")}
                 />
               </div>
               <div>
-                <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.skillsLabel")}</Label>
-                <TagInput items={exp.skills} onChange={(skills) => updateExp(exp.id, { skills })} placeholder="es. React, Python..." />
+                <Label className="text-[11px] text-muted-foreground mb-1 block">
+                  {t("cv.skillsLabel")}
+                </Label>
+                <TagInput
+                  items={exp.skills}
+                  onChange={(skills) => updateExp(exp.id, { skills })}
+                  placeholder="es. React, Python..."
+                />
               </div>
             </div>
           ))}
-          <Button type="button" size="sm" variant="outline" className="w-full rounded-lg gap-1.5 h-8" onClick={addExp}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="w-full rounded-lg gap-1.5 h-8"
+            onClick={addExp}
+          >
             <Plus className="w-3.5 h-3.5" /> {t("cv.addExperience")}
           </Button>
         </div>
       </EditBlock>
 
       {/* Education */}
-      <EditBlock icon={GraduationCap} title={t("cv.educationN", { count: cv.education.length })} defaultOpen={cv.education.length > 0}>
+      <EditBlock
+        icon={GraduationCap}
+        title={t("cv.educationN", { count: cv.education.length })}
+        defaultOpen={cv.education.length > 0}
+      >
         <div className="space-y-3">
           {cv.education.map((edu, idx) => (
-            <div key={edu.id} className="border rounded-lg p-3 space-y-2 bg-muted/20">
+            <div
+              key={edu.id}
+              className="border rounded-lg p-3 space-y-2 bg-muted/20"
+            >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("cv.educationRow", { n: idx + 1 })}</span>
-                <button onClick={() => delEdu(edu.id)} className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {t("cv.educationRow", { n: idx + 1 })}
+                </span>
+                <button
+                  onClick={() => delEdu(edu.id)}
+                  className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
               <div>
-                <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.degreeLabel")}</Label>
-                <Input value={edu.degree} onChange={(e) => updateEdu(edu.id, { degree: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="es. Laurea Magistrale in Informatica" />
+                <Label className="text-[11px] text-muted-foreground mb-1 block">
+                  {t("cv.degreeLabel")}
+                </Label>
+                <Input
+                  value={edu.degree}
+                  onChange={(e) =>
+                    updateEdu(edu.id, { degree: e.target.value })
+                  }
+                  className="h-8 text-xs rounded-lg"
+                  placeholder="es. Laurea Magistrale in Informatica"
+                />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.institutionLabel")}</Label>
-                  <Input value={edu.institution} onChange={(e) => updateEdu(edu.id, { institution: e.target.value })} className="h-8 text-xs rounded-lg" placeholder={t("cv.institutionPlaceholder")} />
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">
+                    {t("cv.institutionLabel")}
+                  </Label>
+                  <Input
+                    value={edu.institution}
+                    onChange={(e) =>
+                      updateEdu(edu.id, { institution: e.target.value })
+                    }
+                    className="h-8 text-xs rounded-lg"
+                    placeholder={t("cv.institutionPlaceholder")}
+                  />
                 </div>
                 <div>
-                  <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.yearLabel")}</Label>
-                  <Input value={edu.year} onChange={(e) => updateEdu(edu.id, { year: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="2022" />
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">
+                    {t("cv.yearLabel")}
+                  </Label>
+                  <Input
+                    value={edu.year}
+                    onChange={(e) =>
+                      updateEdu(edu.id, { year: e.target.value })
+                    }
+                    className="h-8 text-xs rounded-lg"
+                    placeholder="2022"
+                  />
                 </div>
               </div>
               <div>
-                <Label className="text-[11px] text-muted-foreground mb-1 block">{t("cv.eduNotes")}</Label>
-                <Input value={edu.description ?? ""} onChange={(e) => updateEdu(edu.id, { description: e.target.value })} className="h-8 text-xs rounded-lg" placeholder="110/110 con lode" />
+                <Label className="text-[11px] text-muted-foreground mb-1 block">
+                  {t("cv.eduNotes")}
+                </Label>
+                <Input
+                  value={edu.description ?? ""}
+                  onChange={(e) =>
+                    updateEdu(edu.id, { description: e.target.value })
+                  }
+                  className="h-8 text-xs rounded-lg"
+                  placeholder="110/110 con lode"
+                />
               </div>
             </div>
           ))}
-          <Button type="button" size="sm" variant="outline" className="w-full rounded-lg gap-1.5 h-8" onClick={addEdu}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="w-full rounded-lg gap-1.5 h-8"
+            onClick={addEdu}
+          >
             <Plus className="w-3.5 h-3.5" /> {t("cv.addEducation")}
           </Button>
         </div>
       </EditBlock>
 
       {/* Skills */}
-      <EditBlock icon={Sparkles} title={t("cv.skillsSection")} defaultOpen={false}>
-        <TagInput items={cv.skills} onChange={(skills) => set({ skills })} placeholder="es. Machine Learning..." />
+      <EditBlock
+        icon={Sparkles}
+        title={t("cv.skillsSection")}
+        defaultOpen={false}
+      >
+        <TagInput
+          items={cv.skills}
+          onChange={(skills) => set({ skills })}
+          placeholder="es. Machine Learning..."
+        />
       </EditBlock>
 
       {/* Tools */}
       <EditBlock icon={Wrench} title={t("cv.toolsSection")} defaultOpen={false}>
-        <TagInput items={cv.tools} onChange={(tools) => set({ tools })} placeholder="es. TensorFlow, Figma..." />
+        <TagInput
+          items={cv.tools}
+          onChange={(tools) => set({ tools })}
+          placeholder="es. TensorFlow, Figma..."
+        />
       </EditBlock>
 
       {/* Languages */}
-      <EditBlock icon={Globe} title={t("cv.languagesSection")} defaultOpen={false}>
+      <EditBlock
+        icon={Globe}
+        title={t("cv.languagesSection")}
+        defaultOpen={false}
+      >
         <div className="space-y-2">
           {cv.languages.map((l, i) => (
             <div key={i} className="flex gap-2 items-center">
-              <Input value={l.language} onChange={(e) => updateLang(i, { language: e.target.value })} className="h-8 text-xs rounded-lg flex-1" placeholder={t("cv.langName")} />
-              <Input value={l.level} onChange={(e) => updateLang(i, { level: e.target.value })} className="h-8 text-xs rounded-lg w-28" placeholder={t("cv.langLevel")} />
-              <button onClick={() => delLang(i)} className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors shrink-0">
+              <Input
+                value={l.language}
+                onChange={(e) => updateLang(i, { language: e.target.value })}
+                className="h-8 text-xs rounded-lg flex-1"
+                placeholder={t("cv.langName")}
+              />
+              <Input
+                value={l.level}
+                onChange={(e) => updateLang(i, { level: e.target.value })}
+                className="h-8 text-xs rounded-lg w-28"
+                placeholder={t("cv.langLevel")}
+              />
+              <button
+                onClick={() => delLang(i)}
+                className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+              >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}
-          <Button type="button" size="sm" variant="outline" className="w-full rounded-lg gap-1.5 h-8" onClick={addLang}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="w-full rounded-lg gap-1.5 h-8"
+            onClick={addLang}
+          >
             <Plus className="w-3.5 h-3.5" /> {t("cv.addLanguage")}
           </Button>
         </div>
@@ -462,16 +1037,22 @@ function EditPanel({ cv, onChange }: { cv: GeneratedCv; onChange: (cv: Generated
 
       {/* Certifications */}
       <EditBlock icon={Award} title={t("cv.certsSection")} defaultOpen={false}>
-        <TagInput items={cv.certifications} onChange={(certifications) => set({ certifications })} placeholder="es. AWS Solutions Architect..." />
+        <TagInput
+          items={cv.certifications}
+          onChange={(certifications) => set({ certifications })}
+          placeholder="es. AWS Solutions Architect..."
+        />
       </EditBlock>
-
     </div>
   );
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────
 export function CvGeneratorModal({
-  userId, cvData, confirmedSectorId, onClose,
+  userId,
+  cvData,
+  confirmedSectorId,
+  onClose,
 }: {
   userId: number;
   cvData: CvData | null;
@@ -487,18 +1068,27 @@ export function CvGeneratorModal({
   const [error, setError] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<"edit" | "preview">("preview");
   const [isEditing, setIsEditing] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(
-    (cvData as any)?.lastSaved ?? null
+    (cvData as any)?.lastSaved ?? null,
   );
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // ── Version history state ──────────────────────────────────────────
   const [showVersions, setShowVersions] = useState(false);
-  const [versions, setVersions] = useState<Array<{
-    id: string; name: string; targetRole: string; savedAt: string;
-  }>>([]);
-  const [versionSaveStatus, setVersionSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [versions, setVersions] = useState<
+    Array<{
+      id: string;
+      name: string;
+      targetRole: string;
+      savedAt: string;
+    }>
+  >([]);
+  const [versionSaveStatus, setVersionSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
   const [newVersionName, setNewVersionName] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -508,31 +1098,50 @@ export function CvGeneratorModal({
   // ── Tailor state ───────────────────────────────────────────────────
   const [showTailor, setShowTailor] = useState(false);
   const [jobPosting, setJobPosting] = useState("");
-  const [tailorStatus, setTailorStatus] = useState<"idle" | "tailoring" | "done" | "error">("idle");
+  const [tailorStatus, setTailorStatus] = useState<
+    "idle" | "tailoring" | "done" | "error"
+  >("idle");
   const [tailorError, setTailorError] = useState<string | null>(null);
   const [tailorKeywords, setTailorKeywords] = useState<string[]>([]);
 
   // ── Cover letter state ─────────────────────────────────────────────
   interface CoverLetter {
-    senderName: string; senderTitle?: string; senderEmail?: string; senderPhone?: string; senderLocation?: string;
-    recipientCompany?: string; recipientRole?: string; date: string;
-    subject?: string; salutation: string; paragraphs: string[]; closing: string; generatedAt?: string;
+    senderName: string;
+    senderTitle?: string;
+    senderEmail?: string;
+    senderPhone?: string;
+    senderLocation?: string;
+    recipientCompany?: string;
+    recipientRole?: string;
+    date: string;
+    subject?: string;
+    salutation: string;
+    paragraphs: string[];
+    closing: string;
+    generatedAt?: string;
   }
   const [showLetter, setShowLetter] = useState(false);
   const [letterJobPosting, setLetterJobPosting] = useState("");
   const [letterCompany, setLetterCompany] = useState("");
   const [letterRole, setLetterRole] = useState("");
   const [letterExtra, setLetterExtra] = useState("");
-  const [letterStatus, setLetterStatus] = useState<"idle" | "generating" | "done" | "error">("idle");
+  const [letterStatus, setLetterStatus] = useState<
+    "idle" | "generating" | "done" | "error"
+  >("idle");
   const [letterError, setLetterError] = useState<string | null>(null);
   const [letter, setLetter] = useState<CoverLetter | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
   const [downloadingLetter, setDownloadingLetter] = useState(false);
 
   // ── ATS Score state ────────────────────────────────────────────────
-  interface AtsSection { name: string; score: number; feedback: string; }
+  interface AtsSection {
+    name: string;
+    score: number;
+    feedback: string;
+  }
   interface AtsResult {
-    score: number; label: string;
+    score: number;
+    label: string;
     sections: AtsSection[];
     missingKeywords: string[];
     strengths: string[];
@@ -540,7 +1149,9 @@ export function CvGeneratorModal({
   }
   const [showAts, setShowAts] = useState(false);
   const [atsJobPosting, setAtsJobPosting] = useState("");
-  const [atsStatus, setAtsStatus] = useState<"idle" | "analyzing" | "done" | "error">("idle");
+  const [atsStatus, setAtsStatus] = useState<
+    "idle" | "analyzing" | "done" | "error"
+  >("idle");
   const [atsError, setAtsError] = useState<string | null>(null);
   const [atsResult, setAtsResult] = useState<AtsResult | null>(null);
 
@@ -549,7 +1160,9 @@ export function CvGeneratorModal({
       const res = await fetch(`${BASE}api/cv/${userId}/versions`);
       const data = await res.json();
       setVersions(data.versions ?? []);
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   async function saveAsVersion() {
@@ -574,24 +1187,35 @@ export function CvGeneratorModal({
   }
 
   async function renameVersion(id: string) {
-    if (!renameValue.trim()) { setRenamingId(null); return; }
+    if (!renameValue.trim()) {
+      setRenamingId(null);
+      return;
+    }
     try {
       await fetch(`${BASE}api/cv/${userId}/versions/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: renameValue.trim() }),
       });
-      setVersions((prev) => prev.map((v) => v.id === id ? { ...v, name: renameValue.trim() } : v));
-    } catch { /* silent */ } finally {
+      setVersions((prev) =>
+        prev.map((v) => (v.id === id ? { ...v, name: renameValue.trim() } : v)),
+      );
+    } catch {
+      /* silent */
+    } finally {
       setRenamingId(null);
     }
   }
 
   async function deleteVersion(id: string) {
     try {
-      await fetch(`${BASE}api/cv/${userId}/versions/${id}`, { method: "DELETE" });
+      await fetch(`${BASE}api/cv/${userId}/versions/${id}`, {
+        method: "DELETE",
+      });
       setVersions((prev) => prev.filter((v) => v.id !== id));
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   async function tailorCv() {
@@ -613,7 +1237,10 @@ export function CvGeneratorModal({
       setTailorStatus("done");
       // Auto-detect matched keywords for the success message
       const posting = jobPosting.toLowerCase();
-      const matched = [...(data.tailored.skills ?? []), ...(data.tailored.tools ?? [])]
+      const matched = [
+        ...(data.tailored.skills ?? []),
+        ...(data.tailored.tools ?? []),
+      ]
         .filter((k: string) => posting.includes(k.toLowerCase()))
         .slice(0, 6);
       setTailorKeywords(matched);
@@ -640,7 +1267,9 @@ export function CvGeneratorModal({
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-    } catch { /* silent */ } finally {
+    } catch {
+      /* silent */
+    } finally {
       setDownloading(false);
     }
   }
@@ -655,7 +1284,9 @@ export function CvGeneratorModal({
       setHasUnsavedChanges(false);
       setSaveStatus("idle");
       setShowVersions(false);
-    } catch { /* silent */ } finally {
+    } catch {
+      /* silent */
+    } finally {
       setLoadingVersionId(null);
     }
   }
@@ -666,7 +1297,9 @@ export function CvGeneratorModal({
       const raw = localStorage.getItem(key);
       if (!raw) return [];
       return JSON.parse(raw).nodes ?? [];
-    } catch { return []; }
+    } catch {
+      return [];
+    }
   }
 
   async function generate() {
@@ -675,7 +1308,9 @@ export function CvGeneratorModal({
     setHasUnsavedChanges(false);
     try {
       const latestSession = profile?.testSessions?.[0];
-      const confirmedSector = profile?.exploredSectors?.find((s: any) => s.confirmed);
+      const confirmedSector = profile?.exploredSectors?.find(
+        (s: any) => s.confirmed,
+      );
       const graphNodes = readGraphNodes();
       const res = await fetch(`${BASE}api/cv/generate`, {
         method: "POST",
@@ -786,8 +1421,12 @@ export function CvGeneratorModal({
     if (!letter) return;
     setDownloadingLetter(true);
     try {
-      const encoded = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(letter)))));
-      const res = await fetch(`${BASE}api/cv/${userId}/cover-letter/pdf?data=${encoded}`);
+      const encoded = encodeURIComponent(
+        btoa(unescape(encodeURIComponent(JSON.stringify(letter)))),
+      );
+      const res = await fetch(
+        `${BASE}api/cv/${userId}/cover-letter/pdf?data=${encoded}`,
+      );
       if (!res.ok) throw new Error("Errore PDF");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -796,7 +1435,9 @@ export function CvGeneratorModal({
       a.download = `lettera-${(letter.senderName ?? "cv").replace(/\s+/g, "-").toLowerCase()}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch { /* silent */ } finally {
+    } catch {
+      /* silent */
+    } finally {
       setDownloadingLetter(false);
     }
   }
@@ -848,7 +1489,9 @@ export function CvGeneratorModal({
       }
     `;
     document.head.appendChild(style);
-    return () => { document.getElementById("cv-print-style")?.remove(); };
+    return () => {
+      document.getElementById("cv-print-style")?.remove();
+    };
   }, []);
 
   const hasContent = !!generated && !loading;
@@ -856,7 +1499,10 @@ export function CvGeneratorModal({
 
   function formatSavedAt(iso: string) {
     return new Date(iso).toLocaleString("it-IT", {
-      day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   }
 
@@ -864,7 +1510,9 @@ export function CvGeneratorModal({
     <div
       id="cv-print-portal"
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       {/* ── Toolbar ── */}
       <div className="flex items-center justify-between px-4 py-2.5 bg-background/97 border-b shadow-sm print:hidden gap-3 flex-wrap">
@@ -873,10 +1521,14 @@ export function CvGeneratorModal({
             <Sparkles className="w-4 h-4 text-primary" />
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-sm text-foreground leading-tight">{t("cv.generatedTitle")}</p>
+            <p className="font-semibold text-sm text-foreground leading-tight">
+              {t("cv.generatedTitle")}
+            </p>
             <div className="flex items-center gap-2 flex-wrap">
               {generated?.targetRole && (
-                <span className="text-xs text-muted-foreground">{t("cv.targetRole", { role: generated.targetRole })}</span>
+                <span className="text-xs text-muted-foreground">
+                  {t("cv.targetRole", { role: generated.targetRole })}
+                </span>
               )}
               {lastSavedAt && (
                 <span className="flex items-center gap-1 text-xs text-emerald-600">
@@ -885,7 +1537,9 @@ export function CvGeneratorModal({
                 </span>
               )}
               {hasUnsavedChanges && (
-                <span className="text-xs text-amber-600 font-medium">● {t("cv.unsavedChanges")}</span>
+                <span className="text-xs text-amber-600 font-medium">
+                  ● {t("cv.unsavedChanges")}
+                </span>
               )}
             </div>
           </div>
@@ -897,13 +1551,23 @@ export function CvGeneratorModal({
             <div className="flex rounded-lg bg-muted p-0.5 md:hidden">
               <button
                 onClick={() => setMobileTab("edit")}
-                className={cn("flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all", mobileTab === "edit" ? "bg-white shadow text-foreground" : "text-muted-foreground")}
+                className={cn(
+                  "flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all",
+                  mobileTab === "edit"
+                    ? "bg-white shadow text-foreground"
+                    : "text-muted-foreground",
+                )}
               >
                 <Pencil className="w-3 h-3" /> {t("cv.noTabMobile")}
               </button>
               <button
                 onClick={() => setMobileTab("preview")}
-                className={cn("flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all", mobileTab === "preview" ? "bg-white shadow text-foreground" : "text-muted-foreground")}
+                className={cn(
+                  "flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all",
+                  mobileTab === "preview"
+                    ? "bg-white shadow text-foreground"
+                    : "text-muted-foreground",
+                )}
               >
                 <Eye className="w-3 h-3" /> {t("cv.previewTabMobile")}
               </button>
@@ -918,9 +1582,17 @@ export function CvGeneratorModal({
               className="rounded-full gap-1.5 hidden md:flex"
               onClick={() => setIsEditing((v) => !v)}
             >
-              {isEditing
-                ? <><Check className="w-3.5 h-3.5" />{t("cv.doneEdit")}</>
-                : <><Pencil className="w-3.5 h-3.5" />{t("cv.edit")}</>}
+              {isEditing ? (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  {t("cv.doneEdit")}
+                </>
+              ) : (
+                <>
+                  <Pencil className="w-3.5 h-3.5" />
+                  {t("cv.edit")}
+                </>
+              )}
             </Button>
           )}
 
@@ -931,21 +1603,32 @@ export function CvGeneratorModal({
               variant={saveStatus === "saved" ? "outline" : "default"}
               className={cn(
                 "rounded-full gap-1.5",
-                saveStatus === "saved" && "text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-50",
-                saveStatus === "error" && "text-destructive border-destructive/30 bg-destructive/5",
+                saveStatus === "saved" &&
+                  "text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-50",
+                saveStatus === "error" &&
+                  "text-destructive border-destructive/30 bg-destructive/5",
               )}
               onClick={save}
               disabled={saveStatus === "saving" || saveStatus === "saved"}
             >
-              {saveStatus === "saving" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {saveStatus === "saved" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
-              {saveStatus === "error" && <AlertCircle className="w-3.5 h-3.5" />}
+              {saveStatus === "saving" && (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              )}
+              {saveStatus === "saved" && (
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              )}
+              {saveStatus === "error" && (
+                <AlertCircle className="w-3.5 h-3.5" />
+              )}
               {saveStatus === "idle" && <Save className="w-3.5 h-3.5" />}
               <span className="hidden sm:inline">
-                {saveStatus === "saving" ? t("cv.saving")
-                  : saveStatus === "saved" ? t("cv.saved")
-                  : saveStatus === "error" ? t("cv.saveError")
-                  : t("cv.saveChanges")}
+                {saveStatus === "saving"
+                  ? t("cv.saving")
+                  : saveStatus === "saved"
+                    ? t("cv.saved")
+                    : saveStatus === "error"
+                      ? t("cv.saveError")
+                      : t("cv.saveChanges")}
               </span>
             </Button>
           )}
@@ -979,7 +1662,8 @@ export function CvGeneratorModal({
               variant={showLetter ? "default" : "outline"}
               className={cn(
                 "rounded-full gap-1.5",
-                !showLetter && "border-indigo-300 text-indigo-700 hover:bg-indigo-50",
+                !showLetter &&
+                  "border-indigo-300 text-indigo-700 hover:bg-indigo-50",
                 showLetter && "bg-indigo-600 hover:bg-indigo-700",
               )}
               onClick={() => {
@@ -1001,7 +1685,8 @@ export function CvGeneratorModal({
               variant={showTailor ? "default" : "outline"}
               className={cn(
                 "rounded-full gap-1.5",
-                !showTailor && "border-amber-300 text-amber-700 hover:bg-amber-50",
+                !showTailor &&
+                  "border-amber-300 text-amber-700 hover:bg-amber-50",
                 showTailor && "bg-amber-600 hover:bg-amber-700",
               )}
               onClick={() => {
@@ -1029,7 +1714,8 @@ export function CvGeneratorModal({
             >
               <History className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">
-                {t("cv.versionsButton")}{versions.length > 0 ? ` (${versions.length})` : ""}
+                {t("cv.versionsButton")}
+                {versions.length > 0 ? ` (${versions.length})` : ""}
               </span>
             </Button>
           )}
@@ -1043,7 +1729,9 @@ export function CvGeneratorModal({
               onClick={generate}
               disabled={loading}
             >
-              <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
+              <RefreshCw
+                className={cn("w-3.5 h-3.5", loading && "animate-spin")}
+              />
               <span className="hidden sm:inline">{t("cv.regenerate")}</span>
             </Button>
           )}
@@ -1058,22 +1746,33 @@ export function CvGeneratorModal({
               disabled={downloading}
               title={t("cv.realPdfTitle")}
             >
-              {downloading
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : <Download className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">{downloading ? t("cv.downloadingPdf") : t("cv.downloadPdf")}</span>
+              {downloading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
+              <span className="hidden sm:inline">
+                {downloading ? t("cv.downloadingPdf") : t("cv.downloadPdf")}
+              </span>
             </Button>
           )}
 
           {/* Stampa */}
           {hasContent && (
-            <Button size="sm" className="rounded-full gap-1.5" onClick={() => window.print()}>
+            <Button
+              size="sm"
+              className="rounded-full gap-1.5"
+              onClick={() => window.print()}
+            >
               <Printer className="w-3.5 h-3.5" />
               <span className="hidden lg:inline">{t("cv.print")}</span>
             </Button>
           )}
 
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors ml-0.5">
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-muted transition-colors ml-0.5"
+          >
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
@@ -1081,7 +1780,6 @@ export function CvGeneratorModal({
 
       {/* ── Body ── */}
       <div className="flex flex-1 overflow-hidden">
-
         {/* Loading */}
         {loading && (
           <div className="flex flex-col items-center justify-center w-full gap-4">
@@ -1089,9 +1787,13 @@ export function CvGeneratorModal({
               <Sparkles className="w-8 h-8 text-primary animate-pulse" />
             </div>
             <div className="text-center">
-              <p className="font-semibold text-foreground">{t("cv.generating")}</p>
+              <p className="font-semibold text-foreground">
+                {t("cv.generating")}
+              </p>
               <p className="text-sm text-muted-foreground mt-1">
-                {t("cv.generatingDesc", { cvSuffix: cvData ? t("cv.generatingDescWithCv") : "" })}
+                {t("cv.generatingDesc", {
+                  cvSuffix: cvData ? t("cv.generatingDescWithCv") : "",
+                })}
               </p>
             </div>
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -1104,9 +1806,13 @@ export function CvGeneratorModal({
             <div className="w-14 h-14 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
               <AlertCircle className="w-7 h-7 text-destructive" />
             </div>
-            <p className="font-semibold text-foreground mb-2">{t("cv.errorGenerating")}</p>
+            <p className="font-semibold text-foreground mb-2">
+              {t("cv.errorGenerating")}
+            </p>
             <p className="text-sm text-muted-foreground mb-5">{error}</p>
-            <Button onClick={generate} className="rounded-full">{t("cv.retry")}</Button>
+            <Button onClick={generate} className="rounded-full">
+              {t("cv.retry")}
+            </Button>
           </div>
         )}
 
@@ -1116,35 +1822,68 @@ export function CvGeneratorModal({
             {/* Desktop: side-by-side */}
             <div className="hidden md:flex flex-1 overflow-hidden">
               {/* Edit panel */}
-              {isEditing && !showVersions && !showTailor && !showLetter && !showAts && (
-                <div className="w-[400px] flex-shrink-0 overflow-y-auto border-r bg-background p-4">
-                  <div className="flex items-center gap-2 mb-4 pb-3 border-b">
-                    <Pencil className="w-4 h-4 text-primary" />
-                    <h2 className="font-semibold text-sm text-foreground">{t("cv.editCv")}</h2>
-                    <span className="text-xs text-muted-foreground ml-auto">{t("cv.livePreview")}</span>
+              {isEditing &&
+                !showVersions &&
+                !showTailor &&
+                !showLetter &&
+                !showAts && (
+                  <div className="w-100 shrink-0 overflow-y-auto border-r bg-background p-4">
+                    <div className="flex items-center gap-2 mb-4 pb-3 border-b">
+                      <Pencil className="w-4 h-4 text-primary" />
+                      <h2 className="font-semibold text-sm text-foreground">
+                        {t("cv.editCv")}
+                      </h2>
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        {t("cv.livePreview")}
+                      </span>
+                    </div>
+                    <EditPanel cv={generated} onChange={handleCvChange} />
+                    <div className="mt-4 pt-4 border-t sticky bottom-0 bg-background pb-2">
+                      <Button
+                        className={cn(
+                          "w-full rounded-xl gap-2",
+                          saveStatus === "saved" &&
+                            "bg-emerald-600 hover:bg-emerald-700",
+                        )}
+                        onClick={save}
+                        disabled={
+                          saveStatus === "saving" ||
+                          (!hasUnsavedChanges && saveStatus !== "idle")
+                        }
+                      >
+                        {saveStatus === "saving" && (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        )}
+                        {saveStatus === "saved" && (
+                          <CheckCircle2 className="w-4 h-4" />
+                        )}
+                        {saveStatus === "error" && (
+                          <AlertCircle className="w-4 h-4" />
+                        )}
+                        {saveStatus === "idle" && <Save className="w-4 h-4" />}
+                        {saveStatus === "saving"
+                          ? t("cv.savingFull")
+                          : saveStatus === "saved"
+                            ? t("cv.savedFull")
+                            : saveStatus === "error"
+                              ? t("cv.saveErrorFull")
+                              : t("cv.saveChanges")}
+                      </Button>
+                      {hasUnsavedChanges && saveStatus === "idle" && (
+                        <p className="text-center text-xs text-amber-600 mt-2">
+                          {t("cv.unsavedNote")}
+                        </p>
+                      )}
+                      {lastSavedAt && saveStatus !== "saving" && (
+                        <p className="text-center text-xs text-muted-foreground mt-1.5">
+                          {t("cv.lastSaved", {
+                            when: formatSavedAt(lastSavedAt),
+                          })}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <EditPanel cv={generated} onChange={handleCvChange} />
-                  <div className="mt-4 pt-4 border-t sticky bottom-0 bg-background pb-2">
-                    <Button
-                      className={cn("w-full rounded-xl gap-2", saveStatus === "saved" && "bg-emerald-600 hover:bg-emerald-700")}
-                      onClick={save}
-                      disabled={saveStatus === "saving" || (!hasUnsavedChanges && saveStatus !== "idle")}
-                    >
-                      {saveStatus === "saving" && <Loader2 className="w-4 h-4 animate-spin" />}
-                      {saveStatus === "saved" && <CheckCircle2 className="w-4 h-4" />}
-                      {saveStatus === "error" && <AlertCircle className="w-4 h-4" />}
-                      {saveStatus === "idle" && <Save className="w-4 h-4" />}
-                      {saveStatus === "saving" ? t("cv.savingFull") : saveStatus === "saved" ? t("cv.savedFull") : saveStatus === "error" ? t("cv.saveErrorFull") : t("cv.saveChanges")}
-                    </Button>
-                    {hasUnsavedChanges && saveStatus === "idle" && (
-                      <p className="text-center text-xs text-amber-600 mt-2">{t("cv.unsavedNote")}</p>
-                    )}
-                    {lastSavedAt && saveStatus !== "saving" && (
-                      <p className="text-center text-xs text-muted-foreground mt-1.5">{t("cv.lastSaved", { when: formatSavedAt(lastSavedAt) })}</p>
-                    )}
-                  </div>
-                </div>
-              )}
+                )}
 
               {/* ── Tailor panel (desktop) ── */}
               {showTailor && (
@@ -1152,8 +1891,13 @@ export function CvGeneratorModal({
                   {/* Header */}
                   <div className="flex items-center gap-2 px-4 py-3 border-b bg-amber-50">
                     <Crosshair className="w-4 h-4 text-amber-600" />
-                    <h2 className="font-semibold text-sm text-amber-900">{t("cv.adaptCvTitle")}</h2>
-                    <button onClick={() => setShowTailor(false)} className="ml-auto p-1 rounded hover:bg-amber-100">
+                    <h2 className="font-semibold text-sm text-amber-900">
+                      {t("cv.adaptCvTitle")}
+                    </h2>
+                    <button
+                      onClick={() => setShowTailor(false)}
+                      className="ml-auto p-1 rounded hover:bg-amber-100"
+                    >
                       <X className="w-3.5 h-3.5 text-amber-700" />
                     </button>
                   </div>
@@ -1162,10 +1906,15 @@ export function CvGeneratorModal({
                     {/* How it works */}
                     <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-1.5">
                       <p className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
-                        <Lightbulb className="w-3.5 h-3.5" /> {t("cv.howItWorks")}
+                        <Lightbulb className="w-3.5 h-3.5" />{" "}
+                        {t("cv.howItWorks")}
                       </p>
                       <ul className="text-xs text-amber-700 space-y-1 pl-1">
-                        {(t("cv.tailorSteps", { returnObjects: true }) as string[]).map((step, i) => (
+                        {(
+                          t("cv.tailorSteps", {
+                            returnObjects: true,
+                          }) as string[]
+                        ).map((step, i) => (
                           <li key={i}>→ {step}</li>
                         ))}
                       </ul>
@@ -1173,7 +1922,7 @@ export function CvGeneratorModal({
 
                     {/* Job posting textarea */}
                     <div>
-                      <Label className="text-xs font-semibold text-foreground mb-1.5 block flex items-center gap-1.5">
+                      <Label className="text-xs font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
                         <FileSearch className="w-3.5 h-3.5 text-muted-foreground" />
                         {t("cv.jobPostingLabel")}
                       </Label>
@@ -1181,7 +1930,10 @@ export function CvGeneratorModal({
                         value={jobPosting}
                         onChange={(e) => {
                           setJobPosting(e.target.value);
-                          if (tailorStatus !== "idle") { setTailorStatus("idle"); setTailorError(null); }
+                          if (tailorStatus !== "idle") {
+                            setTailorStatus("idle");
+                            setTailorError(null);
+                          }
                         }}
                         placeholder={t("cv.jobPostingPlaceholder")}
                         className="min-h-[220px] text-xs rounded-xl resize-none font-mono leading-relaxed"
@@ -1189,7 +1941,9 @@ export function CvGeneratorModal({
                       <p className="text-[11px] text-muted-foreground mt-1">
                         {jobPosting.length} {t("cv.chars")}
                         {jobPosting.length > 0 && jobPosting.length < 30 && (
-                          <span className="text-amber-600 ml-1">{t("cv.charsMin")}</span>
+                          <span className="text-amber-600 ml-1">
+                            {t("cv.charsMin")}
+                          </span>
                         )}
                       </p>
                     </div>
@@ -1198,7 +1952,9 @@ export function CvGeneratorModal({
                     {tailorStatus === "error" && tailorError && (
                       <div className="flex items-start gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
                         <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-                        <p className="text-xs text-destructive">{tailorError}</p>
+                        <p className="text-xs text-destructive">
+                          {tailorError}
+                        </p>
                       </div>
                     )}
 
@@ -1206,14 +1962,20 @@ export function CvGeneratorModal({
                     {tailorStatus === "done" && (
                       <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 space-y-2">
                         <p className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> {t("cv.adaptedSuccess")}
+                          <CheckCircle2 className="w-3.5 h-3.5" />{" "}
+                          {t("cv.adaptedSuccess")}
                         </p>
                         {tailorKeywords.length > 0 && (
                           <div>
-                            <p className="text-xs text-emerald-700 mb-1.5">{t("cv.highlightedKeywords")}</p>
+                            <p className="text-xs text-emerald-700 mb-1.5">
+                              {t("cv.highlightedKeywords")}
+                            </p>
                             <div className="flex flex-wrap gap-1.5">
                               {tailorKeywords.map((k) => (
-                                <span key={k} className="text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span
+                                  key={k}
+                                  className="text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200"
+                                >
                                   {k}
                                 </span>
                               ))}
@@ -1232,59 +1994,104 @@ export function CvGeneratorModal({
                     <Button
                       className={cn(
                         "w-full rounded-xl gap-2 h-10",
-                        tailorStatus === "done" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700",
+                        tailorStatus === "done"
+                          ? "bg-emerald-600 hover:bg-emerald-700"
+                          : "bg-amber-600 hover:bg-amber-700",
                       )}
-                      onClick={tailorStatus === "done" ? () => { setTailorStatus("idle"); setJobPosting(""); } : tailorCv}
-                      disabled={tailorStatus === "tailoring" || jobPosting.trim().length < 30}
+                      onClick={
+                        tailorStatus === "done"
+                          ? () => {
+                              setTailorStatus("idle");
+                              setJobPosting("");
+                            }
+                          : tailorCv
+                      }
+                      disabled={
+                        tailorStatus === "tailoring" ||
+                        jobPosting.trim().length < 30
+                      }
                     >
-                      {tailorStatus === "tailoring" && <Loader2 className="w-4 h-4 animate-spin" />}
-                      {tailorStatus === "tailoring" ? t("cv.adapting")
-                        : tailorStatus === "done" ? t("cv.adaptAnother")
-                        : <><Crosshair className="w-4 h-4" /> {t("cv.adapt")}</>}
+                      {tailorStatus === "tailoring" && (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      )}
+                      {tailorStatus === "tailoring" ? (
+                        t("cv.adapting")
+                      ) : tailorStatus === "done" ? (
+                        t("cv.adaptAnother")
+                      ) : (
+                        <>
+                          <Crosshair className="w-4 h-4" /> {t("cv.adapt")}
+                        </>
+                      )}
                     </Button>
-                    {tailorStatus === "idle" && jobPosting.trim().length >= 30 && (
-                      <p className="text-center text-[11px] text-muted-foreground mt-2">
-                        {t("cv.aiRewriteNote")}
-                      </p>
-                    )}
+                    {tailorStatus === "idle" &&
+                      jobPosting.trim().length >= 30 && (
+                        <p className="text-center text-[11px] text-muted-foreground mt-2">
+                          {t("cv.aiRewriteNote")}
+                        </p>
+                      )}
                   </div>
                 </div>
               )}
 
               {/* Versions panel */}
               {showVersions && (
-                <div className="w-[360px] flex-shrink-0 flex flex-col border-r bg-background">
+                <div className="w-90 shrink-0 flex flex-col border-r bg-background">
                   <div className="flex items-center gap-2 px-4 py-3 border-b">
                     <History className="w-4 h-4 text-primary" />
-                    <h2 className="font-semibold text-sm text-foreground">{t("cv.savedVersions")}</h2>
-                    <span className="ml-auto text-xs text-muted-foreground">{versions.length}/20</span>
-                    <button onClick={() => setShowVersions(false)} className="p-1 rounded hover:bg-muted ml-1">
+                    <h2 className="font-semibold text-sm text-foreground">
+                      {t("cv.savedVersions")}
+                    </h2>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {versions.length}/20
+                    </span>
+                    <button
+                      onClick={() => setShowVersions(false)}
+                      className="p-1 rounded hover:bg-muted ml-1"
+                    >
                       <X className="w-3.5 h-3.5 text-muted-foreground" />
                     </button>
                   </div>
 
                   {/* Save current as new version */}
                   <div className="px-4 py-3 border-b bg-muted/30">
-                    <p className="text-xs font-medium text-foreground mb-2">{t("cv.saveCurrentVersion")}</p>
+                    <p className="text-xs font-medium text-foreground mb-2">
+                      {t("cv.saveCurrentVersion")}
+                    </p>
                     <div className="flex gap-2">
                       <Input
                         value={newVersionName}
                         onChange={(e) => setNewVersionName(e.target.value)}
                         placeholder={`CV ${new Date().toLocaleDateString()}`}
                         className="h-8 text-xs rounded-lg flex-1"
-                        onKeyDown={(e) => { if (e.key === "Enter") saveAsVersion(); }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveAsVersion();
+                        }}
                       />
                       <Button
                         size="sm"
-                        className={cn("h-8 rounded-lg gap-1.5 shrink-0", versionSaveStatus === "saved" && "bg-emerald-600")}
+                        className={cn(
+                          "h-8 rounded-lg gap-1.5 shrink-0",
+                          versionSaveStatus === "saved" && "bg-emerald-600",
+                        )}
                         onClick={saveAsVersion}
                         disabled={versionSaveStatus === "saving" || !generated}
                       >
-                        {versionSaveStatus === "saving" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                        {versionSaveStatus === "saved" && <CheckCircle2 className="w-3.5 h-3.5" />}
-                        {versionSaveStatus === "idle" && <Save className="w-3.5 h-3.5" />}
-                        {versionSaveStatus === "error" && <AlertCircle className="w-3.5 h-3.5" />}
-                        {versionSaveStatus === "saved" ? t("cv.versionSaved") : t("cv.save")}
+                        {versionSaveStatus === "saving" && (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        )}
+                        {versionSaveStatus === "saved" && (
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        )}
+                        {versionSaveStatus === "idle" && (
+                          <Save className="w-3.5 h-3.5" />
+                        )}
+                        {versionSaveStatus === "error" && (
+                          <AlertCircle className="w-3.5 h-3.5" />
+                        )}
+                        {versionSaveStatus === "saved"
+                          ? t("cv.versionSaved")
+                          : t("cv.save")}
                       </Button>
                     </div>
                   </div>
@@ -1294,37 +2101,58 @@ export function CvGeneratorModal({
                     {versions.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                         <FolderOpen className="w-10 h-10 text-muted-foreground/40 mb-3" />
-                        <p className="text-sm font-medium text-muted-foreground">Nessuna versione salvata</p>
-                        <p className="text-xs text-muted-foreground/70 mt-1">Usa il form qui sopra per salvare una versione del CV corrente</p>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Nessuna versione salvata
+                        </p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">
+                          Usa il form qui sopra per salvare una versione del CV
+                          corrente
+                        </p>
                       </div>
                     ) : (
                       <div className="divide-y">
                         {versions.map((v) => (
-                          <div key={v.id} className="px-4 py-3 hover:bg-muted/30 transition-colors group">
+                          <div
+                            key={v.id}
+                            className="px-4 py-3 hover:bg-muted/30 transition-colors group"
+                          >
                             {renamingId === v.id ? (
                               <div className="flex gap-2 items-center mb-1">
                                 <Input
                                   autoFocus
                                   value={renameValue}
-                                  onChange={(e) => setRenameValue(e.target.value)}
+                                  onChange={(e) =>
+                                    setRenameValue(e.target.value)
+                                  }
                                   className="h-7 text-xs rounded-md flex-1"
                                   onKeyDown={(e) => {
                                     if (e.key === "Enter") renameVersion(v.id);
                                     if (e.key === "Escape") setRenamingId(null);
                                   }}
                                 />
-                                <button onClick={() => renameVersion(v.id)} className="p-1 rounded hover:bg-primary/10 text-primary">
+                                <button
+                                  onClick={() => renameVersion(v.id)}
+                                  className="p-1 rounded hover:bg-primary/10 text-primary"
+                                >
                                   <Check className="w-3.5 h-3.5" />
                                 </button>
-                                <button onClick={() => setRenamingId(null)} className="p-1 rounded hover:bg-muted text-muted-foreground">
+                                <button
+                                  onClick={() => setRenamingId(null)}
+                                  className="p-1 rounded hover:bg-muted text-muted-foreground"
+                                >
                                   <X className="w-3.5 h-3.5" />
                                 </button>
                               </div>
                             ) : (
                               <div className="flex items-start gap-1.5 mb-1">
-                                <p className="text-sm font-medium text-foreground leading-tight flex-1 truncate">{v.name}</p>
+                                <p className="text-sm font-medium text-foreground leading-tight flex-1 truncate">
+                                  {v.name}
+                                </p>
                                 <button
-                                  onClick={() => { setRenamingId(v.id); setRenameValue(v.name); }}
+                                  onClick={() => {
+                                    setRenamingId(v.id);
+                                    setRenameValue(v.name);
+                                  }}
                                   className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-muted transition-all shrink-0 mt-0.5"
                                   title={t("cv.rename")}
                                 >
@@ -1333,7 +2161,9 @@ export function CvGeneratorModal({
                               </div>
                             )}
                             {v.targetRole && (
-                              <p className="text-xs text-muted-foreground mb-2">🎯 {v.targetRole}</p>
+                              <p className="text-xs text-muted-foreground mb-2">
+                                🎯 {v.targetRole}
+                              </p>
                             )}
                             <div className="flex items-center gap-1.5 justify-between">
                               <span className="text-[11px] text-muted-foreground/70 flex items-center gap-1">
@@ -1348,9 +2178,11 @@ export function CvGeneratorModal({
                                   onClick={() => loadVersion(v.id)}
                                   disabled={loadingVersionId === v.id}
                                 >
-                                  {loadingVersionId === v.id
-                                    ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                                    : <FolderOpen className="w-2.5 h-2.5" />}
+                                  {loadingVersionId === v.id ? (
+                                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                  ) : (
+                                    <FolderOpen className="w-2.5 h-2.5" />
+                                  )}
                                   {t("cv.loadVersion")}
                                 </Button>
                                 <button
@@ -1372,12 +2204,17 @@ export function CvGeneratorModal({
 
               {/* ── Letter panel (desktop) ── */}
               {showLetter && (
-                <div className="w-[440px] flex-shrink-0 flex flex-col border-r bg-background">
+                <div className="w-110 shrink-0 flex flex-col border-r bg-background">
                   {/* Header */}
                   <div className="flex items-center gap-2 px-4 py-3 border-b bg-indigo-50">
                     <Mail className="w-4 h-4 text-indigo-600" />
-                    <h2 className="font-semibold text-sm text-indigo-900">{t("cv.letterTitle")}</h2>
-                    <button onClick={() => setShowLetter(false)} className="ml-auto p-1 rounded hover:bg-indigo-100">
+                    <h2 className="font-semibold text-sm text-indigo-900">
+                      {t("cv.letterTitle")}
+                    </h2>
+                    <button
+                      onClick={() => setShowLetter(false)}
+                      className="ml-auto p-1 rounded hover:bg-indigo-100"
+                    >
                       <X className="w-3.5 h-3.5 text-indigo-700" />
                     </button>
                   </div>
@@ -1388,53 +2225,90 @@ export function CvGeneratorModal({
                         {/* Inputs */}
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <Label className="text-xs font-semibold mb-1 block">{t("cv.letterCompany")}</Label>
-                            <Input value={letterCompany} onChange={(e) => setLetterCompany(e.target.value)} placeholder="es. Google Italia" className="h-8 text-xs rounded-lg" />
+                            <Label className="text-xs font-semibold mb-1 block">
+                              {t("cv.letterCompany")}
+                            </Label>
+                            <Input
+                              value={letterCompany}
+                              onChange={(e) => setLetterCompany(e.target.value)}
+                              placeholder="es. Google Italia"
+                              className="h-8 text-xs rounded-lg"
+                            />
                           </div>
                           <div>
-                            <Label className="text-xs font-semibold mb-1 block">{t("cv.letterRole")}</Label>
-                            <Input value={letterRole} onChange={(e) => setLetterRole(e.target.value)} placeholder="es. UX Designer" className="h-8 text-xs rounded-lg" />
+                            <Label className="text-xs font-semibold mb-1 block">
+                              {t("cv.letterRole")}
+                            </Label>
+                            <Input
+                              value={letterRole}
+                              onChange={(e) => setLetterRole(e.target.value)}
+                              placeholder="es. UX Designer"
+                              className="h-8 text-xs rounded-lg"
+                            />
                           </div>
                         </div>
 
                         <div>
-                          <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
+                          <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5">
                             <FileSearch className="w-3.5 h-3.5 text-muted-foreground" />
                             {t("cv.jobPostingRequired")}
                           </Label>
                           <Textarea
                             value={letterJobPosting}
-                            onChange={(e) => { setLetterJobPosting(e.target.value); if (letterStatus !== "idle") setLetterStatus("idle"); }}
+                            onChange={(e) => {
+                              setLetterJobPosting(e.target.value);
+                              if (letterStatus !== "idle")
+                                setLetterStatus("idle");
+                            }}
                             placeholder={t("cv.letterJobPlaceholder")}
-                            className="min-h-[180px] text-xs rounded-xl resize-none font-mono leading-relaxed"
+                            className="min-h-45 text-xs rounded-xl resize-none font-mono leading-relaxed"
                           />
                           <p className="text-[11px] text-muted-foreground mt-1">
                             {letterJobPosting.length} {t("cv.chars")}
-                            {letterJobPosting.length > 0 && letterJobPosting.length < 30 && <span className="text-amber-600 ml-1">{t("cv.charsMin")}</span>}
+                            {letterJobPosting.length > 0 &&
+                              letterJobPosting.length < 30 && (
+                                <span className="text-amber-600 ml-1">
+                                  {t("cv.charsMin")}
+                                </span>
+                              )}
                           </p>
                         </div>
 
                         <div>
-                          <Label className="text-xs font-semibold mb-1 block">{t("cv.extraNotes")} <span className="font-normal text-muted-foreground">{t("cv.optional")}</span></Label>
+                          <Label className="text-xs font-semibold mb-1 block">
+                            {t("cv.extraNotes")}{" "}
+                            <span className="font-normal text-muted-foreground">
+                              {t("cv.optional")}
+                            </span>
+                          </Label>
                           <Textarea
                             value={letterExtra}
                             onChange={(e) => setLetterExtra(e.target.value)}
                             placeholder={t("cv.extraNotesPlaceholder")}
-                            className="min-h-[60px] text-xs rounded-xl resize-none"
+                            className="min-h-15 text-xs rounded-xl resize-none"
                           />
                         </div>
 
                         {letterStatus === "error" && letterError && (
                           <div className="flex items-start gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
                             <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-                            <p className="text-xs text-destructive">{letterError}</p>
+                            <p className="text-xs text-destructive">
+                              {letterError}
+                            </p>
                           </div>
                         )}
 
                         <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-3 space-y-1">
-                          <p className="text-xs font-semibold text-indigo-800 flex items-center gap-1.5"><Lightbulb className="w-3.5 h-3.5" /> {t("cv.howItWorks")}</p>
+                          <p className="text-xs font-semibold text-indigo-800 flex items-center gap-1.5">
+                            <Lightbulb className="w-3.5 h-3.5" />{" "}
+                            {t("cv.howItWorks")}
+                          </p>
                           <ul className="text-xs text-indigo-700 space-y-0.5 pl-1">
-                            {(t("cv.letterSteps", { returnObjects: true }) as string[]).map((step, i) => (
+                            {(
+                              t("cv.letterSteps", {
+                                returnObjects: true,
+                              }) as string[]
+                            ).map((step, i) => (
                               <li key={i}>→ {step}</li>
                             ))}
                           </ul>
@@ -1445,57 +2319,85 @@ export function CvGeneratorModal({
                       <div className="space-y-4">
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                          <p className="text-xs font-semibold text-emerald-700">{t("cv.letterGenerated")}</p>
+                          <p className="text-xs font-semibold text-emerald-700">
+                            {t("cv.letterGenerated")}
+                          </p>
                         </div>
 
                         {letter?.subject && (
                           <div className="rounded-lg bg-muted/50 border px-3 py-2">
-                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t("cv.subject")}</p>
+                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                              {t("cv.subject")}
+                            </p>
                             <input
                               className="w-full text-xs font-semibold bg-transparent outline-none text-foreground"
                               value={letter.subject}
-                              onChange={(e) => setLetter((l) => l ? { ...l, subject: e.target.value } : l)}
+                              onChange={(e) =>
+                                setLetter((l) =>
+                                  l ? { ...l, subject: e.target.value } : l,
+                                )
+                              }
                             />
                           </div>
                         )}
 
                         <div>
-                          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t("cv.salutation")}</p>
+                          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                            {t("cv.salutation")}
+                          </p>
                           <input
                             className="w-full text-xs border rounded-lg px-2 py-1.5 bg-background outline-none focus:ring-1 focus:ring-indigo-300"
                             value={letter?.salutation ?? ""}
-                            onChange={(e) => setLetter((l) => l ? { ...l, salutation: e.target.value } : l)}
+                            onChange={(e) =>
+                              setLetter((l) =>
+                                l ? { ...l, salutation: e.target.value } : l,
+                              )
+                            }
                           />
                         </div>
 
                         {letter?.paragraphs.map((p, i) => (
                           <div key={i}>
-                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t("cv.paragraphN", { n: i + 1 })}</p>
+                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                              {t("cv.paragraphN", { n: i + 1 })}
+                            </p>
                             <Textarea
                               value={p}
-                              onChange={(e) => setLetter((l) => {
-                                if (!l) return l;
-                                const np = [...l.paragraphs];
-                                np[i] = e.target.value;
-                                return { ...l, paragraphs: np };
-                              })}
-                              className="min-h-[80px] text-xs rounded-xl resize-none leading-relaxed"
+                              onChange={(e) =>
+                                setLetter((l) => {
+                                  if (!l) return l;
+                                  const np = [...l.paragraphs];
+                                  np[i] = e.target.value;
+                                  return { ...l, paragraphs: np };
+                                })
+                              }
+                              className="min-h-20 text-xs rounded-xl resize-none leading-relaxed"
                             />
                           </div>
                         ))}
 
                         <div>
-                          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t("cv.closing")}</p>
+                          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                            {t("cv.closing")}
+                          </p>
                           <input
                             className="w-full text-xs border rounded-lg px-2 py-1.5 bg-background outline-none focus:ring-1 focus:ring-indigo-300"
                             value={letter?.closing ?? ""}
-                            onChange={(e) => setLetter((l) => l ? { ...l, closing: e.target.value } : l)}
+                            onChange={(e) =>
+                              setLetter((l) =>
+                                l ? { ...l, closing: e.target.value } : l,
+                              )
+                            }
                           />
                         </div>
 
                         <div className="rounded-lg bg-muted/30 border px-3 py-2 text-xs font-semibold text-foreground">
                           {letter?.senderName}
-                          {letter?.senderTitle && <span className="font-normal text-muted-foreground ml-2">— {letter.senderTitle}</span>}
+                          {letter?.senderTitle && (
+                            <span className="font-normal text-muted-foreground ml-2">
+                              — {letter.senderTitle}
+                            </span>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1507,10 +2409,22 @@ export function CvGeneratorModal({
                       <Button
                         className="w-full rounded-xl gap-2 h-10 bg-indigo-600 hover:bg-indigo-700"
                         onClick={generateLetter}
-                        disabled={letterStatus === "generating" || letterJobPosting.trim().length < 30}
+                        disabled={
+                          letterStatus === "generating" ||
+                          letterJobPosting.trim().length < 30
+                        }
                       >
-                        {letterStatus === "generating" && <Loader2 className="w-4 h-4 animate-spin" />}
-                        {letterStatus === "generating" ? t("cv.letterWriting") : <><Mail className="w-4 h-4" /> {t("cv.generateLetter")}</>}
+                        {letterStatus === "generating" && (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        )}
+                        {letterStatus === "generating" ? (
+                          t("cv.letterWriting")
+                        ) : (
+                          <>
+                            <Mail className="w-4 h-4" />{" "}
+                            {t("cv.generateLetter")}
+                          </>
+                        )}
                       </Button>
                     ) : (
                       <div className="flex gap-2">
@@ -1519,16 +2433,32 @@ export function CvGeneratorModal({
                           onClick={downloadLetterPdf}
                           disabled={downloadingLetter}
                         >
-                          {downloadingLetter ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                          {downloadingLetter ? t("cv.downloadingPdf") : t("cv.downloadPdf")}
+                          {downloadingLetter ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Download className="w-3.5 h-3.5" />
+                          )}
+                          {downloadingLetter
+                            ? t("cv.downloadingPdf")
+                            : t("cv.downloadPdf")}
                         </Button>
                         <Button
                           variant="outline"
-                          className={cn("flex-1 rounded-xl gap-2 h-9", copyStatus === "copied" && "border-emerald-300 text-emerald-700 bg-emerald-50")}
+                          className={cn(
+                            "flex-1 rounded-xl gap-2 h-9",
+                            copyStatus === "copied" &&
+                              "border-emerald-300 text-emerald-700 bg-emerald-50",
+                          )}
                           onClick={copyLetter}
                         >
-                          {copyStatus === "copied" ? <ClipboardCheck className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                          {copyStatus === "copied" ? t("cv.copied") : t("cv.copyText")}
+                          {copyStatus === "copied" ? (
+                            <ClipboardCheck className="w-3.5 h-3.5" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                          {copyStatus === "copied"
+                            ? t("cv.copied")
+                            : t("cv.copyText")}
                         </Button>
                       </div>
                     )}
@@ -1536,7 +2466,9 @@ export function CvGeneratorModal({
                       <Button
                         variant="ghost"
                         className="w-full rounded-xl h-8 text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => { setLetterStatus("idle"); }}
+                        onClick={() => {
+                          setLetterStatus("idle");
+                        }}
                       >
                         ↩ {t("cv.generateAnotherLetter")}
                       </Button>
@@ -1546,172 +2478,299 @@ export function CvGeneratorModal({
               )}
 
               {/* ── ATS Score panel (desktop) ── */}
-              {showAts && (() => {
-                const scoreColor = (s: number) => s >= 80 ? "hsl(var(--chart-2))" : s >= 60 ? "hsl(var(--primary))" : "hsl(var(--chart-5))";
-                const scoreBg = (s: number) => s >= 80 ? "bg-emerald-50 border-emerald-200 text-emerald-800" : s >= 60 ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-red-50 border-red-200 text-red-800";
-                const R = 45; const CX = 60; const CY = 60;
-                const CIRC = 2 * Math.PI * R;
-                return (
-                  <div className="w-[400px] flex-shrink-0 flex flex-col border-r bg-background">
-                    {/* Header */}
-                    <div className="flex items-center gap-2 px-4 py-3 border-b bg-teal-50">
-                      <BarChart2 className="w-4 h-4 text-teal-600" />
-                      <h2 className="font-semibold text-sm text-teal-900">{t("cv.atsTitle")}</h2>
-                      <button onClick={() => setShowAts(false)} className="ml-auto p-1 rounded hover:bg-teal-100">
-                        <X className="w-3.5 h-3.5 text-teal-700" />
-                      </button>
-                    </div>
+              {showAts &&
+                (() => {
+                  const scoreColor = (s: number) =>
+                    s >= 80
+                      ? "hsl(var(--chart-2))"
+                      : s >= 60
+                        ? "hsl(var(--primary))"
+                        : "hsl(var(--chart-5))";
+                  const scoreBg = (s: number) =>
+                    s >= 80
+                      ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                      : s >= 60
+                        ? "bg-amber-50 border-amber-200 text-amber-800"
+                        : "bg-red-50 border-red-200 text-red-800";
+                  const R = 45;
+                  const CX = 60;
+                  const CY = 60;
+                  const CIRC = 2 * Math.PI * R;
+                  return (
+                    <div className="w-100 shrink-0 flex flex-col border-r bg-background">
+                      {/* Header */}
+                      <div className="flex items-center gap-2 px-4 py-3 border-b bg-teal-50">
+                        <BarChart2 className="w-4 h-4 text-teal-600" />
+                        <h2 className="font-semibold text-sm text-teal-900">
+                          {t("cv.atsTitle")}
+                        </h2>
+                        <button
+                          onClick={() => setShowAts(false)}
+                          className="ml-auto p-1 rounded hover:bg-teal-100"
+                        >
+                          <X className="w-3.5 h-3.5 text-teal-700" />
+                        </button>
+                      </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                      {atsStatus !== "done" ? (
-                        <>
-                          <div className="rounded-xl bg-teal-50 border border-teal-100 p-3 space-y-1.5">
-                            <p className="text-xs font-semibold text-teal-800 flex items-center gap-1.5"><Lightbulb className="w-3.5 h-3.5" /> {t("cv.howItWorks")}</p>
-                            <ul className="text-xs text-teal-700 space-y-0.5 pl-1">
-                              {(t("cv.atsSteps", { returnObjects: true }) as string[]).map((step, i) => (
-                                <li key={i}>→ {step}</li>
-                              ))}
-                            </ul>
-                          </div>
-
-                          <div>
-                            <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
-                              <FileSearch className="w-3.5 h-3.5 text-muted-foreground" />
-                              {t("cv.jobPostingLabel")}
-                            </Label>
-                            <Textarea
-                              value={atsJobPosting}
-                              onChange={(e) => { setAtsJobPosting(e.target.value); if (atsStatus !== "idle") setAtsStatus("idle"); }}
-                              placeholder={t("cv.atsJobPlaceholder")}
-                              className="min-h-[220px] text-xs rounded-xl resize-none font-mono leading-relaxed"
-                            />
-                            <p className="text-[11px] text-muted-foreground mt-1">
-                              {atsJobPosting.length} {t("cv.chars")}
-                              {atsJobPosting.length > 0 && atsJobPosting.length < 30 && <span className="text-amber-600 ml-1">{t("cv.charsMin")}</span>}
-                            </p>
-                          </div>
-
-                          {atsStatus === "error" && atsError && (
-                            <div className="flex items-start gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
-                              <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-                              <p className="text-xs text-destructive">{atsError}</p>
-                            </div>
-                          )}
-                        </>
-                      ) : atsResult ? (
-                        <>
-                          {/* Score gauge */}
-                          <div className="flex flex-col items-center py-2">
-                            <svg width="120" height="120" viewBox="0 0 120 120">
-                              <circle cx={CX} cy={CY} r={R} fill="none" stroke="hsl(var(--border))" strokeWidth="10" />
-                              <circle
-                                cx={CX} cy={CY} r={R}
-                                fill="none"
-                                stroke={scoreColor(atsResult.score)}
-                                strokeWidth="10"
-                                strokeLinecap="round"
-                                strokeDasharray={`${CIRC * atsResult.score / 100} ${CIRC}`}
-                                transform={`rotate(-90 ${CX} ${CY})`}
-                                style={{ transition: "stroke-dasharray 0.8s ease" }}
-                              />
-                              <text x={CX} y={CY + 8} textAnchor="middle" fontSize="22" fontWeight="bold" fill={scoreColor(atsResult.score)}>{atsResult.score}</text>
-                              <text x={CX} y={CY + 22} textAnchor="middle" fontSize="9" fill="hsl(var(--muted-foreground))">/100</text>
-                            </svg>
-                            <span className={cn("text-sm font-bold px-3 py-1 rounded-full border mt-1", scoreBg(atsResult.score))}>
-                              {atsResult.label}
-                            </span>
-                          </div>
-
-                          {/* Sections */}
-                          <div className="space-y-2.5">
-                            <p className="text-xs font-semibold text-foreground">{t("cv.sectionBreakdown")}</p>
-                            {atsResult.sections.map((sec) => (
-                              <div key={sec.name}>
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="text-xs font-medium text-foreground">{sec.name}</span>
-                                  <span className="text-xs font-bold" style={{ color: scoreColor(sec.score) }}>{sec.score}%</span>
-                                </div>
-                                <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-1">
-                                  <div
-                                    className="h-full rounded-full transition-all duration-700"
-                                    style={{ width: `${sec.score}%`, backgroundColor: scoreColor(sec.score) }}
-                                  />
-                                </div>
-                                <p className="text-[11px] text-muted-foreground">{sec.feedback}</p>
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Strengths */}
-                          {atsResult.strengths.length > 0 && (
-                            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 space-y-1.5">
-                              <p className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5" /> {t("cv.strengths")}</p>
-                              {atsResult.strengths.map((s, i) => (
-                                <p key={i} className="text-xs text-emerald-700 flex gap-1.5"><span className="shrink-0">✓</span>{s}</p>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Missing keywords */}
-                          {atsResult.missingKeywords.length > 0 && (
-                            <div>
-                              <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
-                                <Zap className="w-3.5 h-3.5 text-amber-500" /> {t("cv.missingKeywords")}
+                      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                        {atsStatus !== "done" ? (
+                          <>
+                            <div className="rounded-xl bg-teal-50 border border-teal-100 p-3 space-y-1.5">
+                              <p className="text-xs font-semibold text-teal-800 flex items-center gap-1.5">
+                                <Lightbulb className="w-3.5 h-3.5" />{" "}
+                                {t("cv.howItWorks")}
                               </p>
-                              <div className="flex flex-wrap gap-1.5">
-                                {atsResult.missingKeywords.map((k) => (
-                                  <span key={k} className="text-[11px] bg-amber-50 border border-amber-200 text-amber-800 px-2 py-0.5 rounded-full">{k}</span>
+                              <ul className="text-xs text-teal-700 space-y-0.5 pl-1">
+                                {(
+                                  t("cv.atsSteps", {
+                                    returnObjects: true,
+                                  }) as string[]
+                                ).map((step, i) => (
+                                  <li key={i}>→ {step}</li>
+                                ))}
+                              </ul>
+                            </div>
+
+                            <div>
+                              <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5">
+                                <FileSearch className="w-3.5 h-3.5 text-muted-foreground" />
+                                {t("cv.jobPostingLabel")}
+                              </Label>
+                              <Textarea
+                                value={atsJobPosting}
+                                onChange={(e) => {
+                                  setAtsJobPosting(e.target.value);
+                                  if (atsStatus !== "idle")
+                                    setAtsStatus("idle");
+                                }}
+                                placeholder={t("cv.atsJobPlaceholder")}
+                                className="min-h-55 text-xs rounded-xl resize-none font-mono leading-relaxed"
+                              />
+                              <p className="text-[11px] text-muted-foreground mt-1">
+                                {atsJobPosting.length} {t("cv.chars")}
+                                {atsJobPosting.length > 0 &&
+                                  atsJobPosting.length < 30 && (
+                                    <span className="text-amber-600 ml-1">
+                                      {t("cv.charsMin")}
+                                    </span>
+                                  )}
+                              </p>
+                            </div>
+
+                            {atsStatus === "error" && atsError && (
+                              <div className="flex items-start gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+                                <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                                <p className="text-xs text-destructive">
+                                  {atsError}
+                                </p>
+                              </div>
+                            )}
+                          </>
+                        ) : atsResult ? (
+                          <>
+                            {/* Score gauge */}
+                            <div className="flex flex-col items-center py-2">
+                              <svg
+                                width="120"
+                                height="120"
+                                viewBox="0 0 120 120"
+                              >
+                                <circle
+                                  cx={CX}
+                                  cy={CY}
+                                  r={R}
+                                  fill="none"
+                                  stroke="hsl(var(--border))"
+                                  strokeWidth="10"
+                                />
+                                <circle
+                                  cx={CX}
+                                  cy={CY}
+                                  r={R}
+                                  fill="none"
+                                  stroke={scoreColor(atsResult.score)}
+                                  strokeWidth="10"
+                                  strokeLinecap="round"
+                                  strokeDasharray={`${(CIRC * atsResult.score) / 100} ${CIRC}`}
+                                  transform={`rotate(-90 ${CX} ${CY})`}
+                                  style={{
+                                    transition: "stroke-dasharray 0.8s ease",
+                                  }}
+                                />
+                                <text
+                                  x={CX}
+                                  y={CY + 8}
+                                  textAnchor="middle"
+                                  fontSize="22"
+                                  fontWeight="bold"
+                                  fill={scoreColor(atsResult.score)}
+                                >
+                                  {atsResult.score}
+                                </text>
+                                <text
+                                  x={CX}
+                                  y={CY + 22}
+                                  textAnchor="middle"
+                                  fontSize="9"
+                                  fill="hsl(var(--muted-foreground))"
+                                >
+                                  /100
+                                </text>
+                              </svg>
+                              <span
+                                className={cn(
+                                  "text-sm font-bold px-3 py-1 rounded-full border mt-1",
+                                  scoreBg(atsResult.score),
+                                )}
+                              >
+                                {atsResult.label}
+                              </span>
+                            </div>
+
+                            {/* Sections */}
+                            <div className="space-y-2.5">
+                              <p className="text-xs font-semibold text-foreground">
+                                {t("cv.sectionBreakdown")}
+                              </p>
+                              {atsResult.sections.map((sec) => (
+                                <div key={sec.name}>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs font-medium text-foreground">
+                                      {sec.name}
+                                    </span>
+                                    <span
+                                      className="text-xs font-bold"
+                                      style={{ color: scoreColor(sec.score) }}
+                                    >
+                                      {sec.score}%
+                                    </span>
+                                  </div>
+                                  <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-1">
+                                    <div
+                                      className="h-full rounded-full transition-all duration-700"
+                                      style={{
+                                        width: `${sec.score}%`,
+                                        backgroundColor: scoreColor(sec.score),
+                                      }}
+                                    />
+                                  </div>
+                                  <p className="text-[11px] text-muted-foreground">
+                                    {sec.feedback}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Strengths */}
+                            {atsResult.strengths.length > 0 && (
+                              <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 space-y-1.5">
+                                <p className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
+                                  <TrendingUp className="w-3.5 h-3.5" />{" "}
+                                  {t("cv.strengths")}
+                                </p>
+                                {atsResult.strengths.map((s, i) => (
+                                  <p
+                                    key={i}
+                                    className="text-xs text-emerald-700 flex gap-1.5"
+                                  >
+                                    <span className="shrink-0">✓</span>
+                                    {s}
+                                  </p>
                                 ))}
                               </div>
-                            </div>
-                          )}
+                            )}
 
-                          {/* Tips */}
-                          <div className="rounded-xl bg-muted/40 border p-3 space-y-2">
-                            <p className="text-xs font-semibold text-foreground">{t("cv.howToImprove")}</p>
-                            {atsResult.tips.map((t, i) => (
-                              <p key={i} className="text-xs text-foreground flex gap-2">
-                                <span className="shrink-0 w-4 h-4 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-[10px] font-bold">{i + 1}</span>
-                                {t}
+                            {/* Missing keywords */}
+                            {atsResult.missingKeywords.length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
+                                  <Zap className="w-3.5 h-3.5 text-amber-500" />{" "}
+                                  {t("cv.missingKeywords")}
+                                </p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {atsResult.missingKeywords.map((k) => (
+                                    <span
+                                      key={k}
+                                      className="text-[11px] bg-amber-50 border border-amber-200 text-amber-800 px-2 py-0.5 rounded-full"
+                                    >
+                                      {k}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Tips */}
+                            <div className="rounded-xl bg-muted/40 border p-3 space-y-2">
+                              <p className="text-xs font-semibold text-foreground">
+                                {t("cv.howToImprove")}
                               </p>
-                            ))}
-                          </div>
-                        </>
-                      ) : null}
-                    </div>
+                              {atsResult.tips.map((t, i) => (
+                                <p
+                                  key={i}
+                                  className="text-xs text-foreground flex gap-2"
+                                >
+                                  <span className="shrink-0 w-4 h-4 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-[10px] font-bold">
+                                    {i + 1}
+                                  </span>
+                                  {t}
+                                </p>
+                              ))}
+                            </div>
+                          </>
+                        ) : null}
+                      </div>
 
-                    {/* Footer action */}
-                    <div className="p-4 border-t bg-muted/20">
-                      {atsStatus !== "done" ? (
-                        <Button
-                          className="w-full rounded-xl gap-2 h-10 bg-teal-600 hover:bg-teal-700"
-                          onClick={analyzeAts}
-                          disabled={atsStatus === "analyzing" || atsJobPosting.trim().length < 30}
-                        >
-                          {atsStatus === "analyzing" && <Loader2 className="w-4 h-4 animate-spin" />}
-                          {atsStatus === "analyzing" ? t("cv.analyzing") : <><BarChart2 className="w-4 h-4" /> {t("cv.analyzeCompat")}</>}
-                        </Button>
-                      ) : (
-                        <div className="space-y-2">
-                          <p className="text-center text-xs text-muted-foreground">
-                            {t("cv.atsTipUseTailor")}
-                          </p>
+                      {/* Footer action */}
+                      <div className="p-4 border-t bg-muted/20">
+                        {atsStatus !== "done" ? (
                           <Button
-                            variant="ghost"
-                            className="w-full rounded-xl h-8 text-xs text-muted-foreground hover:text-foreground"
-                            onClick={() => { setAtsStatus("idle"); setAtsResult(null); }}
+                            className="w-full rounded-xl gap-2 h-10 bg-teal-600 hover:bg-teal-700"
+                            onClick={analyzeAts}
+                            disabled={
+                              atsStatus === "analyzing" ||
+                              atsJobPosting.trim().length < 30
+                            }
                           >
-                            ↩ {t("cv.analyzeAnother")}
+                            {atsStatus === "analyzing" && (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            )}
+                            {atsStatus === "analyzing" ? (
+                              t("cv.analyzing")
+                            ) : (
+                              <>
+                                <BarChart2 className="w-4 h-4" />{" "}
+                                {t("cv.analyzeCompat")}
+                              </>
+                            )}
                           </Button>
-                        </div>
-                      )}
+                        ) : (
+                          <div className="space-y-2">
+                            <p className="text-center text-xs text-muted-foreground">
+                              {t("cv.atsTipUseTailor")}
+                            </p>
+                            <Button
+                              variant="ghost"
+                              className="w-full rounded-xl h-8 text-xs text-muted-foreground hover:text-foreground"
+                              onClick={() => {
+                                setAtsStatus("idle");
+                                setAtsResult(null);
+                              }}
+                            >
+                              ↩ {t("cv.analyzeAnother")}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
 
               {/* Preview */}
-              <div id="cv-preview-scroll" className="flex-1 overflow-auto py-8 px-6 bg-muted/30">
+              <div
+                id="cv-preview-scroll"
+                className="flex-1 overflow-auto py-8 px-6 bg-muted/30"
+              >
                 <CvDocument cv={generated} />
               </div>
             </div>
@@ -1725,33 +2784,57 @@ export function CvGeneratorModal({
                     <div>
                       <div className="flex items-center gap-2 mb-3 pb-3 border-b bg-teal-50 -mx-4 -mt-4 px-4 pt-4">
                         <BarChart2 className="w-4 h-4 text-teal-600" />
-                        <h2 className="font-semibold text-sm text-teal-900">{t("cv.atsTitle")}</h2>
-                        <button onClick={() => setShowAts(false)} className="ml-auto p-1 rounded hover:bg-teal-100">
+                        <h2 className="font-semibold text-sm text-teal-900">
+                          {t("cv.atsTitle")}
+                        </h2>
+                        <button
+                          onClick={() => setShowAts(false)}
+                          className="ml-auto p-1 rounded hover:bg-teal-100"
+                        >
                           <X className="w-3.5 h-3.5 text-teal-700" />
                         </button>
                       </div>
                       {atsStatus !== "done" ? (
                         <div className="mt-4 space-y-3">
-                          <Label className="text-xs font-semibold mb-1.5 block">{t("cv.jobPostingShort")}</Label>
+                          <Label className="text-xs font-semibold mb-1.5 block">
+                            {t("cv.jobPostingShort")}
+                          </Label>
                           <Textarea
                             value={atsJobPosting}
-                            onChange={(e) => { setAtsJobPosting(e.target.value); if (atsStatus !== "idle") setAtsStatus("idle"); }}
+                            onChange={(e) => {
+                              setAtsJobPosting(e.target.value);
+                              if (atsStatus !== "idle") setAtsStatus("idle");
+                            }}
                             placeholder={t("cv.atsJobShortPlaceholder")}
                             className="min-h-[150px] text-xs rounded-xl resize-none"
                           />
                           {atsStatus === "error" && atsError && (
                             <div className="flex gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
                               <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
-                              <p className="text-xs text-destructive">{atsError}</p>
+                              <p className="text-xs text-destructive">
+                                {atsError}
+                              </p>
                             </div>
                           )}
                           <Button
                             className="w-full rounded-xl gap-2 bg-teal-600 hover:bg-teal-700"
                             onClick={analyzeAts}
-                            disabled={atsStatus === "analyzing" || atsJobPosting.trim().length < 30}
+                            disabled={
+                              atsStatus === "analyzing" ||
+                              atsJobPosting.trim().length < 30
+                            }
                           >
-                            {atsStatus === "analyzing" && <Loader2 className="w-4 h-4 animate-spin" />}
-                            {atsStatus === "analyzing" ? t("cv.analyzing") : <><BarChart2 className="w-4 h-4" /> {t("cv.analyze")}</>}
+                            {atsStatus === "analyzing" && (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            )}
+                            {atsStatus === "analyzing" ? (
+                              t("cv.analyzing")
+                            ) : (
+                              <>
+                                <BarChart2 className="w-4 h-4" />{" "}
+                                {t("cv.analyze")}
+                              </>
+                            )}
                           </Button>
                         </div>
                       ) : atsResult ? (
@@ -1759,35 +2842,99 @@ export function CvGeneratorModal({
                           {/* Score */}
                           <div className="flex items-center gap-4 p-3 rounded-xl border bg-muted/30">
                             {(() => {
-                              const R = 32; const CX = 36; const CY = 36; const CIRC = 2 * Math.PI * R;
-                              const color = atsResult.score >= 80 ? "hsl(var(--chart-2))" : atsResult.score >= 60 ? "hsl(var(--primary))" : "hsl(var(--chart-5))";
+                              const R = 32;
+                              const CX = 36;
+                              const CY = 36;
+                              const CIRC = 2 * Math.PI * R;
+                              const color =
+                                atsResult.score >= 80
+                                  ? "hsl(var(--chart-2))"
+                                  : atsResult.score >= 60
+                                    ? "hsl(var(--primary))"
+                                    : "hsl(var(--chart-5))";
                               return (
                                 <svg width="72" height="72" viewBox="0 0 72 72">
-                                  <circle cx={CX} cy={CY} r={R} fill="none" stroke="hsl(var(--border))" strokeWidth="8" />
-                                  <circle cx={CX} cy={CY} r={R} fill="none" stroke={color} strokeWidth="8" strokeLinecap="round"
-                                    strokeDasharray={`${CIRC * atsResult.score / 100} ${CIRC}`}
-                                    transform={`rotate(-90 ${CX} ${CY})`} />
-                                  <text x={CX} y={CY + 5} textAnchor="middle" fontSize="14" fontWeight="bold" fill={color}>{atsResult.score}</text>
+                                  <circle
+                                    cx={CX}
+                                    cy={CY}
+                                    r={R}
+                                    fill="none"
+                                    stroke="hsl(var(--border))"
+                                    strokeWidth="8"
+                                  />
+                                  <circle
+                                    cx={CX}
+                                    cy={CY}
+                                    r={R}
+                                    fill="none"
+                                    stroke={color}
+                                    strokeWidth="8"
+                                    strokeLinecap="round"
+                                    strokeDasharray={`${(CIRC * atsResult.score) / 100} ${CIRC}`}
+                                    transform={`rotate(-90 ${CX} ${CY})`}
+                                  />
+                                  <text
+                                    x={CX}
+                                    y={CY + 5}
+                                    textAnchor="middle"
+                                    fontSize="14"
+                                    fontWeight="bold"
+                                    fill={color}
+                                  >
+                                    {atsResult.score}
+                                  </text>
                                 </svg>
                               );
                             })()}
                             <div>
-                              <p className="text-lg font-bold text-foreground">{atsResult.score}/100</p>
-                              <p className="text-sm font-semibold" style={{ color: atsResult.score >= 80 ? "hsl(var(--chart-2))" : atsResult.score >= 60 ? "hsl(var(--primary))" : "hsl(var(--chart-5))" }}>{atsResult.label}</p>
+                              <p className="text-lg font-bold text-foreground">
+                                {atsResult.score}/100
+                              </p>
+                              <p
+                                className="text-sm font-semibold"
+                                style={{
+                                  color:
+                                    atsResult.score >= 80
+                                      ? "hsl(var(--chart-2))"
+                                      : atsResult.score >= 60
+                                        ? "hsl(var(--primary))"
+                                        : "hsl(var(--chart-5))",
+                                }}
+                              >
+                                {atsResult.label}
+                              </p>
                             </div>
                           </div>
                           {/* Sections */}
                           <div className="space-y-2">
                             {atsResult.sections.map((sec) => {
-                              const color = sec.score >= 80 ? "hsl(var(--chart-2))" : sec.score >= 60 ? "hsl(var(--primary))" : "hsl(var(--chart-5))";
+                              const color =
+                                sec.score >= 80
+                                  ? "hsl(var(--chart-2))"
+                                  : sec.score >= 60
+                                    ? "hsl(var(--primary))"
+                                    : "hsl(var(--chart-5))";
                               return (
                                 <div key={sec.name}>
                                   <div className="flex justify-between mb-0.5">
-                                    <span className="text-xs font-medium">{sec.name}</span>
-                                    <span className="text-xs font-bold" style={{ color }}>{sec.score}%</span>
+                                    <span className="text-xs font-medium">
+                                      {sec.name}
+                                    </span>
+                                    <span
+                                      className="text-xs font-bold"
+                                      style={{ color }}
+                                    >
+                                      {sec.score}%
+                                    </span>
                                   </div>
                                   <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                                    <div className="h-full rounded-full" style={{ width: `${sec.score}%`, backgroundColor: color }} />
+                                    <div
+                                      className="h-full rounded-full"
+                                      style={{
+                                        width: `${sec.score}%`,
+                                        backgroundColor: color,
+                                      }}
+                                    />
                                   </div>
                                 </div>
                               );
@@ -1796,25 +2943,44 @@ export function CvGeneratorModal({
                           {/* Missing keywords */}
                           {atsResult.missingKeywords.length > 0 && (
                             <div>
-                              <p className="text-xs font-semibold mb-2 flex items-center gap-1"><Zap className="w-3 h-3 text-amber-500" /> {t("cv.missingKeywords")}</p>
+                              <p className="text-xs font-semibold mb-2 flex items-center gap-1">
+                                <Zap className="w-3 h-3 text-amber-500" />{" "}
+                                {t("cv.missingKeywords")}
+                              </p>
                               <div className="flex flex-wrap gap-1">
                                 {atsResult.missingKeywords.map((k) => (
-                                  <span key={k} className="text-[11px] bg-amber-50 border border-amber-200 text-amber-800 px-2 py-0.5 rounded-full">{k}</span>
+                                  <span
+                                    key={k}
+                                    className="text-[11px] bg-amber-50 border border-amber-200 text-amber-800 px-2 py-0.5 rounded-full"
+                                  >
+                                    {k}
+                                  </span>
                                 ))}
                               </div>
                             </div>
                           )}
                           {/* Tips */}
                           <div className="rounded-xl bg-muted/40 border p-3 space-y-1.5">
-                            <p className="text-xs font-semibold">{t("cv.howToImprove")}</p>
+                            <p className="text-xs font-semibold">
+                              {t("cv.howToImprove")}
+                            </p>
                             {atsResult.tips.map((t, i) => (
                               <p key={i} className="text-xs flex gap-2">
-                                <span className="shrink-0 w-4 h-4 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-[10px] font-bold">{i + 1}</span>
+                                <span className="shrink-0 w-4 h-4 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-[10px] font-bold">
+                                  {i + 1}
+                                </span>
                                 {t}
                               </p>
                             ))}
                           </div>
-                          <Button variant="ghost" className="w-full rounded-xl h-8 text-xs text-muted-foreground" onClick={() => { setAtsStatus("idle"); setAtsResult(null); }}>
+                          <Button
+                            variant="ghost"
+                            className="w-full rounded-xl h-8 text-xs text-muted-foreground"
+                            onClick={() => {
+                              setAtsStatus("idle");
+                              setAtsResult(null);
+                            }}
+                          >
                             ↩ {t("cv.analyzeAnother")}
                           </Button>
                         </div>
@@ -1825,8 +2991,13 @@ export function CvGeneratorModal({
                     <div>
                       <div className="flex items-center gap-2 mb-3 pb-3 border-b bg-indigo-50 -mx-4 -mt-4 px-4 pt-4">
                         <Mail className="w-4 h-4 text-indigo-600" />
-                        <h2 className="font-semibold text-sm text-indigo-900">{t("cv.letterTitle")}</h2>
-                        <button onClick={() => setShowLetter(false)} className="ml-auto p-1 rounded hover:bg-indigo-100">
+                        <h2 className="font-semibold text-sm text-indigo-900">
+                          {t("cv.letterTitle")}
+                        </h2>
+                        <button
+                          onClick={() => setShowLetter(false)}
+                          className="ml-auto p-1 rounded hover:bg-indigo-100"
+                        >
                           <X className="w-3.5 h-3.5 text-indigo-700" />
                         </button>
                       </div>
@@ -1835,71 +3006,141 @@ export function CvGeneratorModal({
                         <div className="mt-4 space-y-3">
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <Label className="text-xs font-semibold mb-1 block">{t("cv.letterCompany")}</Label>
-                              <Input value={letterCompany} onChange={(e) => setLetterCompany(e.target.value)} placeholder="es. Google" className="h-8 text-xs rounded-lg" />
+                              <Label className="text-xs font-semibold mb-1 block">
+                                {t("cv.letterCompany")}
+                              </Label>
+                              <Input
+                                value={letterCompany}
+                                onChange={(e) =>
+                                  setLetterCompany(e.target.value)
+                                }
+                                placeholder="es. Google"
+                                className="h-8 text-xs rounded-lg"
+                              />
                             </div>
                             <div>
-                              <Label className="text-xs font-semibold mb-1 block">{t("cv.letterRoleShort")}</Label>
-                              <Input value={letterRole} onChange={(e) => setLetterRole(e.target.value)} placeholder="es. Designer" className="h-8 text-xs rounded-lg" />
+                              <Label className="text-xs font-semibold mb-1 block">
+                                {t("cv.letterRoleShort")}
+                              </Label>
+                              <Input
+                                value={letterRole}
+                                onChange={(e) => setLetterRole(e.target.value)}
+                                placeholder="es. Designer"
+                                className="h-8 text-xs rounded-lg"
+                              />
                             </div>
                           </div>
                           <div>
-                            <Label className="text-xs font-semibold mb-1.5 block">{t("cv.jobPostingShortReq")}</Label>
+                            <Label className="text-xs font-semibold mb-1.5 block">
+                              {t("cv.jobPostingShortReq")}
+                            </Label>
                             <Textarea
                               value={letterJobPosting}
-                              onChange={(e) => { setLetterJobPosting(e.target.value); if (letterStatus !== "idle") setLetterStatus("idle"); }}
+                              onChange={(e) => {
+                                setLetterJobPosting(e.target.value);
+                                if (letterStatus !== "idle")
+                                  setLetterStatus("idle");
+                              }}
                               placeholder={t("cv.jobShortPlaceholder")}
                               className="min-h-[140px] text-xs rounded-xl resize-none mb-1"
                             />
-                            <p className="text-[11px] text-muted-foreground">{letterJobPosting.length} {t("cv.chars")}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {letterJobPosting.length} {t("cv.chars")}
+                            </p>
                           </div>
                           {letterStatus === "error" && letterError && (
                             <div className="flex gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
                               <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
-                              <p className="text-xs text-destructive">{letterError}</p>
+                              <p className="text-xs text-destructive">
+                                {letterError}
+                              </p>
                             </div>
                           )}
                           <Button
                             className="w-full rounded-xl gap-2 bg-indigo-600 hover:bg-indigo-700"
                             onClick={generateLetter}
-                            disabled={letterStatus === "generating" || letterJobPosting.trim().length < 30}
+                            disabled={
+                              letterStatus === "generating" ||
+                              letterJobPosting.trim().length < 30
+                            }
                           >
-                            {letterStatus === "generating" && <Loader2 className="w-4 h-4 animate-spin" />}
-                            {letterStatus === "generating" ? t("cv.generatingShort") : <><Mail className="w-4 h-4" /> {t("cv.generateLetter")}</>}
+                            {letterStatus === "generating" && (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            )}
+                            {letterStatus === "generating" ? (
+                              t("cv.generatingShort")
+                            ) : (
+                              <>
+                                <Mail className="w-4 h-4" />{" "}
+                                {t("cv.generateLetter")}
+                              </>
+                            )}
                           </Button>
                         </div>
                       ) : (
                         <div className="mt-4 space-y-3">
                           <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50 border border-emerald-200">
                             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            <p className="text-xs font-semibold text-emerald-700">{t("cv.letterReady")}</p>
+                            <p className="text-xs font-semibold text-emerald-700">
+                              {t("cv.letterReady")}
+                            </p>
                           </div>
                           {letter?.paragraphs.map((p, i) => (
                             <div key={i}>
-                              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t("cv.paragraphN", { n: i + 1 })}</p>
+                              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                                {t("cv.paragraphN", { n: i + 1 })}
+                              </p>
                               <Textarea
                                 value={p}
-                                onChange={(e) => setLetter((l) => {
-                                  if (!l) return l;
-                                  const np = [...l.paragraphs];
-                                  np[i] = e.target.value;
-                                  return { ...l, paragraphs: np };
-                                })}
+                                onChange={(e) =>
+                                  setLetter((l) => {
+                                    if (!l) return l;
+                                    const np = [...l.paragraphs];
+                                    np[i] = e.target.value;
+                                    return { ...l, paragraphs: np };
+                                  })
+                                }
                                 className="min-h-[70px] text-xs rounded-xl resize-none"
                               />
                             </div>
                           ))}
                           <div className="flex gap-2 pt-2">
-                            <Button className="flex-1 rounded-xl gap-1.5 bg-indigo-600 hover:bg-indigo-700 h-9" onClick={downloadLetterPdf} disabled={downloadingLetter}>
-                              {downloadingLetter ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                            <Button
+                              className="flex-1 rounded-xl gap-1.5 bg-indigo-600 hover:bg-indigo-700 h-9"
+                              onClick={downloadLetterPdf}
+                              disabled={downloadingLetter}
+                            >
+                              {downloadingLetter ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Download className="w-3.5 h-3.5" />
+                              )}
                               PDF
                             </Button>
-                            <Button variant="outline" className={cn("flex-1 rounded-xl gap-1.5 h-9", copyStatus === "copied" && "border-emerald-300 text-emerald-700")} onClick={copyLetter}>
-                              {copyStatus === "copied" ? <ClipboardCheck className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                              {copyStatus === "copied" ? t("cv.copied") : t("cv.copyShort")}
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "flex-1 rounded-xl gap-1.5 h-9",
+                                copyStatus === "copied" &&
+                                  "border-emerald-300 text-emerald-700",
+                              )}
+                              onClick={copyLetter}
+                            >
+                              {copyStatus === "copied" ? (
+                                <ClipboardCheck className="w-3.5 h-3.5" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                              {copyStatus === "copied"
+                                ? t("cv.copied")
+                                : t("cv.copyShort")}
                             </Button>
                           </div>
-                          <Button variant="ghost" className="w-full rounded-xl h-8 text-xs text-muted-foreground" onClick={() => setLetterStatus("idle")}>
+                          <Button
+                            variant="ghost"
+                            className="w-full rounded-xl h-8 text-xs text-muted-foreground"
+                            onClick={() => setLetterStatus("idle")}
+                          >
                             ↩ {t("cv.generateAnotherLetter")}
                           </Button>
                         </div>
@@ -1910,49 +3151,96 @@ export function CvGeneratorModal({
                     <div>
                       <div className="flex items-center gap-2 mb-3 pb-3 border-b bg-amber-50 -mx-4 -mt-4 px-4 pt-4">
                         <Crosshair className="w-4 h-4 text-amber-600" />
-                        <h2 className="font-semibold text-sm text-amber-900">{t("cv.adaptCvTitle")}</h2>
-                        <button onClick={() => setShowTailor(false)} className="ml-auto p-1 rounded hover:bg-amber-100">
+                        <h2 className="font-semibold text-sm text-amber-900">
+                          {t("cv.adaptCvTitle")}
+                        </h2>
+                        <button
+                          onClick={() => setShowTailor(false)}
+                          className="ml-auto p-1 rounded hover:bg-amber-100"
+                        >
                           <X className="w-3.5 h-3.5 text-amber-700" />
                         </button>
                       </div>
                       <div className="mt-4 rounded-xl bg-amber-50 border border-amber-200 p-3 mb-4 space-y-1">
-                        <p className="text-xs font-semibold text-amber-800">{t("cv.howItWorks")}</p>
-                        <p className="text-xs text-amber-700">{t("cv.tailorMobileDesc")}</p>
+                        <p className="text-xs font-semibold text-amber-800">
+                          {t("cv.howItWorks")}
+                        </p>
+                        <p className="text-xs text-amber-700">
+                          {t("cv.tailorMobileDesc")}
+                        </p>
                       </div>
-                      <Label className="text-xs font-semibold mb-1.5 block">{t("cv.jobPostingShort")}</Label>
+                      <Label className="text-xs font-semibold mb-1.5 block">
+                        {t("cv.jobPostingShort")}
+                      </Label>
                       <Textarea
                         value={jobPosting}
-                        onChange={(e) => { setJobPosting(e.target.value); if (tailorStatus !== "idle") setTailorStatus("idle"); }}
+                        onChange={(e) => {
+                          setJobPosting(e.target.value);
+                          if (tailorStatus !== "idle") setTailorStatus("idle");
+                        }}
                         placeholder={t("cv.jobShortPlaceholder")}
                         className="min-h-[160px] text-xs rounded-xl resize-none mb-3"
                       />
                       {tailorStatus === "error" && tailorError && (
                         <div className="flex gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20 mb-3">
                           <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
-                          <p className="text-xs text-destructive">{tailorError}</p>
+                          <p className="text-xs text-destructive">
+                            {tailorError}
+                          </p>
                         </div>
                       )}
                       {tailorStatus === "done" && (
                         <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 mb-3">
                           <p className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> {t("cv.cvAdaptedMobile")}
+                            <CheckCircle2 className="w-3.5 h-3.5" />{" "}
+                            {t("cv.cvAdaptedMobile")}
                           </p>
                           {tailorKeywords.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-2">
                               {tailorKeywords.map((k) => (
-                                <span key={k} className="text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">{k}</span>
+                                <span
+                                  key={k}
+                                  className="text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full"
+                                >
+                                  {k}
+                                </span>
                               ))}
                             </div>
                           )}
                         </div>
                       )}
                       <Button
-                        className={cn("w-full rounded-xl gap-2", tailorStatus === "done" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700")}
-                        onClick={tailorStatus === "done" ? () => { setTailorStatus("idle"); setJobPosting(""); } : tailorCv}
-                        disabled={tailorStatus === "tailoring" || jobPosting.trim().length < 30}
+                        className={cn(
+                          "w-full rounded-xl gap-2",
+                          tailorStatus === "done"
+                            ? "bg-emerald-600 hover:bg-emerald-700"
+                            : "bg-amber-600 hover:bg-amber-700",
+                        )}
+                        onClick={
+                          tailorStatus === "done"
+                            ? () => {
+                                setTailorStatus("idle");
+                                setJobPosting("");
+                              }
+                            : tailorCv
+                        }
+                        disabled={
+                          tailorStatus === "tailoring" ||
+                          jobPosting.trim().length < 30
+                        }
                       >
-                        {tailorStatus === "tailoring" && <Loader2 className="w-4 h-4 animate-spin" />}
-                        {tailorStatus === "tailoring" ? t("cv.adapting") : tailorStatus === "done" ? `↩ ${t("cv.adaptAnother")}` : <><Crosshair className="w-4 h-4" /> {t("cv.adapt")}</>}
+                        {tailorStatus === "tailoring" && (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        )}
+                        {tailorStatus === "tailoring" ? (
+                          t("cv.adapting")
+                        ) : tailorStatus === "done" ? (
+                          `↩ ${t("cv.adaptAnother")}`
+                        ) : (
+                          <>
+                            <Crosshair className="w-4 h-4" /> {t("cv.adapt")}
+                          </>
+                        )}
                       </Button>
                     </div>
                   ) : showVersions ? (
@@ -1960,8 +3248,13 @@ export function CvGeneratorModal({
                     <div>
                       <div className="flex items-center gap-2 mb-3 pb-3 border-b">
                         <History className="w-4 h-4 text-primary" />
-                        <h2 className="font-semibold text-sm">{t("cv.savedVersions")}</h2>
-                        <button onClick={() => setShowVersions(false)} className="ml-auto p-1 rounded hover:bg-muted">
+                        <h2 className="font-semibold text-sm">
+                          {t("cv.savedVersions")}
+                        </h2>
+                        <button
+                          onClick={() => setShowVersions(false)}
+                          className="ml-auto p-1 rounded hover:bg-muted"
+                        >
                           <X className="w-3.5 h-3.5 text-muted-foreground" />
                         </button>
                       </div>
@@ -1972,25 +3265,57 @@ export function CvGeneratorModal({
                           placeholder={`CV ${new Date().toLocaleDateString()}`}
                           className="h-8 text-xs rounded-lg flex-1"
                         />
-                        <Button size="sm" className="h-8 rounded-lg gap-1 shrink-0" onClick={saveAsVersion} disabled={versionSaveStatus === "saving"}>
-                          {versionSaveStatus === "saving" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                          {versionSaveStatus === "saved" ? t("cv.versionSaved") : t("cv.save")}
+                        <Button
+                          size="sm"
+                          className="h-8 rounded-lg gap-1 shrink-0"
+                          onClick={saveAsVersion}
+                          disabled={versionSaveStatus === "saving"}
+                        >
+                          {versionSaveStatus === "saving" ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Save className="w-3.5 h-3.5" />
+                          )}
+                          {versionSaveStatus === "saved"
+                            ? t("cv.versionSaved")
+                            : t("cv.save")}
                         </Button>
                       </div>
                       {versions.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-8">{t("cv.noVersions")}</p>
+                        <p className="text-sm text-muted-foreground text-center py-8">
+                          {t("cv.noVersions")}
+                        </p>
                       ) : (
                         <div className="space-y-2">
                           {versions.map((v) => (
                             <div key={v.id} className="border rounded-lg p-3">
-                              <p className="text-sm font-medium mb-0.5 truncate">{v.name}</p>
-                              {v.targetRole && <p className="text-xs text-muted-foreground mb-2">🎯 {v.targetRole}</p>}
+                              <p className="text-sm font-medium mb-0.5 truncate">
+                                {v.name}
+                              </p>
+                              {v.targetRole && (
+                                <p className="text-xs text-muted-foreground mb-2">
+                                  🎯 {v.targetRole}
+                                </p>
+                              )}
                               <div className="flex gap-2 justify-end">
-                                <Button size="sm" variant="outline" className="h-7 text-xs rounded-md gap-1" onClick={() => loadVersion(v.id)} disabled={loadingVersionId === v.id}>
-                                  {loadingVersionId === v.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FolderOpen className="w-3 h-3" />}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs rounded-md gap-1"
+                                  onClick={() => loadVersion(v.id)}
+                                  disabled={loadingVersionId === v.id}
+                                >
+                                  {loadingVersionId === v.id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <FolderOpen className="w-3 h-3" />
+                                  )}
                                   {t("cv.loadVersion")}
                                 </Button>
-                                <button onClick={() => deleteVersion(v.id)} className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                                <button
+                                  onClick={() => deleteVersion(v.id)}
+                                  className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                                >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>
@@ -2003,29 +3328,54 @@ export function CvGeneratorModal({
                     <>
                       <div className="flex items-center gap-2 mb-4 pb-3 border-b">
                         <Pencil className="w-4 h-4 text-primary" />
-                        <h2 className="font-semibold text-sm">{t("cv.editCvShort")}</h2>
-                        <span className="text-xs text-muted-foreground ml-auto">{t("cv.goToPreview")}</span>
+                        <h2 className="font-semibold text-sm">
+                          {t("cv.editCvShort")}
+                        </h2>
+                        <span className="text-xs text-muted-foreground ml-auto">
+                          {t("cv.goToPreview")}
+                        </span>
                       </div>
                       <EditPanel cv={generated} onChange={handleCvChange} />
                       <div className="mt-4 pt-4 border-t">
                         <Button
-                          className={cn("w-full rounded-xl gap-2", saveStatus === "saved" && "bg-emerald-600")}
+                          className={cn(
+                            "w-full rounded-xl gap-2",
+                            saveStatus === "saved" && "bg-emerald-600",
+                          )}
                           onClick={save}
                           disabled={saveStatus === "saving"}
                         >
-                          {saveStatus === "saving" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                          {saveStatus === "saving" ? t("cv.saving") : saveStatus === "saved" ? t("cv.saved") : t("cv.saveChanges")}
+                          {saveStatus === "saving" ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Save className="w-4 h-4" />
+                          )}
+                          {saveStatus === "saving"
+                            ? t("cv.saving")
+                            : saveStatus === "saved"
+                              ? t("cv.saved")
+                              : t("cv.saveChanges")}
                         </Button>
                         {lastSavedAt && (
-                          <p className="text-center text-xs text-muted-foreground mt-2">{t("cv.lastSaved", { when: formatSavedAt(lastSavedAt) })}</p>
+                          <p className="text-center text-xs text-muted-foreground mt-2">
+                            {t("cv.lastSaved", {
+                              when: formatSavedAt(lastSavedAt),
+                            })}
+                          </p>
                         )}
                       </div>
                     </>
                   )}
                 </div>
               ) : (
-                <div id="cv-preview-scroll" className="flex-1 overflow-auto py-4 px-2 bg-muted/30">
-                  <div className="scale-[0.45] origin-top-left" style={{ width: "222%", transformOrigin: "top left" }}>
+                <div
+                  id="cv-preview-scroll"
+                  className="flex-1 overflow-auto py-4 px-2 bg-muted/30"
+                >
+                  <div
+                    className="scale-[0.45] origin-top-left"
+                    style={{ width: "222%", transformOrigin: "top left" }}
+                  >
                     <CvDocument cv={generated} />
                   </div>
                 </div>
@@ -2043,8 +3393,8 @@ export function CvGeneratorModal({
               ? `● ${t("cv.footerUnsaved")}`
               : t("cv.footerEditing")
             : lastSavedAt
-            ? t("cv.footerSavedAt", { when: formatSavedAt(lastSavedAt) })
-            : t("cv.footerHelp")}
+              ? t("cv.footerSavedAt", { when: formatSavedAt(lastSavedAt) })
+              : t("cv.footerHelp")}
         </div>
       )}
     </div>
