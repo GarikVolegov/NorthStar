@@ -64,7 +64,7 @@ function CvDocument({ cv }: { cv: GeneratedCv }) {
       style={{ width: "210mm", minHeight: "297mm", fontFamily: "system-ui, -apple-system, sans-serif" }}
     >
       {/* Header */}
-      <div       style={{ background: "hsl(var(--growth))", padding: "32px 40px 28px", color: "#ffffff" }}>
+      <div       style={{ background: "hsl(var(--growth))", padding: "32px 40px 28px", color: "hsl(var(--foreground))" }}>
         <h1 style={{ margin: 0, fontSize: "28px", fontWeight: "700", letterSpacing: "-0.5px", fontFamily: "Georgia, serif" }}>
           {cv.personalInfo.name || "Nome Cognome"}
         </h1>

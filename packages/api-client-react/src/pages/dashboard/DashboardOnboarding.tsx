@@ -23,7 +23,7 @@ export default function DashboardOnboarding() {
         transition={{ duration: 0.4 }}
         className="text-center mb-10"
       >
-        <div className="w-16 h-16 rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06]
+        <div className="w-16 h-16 rounded-2xl bg-[hsl(var(--background))] border border-foreground/[0.06]
                         flex items-center justify-center mx-auto mb-4">
           <Compass className="w-8 h-8 text-[hsl(var(--chart-3))]" />
         </div>
@@ -48,7 +48,7 @@ export default function DashboardOnboarding() {
             initial={{ opacity: 0, x: -16 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.1 + i * 0.08 }}
-            className="flex items-start gap-4 p-4 rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06]"
+            className="flex items-start gap-4 p-4 rounded-2xl bg-[hsl(var(--background))] border border-foreground/[0.06]"
           >
             <div className="w-8 h-8 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center
                             flex-shrink-0 text-[11px] font-bold text-[hsl(var(--chart-3))]">
@@ -73,7 +73,7 @@ export default function DashboardOnboarding() {
           className="
             inline-flex items-center gap-2.5 px-6 py-3 rounded-xl
             bg-[hsl(var(--chart-3))] hover:bg-[hsl(var(--chart-3))]
-            text-[14px] font-semibold text-white
+            text-[14px] font-semibold text-[hsl(var(--foreground))]
             transition-colors shadow-lg shadow-blue-500/20
           ">
           <Compass className="w-4 h-4" />

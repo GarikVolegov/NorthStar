@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const mockPoolQuery = vi.fn();
-const mockDbSelect = vi.fn(() => ({
-  from: vi.fn(() => ({
-    where: vi.fn(() => ({
-      limit: vi.fn(() => Promise.resolve([])),
+const { mockPoolQuery, mockDbSelect } = vi.hoisted(() => ({
+  mockPoolQuery: vi.fn(),
+  mockDbSelect: vi.fn(() => ({
+    from: vi.fn(() => ({
+      where: vi.fn(() => ({
+        limit: vi.fn(() => Promise.resolve([])),
+      })),
     })),
   })),
 }));
@@ -97,9 +99,9 @@ describe("Retriever", () => {
         minScore: 0.30,
         sourceTypes: ["platform_content", "document"],
       });
-      // Should include userId=0 in query params (5th param)
-      const sql = mockPoolQuery.mock.calls[0][0];
-      expect(sql.text).toContain("user_id = $2 OR user_id = $5");
+      // Should include userId=0 in query params
+      const sqlText = mockPoolQuery.mock.calls[0][0] as string;
+      expect(sqlText).toContain("user_id = $2 OR user_id = $5");
     });
 
     it("does not include platform_content filter when sourceTypes excludes it", async () => {
@@ -109,8 +111,8 @@ describe("Retriever", () => {
         minScore: 0.30,
         sourceTypes: ["document"],
       });
-      const sql = mockPoolQuery.mock.calls[0][0];
-      expect(sql.text).not.toContain("user_id = $2 OR user_id = $5");
+      const sqlText = mockPoolQuery.mock.calls[0][0] as string;
+      expect(sqlText).not.toContain("user_id = $2 OR user_id = $5");
     });
   });
 });

@@ -3,6 +3,65 @@ import { useWendyOpenAITTS } from '../hooks/useWendyOpenAITTS';
 
 export type WendyPhase = 'idle' | 'thinking' | 'speaking' | 'listening';
 
+export interface PageContext {
+  page: string;
+  title?: string;
+  data?: Record<string, unknown>;
+}
+
+const PAGE_HINTS: Record<string, { welcome?: string; quickActions: { label: string; icon: string }[] }> = {
+  dashboard: {
+    welcome: "Ecco la tua dashboard! Vuoi che analizzi i tuoi progressi o hai domande su qualcosa?",
+    quickActions: [
+      { label: 'Analizza i miei progressi', icon: '📊' },
+      { label: 'Cosa dovrei fare oggi?', icon: '🎯' },
+    ],
+  },
+  coach: {
+    welcome: "Benvenuto nel coaching! Di cosa vuoi parlare oggi?",
+    quickActions: [
+      { label: 'Fissa un obiettivo', icon: '🎯' },
+      { label: 'Rivedi i progressi', icon: '📈' },
+    ],
+  },
+  test: {
+    welcome: "Pronto per il test? Se hai dubbi sulle domande, chiedimi pure!",
+    quickActions: [
+      { label: 'Spiegami questo test', icon: '📝' },
+      { label: 'Come prepararmi?', icon: '📚' },
+    ],
+  },
+  trading: {
+    welcome: "Analisi di mercato o strategia? Sono qui per aiutarti.",
+    quickActions: [
+      { label: 'Analizza XAUUSD', icon: '📈' },
+      { label: 'Revisione risk management', icon: '🛡️' },
+    ],
+  },
+  calendario: {
+    quickActions: [
+      { label: 'Ottimizza la mia agenda', icon: '📅' },
+      { label: 'Piano settimanale', icon: '📋' },
+    ],
+  },
+  risultati: {
+    welcome: "Vediamo insieme i tuoi risultati! Vuoi un'analisi approfondita?",
+    quickActions: [
+      { label: 'Analizza i risultati', icon: '🔍' },
+      { label: 'Prossimi passi', icon: '👣' },
+    ],
+  },
+  default: {
+    welcome: "Ciao! Sono Wendy, la tua assistente di orientamento. Come posso aiutarti oggi?",
+    quickActions: [
+      { label: 'Controlla il mio piano trading', icon: '📈' },
+      { label: 'Analizza il mio mindset', icon: '🧠' },
+      { label: 'Piano settimanale abitudini', icon: '🌱' },
+      { label: 'Revisione carriera', icon: '💼' },
+    ],
+  },
+};
+
 interface WendyContextValue {
   isOpen: boolean;
   isSpeaking: boolean;
@@ -14,6 +73,9 @@ interface WendyContextValue {
   speak: (text: string) => void;
   ask: (message: string) => void;
   setIsSpeaking: (v: boolean) => void;
+  pageContext: PageContext;
+  setPageContext: (ctx: PageContext) => void;
+  getPageHints: () => { welcome?: string; quickActions: { label: string; icon: string }[] };
 }
 
 const WendyContext = createContext<WendyContextValue | null>(null);
@@ -54,6 +116,7 @@ export function WendyProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [phase, setPhase] = useState<WendyPhase>('idle');
+  const [pageContext, setPageContext] = useState<PageContext>({ page: 'default' });
   const pendingAskRef = useRef<string | null>(null);
 
   const open = useCallback(() => setIsOpen(true), []);
@@ -70,8 +133,12 @@ export function WendyProvider({ children }: { children: ReactNode }) {
     setIsOpen(true);
   }, []);
 
+  const getPageHints = useCallback(() => {
+    return PAGE_HINTS[pageContext.page] ?? PAGE_HINTS.default;
+  }, [pageContext.page]);
+
   return (
-    <WendyContext.Provider value={{ isOpen, isSpeaking, phase, setPhase, open, close, toggle, speak, ask, setIsSpeaking }}>
+    <WendyContext.Provider value={{ isOpen, isSpeaking, phase, setPhase, open, close, toggle, speak, ask, setIsSpeaking, pageContext, setPageContext, getPageHints }}>
       {children}
       <WendyTTSBridge onSpeakingChange={setIsSpeaking} onPhaseChange={setPhase} />
     </WendyContext.Provider>

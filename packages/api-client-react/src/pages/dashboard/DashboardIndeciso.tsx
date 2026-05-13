@@ -127,7 +127,7 @@ function StatsRow({ stats }: { stats: UserStats }) {
 
       {/* XP */}
       <motion.div variants={fadeUp}
-        className="col-span-2 rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06] p-4">
+        className="col-span-2 rounded-2xl bg-[hsl(var(--background))] border border-foreground/[0.06] p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
             <Zap className="w-4 h-4 text-amber-400" />
@@ -154,7 +154,7 @@ function StatsRow({ stats }: { stats: UserStats }) {
 
       {/* Streak */}
       <motion.div variants={fadeUp}
-        className="rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06] p-4 flex flex-col items-center justify-center">
+        className="rounded-2xl bg-[hsl(var(--background))] border border-foreground/[0.06] p-4 flex flex-col items-center justify-center">
         <Flame className={`w-6 h-6 mb-1 ${
           stats.currentStreak > 0 ? 'text-orange-400' : 'text-[hsl(var(--muted-foreground))]'
         }`} />
@@ -223,8 +223,8 @@ function SettoriConsigliati({ sectors }: { sectors: Sector[] }) {
           <Link key={s.id} href={`/settore/${s.id}`}
             className="
               group flex items-center gap-2.5 p-3 rounded-xl
-              bg-[hsl(var(--background))] border border-white/[0.06]
-              hover:border-white/[0.12] hover:bg-[hsl(var(--muted))]
+              bg-[hsl(var(--background))] border border-foreground/[0.06]
+              hover:border-foreground/[0.12] hover:bg-[hsl(var(--muted))]
               transition-all
             ">
             <div className="w-7 h-7 rounded-lg bg-[hsl(var(--muted))] flex items-center justify-center flex-shrink-0">
@@ -262,8 +262,8 @@ function RuoliEsplorabili() {
             <motion.div key={r.label} variants={fadeUp} layout
               className="
                 flex items-center gap-3 p-3.5 rounded-xl
-                bg-[hsl(var(--background))] border border-white/[0.06]
-                hover:border-white/[0.1] hover:bg-[hsl(var(--muted))]
+                bg-[hsl(var(--background))] border border-foreground/[0.06]
+                hover:border-foreground/[0.1] hover:bg-[hsl(var(--muted))]
                 transition-all cursor-default
               ">
               <div className="w-9 h-9 rounded-xl bg-[hsl(var(--muted))] flex items-center justify-center flex-shrink-0">
@@ -286,7 +286,7 @@ function RuoliEsplorabili() {
         className="
           mt-3 w-full py-2 rounded-xl text-[12px] font-medium
           text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--muted-foreground))]
-          border border-white/[0.04] hover:border-white/[0.08]
+          border border-foreground/[0.04] hover:border-foreground/[0.08]
           bg-[hsl(var(--background))] hover:bg-[hsl(var(--muted))]
           transition-all
         ">
@@ -326,7 +326,7 @@ function BannerAvanzamento({ hasCompletedTest }: { hasCompletedTest: boolean }) 
             className="
               inline-flex items-center gap-2 px-4 py-2 rounded-lg
               bg-violet-600/80 hover:bg-violet-600
-              text-[13px] font-semibold text-white
+              text-[13px] font-semibold text-[hsl(var(--foreground))]
               transition-colors
             ">
             Fai il test ora
@@ -355,7 +355,7 @@ function ObiettivoGiorno() {
 
   return (
     <motion.div variants={fadeUp}
-      className="rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06] p-4">
+      className="rounded-2xl bg-[hsl(var(--background))] border border-foreground/[0.06] p-4">
       <div className="flex items-center gap-2 mb-3">
         <Target className="w-4 h-4 text-[hsl(var(--chart-3))]" />
         <span className="text-[12px] font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide">
@@ -442,7 +442,7 @@ export default function DashboardIndeciso() {
               Inizia a esplorare.
             </p>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06]
+          <div className="w-12 h-12 rounded-2xl bg-[hsl(var(--background))] border border-foreground/[0.06]
                           flex items-center justify-center flex-shrink-0">
             <Compass className="w-6 h-6 text-[hsl(var(--chart-3))]" />
           </div>

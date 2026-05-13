@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { db, supervisorLogs, qualityMetrics } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { register } from "@workspace/ai-server/metrics";
+import { writeAuditLog } from "../middleware/audit";
 
 const router = Router();
 
@@ -53,6 +54,12 @@ router.get("/quality", async (req: Request, res: Response) => {
         uiTools: sql<number>`count(*) filter (where ${qualityMetrics.usedUiTool} = true)::int`,
       })
       .from(qualityMetrics);
+
+    writeAuditLog(req, {
+      action: "admin_quality_view",
+      category: "admin_action",
+      metadata: { domains: supervisorStats.map((s: any) => s.domain) },
+    });
 
     res.json({
       supervisorStats,

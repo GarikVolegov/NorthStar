@@ -62,7 +62,7 @@ function SectorForm({ initial, adminKey, onSaved, onCancel }: {
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [icon, setIcon] = useState(initial?.icon ?? "briefcase");
-  const [color, setColor] = useState(initial?.color ?? "#6366f1");
+  const [color, setColor] = useState(initial?.color ?? "hsl(var(--chart-4))");
   const [automationRisk, setAutomationRisk] = useState(initial?.automationRisk ?? "medium");
   const [trend, setTrend] = useState(initial?.trend ?? "stable");
   const [growthRate, setGrowthRate] = useState(String(initial?.growthRate ?? 5));

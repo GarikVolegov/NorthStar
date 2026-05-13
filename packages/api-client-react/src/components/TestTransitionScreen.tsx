@@ -44,7 +44,7 @@ export function TestTransitionScreen({ from, to, onComplete }: Props) {
   }, []); // Eseguito solo al mount — corretto per una schermata di transizione
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0e1018]">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[hsl(var(--background))]">
       <AnimatePresence mode="wait">
         {phase === 0 ? (
           <motion.div
@@ -53,7 +53,7 @@ export function TestTransitionScreen({ from, to, onComplete }: Props) {
             animate={{ opacity: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.8 }}
-            className="absolute inset-0 bg-[#0e1018]"
+            className="absolute inset-0 bg-[hsl(var(--background))]"
           />
         ) : (
           <motion.div
@@ -70,7 +70,7 @@ export function TestTransitionScreen({ from, to, onComplete }: Props) {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="text-[#c19e4a] text-sm tracking-[0.3em] uppercase mb-6"
+                className="text-[hsl(var(--chart-1))] text-sm tracking-[0.3em] uppercase mb-6"
               >
                 {from} → {to}
               </motion.div>
@@ -80,15 +80,15 @@ export function TestTransitionScreen({ from, to, onComplete }: Props) {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6, duration: 1 }}
-              className="text-3xl md:text-5xl font-bold text-[#e6e8ed] mb-8 leading-tight"
+              className="text-3xl md:text-5xl font-bold text-[hsl(var(--foreground))] mb-8 leading-tight"
             >
               {poeticLine}
             </motion.h2>
 
             {/* Progress bar: durata 3.2s per coprire fino al timeout 4000ms - delay 0.8s */}
-            <motion.div className="w-48 h-1 bg-[#1a1d2a] rounded-full mx-auto overflow-hidden">
+            <motion.div className="w-48 h-1 bg-[hsl(var(--muted))] rounded-full mx-auto overflow-hidden">
               <motion.div
-                className="h-full bg-[#c19e4a]"
+                className="h-full bg-[hsl(var(--chart-1))]"
                 initial={{ width: '0%' }}
                 animate={{ width: '100%' }}
                 transition={{ duration: 3.2, ease: 'easeInOut' }}

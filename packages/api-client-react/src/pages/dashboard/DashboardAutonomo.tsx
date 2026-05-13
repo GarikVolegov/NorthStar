@@ -284,7 +284,7 @@ function PipelineBoard({ clients }: { clients: PipelineClient[] }) {
                 <motion.div key={client.id} layout variants={fadeUp}
                   exit={{ opacity: 0, scale: 0.97 }}
                   className="flex items-center gap-3 p-3.5 rounded-xl bg-[hsl(var(--background))]
-                             border border-white/[0.06] hover:border-white/10 transition-all">
+                             border border-foreground/[0.06] hover:border-foreground/10 transition-all">
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${stage.bg}`}>
                     <StageIcon className={`w-3.5 h-3.5 ${stage.color}`} />
                   </div>
@@ -356,7 +356,7 @@ function ValidatoreIdea() {
           onChange={(e) => setIdea(e.target.value)}
           placeholder="Descrivi la tua idea di business o il servizio che vuoi offrire…"
           rows={3}
-          className="w-full px-3 py-2.5 rounded-xl bg-[hsl(var(--card))] border border-white/[0.08]
+          className="w-full px-3 py-2.5 rounded-xl bg-[hsl(var(--card))] border border-foreground/[0.08]
                      text-[13px] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]
                      focus:outline-none focus:border-violet-500/40 resize-none
                      transition-colors leading-relaxed"
@@ -456,8 +456,8 @@ function NewsFeed({ news }: { news: SectorNews[] }) {
               layout
               variants={fadeUp}
               exit={{ opacity: 0 }}
-              className="block p-4 rounded-xl bg-[hsl(var(--background))] border border-white/[0.06]
-                         hover:border-white/10 transition-all group">
+              className="block p-4 rounded-xl bg-[hsl(var(--background))] border border-foreground/[0.06]
+                         hover:border-foreground/10 transition-all group">
               <div className="flex items-start justify-between gap-2">
                 <h3 className="text-[13px] font-semibold text-[hsl(var(--foreground))] leading-snug
                                group-hover:text-[hsl(var(--foreground))] transition-colors">

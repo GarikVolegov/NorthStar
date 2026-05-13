@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -82,6 +83,7 @@ function getEventColor(event: CalendarEvent): string {
 }
 
 export default function Calendario() {
+  useWendyPageContext({ page: 'calendario', title: 'Calendario' });
   const { user, isLoggedIn } = useAuth();
   const queryClient = useQueryClient();
   const [, routerNavigate] = useLocation();

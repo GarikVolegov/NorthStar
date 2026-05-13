@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-fetch";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useAgentAnalysis } from "@/hooks/useAgentAnalysis";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import type { ProfessionResult, EducationResult, WorkModeResult } from "@/hooks/useAgentAnalysis";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -324,6 +325,7 @@ export default function Dashboard() {
     title: "Dashboard AI — NorthStar",
     description: "La tua analisi AI personalizzata: professioni consigliate, percorsi formativi e modalità di lavoro ottimale per il tuo profilo RIASEC.",
   });
+  useWendyPageContext({ page: 'dashboard', title: 'Dashboard' });
 
   const { user, authReady } = useAuth();
   const [, navigate] = useLocation();

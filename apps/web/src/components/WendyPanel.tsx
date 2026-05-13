@@ -1,17 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useWendy } from '../contexts/WendyProvider';
 import { WendyChat } from './WendyChat';
 import { WendyAvatar } from './wendy-avatar';
 
-const QUICK_ACTIONS = [
-  { label: 'Controlla il mio piano trading', icon: '📈' },
-  { label: 'Analizza il mio mindset', icon: '🧠' },
-  { label: 'Piano settimanale abitudini', icon: '🌱' },
-  { label: 'Revisione carriera', icon: '💼' },
-];
-
 export function WendyPanel() {
-  const { isOpen, isSpeaking, close } = useWendy();
+  const { isOpen, isSpeaking, close, getPageHints } = useWendy();
+  const hints = useMemo(() => getPageHints(), [getPageHints]);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -72,12 +66,12 @@ export function WendyPanel() {
 
         {/* Chat */}
         <div className="flex-1 overflow-hidden">
-          <WendyChat className="h-full border-0 rounded-none" />
+          <WendyChat className="h-full border-0 rounded-none" welcomeMessage={hints.welcome} />
         </div>
 
-        {/* Quick actions */}
+        {/* Quick actions — contestuali alla pagina */}
         <div className="flex gap-2 overflow-x-auto px-4 py-2 border-t border-gray-200 dark:border-gray-800 shrink-0">
-          {QUICK_ACTIONS.map((a) => (
+          {hints.quickActions.map((a) => (
             <button
               key={a.label}
               className="shrink-0 text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 whitespace-nowrap transition-colors"

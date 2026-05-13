@@ -54,7 +54,7 @@ interface RiasecScores {
 }
 
 const RIASEC_COLORS: Record<keyof RiasecScores, string> = {
-  R: 'hsl(var(--chart-1))', I: 'hsl(var(--chart-4))', A: '#ec4899',
+  R: 'hsl(var(--chart-1))', I: 'hsl(var(--chart-4))', A: 'hsl(var(--chart-5))',
   S: 'hsl(var(--chart-2))', E: 'hsl(var(--chart-1))', C: 'hsl(var(--chart-3))',
 };
 const RIASEC_LABELS: Record<keyof RiasecScores, string> = {

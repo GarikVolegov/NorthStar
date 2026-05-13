@@ -51,7 +51,7 @@ function matchColor(score: number): string {
   if (score >= 80) return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
   if (score >= 50) return 'text-blue-400 bg-blue-400/10 border-blue-400/20';
   if (score >= 25) return 'text-amber-400 bg-amber-400/10 border-amber-400/20';
-  return 'text-[#4a5a75] bg-[#1a2035] border-white/[0.06]';
+  return 'text-[hsl(var(--muted-foreground) / 0.8)] bg-[hsl(var(--muted))] border-foreground/[0.06]';
 }
 
 function Avatar({ user, size = 10 }: { user: NetworkUser; size?: number }) {
@@ -77,10 +77,10 @@ function Avatar({ user, size = 10 }: { user: NetworkUser; size?: number }) {
 
   return (
     <div
-      className={`w-${size} h-${size} rounded-full bg-[#1a2035] flex items-center
-                  justify-center flex-shrink-0 border border-white/[0.06]`}
+      className={`w-${size} h-${size} rounded-full bg-[hsl(var(--muted))] flex items-center
+                  justify-center flex-shrink-0 border border-foreground/[0.06]`}
     >
-      <span className="text-[11px] font-bold text-[#7c8db5]">{initials}</span>
+      <span className="text-[11px] font-bold text-[hsl(var(--muted-foreground))]">{initials}</span>
     </div>
   );
 }
@@ -88,15 +88,15 @@ function Avatar({ user, size = 10 }: { user: NetworkUser; size?: number }) {
 // ── Skeleton ─────────────────────────────────────────────────────────────────
 
 function Sk({ className = '' }: { className?: string }) {
-  return <div className={`rounded-xl bg-[#131929] animate-pulse ${className}`} />;
+  return <div className={`rounded-xl bg-[hsl(var(--card))] animate-pulse ${className}`} />;
 }
 
 function SkeletonList({ n = 4 }: { n?: number }) {
   return (
     <div className="space-y-3">
       {Array.from({ length: n }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3 p-4 rounded-xl bg-[#0d1421]
-                                border border-white/[0.06]">
+        <div key={i} className="flex items-center gap-3 p-4 rounded-xl bg-[hsl(var(--background))]
+                                border border-foreground/[0.06]">
           <Sk className="w-10 h-10 rounded-full flex-shrink-0" />
           <div className="flex-1 space-y-2">
             <Sk className="h-3.5 w-32" />
@@ -122,7 +122,7 @@ function TabConnessioni() {
         <SkeletonList />
       ) : friends.length === 0 ? (
         <EmptyState
-          icon={<Users className="w-8 h-8 text-[#3a4a65]" />}
+          icon={<Users className="w-8 h-8 text-[hsl(var(--muted-foreground) / 0.8)]" />}
           title="Nessuna connessione"
           desc="Esplora la community e connettiti con altri professionisti."
           cta={{ label: 'Esplora', tab: 'esplora' }}
@@ -150,8 +150,8 @@ function FriendCard({ entry, onRemove }: { entry: FriendEntry; onRemove: () => v
   return (
     <motion.div
       variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0, transition: { duration: 0.25 } } }}
-      className="flex items-center gap-3 p-4 rounded-xl bg-[#0d1421]
-                 border border-white/[0.06] hover:border-white/10 transition-all"
+      className="flex items-center gap-3 p-4 rounded-xl bg-[hsl(var(--background))]
+                 border border-foreground/[0.06] hover:border-foreground/10 transition-all"
     >
       <Link href={`/profilo/${u.id}`}>
         <Avatar user={u} size={10} />
@@ -159,10 +159,10 @@ function FriendCard({ entry, onRemove }: { entry: FriendEntry; onRemove: () => v
 
       <div className="flex-1 min-w-0">
         <Link href={`/profilo/${u.id}`}
-          className="text-[13px] font-semibold text-[#c5cee0] hover:text-white transition-colors truncate block">
+          className="text-[13px] font-semibold text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground))] transition-colors truncate block">
           {u.name}
         </Link>
-        <p className="text-[11px] text-[#4a5a75] truncate">
+        <p className="text-[11px] text-[hsl(var(--muted-foreground) / 0.8)] truncate">
           {u.sectorName ?? journeyLabel(u.journeyType)}
         </p>
         {u.totalXp !== null && (
@@ -179,12 +179,12 @@ function FriendCard({ entry, onRemove }: { entry: FriendEntry; onRemove: () => v
         {/* DM */}
         <Link
           href={`/messaggi/${u.id}`}
-          className="w-8 h-8 rounded-lg bg-[#1a2035] border border-white/[0.06]
-                     flex items-center justify-center hover:bg-[#1e2840]
-                     hover:border-white/10 transition-all"
+          className="w-8 h-8 rounded-lg bg-[hsl(var(--muted))] border border-foreground/[0.06]
+                     flex items-center justify-center hover:bg-[hsl(var(--muted))]
+                     hover:border-foreground/10 transition-all"
           aria-label={`Messaggio a ${u.name}`}
         >
-          <MessageCircle className="w-3.5 h-3.5 text-[#7c8db5]" />
+          <MessageCircle className="w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
         </Link>
 
         {/* Rimuovi */}
@@ -201,7 +201,7 @@ function FriendCard({ entry, onRemove }: { entry: FriendEntry; onRemove: () => v
             <button
               onClick={() => setConfirmRemove(false)}
               className="w-6 h-6 flex items-center justify-center rounded-lg
-                         text-[#4a5a75] hover:text-[#7c8db5] transition-colors"
+                         text-[hsl(var(--muted-foreground) / 0.8)] hover:text-[hsl(var(--muted-foreground))] transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -209,12 +209,12 @@ function FriendCard({ entry, onRemove }: { entry: FriendEntry; onRemove: () => v
         ) : (
           <button
             onClick={() => setConfirmRemove(true)}
-            className="w-8 h-8 rounded-lg bg-[#1a2035] border border-white/[0.06]
+            className="w-8 h-8 rounded-lg bg-[hsl(var(--muted))] border border-foreground/[0.06]
                        flex items-center justify-center hover:bg-red-500/10
                        hover:border-red-500/20 transition-all"
             aria-label="Rimuovi connessione"
           >
-            <UserMinus className="w-3.5 h-3.5 text-[#4a5a75]" />
+            <UserMinus className="w-3.5 h-3.5 text-[hsl(var(--muted-foreground) / 0.8)]" />
           </button>
         )}
       </div>
@@ -239,7 +239,7 @@ function TabRichieste({ onCountChange }: { onCountChange?: (n: number) => void }
         <SkeletonList n={3} />
       ) : reqs.length === 0 ? (
         <EmptyState
-          icon={<UserPlus className="w-8 h-8 text-[#3a4a65]" />}
+          icon={<UserPlus className="w-8 h-8 text-[hsl(var(--muted-foreground) / 0.8)]" />}
           title="Nessuna richiesta"
           desc="Quando qualcuno vuole connettersi con te, apparirà qui."
         />
@@ -278,7 +278,7 @@ function RequestCard({
   return (
     <motion.div
       variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0, transition: { duration: 0.25 } } }}
-      className="flex items-center gap-3 p-4 rounded-xl bg-[#0d1421]
+      className="flex items-center gap-3 p-4 rounded-xl bg-[hsl(var(--background))]
                  border border-blue-500/15 hover:border-blue-500/25 transition-all"
     >
       <Link href={`/profilo/${u.id}`}>
@@ -287,16 +287,16 @@ function RequestCard({
 
       <div className="flex-1 min-w-0">
         <Link href={`/profilo/${u.id}`}
-          className="text-[13px] font-semibold text-[#c5cee0] hover:text-white transition-colors truncate block">
+          className="text-[13px] font-semibold text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground))] transition-colors truncate block">
           {u.name}
         </Link>
-        <p className="text-[11px] text-[#4a5a75] truncate">
+        <p className="text-[11px] text-[hsl(var(--muted-foreground) / 0.8)] truncate">
           {u.sectorName ?? journeyLabel(u.journeyType)}
         </p>
         {entry.sentAt && (
           <div className="flex items-center gap-1 mt-0.5">
-            <Clock className="w-2.5 h-2.5 text-[#3a4a65]" />
-            <span className="text-[10px] text-[#3a4a65]">
+            <Clock className="w-2.5 h-2.5 text-[hsl(var(--muted-foreground) / 0.8)]" />
+            <span className="text-[10px] text-[hsl(var(--muted-foreground) / 0.8)]">
               {new Date(entry.sentAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
             </span>
           </div>
@@ -316,12 +316,12 @@ function RequestCard({
         </button>
         <button
           onClick={onDecline}
-          className="w-8 h-8 rounded-lg bg-[#1a2035] border border-white/[0.06]
+          className="w-8 h-8 rounded-lg bg-[hsl(var(--muted))] border border-foreground/[0.06]
                      flex items-center justify-center hover:bg-red-500/10
                      hover:border-red-500/20 transition-all"
           aria-label="Rifiuta richiesta"
         >
-          <X className="w-3.5 h-3.5 text-[#4a5a75]" />
+          <X className="w-3.5 h-3.5 text-[hsl(var(--muted-foreground) / 0.8)]" />
         </button>
       </div>
     </motion.div>
@@ -349,7 +349,7 @@ function TabEsplora() {
     <div className="space-y-4">
       {/* Searchbar */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4a5a75]"
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground) / 0.8)]"
           aria-hidden="true" />
         <input
           ref={inputRef}
@@ -357,16 +357,16 @@ function TabEsplora() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Cerca per nome..."
-          className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-[#0d1421]
-                     border border-white/[0.06] focus:border-blue-500/40
-                     text-[13px] text-[#c5cee0] placeholder:text-[#3a4a65]
+          className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-[hsl(var(--background))]
+                     border border-foreground/[0.06] focus:border-blue-500/40
+                     text-[13px] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground) / 0.8)]
                      outline-none transition-colors"
         />
         {query && (
           <button
             onClick={() => { setQuery(''); inputRef.current?.focus(); }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#4a5a75]
-                       hover:text-[#7c8db5] transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground) / 0.8)]
+                       hover:text-[hsl(var(--muted-foreground))] transition-colors"
             aria-label="Cancella ricerca"
           >
             <X className="w-3.5 h-3.5" />
@@ -375,7 +375,7 @@ function TabEsplora() {
       </div>
 
       {/* Label sezione */}
-      <p className="text-[11px] font-semibold text-[#4a5a75] uppercase tracking-wide">
+      <p className="text-[11px] font-semibold text-[hsl(var(--muted-foreground) / 0.8)] uppercase tracking-wide">
         {isSearching
           ? `Risultati per “${debouncedQ}”`
           : 'Suggeriti per te'}
@@ -386,7 +386,7 @@ function TabEsplora() {
         <SkeletonList />
       ) : users.length === 0 ? (
         <EmptyState
-          icon={<Compass className="w-8 h-8 text-[#3a4a65]" />}
+          icon={<Compass className="w-8 h-8 text-[hsl(var(--muted-foreground) / 0.8)]" />}
           title={isSearching ? 'Nessun risultato' : 'Nessun suggerimento'}
           desc={isSearching
             ? 'Prova un altro nome o cognome.'
@@ -426,8 +426,8 @@ function SuggestionCard({
   return (
     <motion.div
       variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0, transition: { duration: 0.25 } } }}
-      className="flex items-center gap-3 p-4 rounded-xl bg-[#0d1421]
-                 border border-white/[0.06] hover:border-white/10 transition-all"
+      className="flex items-center gap-3 p-4 rounded-xl bg-[hsl(var(--background))]
+                 border border-foreground/[0.06] hover:border-foreground/10 transition-all"
     >
       <Link href={`/profilo/${u.id}`}>
         <Avatar user={u} size={10} />
@@ -436,7 +436,7 @@ function SuggestionCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <Link href={`/profilo/${u.id}`}
-            className="text-[13px] font-semibold text-[#c5cee0] hover:text-white transition-colors truncate">
+            className="text-[13px] font-semibold text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground))] transition-colors truncate">
             {u.name}
           </Link>
           {u.matchScore !== undefined && (
@@ -447,7 +447,7 @@ function SuggestionCard({
             </span>
           )}
         </div>
-        <p className="text-[11px] text-[#4a5a75] truncate">
+        <p className="text-[11px] text-[hsl(var(--muted-foreground) / 0.8)] truncate">
           {u.sectorName ?? journeyLabel(u.journeyType)}
         </p>
         {u.totalXp !== null && (
@@ -496,10 +496,10 @@ function EmptyState({
       className="flex flex-col items-center py-12 text-center"
     >
       <div className="mb-3 opacity-40">{icon}</div>
-      <p className="text-[14px] font-semibold text-[#c5cee0] mb-1">{title}</p>
-      <p className="text-[12px] text-[#4a5a75] max-w-[32ch]">{desc}</p>
+      <p className="text-[14px] font-semibold text-[hsl(var(--foreground))] mb-1">{title}</p>
+      <p className="text-[12px] text-[hsl(var(--muted-foreground) / 0.8)] max-w-[32ch]">{desc}</p>
       {cta && (
-        <span className="mt-4 text-[12px] text-[#4a8bff] hover:underline cursor-pointer flex items-center gap-1">
+        <span className="mt-4 text-[12px] text-[hsl(var(--chart-3))] hover:underline cursor-pointer flex items-center gap-1">
           {cta.label} <ChevronRight className="w-3.5 h-3.5" />
         </span>
       )}
@@ -521,8 +521,8 @@ function NetworkHeader() {
     >
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[22px] font-bold text-[#dce6f5] tracking-tight">Network</h1>
-          <p className="text-[13px] text-[#4a5a75] mt-0.5">
+          <h1 className="text-[22px] font-bold text-[hsl(var(--foreground))] tracking-tight">Network</h1>
+          <p className="text-[13px] text-[hsl(var(--muted-foreground) / 0.8)] mt-0.5">
             {count > 0
               ? `${count} connession${count === 1 ? 'e' : 'i'} attiv${count === 1 ? 'a' : 'e'}`
               : 'Costruisci la tua rete professionale'}
@@ -555,7 +555,7 @@ function TabsBar({
   requestCount: number;
 }) {
   return (
-    <div className="flex gap-1 p-1 rounded-2xl bg-[#0d1421] border border-white/[0.06]">
+    <div className="flex gap-1 p-1 rounded-2xl bg-[hsl(var(--background))] border border-foreground/[0.06]">
       {TABS.map((tab) => (
         <button
           key={tab.id}
@@ -563,8 +563,8 @@ function TabsBar({
           className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl
             text-[12px] font-semibold transition-all relative ${
             active === tab.id
-              ? 'bg-[#1a2035] text-[#c5cee0] border border-white/[0.08]'
-              : 'text-[#4a5a75] hover:text-[#7c8db5]'
+              ? 'bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] border border-foreground/[0.08]'
+              : 'text-[hsl(var(--muted-foreground) / 0.8)] hover:text-[hsl(var(--muted-foreground))]'
           }`}
         >
           <tab.icon className="w-3.5 h-3.5" />
@@ -572,7 +572,7 @@ function TabsBar({
           {/* Badge richieste */}
           {tab.id === 'richieste' && requestCount > 0 && (
             <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1
-                             bg-blue-500 text-white text-[9px] font-bold
+                             bg-blue-500 text-[hsl(var(--foreground))] text-[9px] font-bold
                              rounded-full flex items-center justify-center">
               {requestCount}
             </span>

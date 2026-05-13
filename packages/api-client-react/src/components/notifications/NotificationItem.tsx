@@ -44,8 +44,8 @@ function Avatar({ name, avatarUrl }: { name: string; avatarUrl: string | null })
     );
   }
   return (
-    <div className="w-9 h-9 rounded-full bg-[#1e2c42] flex items-center justify-center flex-shrink-0">
-      <span className="text-[11px] font-semibold text-[#7c8db5]">{initials}</span>
+    <div className="w-9 h-9 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center flex-shrink-0">
+      <span className="text-[11px] font-semibold text-[hsl(var(--muted-foreground))]">{initials}</span>
     </div>
   );
 }
@@ -67,28 +67,28 @@ export function NotificationItem({
 }: NotificationItemProps) {
   if (notification.type === "friend_request") {
     return (
-      <div className="flex items-start gap-3 px-4 py-3 hover:bg-white/[0.03] transition-colors">
+      <div className="flex items-start gap-3 px-4 py-3 hover:bg-foreground/[0.03] transition-colors">
         <Avatar name={notification.from.name} avatarUrl={notification.from.avatarUrl} />
         <div className="flex-1 min-w-0">
-          <p className="text-[13px] text-[#c5cee0] leading-snug">
-            <span className="font-semibold text-[#dce6f5]">{notification.from.name}</span>
+          <p className="text-[13px] text-[hsl(var(--foreground))] leading-snug">
+            <span className="font-semibold text-[hsl(var(--foreground))]">{notification.from.name}</span>
             {" "}
             vuole connettersi con te
             {notification.from.sectorName && (
-              <span className="text-[#7c8db5]"> · {notification.from.sectorName}</span>
+              <span className="text-[hsl(var(--muted-foreground))]"> · {notification.from.sectorName}</span>
             )}
           </p>
-          <p className="text-[11px] text-[#4a5a75] mt-0.5">{relativeTime(notification.sentAt)}</p>
+          <p className="text-[11px] text-[hsl(var(--muted-foreground) / 0.8)] mt-0.5">{relativeTime(notification.sentAt)}</p>
           <div className="flex items-center gap-2 mt-2">
             <button
               onClick={() => onAccept(notification.friendshipId, notification.id)}
               disabled={accepting || declining}
               className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold
-                         bg-[#1a3a6b] text-[#7eb3ff] hover:bg-[#1f4480] transition-colors
+                         bg-[hsl(var(--muted))] text-[hsl(var(--chart-3))] hover:bg-[hsl(var(--muted))] transition-colors
                          disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {accepting ? (
-                <span className="w-3 h-3 border border-[#7eb3ff]/30 border-t-[#7eb3ff] rounded-full animate-spin" />
+                <span className="w-3 h-3 border border-[hsl(var(--chart-3))]/30 border-t-[hsl(var(--chart-3))] rounded-full animate-spin" />
               ) : (
                 <UserCheck className="w-3 h-3" />
               )}
@@ -98,7 +98,7 @@ export function NotificationItem({
               onClick={() => onDecline(notification.friendshipId, notification.id)}
               disabled={declining || accepting}
               className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium
-                         text-[#7c8db5] hover:text-red-400 hover:bg-red-500/10 transition-colors
+                         text-[hsl(var(--muted-foreground))] hover:text-red-400 hover:bg-red-500/10 transition-colors
                          disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {declining ? (

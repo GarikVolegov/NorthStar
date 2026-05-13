@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod/v4";
 import OpenAI from "openai";
 import { requireAuth } from "../middleware/auth";
+import { writeAuditLog } from "../middleware/audit";
 import type { LoggerFields } from "@workspace/ai-server/logger";
 
 const router = Router();
@@ -105,6 +106,12 @@ router.post("/ask", requireAuth, async (req: Request, res: Response) => {
 
     res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
     res.end();
+
+    writeAuditLog(req, {
+      action: "agent_message",
+      category: "agent_action",
+      metadata: { messageLength: data.message.length, chunkCount: chunks.length },
+    });
   } catch (err) {
     logger.error({ err, ...logFields }, "wendy ask error");
     res.write(`data: ${JSON.stringify({ type: "error", message: "Errore durante la generazione della risposta" })}\n\n`);

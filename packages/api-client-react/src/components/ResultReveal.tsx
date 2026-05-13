@@ -28,7 +28,7 @@ export function ResultReveal({ profileName, subtitle, onRevealComplete }: Props)
   }, []); // Mount-only: schermata di reveal non si ripete
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#0e1018]">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-[hsl(var(--background))]">
       <AnimatePresence>
         {/* LAYER 1: stella — key obbligatoria per AnimatePresence */}
         {phase >= 1 && (
@@ -43,7 +43,7 @@ export function ResultReveal({ profileName, subtitle, onRevealComplete }: Props)
             <div className="w-32 h-32 md:w-48 md:h-48 relative">
               {/* Pulse ring: easing corretto per evitare pop */}
               <motion.div
-                className="absolute inset-0 bg-[#c19e4a]/20 rounded-full"
+                className="absolute inset-0 bg-[hsl(var(--chart-1))]/20 rounded-full"
                 animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
                 transition={{
                   duration: 2,
@@ -55,7 +55,7 @@ export function ResultReveal({ profileName, subtitle, onRevealComplete }: Props)
               {/* drop-shadow su SVG path className non funziona: usare filter style sull'svg */}
               <svg
                 viewBox="0 0 100 100"
-                className="w-full h-full text-[#c19e4a] relative z-10"
+                className="w-full h-full text-[hsl(var(--chart-1))] relative z-10"
                 style={{ filter: 'drop-shadow(0 0 30px rgba(193,158,74,0.5))' }}
               >
                 <path
@@ -78,11 +78,11 @@ export function ResultReveal({ profileName, subtitle, onRevealComplete }: Props)
             className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 z-20"
           >
             <h1
-              className="text-4xl md:text-6xl font-bold text-[#e6e8ed] mb-4"
+              className="text-4xl md:text-6xl font-bold text-[hsl(var(--foreground))] mb-4"
               style={{ textShadow: '0 0 40px rgba(193,158,74,0.3)' }}
             >
               Sei un{' '}
-              <span className="text-[#c19e4a]">{profileName}</span>
+              <span className="text-[hsl(var(--chart-1))]">{profileName}</span>
             </h1>
 
             {/*
@@ -99,7 +99,7 @@ export function ResultReveal({ profileName, subtitle, onRevealComplete }: Props)
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.6 }}
-                  className="text-xl text-[#e6e8ed]/70 max-w-lg"
+                  className="text-xl text-[hsl(var(--foreground))]/70 max-w-lg"
                 >
                   {subtitle}
                 </motion.p>

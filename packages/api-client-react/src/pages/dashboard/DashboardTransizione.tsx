@@ -140,7 +140,7 @@ const fadeUp  = {
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
 function Sk({ className = '' }: { className?: string }) {
-  return <div className={`rounded-xl bg-[#131929] animate-pulse ${className}`} />;
+  return <div className={`rounded-xl bg-[hsl(var(--card))] animate-pulse ${className}`} />;
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
@@ -158,11 +158,11 @@ function TransitionHeader({ data, name }: { data: TransitionData; name: string }
     >
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-[13px] text-[#7c8db5] mb-0.5">{greeting}, {name} 🧭</p>
-          <h1 className="text-[22px] font-bold text-[#dce6f5] tracking-tight">
+          <p className="text-[13px] text-[hsl(var(--muted-foreground))] mb-0.5">{greeting}, {name} 🧭</p>
+          <h1 className="text-[22px] font-bold text-[hsl(var(--foreground))] tracking-tight">
             In transizione
           </h1>
-          <p className="text-[13px] text-[#4a5a75] mt-1 max-w-[42ch]">
+          <p className="text-[13px] text-[hsl(var(--muted-foreground) / 0.8)] mt-1 max-w-[42ch]">
             Stai costruendo il tuo prossimo capitolo. Ogni skill acquisita è un passo avanti.
           </p>
         </div>
@@ -180,12 +180,12 @@ function TransitionHeader({ data, name }: { data: TransitionData; name: string }
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15, duration: 0.3 }}
-        className="mt-4 flex items-center gap-3 p-4 rounded-2xl bg-[#0d1421]
-                   border border-white/[0.06]"
+        className="mt-4 flex items-center gap-3 p-4 rounded-2xl bg-[hsl(var(--background))]
+                   border border-foreground/[0.06]"
       >
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-semibold text-[#4a5a75] uppercase tracking-wide mb-0.5">Ruolo attuale</p>
-          <p className="text-[13px] font-semibold text-[#7c8db5] truncate">
+          <p className="text-[10px] font-semibold text-[hsl(var(--muted-foreground) / 0.8)] uppercase tracking-wide mb-0.5">Ruolo attuale</p>
+          <p className="text-[13px] font-semibold text-[hsl(var(--muted-foreground))] truncate">
             {data.currentRole ?? 'Non specificato'}
           </p>
         </div>
@@ -194,8 +194,8 @@ function TransitionHeader({ data, name }: { data: TransitionData; name: string }
           <div className="h-0.5 w-8 bg-gradient-to-r from-blue-600 to-blue-400 rounded-full" />
         </div>
         <div className="flex-1 min-w-0 text-right">
-          <p className="text-[10px] font-semibold text-[#4a8bff] uppercase tracking-wide mb-0.5">Ruolo target</p>
-          <p className="text-[13px] font-bold text-[#dce6f5] truncate">
+          <p className="text-[10px] font-semibold text-[hsl(var(--chart-3))] uppercase tracking-wide mb-0.5">Ruolo target</p>
+          <p className="text-[13px] font-bold text-[hsl(var(--foreground))] truncate">
             {data.targetRole ?? 'Da definire'}
           </p>
         </div>
@@ -204,10 +204,10 @@ function TransitionHeader({ data, name }: { data: TransitionData; name: string }
       {/* Barra progresso piano */}
       <div className="mt-3 space-y-1.5">
         <div className="flex justify-between text-[11px]">
-          <span className="text-[#4a5a75]">Fase {data.phasesCompleted} di 3 completata</span>
+          <span className="text-[hsl(var(--muted-foreground) / 0.8)]">Fase {data.phasesCompleted} di 3 completata</span>
           <span className="text-blue-400">{pct}%</span>
         </div>
-        <div className="h-1.5 rounded-full bg-[#1a2035] overflow-hidden">
+        <div className="h-1.5 rounded-full bg-[hsl(var(--muted))] overflow-hidden">
           <motion.div
             className="h-full rounded-full bg-gradient-to-r from-blue-600 to-blue-400"
             initial={{ width: 0 }}
@@ -234,14 +234,14 @@ function KpiStrip({ data, loading }: { data: TransitionData | undefined; loading
       {items.map((item) => (
         <div
           key={item.label}
-          className="flex flex-col items-center py-3 px-2 rounded-xl bg-[#0d1421]
-                     border border-white/[0.06] text-center"
+          className="flex flex-col items-center py-3 px-2 rounded-xl bg-[hsl(var(--background))]
+                     border border-foreground/[0.06] text-center"
         >
           <item.icon className={`w-4 h-4 ${item.color} mb-1.5`} />
-          <p className="text-[16px] font-bold text-[#dce6f5] tabular-nums leading-none">
+          <p className="text-[16px] font-bold text-[hsl(var(--foreground))] tabular-nums leading-none">
             {item.value}
           </p>
-          <p className="text-[10px] text-[#4a5a75] mt-0.5">{item.label}</p>
+          <p className="text-[10px] text-[hsl(var(--muted-foreground) / 0.8)] mt-0.5">{item.label}</p>
         </div>
       ))}
     </motion.div>
@@ -269,8 +269,8 @@ function AzioniRapide() {
           >
             <a.icon className={`w-5 h-5 ${a.accent}`} />
             <div>
-              <p className="text-[13px] font-semibold text-[#dce6f5]">{a.label}</p>
-              <p className="text-[11px] text-[#7c8db5] leading-snug">{a.desc}</p>
+              <p className="text-[13px] font-semibold text-[hsl(var(--foreground))]">{a.label}</p>
+              <p className="text-[11px] text-[hsl(var(--muted-foreground))] leading-snug">{a.desc}</p>
             </div>
           </Link>
         </motion.div>
@@ -288,16 +288,16 @@ function SkillsGapCard() {
   return (
     <motion.div
       variants={fadeUp}
-      className="rounded-2xl bg-[#0d1421] border border-white/[0.06] p-5"
+      className="rounded-2xl bg-[hsl(var(--background))] border border-foreground/[0.06] p-5"
     >
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-[14px] font-semibold text-[#a8b8d0] flex items-center gap-2">
+        <h2 className="text-[14px] font-semibold text-[hsl(var(--muted-foreground))] flex items-center gap-2">
           <BarChart2 className="w-4 h-4 text-amber-400" />
           Skills Gap
         </h2>
         <Link
           href="/skills-gap"
-          className="text-[12px] text-[#4a8bff] hover:text-[#7eb3ff] transition-colors flex items-center gap-1"
+          className="text-[12px] text-[hsl(var(--chart-3))] hover:text-[hsl(var(--chart-3))] transition-colors flex items-center gap-1"
         >
           Dettaglio <ChevronRight className="w-3.5 h-3.5" />
         </Link>
@@ -311,18 +311,18 @@ function SkillsGapCard() {
           return (
             <div key={skill.name}>
               <div className="flex justify-between text-[12px] mb-1">
-                <span className="text-[#c5cee0] font-medium">{skill.name}</span>
+                <span className="text-[hsl(var(--foreground))] font-medium">{skill.name}</span>
                 <span className={covered ? 'text-emerald-400' : 'text-amber-400/80'}>
                   {covered ? '✓ Ok' : `–${gap}% da fare`}
                 </span>
               </div>
-              <div className="relative h-2 rounded-full bg-[#1a2035] overflow-hidden">
+              <div className="relative h-2 rounded-full bg-[hsl(var(--muted))] overflow-hidden">
                 {/* required track (ghost) */}
                 <div
                   className="absolute inset-y-0 left-0 rounded-full opacity-20"
                   style={{
                     width: `${skill.required}%`,
-                    background: covered ? '#34d399' : '#f59e0b',
+                    background: covered ? 'hsl(var(--chart-2))' : 'hsl(var(--chart-1))',
                   }}
                 />
                 {/* current progress */}
@@ -330,8 +330,8 @@ function SkillsGapCard() {
                   className="absolute inset-y-0 left-0 rounded-full"
                   style={{
                     background: covered
-                      ? 'linear-gradient(90deg,#059669,#34d399)'
-                      : 'linear-gradient(90deg,#b45309,#f59e0b)',
+                      ? 'linear-gradient(90deg,hsl(var(--chart-2)),hsl(var(--chart-2)))'
+                      : 'linear-gradient(90deg,hsl(var(--chart-1)),hsl(var(--chart-1)))',
                   }}
                   initial={{ width: 0 }}
                   animate={{ width: `${skill.current}%` }}
@@ -346,7 +346,7 @@ function SkillsGapCard() {
       {SKILLS_MOCK.length > 3 && (
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="mt-3 w-full text-[12px] text-[#4a5a75] hover:text-[#7c8db5] transition-colors"
+          className="mt-3 w-full text-[12px] text-[hsl(var(--muted-foreground) / 0.8)] hover:text-[hsl(var(--muted-foreground))] transition-colors"
         >
           {expanded
             ? 'Mostra meno ↑'
@@ -364,7 +364,7 @@ function RoadmapCard({ phasesCompleted }: { phasesCompleted: number }) {
 
   return (
     <motion.div variants={fadeUp}>
-      <h2 className="text-[14px] font-semibold text-[#a8b8d0] flex items-center gap-2 mb-3">
+      <h2 className="text-[14px] font-semibold text-[hsl(var(--muted-foreground))] flex items-center gap-2 mb-3">
         <Target className="w-4 h-4 text-blue-400" />
         Piano di transizione
       </h2>
@@ -381,11 +381,11 @@ function RoadmapCard({ phasesCompleted }: { phasesCompleted: number }) {
           const borderColor =
             status === 'done'   ? 'border-emerald-500/30' :
             status === 'active' ? 'border-blue-500/30' :
-            'border-white/[0.06]';
+            'border-foreground/[0.06]';
           const bgColor =
             status === 'done'   ? 'bg-emerald-500/5' :
             status === 'active' ? 'bg-blue-500/5' :
-            'bg-[#0d1421]';
+            'bg-[hsl(var(--background))]';
           const IconComp =
             status === 'done'   ? CheckCircle2 :
             status === 'active' ? Zap :
@@ -393,7 +393,7 @@ function RoadmapCard({ phasesCompleted }: { phasesCompleted: number }) {
           const iconColor =
             status === 'done'   ? 'text-emerald-400' :
             status === 'active' ? 'text-blue-400' :
-            'text-[#3a4a65]';
+            'text-[hsl(var(--muted-foreground) / 0.8)]';
 
           return (
             <motion.div
@@ -409,7 +409,7 @@ function RoadmapCard({ phasesCompleted }: { phasesCompleted: number }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className={`text-[13px] font-semibold ${
-                      status === 'locked' ? 'text-[#4a5a75]' : 'text-[#c5cee0]'
+                      status === 'locked' ? 'text-[hsl(var(--muted-foreground) / 0.8)]' : 'text-[hsl(var(--foreground))]'
                     }`}>
                       Fase {ph.phase}: {ph.label}
                     </span>
@@ -426,10 +426,10 @@ function RoadmapCard({ phasesCompleted }: { phasesCompleted: number }) {
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-[#4a5a75] mt-0.5">{ph.weeks}</p>
+                  <p className="text-[11px] text-[hsl(var(--muted-foreground) / 0.8)] mt-0.5">{ph.weeks}</p>
                 </div>
                 <ChevronRight
-                  className={`w-4 h-4 flex-shrink-0 text-[#3a4a65] transition-transform ${
+                  className={`w-4 h-4 flex-shrink-0 text-[hsl(var(--muted-foreground) / 0.8)] transition-transform ${
                     isOpen ? 'rotate-90' : ''
                   }`}
                 />
@@ -445,16 +445,16 @@ function RoadmapCard({ phasesCompleted }: { phasesCompleted: number }) {
                     className="overflow-hidden"
                   >
                     <div className="px-4 pb-4 space-y-1.5">
-                      <p className="text-[12px] text-[#7c8db5] mb-2">{ph.desc}</p>
+                      <p className="text-[12px] text-[hsl(var(--muted-foreground))] mb-2">{ph.desc}</p>
                       {ph.tasks.map((task, ti) => (
                         <div key={ti} className="flex items-center gap-2">
                           {status === 'done'
                             ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                            : <Circle       className="w-3.5 h-3.5 text-[#3a4a65] flex-shrink-0" />}
+                            : <Circle       className="w-3.5 h-3.5 text-[hsl(var(--muted-foreground) / 0.8)] flex-shrink-0" />}
                           <span className={`text-[12px] ${
                             status === 'done'
-                              ? 'line-through text-[#4a5a75]'
-                              : 'text-[#a8b8d0]'
+                              ? 'line-through text-[hsl(var(--muted-foreground) / 0.8)]'
+                              : 'text-[hsl(var(--muted-foreground))]'
                           }`}>
                             {task}
                           </span>
@@ -486,18 +486,18 @@ function ObiettiviTransizione({
   return (
     <motion.div variants={fadeUp}>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[14px] font-semibold text-[#a8b8d0] flex items-center gap-2">
+        <h2 className="text-[14px] font-semibold text-[hsl(var(--muted-foreground))] flex items-center gap-2">
           <BookOpen className="w-4 h-4 text-violet-400" />
           Prossimi step
           {active.length > 0 && (
-            <span className="text-[11px] bg-[#1a2035] text-[#7c8db5] px-2 py-0.5 rounded-full">
+            <span className="text-[11px] bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] px-2 py-0.5 rounded-full">
               {active.length}
             </span>
           )}
         </h2>
         <Link
           href="/percorso"
-          className="text-[12px] text-[#4a8bff] hover:text-[#7eb3ff] transition-colors flex items-center gap-1"
+          className="text-[12px] text-[hsl(var(--chart-3))] hover:text-[hsl(var(--chart-3))] transition-colors flex items-center gap-1"
         >
           Tutti <ChevronRight className="w-3.5 h-3.5" />
         </Link>
@@ -510,10 +510,10 @@ function ObiettiviTransizione({
       ) : active.length === 0 ? (
         <div className="flex flex-col items-center py-8 text-center">
           <Sparkles className="w-7 h-7 text-violet-400 mb-2" />
-          <p className="text-[13px] text-[#c5cee0] mb-1">Nessun passo attivo</p>
+          <p className="text-[13px] text-[hsl(var(--foreground))] mb-1">Nessun passo attivo</p>
           <Link
             href="/percorso"
-            className="text-[12px] text-[#4a8bff] hover:underline mt-1"
+            className="text-[12px] text-[hsl(var(--chart-3))] hover:underline mt-1"
           >
             + Aggiungi obiettivo
           </Link>
@@ -529,15 +529,15 @@ function ObiettiviTransizione({
             <motion.div
               key={obj.id}
               variants={fadeUp}
-              className="p-4 rounded-xl bg-[#0d1421] border border-white/[0.06]
-                         hover:border-white/10 transition-all"
+              className="p-4 rounded-xl bg-[hsl(var(--background))] border border-foreground/[0.06]
+                         hover:border-foreground/10 transition-all"
             >
               <div className="flex items-start justify-between gap-2 mb-2">
-                <p className="text-[13px] font-semibold text-[#c5cee0] leading-snug">
+                <p className="text-[13px] font-semibold text-[hsl(var(--foreground))] leading-snug">
                   {obj.title}
                 </p>
                 {obj.dueDate && (
-                  <div className="flex items-center gap-1 text-[11px] text-[#4a5a75] flex-shrink-0">
+                  <div className="flex items-center gap-1 text-[11px] text-[hsl(var(--muted-foreground) / 0.8)] flex-shrink-0">
                     <Clock className="w-3 h-3" />
                     {new Date(obj.dueDate).toLocaleDateString('it-IT', {
                       day: 'numeric',
@@ -547,12 +547,12 @@ function ObiettiviTransizione({
                 )}
               </div>
               <div className="flex justify-between text-[11px] mb-1">
-                <span className="text-[#4a5a75]">
+                <span className="text-[hsl(var(--muted-foreground) / 0.8)]">
                   {obj.currentValue} / {obj.targetValue}{obj.unit ? ` ${obj.unit}` : ''}
                 </span>
                 <span className="text-violet-400">{obj.progress}%</span>
               </div>
-              <div className="h-1.5 rounded-full bg-[#1a2035] overflow-hidden">
+              <div className="h-1.5 rounded-full bg-[hsl(var(--muted))] overflow-hidden">
                 <motion.div
                   className="h-full rounded-full bg-gradient-to-r from-violet-600 to-violet-400"
                   initial={{ width: 0 }}
@@ -574,13 +574,13 @@ function MentorCard() {
   return (
     <motion.div variants={fadeUp}>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[14px] font-semibold text-[#a8b8d0] flex items-center gap-2">
+        <h2 className="text-[14px] font-semibold text-[hsl(var(--muted-foreground))] flex items-center gap-2">
           <Users className="w-4 h-4 text-emerald-400" />
           Nel tuo settore target
         </h2>
         <Link
           href="/amici"
-          className="text-[12px] text-[#4a8bff] hover:text-[#7eb3ff] transition-colors flex items-center gap-1"
+          className="text-[12px] text-[hsl(var(--chart-3))] hover:text-[hsl(var(--chart-3))] transition-colors flex items-center gap-1"
         >
           Connettiti <ChevronRight className="w-3.5 h-3.5" />
         </Link>
@@ -591,17 +591,17 @@ function MentorCard() {
           <motion.div
             key={m.id}
             variants={fadeUp}
-            className="flex items-center gap-3 p-3.5 rounded-xl bg-[#0d1421]
-                       border border-white/[0.06] hover:border-white/10 transition-all"
+            className="flex items-center gap-3 p-3.5 rounded-xl bg-[hsl(var(--background))]
+                       border border-foreground/[0.06] hover:border-foreground/10 transition-all"
           >
-            <div className="w-9 h-9 rounded-full bg-[#1a2035] flex items-center justify-center flex-shrink-0">
-              <span className="text-[11px] font-bold text-[#7c8db5]">
+            <div className="w-9 h-9 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center flex-shrink-0">
+              <span className="text-[11px] font-bold text-[hsl(var(--muted-foreground))]">
                 {m.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold text-[#c5cee0] truncate">{m.name}</p>
-              <p className="text-[11px] text-[#4a5a75] truncate">{m.role}</p>
+              <p className="text-[13px] font-semibold text-[hsl(var(--foreground))] truncate">{m.name}</p>
+              <p className="text-[11px] text-[hsl(var(--muted-foreground) / 0.8)] truncate">{m.role}</p>
             </div>
             <div className="flex items-center gap-1 text-[11px] text-amber-400/70 flex-shrink-0">
               <Star className="w-3 h-3" />
@@ -668,7 +668,7 @@ export default function DashboardTransizione() {
 
       {/* Azioni rapide */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
-        <h2 className="text-[13px] font-semibold text-[#7c8db5] uppercase tracking-wide mb-3">
+        <h2 className="text-[13px] font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wide mb-3">
           Strumenti
         </h2>
         <AzioniRapide />

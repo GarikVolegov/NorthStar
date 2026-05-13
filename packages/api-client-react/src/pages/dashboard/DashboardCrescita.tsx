@@ -180,7 +180,7 @@ function StreakCard({ streak, longest }: { streak: number; longest: number }) {
 
   return (
     <motion.div variants={fadeUp}
-      className="rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06] p-4">
+      className="rounded-2xl bg-[hsl(var(--background))] border border-foreground/[0.06] p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Flame className={`w-4 h-4 ${streak > 0 ? 'text-orange-400' : 'text-[hsl(var(--muted-foreground))]'}`} />
@@ -201,11 +201,11 @@ function StreakCard({ streak, longest }: { streak: number; longest: number }) {
               text-[10px] font-bold transition-colors
               ${
                 i === todayIdx && activeDays.has(i)
-                  ? 'bg-orange-500 text-white'
+                  ? 'bg-orange-500 text-[hsl(var(--foreground))]'
                   : activeDays.has(i)
                   ? 'bg-orange-500/30 text-orange-400'
                   : i === todayIdx
-                  ? 'bg-[hsl(var(--muted))] text-[hsl(var(--chart-3))] ring-1 ring-[#4a8bff]/30'
+                  ? 'bg-[hsl(var(--muted))] text-[hsl(var(--chart-3))] ring-1 ring-[hsl(var(--chart-3))]/30'
                   : 'bg-[hsl(var(--card))] text-[hsl(var(--muted-foreground))]'
               }
             `}>
@@ -239,7 +239,7 @@ function ObjectiveCard({ obj }: { obj: Objective }) {
         ${
           obj.completed
             ? 'bg-emerald-500/5 border-emerald-500/20'
-            : 'bg-[hsl(var(--background))] border-white/[0.06] hover:border-white/10'
+            : 'bg-[hsl(var(--background))] border-foreground/[0.06] hover:border-foreground/10'
         }
       `}>
       <div className="flex items-start gap-3">
@@ -337,7 +337,7 @@ function ObiettiviAttivi({ objectives, loading }: { objectives: Objective[]; loa
             <button
               onClick={() => setShowAll((v) => !v)}
               className="w-full py-2 rounded-xl text-[12px] font-medium text-[hsl(var(--muted-foreground))]
-                         hover:text-[hsl(var(--muted-foreground))] border border-white/[0.04] hover:border-white/[0.08]
+                         hover:text-[hsl(var(--muted-foreground))] border border-foreground/[0.04] hover:border-foreground/[0.08]
                          bg-[hsl(var(--background))] hover:bg-[hsl(var(--muted))] transition-all">
               {showAll ? 'Mostra meno ↑' : `Mostra altri ${active.length - 3} obiettivi ↓`}
             </button>
@@ -374,7 +374,7 @@ function CertificazioniCard() {
         {CERT_MOCK.map((cert, i) => (
           <motion.div key={cert.id} variants={fadeUp}
             className="flex items-center gap-3 p-3.5 rounded-xl bg-[hsl(var(--background))]
-                       border border-white/[0.06] hover:border-white/10 transition-all">
+                       border border-foreground/[0.06] hover:border-foreground/10 transition-all">
             <div className="w-9 h-9 rounded-xl bg-[hsl(var(--muted))] flex items-center justify-center flex-shrink-0">
               <GraduationCap className="w-4 h-4 text-emerald-400" />
             </div>
@@ -415,7 +415,7 @@ function LeaderboardPreview({ entries, loading }: { entries: LeaderboardEntry[];
 
   return (
     <motion.div variants={fadeUp}
-      className="rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06] p-4">
+      className="rounded-2xl bg-[hsl(var(--background))] border border-foreground/[0.06] p-4">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-[14px] font-semibold text-[hsl(var(--muted-foreground))] flex items-center gap-2">
           <Star className="w-4 h-4 text-amber-400" />
@@ -431,8 +431,8 @@ function LeaderboardPreview({ entries, loading }: { entries: LeaderboardEntry[];
               flex items-center gap-3 p-2.5 rounded-lg transition-all
               ${
                 entry.isCurrentUser
-                  ? 'bg-[hsl(var(--muted))]/30 border border-[#1a3a6b]/50'
-                  : 'hover:bg-white/[0.02]'
+                  ? 'bg-[hsl(var(--muted))]/30 border border-[hsl(var(--muted))]/50'
+                  : 'hover:bg-foreground/[0.02]'
               }
             `}>
             <div className={`
@@ -578,7 +578,7 @@ export default function DashboardCrescita() {
 
         {/* Mini KPI completati */}
         <motion.div variants={fadeUp}
-          className="rounded-2xl bg-[hsl(var(--background))] border border-white/[0.06] p-4
+          className="rounded-2xl bg-[hsl(var(--background))] border border-foreground/[0.06] p-4
                      flex flex-col justify-between">
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />

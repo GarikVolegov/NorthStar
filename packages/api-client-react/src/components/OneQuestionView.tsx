@@ -62,21 +62,21 @@ export function OneQuestionView({ question, index, total, onAnswer, direction }:
       >
         {/* Barra progresso: parte da index/total, anima a (index+1)/total */}
         <div className="w-full max-w-md mb-12">
-          <div className="h-2 bg-[#1a1d2a] rounded-full overflow-hidden">
+          <div className="h-2 bg-[hsl(var(--muted))] rounded-full overflow-hidden">
             <motion.div
-              className="h-full bg-[#c19e4a]"
+              className="h-full bg-[hsl(var(--chart-1))]"
               initial={{ width: `${progressBefore}%` }}
               animate={{ width: answered ? `${progressAfter}%` : `${progressBefore}%` }}
               transition={{ duration: 0.6, ease: 'easeOut' }}
             />
           </div>
-          <p className="text-center text-[#7db89a] text-sm mt-3 font-medium">
+          <p className="text-center text-[hsl(var(--chart-2))] text-sm mt-3 font-medium">
             Domanda {index + 1} di {total}
           </p>
         </div>
 
         {/* Testo domanda */}
-        <h2 className="text-2xl md:text-3xl font-bold text-[#e6e8ed] text-center max-w-2xl mb-12 leading-relaxed">
+        <h2 className="text-2xl md:text-3xl font-bold text-[hsl(var(--foreground))] text-center max-w-2xl mb-12 leading-relaxed">
           {question.text}
         </h2>
 
@@ -89,17 +89,17 @@ export function OneQuestionView({ question, index, total, onAnswer, direction }:
               whileTap={answered ? {} : { scale: 0.98 }}
               onClick={() => handleAnswer(val)}
               disabled={answered}
-              className="w-full py-4 px-6 rounded-xl border border-[#c19e4a]/20 bg-[#1a1d2a]/80
-                         text-[#e6e8ed] text-lg font-medium transition-all
-                         hover:bg-[#c19e4a]/10 hover:border-[#c19e4a]/40
-                         focus:outline-none focus:ring-2 focus:ring-[#c19e4a]/50
-                         active:bg-[#c19e4a]/20
+              className="w-full py-4 px-6 rounded-xl border border-[hsl(var(--chart-1))]/20 bg-[hsl(var(--muted))]/80
+                         text-[hsl(var(--foreground))] text-lg font-medium transition-all
+                         hover:bg-[hsl(var(--chart-1))]/10 hover:border-[hsl(var(--chart-1))]/40
+                         focus:outline-none focus:ring-2 focus:ring-[hsl(var(--chart-1))]/50
+                         active:bg-[hsl(var(--chart-1))]/20
                          disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label={`${LABELS[val - 1]}, valore ${val} su 5`}
             >
               <span className="flex items-center justify-between">
                 <span>{LABELS[val - 1]}</span>
-                <span className="text-[#c19e4a]/60 text-sm">{val}</span>
+                <span className="text-[hsl(var(--chart-1))]/60 text-sm">{val}</span>
               </span>
             </motion.button>
           ))}

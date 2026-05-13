@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { usePageMeta } from "@/lib/seo";
 import { ResultsSkeleton } from "@/components/skeletons/ResultsSkeleton";
 import { useParams, Link, useLocation } from "wouter";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { useGetTestSession, useConfirmSector, useGetStatsSummary, getGetTestSessionQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -363,6 +364,7 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
 }
 
 export default function Results() {
+  useWendyPageContext({ page: 'risultati', title: 'Risultati Test' });
   const { t } = useTranslation();
   const prefersReduced = useReducedMotion();
   usePageMeta({

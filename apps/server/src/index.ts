@@ -7,6 +7,7 @@ import cors from "cors";
 import helmet from "helmet";
 import { register, getMetricsContentType, getMetrics } from "@workspace/ai-server/metrics";
 import { requestIdMiddleware } from "./middleware/request-id";
+import { globalLimiter, wendyLimiter, adminLimiter } from "./middleware/rate-limit";
 import { logger } from "@workspace/ai-server/logger";
 
 const app = express();
@@ -17,6 +18,7 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(requestIdMiddleware);
+app.use(globalLimiter);
 
 // Routes
 import objectivesRouter from "./routes/objectives";
@@ -31,11 +33,31 @@ app.use("/api/objectives", objectivesRouter);
 app.use("/api/calendar", calendarRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/coach", coachRouter);
-app.use("/api/wendy", wendyRouter);
+app.use("/api/wendy", wendyLimiter, wendyRouter);
 app.use("/api/users", usersRouter);
-app.use("/api/admin", adminRouter);
+app.use("/api/admin", adminLimiter, adminRouter);
 
-// Health check endpoint
+// Kubernetes liveness probe — always 200 if process is alive
+app.get("/api/health/live", (req, res) => {
+  res.json({ status: "alive" });
+});
+
+// Kubernetes readiness probe — checks DB connectivity
+app.get("/api/health/ready", async (req, res) => {
+  try {
+    const { pool } = await import("@workspace/db");
+    const result = await pool.query("SELECT 1");
+    if (result) {
+      res.json({ status: "ready" });
+    } else {
+      res.status(503).json({ status: "not ready" });
+    }
+  } catch (err) {
+    res.status(503).json({ status: "not ready", message: String(err) });
+  }
+});
+
+// Legacy health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
@@ -102,10 +124,6 @@ app.use(
     });
   },
 );
-
-app.listen(PORT, () => {
-  logger.info({ port: PORT }, "NorthStar API Server started");
-});
 
 app.listen(PORT, () => {
   logger.info({ port: PORT }, "NorthStar API Server started");
