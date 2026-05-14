@@ -1,0 +1,51 @@
+version: 2
+project_name: stripe-pp-cli
+changelog:
+  disable: true
+builds:
+  - id: stripe-pp-cli
+    main: ./cmd/stripe-pp-cli
+    binary: stripe-pp-cli
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X stripe-pp-cli/internal/cli.version={{ .Version }}
+    targets:
+      - darwin_amd64
+      - darwin_arm64
+      - linux_amd64
+      - linux_arm64
+      - windows_amd64
+      - windows_arm64
+  - id: stripe-pp-mcp
+    main: ./cmd/stripe-pp-mcp
+    binary: stripe-pp-mcp
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+    targets:
+      - darwin_amd64
+      - darwin_arm64
+      - linux_amd64
+      - linux_arm64
+      - windows_amd64
+      - windows_arm64
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+checksum:
+  name_template: checksums.txt
+brews:
+  - name: stripe-pp-cli
+    repository:
+      owner: garik-v
+      name: homebrew-tap
+    homepage: "https://github.com/garik-v/stripe-pp-cli"
+    description: "The Stripe REST API. Please see https://stripe.com/docs/api for more details."
+    install: |
+      bin.install "stripe-pp-cli"
+      bin.install "stripe-pp-mcp"

@@ -9,5 +9,4 @@ if ($processOnPort) {
     Start-Sleep -Milliseconds 500
 }
 
-Write-Host "Starting dev server..."
-pnpm run dev:web
+Write-Host "Port 5173 is now free."

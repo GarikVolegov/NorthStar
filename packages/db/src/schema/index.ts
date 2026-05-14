@@ -57,3 +57,7 @@ export * from "./sessionSummaries";
 export * from "./voiceSessions";
 export * from "./routingLogs";
 export * from "./qualityMetrics";
+export * from "./chatMessages";
+export * from "./userKeys";
+export * from "./userBadges";
+export * from "./weeklyLeaderboard";

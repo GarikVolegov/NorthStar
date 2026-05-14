@@ -1,9 +1,7 @@
 import { type Request, type Response, type NextFunction } from "express";
 import jwt from "jsonwebtoken";
 const { verify } = jwt;
-import { eq } from "drizzle-orm";
-import { db } from "@workspace/db";
-import { usersTable } from "@workspace/db";
+import { pool } from "@workspace/db";
 
 declare global {
   namespace Express {
@@ -43,29 +41,36 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   try {
     const payload = verify(token, JWT_SECRET) as unknown as TokenPayload;
 
-    const [user] = await db
-      .select({
-        id: usersTable.id,
-        name: usersTable.name,
-        email: usersTable.email,
-        stripeSubscriptionId: usersTable.stripeSubscriptionId,
-        journeyType: usersTable.journeyType,
-        testSessionId: usersTable.testSessionId,
-        onboardingCompleted: usersTable.onboardingCompleted,
-      })
-      .from(usersTable)
-      .where(eq(usersTable.id, payload.userId))
-      .limit(1);
+    const { rows } = await pool.query<{
+      id: number; name: string; email: string;
+      stripe_subscription_id: string | null;
+      test_session_id: number | null;
+    }>(
+      `SELECT id, name, email, stripe_subscription_id, test_session_id
+       FROM users WHERE id = $1 LIMIT 1`,
+      [payload.userId],
+    );
 
+    const user = rows[0];
     if (!user) {
       res.status(401).json({ error: "Utente non trovato" });
       return;
     }
 
     req.user = {
-      ...user,
-      role: "user" as const,
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: "user",
+      stripeSubscriptionId: user.stripe_subscription_id,
+      journeyType: null,
+      testSessionId: user.test_session_id,
+      onboardingCompleted: true,
     };
+
+    if (req.log) {
+      req.log = req.log.child({ userId: user.id });
+    }
 
     next();
   } catch {

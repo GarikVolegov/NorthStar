@@ -7,10 +7,7 @@
       "name": "Launch NorthStar (Chrome)",
       "preLaunchTask": "dev:web",
       "url": "http://localhost:5173",
-      "webRoot": "${workspaceFolder}/apps/web",
-      "sourceMapPathOverrides": {
-        "webpack:///src/*": "${webRoot}/src/*"
-      }
+      "webRoot": "${workspaceFolder}/apps/web"
     },
     {
       "type": "node",

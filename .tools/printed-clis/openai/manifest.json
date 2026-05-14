@@ -1,0 +1,39 @@
+{
+  "manifest_version": "0.3",
+  "name": "openai-pp-mcp",
+  "display_name": "Openai",
+  "version": "4.6.1",
+  "description": "Openai API surface as MCP tools.",
+  "author": {
+    "name": "CLI Printing Press"
+  },
+  "license": "Apache-2.0",
+  "server": {
+    "type": "binary",
+    "entry_point": "bin/openai-pp-mcp",
+    "mcp_config": {
+      "command": "${__dirname}/bin/openai-pp-mcp",
+      "args": [],
+      "env": {
+        "OPENAI_API_KEY_AUTH": "${user_config.openai_api_key_auth}"
+      }
+    }
+  },
+  "user_config": {
+    "openai_api_key_auth": {
+      "type": "string",
+      "title": "OPENAI_API_KEY_AUTH",
+      "description": "Sets OPENAI_API_KEY_AUTH for the Openai MCP server.",
+      "sensitive": true,
+      "required": true
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=1.0.0",
+    "platforms": [
+      "darwin",
+      "linux",
+      "win32"
+    ]
+  }
+}

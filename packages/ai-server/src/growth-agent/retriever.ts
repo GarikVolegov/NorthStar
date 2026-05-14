@@ -116,10 +116,10 @@ async function retrieveWithJs(
         isNotNull(knowledgeNodesTable.embedding),
       ),
     )
-    .limit(500);
+    .limit(200);
 
-  if (nodes.length >= 500) {
-    logger.warn({ userId, sourceTypes }, "JS retriever hit 500-row limit — results may be incomplete");
+  if (nodes.length >= 200) {
+    logger.warn({ userId, sourceTypes }, "JS retriever hit 200-row limit — results may be incomplete");
   }
 
   return nodes
@@ -173,16 +173,18 @@ export async function retrieve(
 ): Promise<RetrievedChunk[]> {
   const { topK = 6, minScore = 0.35, sourceTypes } = opts;
   const queryEmbedding = await embedText(query);
-  const usePgvector    = process.env.PGVECTOR === "true";
 
   const needsPlatform = !sourceTypes || sourceTypes.includes("platform_content");
   const PLATFORM_USER_ID = 0; // global namespace
 
-  if (usePgvector) {
-    return retrieveWithPgvector(
+  // Try pgvector first (PostgreSQL vector search), fallback to JS cosine
+  try {
+    return await retrieveWithPgvector(
       queryEmbedding, userId, topK, minScore, sourceTypes,
       needsPlatform ? PLATFORM_USER_ID : undefined,
     );
+  } catch (pgErr) {
+    logger.warn({ err: pgErr }, "pgvector unavailable — falling back to JS retriever");
   }
   try {
     return await withTimeout(

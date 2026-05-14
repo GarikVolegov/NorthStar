@@ -1,0 +1,39 @@
+{
+  "manifest_version": "0.3",
+  "name": "sentry-pp-mcp",
+  "display_name": "Sentry",
+  "version": "4.6.1",
+  "description": "Error tracking and performance monitoring - projects, issues, events, releases",
+  "author": {
+    "name": "CLI Printing Press"
+  },
+  "license": "Apache-2.0",
+  "server": {
+    "type": "binary",
+    "entry_point": "bin/sentry-pp-mcp",
+    "mcp_config": {
+      "command": "${__dirname}/bin/sentry-pp-mcp",
+      "args": [],
+      "env": {
+        "REFERENCE_AUTH_TOKEN": "${user_config.reference_auth_token}"
+      }
+    }
+  },
+  "user_config": {
+    "reference_auth_token": {
+      "type": "string",
+      "title": "REFERENCE_AUTH_TOKEN",
+      "description": "Sets REFERENCE_AUTH_TOKEN for the Sentry MCP server. Get a credential from https://sentry.io/settings/account/api/auth-tokens/.",
+      "sensitive": true,
+      "required": true
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=1.0.0",
+    "platforms": [
+      "darwin",
+      "linux",
+      "win32"
+    ]
+  }
+}

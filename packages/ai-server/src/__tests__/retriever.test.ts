@@ -38,7 +38,7 @@ function makeChunk(text: string, score: number): RetrievedChunk {
 describe("Retriever", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.PGVECTOR = "false";
+    // pgvector is default, but pool.query returns undefined → falls through to JS retriever
   });
 
   describe("embedding", () => {
@@ -81,11 +81,7 @@ describe("Retriever", () => {
   });
 
   describe("pgvector mode", () => {
-    beforeEach(() => {
-      process.env.PGVECTOR = "true";
-    });
-
-    it("queries pgvector when PGVECTOR=true", async () => {
+    it("queries pgvector as default", async () => {
       mockPoolQuery.mockResolvedValue({ rows: [] });
       const result = await retrieve("test", 1, { topK: 3, minScore: 0.30 });
       expect(mockPoolQuery).toHaveBeenCalled();
@@ -99,7 +95,6 @@ describe("Retriever", () => {
         minScore: 0.30,
         sourceTypes: ["platform_content", "document"],
       });
-      // Should include userId=0 in query params
       const sqlText = mockPoolQuery.mock.calls[0][0] as string;
       expect(sqlText).toContain("user_id = $2 OR user_id = $5");
     });
@@ -113,6 +108,13 @@ describe("Retriever", () => {
       });
       const sqlText = mockPoolQuery.mock.calls[0][0] as string;
       expect(sqlText).not.toContain("user_id = $2 OR user_id = $5");
+    });
+
+    it("falls back to JS retriever when pgvector fails", async () => {
+      mockPoolQuery.mockRejectedValue(new Error("pgvector not available"));
+      const result = await retrieve("test", 1, { topK: 3, minScore: 0.0 });
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
     });
   });
 });

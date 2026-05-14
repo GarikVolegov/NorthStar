@@ -3,6 +3,7 @@ import { db, supervisorLogs, qualityMetrics } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { register } from "@workspace/ai-server/metrics";
 import { writeAuditLog } from "../middleware/audit";
+import { rootLogger } from "../middleware/logger";
 
 const router = Router();
 
@@ -67,7 +68,7 @@ router.get("/quality", async (req: Request, res: Response) => {
       totals: totals[0] ?? { total: 0, avgEvalScore: 0, avgSupervisorScore: 0, rewrites: 0, clarifications: 0, uiTools: 0 },
     });
   } catch (err) {
-    console.error("[admin/quality] query failed:", err);
+    rootLogger.error({ err }, "[admin/quality] query failed");
     res.status(500).json({ error: String(err) });
   }
 });
@@ -135,7 +136,7 @@ router.get("/wendy-metrics", async (req: Request, res: Response) => {
       generatedAt: new Date().toISOString(),
     });
   } catch (err) {
-    console.error("[admin/wendy-metrics] error:", err);
+    rootLogger.error({ err }, "[admin/wendy-metrics] error");
     res.status(500).json({ error: String(err) });
   }
 });

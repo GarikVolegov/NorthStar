@@ -20,6 +20,7 @@ import {
   Compass,
   MapPin,
   HandCoins,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,6 +72,8 @@ const JOURNEY_LABELS: Record<string, { label: string; color: string }> = {
   },
 };
 
+type NavPhase = 'guest' | 'new-user' | 'indeciso' | 'dipendente' | 'autonomo' | 'azienda' | 'investitore';
+
 /**
  * Mappa path → factory di import dinamico.
  * Il browser esegue il fetch del chunk JS solo al primo hover;
@@ -92,8 +95,12 @@ const PREFETCH_MAP: Record<string, () => Promise<unknown>> = {
   "/amici": () => import("@/pages/amici"),
   "/coach": () => import("@/pages/coach"),
   "/validatore-idea": () => import("@/pages/validatore-idea"),
-  // Fase 4: dashboard affiliato
   "/affiliazione/dashboard": () => import("@/pages/affiliazione-dashboard"),
+  "/chi-siamo": () => import("@/pages/chi-siamo"),
+  "/come-funziona": () => import("@/pages/come-funziona"),
+  "/dashboard": () => import("@/pages/dashboard"),
+  "/archivio": () => import("@/pages/grafo-conoscenza"),
+  "/affiliazione": () => import("@/pages/affiliazione"),
 };
 
 function prefetchRoute(path: string) {
@@ -110,15 +117,59 @@ export function Navbar() {
   const [pendingFriends, setPendingFriends] = useState<number | null>(null);
   const prefersReduced = useReducedMotion();
 
-  const NAV_LINKS = [
-    { href: "/test", label: t("nav.test"), icon: FlaskConical },
-    { href: "/settori", label: t("nav.sectors"), icon: Layers },
-    { href: "/ruoli", label: "Ruoli", icon: Briefcase },
-    { href: "/lavori", label: "Lavori", icon: MapPin },
-    { href: "/crescita", label: t("nav.growth"), icon: BookOpenText },
-    { href: "/news", label: t("nav.news"), icon: Newspaper },
-    { href: "/premium", label: t("nav.premium"), icon: Crown },
-  ];
+  const phase: NavPhase = !isLoggedIn ? 'guest'
+    : !user?.journeyType ? 'new-user'
+    : ['indeciso', 'dipendente', 'autonomo', 'azienda', 'investitore'].includes(user.journeyType) ? user.journeyType as NavPhase
+    : 'new-user';
+
+  const PHASE_LINKS: Record<NavPhase, Array<{ href: string; label: string; icon: LucideIcon }>> = {
+    guest: [
+      { href: "/chi-siamo", label: "Chi siamo", icon: Users },
+      { href: "/come-funziona", label: "Come funziona", icon: BookOpenText },
+      { href: "/test", label: t("nav.test"), icon: FlaskConical },
+      { href: "/settori", label: t("nav.sectors"), icon: Layers },
+    ],
+    "new-user": [
+      { href: "/test", label: t("nav.test"), icon: FlaskConical },
+      { href: "/settori", label: t("nav.sectors"), icon: Layers },
+      { href: "/percorso", label: "Il mio percorso", icon: MapPin },
+    ],
+    indeciso: [
+      { href: "/test", label: t("nav.test"), icon: FlaskConical },
+      { href: "/settori", label: t("nav.sectors"), icon: Layers },
+      { href: "/ruoli", label: "Ruoli", icon: Briefcase },
+      { href: "/lavori", label: "Lavori", icon: MapPin },
+    ],
+    dipendente: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/lavori", label: "Lavori", icon: MapPin },
+      { href: "/coach", label: "Coach AI", icon: BrainCircuit },
+      { href: "/crescita", label: t("nav.growth"), icon: BookOpenText },
+    ],
+    autonomo: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/validatore-idea", label: "Validatore", icon: Compass },
+      { href: "/coach", label: "Coach AI", icon: BrainCircuit },
+      { href: "/settori", label: t("nav.sectors"), icon: Layers },
+      { href: "/news", label: t("nav.news"), icon: Newspaper },
+    ],
+    azienda: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/settori", label: t("nav.sectors"), icon: Layers },
+      { href: "/affiliazione", label: "Affiliazione", icon: HandCoins },
+      { href: "/crescita", label: t("nav.growth"), icon: BookOpenText },
+      { href: "/news", label: t("nav.news"), icon: Newspaper },
+    ],
+    investitore: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/settori", label: t("nav.sectors"), icon: Layers },
+      { href: "/archivio", label: "Grafo", icon: Compass },
+      { href: "/news", label: t("nav.news"), icon: Newspaper },
+      { href: "/crescita", label: t("nav.growth"), icon: BookOpenText },
+    ],
+  };
+
+  const navLinks = PHASE_LINKS[phase];
 
   useState(() => {
     if (!user?.id) return;
@@ -168,7 +219,7 @@ export function Navbar() {
 
           {/* Desktop nav links */}
           <nav className="hidden md:flex items-center gap-0.5 flex-1 justify-center">
-            {NAV_LINKS.map(({ href, label }) => {
+            {navLinks.map(({ href, label }) => {
               const isActive =
                 location === href || location.startsWith(href + "/");
               return (
@@ -292,18 +343,6 @@ export function Navbar() {
                       <Calendar className="h-4 w-4 mr-2" /> {t("nav.calendar")}
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => setLocation("/amici")}
-                      onMouseEnter={() => prefetchRoute("/amici")}
-                      className="cursor-pointer"
-                    >
-                      <Users className="h-4 w-4 mr-2" /> {t("nav.friends")}
-                      {friendsBadge ? (
-                        <span className="ml-auto text-xs font-semibold text-primary">
-                          {friendsBadge}
-                        </span>
-                      ) : null}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
                       onClick={() => setLocation("/coach")}
                       onMouseEnter={() => prefetchRoute("/coach")}
                       className="cursor-pointer"
@@ -424,7 +463,7 @@ export function Navbar() {
                 </div>
 
                 <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-                  {NAV_LINKS.map(({ href, label, icon: Icon }, i) => {
+                  {navLinks.map(({ href, label, icon: Icon }, i) => {
                     const isActive = location === href;
                     return (
                       <m.div
@@ -533,6 +572,21 @@ export function Navbar() {
                         className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
                       >
                         <Compass className="h-4 w-4" /> Validatore Idea
+                      </button>
+                      <button
+                        onClick={() => {
+                          setLocation("/amici");
+                          setMenuOpen(false);
+                        }}
+                        onMouseEnter={() => prefetchRoute("/amici")}
+                        className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                      >
+                        <Users className="h-4 w-4" /> {t("nav.friends")}
+                        {friendsBadge && (
+                          <span className="ml-auto text-xs font-semibold text-primary">
+                            {friendsBadge}
+                          </span>
+                        )}
                       </button>
                       {/* ── Fase 4: Dashboard Affiliazione (mobile) ── */}
                       {isAffiliate && (

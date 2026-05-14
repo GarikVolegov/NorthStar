@@ -317,7 +317,7 @@ export default function Sector() {
       {/* Data Freshness */}
       {sector && (
         <div className="flex justify-end mb-4">
-          <SectorFreshnessBadge updatedAt={(sector as Record<string, unknown>).updatedAt as string | undefined} />
+          <SectorFreshnessBadge updatedAt={(sector as unknown as Record<string, unknown>).updatedAt as string | undefined} />
         </div>
       )}
 

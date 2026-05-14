@@ -30,7 +30,7 @@ export interface UseSSEStreamReturn {
  * Il flush finale è sincrono per mostrare il contenuto completo.
  */
 export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamReturn {
-  const { onComplete, onError, flushIntervalMs = 50 } = options;
+  const { onComplete, onRawChunk, onError, flushIntervalMs = 50 } = options;
 
   const [content, setContent] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);

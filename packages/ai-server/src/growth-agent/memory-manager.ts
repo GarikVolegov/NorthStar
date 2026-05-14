@@ -81,7 +81,13 @@ function computeConfidence(observedCount: number): number {
 // ── Semantic similarity ─────────────────────────────────────────────────────
 
 const SIMILARITY_THRESHOLD = 0.85;
-const patternEmbeddingCache = new Map<number, number[]>();
+
+interface CacheEntry {
+  embedding: number[];
+  expiresAt: number;
+}
+const patternEmbeddingCache = new Map<number, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0, na = 0, nb = 0;
@@ -98,9 +104,9 @@ async function getPatternEmbedding(
   description: string,
 ): Promise<number[]> {
   const cached = patternEmbeddingCache.get(id);
-  if (cached) return cached;
+  if (cached && cached.expiresAt > Date.now()) return cached.embedding;
   const emb = await embedText(description);
-  patternEmbeddingCache.set(id, emb);
+  patternEmbeddingCache.set(id, { embedding: emb, expiresAt: Date.now() + CACHE_TTL_MS });
   // Keep cache bounded
   if (patternEmbeddingCache.size > 500) {
     const firstKey = patternEmbeddingCache.keys().next().value;
@@ -204,17 +210,25 @@ export async function mergeMemory(
   sessionId: number,
   extracted: ExtractedMemory,
 ): Promise<void> {
-  // ── Load ALL existing data for this user in 2 queries ────────────
+  // ── Load existing data for this user (max 1000 rows each) ───────
+  const MAX_MEMORY_ROWS = 1000;
   const [allExistingFacts, allExistingPatterns] = await Promise.all([
     db
       .select()
       .from(coachMemoryFactsTable)
-      .where(eq(coachMemoryFactsTable.userId, userId)),
+      .where(eq(coachMemoryFactsTable.userId, userId))
+      .limit(MAX_MEMORY_ROWS),
     db
       .select()
       .from(coachMemoryPatternsTable)
-      .where(eq(coachMemoryPatternsTable.userId, userId)),
+      .where(eq(coachMemoryPatternsTable.userId, userId))
+      .limit(MAX_MEMORY_ROWS),
   ]);
+
+  if (allExistingFacts.length >= MAX_MEMORY_ROWS || allExistingPatterns.length >= MAX_MEMORY_ROWS) {
+    logger.warn({ userId, facts: allExistingFacts.length, patterns: allExistingPatterns.length },
+      "mergeMemory hit row limit — memory may be truncated");
+  }
 
   const existingFactsMap = new Map(allExistingFacts.map((f) => [f.key, f]));
 

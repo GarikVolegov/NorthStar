@@ -1,5 +1,7 @@
 import { LayoutGrid } from "lucide-react";
-import { ToolCard, type ToolItem } from "./ToolCard";
+import { ToolCard } from "./ToolCard";
+import type { ToolItem } from "./ToolCard";
+export type { ToolItem };
 
 export function ToolsGrid({ tools }: { tools: ToolItem[] }) {
   return (

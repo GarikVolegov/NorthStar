@@ -4,48 +4,30 @@
 
 ---
 
-## 🔴 SICUREZZA — File Replit: regole di commit
+## 🔴 SICUREZZA — Secret: regole di commit
 
 > Queste regole si applicano a OGNI commit. Violazioni = secret esposti su GitHub.
 
-### File Replit — cosa si può committare
+### File da non committare MAI
 
-| File | Committare? | Motivo |
-|---|---|---|
-| `replit.md` | ✅ Sì | Documentazione tecnica — **ZERO secret, ZERO env var reali** |
-| `.replit` | ✅ Sì | Configurazione run/workflow — **solo comandi, nessun valore segreto** |
-| `replit.nix` | ✅ Sì | Dipendenze di sistema — **nomi pacchetti, mai chiavi** |
-| `.replitignore` | ✅ Sì | Pattern ignore |
-| `.replit_integration_files/` | ⚠️ Solo se privi di secret | Controllare prima con `grep -r 'sk-\|Bearer\|password' .replit_integration_files/` |
-| `.env` | ❌ MAI | Contiene secret reali |
-| `.env.local` | ❌ MAI | Contiene secret reali |
-| `secrets.json` | ❌ MAI | Contiene secret reali |
+| File/Pattern | Motivo |
+|---|---|
+| `.env` | Contiene secret reali |
+| `.env.*` (eccetto `.env.example`) | Contiene secret reali |
+| `secrets.json` | Contiene secret reali |
+| Qualsiasi file con `sk-`, `Bearer `, `password=` | API key o token |
 
-### Regole esplicite per `replit.md` e `replit.nix`
+### Regola esplicita per `.env.example`
 
 ```
-❌ SBAGLIATO — secret inline in replit.md
-JWT_SECRET=eyJhbGci...
-OPENAI_API_KEY=sk-proj-ABC123
-DATABASE_URL=postgresql://northstar:password_reale@...
+✅ CORRETTO — solo placeholder, nessun valore reale
+JWT_SECRET=
+OPENAI_API_KEY=
+DATABASE_URL=postgresql://user:password@localhost:5432/northstar
 
-✅ CORRETTO — solo riferimento al nome della variabile
-JWT_SECRET       # generato con pnpm secrets, iniettato da Replit Secrets tab
-OPENAI_API_KEY   # da Replit Secrets tab
-DATABASE_URL     # da Replit Secrets tab o .env locale (non committato)
-```
-
-```nix
-# ❌ SBAGLIATO — mai in replit.nix
-environment.variables.OPENAI_API_KEY = "sk-proj-ABC123";
-
-# ✅ CORRETTO — replit.nix contiene SOLO pacchetti di sistema
-{ pkgs }: {
-  deps = [
-    pkgs.nodejs_20
-    pkgs.postgresql
-  ];
-}
+❌ SBAGLIATO — valori reali o di default
+JWT_SECRET=eyJhbGci...   # MAI un JWT valido
+OPENAI_API_KEY=sk-proj-ABC123  # MAI una chiave reale
 ```
 
 ### Checklist sicurezza pre-commit
@@ -56,14 +38,12 @@ Prima di ogni `git commit` verifica:
 # 1. Cerca pattern di secret nel diff
 git diff --staged | grep -iE '(sk-|sk-proj-|Bearer |password=|secret=|api_key=|OPENAI|JWT_SECRET)'
 
-# 2. Cerca in file Replit specificamente
-git diff --staged -- replit.md .replit replit.nix | grep -iE '(sk-|password|secret|key)=.'
+# 2. Cerca file di ambiente
+git diff --staged --name-only | grep -iE '\.env$'
 
 # 3. Se il grep torna output → STOP, non committare
-# 4. Rimuovi il secret, usa solo il nome della variabile come riferimento
+# 4. Rimuovi il secret, usa solo variabili d'ambiente o .env.example
 ```
-
-> **Tip Replit**: i secret vanno nella tab "Secrets" di Replit. Da lì vengono iniettati automaticamente come env vars senza mai toccare i file committati.
 
 ---
 
@@ -174,11 +154,11 @@ security(jwt): aumenta scadenza token da 1d a 7d
 
 ## Checklist
 - [ ] Nessun secret in commit (API key, password, token)
-- [ ] File replit.md / .replit / replit.nix senza valori segreti
 - [ ] Typecheck passa (`pnpm typecheck`)
 - [ ] Test passano (`pnpm test:unit`)
-- [ ] `replit.md` aggiornato se cambio architettura o nuovi file chiave
 - [ ] `*_RULES.md` aggiornato se cambio pattern o convenzioni
+- [ ] README.md aggiornato se cambio architettura o setup
+- [ ] Docs AI (`docs/ai-modules/`) aggiornate se cambio AI pipeline
 
 ## Screenshot / output (se UI o API)
 <!-- Incolla output curl, screenshot, ecc. -->
@@ -192,6 +172,32 @@ security(jwt): aumenta scadenza token da 1d a 7d
 - Eliminare il branch dopo il merge
 
 ---
+
+## CI/CD — GitHub Actions Workflows
+
+I workflow sono in `.github/workflows/`:
+
+| Workflow | Trigger | Cosa fa |
+|---|---|---|
+| `ci.yml` | Push main/develop, PR main | Typecheck, test unitari (Vitest), test AI server, test Python, eval regression, E2E (Playwright) |
+| `staging.yml` | Push develop | Typecheck → test → DB migration → Deploy Railway staging → Sentry release |
+| `production.yml` | Push main | Typecheck → test → DB migration → Deploy Railway production → Sentry release |
+| `rollback.yml` | Manuale | Rollback trigger |
+| `mobile-qa.yml` | Schedule/trigger | Lighthouse CI + Playwright mobile tests |
+
+### Regole CI/CD
+
+- **Non mergiare su main** se CI fallisce (typecheck, test, o eval)
+- **Sentry release** automatica su staging e production
+- **Migration DB automatica** in staging e production — assicurati che la migration sia safe (non-breaking)
+- **Eval regression** blocca il merge se il quality score scende sotto soglia
+
+## pnpm Workspace — Convenzioni
+
+- Usa `pnpm --filter <package>` per eseguire comandi in un workspace specifico
+- Usa `pnpm -r` per eseguire comandi in tutti i workspace
+- Le dipendenze condivise vanno nel catalogo `pnpm-workspace.yaml` (sezione `catalog`)
+- `pnpm-lock.yaml` va SEMPRE committato
 
 ## .gitignore — checklist
 
@@ -229,9 +235,10 @@ Thumbs.db
 
 ## Gotchas git
 
-- **`git add .` su Replit**: attenzione, può raccogliere file temporanei. Usa sempre `git add -p` o `git add <file>` specifici.
+- **`git add .`**: attenzione, può raccogliere file temporanei. Usa sempre `git add -p` o `git add <file>` specifici.
 - **`pnpm-lock.yaml`**: va committato. Mai ignorarlo o cancellarlo manualmente.
 - **`uv.lock`**: va committato (Python deps).
 - **`dist/`**: NON committare — build artefatto, generato dalla CI.
 - **Secret nel diff**: se hai già committato un secret per errore, non basta fare un nuovo commit che lo rimuove. Devi fare `git filter-branch` o contattare GitHub per rimuoverlo dalla storia.
-- **Replit Secrets tab**: è il posto giusto per i secret su Replit. Non usare mai `.env` committato come workaround.
+- **Workspace cross-deps**: se modifichi `packages/db/`, ricordati di rigenerare i tipi per `packages/api-client-react/` con `pnpm build:api-client`
+- **Drizzle migration**: genera SEMPRE una migration dopo aver modificato lo schema (`pnpm db:generate`) prima di committare

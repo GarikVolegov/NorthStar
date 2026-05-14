@@ -14,6 +14,7 @@ export type Domain =
   | "trading"
   | "finance"
   | "relationships"
+  | "health"
   | "general";
 
 export type Intent =
@@ -49,6 +50,7 @@ DOMAINS disponibili:
 - trading:       operatività attiva su mercati finanziari, psicologia del trading, strategie di trading, analisi tecnica/fondamentale, forex, crypto, macroeconomia, CFD, futures, opzioni, risk management nel trading. BREVE/MEDIO TERMINE, ATTIVO.
 - finance:       finanza personale, gestione patrimoniale PASSIVA, budget, risparmio, investimenti ETF, PAC, FIRE, debiti, mutuo, fondo emergenza, pensione integrativa, TFR, ottimizzazione fiscale. LUNGO TERMINE, STRUTTURALE.
 - relationships: networking autentico, comunicazione, mentorship, relazioni professionali, conflitti team, leadership
+- health:       benessere psicofisico, stress, sonno, alimentazione, attività fisica, burnout, ansia, salute mentale, rilassamento, mindfulness, equilibrio vita-lavoro
 - general:       tutto il resto, domande multi-dominio, conversazione generica
 
 INTENTS disponibili:
@@ -109,6 +111,7 @@ const DOMAIN_KEYWORDS: Record<Domain, string[]> = {
   trading:       ["trading", "mercato", "xauusd", "forex", "macro", "trade", "borsa", "crypto", "leva", "margin", "stop loss", "take profit", "volatilità", "short", "long", "analisi tecnica", "supporto", "resistenza", "position sizing", "risk management", "drawdown", "fomo", "revenge", "backtest", "strategia", "setup", "entry", "exit", "tp", "sl"],
   finance:       ["budget", "risparmio", "investimento", "etf", "debito", "banca", "mutuo", "fire", "patrimonio", "soldi", "credito", "interessi", "tasso", "inflazione", "cashflow", "entrate", "uscite", "patrimonio netto", "fondo emergenza", "pensione integrativa", "tfr", "piano accumulo", "pac", "bollo", "capital gain", "plusvalenza", "minusvalenza"],
   relationships: ["networking", "relazione", "comunicazione", "mentore", "conflitto", "linkedin", "collega", "team", "leadership", "collaborazione"],
+  health:        ["stress", "sonno", "dormire", "alimentaz", "nutrizione", "dieta", "attività fisica", "palestra", "yoga", "meditazion", "mindfulness", "burnout", "stanco", "affaticamento", "rilassamento", "benessere", "salute", "ansia", "wellness", "respiro"],
   general:       [],
 };
 

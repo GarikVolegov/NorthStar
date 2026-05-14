@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-05-14T16:04:38.3074064Z",
+  "printing_press_version": "4.6.1",
+  "api_name": "openai",
+  "display_name": "Openai",
+  "cli_name": "openai-pp-cli",
+  "owner": "garik-v",
+  "printer_name": "Garik V.",
+  "spec_url": "https://raw.githubusercontent.com/openai/openai-openapi/master/openapi.yaml",
+  "mcp_binary": "openai-pp-mcp",
+  "mcp_tool_count": 242,
+  "mcp_ready": "full",
+  "api_version": "2.3.0",
+  "auth_type": "bearer_token",
+  "auth_env_vars": [
+    "OPENAI_API_KEY_AUTH"
+  ]
+}

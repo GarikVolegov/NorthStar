@@ -1,4 +1,4 @@
-import rateLimit, { type Options } from "express-rate-limit";
+import rateLimit, { ipKeyGenerator, type Options } from "express-rate-limit";
 import type { Request } from "express";
 
 let redisStoreInitialized = false;
@@ -44,6 +44,18 @@ export const wendyLimiter = rateLimit(
     max: 30,
     skip: (req: Request) =>
       process.env.NODE_ENV === "test" || process.env.USE_MOCK_AI === "true",
+  })
+);
+
+// Per-IP rate limiter for AI endpoints — stricter than user-level
+export const wendyIpLimiter = rateLimit(
+  buildOptions({
+    windowMs: 60 * 1000,
+    max: 20,
+    keyGenerator: (req: Request) => ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? "unknown"),
+    skip: (req: Request) =>
+      process.env.NODE_ENV === "test" || process.env.USE_MOCK_AI === "true",
+    message: { error: "Troppe richieste da questo IP. Riprova tra poco." },
   })
 );
 

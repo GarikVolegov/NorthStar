@@ -12,6 +12,21 @@ export const wendyRequestsTotal = new promClient.Counter({
   registers: [register],
 });
 
+export const wendyErrorsTotal = new promClient.Counter({
+  name: "wendy_errors_total",
+  help: "Total errors by phase and domain",
+  labelNames: ["phase", "domain"] as const,
+  registers: [register],
+});
+
+export const wendyMemoryOpsDuration = new promClient.Histogram({
+  name: "wendy_memory_ops_duration_seconds",
+  help: "Duration of memory extract/merge operations",
+  labelNames: ["operation"] as const,
+  buckets: [0.1, 0.5, 1, 2, 5, 10, 30],
+  registers: [register],
+});
+
 export const wendyLatencySeconds = new promClient.Histogram({
   name: "wendy_latency_seconds",
   help: "Latency of each processing phase in seconds",
@@ -44,6 +59,14 @@ export const wendyRouterConfidenceHistogram = new promClient.Histogram({
 
 export function recordRequest(domain: Domain, intent: Intent): void {
   wendyRequestsTotal.inc({ domain, intent });
+}
+
+export function recordError(phase: string, domain: string): void {
+  wendyErrorsTotal.inc({ phase, domain });
+}
+
+export function recordMemoryOpDuration(operation: string, seconds: number): void {
+  wendyMemoryOpsDuration.observe({ operation }, seconds);
 }
 
 export function recordSupervisorRewrite(domain: Domain): void {

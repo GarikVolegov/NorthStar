@@ -9,7 +9,7 @@
     "dev:server": "pnpm --filter @northstar/server run dev",
     "dev:web": "pnpm --filter @northstar/web run dev",
     "dev:orientamento": "pnpm --filter @northstar/web run dev",
-    "dev:all": "concurrently -n server,web --kill-others \"docker compose up -d postgres redis\" \"pnpm run dev:server\" \"pnpm run dev:web\"",
+    "dev:all": "concurrently -n docker,server,web --kill-others-on-fail \"docker compose up -d postgres redis || echo Docker not available, using local services\" \"pnpm run dev:server\" \"pnpm run dev:web\"",
     "// ── BUILD ─────────────────────────────────────────": "---",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "build:server": "pnpm --filter @northstar/server run build",

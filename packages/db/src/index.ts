@@ -1,14 +1,6 @@
-/**
- * FIXED: safe singleton with early validation.
- *
- * Changes from the original:
- * 1. DATABASE_URL is validated immediately at module load — fail fast.
- * 2. Pool is initialised once synchronously at module import time.
- *    This eliminates the race condition where two concurrent requests
- *    both see `_pool === null` before either sets it (can happen in
- *    Node.js cluster mode or serverless cold-start with parallel invocations).
- * 3. The Proxy wrappers are kept for API compatibility.
- */
+import dotenv from "dotenv";
+dotenv.config();
+
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import * as schema from "./schema";

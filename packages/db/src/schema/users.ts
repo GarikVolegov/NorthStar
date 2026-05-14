@@ -19,6 +19,7 @@ export const usersTable = pgTable("users", {
   passwordHash: text("password_hash"),
   googleId: text("google_id").unique(),
   avatarUrl: text("avatar_url"),
+  bannerUrl: text("banner_url"),
 
   // ── Passo 4: username univoco per profilo pubblico ────────────────────
   username: text("username").unique(),

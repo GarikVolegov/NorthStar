@@ -1,14 +1,18 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+import "express-async-errors";
+process.on("unhandledRejection", (reason) => {
+  console.error("[fatal] Unhandled Promise rejection:", reason);
+});
 import "./tracing";
+import http from "node:http";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { register, getMetricsContentType, getMetrics } from "@workspace/ai-server/metrics";
-import { requestIdMiddleware } from "./middleware/request-id";
-import { globalLimiter, wendyLimiter, adminLimiter } from "./middleware/rate-limit";
-import { logger } from "@workspace/ai-server/logger";
+import { requestLoggerMiddleware, rootLogger } from "./middleware/logger";
+import { globalLimiter, wendyLimiter, wendyIpLimiter, adminLimiter } from "./middleware/rate-limit";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -17,7 +21,7 @@ const PORT = process.env.PORT || 3001;
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
-app.use(requestIdMiddleware);
+app.use(requestLoggerMiddleware);
 app.use(globalLimiter);
 
 // Routes
@@ -28,14 +32,40 @@ import coachRouter from "./routes/coach";
 import wendyRouter from "./routes/wendy";
 import usersRouter from "./routes/users";
 import adminRouter from "./routes/admin";
+import friendsRouter from "./routes/friends";
+import profileRouter from "./routes/profile";
+import knowledgeRouter from "./routes/knowledge";
+import wikiRouter from "./routes/wiki";
+import interviewRouter from "./routes/interview";
+import authRouter from "./routes/auth";
+import statsRouter from "./routes/stats";
+import newsRouter from "./routes/news";
+import trendingRouter from "./routes/trending";
+import voiceRouter from "./routes/voice";
+import leaderboardRouter from "./routes/leaderboard";
+import xpRouter from "./routes/xp";
+import badgesRouter from "./routes/badges";
 
+app.use("/api/auth", authRouter);
+app.use("/api/profile", profileRouter);
+app.use("/api/users", usersRouter);
+app.use("/api/friends", friendsRouter);
 app.use("/api/objectives", objectivesRouter);
 app.use("/api/calendar", calendarRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/coach", coachRouter);
-app.use("/api/wendy", wendyLimiter, wendyRouter);
-app.use("/api/users", usersRouter);
-app.use("/api/admin", adminLimiter, adminRouter);
+app.use("/api/wendy", wendyRouter);
+app.use("/api/admin", adminRouter);
+app.use("/api/knowledge", knowledgeRouter);
+app.use("/api/wiki", wikiRouter);
+app.use("/api/interview", interviewRouter);
+app.use("/api/stats", statsRouter);
+app.use("/api/news", newsRouter);
+app.use("/api/trending-sectors", trendingRouter);
+app.use("/api/voice", voiceRouter);
+app.use("/api/leaderboard", leaderboardRouter);
+app.use("/api/xp", xpRouter);
+app.use("/api/badges", badgesRouter);
 
 // Kubernetes liveness probe — always 200 if process is alive
 app.get("/api/health/live", (req, res) => {
@@ -84,7 +114,7 @@ app.get("/api/metrics", async (req, res) => {
     const metrics = await getMetrics();
     res.send(metrics);
   } catch (err) {
-    logger.error({ err }, "failed to serve metrics");
+    rootLogger.error({ err }, "failed to serve metrics");
     res.status(500).json({ error: "metrics unavailable" });
   }
 });
@@ -117,7 +147,7 @@ app.use(
     res: express.Response,
     next: express.NextFunction,
   ) => {
-    logger.error({ err, requestId: req.requestId }, "unhandled error");
+    (req.log ?? rootLogger).error({ err }, "unhandled error");
     res.status(500).json({
       error: "Internal Server Error",
       message: "Something went wrong",
@@ -125,6 +155,13 @@ app.use(
   },
 );
 
-app.listen(PORT, () => {
-  logger.info({ port: PORT }, "NorthStar API Server started");
+const httpServer = http.createServer(app);
+const { createWsServer } = await import("@workspace/ws-server");
+const wss = createWsServer(httpServer);
+
+// Rende il WebSocket server accessibile ai route handler
+import("./ws").then(({ setWss }) => setWss(wss));
+
+httpServer.listen(PORT, () => {
+  rootLogger.info({ port: PORT, wsPath: "/ws" }, "NorthStar API Server started");
 });

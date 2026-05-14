@@ -27,12 +27,13 @@ import jwt from "jsonwebtoken";
 const { verify } = jwt;
 import type { JwtPayload } from "jsonwebtoken";
 import { ServerWsEvent, ClientWsEvent } from "@workspace/api-zod/ws-events";
+import { logger } from "./logger";
 
 // ─── JWT verification ─────────────────────────────────────────────────────
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
-  console.error("[ws] JWT_SECRET not configured — cannot start server");
+  logger.fatal("JWT_SECRET not configured — cannot start server");
   process.exit(1);
 }
 
@@ -78,6 +79,7 @@ export interface NorthStarWss {
   isOnline(userId: number): boolean;
   connectionCount(): number;
   raw: WebSocketServer;
+  health(): { status: string; connections: number; uptime: number };
 }
 
 export function createWsServer(httpServer: Server): NorthStarWss {
@@ -101,13 +103,19 @@ export function createWsServer(httpServer: Server): NorthStarWss {
 
   wss.on("close", () => clearInterval(heartbeat));
 
+  logger.info("WebSocket server started on /ws");
+
   // ── New connection ───────────────────────────────────────────────────────
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
+    const clientIp = req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? "unknown";
+    logger.debug({ clientIp }, "new WebSocket connection");
+
     // Check Authorization header first (server-side clients)
     const headerToken = getTokenFromRequest(req);
     if (headerToken) {
       const userId = extractUserIdFromToken(headerToken);
       if (!userId) {
+        logger.warn({ clientIp }, "WS auth failed — invalid token in header");
         ws.close(4001, "Unauthorized: invalid token");
         return;
       }
@@ -116,6 +124,7 @@ export function createWsServer(httpServer: Server): NorthStarWss {
       annotated._userId = userId;
       addConnection(userId, ws);
       ws.send(JSON.stringify({ type: "pong" }));
+      logger.info({ userId, clientIp }, "WS authenticated via header");
       setupMessageHandler(ws, userId);
       return;
     }
@@ -133,6 +142,7 @@ export function createWsServer(httpServer: Server): NorthStarWss {
         if (raw?.type === "auth" && typeof raw?.token === "string") {
           const userId = extractUserIdFromToken(raw.token);
           if (!userId) {
+            logger.warn({ clientIp }, "WS auth failed — invalid token in auth message");
             ws.close(4001, "Unauthorized: invalid token");
             return;
           }
@@ -142,11 +152,14 @@ export function createWsServer(httpServer: Server): NorthStarWss {
           addConnection(userId, ws);
           ws.send(JSON.stringify({ type: "auth_ok" }));
           ws.removeListener("message", onFirstMessage);
+          logger.info({ userId, clientIp }, "WS authenticated via message");
           setupMessageHandler(ws, userId);
         } else {
+          logger.warn({ clientIp }, "WS first message was not auth");
           ws.close(4001, "Unauthorized: send auth first");
         }
       } catch {
+        logger.warn({ clientIp }, "WS first message parse failed");
         ws.close(4001, "Unauthorized: invalid message");
       }
     });
@@ -154,6 +167,7 @@ export function createWsServer(httpServer: Server): NorthStarWss {
     // Timeout: if no auth within 10s, close
     const authTimeout = setTimeout(() => {
       if (!authenticated) {
+        logger.warn({ clientIp }, "WS auth timeout");
         pendingAuth.delete(ws);
         ws.close(4001, "Unauthorized: auth timeout");
       }
@@ -162,10 +176,14 @@ export function createWsServer(httpServer: Server): NorthStarWss {
     ws.once("close", () => {
       clearTimeout(authTimeout);
       pendingAuth.delete(ws);
-      if (annotated._userId) removeConnection(annotated._userId, ws);
+      if (annotated._userId) {
+        removeConnection(annotated._userId, ws);
+        logger.info({ userId: annotated._userId }, "WS connection closed");
+      }
     });
 
-    ws.on("error", () => {
+    ws.on("error", (err) => {
+      logger.warn({ err, clientIp }, "WS connection error");
       clearTimeout(authTimeout);
       pendingAuth.delete(ws);
       if (annotated._userId) removeConnection(annotated._userId, ws);
@@ -206,13 +224,19 @@ export function createWsServer(httpServer: Server): NorthStarWss {
 
     emit(userId: number, event: ServerWsEvent): void {
       const sockets = activeConnections.get(userId);
-      if (!sockets || sockets.size === 0) return;
+      if (!sockets || sockets.size === 0) {
+        logger.debug({ userId, eventType: event.type }, "WS emit — user offline");
+        return;
+      }
       const payload = JSON.stringify(event);
+      let sent = 0;
       for (const socket of sockets) {
         if (socket.readyState === WebSocket.OPEN) {
           socket.send(payload);
+          sent++;
         }
       }
+      logger.debug({ userId, eventType: event.type, sent }, "WS emit");
     },
 
     isOnline(userId: number): boolean {
@@ -226,6 +250,15 @@ export function createWsServer(httpServer: Server): NorthStarWss {
         total += sockets.size;
       }
       return total;
+    },
+
+    health(): { status: string; connections: number; uptime: number } {
+      const uptime = process.uptime();
+      return {
+        status: "ok",
+        connections: this.connectionCount(),
+        uptime: Math.floor(uptime),
+      };
     },
   };
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, ArrowRight, Sparkles, BrainCircuit, GraduationCap, Zap } from "lucide-react";
 

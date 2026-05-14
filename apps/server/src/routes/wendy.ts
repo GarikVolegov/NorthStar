@@ -3,7 +3,6 @@ import { z } from "zod/v4";
 import OpenAI from "openai";
 import { requireAuth } from "../middleware/auth";
 import { writeAuditLog } from "../middleware/audit";
-import type { LoggerFields } from "@workspace/ai-server/logger";
 
 const router = Router();
 
@@ -31,11 +30,9 @@ function getOpenAI(): OpenAI {
 }
 
 router.post("/ask", requireAuth, async (req: Request, res: Response) => {
-  const requestId = req.requestId;
   const userId = req.user!.id;
   const data = askSchema.parse(req.body);
-  const logger = (await import("@workspace/ai-server/logger")).logger;
-  const logFields: LoggerFields = { userId, requestId };
+  const log = req.log;
 
   // ── RAG retrieval ──────────────────────────────────────────
   let chunks: Array<{ content: string; source: string; score: number }> = [];
@@ -47,7 +44,7 @@ router.post("/ask", requireAuth, async (req: Request, res: Response) => {
       sourceTypes: ["platform_content", "document", "persona_example"],
     });
   } catch (err) {
-    logger.warn({ err, ...logFields }, "wendy RAG retrieval failed");
+    log.warn({ err }, "wendy RAG retrieval failed");
   }
 
   // ── Build context ──────────────────────────────────────────
@@ -110,10 +107,25 @@ router.post("/ask", requireAuth, async (req: Request, res: Response) => {
     writeAuditLog(req, {
       action: "agent_message",
       category: "agent_action",
-      metadata: { messageLength: data.message.length, chunkCount: chunks.length },
+      metadata: {
+        messageLength: data.message.length,
+        chunkCount: chunks.length,
+        sessionId: data.sessionId,
+        model: "gpt-4o-mini",
+        endpoint: "wendy/ask",
+      },
     });
   } catch (err) {
-    logger.error({ err, ...logFields }, "wendy ask error");
+    log.error({ err }, "wendy ask error");
+    writeAuditLog(req, {
+      action: "agent_error",
+      category: "agent_action",
+      metadata: {
+        messageLength: data.message.length,
+        error: String(err).slice(0, 500),
+        endpoint: "wendy/ask",
+      },
+    });
     res.write(`data: ${JSON.stringify({ type: "error", message: "Errore durante la generazione della risposta" })}\n\n`);
     res.end();
   }
@@ -127,9 +139,8 @@ const voiceSchema = z.object({
 });
 
 router.post("/voice", requireAuth, async (req: Request, res: Response) => {
-  const requestId = req.requestId;
   const data = voiceSchema.parse(req.body);
-  const logger = (await import("@workspace/ai-server/logger")).logger;
+  const log = req.log;
 
   try {
     const { wendyTextToSpeech } = await import("@workspace/ai-server/audio");
@@ -151,7 +162,7 @@ router.post("/voice", requireAuth, async (req: Request, res: Response) => {
     res.setHeader("Content-Length", audioBuffer.length.toString());
     res.send(audioBuffer);
   } catch (err) {
-    logger.error({ err, requestId }, "wendy voice error");
+    log.error({ err }, "wendy voice error");
     res.status(500).json({ error: "TTS generation failed", message: String(err) });
   }
 });

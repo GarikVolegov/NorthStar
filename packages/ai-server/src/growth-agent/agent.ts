@@ -17,8 +17,9 @@ import type { CoTResult } from "./chain-of-thought";
 import type { RouteDecision } from "./router-agent";
 import type { SupervisorResult } from "./supervisor-agent";
 import { logger, type LoggerFields } from "../logger";
-import { recordRequest, recordLlmTokens } from "../metrics";
+import { recordRequest, recordError, recordLlmTokens } from "../metrics";
 import { wendyLatencySeconds } from "../metrics";
+import { startSpan } from "../tracing";
 import { FF } from "../feature-flags";
 import { withTimeout } from "../utils";
 
@@ -26,6 +27,7 @@ import "./specialists/career-agent";
 import "./specialists/mindset-agent";
 import "./specialists/habits-agent";
 import "./specialists/trading-agent";
+import "./specialists/health-agent";
 
 export const GROWTH_AGENT_MODEL       = "gpt-4o";
 export const GROWTH_AGENT_VOICE_MODEL = "gpt-4o-mini";
@@ -110,6 +112,7 @@ export async function* runGrowthAgent(
         })();
       }
     } catch (err) {
+      recordError("voice", "general");
       logger.error({ err, ...logFields }, "voice fast path failed");
       yield { type: "error", message: err instanceof Error ? err.message : String(err) };
     }
@@ -122,11 +125,17 @@ export async function* runGrowthAgent(
   const [routeDecision, userMemory] = await Promise.all([
     (async () => {
       const endRouterTimer = wendyLatencySeconds.startTimer({ phase: "router" });
-      const result = await routerAgent.route(userMessage, history, requestId);
-      endRouterTimer();
-      return result;
+      const routerSpan = startSpan("router", { requestId });
+      try {
+        const result = await routerAgent.route(userMessage, history, requestId);
+        return result;
+      } finally {
+        routerSpan.end();
+        endRouterTimer();
+      }
     })(),
     loadMemory(userId).catch((err) => {
+      recordError("memory_load", "general");
       logger.warn({ err, ...logFields }, "memory load failed");
       return { facts: [], patterns: [] } as UserMemory;
     }),
@@ -246,12 +255,14 @@ export async function* runGrowthAgent(
 
   const conversationSummary = buildConversationSummary(history);
 
+  const ragSpan = startSpan("rag_retrieval", { requestId });
   const [personaExamples, documentChunks, platformChunks, cot] = await Promise.all([
     retrieve(userMessage, userId, { topK: 3, minScore: 0.30, sourceTypes: ["persona_example"] }),
     retrieve(userMessage, userId, { topK: 5, minScore: 0.35, sourceTypes: ["document", "user_note"] }),
     retrieve(userMessage, userId, { topK: 3, minScore: 0.30, sourceTypes: ["platform_content"] }),
     FF.chainOfThought ? runChainOfThought(userId, userMessage, conversationSummary) : Promise.resolve(null),
   ]);
+  ragSpan.end();
 
   endRagTimer();
 
@@ -301,6 +312,7 @@ export async function* runGrowthAgent(
     yield { type: "status", value: "✍️ Generando risposta..." };
 
     const endLlmTimer = wendyLatencySeconds.startTimer({ phase: "llm" });
+    const llmSpan = startSpan("llm_generation", { requestId, domain: routeDecision.domain, intent: routeDecision.intent });
 
     const stream = await openai.chat.completions.create({
       model: GROWTH_AGENT_MODEL,
@@ -335,14 +347,17 @@ export async function* runGrowthAgent(
       }
     }
 
+    llmSpan.end();
     endLlmTimer();
     const fullText = tokenBuffer.join("");
     recordLlmTokens(GROWTH_AGENT_MODEL, fullText.length);
 
     const endSupervisorTimer = wendyLatencySeconds.startTimer({ phase: "supervisor" });
+    const supervisorSpan = startSpan("supervisor_evaluation", { requestId, domain: routeDecision.domain, intent: routeDecision.intent });
 
     if (finishReason === "tool_calls" && toolCallName) {
-      endSupervisorTimer();
+    supervisorSpan.end();
+    endSupervisorTimer();
       let args: UiToolArgs;
       try {
         args = JSON.parse(toolCallArgs) as UiToolArgs;
@@ -391,6 +406,7 @@ export async function* runGrowthAgent(
       }, "supervisor PASS");
     }
 
+    supervisorSpan.end();
     endSupervisorTimer();
 
     const CHUNK_SIZE = 4;
@@ -407,6 +423,7 @@ export async function* runGrowthAgent(
     scheduleMemorySave(finalText, sessionId ?? Date.now());
     logger.info({ ...logFields, responseLength: finalText.length }, "response completed");
   } catch (err) {
+    recordError("llm_generation", routeDecision.domain);
     logger.error({ err, ...logFields }, "response generation failed");
     yield { type: "error", message: err instanceof Error ? err.message : String(err) };
   }

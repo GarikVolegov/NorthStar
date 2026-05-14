@@ -1,0 +1,51 @@
+version: 2
+project_name: openai-pp-cli
+changelog:
+  disable: true
+builds:
+  - id: openai-pp-cli
+    main: ./cmd/openai-pp-cli
+    binary: openai-pp-cli
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X openai-pp-cli/internal/cli.version={{ .Version }}
+    targets:
+      - darwin_amd64
+      - darwin_arm64
+      - linux_amd64
+      - linux_arm64
+      - windows_amd64
+      - windows_arm64
+  - id: openai-pp-mcp
+    main: ./cmd/openai-pp-mcp
+    binary: openai-pp-mcp
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+    targets:
+      - darwin_amd64
+      - darwin_arm64
+      - linux_amd64
+      - linux_arm64
+      - windows_amd64
+      - windows_arm64
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+checksum:
+  name_template: checksums.txt
+brews:
+  - name: openai-pp-cli
+    repository:
+      owner: garik-v
+      name: homebrew-tap
+    homepage: "https://github.com/garik-v/openai-pp-cli"
+    description: "The OpenAI REST API. Please see https://platform.openai.com/docs/api-reference for more details."
+    install: |
+      bin.install "openai-pp-cli"
+      bin.install "openai-pp-mcp"

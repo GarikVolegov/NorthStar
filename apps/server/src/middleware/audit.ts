@@ -1,5 +1,6 @@
 import type { Request } from "express";
 import { db, auditLogTable, hashIp } from "@workspace/db";
+import { rootLogger } from "./logger";
 
 interface AuditOptions {
   action: string;
@@ -20,6 +21,7 @@ export async function writeAuditLog(req: Request | null, opts: AuditOptions): Pr
       userAgent: req?.headers?.["user-agent"] ?? null,
     });
   } catch (err) {
-    console.error("[audit] failed to write log:", err);
+    const log = req?.log ?? rootLogger;
+    log.error({ err }, "failed to write audit log");
   }
 }

@@ -64,6 +64,13 @@
       "when": 1747000000000,
       "tag": "0008_add_route_logs",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1778771265769,
+      "tag": "0009_add_gamification_and_missing",
+      "breakpoints": true
     }
   ]
 }

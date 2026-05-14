@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-05-14T16:04:36.1603349Z",
+  "printing_press_version": "4.6.1",
+  "api_name": "sentry",
+  "display_name": "Sentry",
+  "cli_name": "sentry-pp-cli",
+  "owner": "garik-v",
+  "printer_name": "Garik V.",
+  "spec_url": "https://raw.githubusercontent.com/getsentry/sentry-api-schema/main/openapi-derefed.json",
+  "catalog_entry": "sentry",
+  "category": "monitoring",
+  "description": "Error tracking and performance monitoring - projects, issues, events, releases",
+  "mcp_binary": "sentry-pp-mcp",
+  "mcp_tool_count": 209,
+  "mcp_ready": "full",
+  "api_version": "v0",
+  "auth_type": "bearer_token",
+  "auth_env_vars": [
+    "REFERENCE_AUTH_TOKEN"
+  ],
+  "auth_key_url": "https://sentry.io/settings/account/api/auth-tokens/"
+}

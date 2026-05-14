@@ -125,8 +125,7 @@ router.post("/sessions/:id/ask", requireAuth, async (req, res) => {
     return;
   }
 
-  const requestId = req.requestId;
-  const logger = (await import("@workspace/ai-server/logger")).logger;
+  const log = req.log;
 
   // ── Load memory ────────────────────────────────────────────
   let memorySection = "";
@@ -135,7 +134,7 @@ router.post("/sessions/:id/ask", requireAuth, async (req, res) => {
     const userMemory = await loadMemory(userId);
     memorySection = buildMemorySection(userMemory);
   } catch (err) {
-    logger.warn({ err, userId, requestId }, "coach memory load failed");
+    log.warn({ err }, "coach memory load failed");
   }
 
   // ── Build messages array ────────────────────────────────────
@@ -201,23 +200,26 @@ router.post("/sessions/:id/ask", requireAuth, async (req, res) => {
     (async () => {
       try {
         const { extractMemory, mergeMemory } = await import("@workspace/ai-server/growth-agent");
+        const { withTimeout } = await import("@workspace/ai-server/utils");
         const lastTurns = updatedMessages.slice(-8);
-        const extracted = await extractMemory(
-          lastTurns.map((m: { role: string; content: string }) => ({ role: m.role, content: m.content }))
+        const extracted = await withTimeout(
+          extractMemory(lastTurns.map((m: { role: string; content: string }) => ({ role: m.role, content: m.content }))),
+          5000,
+          "extractMemory",
         );
         if (extracted && (extracted.facts.length > 0 || extracted.patterns.length > 0)) {
-          await mergeMemory(userId, id, extracted);
-          logger.info({ userId, requestId, facts: extracted.facts.length, patterns: extracted.patterns.length }, "coach memory saved");
+          await withTimeout(mergeMemory(userId, id, extracted), 3000, "mergeMemory");
+          log.info({ facts: extracted.facts.length, patterns: extracted.patterns.length }, "coach memory saved");
         }
       } catch (err) {
-        logger.warn({ err, userId, requestId }, "coach memory save failed");
+        log.warn({ err }, "coach memory save failed/timed out");
       }
     })();
 
     res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
     res.end();
   } catch (err) {
-    logger.error({ err, userId, requestId }, "coach ask error");
+    log.error({ err }, "coach ask error");
     res.write(`data: ${JSON.stringify({ type: "error", message: "Errore durante la generazione" })}\n\n`);
     res.end();
   }

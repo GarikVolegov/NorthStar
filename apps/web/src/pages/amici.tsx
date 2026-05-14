@@ -3,13 +3,16 @@ import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { useChatEncryption } from "@/hooks/useChatEncryption";
+import { ChatDrawer } from "@/components/chat/ChatDrawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Users, UserPlus, Search, Check, X, Loader2, Star,
   UserCheck, Clock, Globe, Lock, Trash2, ExternalLink,
-  UserMinus, ChevronRight,
+  UserMinus, ChevronRight, MessageCircle, Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,9 +35,17 @@ interface SearchResult {
   name: string;
   email: string;
   isPublic: boolean;
+  avatarUrl?: string | null;
+  city?: string | null;
   friendshipId: number | null;
   friendshipStatus: FriendshipStatus | null;
   iAmRequester: boolean | null;
+}
+
+interface ChatMessage {
+  id: number;
+  senderId: number;
+  readAt?: string | null;
 }
 
 function initials(name: string) {
@@ -68,13 +79,37 @@ function avatarColor(id: number) {
 /* ═══════════════════════════════════════════════════════════════════════ */
 export default function Amici() {
   const { t } = useTranslation();
-  const { user, isLoggedIn } = useAuth();
+  const { user, isLoggedIn, token } = useAuth();
   const formatRelDate = useFormatRelDate();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("amici");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [chatFriend, setChatFriend] = useState<{ friendshipId: number; id: number; name: string } | null>(null);
+  const [onlineUsers, setOnlineUsers] = useState<Set<number>>(new Set());
+  const [unreadCounts, setUnreadCounts] = useState<Record<number, number>>({});
   const searchRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // WebSocket
+  const wss = useWebSocket(token, user?.id ?? null);
+
+  // Inizializza crittografia
+  const { ensureKeys } = useChatEncryption(user?.id ?? null);
+  useEffect(() => { ensureKeys(); }, [ensureKeys]);
+
+  // Ascolta eventi online/offline
+  useEffect(() => {
+    if (!wss.on) return;
+    const unsub = wss.on("friend:online", (payload: { userId: number; online: boolean }) => {
+      setOnlineUsers((prev) => {
+        const next = new Set(prev);
+        if (payload.online) next.add(payload.userId);
+        else next.delete(payload.userId);
+        return next;
+      });
+    });
+    return unsub;
+  }, [wss.on]);
 
   useEffect(() => {
     clearTimeout(searchRef.current);
@@ -99,6 +134,28 @@ export default function Amici() {
     },
     enabled: !!user?.id && debouncedSearch.length >= 2,
   });
+
+  // Polling messaggi non letti
+  const { data: unreadData } = useQuery({
+    queryKey: ["unread-messages", user?.id],
+    queryFn: async () => {
+      const friends = friendsData?.friends ?? [];
+      const counts: Record<number, number> = {};
+      for (const f of friends) {
+        const res = await fetch(`${BASE}api/friends/messages/${f.friendshipId}?limit=100`);
+        const data = await res.json();
+        const msgs: ChatMessage[] = data.messages ?? [];
+        counts[f.friendshipId] = msgs.filter((m) => m.senderId !== user!.id && !m.readAt).length;
+      }
+      return counts;
+    },
+    enabled: !!user?.id && (friendsData?.friends?.length ?? 0) > 0,
+    refetchInterval: 30_000,
+  });
+
+  useEffect(() => {
+    if (unreadData) setUnreadCounts(unreadData);
+  }, [unreadData]);
 
   const invalidateFriends = () => queryClient.invalidateQueries({ queryKey: ["friends", user?.id] });
   const invalidateSearch = () => queryClient.invalidateQueries({ queryKey: ["users-search"] });
@@ -222,6 +279,9 @@ export default function Amici() {
                 <FriendCard
                   key={f.friendshipId}
                   friend={f}
+                  isOnline={onlineUsers.has(f.id)}
+                  unreadCount={unreadCounts[f.friendshipId] ?? 0}
+                  onChat={() => setChatFriend({ friendshipId: f.friendshipId, id: f.id, name: f.name })}
                   onRemove={() => removeMutation.mutate(f.friendshipId)}
                   removing={removeMutation.isPending && (removeMutation.variables as number) === f.friendshipId}
                 />
@@ -234,7 +294,6 @@ export default function Amici() {
         {tab === "richieste" && (
           friendsLoading ? <LoadingGrid rows={2} /> : (
             <div className="space-y-6">
-              {/* Incoming */}
               <section>
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                   {t("amici.incomingCount", { count: incoming.length })}
@@ -281,7 +340,6 @@ export default function Amici() {
                 )}
               </section>
 
-              {/* Outgoing */}
               <section>
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                   {t("amici.outgoingCount", { count: outgoing.length })}
@@ -370,6 +428,17 @@ export default function Amici() {
           </div>
         )}
       </div>
+
+      {/* Chat Drawer */}
+      {chatFriend && (
+        <ChatDrawer
+          friend={chatFriend}
+          userId={user!.id}
+          wssSend={wss.send}
+          wssOn={wss.on}
+          onClose={() => setChatFriend(null)}
+        />
+      )}
     </div>
   );
 }
@@ -385,13 +454,21 @@ function Avatar({ name, userId, size = "md" }: { name: string; userId: number; s
   );
 }
 
-function FriendCard({ friend, onRemove, removing }: {
-  friend: FriendEntry; onRemove: () => void; removing: boolean;
+function FriendCard({ friend, isOnline, unreadCount, onChat, onRemove, removing }: {
+  friend: FriendEntry; isOnline: boolean; unreadCount: number;
+  onChat: () => void; onRemove: () => void; removing: boolean;
 }) {
   const { t } = useTranslation();
   return (
-    <div className="bg-background rounded-2xl border p-4 flex items-center gap-3 hover:shadow-sm transition-shadow group">
-      <Avatar name={friend.name} userId={friend.id} size="md" />
+    <div className="bg-background rounded-2xl border p-4 flex items-center gap-3 hover:shadow-md transition-all duration-200 group relative">
+      {/* Online dot */}
+      <div className="relative shrink-0">
+        <Avatar name={friend.name} userId={friend.id} size="md" />
+        <span className={cn(
+          "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-background",
+          isOnline ? "bg-emerald-500" : "bg-muted-foreground/30",
+        )} />
+      </div>
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-sm truncate">{friend.name}</p>
         <p className="text-xs text-muted-foreground truncate">{friend.email}</p>
@@ -402,15 +479,25 @@ function FriendCard({ friend, onRemove, removing }: {
         </div>
       </div>
       <div className="flex gap-1.5 shrink-0">
+        <Button size="sm" variant="ghost"
+          className="rounded-full h-8 w-8 p-0 text-muted-foreground hover:text-primary hover:bg-primary/10 relative"
+          onClick={onChat} title="Chat">
+          <MessageCircle className="w-4 h-4" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 text-[10px] font-bold bg-primary text-primary-foreground min-w-[16px] h-4 rounded-full flex items-center justify-center px-1 leading-none">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </Button>
         {friend.isPublic && (
           <Link href={`/utente/${friend.id}`}>
-            <Button size="sm" variant="outline" className="rounded-full h-8 px-3 gap-1.5 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button size="sm" variant="outline" className="rounded-full h-8 px-3 gap-1.5 text-xs opacity-0 group-hover:opacity-100 transition-opacity max-sm:hidden">
               <ExternalLink className="w-3 h-3" /> Profilo
             </Button>
           </Link>
         )}
         <Button size="sm" variant="ghost"
-          className="rounded-full h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          className="rounded-full h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10 max-sm:hidden"
           onClick={onRemove} disabled={removing} title="Rimuovi amico">
           {removing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserMinus className="w-3.5 h-3.5" />}
         </Button>
@@ -430,18 +517,35 @@ function SearchResultCard({ user, onSendRequest, onCancel, sendingRequest, cance
   const isAccepted = user.friendshipStatus === "accepted";
   const isPending = user.friendshipStatus === "pending";
 
+  const avatar = user.avatarUrl ? (
+    <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover shrink-0" />
+  ) : (
+    <Avatar name={user.name} userId={user.id} size="md" />
+  );
+
   return (
-    <div className="bg-background rounded-2xl border p-4 flex items-center gap-3">
-      <Avatar name={user.name} userId={user.id} size="md" />
+    <div className="bg-background rounded-2xl border p-4 flex items-center gap-3 hover:shadow-md transition-all duration-200 cursor-pointer relative group"
+      onClick={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest("button")) return;
+        window.location.href = `/utente/${user.id}`;
+      }}
+    >
+      {avatar}
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-sm truncate">{user.name}</p>
         <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-        <div className="flex items-center gap-1 mt-0.5">
-          <Globe className="w-2.5 h-2.5 text-emerald-500" />
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <Globe className="w-2.5 h-2.5 text-emerald-500 shrink-0" />
           <span className="text-[10px] text-emerald-600 font-medium">{t("amici.publicProfile")}</span>
+          {user.city && (
+            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5 ml-1">
+              · {user.city}
+            </span>
+          )}
         </div>
       </div>
-      <div className="shrink-0">
+      <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
         {isAccepted ? (
           <Badge variant="outline" className="text-xs gap-1 bg-emerald-50 text-emerald-700 border-emerald-200">
             <UserCheck className="w-3 h-3" /> {t("amici.tabs.friends")}
