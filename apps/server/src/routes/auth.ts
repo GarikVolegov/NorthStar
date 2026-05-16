@@ -7,6 +7,7 @@ import crypto from "node:crypto";
 import { db, protectedDbQuery, usersTable, userProfileSettingsTable, generateUsername } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { authLimiter } from "../middleware/rate-limit";
+import { sendVerificationCode, sendPasswordReset, sendWelcomeEmail } from "../lib/email";
 
 const router = Router();
 
@@ -129,6 +130,8 @@ router.post("/register", async (req, res) => {
       ...user,
       token,
     };
+
+    sendVerificationCode(user.email, user.name, verificationCode);
 
     if (DEV_MODE) {
       response.devCode = verificationCode;

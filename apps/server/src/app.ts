@@ -39,13 +39,15 @@ app.use(
     },
   })
 );
+const isDev = process.env.NODE_ENV === "development";
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
+    // Development: allow any origin
+    if (isDev) return callback(null, true);
+    // Production: check against allowed origins
+    if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true
