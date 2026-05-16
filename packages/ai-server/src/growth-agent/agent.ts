@@ -22,6 +22,7 @@ import { wendyLatencySeconds } from "../metrics";
 import { startSpan } from "../tracing";
 import { FF } from "../feature-flags";
 import { withTimeout } from "../utils";
+import { selectModelFor, modelFor } from "../model-router";
 
 import "./specialists/career-agent";
 import "./specialists/mindset-agent";
@@ -29,8 +30,13 @@ import "./specialists/habits-agent";
 import "./specialists/trading-agent";
 import "./specialists/health-agent";
 
-export const GROWTH_AGENT_MODEL       = "gpt-4o";
-export const GROWTH_AGENT_VOICE_MODEL = "gpt-4o-mini";
+/**
+ * @deprecated kept for backward compatibility — use `selectModelFor("growth-agent-chat", { isPremium })` instead.
+ * The actual model is chosen per-request inside `runGrowthAgent` via the router,
+ * so this constant only reflects the *baseline* (non-premium, standard complexity).
+ */
+export const GROWTH_AGENT_MODEL       = modelFor("growth-agent-chat");
+export const GROWTH_AGENT_VOICE_MODEL = modelFor("growth-agent-voice");
 
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -314,8 +320,15 @@ export async function* runGrowthAgent(
     const endLlmTimer = wendyLatencySeconds.startTimer({ phase: "llm" });
     const llmSpan = startSpan("llm_generation", { requestId, domain: routeDecision.domain, intent: routeDecision.intent });
 
+    // Per-request model pick: premium users with high-confidence specialist
+    // routing get the premium model; everyone else gets the free-tier default.
+    const route = selectModelFor("growth-agent-chat", {
+      isPremium: !!userContext.isPremium,
+      complexity: evalResult.level === "high" ? "deep" : "standard",
+    });
+
     const stream = await openai.chat.completions.create({
-      model: GROWTH_AGENT_MODEL,
+      model: route.model,
       messages,
       stream: true,
       temperature,
@@ -350,7 +363,7 @@ export async function* runGrowthAgent(
     llmSpan.end();
     endLlmTimer();
     const fullText = tokenBuffer.join("");
-    recordLlmTokens(GROWTH_AGENT_MODEL, fullText.length);
+    recordLlmTokens(route.model, fullText.length);
 
     const endSupervisorTimer = wendyLatencySeconds.startTimer({ phase: "supervisor" });
     const supervisorSpan = startSpan("supervisor_evaluation", { requestId, domain: routeDecision.domain, intent: routeDecision.intent });

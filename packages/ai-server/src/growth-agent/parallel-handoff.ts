@@ -22,6 +22,7 @@
  */
 import { openai } from "../client";
 import { getLLM } from "../llm/client";
+import { selectModelFor } from "../model-router";
 import { getSpecialist } from "./specialist-agent";
 import type { SpecialistRunOptions, SpecialistEvent } from "./specialist-agent";
 import type { RouteDecision, Domain } from "./router-agent";
@@ -144,8 +145,9 @@ ${secondary.text}
 Sintetizza le due bozze in una risposta unica, coerente e di alta qualità.
 `.trim();
 
+  const route = selectModelFor("parallel-handoff-extract");
   const res = await openai.chat.completions.create({
-    model:       "gpt-4o-mini",
+    model:       route.model,
     messages: [
       { role: "system", content: FUSION_SYSTEM },
       { role: "user",   content: prompt },
@@ -179,6 +181,7 @@ Estrai 3-5 punti chiave dalla bozza secondaria che NON siano già coperti nella 
 Output: un bullet point per riga, massimo 15 parole ciascuno. Nessun preambolo.`;
 
   try {
+    const route = selectModelFor("parallel-handoff-gate");
     const res = await getLLM().chatOnce(
       [
         {
@@ -187,7 +190,7 @@ Output: un bullet point per riga, massimo 15 parole ciascuno. Nessun preambolo.`
         },
         { role: "user", content: prompt },
       ],
-      { model: "gpt-4o-mini", temperature: 0.3, maxTokens: 200 },
+      { model: route.model, temperature: 0.3, maxTokens: 200 },
     );
     return res.trim();
   } catch {

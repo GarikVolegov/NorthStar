@@ -38,6 +38,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useReducedMotion } from "@/lib/motion";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
+import { useLefty } from "@/hooks/useLefty";
 import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES, STORAGE_KEY } from "@/i18n";
 import { SearchDialog } from "@/components/search/SearchDialog";
@@ -123,6 +124,7 @@ export function Navbar() {
   const prefersReduced = useReducedMotion();
   const search = useGlobalSearch();
   const wendy = useWendy();
+  const { isLefty } = useLefty();
   const [newsTitles, setNewsTitles] = useState<string[]>([]);
 
   const phase: NavPhase = !isLoggedIn ? 'guest'
@@ -323,7 +325,7 @@ export function Navbar() {
               onClick={() => search.setIsOpen(true)}
               className="relative w-full group"
             >
-              <div className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none z-10">
+              <div className="absolute left-2.5 lefty:left-auto lefty:right-2.5 top-1/2 -translate-y-1/2 pointer-events-none z-10">
                 {wendy.phase === 'thinking' || wendy.phase === 'speaking' ? (
                   <m.div
                     className="h-5 w-5 rounded-full"
@@ -365,7 +367,7 @@ export function Navbar() {
                   />
                 </>
               ) : null}
-              <span className={`flex items-center w-full pl-9 pr-4 py-2 rounded-full bg-white/5 border text-sm text-muted-foreground/50 text-left transition-all group-hover:bg-white/10 group-hover:border-white/20 ${wendy.isOpen ? 'border-primary/30' : 'border-white/10'} ${wendy.phase === 'thinking' || wendy.phase === 'speaking' ? 'border-transparent' : ''}`}>
+              <span className={`flex items-center w-full pl-9 pr-4 lefty:pl-4 lefty:pr-9 py-2 rounded-full bg-white/5 border text-sm text-muted-foreground/50 text-left transition-all group-hover:bg-white/10 group-hover:border-white/20 ${wendy.isOpen ? 'border-primary/30' : 'border-white/10'} ${wendy.phase === 'thinking' || wendy.phase === 'speaking' ? 'border-transparent' : ''}`}>
                 <span className="flex-1">{t("search.placeholder")}</span>
                 <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono font-medium text-muted-foreground">
                   ⌘K
@@ -398,7 +400,7 @@ export function Navbar() {
           </nav>
 
           {/* Right actions */}
-          <div className="hidden md:flex items-center gap-1 ml-auto">
+          <div className="hidden md:flex items-center gap-1 ml-auto lefty:ml-0 lefty:mr-auto">
             {/* Language pill */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -475,21 +477,21 @@ export function Navbar() {
                       onClick={() => setLocation("/percorso")}
                       className="cursor-pointer"
                     >
-                      <MapPin className="h-4 w-4 mr-2 text-primary" /> Il mio
+                      <MapPin className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2 text-primary" /> Il mio
                       percorso
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setLocation("/profilo")}
                       className="cursor-pointer"
                     >
-                      <LayoutDashboard className="h-4 w-4 mr-2" />{" "}
+                      <LayoutDashboard className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2" />{" "}
                       {t("nav.myProfile")}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setLocation("/candidature")}
                       className="cursor-pointer"
                     >
-                      <Briefcase className="h-4 w-4 mr-2" />{" "}
+                      <Briefcase className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2" />{" "}
                       {t("nav.applications")}
                     </DropdownMenuItem>
                     <DropdownMenuItem
@@ -497,21 +499,21 @@ export function Navbar() {
                       onMouseEnter={() => prefetchRoute("/calendario")}
                       className="cursor-pointer"
                     >
-                      <Calendar className="h-4 w-4 mr-2" /> {t("nav.calendar")}
+                      <Calendar className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2" /> {t("nav.calendar")}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setLocation("/coach")}
                       onMouseEnter={() => prefetchRoute("/coach")}
                       className="cursor-pointer"
                     >
-                      <BrainCircuit className="h-4 w-4 mr-2" /> {NAV_LABELS.coach}
+                      <BrainCircuit className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2" /> {NAV_LABELS.coach}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setLocation("/validatore-idea")}
                       onMouseEnter={() => prefetchRoute("/validatore-idea")}
                       className="cursor-pointer"
                     >
-                      <Compass className="h-4 w-4 mr-2" /> {NAV_LABELS.idea}
+                      <Compass className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2" /> {NAV_LABELS.idea}
                     </DropdownMenuItem>
                     {/* Partner */}
                     {isAffiliate && (
@@ -524,7 +526,7 @@ export function Navbar() {
                           }
                           className="cursor-pointer text-primary focus:text-primary"
                         >
-                          <HandCoins className="h-4 w-4 mr-2" /> {NAV_LABELS.partner}
+                          <HandCoins className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2" /> {NAV_LABELS.partner}
                         </DropdownMenuItem>
                       </>
                     )}
@@ -533,7 +535,7 @@ export function Navbar() {
                       onClick={logout}
                       className="text-destructive focus:text-destructive cursor-pointer"
                     >
-                      <LogOut className="h-4 w-4 mr-2" /> {t("nav.logout")}
+                      <LogOut className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2" /> {t("nav.logout")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -558,13 +560,13 @@ export function Navbar() {
           {/* Mobile search + right */}
           <div className="flex md:hidden items-center gap-1 flex-1 justify-end">
             <div className="relative flex-1 max-w-[160px] sm:max-w-[220px]">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+              <span className="absolute left-2.5 lefty:left-auto lefty:right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
                 <img src="/logo.svg" alt="" className="h-4 w-4 rounded-full object-cover opacity-40" />
               </span>
               <input
                 type="text"
                 placeholder="Cerca..."
-                className="w-full pl-8 pr-2.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary focus:bg-white/10 transition-all"
+                className="w-full pl-8 pr-2.5 lefty:pl-2.5 lefty:pr-8 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary focus:bg-white/10 transition-all"
               />
             </div>
             {isLoggedIn && user && <NotificationBell userId={user.id} />}
@@ -602,7 +604,7 @@ export function Navbar() {
               </SheetTrigger>
 
               <SheetContent
-                side="right"
+                side={isLefty ? "left" : "right"}
                 className="w-72 p-0 flex flex-col bg-card border-border"
               >
                 <div className="flex items-center justify-between px-5 py-4 border-b border-border">

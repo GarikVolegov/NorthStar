@@ -1,6 +1,7 @@
 import { getLLM } from "../llm/client";
 import { logger } from "../logger";
 import { withTimeout } from "../utils";
+import { selectModelFor } from "../model-router";
 
 export interface RouterInput {
   q: string;
@@ -77,10 +78,11 @@ export async function routeQuery(input: RouterInput): Promise<RouterOutput> {
 
   try {
     const llm = getLLM();
+    const route = selectModelFor("search-router");
     const response = await withTimeout(
       llm.chatOnce(
         [{ role: "system", content: prompt }],
-        { model: "gpt-4o-mini", temperature: 0.3, maxTokens: 300 },
+        { model: route.model, temperature: route.temperature, maxTokens: route.maxTokens },
       ),
       5000,
       "search-router",

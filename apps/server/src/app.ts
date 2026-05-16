@@ -12,14 +12,55 @@ import helmet from "helmet";
 import { register, getMetricsContentType, getMetrics } from "@workspace/ai-server/metrics";
 import { requestLoggerMiddleware, rootLogger } from "./middleware/logger";
 import { globalLimiter } from "./middleware/rate-limit";
+import { metricsProtection } from "./middleware/metrics-protection";
+import { record } from "./lib/monitor";
 
 const app = express();
 
-app.use(helmet());
-app.use(cors());
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : [];
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https:"],
+        imgSrc: ["'self'", "data:", "https:"],
+        fontSrc: ["'self'", "https:"],
+        connectSrc: ["'self'", "https:", "wss:"],
+        frameSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
+  })
+);
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+}));
 app.use(express.json());
 app.use(requestLoggerMiddleware);
 app.use(globalLimiter);
+
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    record(res.statusCode, Date.now() - start);
+  });
+  next();
+});
 
 import objectivesRouter from "./routes/objectives";
 import calendarRouter from "./routes/calendar";
@@ -129,7 +170,12 @@ app.get("/api/health/db", async (req, res) => {
   }
 });
 
-app.get("/api/metrics", async (req, res) => {
+app.get("/api/health/alerts", async (req, res) => {
+  const { getAlertHistory } = await import("./lib/alerts");
+  res.json({ alerts: getAlertHistory() });
+});
+
+app.get("/api/metrics", metricsProtection, async (req, res) => {
   try {
     res.setHeader("Content-Type", getMetricsContentType());
     const metrics = await getMetrics();

@@ -31,6 +31,7 @@ import { openai } from "../client";
 import { db } from "../db/client";
 import { supervisorLogs } from "../db/schema";
 import { gte } from "drizzle-orm";
+import { selectModelFor } from "../model-router";
 
 export interface PatternProposal {
   newPlatitudePatterns: string[]; // regex strings to add to PLATITUDE_PATTERNS
@@ -94,11 +95,12 @@ Rispondi SOLO con JSON valido in questo formato:
   "dominantReasons": ["reason1", "reason2", "reason3"]
 }`.trim();
 
-  // ── 3. Call GPT-4o-mini ──────────────────────────────────────────────────
+  // ── 3. Call LLM (router-selected) ────────────────────────────────────────
   let proposal: PatternProposal;
   try {
+    const route = selectModelFor("supervisor-pattern");
     const res = await openai.chat.completions.create({
-      model:           "gpt-4o-mini",
+      model:           route.model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user",   content: `BATCH (${logs.length} logs):\n\n${batch}` },

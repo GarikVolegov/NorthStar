@@ -38,6 +38,8 @@ export const llmUsageTable = pgTable(
     createdIdx: index("llm_usage_created_idx").on(t.createdAt),
     modelIdx: index("llm_usage_model_idx").on(t.model),
     requestTypeIdx: index("llm_usage_request_type_idx").on(t.requestType),
+    // Composite index for monthly cost aggregation per user (cost-guard queries)
+    userCreatedIdx: index("llm_usage_user_created_idx").on(t.userId, t.createdAt),
   }),
 );
 

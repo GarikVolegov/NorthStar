@@ -21,6 +21,7 @@ import { sessionSummariesTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import type { ChatMessage } from "./agent";
 import { logger } from "../logger";
+import { selectModelFor } from "../model-router";
 
 const SUMMARIZER_SYSTEM = `
 Sei un assistente che produce riepiloghi concisi di sessioni di coaching.
@@ -53,8 +54,9 @@ export async function summarizeSession(
     .join("\n");
 
   try {
+    const route = selectModelFor("session-summarize");
     const res = await openai.chat.completions.create({
-      model:           "gpt-4o-mini",
+      model:           route.model,
       messages: [
         { role: "system", content: SUMMARIZER_SYSTEM },
         { role: "user",   content: `Trascrizione sessione:\n${transcript}` },

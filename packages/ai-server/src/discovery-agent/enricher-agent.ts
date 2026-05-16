@@ -48,6 +48,7 @@ import { db }     from "@workspace/db";
 import { discoveryItemsTable } from "@workspace/db";
 import { eq, and, lt, isNull, or, asc, desc, sql } from "drizzle-orm";
 import type { DiscoveryItem } from "@workspace/db";
+import { selectModelFor } from "../model-router";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -180,9 +181,10 @@ async function callGPT(item: DiscoveryItem): Promise<EnrichmentResult> {
     `Settori: ${(item.sectorNames ?? []).join(", ")}`,
   ].join("\n");
 
+  const route = selectModelFor("discovery-enrich");
   const res = await withRetry(() =>
     openai.chat.completions.create({
-      model:           "gpt-4o-mini",
+      model:           route.model,
       messages: [
         { role: "system", content: ENRICHER_SYSTEM },
         { role: "user",   content: userPrompt },

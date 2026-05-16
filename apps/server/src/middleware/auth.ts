@@ -1,7 +1,6 @@
 import { type Request, type Response, type NextFunction } from "express";
 import jwt from "jsonwebtoken";
 const { verify } = jwt;
-import { pool } from "@workspace/db";
 import { rootLogger } from "./logger";
 
 declare global {
@@ -27,10 +26,28 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
-interface TokenPayload {
+/** Shape of the stable user data embedded in every JWT at login/register time */
+interface JwtPayload {
   userId: number;
+  name: string;
+  email: string;
+  role: "user" | "admin";
+  onboardingCompleted: boolean;
+  journeyType: string | null;
+  stripeSubscriptionId: string | null;
+  testSessionId: number | null;
 }
 
+/**
+ * requireAuth — 0 DB queries.
+ *
+ * Stable user data (id, role, onboardingCompleted, journeyType,
+ * stripeSubscriptionId, testSessionId) is embedded in the JWT at
+ * login/register time and extracted here without hitting the database.
+ *
+ * Only the `/me` endpoint makes a DB query for full profile data that
+ * changes frequently (preferences, avatar, timezone, etc.).
+ */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
@@ -40,41 +57,28 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   const token = authHeader.slice(7);
   try {
-    const payload = verify(token, JWT_SECRET) as unknown as TokenPayload;
-
-    const { rows } = await pool.query<{
-      id: number; name: string; email: string;
-      stripe_subscription_id: string | null;
-      test_session_id: number | null;
-    }>(
-      `SELECT id, name, email, stripe_subscription_id, test_session_id
-       FROM users WHERE id = $1 LIMIT 1`,
-      [payload.userId],
-    );
-
-    const user = rows[0];
-    if (!user) {
-      res.status(401).json({ error: "Utente non trovato" });
-      return;
-    }
+    const payload = verify(token, JWT_SECRET) as unknown as JwtPayload;
 
     req.user = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: "user",
-      stripeSubscriptionId: user.stripe_subscription_id,
-      journeyType: null,
-      testSessionId: user.test_session_id,
-      onboardingCompleted: true,
+      id: payload.userId,
+      name: payload.name,
+      email: payload.email,
+      role: payload.role,
+      stripeSubscriptionId: payload.stripeSubscriptionId,
+      journeyType: payload.journeyType,
+      testSessionId: payload.testSessionId,
+      onboardingCompleted: payload.onboardingCompleted,
     };
 
     if (req.log) {
-      req.log = req.log.child({ userId: user.id });
+      req.log = req.log.child({ userId: payload.userId });
     }
 
     next();
-  } catch {
+  } catch (err) {
+    if (req.log) {
+      req.log.error({ err }, "JWT verification failed");
+    }
     res.status(401).json({ error: "Token non valido" });
   }
 }

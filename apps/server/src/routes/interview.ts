@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod/v4";
 import { requireAuth } from "../middleware/auth";
+import { wendyLimiter, wendyIpLimiter, planQuotaLimiter } from "../middleware/rate-limit";
 
 const router = Router();
 
@@ -17,7 +18,7 @@ const askSchema = z.object({
 const MAX_TURNS = 5;
 
 // ── ASK (SSE streaming with ML evaluation + adaptation) ─────
-router.post("/:id/ask", requireAuth, async (req, res) => {
+router.post("/:id/ask", requireAuth, wendyLimiter, wendyIpLimiter, planQuotaLimiter, async (req, res) => {
   const userId = req.user!.id;
   const sectorId = parseInt(req.params.id);
   const data = askSchema.parse(req.body);
@@ -32,13 +33,13 @@ router.post("/:id/ask", requireAuth, async (req, res) => {
 
   try {
     const { generateQuestions, evaluateAnswer, adaptDifficulty } = await import("@workspace/ai-server");
-    const { db, usersTable } = await import("@workspace/db");
+    const { db, usersTable, userProfileSettingsTable } = await import("@workspace/db");
     const { eq } = await import("drizzle-orm");
 
     const [userRow] = await db
-      .select({ cvText: usersTable.cvText })
-      .from(usersTable)
-      .where(eq(usersTable.id, userId))
+      .select({ cvText: userProfileSettingsTable.cvText })
+      .from(userProfileSettingsTable)
+      .where(eq(userProfileSettingsTable.userId, userId))
       .limit(1);
 
     const history = data.history ?? [];

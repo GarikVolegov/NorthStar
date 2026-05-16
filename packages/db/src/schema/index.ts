@@ -13,6 +13,7 @@
  */
 
 export * from "./users";
+export * from "./userProfiles";
 export * from "./testSessions";
 export * from "./sectors";
 export * from "./professions";

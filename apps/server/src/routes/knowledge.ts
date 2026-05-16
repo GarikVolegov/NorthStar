@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { db, knowledgeNodesTable, knowledgeEdgesTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { suggestAutoLinks, autoCategorize, suggestMissingNodes } from "@workspace/ai-server";
+import { wendyLimiter, wendyIpLimiter, planQuotaLimiter } from "../middleware/rate-limit";
 
 const router = Router();
 
@@ -142,7 +143,7 @@ router.post("/nodes/positions", requireAuth, async (req, res) => {
 });
 
 // ── Auto-link suggestions (ML) ──────────────────────────────
-router.post("/nodes/:id/auto-link", requireAuth, async (req, res) => {
+router.post("/nodes/:id/auto-link", requireAuth, wendyLimiter, wendyIpLimiter, planQuotaLimiter, async (req, res) => {
   const userId = req.user!.id;
   const id = parseInt(req.params.id);
 
@@ -294,13 +295,15 @@ Rispondi in modo chiaro e utile, basandoti sui nodi del grafo. Se non trovi info
 
   try {
     const { getLLM } = await import("@workspace/ai-server/llm/client");
+    const { selectModelFor } = await import("@workspace/ai-server");
     const llm = getLLM();
+    const route = selectModelFor("wiki-chat");
     const stream = await llm.chat(
       [
         { role: "system" as const, content: systemContent },
         { role: "user" as const, content: data.message },
       ],
-      { model: "gpt-4o-mini", temperature: 0.65, maxTokens: 600 },
+      { model: route.model, temperature: 0.65, maxTokens: 600 },
     );
 
     for await (const delta of stream) {

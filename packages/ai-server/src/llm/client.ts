@@ -75,12 +75,14 @@ function createOpenAIProvider(): LLMProvider {
   }
   const client = new OpenAI({ apiKey, baseURL });
 
+  const DEFAULT_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+
   return {
     async chat(messages, config = {}) {
       const stream = await pRetry(
         () => withTimeout(
           client.chat.completions.create({
-            model: config.model ?? "gpt-4o-mini",
+            model: config.model ?? DEFAULT_MODEL,
             messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
             stream: true,
             temperature: config.temperature ?? 0.7,
@@ -111,7 +113,7 @@ function createOpenAIProvider(): LLMProvider {
       const res = await pRetry(
         () => withTimeout(
           client.chat.completions.create({
-            model: config.model ?? "gpt-4o-mini",
+            model: config.model ?? DEFAULT_MODEL,
             messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
             temperature: config.temperature ?? 0.7,
             max_tokens: config.maxTokens ?? 800,

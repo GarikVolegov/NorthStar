@@ -13,6 +13,8 @@ export interface UserContext {
   pageContext?:  Record<string, unknown>;
   memorySection?: string;
   locale?:       string;
+  isPremium?:    boolean;
+  stripeSubscriptionId?: string | null;
 }
 
 export interface BuildSystemPromptOptions {

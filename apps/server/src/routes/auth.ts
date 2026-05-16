@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 const { sign } = jwt;
 import { eq, and, or } from "drizzle-orm";
 import crypto from "node:crypto";
-import { db, usersTable, generateUsername } from "@workspace/db";
+import { db, protectedDbQuery, usersTable, userProfileSettingsTable, generateUsername } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { authLimiter } from "../middleware/rate-limit";
 
@@ -13,12 +13,58 @@ const router = Router();
 const JWT_SECRET: string = process.env.JWT_SECRET ?? "";
 const DEV_MODE = process.env.NODE_ENV !== "production";
 
-function generateToken(userId: number): string {
-  return sign({ userId }, JWT_SECRET, { expiresIn: "7d" });
+/** Stable user data embedded in JWT — no DB query needed on every request */
+interface JwtPayload {
+  userId: number;
+  name: string;
+  email: string;
+  role: "user" | "admin";
+  onboardingCompleted: boolean;
+  journeyType: string | null;
+  stripeSubscriptionId: string | null;
+  testSessionId: number | null;
+}
+
+function generateToken(user: JwtPayload): string {
+  return sign(user, JWT_SECRET, { expiresIn: "7d" });
 }
 
 function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+/** Fields to select when we need stable data for the JWT */
+const tokenUserSelect = {
+  id: usersTable.id,
+  name: usersTable.name,
+  email: usersTable.email,
+  role: usersTable.role,
+  onboardingCompleted: usersTable.onboardingCompleted,
+  journeyType: usersTable.journeyType,
+  stripeSubscriptionId: usersTable.stripeSubscriptionId,
+  testSessionId: usersTable.testSessionId,
+} as const;
+
+function buildJwtPayload(user: {
+  id: number;
+  name: string;
+  email: string;
+  role: string | null;
+  onboardingCompleted: boolean | null;
+  journeyType: string | null;
+  stripeSubscriptionId: string | null;
+  testSessionId: number | null;
+}): JwtPayload {
+  return {
+    userId: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role === "admin" ? "admin" : "user",
+    onboardingCompleted: user.onboardingCompleted ?? false,
+    journeyType: user.journeyType,
+    stripeSubscriptionId: user.stripeSubscriptionId,
+    testSessionId: user.testSessionId,
+  };
 }
 
 /* ─── POST /api/auth/register  —  registrazione ──────────────────── */
@@ -34,11 +80,13 @@ router.post("/register", async (req, res) => {
       return;
     }
 
-    const [existing] = await db
-      .select({ id: usersTable.id })
-      .from(usersTable)
-      .where(eq(usersTable.email, email.toLowerCase()))
-      .limit(1);
+    const [existing] = await protectedDbQuery(async () => {
+      return await db
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(eq(usersTable.email, email.toLowerCase()))
+        .limit(1);
+    });
 
     if (existing) {
       res.status(409).json({ error: "Email già registrata" });
@@ -62,18 +110,20 @@ router.post("/register", async (req, res) => {
         id: usersTable.id,
         name: usersTable.name,
         email: usersTable.email,
+        role: usersTable.role,
         journeyType: usersTable.journeyType,
-        userMode: usersTable.userMode,
         onboardingCompleted: usersTable.onboardingCompleted,
+        stripeSubscriptionId: usersTable.stripeSubscriptionId,
+        testSessionId: usersTable.testSessionId,
         createdAt: usersTable.createdAt,
       });
 
-    await db
-      .update(usersTable)
-      .set({ username: generateUsername(user.name, user.id) })
-      .where(eq(usersTable.id, user.id));
+    await db.insert(userProfileSettingsTable).values({
+      userId: user.id,
+      username: generateUsername(user.name, user.id),
+    });
 
-    const token = generateToken(user.id);
+    const token = generateToken(buildJwtPayload(user));
 
     const response: Record<string, unknown> = {
       ...user,
@@ -127,10 +177,12 @@ router.post("/login", authLimiter, async (req, res) => {
       const verificationCode = generateVerificationCode();
       const verificationCodeExpires = new Date(Date.now() + 30 * 60 * 1000);
 
-      await db
+    await protectedDbQuery(async () => {
+      return await db
         .update(usersTable)
         .set({ verificationCode, verificationCodeExpires })
         .where(eq(usersTable.id, user.id));
+    });
 
       const response: Record<string, unknown> = {
         needsVerification: true,
@@ -145,7 +197,7 @@ router.post("/login", authLimiter, async (req, res) => {
       return;
     }
 
-    const token = generateToken(user.id);
+    const token = generateToken(buildJwtPayload(user));
 
     const { passwordHash: _, verificationCode: __, verificationCodeExpires: ___, resetToken: ____, resetTokenExpires: ______, ...safeUser } = user;
 
@@ -168,18 +220,15 @@ router.post("/verify-email", async (req, res) => {
       return;
     }
 
-    const [user] = await db
-      .select()
-      .from(usersTable)
-      .where(
-        and(
-          eq(usersTable.email, email.toLowerCase()),
-          eq(usersTable.verificationCode, code),
-        ),
-      )
-      .limit(1);
+    const [user] = await protectedDbQuery(async () => {
+      return await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.verificationCode, code))
+        .limit(1);
+    });
 
-    if (!user) {
+    if (!user || user.email !== email.toLowerCase()) {
       res.status(400).json({ error: "Codice non valido" });
       return;
     }
@@ -189,17 +238,19 @@ router.post("/verify-email", async (req, res) => {
       return;
     }
 
-    await db
-      .update(usersTable)
-      .set({
-        emailVerified: true,
-        verificationCode: null,
-        verificationCodeExpires: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(usersTable.id, user.id));
+    await protectedDbQuery(async () => {
+      return await db
+        .update(usersTable)
+        .set({
+          emailVerified: true,
+          verificationCode: null,
+          verificationCodeExpires: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(usersTable.id, user.id));
+    });
 
-    const token = generateToken(user.id);
+    const token = generateToken(buildJwtPayload(user));
 
     const { passwordHash: _, verificationCode: __, verificationCodeExpires: ___, resetToken: ____, resetTokenExpires: ______, ...safeUser } = user;
 
@@ -226,10 +277,12 @@ router.post("/resend-verification", async (req, res) => {
     const verificationCode = generateVerificationCode();
     const verificationCodeExpires = new Date(Date.now() + 30 * 60 * 1000);
 
-    await db
-      .update(usersTable)
-      .set({ verificationCode, verificationCodeExpires })
-      .where(eq(usersTable.email, email.toLowerCase()));
+    await protectedDbQuery(async () => {
+      return await db
+        .update(usersTable)
+        .set({ verificationCode, verificationCodeExpires })
+        .where(eq(usersTable.email, email.toLowerCase()));
+    });
 
     const response: Record<string, unknown> = {};
 
@@ -287,11 +340,13 @@ router.post("/reset-password", authLimiter, async (req, res) => {
       return;
     }
 
-    const [user] = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.resetToken, token))
-      .limit(1);
+    const [user] = await protectedDbQuery(async () => {
+      return await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.resetToken, token))
+        .limit(1);
+    });
 
     if (!user) {
       res.status(400).json({ error: "Token non valido" });
@@ -305,15 +360,17 @@ router.post("/reset-password", authLimiter, async (req, res) => {
 
     const passwordHash = await bcrypt.hash(newPassword, 12);
 
-    await db
-      .update(usersTable)
-      .set({
-        passwordHash,
-        resetToken: null,
-        resetTokenExpires: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(usersTable.id, user.id));
+    await protectedDbQuery(async () => {
+      return await db
+        .update(usersTable)
+        .set({
+          passwordHash,
+          resetToken: null,
+          resetTokenExpires: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(usersTable.id, user.id));
+    });
 
     res.json({ success: true });
   } catch (err) {
@@ -345,45 +402,51 @@ router.post("/google-token", async (req, res) => {
     const name = googlePayload.name;
     const avatarUrl = googlePayload.picture ?? null;
 
-    let [existing] = await db
-      .select()
-      .from(usersTable)
-      .where(
-        or(
-          eq(usersTable.googleId, googleId),
-          eq(usersTable.email, email),
-        ),
-      )
-      .limit(1);
+    let [existing] = await protectedDbQuery(async () => {
+      return await db
+        .select()
+        .from(usersTable)
+        .where(
+          or(
+            eq(usersTable.googleId, googleId),
+            eq(usersTable.email, email),
+          ),
+        )
+        .limit(1);
+    });
 
     if (existing) {
       if (!existing.googleId) {
-        await db
-          .update(usersTable)
-          .set({
-            googleId,
-            emailVerified: true,
-            avatarUrl: avatarUrl ?? existing.avatarUrl,
-            updatedAt: new Date(),
-          })
-          .where(eq(usersTable.id, existing.id));
+       await protectedDbQuery(async () => {
+         return await db
+           .update(usersTable)
+           .set({
+             googleId,
+             emailVerified: true,
+             avatarUrl: avatarUrl ?? existing.avatarUrl,
+             updatedAt: new Date(),
+           })
+           .where(eq(usersTable.id, existing.id));
+       });
       }
     } else {
-      const [created] = await db
-        .insert(usersTable)
-        .values({
-          name,
-          email,
-          googleId,
-          avatarUrl,
-          emailVerified: true,
-        })
-        .returning({ id: usersTable.id });
+       const [created] = await protectedDbQuery(async () => {
+         return await db
+           .insert(usersTable)
+           .values({
+             name,
+             email,
+             googleId,
+             avatarUrl,
+             emailVerified: true,
+           })
+           .returning({ id: usersTable.id });
+       });
 
-      await db
-        .update(usersTable)
-        .set({ username: generateUsername(name, created.id) })
-        .where(eq(usersTable.id, created.id));
+      await db.insert(userProfileSettingsTable).values({
+        userId: created.id,
+        username: generateUsername(name, created.id),
+      });
     }
 
     const [user] = await db
@@ -391,26 +454,28 @@ router.post("/google-token", async (req, res) => {
         id: usersTable.id,
         name: usersTable.name,
         email: usersTable.email,
+        role: usersTable.role,
         testSessionId: usersTable.testSessionId,
         emailVerified: usersTable.emailVerified,
         stripeSubscriptionId: usersTable.stripeSubscriptionId,
-        workPreference: usersTable.workPreference,
-        autonomyPreference: usersTable.autonomyPreference,
-        stabilityPreference: usersTable.stabilityPreference,
-        timezone: usersTable.timezone,
-        userMode: usersTable.userMode,
+        workPreference: userProfileSettingsTable.workPreference,
+        autonomyPreference: userProfileSettingsTable.autonomyPreference,
+        stabilityPreference: userProfileSettingsTable.stabilityPreference,
+        timezone: userProfileSettingsTable.timezone,
+        userMode: userProfileSettingsTable.userMode,
         journeyType: usersTable.journeyType,
         avatarUrl: usersTable.avatarUrl,
-        isPublic: usersTable.isPublic,
-        isAffiliate: usersTable.isAffiliate,
+        isPublic: userProfileSettingsTable.isPublic,
+        isAffiliate: userProfileSettingsTable.isAffiliate,
         onboardingCompleted: usersTable.onboardingCompleted,
         createdAt: usersTable.createdAt,
       })
       .from(usersTable)
+      .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
       .where(eq(usersTable.email, email))
       .limit(1);
 
-    const token = generateToken(user.id);
+    const token = generateToken(buildJwtPayload(user));
 
     res.json({
       ...user,
@@ -432,8 +497,8 @@ router.post("/refresh", async (req, res) => {
     }
 
     const token = authHeader.slice(7);
-    const payload = jwt.verify(token, JWT_SECRET) as { userId: number };
-    const newToken = generateToken(payload.userId);
+    const payload = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    const newToken = generateToken(payload);
 
     res.json({ token: newToken });
   } catch {
@@ -449,21 +514,23 @@ router.get("/me", requireAuth, async (req, res) => {
         id: usersTable.id,
         name: usersTable.name,
         email: usersTable.email,
+        role: usersTable.role,
         testSessionId: usersTable.testSessionId,
         emailVerified: usersTable.emailVerified,
         stripeSubscriptionId: usersTable.stripeSubscriptionId,
-        workPreference: usersTable.workPreference,
-        autonomyPreference: usersTable.autonomyPreference,
-        stabilityPreference: usersTable.stabilityPreference,
-        timezone: usersTable.timezone,
-        userMode: usersTable.userMode,
+        workPreference: userProfileSettingsTable.workPreference,
+        autonomyPreference: userProfileSettingsTable.autonomyPreference,
+        stabilityPreference: userProfileSettingsTable.stabilityPreference,
+        timezone: userProfileSettingsTable.timezone,
+        userMode: userProfileSettingsTable.userMode,
         journeyType: usersTable.journeyType,
         avatarUrl: usersTable.avatarUrl,
-        isPublic: usersTable.isPublic,
-        isAffiliate: usersTable.isAffiliate,
+        isPublic: userProfileSettingsTable.isPublic,
+        isAffiliate: userProfileSettingsTable.isAffiliate,
         onboardingCompleted: usersTable.onboardingCompleted,
       })
       .from(usersTable)
+      .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
       .where(eq(usersTable.id, req.user!.id))
       .limit(1);
 

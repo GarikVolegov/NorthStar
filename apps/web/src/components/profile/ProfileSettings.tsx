@@ -1,9 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, Mail, Calendar, ShieldCheck, KeyRound, Globe } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { User, Mail, Calendar, ShieldCheck, KeyRound, Globe, Palette, Hand } from "lucide-react";
 import { AvatarUpload } from "@/components/profile/settings/AvatarUpload";
 import { BannerUpload } from "@/components/profile/settings/BannerUpload";
 import { ChangePasswordSection } from "@/components/profile/settings/ChangePasswordSection";
 import { PrivacyCard } from "@/components/profile/settings/PrivacyCard";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { useLefty } from "@/hooks/useLefty";
 import type { AuthUser } from "@/contexts/AuthContext";
 
 function formatDate(iso: string) {
@@ -22,6 +25,8 @@ interface ProfileSettingsProps {
 }
 
 export function ProfileSettings({ user, avatarUrl, onAvatarUpdate, bannerUrl, onBannerUpdate, createdAt }: ProfileSettingsProps) {
+  const { isLefty, setIsLefty } = useLefty();
+
   return (
     <Card className="rounded-2xl">
       <CardHeader className="pb-3">
@@ -94,6 +99,22 @@ export function ProfileSettings({ user, avatarUrl, onAvatarUpdate, bannerUrl, on
             <PrivacyCard userId={user.id} />
           </div>
         </details>
+
+        <div className="pt-1 border-t border-border">
+          <div className="flex items-center gap-2 mb-2">
+            <Palette className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">Tema</span>
+          </div>
+          <ThemeToggle />
+        </div>
+
+        <div className="flex items-center justify-between pt-1 border-t border-border">
+          <div className="flex items-center gap-2">
+            <Hand className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">Modalità mancino</span>
+          </div>
+          <Switch checked={isLefty} onCheckedChange={setIsLefty} />
+        </div>
       </CardContent>
     </Card>
   );

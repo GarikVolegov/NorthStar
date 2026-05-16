@@ -67,6 +67,7 @@
     "@opentelemetry/auto-instrumentations-node": "^0.75.0",
     "@opentelemetry/resources": "^2.7.1",
     "@opentelemetry/semantic-conventions": "^1.40.0",
+    "opossum": "^9.0.0",
     "pg": "^8.20.0"
   }
 }

@@ -4,6 +4,7 @@ import { loadMemory } from "./memory-manager";
 import type { ChatMessage } from "./agent";
 import { logger, type LoggerFields } from "../logger";
 import { recordRouterConfidence } from "../metrics";
+import { selectModelFor } from "../model-router";
 
 // ── Types ─────────────────────────────────────────────────────────────────────────
 
@@ -228,12 +229,13 @@ export class RouterAgent {
 
     try {
       const llm = getLLM();
+      const route = selectModelFor("router-classify");
       const result = await llm.chatOnce(
         [
           { role: "system", content: systemWithMemory },
           { role: "user", content: userContent },
         ],
-        { model: "gpt-4o-mini", temperature: 0.1, maxTokens: 300 },
+        { model: route.model, temperature: route.temperature, maxTokens: route.maxTokens },
       );
 
       const raw = result ?? "{}";

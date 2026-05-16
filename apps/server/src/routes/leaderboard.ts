@@ -1,10 +1,13 @@
 import { Router } from "express";
-import { sql, desc, eq, and, gte, lt } from "drizzle-orm";
+import { sql, desc, eq, and, gte, lt, gt } from "drizzle-orm";
 import { db, usersTable, weeklyLeaderboardTable, voiceSessionsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { XP_PER_LEVEL } from "./xp-constants";
+import { cacheGet, cacheSet } from "../lib/redis";
 
 const router = Router();
+
+const CACHE_TTL = 60; // seconds
 
 function getWeekBounds(): { start: Date; end: Date } {
   const now = new Date();
@@ -18,10 +21,28 @@ function getWeekBounds(): { start: Date; end: Date } {
   return { start, end };
 }
 
+/**
+ * Encode a keyset cursor as a base64url string.
+ * Format: "sortValue|tiebreakerId"
+ */
+function encodeCursor(sortValue: unknown, id: number): string {
+  return Buffer.from(`${String(sortValue ?? "")}|${id}`, "utf-8").toString("base64url");
+}
+
+function decodeCursor(cursor: string): [string, number] {
+  const raw = Buffer.from(cursor, "base64url").toString("utf-8");
+  const pipe = raw.indexOf("|");
+  if (pipe === -1) return [raw, 0];
+  const sortVal = raw.slice(0, pipe);
+  const id = parseInt(raw.slice(pipe + 1), 10);
+  return [sortVal, Number.isNaN(id) ? 0 : id];
+}
+
 router.get("/", requireAuth, async (req, res) => {
   try {
     const mode = (req.query.mode as string) ?? "xp";
     const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 20, 1), 100);
+    const cursor = req.query.cursor as string | undefined;
     const userId = req.user!.id;
 
     if (mode === "weekly") {
@@ -42,7 +63,10 @@ router.get("/", requireAuth, async (req, res) => {
           ),
         )
         .orderBy(weeklyLeaderboardTable.rank)
-        .limit(limit);
+        .limit(limit + 1);
+
+      const hasMore = entries.length > limit;
+      if (hasMore) entries = entries.slice(0, limit);
 
       if (entries.length === 0) {
         const weeklyScores = await db
@@ -61,11 +85,13 @@ router.get("/", requireAuth, async (req, res) => {
           )
           .groupBy(voiceSessionsTable.userId)
           .orderBy(sql`sum(${voiceSessionsTable.xpAwarded}) desc`)
-          .limit(limit);
+          .limit(limit + 1);
 
-        const weeklyEntries = [];
-        for (let i = 0; i < weeklyScores.length; i++) {
-          const score = weeklyScores[i];
+        const hasMoreWeekly = weeklyScores.length > limit;
+        const capped = hasMoreWeekly ? weeklyScores.slice(0, limit) : weeklyScores;
+
+        for (let i = 0; i < capped.length; i++) {
+          const score = capped[i];
           const rank = i + 1;
           await db.insert(weeklyLeaderboardTable).values({
             userId: score.userId,
@@ -75,9 +101,9 @@ router.get("/", requireAuth, async (req, res) => {
             sessionsCompleted: score.sessionsCompleted ?? 0,
             rank,
           }).onConflictDoNothing();
-          weeklyEntries.push(score);
         }
-        entries = weeklyEntries.map((e, i) => ({
+
+        entries = capped.map((e, i) => ({
           userId: e.userId,
           xpEarned: e.xpEarned ?? 0,
           sessionsCompleted: e.sessionsCompleted ?? 0,
@@ -104,14 +130,37 @@ router.get("/", requireAuth, async (req, res) => {
         isSelf: e.userId === userId,
       }));
 
+      const last = entries[entries.length - 1];
+      const nextCursor = hasMore && last
+        ? encodeCursor(last.rank, last.userId)
+        : null;
+
       const selfRank = result.find((e) => e.isSelf)?.rank;
-      res.json({ mode: "weekly", entries: result, selfRank });
+      res.json({ mode: "weekly", entries: result, nextCursor, selfRank });
       return;
     }
 
+    // ── XP / Streak mode with keyset cursor ──────────────────────
     const orderColumn = mode === "streak"
       ? desc(usersTable.voiceStreak)
       : desc(usersTable.totalXp);
+
+    const orderColSql = mode === "streak"
+      ? usersTable.voiceStreak
+      : usersTable.totalXp;
+
+    let cursorSortValue: number | undefined;
+    let cursorId: number | undefined;
+
+    if (cursor) {
+      const [sv, id] = decodeCursor(cursor);
+      cursorSortValue = parseFloat(sv);
+      cursorId = id;
+    }
+
+    const whereClause = cursorSortValue != null && cursorId != null
+      ? sql`(${orderColSql}, ${usersTable.id}) < (${cursorSortValue}, ${cursorId}) AND ${usersTable.totalXp} > 0`
+      : sql`${usersTable.totalXp} > 0`;
 
     const allEntries = await db
       .select({
@@ -122,11 +171,15 @@ router.get("/", requireAuth, async (req, res) => {
         voiceStreak: usersTable.voiceStreak,
       })
       .from(usersTable)
-      .where(sql`${usersTable.totalXp} > 0`)
-      .orderBy(orderColumn);
+      .where(whereClause)
+      .orderBy(orderColumn, desc(usersTable.id))
+      .limit(limit + 1);
 
-    const ranked = allEntries.map((entry, i) => ({
-      rank: i + 1,
+    const hasMore = allEntries.length > limit;
+    const capped = hasMore ? allEntries.slice(0, limit) : allEntries;
+
+    const ranked = capped.map((entry, i) => ({
+      rank: (cursor ? 0 : i + 1), // relative rank when using cursor
       userId: entry.userId,
       name: entry.name,
       avatarUrl: entry.avatarUrl,
@@ -136,10 +189,22 @@ router.get("/", requireAuth, async (req, res) => {
       isSelf: entry.userId === userId,
     }));
 
-    const entries = ranked.slice(0, limit);
+    const lastEntry = capped[capped.length - 1];
+    const nextCursor = hasMore && lastEntry
+      ? encodeCursor(
+          mode === "streak" ? lastEntry.voiceStreak : lastEntry.totalXp,
+          lastEntry.userId,
+        )
+      : null;
+
     const selfRank = ranked.find((e) => e.isSelf)?.rank;
 
-    res.json({ mode, entries, selfRank });
+    res.json({
+      mode,
+      entries: ranked,
+      nextCursor,
+      selfRank,
+    });
   } catch (err) {
     req.log?.error?.({ err }, "leaderboard error");
     res.status(500).json({ error: "Errore nel recupero della classifica" });

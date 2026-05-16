@@ -1,6 +1,7 @@
 import { getLLM } from "../llm/client";
 import { logger } from "../logger";
 import { withTimeout } from "../utils";
+import { selectModelFor } from "../model-router";
 
 export async function suggestFollowUpQuestions(
   sectorName: string,
@@ -23,8 +24,9 @@ Rispondi SOLO con un array JSON di stringhe, esattamente 3 domande. Esempio:
 ["Domanda 1?", "Domanda 2?", "Domanda 3?"]`;
 
     const llm = getLLM();
+    const route = selectModelFor("wiki-suggest");
     const response = await withTimeout(
-      llm.chatOnce([{ role: "system", content: prompt }], { model: "gpt-4o-mini", temperature: 0.6, maxTokens: 300 }),
+      llm.chatOnce([{ role: "system", content: prompt }], { model: route.model, temperature: route.temperature, maxTokens: route.maxTokens }),
       8000,
       "suggest-questions",
     );

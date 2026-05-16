@@ -168,9 +168,15 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
           setError(data.error || t("auth.errors.loginError"));
         }
       } else {
-        login(data, data.token ?? "");
-        onOpenChange(false);
-        resetAll();
+        if (data.needsVerification) {
+          setVerifyEmail(data.email ?? loginEmail);
+          if (data.devCode) setDevHint(data.devCode);
+          goTo("verify");
+        } else {
+          login(data, data.token ?? "");
+          onOpenChange(false);
+          resetAll();
+        }
       }
     } catch {
       setError(t("auth.errors.networkError"));

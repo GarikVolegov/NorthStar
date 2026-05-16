@@ -84,12 +84,118 @@
 }
 
 /* ── CSS Custom Properties ────────────────────────────────────── */
+
+/* ─ Tema chiaro (default) ─ */
 :root {
+  color-scheme: light;
+
+  --button-outline: rgba(193, 158, 74, 0.18);
+  --badge-outline:  rgba(193, 158, 74, 0.08);
+  --opaque-button-border-intensity: 8;
+  --elevate-1: rgba(0, 0, 0, 0.030);
+  --elevate-2: rgba(0, 0, 0, 0.055);
+
+  /* ─ Base surfaces ─ */
+  --background:          220 20% 97%;
+  --foreground:          224 24% 12%;
+  --border:              220 15% 86%;
+
+  /* ─ Cards ─ */
+  --card:                0 0% 100%;
+  --card-foreground:     224 24% 12%;
+  --card-border:         220 15% 88%;
+
+  /* ─ Popovers ─ */
+  --popover:             0 0% 100%;
+  --popover-foreground:  224 24% 12%;
+  --popover-border:      220 15% 88%;
+
+  /* ─ Primary — Champagne Gold (più scuro per contrasto su chiaro) ─ */
+  --primary:             43 44% 44%;
+  --primary-foreground:  0 0% 100%;
+  --primary-border:      hsl(43 44% 36%);
+
+  /* ─ Secondary ─ */
+  --secondary:           220 15% 92%;
+  --secondary-foreground:224 20% 25%;
+  --secondary-border:    hsl(220 15% 84%);
+
+  /* ─ Muted ─ */
+  --muted:               220 15% 93%;
+  --muted-foreground:    220 10% 45%;
+  --muted-border:        hsl(220 15% 86%);
+
+  /* ─ Accent ─ */
+  --accent:              220 15% 91%;
+  --accent-foreground:   224 24% 12%;
+  --accent-border:       hsl(220 15% 84%);
+
+  /* ─ Destructive ─ */
+  --destructive:         4 62% 52%;
+  --destructive-foreground: 0 0% 100%;
+  --destructive-border:  hsl(4 62% 42%);
+
+  /* ─ Input / Ring ─ */
+  --input:               220 15% 88%;
+  --ring:                43 44% 44%;
+
+  /* ─ Charts ─ */
+  --chart-1:  43 44% 50%;   /* gold   */
+  --chart-2: 152 28% 46%;   /* green  */
+  --chart-3: 210 55% 50%;   /* blue   */
+  --chart-4: 268 38% 52%;   /* purple */
+  --chart-5:   4 52% 50%;   /* red    */
+
+  /* ─ Typography ─ */
+  --app-font-sans:  'Inter', system-ui, sans-serif;
+  --app-font-serif: 'Playfair Display', Georgia, serif;
+  --app-font-mono:  ui-monospace, 'Cascadia Code', monospace;
+
+  /* ─ Radius ─ */
+  --radius: 0.75rem;
+
+  /* ─ Shadows (leggere) ─ */
+  --shadow-2xs: 0px 1px  2px 0px rgba(0,0,0,0.08);
+  --shadow-xs:  0px 1px  3px 0px rgba(0,0,0,0.10);
+  --shadow-sm:  0px 2px  6px 0px rgba(0,0,0,0.08), 0px 1px  2px -1px rgba(0,0,0,0.10);
+  --shadow:     0px 2px  8px 0px rgba(0,0,0,0.08), 0px 1px  3px -1px rgba(0,0,0,0.10);
+  --shadow-md:  0px 4px 16px 0px rgba(0,0,0,0.10), 0px 2px  6px -1px rgba(0,0,0,0.12);
+  --shadow-lg:  0px 8px 24px 0px rgba(0,0,0,0.10), 0px 4px 10px -2px rgba(0,0,0,0.14);
+  --shadow-xl:  0px 12px 36px 0px rgba(0,0,0,0.12), 0px 8px 16px -4px rgba(0,0,0,0.14);
+  --shadow-2xl: 0px 20px 48px 0px rgba(0,0,0,0.16);
+
+  /* ─ Brand / Champagne Gold ─ */
+  --brand:        hsl(43 44% 44%);
+  --brand-light:  hsl(43 44% 60%);
+  --brand-dark:   hsl(43 44% 30%);
+  --brand-border: hsl(43 44% 38%);
+  --brand-fg:     hsl(0 0% 100%);
+
+  /* ─ Growth / Sage Green ─ */
+  --growth:        hsl(152 26% 44%);
+  --growth-light:  hsl(152 26% 60%);
+  --growth-dark:   hsl(152 26% 30%);
+  --growth-border: hsl(152 26% 36%);
+  --growth-fg:     hsl(0 0% 100%);
+
+  /* ─ Hero light surfaces ─ */
+  --hero-dark:   hsl(220 20% 94%);
+  --hero-dark-2: hsl(220 20% 91%);
+
+  /* ─ Glow effects ─ */
+  --glow-primary: 0 0 28px 0 hsl(43 44% 44% / 0.18);
+  --glow-growth:  0 0 20px 0 hsl(152 26% 44% / 0.14);
+
+  --tracking-normal: 0em;
+  --spacing: 0.25rem;
+}
+
+/* ─ Tema scuro ─ */
+.dark {
   color-scheme: dark;
 
   --button-outline: rgba(193, 158, 74, 0.13);
   --badge-outline:  rgba(193, 158, 74, 0.06);
-  --opaque-button-border-intensity: 8;
   --elevate-1: rgba(255, 255, 255, 0.022);
   --elevate-2: rgba(255, 255, 255, 0.044);
 
@@ -144,14 +250,6 @@
   --chart-4: 268 38% 60%;   /* purple */
   --chart-5:   4 52% 56%;   /* red    */
 
-  /* ─ Typography ─ */
-  --app-font-sans:  'Inter', system-ui, sans-serif;
-  --app-font-serif: 'Playfair Display', Georgia, serif;
-  --app-font-mono:  ui-monospace, 'Cascadia Code', monospace;
-
-  /* ─ Radius ─ */
-  --radius: 0.75rem;
-
   /* ─ Shadows (navy depth) ─ */
   --shadow-2xs: 0px 1px  2px 0px rgba(0,0,0,0.55);
   --shadow-xs:  0px 1px  3px 0px rgba(0,0,0,0.62);
@@ -183,9 +281,6 @@
   /* ─ Glow effects ─ */
   --glow-primary: 0 0 28px 0 hsl(43 44% 57% / 0.20);
   --glow-growth:  0 0 20px 0 hsl(152 26% 62% / 0.16);
-
-  --tracking-normal: 0em;
-  --spacing: 0.25rem;
 }
 
 /* ── Base layer ────────────────────────────────────────────────── */
@@ -198,7 +293,13 @@
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     background-image:
-      radial-gradient(ellipse at 15% 60%, hsl(43 44% 57% / 0.04) 0%, transparent 55%),
+      radial-gradient(ellipse at 15% 60%, hsl(var(--primary) / 0.04) 0%, transparent 55%),
+      radial-gradient(ellipse at 85% 15%, hsl(210 55% 58% / 0.03) 0%, transparent 50%);
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(ellipse at 15% 60%, hsl(var(--primary) / 0.04) 0%, transparent 55%),
       radial-gradient(ellipse at 85% 15%, hsl(210 55% 58% / 0.04) 0%, transparent 50%),
       radial-gradient(ellipse at 50% 100%, hsl(224 24% 12% / 0.6) 0%, transparent 60%);
   }
@@ -284,16 +385,16 @@
 
   /* Navbar pill */
   .pill-nav {
-    background: hsl(224 20% 15% / 0.97);
+    background: hsl(var(--card) / 0.97);
     backdrop-filter: blur(10px);
-    border: 1px solid hsl(224 16% 26%);
+    border: 1px solid hsl(var(--card-border));
     border-radius: 9999px;
   }
 
   @media (max-width: 768px) {
     .pill-nav {
       backdrop-filter: none;
-      background: hsl(224 20% 15% / 0.99);
+      background: hsl(var(--card) / 0.99);
     }
   }
 
@@ -301,9 +402,9 @@
   .hero-navy {
     background: linear-gradient(
       160deg,
-      hsl(224 22% 10%) 0%,
-      hsl(224 24%  8%) 50%,
-      hsl(224 26%  6%) 100%
+      hsl(var(--hero-dark)) 0%,
+      hsl(var(--background)) 50%,
+      hsl(var(--hero-dark-2)) 100%
     );
     position: relative;
   }

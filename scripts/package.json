@@ -6,16 +6,21 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "seed-products": "tsx ./src/seed-products.ts"
+    "seed-products": "tsx ./src/seed-products.ts",
+    "seed:e2e": "tsx ./src/seed-e2e.ts",
+    "seed:e2e-affiliate": "tsx ./src/seed-e2e-affiliate.ts"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",
     "@neondatabase/serverless": "catalog:",
+    "bcryptjs": "^2.4.3",
     "drizzle-orm": "catalog:",
+    "openai": "catalog:",
     "pg": "^8.20.0",
     "stripe": "^22.1.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "catalog:",
     "@types/pg": "^8.18.0",
     "tsx": "catalog:"

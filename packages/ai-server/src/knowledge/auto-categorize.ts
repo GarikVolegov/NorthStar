@@ -1,6 +1,7 @@
 import { getLLM } from "../llm/client";
 import { logger } from "../logger";
 import { withTimeout } from "../utils";
+import { selectModelFor } from "../model-router";
 
 const VALID_TYPES = [
   "document",
@@ -27,8 +28,9 @@ Contenuto: "${content.slice(0, 500)}"
 
 Rispondi SOLO con il nome del tipo, senza spiegazioni o punteggiatura.`;
 
+    const route = selectModelFor("knowledge-categorize");
     const response = await withTimeout(
-      llm.chatOnce([{ role: "system", content: prompt }], { model: "gpt-4o-mini", temperature: 0.1, maxTokens: 20 }),
+      llm.chatOnce([{ role: "system", content: prompt }], { model: route.model, temperature: route.temperature, maxTokens: route.maxTokens }),
       5000,
       "auto-categorize",
     );

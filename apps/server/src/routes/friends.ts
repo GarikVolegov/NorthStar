@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, and, or, desc, lt, sql } from "drizzle-orm";
-import { db, friendshipsTable, usersTable, chatMessagesTable } from "@workspace/db";
+import { db, friendshipsTable, usersTable, userProfileSettingsTable, chatMessagesTable } from "@workspace/db";
 import { userKeysTable, friendshipKeysTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { getWss } from "../ws";
@@ -27,13 +27,14 @@ router.get("/:userId", async (req, res) => {
       id: sql<number>`CASE WHEN ${friendshipsTable.requesterId} = ${userId} THEN ${friendshipsTable.receiverId} ELSE ${friendshipsTable.requesterId} END`,
       name: usersTable.name,
       email: usersTable.email,
-      isPublic: usersTable.isPublic,
+      isPublic: userProfileSettingsTable.isPublic,
     })
     .from(friendshipsTable)
     .innerJoin(usersTable, sql`(
       CASE WHEN ${friendshipsTable.requesterId} = ${userId} THEN ${friendshipsTable.receiverId}
       ELSE ${friendshipsTable.requesterId} END
     ) = ${usersTable.id}`)
+    .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
     .where(and(
       or(
         eq(friendshipsTable.requesterId, userId),
@@ -49,11 +50,12 @@ router.get("/:userId", async (req, res) => {
       id: friendshipsTable.requesterId,
       name: usersTable.name,
       email: usersTable.email,
-      isPublic: usersTable.isPublic,
+      isPublic: userProfileSettingsTable.isPublic,
       createdAt: friendshipsTable.createdAt,
     })
     .from(friendshipsTable)
     .innerJoin(usersTable, eq(friendshipsTable.requesterId, usersTable.id))
+    .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
     .where(and(
       eq(friendshipsTable.receiverId, userId),
       eq(friendshipsTable.status, "pending"),
@@ -66,11 +68,12 @@ router.get("/:userId", async (req, res) => {
       id: friendshipsTable.receiverId,
       name: usersTable.name,
       email: usersTable.email,
-      isPublic: usersTable.isPublic,
+      isPublic: userProfileSettingsTable.isPublic,
       createdAt: friendshipsTable.createdAt,
     })
     .from(friendshipsTable)
     .innerJoin(usersTable, eq(friendshipsTable.receiverId, usersTable.id))
+    .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
     .where(and(
       eq(friendshipsTable.requesterId, userId),
       eq(friendshipsTable.status, "pending"),

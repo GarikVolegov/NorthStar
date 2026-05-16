@@ -32,6 +32,7 @@
  */
 import { openai } from "../client";
 import { logger } from "../logger";
+import { selectModelFor } from "../model-router";
 
 export interface CoTResult {
   limitingPattern: string;      // e.g. "all-or-nothing thinking"
@@ -135,8 +136,9 @@ export async function runChainOfThought(
     : userMessage;
 
   try {
+    const route = selectModelFor("chain-of-thought");
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: route.model,
       messages: [
         { role: "system", content: COT_SYSTEM },
         { role: "user",   content: userContent },

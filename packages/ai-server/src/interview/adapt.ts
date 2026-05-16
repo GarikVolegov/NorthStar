@@ -1,6 +1,7 @@
 import { getLLM } from "../llm/client";
 import { logger } from "../logger";
 import { withTimeout } from "../utils";
+import { selectModelFor } from "../model-router";
 
 export type DifficultyLevel = "base" | "media" | "avanzata";
 
@@ -24,8 +25,9 @@ Regole:
 Rispondi SOLO con una parola: "base", "media" o "avanzata"`;
 
     const llm = getLLM();
+    const route = selectModelFor("interview-adapt");
     const response = await withTimeout(
-      llm.chatOnce([{ role: "system", content: prompt }], { model: "gpt-4o-mini", temperature: 0.2, maxTokens: 10 }),
+      llm.chatOnce([{ role: "system", content: prompt }], { model: route.model, temperature: route.temperature, maxTokens: route.maxTokens }),
       5000,
       "interview-adapt",
     );

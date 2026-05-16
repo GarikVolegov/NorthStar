@@ -46,8 +46,8 @@ export { FF } from "./feature-flags";
 // Cost tracking & model routing
 export { recordLlmUsage, estimateTokens, estimateCost, getProvider, MODEL_PRICING } from "./cost-tracking";
 export type { ModelPricing } from "./cost-tracking";
-export { selectModel } from "./model-router";
-export type { RouterOptions, ModelRoute, RequestComplexity } from "./model-router";
+export { selectModel, selectModelFor, modelFor } from "./model-router";
+export type { RouterOptions, ModelRoute, RequestComplexity, AgentRole } from "./model-router";
 
 // Search Router
 export { routeQuery } from "./search-router/router";

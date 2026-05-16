@@ -41,6 +41,7 @@ import { eq, and } from "drizzle-orm";
 import { openai } from "../client";
 import { embedText } from "./embedder";
 import { logger } from "../logger";
+import { selectModelFor } from "../model-router";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -170,8 +171,9 @@ export async function extractMemory(
     .join("\n");
 
   try {
+    const route = selectModelFor("memory-extract");
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: route.model,
       messages: [
         { role: "system", content: EXTRACT_SYSTEM },
         { role: "user",   content: transcript },

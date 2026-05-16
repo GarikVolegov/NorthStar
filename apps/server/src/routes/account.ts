@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { eq, and, isNull, desc } from "drizzle-orm";
-import { db, usersTable, userObjectivesTable, objectiveCommentsTable, coachSessionsTable, voiceSessionsTable, messages, conversations, businessIdeasTable, coachMemoryFactsTable, coachMemoryPatternsTable, sessionSummariesTable, affiliateAccountsTable, affiliateCommissionsTable, affiliateWithdrawalsTable, affiliateReferralsTable, chatMessagesTable } from "@workspace/db";
+import { db, usersTable, userProfileSettingsTable, nftCertificatesTable, userObjectivesTable, objectiveCommentsTable, coachSessionsTable, voiceSessionsTable, messages, conversations, businessIdeasTable, coachMemoryFactsTable, coachMemoryPatternsTable, sessionSummariesTable, affiliateAccountsTable, affiliateCommissionsTable, affiliateWithdrawalsTable, affiliateReferralsTable, chatMessagesTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { writeAuditLog } from "../middleware/audit";
 
@@ -8,6 +8,8 @@ const router = Router();
 
 async function getUserRelatedData(userId: number) {
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  const [profile] = await db.select().from(userProfileSettingsTable).where(eq(userProfileSettingsTable.userId, userId)).limit(1);
+  const userWithProfile = { ...user, ...(profile ?? {}) };
   const objectives = await db.select().from(userObjectivesTable).where(eq(userObjectivesTable.userId, userId));
   const coachSessions = await db.select().from(coachSessionsTable).where(eq(coachSessionsTable.userId, userId));
   const voiceSessions = await db.select().from(voiceSessionsTable).where(eq(voiceSessionsTable.userId, userId));
@@ -35,7 +37,7 @@ async function getUserRelatedData(userId: number) {
   }
 
   return {
-    profile: user,
+    profile: userWithProfile,
     objectives,
     coachSessions,
     voiceSessions,
@@ -122,6 +124,14 @@ router.delete("/", requireAuth, async (req: Request, res: Response) => {
           passwordHash: null,
           googleId: null,
           avatarUrl: null,
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          updatedAt: now,
+        })
+        .where(eq(usersTable.id, userId));
+
+      await tx.update(userProfileSettingsTable)
+        .set({
           bannerUrl: null,
           username: `deleted-${userId}${anonSuffix}`,
           cvText: null,
@@ -129,12 +139,18 @@ router.delete("/", requireAuth, async (req: Request, res: Response) => {
           city: null,
           bio: null,
           cityPlaceId: null,
-          stripeCustomerId: null,
-          stripeSubscriptionId: null,
           referralConvertedAt: null,
           updatedAt: now,
         })
-        .where(eq(usersTable.id, userId));
+        .where(eq(userProfileSettingsTable.userId, userId));
+
+      await tx.update(nftCertificatesTable)
+        .set({
+          userName: "Utente Eliminato",
+          objectiveText: "Eliminato",
+          isPublic: false,
+        })
+        .where(eq(nftCertificatesTable.userId, userId));
 
       const tables = [
         { table: coachSessionsTable, col: coachSessionsTable.userId },

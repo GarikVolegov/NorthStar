@@ -51,7 +51,7 @@ export const wendyLimiter = rateLimit(
 export const wendyIpLimiter = rateLimit(
   buildOptions({
     windowMs: 60 * 1000,
-    max: 20,
+    max: 10,
     keyGenerator: (req: Request) => ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? "unknown"),
     skip: (req: Request) =>
       process.env.NODE_ENV === "test" || process.env.USE_MOCK_AI === "true",

@@ -1,6 +1,7 @@
 import { getLLM } from "../llm/client";
 import { logger } from "../logger";
 import { withTimeout } from "../utils";
+import { selectModelFor } from "../model-router";
 
 export interface InterviewQuestion {
   question: string;
@@ -30,8 +31,9 @@ Rispondi SOLO con un array JSON nel formato:
 [{ "question": "testo domanda", "difficulty": "base|media|avanzata", "focus": "area valutata" }]`;
 
     const llm = getLLM();
+    const route = selectModelFor("interview-generate");
     const response = await withTimeout(
-      llm.chatOnce([{ role: "system", content: prompt }], { model: "gpt-4o-mini", temperature: 0.7, maxTokens: 600 }),
+      llm.chatOnce([{ role: "system", content: prompt }], { model: route.model, temperature: route.temperature, maxTokens: route.maxTokens }),
       10000,
       "interview-generate",
     );

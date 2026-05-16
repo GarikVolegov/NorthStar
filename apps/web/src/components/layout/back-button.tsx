@@ -16,7 +16,7 @@ export function BackButton() {
         onClick={() => window.history.back()}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors group"
       >
-        <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+        <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 lefty:rotate-180 lefty:group-hover:translate-x-0.5 transition-transform" />
         {t("nav.back", { defaultValue: "Indietro" })}
       </button>
     </div>

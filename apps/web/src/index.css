@@ -4,6 +4,24 @@
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant lefty (&:is(.lefty *));
+
+html.lefty #root {
+  direction: rtl;
+}
+
+/* Testo sempre LTR anche in modalità mancino */
+html.lefty #root p,
+html.lefty #root span,
+html.lefty #root h1, html.lefty #root h2, html.lefty #root h3,
+html.lefty #root h4, html.lefty #root h5, html.lefty #root h6,
+html.lefty #root a, html.lefty #root button,
+html.lefty #root input, html.lefty #root textarea, html.lefty #root label,
+html.lefty #root li, html.lefty #root td, html.lefty #root th {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: embed;
+}
 
 /* All design tokens (colors, fonts, radius, shadows) inherited from @workspace/design-tokens/northstar-theme.css
    ─ If you need to override a token, do it here: */
@@ -14,11 +32,6 @@
   }
   body {
     @apply font-sans antialiased bg-background text-foreground;
-    /* Subtle cool-warm ambient gradient */
-    background-image:
-      radial-gradient(ellipse at 15% 60%, hsl(43 44% 57% / 0.04) 0%, transparent 55%),
-      radial-gradient(ellipse at 85% 15%, hsl(210 55% 58% / 0.04) 0%, transparent 50%),
-      radial-gradient(ellipse at 50% 100%, hsl(224 24% 12% / 0.6) 0%, transparent 60%);
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-sans tracking-tight text-foreground;

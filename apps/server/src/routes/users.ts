@@ -2,7 +2,7 @@ import { Router } from "express";
 import { eq, and, or, like, sql, ne } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 const { sign } = jwt;
-import { db, pool, usersTable, friendshipsTable } from "@workspace/db";
+import { db, pool, usersTable, userProfileSettingsTable, friendshipsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 
 const router = Router();
@@ -82,23 +82,32 @@ router.get("/:userId/public", async (req, res) => {
     const targetId = parseInt(req.params.userId, 10);
     const viewerId = req.query.viewerId ? parseInt(req.query.viewerId as string, 10) : null;
 
-    const { rows } = await pool.query<{
-      id: number; name: string; email: string;
-      avatar_url: string | null; is_public: boolean;
-      work_preference: string | null; created_at: string;
-    }>(
-      `SELECT id, name, email, avatar_url, is_public, work_preference, created_at
-       FROM users WHERE id = $1 LIMIT 1`,
-      [targetId],
-    );
+    const [user] = await db
+      .select({
+        id: usersTable.id,
+        name: usersTable.name,
+        email: usersTable.email,
+        avatarUrl: usersTable.avatarUrl,
+        createdAt: usersTable.createdAt,
+        journeyType: usersTable.journeyType,
+        isPublic: userProfileSettingsTable.isPublic,
+        workPreference: userProfileSettingsTable.workPreference,
+        bannerUrl: userProfileSettingsTable.bannerUrl,
+        bio: userProfileSettingsTable.bio,
+        city: userProfileSettingsTable.city,
+        userMode: userProfileSettingsTable.userMode,
+      })
+      .from(usersTable)
+      .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
+      .where(eq(usersTable.id, targetId))
+      .limit(1);
 
-    const user = rows[0];
     if (!user) {
       res.status(404).json({ error: "Utente non trovato" });
       return;
     }
 
-    let canView = user.is_public;
+    let canView = user.isPublic ?? false;
     let areFriends = false;
     let friendshipStatus: string | null = null;
     let friendshipId: number | null = null;
@@ -133,11 +142,11 @@ router.get("/:userId/public", async (req, res) => {
     const base = {
       id: user.id,
       name: user.name,
-      isPublic: user.is_public,
-      createdAt: user.created_at,
+      isPublic: user.isPublic,
+      createdAt: user.createdAt,
       // camelCase versions for frontend compatibility
-      is_public: user.is_public,
-      created_at: user.created_at,
+      is_public: user.isPublic,
+      created_at: user.createdAt,
       canView,
       areFriends,
       friendshipStatus,
@@ -148,13 +157,13 @@ router.get("/:userId/public", async (req, res) => {
       res.json({
         ...base,
         email: user.email,
-        avatarUrl: user.avatar_url,
-        workPreference: user.work_preference,
-        bannerUrl: null,
-        bio: null,
-        city: null,
-        journeyType: null,
-        userMode: null,
+        avatarUrl: user.avatarUrl,
+        workPreference: user.workPreference,
+        bannerUrl: user.bannerUrl,
+        bio: user.bio,
+        city: user.city,
+        journeyType: user.journeyType,
+        userMode: user.userMode,
       });
     } else {
       res.json(base);
@@ -180,10 +189,10 @@ router.patch("/:userId/privacy", requireAuth, async (req, res) => {
   }
 
   const [updated] = await db
-    .update(usersTable)
+    .update(userProfileSettingsTable)
     .set({ isPublic, updatedAt: new Date() })
-    .where(eq(usersTable.id, targetId))
-    .returning({ isPublic: usersTable.isPublic });
+    .where(eq(userProfileSettingsTable.userId, targetId))
+    .returning({ isPublic: userProfileSettingsTable.isPublic });
 
   res.json({ isPublic: updated.isPublic });
 });
@@ -221,19 +230,21 @@ router.get("/search", requireAuth, async (req, res) => {
       id: usersTable.id,
       name: usersTable.name,
       email: usersTable.email,
-      isPublic: usersTable.isPublic,
+      isPublic: userProfileSettingsTable.isPublic,
       avatarUrl: usersTable.avatarUrl,
-      city: usersTable.city,
+      city: userProfileSettingsTable.city,
     })
     .from(usersTable)
+    .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
     .where(and(
       ne(usersTable.id, userId),
       or(
         like(usersTable.name, likePattern),
         like(usersTable.email, likePattern),
+        like(userProfileSettingsTable.city, likePattern),
       ),
       or(
-        eq(usersTable.isPublic, true),
+        eq(userProfileSettingsTable.isPublic, true),
         sql`${usersTable.id} = ANY(${friendIdSet.size > 0 ? [...friendIdSet] : [0]}::int[])`,
       ),
     ))

@@ -1,6 +1,7 @@
 import { getLLM } from "../llm/client";
 import { logger } from "../logger";
 import { withTimeout } from "../utils";
+import { selectModelFor } from "../model-router";
 
 export interface AnswerEvaluation {
   score: number;
@@ -42,8 +43,9 @@ Rispondi SOLO con un oggetto JSON:
 }`;
 
     const llm = getLLM();
+    const route = selectModelFor("interview-evaluate");
     const response = await withTimeout(
-      llm.chatOnce([{ role: "system", content: prompt }], { model: "gpt-4o-mini", temperature: 0.3, maxTokens: 400 }),
+      llm.chatOnce([{ role: "system", content: prompt }], { model: route.model, temperature: route.temperature, maxTokens: route.maxTokens }),
       10000,
       "interview-evaluate",
     );

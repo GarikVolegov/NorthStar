@@ -2,6 +2,7 @@ import { getLLM } from "../llm/client";
 import { embedText } from "../growth-agent/embedder";
 import { logger } from "../logger";
 import { withTimeout } from "../utils";
+import { selectModelFor } from "../model-router";
 
 export interface AutoLinkSuggestion {
   targetNodeId: number;
@@ -51,8 +52,9 @@ Rispondi SOLO con un array JSON degli indici dei candidati da collegare, nel for
 [{ "index": number, "label": "relazione", "reason": "motivo" }]`;
 
     const llm = getLLM();
+    const route = selectModelFor("knowledge-link");
     const response = await withTimeout(
-      llm.chatOnce([{ role: "system", content: prompt }], { model: "gpt-4o-mini", temperature: 0.3, maxTokens: 500 }),
+      llm.chatOnce([{ role: "system", content: prompt }], { model: route.model, temperature: route.temperature, maxTokens: route.maxTokens }),
       10000,
       "auto-link",
     );

@@ -3,8 +3,9 @@ import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, coachSessionsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
-import { getLLM } from "@workspace/ai-server/llm/client";
+import { writeAuditLog } from "../middleware/audit";
 import { wendyLimiter, wendyIpLimiter, planQuotaLimiter } from "../middleware/rate-limit";
+import { costGuard } from "../middleware/cost-guard";
 import { recordLlmUsage, estimateTokens, selectModel } from "@workspace/ai-server";
 
 const router = Router();
@@ -111,7 +112,7 @@ router.delete("/sessions/:id", requireAuth, async (req, res) => {
 });
 
 // ── ASK (SSE streaming) ──────────────────────────────────────
-router.post("/sessions/:id/ask", requireAuth, wendyLimiter, wendyIpLimiter, planQuotaLimiter, async (req, res) => {
+router.post("/sessions/:id/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, planQuotaLimiter, async (req, res) => {
   const userId = req.user!.id;
   const id = parseInt(req.params.id);
   const data = askSchema.parse(req.body);

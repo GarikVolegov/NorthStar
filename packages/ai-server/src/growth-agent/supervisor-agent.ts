@@ -27,6 +27,7 @@ import { supervisorLogs } from "../db/schema";
 import type { Domain, Intent } from "./router-agent";
 import { logger, type LoggerFields } from "../logger";
 import { recordSupervisorRewrite } from "../metrics";
+import { selectModelFor } from "../model-router";
 import { withTimeout } from "../utils";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -221,12 +222,13 @@ REGOLE DI RISCRITTURA:
 
     let rewritten = draft; // safe fallback
     try {
+      const route = selectModelFor("supervisor-rewrite");
       rewritten = await getLLM().chatOnce(
         [
           { role: "system", content: systemPrompt },
           { role: "user",   content: `DOMANDA UTENTE:\n${userMessage}\n\nBOZZA:\n${draft}` },
         ],
-        { model: "gpt-4o-mini", temperature: 0.50, maxTokens: 700 },
+        { model: route.model, temperature: route.temperature, maxTokens: route.maxTokens },
       );
     } catch (err) {
       logger.warn({ err, domain, intent }, "rewrite failed — using original draft");

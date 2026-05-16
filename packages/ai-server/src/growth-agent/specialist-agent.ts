@@ -33,8 +33,13 @@ import type { CoTResult } from "./chain-of-thought";
 import type { EvalResult } from "./self-evaluator";
 import type { Domain, RouteDecision } from "./router-agent";
 import type { MemoryPattern } from "./memory-manager";
+import { selectModelFor, modelFor } from "../model-router";
 
-export const SPECIALIST_MODEL = "gpt-4o";
+/**
+ * @deprecated reflects the *baseline* (non-premium) model. The actual model is
+ * resolved per-request inside `run()` via `selectModelFor("specialist-chat", { isPremium })`.
+ */
+export const SPECIALIST_MODEL = modelFor("specialist-chat");
 
 // Domain-specific status icon for the first status message
 const DOMAIN_STATUS_ICONS: Record<Domain, string> = {
@@ -195,8 +200,13 @@ export abstract class SpecialistAgent {
     try {
       yield { type: "status", value: "✨ Sto scrivendo la risposta..." };
 
+      const route = selectModelFor("specialist-chat", {
+        isPremium: !!(enrichedContext as { isPremium?: boolean }).isPremium,
+        complexity: evalResult.level === "high" ? "deep" : "standard",
+      });
+
       const stream = await openai.chat.completions.create({
-        model: SPECIALIST_MODEL, messages, stream: true, temperature,
+        model: route.model, messages, stream: true, temperature,
         max_tokens: evalResult.level === "low" ? 300 : 700,
       });
 

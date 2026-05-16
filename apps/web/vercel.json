@@ -1,5 +1,6 @@
 {
-  "buildCommand": "pnpm run build",
-  "outputDirectory": "dist/public",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter @northstar/web run build",
+  "outputDirectory": "apps/web/dist/public",
   "framework": "vite"
 }

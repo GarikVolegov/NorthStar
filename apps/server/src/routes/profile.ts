@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, userProfileSettingsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 
 const router = Router();
@@ -17,10 +17,11 @@ router.get("/:userId", async (req, res) => {
         email: usersTable.email,
         emailVerified: usersTable.emailVerified,
         avatarUrl: usersTable.avatarUrl,
-        bannerUrl: usersTable.bannerUrl,
+        bannerUrl: userProfileSettingsTable.bannerUrl,
         createdAt: usersTable.createdAt,
       })
       .from(usersTable)
+      .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
       .where(eq(usersTable.id, userId))
       .limit(1);
 
@@ -100,10 +101,10 @@ router.patch("/:userId/banner", requireAuth, async (req, res) => {
   }
 
   const [updated] = await db
-    .update(usersTable)
+    .update(userProfileSettingsTable)
     .set({ bannerUrl: bannerDataUrl, updatedAt: new Date() })
-    .where(eq(usersTable.id, userId))
-    .returning({ bannerUrl: usersTable.bannerUrl });
+    .where(eq(userProfileSettingsTable.userId, userId))
+    .returning({ bannerUrl: userProfileSettingsTable.bannerUrl });
 
   res.json({ bannerUrl: updated.bannerUrl });
 });
@@ -117,9 +118,9 @@ router.delete("/:userId/banner", requireAuth, async (req, res) => {
   }
 
   await db
-    .update(usersTable)
+    .update(userProfileSettingsTable)
     .set({ bannerUrl: null, updatedAt: new Date() })
-    .where(eq(usersTable.id, userId));
+    .where(eq(userProfileSettingsTable.userId, userId));
 
   res.json({ success: true });
 });

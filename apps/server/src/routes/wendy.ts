@@ -4,7 +4,8 @@ import OpenAI from "openai";
 import { requireAuth } from "../middleware/auth";
 import { writeAuditLog } from "../middleware/audit";
 import { wendyLimiter, wendyIpLimiter, planQuotaLimiter } from "../middleware/rate-limit";
-import { recordLlmUsage, estimateTokens, selectModel } from "@workspace/ai-server";
+import { costGuard } from "../middleware/cost-guard";
+import { recordLlmUsage, estimateTokens, selectModel, selectModelFor } from "@workspace/ai-server";
 import { routerAgent, type RouteDecision } from "@workspace/ai-server/growth-agent/router-agent";
 import { getSpecialist, type SpecialistEvent } from "@workspace/ai-server/growth-agent/specialist-agent";
 import { buildSystemPrompt, type UserContext } from "@workspace/ai-server/growth-agent/prompt-builder";
@@ -47,7 +48,7 @@ function isPremiumUser(req: Request): boolean {
   return !!req.user?.stripeSubscriptionId;
 }
 
-router.post("/ask", requireAuth, wendyLimiter, wendyIpLimiter, planQuotaLimiter, async (req: Request, res: Response) => {
+router.post("/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, planQuotaLimiter, async (req: Request, res: Response) => {
    const userId = req.user!.id;
    const data = askSchema.parse(req.body);
    const log = req.log;
@@ -202,10 +203,15 @@ router.post("/ask", requireAuth, wendyLimiter, wendyIpLimiter, planQuotaLimiter,
          res.write(`data: ${JSON.stringify({ type: "sources", chunks: [] })}\n\n`);
        }
 
+       // Resolve the *actual* model used by the specialist for accurate cost-tracking & audit
+       const specialistRoute = selectModelFor("specialist-chat", {
+         isPremium: !!userContext.isPremium,
+       });
+
        // Send completion event with metadata
        res.write(`data: ${JSON.stringify({
          type: "done",
-         model: "gpt-4o", // specialist model
+         model: specialistRoute.model,
          reason: `specialist_${routeDecision.domain}`,
          specialistDomain: routeDecision.domain,
          confidence: routeDecision.confidence,
@@ -215,7 +221,7 @@ router.post("/ask", requireAuth, wendyLimiter, wendyIpLimiter, planQuotaLimiter,
        // Record LLM usage (approximate)
        await recordLlmUsage({
          userId,
-         model: "gpt-4o",
+         model: specialistRoute.model,
          promptTokens: estimateTokens(data.message + (contextSection || "")),
          completionTokens: estimateTokens(fullResponse),
          requestType: "wendy_chat",
@@ -237,7 +243,7 @@ router.post("/ask", requireAuth, wendyLimiter, wendyIpLimiter, planQuotaLimiter,
            messageLength: data.message.length,
            chunkCount: chunks.length,
            sessionId: data.sessionId,
-           model: "gpt-4o",
+           model: specialistRoute.model,
            specialistDomain: routeDecision.domain,
            specialistConfidence: routeDecision.confidence,
            endpoint: "wendy/ask",

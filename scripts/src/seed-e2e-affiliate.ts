@@ -21,8 +21,9 @@
  */
 
 import 'dotenv/config';
-import { Pool } from '@neondatabase/serverless';
 import * as crypto from 'crypto';
+import { db } from '@workspace/db';
+import { sql } from 'drizzle-orm';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -45,54 +46,74 @@ function referralCodeFromEmail(email: string): string {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
-  const pool = new Pool({ connectionString: DATABASE_URL });
-  const client = await pool.connect();
-
   try {
+    // Since we're using drizzle with neon/http, we need to execute raw queries differently
+    // For seed scripts, we'll use the db.execute method with raw SQL
+
     // Prende il primo settore disponibile
-    const sectorRes = await client.query(
-      'SELECT id FROM sectors ORDER BY id LIMIT 1'
+    const sectorRes: any = await db.execute(
+      sql`SELECT id FROM sectors ORDER BY id LIMIT 1`
     );
-    const sectorId: number | null = sectorRes.rows[0]?.id ?? null;
+    const sectorId: number | null = sectorRes.length > 0 ? sectorRes[0].id : null;
 
     const passwordHash  = hashPassword(PASSWORD);
     const referralCode  = referralCodeFromEmail(EMAIL);
 
     // Upsert utente affiliate
-    const upsertRes = await client.query(
-      `INSERT INTO users
-         (email, password_hash, name, is_premium, is_affiliate, is_admin,
-          is_email_verified, sector_id, referral_code, created_at, updated_at)
-       VALUES ($1, $2, $3, true, true, false, true, $4, $5, NOW(), NOW())
-       ON CONFLICT (email) DO UPDATE SET
-         password_hash     = EXCLUDED.password_hash,
-         is_premium        = true,
-         is_affiliate      = true,
-         is_admin          = false,
-         is_email_verified = true,
-         sector_id         = EXCLUDED.sector_id,
-         referral_code     = EXCLUDED.referral_code,
-         updated_at        = NOW()
-       RETURNING id`,
-      [EMAIL, passwordHash, 'E2E Affiliate User', sectorId, referralCode]
+    const upsertRes: any = await db.execute(
+      sql`
+        INSERT INTO users
+          (email, password_hash, name, is_premium, is_affiliate, is_admin,
+           email_verified, sector_id, referred_by_code, created_at, updated_at)
+        VALUES (
+          ${EMAIL},
+          ${passwordHash},
+          'E2E Affiliate User',
+          true,
+          true,
+          false,
+          true,
+          ${sectorId ?? null},
+          ${referralCode},
+          NOW(),
+          NOW()
+        )
+        ON CONFLICT (email) DO UPDATE SET
+          password_hash     = EXCLUDED.password_hash,
+          is_premium        = true,
+          is_affiliate      = true,
+          is_admin          = false,
+          email_verified    = true,
+          sector_id         = EXCLUDED.sector_id,
+          referred_by_code  = EXCLUDED.referred_by_code,
+          updated_at        = NOW()
+        RETURNING id
+      `
     );
-
-    const userId: number = upsertRes.rows[0].id;
+    const userId: number = upsertRes.length > 0 ? upsertRes[0].id : 0;
     console.log(`✅  Utente affiliate upserted: ${EMAIL} (id=${userId})`);
     console.log(`ℹ️   referralCode: ${referralCode}`);
 
     // Upsert statistiche affiliate (tabella affiliate_stats o simile)
     // Graceful: se la tabella non esiste, logga e continua
     try {
-      await client.query(
-        `INSERT INTO affiliate_stats
-           (user_id, balance, clicks, conversions, created_at, updated_at)
-         VALUES ($1, 0, 5, 2, NOW(), NOW())
-         ON CONFLICT (user_id) DO UPDATE SET
-           clicks      = 5,
-           conversions = 2,
-           updated_at  = NOW()`,
-        [userId]
+      await db.execute(
+        sql`
+          INSERT INTO affiliate_stats
+            (user_id, balance, clicks, conversions, created_at, updated_at)
+          VALUES (
+            ${userId},
+            0,
+            5,
+            2,
+            NOW(),
+            NOW()
+          )
+          ON CONFLICT (user_id) DO UPDATE SET
+            clicks      = 5,
+            conversions = 2,
+            updated_at  = NOW()
+        `
       );
       console.log('✅  affiliate_stats upserted');
     } catch (statsErr: any) {
@@ -105,22 +126,27 @@ async function main() {
     }
 
     // Objectives minimi per non rompere GET /api/auth/me
-    const existingObj = await client.query(
-      'SELECT COUNT(*) FROM objectives WHERE user_id = $1',
-      [userId]
+    const existingObj: any = await db.execute(
+      sql`SELECT COUNT(*) AS count FROM objectives WHERE user_id = ${userId}`
     );
-    if (parseInt(existingObj.rows[0].count, 10) === 0) {
-      await client.query(
-        `INSERT INTO objectives (user_id, text, category, progress, created_at)
-         VALUES ($1, $2, $3, $4, NOW())`,
-        [userId, 'Obiettivo affiliate di test', 'career', 0]
+    if (existingObj.length > 0 && parseInt(existingObj[0].count, 10) === 0) {
+      await db.execute(
+        sql`
+          INSERT INTO objectives (user_id, text, category, progress, created_at)
+          VALUES (
+            ${userId},
+            'Obiettivo affiliate di test',
+            'career',
+            0,
+            NOW()
+          )
+        `
       );
       console.log('✅  Objective placeholder creato');
     }
-
-  } finally {
-    client.release();
-    await pool.end();
+  } catch (err) {
+    console.error('Error in seed-e2e-affiliate:', err);
+    throw err;
   }
 }
 

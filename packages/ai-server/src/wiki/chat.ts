@@ -1,6 +1,7 @@
 import { getLLM } from "../llm/client";
 import { retrieve } from "../growth-agent/retriever";
 import { logger } from "../logger";
+import { selectModelFor } from "../model-router";
 
 const WIKI_SYSTEM = `Sei un esperto del settore professionale. Rispondi in modo chiaro, dettagliato e aggiornato.
 Usa un tono professionale ma accessibile. Rispondi sempre in italiano.
@@ -73,8 +74,9 @@ export async function* streamWikiResponse(ctx: WikiContext): AsyncGenerator<Wiki
     messages.push({ role: "user", content: ctx.message });
 
     const llm = getLLM();
+    const route = selectModelFor("wiki-chat");
     const stream = await llm.chat(messages, {
-      model: "gpt-4o-mini",
+      model: route.model,
       temperature: 0.65,
       maxTokens: 800,
     });

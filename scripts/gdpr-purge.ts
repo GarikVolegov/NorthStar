@@ -19,7 +19,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import { db, usersTable, coachSessionsTable, voiceSessionsTable, userObjectivesTable, businessIdeasTable, coachMemoryFactsTable, coachMemoryPatternsTable, sessionSummariesTable, conversations, messages, chatMessagesTable } from "@workspace/db";
+import { db, usersTable, nftCertificatesTable, coachSessionsTable, voiceSessionsTable, userObjectivesTable, businessIdeasTable, coachMemoryFactsTable, coachMemoryPatternsTable, sessionSummariesTable, conversations, messages, chatMessagesTable } from "@workspace/db";
 import { eq, lt, isNotNull, and, sql } from "drizzle-orm";
 
 const PURGE_AFTER_DAYS = parseInt(process.env.GDPR_PURGE_AFTER_DAYS ?? "90", 10);
@@ -71,6 +71,7 @@ async function main() {
       await tx.delete(coachSessionsTable).where(eq(coachSessionsTable.userId, userId));
       await tx.delete(userObjectivesTable).where(eq(userObjectivesTable.userId, userId));
       await tx.delete(businessIdeasTable).where(eq(businessIdeasTable.userId, userId));
+      await tx.delete(nftCertificatesTable).where(eq(nftCertificatesTable.userId, userId));
 
       // Delete conversations and their messages
       const convs = await tx
