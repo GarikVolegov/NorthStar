@@ -29,6 +29,7 @@
     "openai": "catalog:",
     "pino": "^9.0.0",
     "rate-limit-redis": "^5.0.0",
+    "resend": "^6.12.3",
     "zod": "catalog:"
   },
   "optionalDependencies": {

@@ -187,6 +187,8 @@ router.post("/login", authLimiter, async (req, res) => {
         .where(eq(usersTable.id, user.id));
     });
 
+      sendVerificationCode(user.email, user.name, verificationCode);
+
       const response: Record<string, unknown> = {
         needsVerification: true,
         email: user.email,
@@ -262,6 +264,8 @@ router.post("/verify-email", async (req, res) => {
       emailVerified: true,
       token,
     });
+
+    sendWelcomeEmail(user.email, user.name);
   } catch (err) {
     req.log?.error?.({ err }, "verify-email error");
     res.status(500).json({ error: "Errore durante la verifica" });
@@ -277,6 +281,17 @@ router.post("/resend-verification", async (req, res) => {
       return;
     }
 
+    const [user] = await db
+      .select({ id: usersTable.id, name: usersTable.name })
+      .from(usersTable)
+      .where(eq(usersTable.email, email.toLowerCase()))
+      .limit(1);
+
+    if (!user) {
+      res.status(404).json({ error: "Utente non trovato" });
+      return;
+    }
+
     const verificationCode = generateVerificationCode();
     const verificationCodeExpires = new Date(Date.now() + 30 * 60 * 1000);
 
@@ -284,8 +299,10 @@ router.post("/resend-verification", async (req, res) => {
       return await db
         .update(usersTable)
         .set({ verificationCode, verificationCodeExpires })
-        .where(eq(usersTable.email, email.toLowerCase()));
+        .where(eq(usersTable.id, user.id));
     });
+
+    sendVerificationCode(email, user.name, verificationCode);
 
     const response: Record<string, unknown> = {};
 
@@ -316,6 +333,8 @@ router.post("/forgot-password", authLimiter, async (req, res) => {
       .update(usersTable)
       .set({ resetToken, resetTokenExpires })
       .where(eq(usersTable.email, email.toLowerCase()));
+
+    sendPasswordReset(email, resetToken);
 
     const response: Record<string, unknown> = {};
 

@@ -142,9 +142,13 @@ function createGroqProvider(): LLMProvider {
   }
   const client = new Groq({ apiKey });
 
+  // Map OpenAI-style names → Groq equivalents. Used only when callers still
+  // pass legacy model strings; the new model-router already returns Groq names
+  // directly so this map is becoming a safety net.
   const GROQ_MODEL_MAP: Record<string, string> = {
-    "gpt-4o-mini": "llama-3.3-70b-versatile",
-    "gpt-4o": "llama-3.3-70b-versatile",
+    "gpt-4o-mini": "llama-3.1-8b-instant",      // cheap class → cheapest Groq
+    "gpt-4o":      "llama-3.3-70b-versatile",   // premium class → best Groq
+    "gpt-3.5-turbo": "llama-3.1-8b-instant",
   };
 
   return {
