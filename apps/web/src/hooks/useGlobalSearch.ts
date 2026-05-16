@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -33,6 +34,17 @@ export interface RouterOutput {
   confidence: number;
 }
 
+export interface AiSource {
+  content: string;
+  source:  string;
+  score:   number;
+}
+
+export interface ChatMessage {
+  role:    "user" | "assistant";
+  content: string;
+}
+
 interface HybridResponse {
   results: SearchResult[];
   has_semantic: boolean;
@@ -41,6 +53,17 @@ interface HybridResponse {
 interface SuggestResponse {
   suggestions: SearchSuggestion[];
 }
+
+const DEFAULT_ROUTE: RouterOutput = {
+  intent: "explore",
+  user_mode: "exploring",
+  experience_level: "beginner",
+  needs_clarification: false,
+  clarifying_question: null,
+  ui_widget_type: "results_list",
+  retrieval_strategy: "hybrid",
+  confidence: 0.5,
+};
 
 let sessionId = crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
 
@@ -65,12 +88,21 @@ async function trackSearch(data: Record<string, unknown>) {
 }
 
 export function useGlobalSearch() {
-  const [query, setQuery] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
-  const [lastQuery, setLastQuery] = useState("");
+  const [query, setQuery]         = useState("");
+  const [isOpen, setIsOpen]       = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const debouncedQuery = useDebounce(query, 300);
+  const debouncedQuery = useDebounce(query, 350);
 
+  // ── AI orchestrator state ──────────────────────────────────────────────────
+  const [aiTokens, setAiTokens]       = useState("");
+  const [aiStatus, setAiStatus]       = useState<string | null>(null);
+  const [aiSources, setAiSources]     = useState<AiSource[]>([]);
+  const [aiRoute, setAiRoute]         = useState<RouterOutput>(DEFAULT_ROUTE);
+  const [isStreaming, setIsStreaming]  = useState(false);
+  const [history, setHistory]         = useState<ChatMessage[]>([]);
+  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+
+  // ── Legacy React Query (fallback / risultati DB istantanei) ───────────────
   const { data, isLoading, isError } = useQuery<HybridResponse>({
     queryKey: ["global-search-hybrid", debouncedQuery],
     queryFn: async () => {
@@ -88,7 +120,7 @@ export function useGlobalSearch() {
     gcTime: 60_000,
   });
 
-  const results = data?.results ?? [];
+  const results    = data?.results  ?? [];
   const hasSemantic = data?.has_semantic ?? false;
 
   const { data: suggestData } = useQuery<SuggestResponse>({
@@ -108,47 +140,97 @@ export function useGlobalSearch() {
     retry: false,
   });
 
-  const { data: routeData } = useQuery<RouterOutput>({
-    queryKey: ["global-search-route", debouncedQuery],
-    queryFn: async () => {
-      if (debouncedQuery.length < 2) {
-        return {
-          intent: "explore",
-          user_mode: "exploring",
-          experience_level: "beginner",
-          needs_clarification: false,
-          clarifying_question: null,
-          ui_widget_type: "results_list",
-          retrieval_strategy: "hybrid",
-          confidence: 0.5,
-        } as RouterOutput;
-      }
-      const res = await fetch(`${BASE}api/search/route`, {
+  const suggestions = suggestData?.suggestions ?? [];
+
+  // ── Orchestrator SSE streaming ─────────────────────────────────────────────
+
+  function stopStream() {
+    readerRef.current?.cancel().catch(() => {});
+    readerRef.current = null;
+    setIsStreaming(false);
+  }
+
+  const startOrchestrate = useCallback(async (q: string, msgs: ChatMessage[]) => {
+    stopStream();
+    setAiTokens("");
+    setAiStatus(null);
+    setAiSources([]);
+    setIsStreaming(true);
+
+    try {
+      const res = await apiFetch(`${BASE}api/search/orchestrate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ q: debouncedQuery }),
+        body: JSON.stringify({ q, history: msgs, sessionId }),
       });
-      if (!res.ok) throw new Error("Route failed");
-      return res.json();
-    },
-    enabled: debouncedQuery.length >= 2,
-    staleTime: 60_000,
-    gcTime: 120_000,
-    retry: false,
-  });
 
-  const suggestions = suggestData?.suggestions ?? [];
-  const route = routeData ?? {
-    intent: "explore" as const,
-    user_mode: "exploring" as const,
-    experience_level: "beginner" as const,
-    needs_clarification: false,
-    clarifying_question: null,
-    ui_widget_type: "results_list" as const,
-    retrieval_strategy: "hybrid" as const,
-    confidence: 0.5,
-  };
+      if (!res.ok || !res.body) {
+        setIsStreaming(false);
+        return;
+      }
 
+      const reader  = res.body.getReader();
+      readerRef.current = reader;
+      const decoder = new TextDecoder();
+      let   buf     = "";
+      let   finalText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n\n");
+        buf = lines.pop()!;
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          let event: Record<string, unknown>;
+          try { event = JSON.parse(line.slice(6)); } catch { continue; }
+
+          if (event.type === "route")   setAiRoute(event.route as RouterOutput);
+          if (event.type === "status")  setAiStatus(event.value as string);
+          if (event.type === "sources") setAiSources(event.chunks as AiSource[]);
+          if (event.type === "token") {
+            const tok = event.value as string;
+            finalText += tok;
+            setAiTokens((t) => t + tok);
+          }
+          if (event.type === "done") {
+            setIsStreaming(false);
+            // Salva nella history per i follow-up
+            if (finalText) {
+              setHistory((h) => [
+                ...h,
+                { role: "user",      content: q },
+                { role: "assistant", content: finalText },
+              ]);
+            }
+            break;
+          }
+          if (event.type === "error") {
+            setIsStreaming(false);
+            break;
+          }
+        }
+      }
+    } catch {
+      setIsStreaming(false);
+    }
+  }, []);
+
+  // Lancia orchestratore quando la query cambia (>= 3 chars)
+  useEffect(() => {
+    if (debouncedQuery.length >= 3 && isOpen) {
+      startOrchestrate(debouncedQuery, history);
+    } else if (debouncedQuery.length < 3) {
+      stopStream();
+      setAiTokens("");
+      setAiStatus(null);
+      setAiSources([]);
+    }
+  }, [debouncedQuery, isOpen]);
+
+  // ── Keyboard shortcut ─────────────────────────────────────────────────────
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -164,10 +246,14 @@ export function useGlobalSearch() {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 50);
     } else {
+      stopStream();
       if (query && query.length >= 2) {
         trackSearch({ query, resultsShown: results, dismissed: true });
       }
       setQuery("");
+      setAiTokens("");
+      setAiStatus(null);
+      setAiSources([]);
     }
   }, [isOpen]);
 
@@ -185,12 +271,18 @@ export function useGlobalSearch() {
     [debouncedQuery, results],
   );
 
+  // Follow-up: aggiunge alla history e richiama orchestratore
+  const sendFollowUp = useCallback((followUpQuery: string) => {
+    setQuery(followUpQuery);
+    startOrchestrate(followUpQuery, history);
+  }, [history, startOrchestrate]);
+
   return {
     query,
     setQuery,
     results,
     suggestions,
-    route,
+    route: aiRoute,
     hasSemantic,
     isLoading: isLoading && debouncedQuery.length >= 2,
     isError,
@@ -200,5 +292,12 @@ export function useGlobalSearch() {
     trackClick,
     inputRef,
     debouncedQuery,
+    // AI orchestrator
+    aiTokens,
+    aiStatus,
+    aiSources,
+    isStreaming,
+    history,
+    sendFollowUp,
   };
 }

@@ -63,6 +63,10 @@ export { getPersonalizedFeed, invalidateUserFeedCache } from "./discovery-agent/
 // Embeddings
 export { generateEmbedding, generateEmbeddingsBatch, buildEmbeddingText } from "./embeddings/generate";
 
+// Search Orchestrator
+export { runSearchOrchestrator } from "./search-agent/orchestrator";
+export type { SearchOrchestratorOptions, SearchOrchestratorEvent, SearchResult as OrchestratorSearchResult } from "./search-agent/orchestrator";
+
 // Security Agent
 export { runSecurityAgent } from "./security-agent/index";
 export type { SecurityScanOptions, SecurityAgentEvent, SecurityFinding, Severity, VulnCategory } from "./security-agent/index";

@@ -822,6 +822,11 @@ export function Navbar() {
         setIsOpen={search.setIsOpen}
         close={search.close}
         trackClick={search.trackClick}
+        aiTokens={search.aiTokens}
+        aiStatus={search.aiStatus}
+        aiSources={search.aiSources}
+        isStreaming={search.isStreaming}
+        sendFollowUp={search.sendFollowUp}
       />
     </LazyMotion>
   );

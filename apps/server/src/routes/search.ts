@@ -7,6 +7,9 @@ import {
   growthArticlesTable,
   newsArticlesTable,
 } from "@workspace/db";
+import { runSearchOrchestrator, loadMemory, buildMemorySection } from "@workspace/ai-server";
+import { requireAuth } from "../middleware/auth";
+import { rootLogger } from "../middleware/logger";
 
 const router = Router();
 
@@ -240,6 +243,58 @@ router.get("/suggest", async (req, res) => {
   } catch (err) {
     req.log?.error?.({ err }, "search suggest error");
     res.json({ suggestions: [] });
+  }
+});
+
+// ── POST /api/search/orchestrate  —  SSE orchestratore AI ───────────────────
+router.post("/orchestrate", requireAuth, async (req, res) => {
+  const { q, sessionId, history = [] } = req.body as {
+    q: string;
+    sessionId?: number;
+    history?: Array<{ role: "user" | "assistant"; content: string }>;
+  };
+
+  if (!q || q.trim().length < 2) {
+    res.status(400).json({ error: "Query troppo corta" });
+    return;
+  }
+
+  const userId     = req.user!.id;
+  const isPremium  = !!req.user!.stripeSubscriptionId;
+
+  res.setHeader("Content-Type",    "text/event-stream");
+  res.setHeader("Cache-Control",   "no-cache");
+  res.setHeader("Connection",      "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  const send = (data: object) => {
+    if (!res.writableEnded) res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  rootLogger.info({ userId, q, sessionId }, "[search/orchestrate] started");
+
+  try {
+    // Carica memoria utente in anticipo
+    const userMemory    = await loadMemory(userId);
+    const memorySection = buildMemorySection(userMemory);
+
+    for await (const event of runSearchOrchestrator({
+      query:      q.trim(),
+      userId,
+      sessionId,
+      userContext: { userId, isPremium, memorySection },
+      history,
+      requestId:  crypto.randomUUID?.() ?? Math.random().toString(36),
+    })) {
+      send(event);
+      if (event.type === "done" || event.type === "error") break;
+    }
+  } catch (err) {
+    rootLogger.error({ err, userId, q }, "[search/orchestrate] unhandled error");
+    send({ type: "error", message: "Errore interno" });
+  } finally {
+    res.end();
   }
 });
 

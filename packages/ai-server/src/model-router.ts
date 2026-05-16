@@ -57,7 +57,9 @@ export type AgentRole =
   | "chain-of-thought"
   // Security agent
   | "security-scan"
-  | "security-fix";
+  | "security-fix"
+  // Search orchestrator
+  | "search-orchestrate";
 
 export interface RouterOptions {
   isPremium?: boolean;
@@ -168,6 +170,9 @@ const ROLE_CONFIG: Record<AgentRole, RoleConfig> = {
   // Security — deep analysis first, targeted fix generation second
   "security-scan":           { tier: "reasoning", temperature: 0.1, maxTokens: 2000 },
   "security-fix":            { tier: "standard",  temperature: 0.2, maxTokens: 1500 },
+
+  // Search orchestrator — solo routing, il LLM pesante è delegato al growth agent
+  "search-orchestrate":      { tier: "nano",      temperature: 0.1, maxTokens: 300 },
 };
 
 // ── Public API ────────────────────────────────────────────────────────────────
