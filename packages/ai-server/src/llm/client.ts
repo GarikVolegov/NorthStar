@@ -304,3 +304,16 @@ export function getLLM(): LLMProvider {
 export function resetLLM(): void {
   _provider = null;
 }
+
+/**
+ * Restituisce un provider LLM specifico per route, permettendo chiamate
+ * a provider diversi (es. Groq per NANO, OpenRouter per STANDARD) nella stessa istanza.
+ * Non usa il singleton: crea un client per-call in base a ModelRoute.provider.
+ */
+export function getLLMForRoute(route: { provider: "openai" | "groq" | "openrouter" }): LLMProvider {
+  switch (route.provider) {
+    case "openrouter": return createOpenRouterProvider();
+    case "groq":       return createGroqProvider();
+    default:           return createOpenAIProvider();
+  }
+}

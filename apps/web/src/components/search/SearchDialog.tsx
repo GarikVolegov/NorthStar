@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { m, AnimatePresence } from "framer-motion";
@@ -119,6 +119,20 @@ function SourcesAccordion({ sources }: { sources: AiSource[] }) {
   );
 }
 
+// ── Mobile detection ────────────────────────────────────────────────────────
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 768,
+  );
+  useEffect(() => {
+    const fn = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", fn, { passive: true });
+    return () => window.removeEventListener("resize", fn);
+  }, []);
+  return isMobile;
+}
+
 // ── Main component ───────────────────────────────────────────────────────────
 
 export function SearchDialog({
@@ -145,6 +159,7 @@ export function SearchDialog({
   const inputRef = useRef<HTMLInputElement>(null);
   const aiPanelRef = useRef<HTMLDivElement>(null);
   const [followUpInput, setFollowUpInput] = useState("");
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 50);
@@ -199,7 +214,7 @@ export function SearchDialog({
           {/* Backdrop */}
           <m.div
             key="search-backdrop"
-            className="fixed inset-0 z-40"
+            className={cn("fixed inset-0 z-40", isMobile && "bg-black/70 backdrop-blur-sm")}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -207,18 +222,33 @@ export function SearchDialog({
             onClick={close}
           />
 
-          {/* Dialog */}
+          {/* Container: bottom sheet su mobile, dropdown su desktop */}
           <m.div
-            key="search-dropdown"
-            className="fixed z-50 left-1/2 -translate-x-1/2 w-full px-4"
-            style={{ top: "68px", maxWidth: isAIActive && queryLong ? "900px" : "640px" }}
-            initial={{ opacity: 0, y: -8, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.98 }}
-            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            key="search-dialog"
+            className={isMobile
+              ? "fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-3xl bg-card/95 backdrop-blur-xl border-t border-white/10 shadow-2xl overflow-hidden"
+              : "fixed z-50 left-1/2 -translate-x-1/2 w-full px-4"}
+            style={isMobile
+              ? { maxHeight: "85dvh" }
+              : { top: "68px", maxWidth: isAIActive && queryLong ? "900px" : "640px" }}
+            initial={isMobile ? { y: "100%" } : { opacity: 0, y: -8, scale: 0.98 }}
+            animate={isMobile ? { y: 0 }   : { opacity: 1, y: 0,   scale: 1 }}
+            exit={isMobile    ? { y: "100%" } : { opacity: 0, y: -8, scale: 0.98 }}
+            transition={isMobile
+              ? { type: "spring", stiffness: 300, damping: 35 }
+              : { duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
           >
-            <div className="rounded-2xl border border-white/10 bg-card/95 backdrop-blur-xl shadow-2xl overflow-hidden">
+            {/* Drag handle (solo mobile) */}
+            {isMobile && (
+              <div className="flex justify-center pt-2.5 pb-1 shrink-0">
+                <div className="h-1 w-10 rounded-full bg-muted-foreground/30" />
+              </div>
+            )}
 
+            <div className={cn(
+              "overflow-hidden",
+              isMobile ? "flex flex-col flex-1" : "rounded-2xl border border-white/10 bg-card/95 backdrop-blur-xl shadow-2xl",
+            )}>
               {/* Input sempre in cima */}
               <Command shouldFilter={false}>
                 <CommandInput
@@ -229,8 +259,8 @@ export function SearchDialog({
                   className="border-b border-white/10"
                 />
 
-                {/* Layout split quando AI è attiva */}
-                {isAIActive && queryLong ? (
+                {/* Layout split quando AI è attiva (solo desktop) */}
+                {isAIActive && queryLong && !isMobile ? (
                   <div className="flex" style={{ minHeight: "320px", maxHeight: "65vh" }}>
 
                     {/* Colonna sinistra: risultati DB */}
@@ -437,6 +467,40 @@ export function SearchDialog({
                       })
                     )}
                   </CommandList>
+                )}
+
+                {/* AI streaming (mobile: panel singolo inline) */}
+                {isMobile && isAIActive && queryLong && (
+                  <div ref={aiPanelRef} className="px-4 py-3 border-t border-white/10 overflow-y-auto" style={{ maxHeight: "40vh" }}>
+                    {route.confidence >= 0.6 && (
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/60">{route.intent}</span>
+                        <div className={cn("h-1.5 w-1.5 rounded-full", route.confidence > 0.8 ? "bg-green-400" : "bg-amber-400")} />
+                      </div>
+                    )}
+                    {aiStatus && isStreaming && <AgentStatusBadge status={aiStatus} />}
+                    {(aiTokens || isStreaming) && (
+                      <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+                        {aiTokens}
+                        {isStreaming && <StreamingCursor />}
+                      </div>
+                    )}
+                    {!isStreaming && <SourcesAccordion sources={aiSources} />}
+                    {!isStreaming && aiTokens && (
+                      <form onSubmit={handleFollowUp} className="mt-3 flex gap-2">
+                        <input
+                          type="text"
+                          value={followUpInput}
+                          onChange={(e) => setFollowUpInput(e.target.value)}
+                          placeholder="Domanda di follow-up..."
+                          className="flex-1 text-xs bg-muted/40 border border-border rounded-full px-3 py-1.5 outline-none focus:border-primary transition-colors"
+                        />
+                        <button type="submit" disabled={!followUpInput.trim()} className="flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground disabled:opacity-40">
+                          <Send className="h-3 w-3" />
+                        </button>
+                      </form>
+                    )}
+                  </div>
                 )}
               </Command>
             </div>

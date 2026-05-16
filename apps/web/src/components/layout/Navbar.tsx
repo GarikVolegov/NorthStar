@@ -559,14 +559,18 @@ export function Navbar() {
 
           {/* Mobile search + right */}
           <div className="flex md:hidden items-center gap-1 flex-1 justify-end">
-            <div className="relative flex-1 max-w-[160px] sm:max-w-[220px]">
+            <div
+              className="relative flex-1 max-w-[160px] sm:max-w-[220px] cursor-pointer"
+              onClick={() => search.setIsOpen(true)}
+            >
               <span className="absolute left-2.5 lefty:left-auto lefty:right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
                 <img src="/logo.svg" alt="" className="h-4 w-4 rounded-full object-cover opacity-40" />
               </span>
               <input
+                readOnly
                 type="text"
                 placeholder="Cerca..."
-                className="w-full pl-8 pr-2.5 lefty:pl-2.5 lefty:pr-8 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary focus:bg-white/10 transition-all"
+                className="w-full pl-8 pr-2.5 lefty:pl-2.5 lefty:pr-8 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none transition-all pointer-events-none"
               />
             </div>
             {isLoggedIn && user && <NotificationBell userId={user.id} />}

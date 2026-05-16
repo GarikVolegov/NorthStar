@@ -87,13 +87,15 @@ export interface ModelRoute {
 const env = (k: string, fallback: string): string => process.env[k] ?? fallback;
 
 // Tier presets — env-overridable. Keep names short for cost-tracking pricing table.
-const NANO_GROQ      = env("MODEL_NANO_GROQ", "llama-3.1-8b-instant");
-const MICRO_GROQ     = env("MODEL_MICRO_GROQ", "llama-3.3-70b-versatile");
+const NANO_GROQ      = env("MODEL_NANO_GROQ",           "llama-3.1-8b-instant");
+const MICRO_GROQ     = env("MODEL_MICRO_GROQ",          "llama-3.3-70b-versatile");
+const NANO_OR        = env("MODEL_NANO_OPENROUTER",     "meta-llama/llama-3.3-70b-instruct:free");
+const MICRO_OR       = env("MODEL_MICRO_OPENROUTER",    "deepseek/deepseek-chat-v3-0324:free");
 const STANDARD_OR    = env("MODEL_STANDARD_OPENROUTER", "deepseek/deepseek-chat-v3-0324:free");
-const STANDARD_GROQ  = env("MODEL_STANDARD_GROQ", "llama-3.3-70b-versatile");
-const REASONING_OR   = env("MODEL_REASONING_OPENROUTER", "deepseek/deepseek-r1:free");
-const PREMIUM_OPENAI = env("MODEL_PREMIUM_OPENAI", "gpt-4o");
-const CHEAP_OPENAI   = env("MODEL_CHEAP_OPENAI", "gpt-4o-mini");
+const STANDARD_GROQ  = env("MODEL_STANDARD_GROQ",       "llama-3.3-70b-versatile");
+const REASONING_OR   = env("MODEL_REASONING_OPENROUTER","deepseek/deepseek-r1:free");
+const PREMIUM_OPENAI = env("MODEL_PREMIUM_OPENAI",      "gpt-4o");
+const CHEAP_OPENAI   = env("MODEL_CHEAP_OPENAI",        "gpt-4o-mini");
 
 /**
  * Active backend. If AI_PROVIDER=openrouter we prefer OpenRouter free-tier models
@@ -116,14 +118,14 @@ function reasoningModel(): { model: string; provider: ModelRoute["provider"] } {
 }
 
 function nanoModel(): { model: string; provider: ModelRoute["provider"] } {
-  if (ACTIVE_PROVIDER === "groq") return { model: NANO_GROQ, provider: "groq" };
-  if (ACTIVE_PROVIDER === "openrouter") return { model: STANDARD_OR, provider: "openrouter" }; // already free
+  if (ACTIVE_PROVIDER === "groq")       return { model: NANO_GROQ, provider: "groq" };
+  if (ACTIVE_PROVIDER === "openrouter") return { model: NANO_OR,   provider: "openrouter" };
   return { model: CHEAP_OPENAI, provider: "openai" };
 }
 
 function microModel(): { model: string; provider: ModelRoute["provider"] } {
-  if (ACTIVE_PROVIDER === "groq") return { model: MICRO_GROQ, provider: "groq" };
-  if (ACTIVE_PROVIDER === "openrouter") return { model: STANDARD_OR, provider: "openrouter" };
+  if (ACTIVE_PROVIDER === "groq")       return { model: MICRO_GROQ, provider: "groq" };
+  if (ACTIVE_PROVIDER === "openrouter") return { model: MICRO_OR,   provider: "openrouter" };
   return { model: CHEAP_OPENAI, provider: "openai" };
 }
 
@@ -204,6 +206,16 @@ export function selectModelFor(role: AgentRole, opts: RouterOptions = {}): Model
 
   // Premium upgrade path (only when the role opts in)
   if (cfg.upgradeOnPremiumDeep && isPremium && complexity === "deep") {
+    // Su OpenRouter: usa deepseek-r1:free (ottimo, gratuito) invece di gpt-4o a pagamento
+    if (ACTIVE_PROVIDER === "openrouter") {
+      const r = reasoningModel();
+      return { model: r.model, provider: r.provider, temperature: cfg.temperature, maxTokens: cfg.maxTokens, reason: `${role}:openrouter-premium-free` };
+    }
+    // Su Groq: usa il modello micro (llama-3.3-70b, gratuito)
+    if (ACTIVE_PROVIDER === "groq") {
+      return { model: MICRO_GROQ, provider: "groq", temperature: cfg.temperature, maxTokens: cfg.maxTokens, reason: `${role}:groq-premium` };
+    }
+    // Solo su OpenAI: upgrade reale a gpt-4o
     return {
       model: PREMIUM_OPENAI,
       provider: "openai",
