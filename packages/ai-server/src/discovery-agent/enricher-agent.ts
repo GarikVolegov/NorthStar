@@ -195,8 +195,13 @@ async function callGPT(item: DiscoveryItem): Promise<EnrichmentResult> {
     })
   );
 
-  const raw    = res.choices[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(raw) as Partial<EnrichmentResult>;
+  const raw = res.choices[0]?.message?.content ?? "{}";
+  let parsed: Partial<EnrichmentResult> = {};
+  try {
+    parsed = JSON.parse(raw) as Partial<EnrichmentResult>;
+  } catch {
+    logger.warn({ raw: raw.slice(0, 200) }, "[enricher] JSON parse failed, using defaults");
+  }
 
   return {
     relevanceScore: typeof parsed.relevanceScore === "number"

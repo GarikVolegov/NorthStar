@@ -74,7 +74,7 @@ router.get("/", async (req, res) => {
 
       const news = results.flatMap((r) => r.articles).map(mapNewsItem);
       const anyMore = results.some((r) => r.hasMore);
-      res.json({ news, nextCursor: anyMore && news.length > 0 ? encodeCursor(news[news.length - 1].publishedAt, parseInt(news[news.length - 1].id)) : null });
+      res.json({ news, nextCursor: anyMore && news.length > 0 ? encodeCursor(news[news.length - 1].publishedAt, news[news.length - 1].id) : null });
       return;
     }
 

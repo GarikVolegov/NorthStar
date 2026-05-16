@@ -52,8 +52,8 @@ router.post("/", async (req, res) => {
 
     try {
       embedding = await generateEmbedding(q);
-    } catch {
-      // embedding generation failed, fall back to lexical only
+    } catch (err) {
+      req.log?.warn?.({ err, q }, "search-hybrid: embedding failed, falling back to lexical-only");
     }
 
     async function queryWithFallback<T extends Record<string, any>>(

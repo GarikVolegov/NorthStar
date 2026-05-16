@@ -14,6 +14,9 @@ import("./ws").then(({ setWss }) => setWss(wss));
 const { startAlertChecker } = await import("./lib/alerts");
 startAlertChecker();
 
+const { startCronJobs } = await import("./jobs/cron");
+startCronJobs();
+
 httpServer.listen(PORT, () => {
   rootLogger.info({ port: PORT, wsPath: "/ws" }, "NorthStar API Server started");
 });

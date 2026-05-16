@@ -1,7 +1,8 @@
 import { Router, type Request, type Response } from "express";
-import { db, supervisorLogs, qualityMetrics } from "@workspace/db";
-import { sql } from "drizzle-orm";
+import { db, supervisorLogs, qualityMetrics, agentRunsTable, sectorsTable, professionsTable } from "@workspace/db";
+import { desc, isNull, eq, sql } from "drizzle-orm";
 import { register } from "@workspace/ai-server/metrics";
+import { runCollector, runEnricher, generateEmbeddingsBatch, buildEmbeddingText } from "@workspace/ai-server";
 import { writeAuditLog } from "../middleware/audit";
 import { rootLogger } from "../middleware/logger";
 
@@ -137,6 +138,119 @@ router.get("/wendy-metrics", async (req: Request, res: Response) => {
     });
   } catch (err) {
     rootLogger.error({ err }, "[admin/wendy-metrics] error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ── Agent Triggers ────────────────────────────────────────────────────────────
+
+/** POST /api/admin/agents/collect — avvia il collector di notizie */
+router.post("/agents/collect", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  try {
+    const result = await runCollector();
+    rootLogger.info({ result }, "[admin] collector triggered manually");
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    rootLogger.error({ err }, "[admin/agents/collect] error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+/** POST /api/admin/agents/enrich — avvia l'enricher LLM */
+router.post("/agents/enrich", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  try {
+    const batchSize = Number(req.query.batchSize) || 20;
+    const result = await runEnricher(batchSize);
+    rootLogger.info({ result }, "[admin] enricher triggered manually");
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    rootLogger.error({ err }, "[admin/agents/enrich] error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+/** GET /api/admin/agents/status — ultimi run degli agenti */
+router.get("/agents/status", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  try {
+    const runs = await db
+      .select()
+      .from(agentRunsTable)
+      .orderBy(desc(agentRunsTable.startedAt))
+      .limit(20);
+    res.json({ runs });
+  } catch (err) {
+    rootLogger.error({ err }, "[admin/agents/status] error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+/** POST /api/admin/agents/backfill — genera embeddings mancanti per settori e professioni */
+router.post("/agents/backfill", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  try {
+    // Settori senza embedding
+    const sectors = await db
+      .select({ id: sectorsTable.id, name: sectorsTable.name, description: sectorsTable.description })
+      .from(sectorsTable)
+      .where(isNull(sectorsTable.embedding))
+      .limit(100);
+
+    let sectorsDone = 0;
+    if (sectors.length > 0) {
+      const items = sectors.map((s) => ({
+        id: s.id,
+        text: buildEmbeddingText([
+          { label: "Settore", value: s.name },
+          { label: "Descrizione", value: s.description },
+        ]),
+      }));
+      const results = await generateEmbeddingsBatch(items);
+      for (const r of results) {
+        if (r.embedding) {
+          await db
+            .update(sectorsTable)
+            .set({ embedding: r.embedding as any })
+            .where(eq(sectorsTable.id, Number(r.id)));
+          sectorsDone++;
+        }
+      }
+    }
+
+    // Professioni senza embedding
+    const professions = await db
+      .select({ id: professionsTable.id, title: professionsTable.title, description: professionsTable.description })
+      .from(professionsTable)
+      .where(isNull(professionsTable.embedding))
+      .limit(100);
+
+    let professionsDone = 0;
+    if (professions.length > 0) {
+      const items = professions.map((p) => ({
+        id: p.id,
+        text: buildEmbeddingText([
+          { label: "Ruolo", value: p.title },
+          { label: "Descrizione", value: p.description },
+        ]),
+      }));
+      const results = await generateEmbeddingsBatch(items);
+      for (const r of results) {
+        if (r.embedding) {
+          await db
+            .update(professionsTable)
+            .set({ embedding: r.embedding as any })
+            .where(eq(professionsTable.id, Number(r.id)));
+          professionsDone++;
+        }
+      }
+    }
+
+    rootLogger.info({ sectorsDone, professionsDone }, "[admin] backfill embeddings completed");
+    res.json({ ok: true, sectorsDone, professionsDone });
+  } catch (err) {
+    rootLogger.error({ err }, "[admin/agents/backfill] error");
     res.status(500).json({ error: String(err) });
   }
 });

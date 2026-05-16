@@ -566,7 +566,7 @@ export async function runCollector(): Promise<CollectorResult> {
 
   // Release advisory lock
   try {
-    await db.execute(sql`SELECT pg_advisory_unlock(1937832947)`);
+    await db.execute(sql`SELECT pg_advisory_unlock(${COLLECTOR_LOCK_KEY})`);
   } catch { /* ignore */ }
 
   return result;

@@ -53,6 +53,16 @@ export type { RouterOptions, ModelRoute, RequestComplexity, AgentRole } from "./
 export { routeQuery } from "./search-router/router";
 export type { RouterInput, RouterOutput } from "./search-router/router";
 
+// Discovery Agents
+export { runCollector } from "./discovery-agent/collector-agent";
+export type { CollectorResult } from "./discovery-agent/collector-agent";
+export { runEnricher } from "./discovery-agent/enricher-agent";
+export type { EnricherResult } from "./discovery-agent/enricher-agent";
+export { getPersonalizedFeed, invalidateUserFeedCache } from "./discovery-agent/personalizer-agent";
+
+// Embeddings
+export { generateEmbedding, generateEmbeddingsBatch, buildEmbeddingText } from "./embeddings/generate";
+
 // Security Agent
 export { runSecurityAgent } from "./security-agent/index";
 export type { SecurityScanOptions, SecurityAgentEvent, SecurityFinding, Severity, VulnCategory } from "./security-agent/index";
