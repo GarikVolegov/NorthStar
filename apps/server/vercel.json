@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd ../.. && pnpm install && node apps/server/build-for-vercel.mjs",
+  "outputDirectory": ".vercel/output",
+  "framework": null,
+  "installCommand": "cd ../.. && pnpm install"
+}

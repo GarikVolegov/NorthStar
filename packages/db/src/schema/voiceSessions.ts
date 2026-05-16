@@ -54,6 +54,8 @@ export const voiceSessionsTable = pgTable(
       .defaultNow(),
 
     completedAt: timestamp("completed_at", { withTimezone: true }),
+
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => ({
     userIdx: index("voice_sessions_user_idx").on(t.userId),

@@ -148,7 +148,7 @@ export const PERSONAS: Persona[] = [
     tagline: "Voglio avviare un'attività",
     ctaLabel: "Valida la tua idea",
     ctaHref: "/validatore-idea",
-    tools: ["Validatore idea", "Business plan", "Analisi mercato"],
+    tools: ["Idea", "Business plan", "Analisi mercato"],
     accentClass: "text-violet-400",
     borderClass: "border-violet-400/20",
   },

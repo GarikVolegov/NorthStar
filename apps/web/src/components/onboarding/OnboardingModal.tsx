@@ -234,7 +234,7 @@ export function OnboardingModal({ sessionId, recommendations, riasecTypes, domin
                     { href: `/roadmap/${recommendations[0].sectorId}`, icon: <Map className="w-4 h-4" />, label: "Roadmap AI", color: "text-emerald-600 bg-emerald-50" },
                     { href: `/wiki/${recommendations[0].sectorId}`, icon: <BookOpen className="w-4 h-4" />, label: "Wiki Settore", color: "text-indigo-600 bg-indigo-50" },
                     { href: "/coach", icon: <BrainCircuit className="w-4 h-4" />, label: "Coach AI", color: "text-violet-600 bg-violet-50" },
-                    { href: `/grafo/${recommendations[0].sectorId}`, icon: <Network className="w-4 h-4" />, label: "Grafo Conoscenza", color: "text-orange-600 bg-orange-50" },
+                    { href: `/grafo/${recommendations[0].sectorId}`, icon: <Network className="w-4 h-4" />, label: "Mappa Conoscenza", color: "text-orange-600 bg-orange-50" },
                   ].map((item) => (
                     <Link key={item.href} href={item.href} onClick={finish}>
                       <div className="rounded-xl border p-3 hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer flex flex-col items-center gap-2 text-center">

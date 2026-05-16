@@ -1,37 +1,305 @@
 import { Router } from "express";
-import { eq, and, gte, asc } from "drizzle-orm";
-import { db, calendarEventsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
+import { eq, and, gte, asc, sql } from "drizzle-orm";
+import { db, calendarEventsTable } from "@workspace/db";
+import { format, parseISO, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays, subDays } from "date-fns";
+import { it } from "date-fns/locale";
 
 const router = Router();
 
-router.get("/upcoming", requireAuth, async (req, res) => {
-  const userId = req.user!.id;
-  const now = new Date();
+/* ─── GET /api/calendar/events  —  eventi filtrati per data ─── */
+router.get("/events", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { from, to } = req.query;
+    
+    let startDate: Date | undefined;
+    let endDate: Date | undefined;
+    
+    if (from) {
+      startDate = parseISO(from as string);
+    }
+    if (to) {
+      endDate = parseISO(to as string);
+    }
+    
+    // Default to current month if no dates provided
+    if (!startDate && !endDate) {
+      const now = new Date();
+      startDate = startOfWeek(startOfMonth(now), { locale: it });
+      endDate = endOfWeek(endOfMonth(now), { locale: it });
+    }
+    
+    let query = db
+      .select({
+        id: calendarEventsTable.id,
+        title: calendarEventsTable.title,
+        description: calendarEventsTable.description,
+        startAt: calendarEventsTable.startAt,
+        endAt: calendarEventsTable.endAt,
+        allDay: calendarEventsTable.allDay,
+        category: calendarEventsTable.category,
+        priority: calendarEventsTable.priority,
+        status: calendarEventsTable.status,
+        color: calendarEventsTable.color,
+        tags: calendarEventsTable.tags,
+        linkedSectorId: calendarEventsTable.linkedSectorId,
+        linkedGoal: calendarEventsTable.linkedGoal,
+        linkedContentIds: calendarEventsTable.linkedContentIds,
+        isRecurring: calendarEventsTable.isRecurring,
+        recurrenceRule: calendarEventsTable.recurrenceRule,
+        reminders: calendarEventsTable.reminders,
+      })
+      .from(calendarEventsTable)
+      .where(eq(calendarEventsTable.userId, userId));
+    
+    if (startDate) {
+      query = query.where(gte(calendarEventsTable.startAt, startDate));
+    }
+    if (endDate) {
+      query = query.where(sql`${calendarEventsTable.endAt} <= ${endDate}`);
+    }
+    
+    const events = await query.orderBy(asc(calendarEventsTable.startAt));
+    
+    res.json({ events });
+  } catch (err) {
+    req.log?.error?.({ err }, "calendar events error");
+    res.status(500).json({ error: "Errore nel caricamento degli eventi del calendario" });
+  }
+});
 
-  const events = await db
-    .select({
-      id: calendarEventsTable.id,
-      title: calendarEventsTable.title,
-      description: calendarEventsTable.description,
-      category: calendarEventsTable.category,
-      startAt: calendarEventsTable.startAt,
-      endAt: calendarEventsTable.endAt,
-      allDay: calendarEventsTable.allDay,
-      priority: calendarEventsTable.priority,
-      status: calendarEventsTable.status,
-    })
-    .from(calendarEventsTable)
-    .where(
-      and(
-        eq(calendarEventsTable.userId, userId),
-        gte(calendarEventsTable.startAt, now),
+/* ─── GET /api/calendar/events/:id  —  singolo evento ─── */
+router.get("/events/:id", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const eventId = parseInt(req.params.id, 10);
+    
+    const [event] = await db
+      .select({
+        id: calendarEventsTable.id,
+        title: calendarEventsTable.title,
+        description: calendarEventsTable.description,
+        startAt: calendarEventsTable.startAt,
+        endAt: calendarEventsTable.endAt,
+        allDay: calendarEventsTable.allDay,
+        category: calendarEventsTable.category,
+        priority: calendarEventsTable.priority,
+        status: calendarEventsTable.status,
+        color: calendarEventsTable.color,
+        tags: calendarEventsTable.tags,
+        linkedSectorId: calendarEventsTable.linkedSectorId,
+        linkedGoal: calendarEventsTable.linkedGoal,
+        linkedContentIds: calendarEventsTable.linkedContentIds,
+        isRecurring: calendarEventsTable.isRecurring,
+        recurrenceRule: calendarEventsTable.recurrenceRule,
+        reminders: calendarEventsTable.reminders,
+      })
+      .from(calendarEventsTable)
+      .where(
+        and(
+          eq(calendarEventsTable.id, eventId),
+          eq(calendarEventsTable.userId, userId)
+        )
+      );
+    
+    if (!event) {
+      res.status(404).json({ error: "Evento non trovato" });
+      return;
+    }
+    
+    res.json(event);
+  } catch (err) {
+    req.log?.error?.({ err }, "calendar event get error");
+    res.status(500).json({ error: "Errore nel caricamento dell'evento" });
+  }
+});
+
+/* ─── POST /api/calendar/events  —  crea evento ─── */
+router.post("/events", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const {
+      title,
+      description,
+      startAt,
+      endAt,
+      allDay,
+      category,
+      priority,
+      status,
+      color,
+      tags,
+      linkedSectorId,
+      linkedGoal,
+      linkedContentIds,
+      isRecurring,
+      recurrenceRule,
+      reminders
+    } = req.body;
+    
+    const [event] = await db
+      .insert(calendarEventsTable)
+      .values({
+        userId,
+        title,
+        description,
+        startAt,
+        endAt,
+        allDay,
+        category,
+        priority,
+        status,
+        color,
+        tags,
+        linkedSectorId,
+        linkedGoal,
+        linkedContentIds,
+        isRecurring,
+        recurrenceRule,
+        reminders
+      })
+      .returning();
+    
+    res.status(201).json(event);
+  } catch (err) {
+    req.log?.error?.({ err }, "calendar event create error");
+    res.status(500).json({ error: "Errore nella creazione dell'evento" });
+  }
+});
+
+/* ─── PATCH /api/calendar/events/:id  —  aggiorna evento ─── */
+router.patch("/events/:id", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const eventId = parseInt(req.params.id, 10);
+    const updateData = req.body;
+    
+    const [event] = await db
+      .update(calendarEventsTable)
+      .set(updateData)
+      .where(
+        and(
+          eq(calendarEventsTable.id, eventId),
+          eq(calendarEventsTable.userId, userId)
+        )
       )
-    )
-    .orderBy(asc(calendarEventsTable.startAt))
-    .limit(5);
+      .returning();
+    
+    if (!event) {
+      res.status(404).json({ error: "Evento non trovato" });
+      return;
+    }
+    
+    res.json(event);
+  } catch (err) {
+    req.log?.error?.({ err }, "calendar event update error");
+    res.status(500).json({ error: "Errore nell'aggiornamento dell'evento" });
+  }
+});
 
-  res.json(events);
+/* ─── DELETE /api/calendar/events/:id  —  elimina evento ─── */
+router.delete("/events/:id", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const eventId = parseInt(req.params.id, 10);
+    
+    await db
+      .delete(calendarEventsTable)
+      .where(
+        and(
+          eq(calendarEventsTable.id, eventId),
+          eq(calendarEventsTable.userId, userId)
+        )
+      );
+    
+    res.json({ success: true });
+  } catch (err) {
+    req.log?.error?.({ err }, "calendar event delete error");
+    res.status(500).json({ error: "Errore nell'eliminazione dell'evento" });
+  }
+});
+
+/* ─── GET /api/calendar/upcoming  —  eventi imminenti (retrocompatibilità) ─── */
+router.get("/upcoming", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const now = new Date();
+    
+    const events = await db
+      .select({
+        id: calendarEventsTable.id,
+        title: calendarEventsTable.title,
+        description: calendarEventsTable.description,
+        category: calendarEventsTable.category,
+        startAt: calendarEventsTable.startAt,
+        endAt: calendarEventsTable.endAt,
+        allDay: calendarEventsTable.allDay,
+        priority: calendarEventsTable.priority,
+        status: calendarEventsTable.status,
+      })
+      .from(calendarEventsTable)
+      .where(
+        and(
+          eq(calendarEventsTable.userId, userId),
+          gte(calendarEventsTable.startAt, now),
+        )
+      )
+      .orderBy(asc(calendarEventsTable.startAt))
+      .limit(5);
+    
+    res.json(events);
+  } catch (err) {
+    req.log?.error?.({ err }, "calendar upcoming error");
+    res.status(500).json({ error: "Errore nel caricamento degli eventi imminenti" });
+  }
+});
+
+/* ─── GET /api/calendar/export.ics  —  esporta in iCal ─── */
+router.get("/export.ics", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const events = await db
+      .select({
+        id: calendarEventsTable.id,
+        title: calendarEventsTable.title,
+        description: calendarEventsTable.description,
+        startAt: calendarEventsTable.startAt,
+        endAt: calendarEventsTable.endAt,
+        allDay: calendarEventsTable.allDay,
+      })
+      .from(calendarEventsTable)
+      .where(eq(calendarEventsTable.userId, userId))
+      .orderBy(asc(calendarEventsTable.startAt));
+    
+    // Generate iCal content
+    let icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//NorthStar//Calendar//IT\n`;
+    
+    for (const event of events) {
+      const startDate = new Date(event.startAt);
+      const endDate = new Date(event.endAt);
+      
+      icsContent += `BEGIN:VEVENT\n`;
+      icsContent += `UID:${event.id}@northstar.it\n`;
+      icsContent += `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '')}Z\n`;
+      icsContent += `DTSTART:${startDate.toISOString().replace(/[-:]/g, '').replace(/\..+/, '')}Z\n`;
+      icsContent += `DTEND:${endDate.toISOString().replace(/[-:]/g, '').replace(/\..+/, '')}Z\n`;
+      icsContent += `SUMMARY:${event.title}\n`;
+      if (event.description) {
+        icsContent += `DESCRIPTION:${event.description}\n`;
+      }
+      icsContent += `END:VEVENT\n`;
+    }
+    
+    icsContent += `END:VCALENDAR`;
+    
+    res.setHeader('Content-Type', 'text/calendar');
+    res.setHeader('Content-Disposition', 'attachment; filename="northstar-calendar.ics"');
+    res.send(icsContent);
+  } catch (err) {
+    req.log?.error?.({ err }, "calendar export error");
+    res.status(500).json({ error: "Errore nell'esportazione del calendario" });
+  }
 });
 
 export default router;

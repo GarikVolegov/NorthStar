@@ -6,6 +6,7 @@ import { eq, and, or } from "drizzle-orm";
 import crypto from "node:crypto";
 import { db, usersTable, generateUsername } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
+import { authLimiter } from "../middleware/rate-limit";
 
 const router = Router();
 
@@ -91,7 +92,7 @@ router.post("/register", async (req, res) => {
 });
 
 /* ─── POST /api/auth/login  —  login ─────────────────────────────── */
-router.post("/login", async (req, res) => {
+router.post("/login", authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -244,7 +245,7 @@ router.post("/resend-verification", async (req, res) => {
 });
 
 /* ─── POST /api/auth/forgot-password  —  richiesta reset password ─── */
-router.post("/forgot-password", async (req, res) => {
+router.post("/forgot-password", authLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) {
@@ -274,7 +275,7 @@ router.post("/forgot-password", async (req, res) => {
 });
 
 /* ─── POST /api/auth/reset-password  —  cambio password ──────────── */
-router.post("/reset-password", async (req, res) => {
+router.post("/reset-password", authLimiter, async (req, res) => {
   try {
     const { token, newPassword } = req.body;
     if (!token || !newPassword) {

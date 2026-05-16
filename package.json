@@ -2,6 +2,7 @@
   "name": "workspace",
   "version": "0.0.0",
   "license": "MIT",
+  "packageManager": "pnpm@11.0.9",
   "scripts": {
     "preinstall": "node scripts/preinstall.js",
     "// ── DEV ─────────────────────────────────────────": "---",
@@ -40,6 +41,10 @@
     "// ── QA ──────────────────────────────────────────": "---",
     "qa": "pnpm run typecheck && pnpm run lint && pnpm run test:ai",
     "check": "pnpm run typecheck && pnpm run lint:all && pnpm run test:all",
+    "// ── CLI/MCP ─────────────────────────────────────": "---",
+    "northstar": ".tools/printed-clis/northstar/bin/northstar-pp-cli.exe",
+    "northstar:mcp": ".tools/printed-clis/northstar/bin/northstar-pp-mcp.exe",
+    "northstar:regen": "cli-printing-press/printing-press.exe generate --spec packages/api-spec/openapi.yaml --name northstar --output .tools/printed-clis/northstar --force",
     "// ── CLEAN ────────────────────────────────────────": "---",
     "clean": "find . -name dist -not -path '*/node_modules/*' -exec rm -rf {} + ; find . -name .turbo -exec rm -rf {} +"
   },

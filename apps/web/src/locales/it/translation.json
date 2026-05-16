@@ -1,7 +1,7 @@
 {
   "nav": {
     "test": "Il Test",
-    "sectors": "Settori",
+    "sectors": "Aree",
     "growth": "Crescita",
     "news": "Notizie",
     "premium": "Pro",
@@ -29,7 +29,7 @@
       "contact": "Contatti",
       "about": "Chi siamo",
       "howItWorks": "Come funziona",
-      "affiliation": "Affiliazione",
+      "affiliation": "Partner",
       "privacy": "Privacy Policy",
       "terms": "Termini di servizio",
       "sitemap": "Mappa del sito"
@@ -55,6 +55,7 @@
     "seeAll": "Vedi tutti",
     "goBack": "Torna indietro",
     "search": "Cerca",
+    "searching": "Cerco...",
     "filter": "Filtra",
     "clearFilters": "Rimuovi tutti i filtri",
     "results": "risultati",
@@ -88,13 +89,14 @@
       "exploreAll": "Esplora tutti i 21 settori",
       "topThisWeek": "Più richiesto questa settimana",
       "deepen": "Approfondisci",
-      "compareWith": "Confronta con un altro settore"
+      "compareWith": "Confronta con un altro settore",
+      "heading": "Aree in crescita"
     },
     "personalized": {
       "badge": "Raccomandazioni personalizzate",
       "title": "I settori più adatti al tuo profilo",
       "sortedBy": "Ordinate per la tua preferenza:",
-    "fullDetail": "Vedi dettaglio",
+      "fullDetail": "Vedi dettaglio",
       "chosen": "✓ Scelto"
     },
     "news": {
@@ -105,12 +107,215 @@
       "badge": "Come funziona",
       "title": "Tre passi verso la tua direzione",
       "step1Title": "Fai il test",
-        "step1Desc": "17 domande rapide per mappare le tue inclinazioni professionali e la tua Bussola Interiore.",
+      "step1Desc": "17 domande rapide per mappare le tue inclinazioni professionali e la tua Bussola Interiore.",
       "step2Title": "Scopri il tuo profilo",
       "step2Desc": "Il sistema elabora le tue risposte e ti mostra i settori più compatibili con la tua personalità.",
       "step3Title": "Costruisci il percorso",
       "step3Desc": "Esplora i settori consigliati, confrontali e scegli quello che risuona davvero con te.",
-      "startNow": "Inizia ora"
+      "startNow": "Inizia ora",
+      "heading": "Il percorso giusto per",
+      "headingHighlight": "te",
+      "subtitle": "Tre semplici passi per capire dove sei, dove vuoi arrivare e come arrivarci.",
+      "step1": {
+        "title": "Scegli il tuo profilo",
+        "desc": "Seleziona il percorso che ti rappresenta: indeciso, dipendente, autonomo, azienda o investitore.",
+        "label": "Scegli il percorso"
+      },
+      "step2": {
+        "title": "Completa il test",
+        "desc": "17 domande RIASEC per mappare la tua personalità professionale e preferenze di lavoro.",
+        "label": "Inizia il test gratuito"
+      },
+      "step3": {
+        "title": "Strumenti con AI",
+        "desc": "Piani personalizzati, analisi competenze, simulazione colloqui e guida AI.",
+        "label": "Scopri gli strumenti"
+      },
+      "stepLabel": "Passo"
+    },
+    "personas": {
+      "indeciso": {
+        "label": "Indeciso",
+        "tagline": "Non so ancora cosa fare",
+        "ctaLabel": "Fai il test gratuito",
+        "tools": [
+          "Test di personalità",
+          "Esplora aree",
+          "Coach AI"
+        ]
+      },
+      "dipendente": {
+        "label": "Dipendente",
+        "tagline": "Ho un lavoro e voglio crescere",
+        "ctaLabel": "Analizza le mie skill",
+        "tools": [
+          "Competenze",
+          "Simulatore colloquio",
+          "Piano di crescita"
+        ]
+      },
+      "autonomo": {
+        "label": "Autonomo",
+        "tagline": "Lavoro in proprio e voglio scalare",
+        "ctaLabel": "Valida la mia idea",
+        "tools": [
+          "Analisi idea",
+          "Piano attività",
+          "Coach AI"
+        ]
+      },
+      "azienda": {
+        "label": "Azienda",
+        "tagline": "Cerco il profilo giusto",
+        "ctaLabel": "Esplora i profili",
+        "tools": [
+          "Profili personalità",
+          "Aree in crescita",
+          "Partner"
+        ]
+      },
+      "investitore": {
+        "label": "Investitore",
+        "tagline": "Valuto opportunità di mercato",
+        "ctaLabel": "Vedi i trend",
+        "tools": [
+          "Aree in crescita",
+          "Analisi andamento",
+          "Mappa conoscenze"
+        ]
+      }
+    },
+    "journeyLabels": {
+      "indeciso": "Indeciso",
+      "dipendente": "Dipendente",
+      "autonomo": "Autonomo",
+      "azienda": "Azienda",
+      "investitore": "Investitore"
+    },
+    "nextStep": {
+      "indeciso": {
+        "label": "Fai il test",
+        "desc": "Scopri la tua personalità professionale"
+      },
+      "dipendente": {
+        "label": "Analizza le competenze",
+        "desc": "Identifica le competenze che ti mancano"
+      },
+      "autonomo": {
+        "label": "Valida la tua idea",
+        "desc": "Ricevi una valutazione della tua attività"
+      },
+      "azienda": {
+        "label": "Esplora i profili",
+        "desc": "Trova i profili più adatti al tuo team"
+      },
+      "investitore": {
+        "label": "Vedi i settori in crescita",
+        "desc": "Analizza andamento e opportunità del mercato italiano"
+      }
+    },
+    "tools": {
+      "indeciso": [
+        {
+          "title": "Test di personalità",
+          "desc": "17 domande per mappare la tua personalità"
+        },
+        {
+          "title": "Esplora aree",
+          "desc": "28 aree con stipendi e crescita"
+        },
+        {
+          "title": "Coach AI",
+          "desc": "Sessioni di consulenza personalizzate"
+        },
+        {
+          "title": "Notizie lavoro",
+          "desc": "Ultime notizie dal mercato"
+        }
+      ],
+      "dipendente": [
+        {
+          "title": "Competenze da sviluppare",
+          "desc": "Identifica cosa ti manca"
+        },
+        {
+          "title": "Simulatore Colloquio",
+          "desc": "Allenati con domande reali"
+        },
+        {
+          "title": "Consulente di carriera",
+          "desc": "Piano di crescita personalizzato"
+        },
+        {
+          "title": "Le mie candidature",
+          "desc": "Gestisci le tue richieste di lavoro"
+        }
+      ],
+      "autonomo": [
+        {
+          "title": "Analisi idea",
+          "desc": "Valutazione con AI dettagliata"
+        },
+        {
+          "title": "Consulente per la tua attività",
+          "desc": "Consigli strategici"
+        },
+        {
+          "title": "Mercati in crescita",
+          "desc": "Trova il settore più adatto"
+        },
+        {
+          "title": "Notizie imprese",
+          "desc": "Ultime novità"
+        }
+      ],
+      "azienda": [
+        {
+          "title": "Profili personalità",
+          "desc": "Trova il profilo psicologico ideale"
+        },
+        {
+          "title": "Partner",
+          "desc": "Pubblica la tua opportunità"
+        },
+        {
+          "title": "Notizie HR",
+          "desc": "Tendenze del mercato del lavoro"
+        },
+        {
+          "title": "Crescita aziendale",
+          "desc": "Articoli su cultura e team"
+        }
+      ],
+      "investitore": [
+        {
+          "title": "Aree in crescita",
+          "desc": "Analisi andamento del mercato italiano"
+        },
+        {
+          "title": "Notizie mercati",
+          "desc": "Ultime notizie economia e finanza"
+        },
+        {
+          "title": "Crescita settori",
+          "desc": "Dati e analisi per investire"
+        },
+        {
+          "title": "Mappa delle conoscenze",
+          "desc": "Collegamenti tra settori"
+        }
+      ]
+    },
+    "quickTools": {
+      "heading": "I tuoi strumenti",
+      "subheading": "Selezionati per il tuo percorso",
+      "dashboardLink": "Dashboard completa"
+    },
+    "hero": {
+      "badge": "Orientamento professionale personalizzato",
+      "heading": "Qual è il tuo",
+      "headingHighlight": "obiettivo?",
+      "subtitle": "NorthStar si adatta al tuo percorso. Scegli il profilo che ti rappresenta e ricevi strumenti e consigli su misura per te."
     }
   },
   "test": {
@@ -149,8 +354,8 @@
           "desc": "Energia"
         },
         "focus": {
-        "name": "Concentrazione",
-        "desc": "Analisi"
+          "name": "Concentrazione",
+          "desc": "Analisi"
         },
         "tenacity": {
           "name": "Tenacia",
@@ -765,12 +970,12 @@
     "roadmap": "Piano di crescita",
     "roadmapDesc": "Piano dettagliato generato dall'AI per entrare nel settore con risorse concrete.",
     "generatePlan": "Genera il piano",
-    "knowledgeGraph": "Grafo della Conoscenza",
+    "knowledgeGraph": "Mappa della Conoscenza",
     "graphDesc": "Visualizza ruoli, competenze e strumenti del settore in un grafo interattivo.",
     "exploreGraph": "Esplora il grafo",
     "tabs": {
       "overview": "Panoramica",
-      "career": "Percorso di Carriera",
+      "career": "Piano di Carriera",
       "skills": "Competenze",
       "data": "Dati & Trend"
     },
@@ -779,7 +984,7 @@
     "opportunities": "Opportunità Future",
     "keySkills": "Competenze Chiave",
     "skillsDesc": "Per eccellere in questo settore, dovrai sviluppare questo set di competenze. Non preoccuparti se non le possiedi tutte ora, {{time}} è il tempo stimato per acquisirle.",
-    "careerPath": "Percorso di Carriera",
+    "careerPath": "Piano di Carriera",
     "employed": "Dipendente",
     "freelance": "Autonomo / Freelance",
     "employedDesc": "Percorso tipico per chi vuole lavorare come <strong>dipendente</strong> nel settore {{name}}. Stabile, strutturato, con progressione chiara.",
@@ -825,7 +1030,7 @@
         "desc": "Accedi a una knowledge base intelligente che risponde alle tue domande specifiche sul settore scelto."
       },
       "graph": {
-    "title": "Mappa delle conoscenze",
+        "title": "Mappa delle conoscenze",
         "desc": "Visualizza percorsi formativi, competenze e connessioni tra ruoli professionali in modo interattivo."
       },
       "roadmap": {
@@ -1038,7 +1243,12 @@
     },
     "read": "Leggi",
     "save": "Salva",
-    "saved": "Salvato"
+    "saved": "Salvato",
+    "myCategories": "Le mie categorie",
+    "subscribe": "Segui",
+    "subscribed": "Seguito",
+    "active": "attive",
+    "subscribeHint": "Clicca su una categoria per ricevere aggiornamenti personalizzati."
   },
   "profilo": {
     "title": "Il tuo profilo",
@@ -1063,7 +1273,7 @@
     "workMode": "Preferenza di lavoro",
     "workModeDesc": "Come preferisci lavorare? Questo influenza le raccomandazioni.",
     "favorites": "Preferiti",
-    "savedSectors": "Settori salvati",
+    "savedSectors": "Aree salvate",
     "savedNews": "Notizie salvate",
     "noSavedSectors": "Nessun settore salvato",
     "noSavedNews": "Nessuna notizia salvata",
@@ -1327,27 +1537,27 @@
     "email": "Email",
     "message": "Messaggio",
     "messagePlaceholder": "Descrivici la tua richiesta nel dettaglio…",
-        "subjects": [
-          {
-            "value": "info",
-            "label": "Informazioni generali"
-          },
-          {
-            "value": "supporto",
-            "label": "Supporto tecnico"
-          },
-          {
-            "value": "premium",
-            "label": "Piani e pagamenti"
-          },
-          {
-            "value": "privacy",
-            "label": "Privacy e dati personali"
-          },
-          {
-            "value": "feedback",
-            "label": "Opinioni e suggerimenti"
-          },
+    "subjects": [
+      {
+        "value": "info",
+        "label": "Informazioni generali"
+      },
+      {
+        "value": "supporto",
+        "label": "Supporto tecnico"
+      },
+      {
+        "value": "premium",
+        "label": "Piani e pagamenti"
+      },
+      {
+        "value": "privacy",
+        "label": "Privacy e dati personali"
+      },
+      {
+        "value": "feedback",
+        "label": "Opinioni e suggerimenti"
+      },
       {
         "value": "altro",
         "label": "Altro"
@@ -1587,13 +1797,13 @@
     "startTest": "Inizia il test gratuito",
     "sectorDesc": "Panoramica, dati e match",
     "wikiDesc": "Contenuti AI approfonditi",
-    "roadmapDesc": "Percorso step-by-step",
+    "roadmapDesc": "Piano step-by-step",
     "grafoDesc": "Visualizzazione AI interattiva",
     "groups": {
       "main": "Principale",
       "sectors": "Esplora settori",
       "brand": "Prodotto e brand",
-      "sectorPages": "Settori professionali",
+      "sectorPages": "Aree professionali",
       "wiki": "Guide per settore",
       "roadmap": "Piano di carriera",
       "grafo": "Mappa delle conoscenze"
@@ -1702,15 +1912,15 @@
     "totalDuration": "Durata totale",
     "phasesCount": "Fasi del percorso",
     "concreteActionsCount": "Azioni concrete",
-    "phasesTimeline": "Le Fasi del Percorso",
+    "phasesTimeline": "Le Fasi del Piano",
     "salaryEvolution": "Evoluzione Salariale",
-    "topRoles": "Ruoli a cui puoi aspirare",
+    "topRoles": "Lavori a cui puoi aspirare",
     "keyTip": "Consiglio chiave",
     "regenerate": "Rigenera",
     "detailed": "Piano di crescita"
   },
   "grafo": {
-    "title": "Grafo della Conoscenza",
+    "title": "Mappa della Conoscenza",
     "subtitle": "Visualizza ruoli, competenze e strumenti del settore.",
     "generating": "Generazione grafo…",
     "premiumRequired": "Funzione Pro",
@@ -1730,9 +1940,9 @@
     "nodeDescription": "Descrizione (opzionale)",
     "nodeDescPlaceholder": "Breve descrizione...",
     "errorResponse": "Errore nella generazione della risposta. Riprova.",
-    "tabGraph": "Grafo",
-    "tabChat": "Chiedi al Grafo",
-    "chatTitle": "Chiedi al Grafo",
+    "tabGraph": "Mappa",
+    "tabChat": "Chiedi alla Mappa",
+    "chatTitle": "Chiedi alla Mappa",
     "chatDesc": "L'intelligenza artificiale risponde usando i nodi della mappa come base di conoscenza. Puoi chiedere di ruoli, competenze, connessioni o percorsi.",
     "chatQuestion1": "Quali competenze devo sviluppare per diventare un ruolo chiave?",
     "chatQuestion2": "Quali strumenti devo imparare come priorità?",
@@ -1797,7 +2007,7 @@
     "commonSkillsHint": "evidenziate in verde",
     "advantages": "Vantaggi",
     "considerations": "Da considerare",
-    "futureOpportunities": "Ruoli e opportunità future",
+    "futureOpportunities": "Lavori e opportunità future",
     "deepen": "Approfondisci",
     "notSure": "Non sei sicuro?",
     "takeFreeTest": "Fai il test gratuito",
@@ -1819,7 +2029,7 @@
     }
   },
   "affiliazione": {
-    "title": "Affiliazione",
+    "title": "Partner",
     "subtitle": "Porta NorthStar nella tua organizzazione.",
     "schools": "Scuole",
     "universities": "Universita'",
@@ -2077,7 +2287,7 @@
   "utente": {
     "notFound": "Utente non trovato",
     "profile": "Profilo",
-    "sectors": "Settori esplorati",
+    "sectors": "Aree esplorate",
     "noPublicInfo": "Questo profilo è privato.",
     "notFoundDesc": "Questo profilo non esiste o non è accessibile.",
     "backToFriends": "Torna agli amici",
@@ -2186,7 +2396,7 @@
     "education": "Formazione",
     "certifications": "Certificazioni",
     "languages": "Lingue",
-    "addToGraph": "Aggiungi al Grafo delle Conoscenze",
+    "addToGraph": "Aggiungi alla Mappa delle Conoscenze",
     "suggestedNodes": "{{count}} nodi suggeriti dal tuo CV",
     "clickToAdd": "Clicca per aggiungere i nodi al grafo del settore.",
     "openGraph": "Apri il grafo →",
@@ -2476,7 +2686,19 @@
     "exploreSector": "Esplora il Settore",
     "exploreSectorDesc": "Scopri tutte le opportunità nel settore {{sector}}",
     "noRoles": "Nessun ruolo disponibile per questo settore.",
-    "rolesTab": "Ruoli",
+    "rolesTab": "Lavori",
     "viewRole": "Scopri di più"
+  },
+  "search": {
+    "placeholder": "Cerca settori, ruoli, articoli...",
+    "noResults": "Nessun risultato per \"{{query}}\"",
+    "sectors": "Aree",
+    "roles": "Lavori",
+    "articles": "Articoli",
+    "news": "News",
+    "hint": "Cerca in tutta la piattaforma",
+    "suggestions": "Consigliati",
+    "askWendy": "Chiedi a Wendy: \"{{query}}\"",
+    "askWendyDesc": "Parla con l'assistente AI per approfondire"
   }
 }

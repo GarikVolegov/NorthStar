@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "northstar": {
+      "type": "local",
+      "command": ["${workspaceFolder}/.tools/printed-clis/northstar/bin/northstar-pp-mcp.exe"],
+      "enabled": true,
+      "environment": {
+        "API_BEARER_AUTH": "${env:API_BEARER_AUTH}"
+      }
+    }
+  }
+}

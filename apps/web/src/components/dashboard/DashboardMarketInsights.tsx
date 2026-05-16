@@ -11,7 +11,7 @@ export function DashboardMarketInsights() {
         </div>
         <div className="flex-1">
           <h3 className="font-semibold text-foreground">Analisi mercato</h3>
-          <p className="text-xs text-muted-foreground">Settori in crescita e opportunità di investimento</p>
+          <p className="text-xs text-muted-foreground">Aree in crescita e opportunità di investimento</p>
         </div>
         <Link href="/settori" className="text-xs text-primary font-semibold hover:underline shrink-0">
           Vedi tutti <ArrowRight className="w-3 h-3 inline ml-0.5" />

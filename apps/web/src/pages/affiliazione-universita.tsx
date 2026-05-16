@@ -27,7 +27,7 @@ export default function AffiliazioneUniversita() {
     { icon: CheckCircle2, title: "Integrazione semplice", desc: "Nessuna infrastruttura aggiuntiva. Accesso tramite link dedicato o dominio personalizzato." },
     { icon: Users, title: "Multi-utente", desc: "Gestione di centinaia o migliaia di studenti da un'unica licenza istituzionale." },
     { icon: Brain, title: "Test validato", desc: "RIASEC è usato nelle migliori università del mondo da oltre 60 anni." },
-    { icon: TrendingUp, title: "Strumenti premium inclusi", desc: "Nella licenza istituzionale: Wiki, Roadmap e Grafo della Conoscenza per ogni studente." },
+    { icon: TrendingUp, title: "Strumenti premium inclusi", desc: "Nella licenza istituzionale: Wiki, Roadmap e Mappa della Conoscenza per ogni studente." },
   ];
 
   return (

@@ -89,6 +89,10 @@ export const usersTable = pgTable("users", {
   // ── Onboarding completato ──────────────────────────────────────
   onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
 
+  // ── GDPR: Soft delete & data retention ──────────────────────────
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  purgedAt: timestamp("purged_at", { withTimezone: true }),
+
   // ── Network Step 2: Posizione + Bio ────────────────────────────────
   /**
    * Città dell'utente — label human-readable (es. "Roma, Lazio, Italia").

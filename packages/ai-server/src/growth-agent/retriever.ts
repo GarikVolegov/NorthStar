@@ -10,7 +10,7 @@
  *
  * TWO MODES controlled by PGVECTOR env var (unchanged from v1).
  */
-import { db, pool } from "@workspace/db";
+import { db } from "@workspace/db";
 import { knowledgeNodesTable } from "@workspace/db";
 import { eq, and, isNotNull } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -45,59 +45,59 @@ function cosine(a: number[], b: number[]): number {
 }
 
 async function retrieveWithPgvector(
-  queryEmbedding: number[],
-  userId: number,
-  topK: number,
-  minScore: number,
-  sourceTypes?: SourceType[],
-  globalUserId?: number,
+   queryEmbedding: number[],
+   userId: number,
+   topK: number,
+   minScore: number,
+   sourceTypes?: SourceType[],
+   globalUserId?: number,
 ): Promise<RetrievedChunk[]> {
-  const vectorLiteral = `[${queryEmbedding.join(",")}]`;
-  const sourceFilter = sourceTypes && sourceTypes.length > 0
-    ? `AND type = ANY(ARRAY[${sourceTypes.map((t) => `'${t}'`).join(",")}])`
-    : "";
+   const vectorLiteral = `[${queryEmbedding.join(",")}]`;
+   const sourceFilter = sourceTypes && sourceTypes.length > 0
+     ? `AND type = ANY(ARRAY[${sourceTypes.map((t) => `'${t}'`).join(",")}])`
+     : "";
 
-  // Platform content is stored under userId=0 (global namespace)
-  // User content is stored under the real userId
-  const userFilter = globalUserId != null
-    ? `AND (user_id = $2 OR user_id = $5)`
-    : `AND user_id = $2`;
+   // Platform content is stored under userId=0 (global namespace)
+   // User content is stored under the real userId
+   const userFilter = globalUserId != null
+     ? `AND (user_id = $2 OR user_id = $5)`
+     : `AND user_id = $2`;
 
-  const params: unknown[] = [vectorLiteral, userId, minScore, topK];
-  if (globalUserId != null) params.push(globalUserId);
+   const params: unknown[] = [vectorLiteral, userId, minScore, topK];
+   if (globalUserId != null) params.push(globalUserId);
 
-  const rows = await pool.query<{
-    id: number;
-    content: string;
-    type: string;
-    metadata: Record<string, unknown>;
-    score: number;
-  }>(
-    `SELECT
-       id,
-       content,
-       type,
-       metadata,
-       1 - (embedding_vec <=> $1::vector) AS score
-     FROM knowledge_nodes
-     WHERE 1=1
-       ${userFilter}
-       AND embedding_vec IS NOT NULL
-       ${sourceFilter}
-       AND 1 - (embedding_vec <=> $1::vector) >= $3
-     ORDER BY embedding_vec <=> $1::vector
-     LIMIT $4`,
-    params,
-  );
+   // Use the db instance instead of pool for query execution
+   const result = await db.execute<{
+     id: number;
+     content: string;
+     type: string;
+     metadata: Record<string, unknown>;
+     score: number;
+   }>(
+     sql`SELECT
+        id,
+        content,
+        type,
+        metadata,
+        1 - (embedding_vec <=> ${vectorLiteral}::vector) AS score
+      FROM knowledge_nodes
+      WHERE 1=1
+        AND ${userFilter === `AND (user_id = $2 OR user_id = $5)` ? sql`(user_id = ${userId} OR user_id = ${globalUserId})` : sql`user_id = ${userId}`}
+        AND embedding_vec IS NOT NULL
+        ${sourceTypes && sourceTypes.length > 0 ? sql`AND type = ANY(ARRAY[${sourceTypes.map((t) => `${t}`)})]` : sql``}
+        AND 1 - (embedding_vec <=> ${vectorLiteral}::vector) >= ${minScore}
+      ORDER BY embedding_vec <=> ${vectorLiteral}::vector
+      LIMIT ${topK}`
+   );
 
-  return rows.rows.map((r) => ({
-    id: r.id,
-    content: r.content ?? "",
-    source: (r.metadata?.["source"] as string) ?? "unknown",
-    sourceType: (r.type as SourceType) ?? "document",
-    score: r.score,
-    metadata: r.metadata ?? {},
-  }));
+   return result.rows.map((r) => ({
+     id: r.id,
+     content: r.content ?? "",
+     source: (r.metadata?.["source"] as string) ?? "unknown",
+     sourceType: (r.type as SourceType) ?? "document",
+     score: r.score,
+     metadata: r.metadata ?? {},
+   }));
 }
 
 async function retrieveWithJs(

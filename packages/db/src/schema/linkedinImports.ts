@@ -18,6 +18,7 @@ export const linkedinImportsTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => ({
     userIdx: index("linkedin_imports_user_idx").on(t.userId),

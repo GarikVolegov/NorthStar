@@ -58,6 +58,12 @@ export * from "./voiceSessions";
 export * from "./routingLogs";
 export * from "./qualityMetrics";
 export * from "./chatMessages";
+// ── AI Cost tracking ────────────────────────────────────────────────
+export * from "./llmUsage";
 export * from "./userKeys";
 export * from "./userBadges";
 export * from "./weeklyLeaderboard";
+// ── Search ──────────────────────────────────────────────────────
+export * from "./search";
+// ── News Subscriptions ─────────────────────────────────────────
+export * from "./newsSubscriptions";

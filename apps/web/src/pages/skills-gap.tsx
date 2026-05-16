@@ -178,7 +178,7 @@ export default function SkillsGap() {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8 text-center">
         <p className="text-muted-foreground">Settore non trovato.</p>
-        <Link href="/settori"><Button variant="ghost" className="mt-4"><ArrowLeft className="w-4 h-4 mr-2" />Settori</Button></Link>
+        <Link href="/settori"><Button variant="ghost" className="mt-4"><ArrowLeft className="w-4 h-4 mr-2" />Aree</Button></Link>
       </div>
     );
   }
@@ -344,7 +344,7 @@ export default function SkillsGap() {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1.5">
-                  {readiness >= 70 ? "Ottima preparazione!" : readiness >= 40 ? "Buona base, con gap da colmare" : "Percorso di formazione necessario"}
+                  {readiness >= 70 ? "Ottima preparazione!" : readiness >= 40 ? "Buona base, con gap da colmare" : "Piano di formazione necessario"}
                 </p>
               </CardContent>
             </Card>

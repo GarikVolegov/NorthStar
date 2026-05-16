@@ -36,6 +36,11 @@ import {
   Save,
   ChevronUp,
   Terminal,
+  BookOpen,
+  Activity,
+  Home,
+  MessageCircle,
+  Handshake,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -143,7 +148,7 @@ const ENTITY_CONFIG: Record<string, { label: string; icon: typeof Briefcase }> =
   {
     sector: { label: "Settore", icon: BarChart3 },
     role: { label: "Ruolo", icon: Briefcase },
-    education_path: { label: "Percorso", icon: GraduationCap },
+    education_path: { label: "Piano", icon: GraduationCap },
     calendar_plan: { label: "Calendario", icon: Calendar },
     growth_content: { label: "Crescita", icon: TrendingUp },
     work_mode: { label: "Work Mode", icon: Sparkles },
@@ -156,7 +161,16 @@ type SidebarSection =
   | "logs"
   | "settings"
   | "agents"
-  | "prompts";
+  | "prompts"
+  | "qualita"
+  | "cataloghi"
+  | "agenti-salute"
+  | "metriche"
+  | "home"
+  | "status"
+  | "messaggi"
+  | "crescita"
+  | "affiliazione";
 
 type AgentRunRecord = {
   id: string;
@@ -285,6 +299,43 @@ export default function AdminReview() {
   >({});
   const [promptSaving, setPromptSaving] = useState<Set<string>>(new Set());
 
+// Qualita section
+const [qualitaData, setQualitaData] = useState<any | null>(null);
+const [qualitaLoading, setQualitaLoading] = useState(false);
+
+// Cataloghi section
+const [cataloghiData, setCataloghiData] = useState<any>(null);
+const [cataloghiLoading, setCataloghiLoading] = useState(false);
+
+// Agenti salute section
+const [agentiSaluteData, setAgentiSaluteData] = useState<any | null>(null);
+const [agentiSaluteLoading, setAgentiSaluteLoading] = useState(false);
+
+// Metriche section
+const [metricheData, setMetricheData] = useState<any | null>(null);
+const [wendyMetricsData, setWendyMetricsData] = useState<any | null>(null);
+const [metricheLoading, setMetricheLoading] = useState(false);
+
+// Home section
+const [homeData, setHomeData] = useState<any>(null);
+const [homeLoading, setHomeLoading] = useState(false);
+
+// Status section
+const [statusData, setStatusData] = useState<any | null>(null);
+const [statusLoading, setStatusLoading] = useState(false);
+
+// Messaggi section
+const [messaggiData, setMessaggiData] = useState<any[]>([]);
+const [messaggiLoading, setMessaggiLoading] = useState(false);
+
+// Crescita section
+const [crescitaData, setCrescitaData] = useState<any | null>(null);
+const [crescitaLoading, setCrescitaLoading] = useState(false);
+
+// Affiliazione section
+const [affiliazioneData, setAffiliazioneData] = useState<any[]>([]);
+const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
+
   const apiFetch = useCallback(
     async (path: string, options?: RequestInit) => {
       const res = await fetch(`${BASE}api${path}`, {
@@ -399,6 +450,120 @@ export default function AdminReview() {
     setRunHistoryLoading(false);
   }, [apiFetch]);
 
+  const loadQualita = useCallback(async () => {
+    setQualitaLoading(true);
+    try {
+      const data = await apiFetch("/admin/quality");
+      setQualitaData(data);
+      setAuthed(true);
+    } catch {
+      /* handled */
+    }
+    setQualitaLoading(false);
+  }, [apiFetch]);
+
+  const loadCataloghi = useCallback(async () => {
+    setCataloghiLoading(true);
+    try {
+      // Since cataloghi uses different endpoints, we'll fetch the main data
+      // For simplicity, we'll fetch sectors as representative data
+      const data = await apiFetch("/admin/catalogs/sectors");
+      setCataloghiData(data);
+      setAuthed(true);
+    } catch {
+      /* handled */
+    }
+    setCataloghiLoading(false);
+  }, [apiFetch]);
+
+  const loadAgentiSalute = useCallback(async () => {
+    setAgentiSaluteLoading(true);
+    try {
+      const data = await apiFetch("/admin/agent-health");
+      setAgentiSaluteData(data);
+      setAuthed(true);
+    } catch {
+      /* handled */
+    }
+    setAgentiSaluteLoading(false);
+  }, [apiFetch]);
+
+  const loadMetriche = useCallback(async () => {
+    setMetricheLoading(true);
+    try {
+      const [metricsRes, wendyRes] = await Promise.all([
+        apiFetch("/admin/metrics"),
+        apiFetch("/admin/wendy-metrics")
+      ]);
+      setMetricheData(metricsRes);
+      setWendyMetricsData(wendyRes);
+      setAuthed(true);
+    } catch {
+      /* handled */
+    }
+    setMetricheLoading(false);
+  }, [apiFetch]);
+
+  const loadHome = useCallback(async () => {
+    setHomeLoading(true);
+    try {
+      // Home page doesn't have a specific API endpoint, so we'll set a flag
+      setHomeData({ loaded: true });
+      setAuthed(true);
+    } catch {
+      /* handled */
+    }
+    setHomeLoading(false);
+  }, [apiFetch]);
+
+  const loadStatus = useCallback(async () => {
+    setStatusLoading(true);
+    try {
+      const data = await apiFetch("/api/health"); // Using the health endpoint
+      setStatusData(data);
+      setAuthed(true);
+    } catch {
+      /* handled */
+    }
+    setStatusLoading(false);
+  }, [apiFetch]);
+
+  const loadMessaggi = useCallback(async () => {
+    setMessaggiLoading(true);
+    try {
+      const data = await apiFetch("/contact/messages");
+      setMessaggiData(data);
+      setAuthed(true);
+    } catch {
+      /* handled */
+    }
+    setMessaggiLoading(false);
+  }, [apiFetch]);
+
+  const loadCrescita = useCallback(async () => {
+    setCrescitaLoading(true);
+    try {
+      const data = await apiFetch("/admin/growth-queue");
+      setCrescitaData(data);
+      setAuthed(true);
+    } catch {
+      /* handled */
+    }
+    setCrescitaLoading(false);
+  }, [apiFetch]);
+
+  const loadAffiliazione = useCallback(async () => {
+    setAffiliazioneLoading(true);
+    try {
+      const data = await apiFetch("/affiliazione/leads");
+      setAffiliazioneData(data);
+      setAuthed(true);
+    } catch {
+      /* handled */
+    }
+    setAffiliazioneLoading(false);
+  }, [apiFetch]);
+
   const triggerAgent = useCallback(
     async (agentKey: string, path: string, body?: Record<string, unknown>) => {
       if (agentsRunning.has(agentKey)) return;
@@ -483,6 +648,15 @@ export default function AdminReview() {
     else if (section === "logs") loadLogs();
     else if (section === "prompts") loadPrompts();
     else if (section === "agents") loadRunHistory();
+    else if (section === "qualita") loadQualita();
+    else if (section === "cataloghi") loadCataloghi();
+    else if (section === "agenti-salute") loadAgentiSalute();
+    else if (section === "metriche") loadMetriche();
+    else if (section === "home") loadHome();
+    else if (section === "status") loadStatus();
+    else if (section === "messaggi") loadMessaggi();
+    else if (section === "crescita") loadCrescita();
+    else if (section === "affiliazione") loadAffiliazione();
   }, [
     authed,
     section,
@@ -491,6 +665,15 @@ export default function AdminReview() {
     loadLogs,
     loadPrompts,
     loadRunHistory,
+    loadQualita,
+    loadCataloghi,
+    loadAgentiSalute,
+    loadMetriche,
+    loadHome,
+    loadStatus,
+    loadMessaggi,
+    loadCrescita,
+    loadAffiliazione,
   ]);
 
   function handleLogin(e: React.FormEvent) {
@@ -509,6 +692,16 @@ export default function AdminReview() {
     setStats(null);
     setSuggestions([]);
     setDetail(null);
+    setQualitaData(null);
+    setCataloghiData(null);
+    setAgentiSaluteData(null);
+    setMetricheData(null);
+    setWendyMetricsData(null);
+    setHomeData(null);
+    setStatusData(null);
+    setMessaggiData([]);
+    setCrescitaData(null);
+    setAffiliazioneData([]);
   }
 
   async function handleApprove(id: number) {
@@ -598,20 +791,24 @@ export default function AdminReview() {
   const sidebarItems: {
     key: SidebarSection;
     label: string;
-    icon: typeof ClipboardList;
+    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
     count?: number;
   }[] = [
-    {
-      key: "queue",
-      label: "Queue Revisione",
-      icon: ClipboardList,
-      count: stats?.pending,
-    },
+    { key: "queue", label: "Queue Revisione", icon: ClipboardList, count: stats?.pending },
     { key: "suggestions", label: "Suggerimenti", icon: Bot },
     { key: "runs", label: "Esecuzioni Agenti", icon: History },
     { key: "logs", label: "Audit Log", icon: FileText },
     { key: "agents", label: "Lancia Agenti", icon: Terminal },
     { key: "prompts", label: "Prompt Agenti", icon: Code2 },
+    { key: "qualita", label: "Qualità Wendy", icon: BarChart3 },
+    { key: "cataloghi", label: "Cataloghi", icon: BookOpen },
+    { key: "agenti-salute", label: "Agent Health", icon: Activity },
+    { key: "metriche", label: "Metriche Business", icon: BarChart3 },
+    { key: "home", label: "Home Admin", icon: Home },
+    { key: "status", label: "Status & Setup", icon: Settings },
+    { key: "messaggi", label: "Messaggi", icon: MessageCircle },
+    { key: "crescita", label: "Coda Crescita", icon: Sparkles },
+    { key: "affiliazione", label: "Partner", icon: Handshake },
     { key: "settings", label: "Impostazioni", icon: Settings },
   ];
 
@@ -975,7 +1172,7 @@ export default function AdminReview() {
                   </div>
                   <div className="space-y-2">
                     <Input
-                      placeholder="Settori specifici (opzionale, separati da virgola)"
+                      placeholder="Aree specifiche (opzionale, separati da virgola)"
                       value={newsSectorInput}
                       onChange={(e) => setNewsSectorInput(e.target.value)}
                       className="text-sm"
@@ -1200,7 +1397,7 @@ export default function AdminReview() {
                                 {fmtDate(run.startedAt)}
                                 {sectors && (
                                   <span className="ml-2">
-                                    · Settori: {sectors}
+                                    · Aree: {sectors}
                                   </span>
                                 )}
                               </div>
@@ -1226,138 +1423,304 @@ export default function AdminReview() {
               </div>
             )}
 
-            {section === "prompts" && (
-              <div className="p-6 space-y-3 max-w-3xl">
-                <p className="text-sm text-muted-foreground mb-4">
-                  Modifica i prompt degli agenti AI. Le modifiche sono salvate
-                  nel database e hanno effetto immediato. Usa{" "}
-                  <code className="bg-muted px-1 py-0.5 rounded text-xs">
-                    {"{{PLACEHOLDER}}"}
-                  </code>{" "}
-                  per i valori dinamici.
-                </p>
+             {section === "prompts" && (
+               <div className="p-6 space-y-3 max-w-3xl">
+                 <p className="text-sm text-muted-foreground mb-4">
+                   Modifica i prompt degli agenti AI. Le modifiche sono salvate
+                   nel database e hanno effetto immediato. Usa{" "}
+                   <code className="bg-muted px-1 py-0.5 rounded text-xs">
+                     {"{{PLACEHOLDER}}"}
+                   </code>{" "}
+                   per i valori dinamici.
+                 </p>
 
-                {promptsLoading ? (
-                  <div className="p-8 text-center text-muted-foreground">
-                    Caricamento prompt…
-                  </div>
-                ) : (
-                  prompts.map((prompt) => {
-                    const isExpanded = promptExpandedKey === prompt.key;
-                    const isSaving = promptSaving.has(prompt.key);
-                    const isDirty =
-                      promptEditValues[prompt.key] !== prompt.currentValue;
+                 {promptsLoading ? (
+                   <div className="p-8 text-center text-muted-foreground">
+                     Caricamento prompt…
+                   </div>
+                 ) : (
+                   prompts.map((prompt) => {
+                     const isExpanded = promptExpandedKey === prompt.key;
+                     const isSaving = promptSaving.has(prompt.key);
+                     const isDirty =
+                       promptEditValues[prompt.key] !== prompt.currentValue;
 
-                    return (
-                      <div
-                        key={prompt.key}
-                        className="bg-card border rounded-2xl overflow-hidden"
-                      >
-                        <button
-                          className="w-full flex items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
-                          onClick={() =>
-                            setPromptExpandedKey(isExpanded ? null : prompt.key)
-                          }
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-medium text-sm">
-                                {prompt.label}
-                              </span>
-                              {prompt.isOverridden && (
-                                <Badge
-                                  variant="secondary"
-                                  className="text-[10px] bg-amber-100 text-amber-700 border-0"
-                                >
-                                  Modificato
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                              {prompt.description}
-                            </p>
-                            {prompt.placeholders.length > 0 && (
-                              <div className="flex gap-1 flex-wrap mt-1">
-                                {prompt.placeholders.map((p) => (
-                                  <code
-                                    key={p}
-                                    className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded"
-                                  >
-                                    {p}
-                                  </code>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          {isExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-                          )}
-                        </button>
+                     return (
+                       <div
+                         key={prompt.key}
+                         className="bg-card border rounded-2xl overflow-hidden"
+                       >
+                         <button
+                           className="w-full flex items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
+                           onClick={() =>
+                             setPromptExpandedKey(isExpanded ? null : prompt.key)
+                           }
+                         >
+                           <div className="flex-1 min-w-0">
+                             <div className="flex items-center gap-2 flex-wrap">
+                               <span className="font-medium text-sm">
+                                 {prompt.label}
+                               </span>
+                               {prompt.isOverridden && (
+                                 <Badge
+                                   variant="secondary"
+                                   className="text-[10px] bg-amber-100 text-amber-700 border-0"
+                                 >
+                                   Modificato
+                                 </Badge>
+                               )}
+                             </div>
+                             <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                               {prompt.description}
+                             </p>
+                             {prompt.placeholders.length > 0 && (
+                               <div className="flex gap-1 flex-wrap mt-1">
+                                 {prompt.placeholders.map((p) => (
+                                   <code
+                                     key={p}
+                                     className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded"
+                                   >
+                                     {p}
+                                   </code>
+                                 ))}
+                               </div>
+                             )}
+                           </div>
+                           {isExpanded ? (
+                             <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
+                           ) : (
+                             <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                           )}
+                         </button>
 
-                        {isExpanded && (
-                          <div className="border-t p-4 space-y-3 bg-muted/10">
-                            <textarea
-                              value={promptEditValues[prompt.key] ?? ""}
-                              onChange={(e) =>
-                                setPromptEditValues((prev) => ({
-                                  ...prev,
-                                  [prompt.key]: e.target.value,
-                                }))
-                              }
-                              rows={Math.max(
-                                8,
-                                (promptEditValues[prompt.key] ?? "").split("\n")
-                                  .length + 2,
-                              )}
-                              className="w-full text-xs font-mono border rounded-xl p-3 bg-background resize-y focus:outline-none focus:ring-2 focus:ring-primary/30"
-                            />
-                            <div className="flex items-center gap-2">
-                              <Button
-                                size="sm"
-                                disabled={isSaving || !isDirty}
-                                onClick={() => savePrompt(prompt.key)}
-                              >
-                                {isSaving ? (
-                                  <RefreshCw className="w-3 h-3 mr-1.5 animate-spin" />
-                                ) : (
-                                  <Save className="w-3 h-3 mr-1.5" />
-                                )}
-                                Salva
-                              </Button>
-                              {prompt.isOverridden && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={isSaving}
-                                  onClick={() => resetPrompt(prompt.key)}
-                                >
-                                  <RotateCcw className="w-3 h-3 mr-1.5" />
-                                  Ripristina Default
-                                </Button>
-                              )}
-                              {isDirty && (
-                                <span className="text-xs text-amber-600 ml-auto">
-                                  Modifiche non salvate
-                                </span>
-                              )}
-                              {prompt.updatedAt && (
-                                <span className="text-xs text-muted-foreground ml-auto">
-                                  Aggiornato: {fmtShortDate(prompt.updatedAt)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
-
-            {section === "settings" && (
+                         {isExpanded && (
+                           <div className="border-t p-4 space-y-3 bg-muted/10">
+                             <textarea
+                               value={promptEditValues[prompt.key] ?? ""}
+                               onChange={(e) =>
+                                 setPromptEditValues((prev) => ({
+                                   ...prev,
+                                   [prompt.key]: e.target.value,
+                                 }))
+                               }
+                               rows={Math.max(
+                                 8,
+                                 (promptEditValues[prompt.key] ?? "").split("\n")
+                                   .length + 2,
+                               )}
+                               className="w-full text-xs font-mono border rounded-xl p-3 bg-background resize-y focus:outline-none focus:ring-2 focus:ring-primary/30"
+                             />
+                             <div className="flex items-center gap-2">
+                               <Button
+                                 size="sm"
+                                 disabled={isSaving || !isDirty}
+                                 onClick={() => savePrompt(prompt.key)}
+                               >
+                                 {isSaving ? (
+                                   <RefreshCw className="w-3 h-3 mr-1.5 animate-spin" />
+                                 ) : (
+                                   <Save className="w-3 h-3 mr-1.5" />
+                                 )}
+                                 Salva
+                               </Button>
+                               {prompt.isOverridden && (
+                                 <Button
+                                   size="sm"
+                                   variant="outline"
+                                   disabled={isSaving}
+                                   onClick={() => resetPrompt(prompt.key)}
+                                 >
+                                   <RotateCcw className="w-3 h-3 mr-1.5" />
+                                   Ripristina Default
+                                 </Button>
+                               )}
+                               {isDirty && (
+                                 <span className="text-xs text-amber-600 ml-auto">
+                                   Modifiche non salvate
+                                 </span>
+                               )}
+                               {prompt.updatedAt && (
+                                 <span className="text-xs text-muted-foreground ml-auto">
+                                   Aggiornato: {fmtShortDate(prompt.updatedAt)}
+                                 </span>
+                               )}
+                             </div>
+                           </div>
+                         )}
+                       </div>
+                     );
+                   })
+                 )}
+               </div>
+             )}
+             {section === "qualita" && (
+               <div className="p-8">
+                 <h3 className="text-lg font-serif font-bold mb-4">
+                   Qualità Wendy
+                 </h3>
+                 {qualitaLoading ? (
+                   <div className="text-center py-8 text-muted-foreground">
+                     Caricamento dati qualità...
+                   </div>
+                 ) : !qualitaData ? (
+                   <div className="text-center py-8 text-muted-foreground">
+                     Nessun dato qualità disponibile
+                   </div>
+                 ) : (
+                   <>
+                     {/* Totali */}
+                     {qualitaData.totals && (
+                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                         <div className="bg-card border rounded-xl p-4">
+                           <h4 className="text-sm font-semibold text-muted-foreground mb-2">
+                             Totale conversazioni
+                           </h4>
+                           <p className="text-2xl font-bold text-foreground">
+                             {qualitaData.totals.total.toLocaleString()}
+                           </p>
+                         </div>
+                         <div className="bg-card border rounded-xl p-4">
+                           <h4 className="text-sm font-semibold text-muted-foreground mb-2">
+                             Eval score medio
+                           </h4>
+                           <p className="text-2xl font-bold text-foreground">
+                             {qualitaData.totals.avgEvalScore ? (qualitaData.totals.avgEvalScore * 100).toFixed(0) + "%" : "N/D"}
+                           </p>
+                         </div>
+                         <div className="bg-card border rounded-xl p-4">
+                           <h4 className="text-sm font-semibold text-muted-foreground mb-2">
+                             Supervisor score medio
+                           </h4>
+                           <p className="text-2xl font-bold text-foreground">
+                             {qualitaData.totals.avgSupervisorScore ? (qualitaData.totals.avgSupervisorScore * 100).toFixed(0) + "%" : "N/D"}
+                           </p>
+                         </div>
+                         <div className="bg-card border rounded-xl p-4">
+                           <h4 className="text-sm font-semibold text-muted-foreground mb-2">
+                             Rewrite rate
+                           </h4>
+                           <p className="text-2xl font-bold text-foreground">
+                             {qualitaData.totals.total > 0 ? `${((qualitaData.totals.rewrites / qualitaData.totals.total) * 100).toFixed(1)}%` : "0%"}
+                           </p>
+                           <p className="text-xs text-muted-foreground mt-1">
+                             {qualitaData.totals.rewrites} riscritte
+                           </p>
+                         </div>
+                         <div className="bg-card border rounded-xl p-4">
+                           <h4 className="text-sm font-semibold text-muted-foreground mb-2">
+                             Chiarificazioni
+                           </h4>
+                           <p className="text-2xl font-bold text-foreground">
+                             {qualitaData.totals.total > 0 ? `${((qualitaData.totals.clarifications / qualitaData.totals.total) * 100).toFixed(1)}%` : "0%"}
+                           </p>
+                           <p className="text-xs text-muted-foreground mt-1">
+                             {qualitaData.totals.clarifications} richieste
+                           </p>
+                         </div>
+                         <div className="bg-card border rounded-xl p-4">
+                           <h4 className="text-sm font-semibold text-muted-foreground mb-2">
+                             UI tools usati
+                           </h4>
+                           <p className="text-2xl font-bold text-foreground">
+                             {String(qualitaData.totals.uiTools)}
+                           </p>
+                           <p className="text-xs text-muted-foreground mt-1">
+                             {qualitaData.totals.total > 0 ? ((qualitaData.totals.uiTools / qualitaData.totals.total) * 100).toFixed(1) + "%" : "0%"} dei turni
+                           </p>
+                         </div>
+                       </div>
+                     )}
+                     
+                     {/* Per dominio */}
+                     {qualitaData.qualityStats && qualitaData.qualityStats.length > 0 && (
+                       <div className="mb-6">
+                         <h4 className="font-semibold mb-4">Metriche per dominio</h4>
+                         <div class="overflow-x-auto">
+                           <table className="w-full text-sm">
+                             <thead>
+                               <tr className="border-b border-gray-200 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 uppercase">
+                                 <th className="px-4 py-3 text-left">Dominio</th>
+                                 <th className="px-4 py-3 text-right">Turni</th>
+                                 <th className="px-4 py-3 text-right">Eval score</th>
+                                 <th className="px-4 py-3 text-right">Supervisor</th>
+                                 <th className="px-4 py-3 text-right">Rewrite</th>
+                                 <th className="px-4 py-3 text-right">Chiarif.</th>
+                                 <th className="px-4 py-3 text-right">UI tool</th>
+                               </tr>
+                             </thead>
+                             <tbody>
+                               {qualitaData.qualityStats.map((s) => (
+                                 <tr key={s.domain} className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-900/50">
+                                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 capitalize">{s.domain}</td>
+                                   <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.total}</td>
+                                   <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{(s.avgEvalScore * 100).toFixed(0)}%</td>
+                                   <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.avgSupervisorScore ? `${(s.avgSupervisorScore * 100).toFixed(0)}%` : "—"}</td>
+                                   <td className="px-4 py-3 text-right">
+                                     <span className={s.rewrites > 0 ? "text-amber-500 font-medium" : "text-gray-400"}>
+                                       {s.rewrites} ({(s.rewrites / Math.max(s.total, 1) * 100).toFixed(0)}%)
+                                     </span>
+                                   </td>
+                                   <td className="px-4 py-3 text-right">
+                                     <span className={s.clarifications > 0 ? "text-blue-500 font-medium" : "text-gray-400"}>
+                                       {s.clarifications}
+                                     </span>
+                                   </td>
+                                   <td className="px-4 py-3 text-right">
+                                     <span className={s.uiTools > 0 ? "text-green-500 font-medium" : "text-gray-400"}>
+                                       {s.uiTools}
+                                     </span>
+                                   </td>
+                                 </tr>
+                               ))}
+                             </tbody>
+                           </table>
+                         </div>
+                       </div>
+                     )}
+                     
+                     {/* Supervisor stats */}
+                     {qualitaData.supervisorStats && qualitaData.supervisorStats.length > 0 && (
+                       <div className="mb-6">
+                         <h4 className="font-semibold mb-4">Supervisor — score prima/dopo rewrite</h4>
+                         <div className="overflow-x-auto">
+                           <table className="w-full text-sm">
+                             <thead>
+                               <tr className="border-b border-gray-200 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 uppercase">
+                                 <th className="px-4 py-3 text-left">Dominio</th>
+                                 <th className="px-4 py-3 text-right">Rewrite totali</th>
+                                 <th className="px-4 py-3 text-right">Score prima (media)</th>
+                                 <th className="px-4 py-3 text-right">Score dopo (media)</th>
+                                 <th className="px-4 py-3 text-right">Miglioramento</th>
+                               </tr>
+                             </thead>
+                             <tbody>
+                               {qualitaData.supervisorStats.map((s) => {
+                                 const improvement = s.avgScoreAfter && s.avgScoreBefore
+                                   ? ((s.avgScoreAfter - s.avgScoreBefore) * 100).toFixed(1)
+                                   : "—";
+                                 const isPositive = s.avgScoreAfter && s.avgScoreAfter > s.avgScoreBefore;
+                                 return (
+                                   <tr key={s.domain} className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-900/50">
+                                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 capitalize">{s.domain}</td>
+                                     <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.total}</td>
+                                     <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.avgScoreBefore ? `${(s.avgScoreBefore * 100).toFixed(0)}%` : "—"}</td>
+                                     <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.avgScoreAfter ? `${(s.avgScoreAfter * 100).toFixed(0)}%` : "—"}</td>
+                                     <td className={`px-4 py-3 text-right font-medium ${isPositive ? "text-green-500" : "text-red-400"}`}>
+                                       {improvement !== "—" ? `${isPositive ? "+" : ""}${improvement}%` : improvement}
+                                     </td>
+                                   </tr>
+                                 );
+                               })}
+                             </tbody>
+                           </table>
+                         </div>
+                       </div>
+                     )}
+                   </>
+                 )}
+               </div>
+             )}
+             {section === "settings" && (
               <div className="p-8">
                 <h3 className="text-lg font-serif font-bold mb-4">
                   Impostazioni

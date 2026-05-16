@@ -19,6 +19,7 @@ export const userObjectivesTable = pgTable("user_objectives", {
   completedAt: timestamp("completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
 export type UserObjective = typeof userObjectivesTable.$inferSelect;

@@ -124,7 +124,7 @@ const WORK_MODE_COLOR: Record<string, string> = {
   ibrido: "text-primary bg-primary/10 border-primary/20",
 };
 
-/* ── Persona definitions ──────────────────────────────── */
+/* ── Persona types ──────────────────────────────────────── */
 type JourneyId =
   | "indeciso"
   | "dipendente"
@@ -142,86 +142,6 @@ interface Persona {
   accentClass: string;
   borderClass: string;
 }
-const PERSONAS: Persona[] = [
-  {
-    id: "indeciso",
-    icon: HelpCircle,
-    label: "Indeciso",
-    tagline: "Non so ancora cosa fare",
-    ctaLabel: "Fai il test gratuito",
-    ctaHref: "/test",
-    tools: ["Test di personalità", "Esplora settori", "Consulente AI"],
-    accentClass: "text-primary",
-    borderClass: "hover:border-primary/50",
-  },
-  {
-    id: "dipendente",
-    icon: TrendingUp,
-    label: "Dipendente",
-    tagline: "Ho un lavoro e voglio crescere",
-    ctaLabel: "Analizza le mie skill",
-    ctaHref: "/test",
-    tools: ["Competenze", "Simulatore colloquio", "Piano di crescita"],
-    accentClass: "text-growth",
-    borderClass: "hover:border-growth/50",
-  },
-  {
-    id: "autonomo",
-    icon: Rocket,
-    label: "Autonomo",
-    tagline: "Lavoro in proprio e voglio scalare",
-    ctaLabel: "Valida la mia idea",
-    ctaHref: "/validatore-idea",
-    tools: ["Analisi idea", "Piano attività", "Consulente AI"],
-    accentClass: "text-primary",
-    borderClass: "hover:border-primary/50",
-  },
-  {
-    id: "azienda",
-    icon: Building2,
-    label: "Azienda",
-    tagline: "Cerco il profilo giusto",
-    ctaLabel: "Esplora i profili",
-    ctaHref: "/settori",
-    tools: ["Profili personalità", "Settori in crescita", "Affiliazione"],
-    accentClass: "text-growth",
-    borderClass: "hover:border-growth/50",
-  },
-  {
-    id: "investitore",
-    icon: BarChart3,
-    label: "Investitore",
-    tagline: "Valuto opportunità di mercato",
-    ctaLabel: "Vedi i trend",
-    ctaHref: "/settori",
-    tools: ["Settori in crescita", "Analisi andamento", "Mappa conoscenze"],
-    accentClass: "text-primary",
-    borderClass: "hover:border-primary/50",
-  },
-];
-
-const JOURNEY_LABELS: Record<
-  JourneyId,
-  { label: string; Icon: React.ElementType; accentClass: string }
-> = {
-  indeciso: {
-    label: "Indeciso",
-    Icon: HelpCircle,
-    accentClass: "text-primary",
-  },
-  dipendente: {
-    label: "Dipendente",
-    Icon: TrendingUp,
-    accentClass: "text-growth",
-  },
-  autonomo: { label: "Autonomo", Icon: Rocket, accentClass: "text-primary" },
-  azienda: { label: "Azienda", Icon: Building2, accentClass: "text-growth" },
-  investitore: {
-    label: "Investitore",
-    Icon: BarChart3,
-    accentClass: "text-primary",
-  },
-};
 
 /* ── Data hooks ───────────────────────────────────────── */
 function useHomeNews() {
@@ -372,7 +292,7 @@ function TrendingMobileStrip({
             <Flame className="w-3.5 h-3.5 text-primary" />
           </div>
           <span className="text-xs font-bold uppercase tracking-wider text-foreground">
-            Settori in crescita
+            {t("home.trending.heading")}
           </span>
         </div>
         <Link href="/settori">
@@ -592,7 +512,13 @@ function TrendingSectorCard({
 }
 
 /* ── Guest hero: 5 persona picker ─────────────────────── */
-function GuestPersonaHero({ onLoginClick }: { onLoginClick: () => void }) {
+function GuestPersonaHero({
+  onLoginClick,
+  personas,
+}: {
+  onLoginClick: () => void;
+  personas: Persona[];
+}) {
   const { t } = useTranslation();
   const prefersReduced = useReducedMotion();
   const [, setLocation] = useLocation();
@@ -611,16 +537,14 @@ function GuestPersonaHero({ onLoginClick }: { onLoginClick: () => void }) {
             transition={{ duration: 0.5 }}
           >
             <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-full px-3.5 py-1.5 text-xs font-semibold text-primary mb-4">
-              <Star className="w-3 h-3" /> Orientamento professionale
-              personalizzato
+              <Star className="w-3 h-3" /> {t("home.hero.badge")}
             </div>
             <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-white leading-tight mb-3">
-              Qual è il tuo{" "}
-              <span className="text-italic-serif text-primary">obiettivo?</span>
+              {t("home.hero.heading")}{" "}
+              <span className="text-italic-serif text-primary">{t("home.hero.headingHighlight")}</span>
             </h1>
             <p className="text-sm sm:text-base text-white/65 max-w-xl mx-auto">
-              NorthStar si adatta al tuo percorso. Scegli il profilo che ti
-              rappresenta e ricevi strumenti e consigli su misura per te.
+              {t("home.hero.subtitle")}
             </p>
           </motion.div>
         </div>
@@ -631,7 +555,7 @@ function GuestPersonaHero({ onLoginClick }: { onLoginClick: () => void }) {
         <div className="max-w-6xl mx-auto px-3 sm:px-4 pt-6 pb-4">
           {/* Mobile: vertical list with icon+text rows. Desktop: 5-col grid */}
           <div className="flex flex-col sm:grid sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-            {PERSONAS.map((persona, i) => {
+            {personas.map((persona, i) => {
               const Icon = persona.icon;
               return (
                 <motion.div
@@ -731,7 +655,41 @@ function LoggedInHero({
   latestResult: LatestResult | null;
 }) {
   const { t } = useTranslation();
-  const journey = journeyType ? JOURNEY_LABELS[journeyType as JourneyId] : null;
+
+  const JOURNEY_LABELS: Record<
+    JourneyId,
+    { label: string; Icon: React.ElementType; accentClass: string }
+  > = {
+    indeciso: {
+      label: t("home.personas.indeciso.label"),
+      Icon: HelpCircle,
+      accentClass: "text-primary",
+    },
+    dipendente: {
+      label: t("home.personas.dipendente.label"),
+      Icon: TrendingUp,
+      accentClass: "text-growth",
+    },
+    autonomo: {
+      label: t("home.personas.autonomo.label"),
+      Icon: Rocket,
+      accentClass: "text-primary",
+    },
+    azienda: {
+      label: t("home.personas.azienda.label"),
+      Icon: Building2,
+      accentClass: "text-growth",
+    },
+    investitore: {
+      label: t("home.personas.investitore.label"),
+      Icon: BarChart3,
+      accentClass: "text-primary",
+    },
+  };
+
+  const journey = journeyType
+    ? JOURNEY_LABELS[journeyType as JourneyId]
+    : null;
   const JourneyIcon = journey?.Icon;
   const hasTest = !!latestResult?.recommendations?.length;
 
@@ -740,32 +698,32 @@ function LoggedInHero({
     { label: string; desc: string; href: string; icon: React.ElementType }
   > = {
     indeciso: {
-      label: "Fai il test",
-      desc: "Scopri la tua personalità professionale",
+      label: t("home.nextStep.indeciso.label"),
+      desc: t("home.nextStep.indeciso.desc"),
       href: "/test",
       icon: Zap,
     },
     dipendente: {
-      label: "Analizza le competenze",
-      desc: "Identifica le competenze che ti mancano",
+      label: t("home.nextStep.dipendente.label"),
+      desc: t("home.nextStep.dipendente.desc"),
       href: "/dashboard",
       icon: TrendingUp,
     },
     autonomo: {
-      label: "Valida la tua idea",
-      desc: "Ricevi una valutazione della tua attività",
+      label: t("home.nextStep.autonomo.label"),
+      desc: t("home.nextStep.autonomo.desc"),
       href: "/validatore-idea",
       icon: Rocket,
     },
     azienda: {
-      label: "Esplora i profili",
-      desc: "Trova i profili più adatti al tuo team",
+      label: t("home.nextStep.azienda.label"),
+      desc: t("home.nextStep.azienda.desc"),
       href: "/settori",
       icon: Building2,
     },
     investitore: {
-      label: "Vedi i settori in crescita",
-      desc: "Analizza andamento e opportunità del mercato italiano",
+      label: t("home.nextStep.investitore.label"),
+      desc: t("home.nextStep.investitore.desc"),
       href: "/settori",
       icon: BarChart3,
     },
@@ -976,6 +934,7 @@ function QuickToolsSection({
   journeyType: string | null | undefined;
   sessionId?: number;
 }) {
+  const { t } = useTranslation();
   type ToolDef = {
     href: string;
     icon: React.ElementType;
@@ -989,134 +948,134 @@ function QuickToolsSection({
       {
         href: "/test",
         icon: Zap,
-        title: "Test di personalità",
-        desc: "17 domande per mappare la tua personalità",
+        title: t("home.tools.indeciso.0.title"),
+        desc: t("home.tools.indeciso.0.desc"),
       },
       {
         href: "/settori",
         icon: TrendingUp,
-        title: "Esplora settori",
-        desc: "28 settori con stipendi e crescita",
+        title: t("home.tools.indeciso.1.title"),
+        desc: t("home.tools.indeciso.1.desc"),
       },
       {
         href: "/coach",
         icon: Bot,
-        title: "Consulente AI",
-        desc: "Sessioni di consulenza personalizzate",
+        title: t("home.tools.indeciso.2.title"),
+        desc: t("home.tools.indeciso.2.desc"),
         badge: "Pro",
       },
       {
         href: "/news",
         icon: Newspaper,
-        title: "Notizie lavoro",
-        desc: "Ultime notizie dal mercato",
+        title: t("home.tools.indeciso.3.title"),
+        desc: t("home.tools.indeciso.3.desc"),
       },
     ],
     dipendente: [
       {
         href: sessionId ? `/skills-gap/${sessionId}` : "/dashboard",
         icon: Zap,
-        title: "Competenze da sviluppare",
-        desc: "Identifica cosa ti manca",
+        title: t("home.tools.dipendente.0.title"),
+        desc: t("home.tools.dipendente.0.desc"),
         badge: "AI",
       },
       {
         href: sessionId ? `/colloquio/${sessionId}` : "/dashboard",
         icon: TrendingUp,
-        title: "Simulatore Colloquio",
-        desc: "Allenati con domande reali",
+        title: t("home.tools.dipendente.1.title"),
+        desc: t("home.tools.dipendente.1.desc"),
         badge: "AI",
       },
       {
         href: "/coach",
         icon: Bot,
-        title: "Consulente di carriera",
-        desc: "Piano di crescita personalizzato",
+        title: t("home.tools.dipendente.2.title"),
+        desc: t("home.tools.dipendente.2.desc"),
       },
       {
         href: "/candidature",
         icon: Briefcase,
-        title: "Le mie candidature",
-        desc: "Gestisci le tue richieste di lavoro",
+        title: t("home.tools.dipendente.3.title"),
+        desc: t("home.tools.dipendente.3.desc"),
       },
     ],
     autonomo: [
       {
         href: "/validatore-idea",
         icon: Rocket,
-        title: "Analisi idea",
-        desc: "Valutazione con AI dettagliata",
+        title: t("home.tools.autonomo.0.title"),
+        desc: t("home.tools.autonomo.0.desc"),
         badge: "AI",
       },
       {
         href: "/coach",
         icon: Bot,
-        title: "Consulente per la tua attività",
-        desc: "Consigli strategici",
+        title: t("home.tools.autonomo.1.title"),
+        desc: t("home.tools.autonomo.1.desc"),
       },
       {
         href: "/settori",
         icon: TrendingUp,
-        title: "Mercati in crescita",
-        desc: "Trova il settore più adatto",
+        title: t("home.tools.autonomo.2.title"),
+        desc: t("home.tools.autonomo.2.desc"),
       },
       {
         href: "/news",
         icon: Newspaper,
-        title: "Notizie imprese",
-        desc: "Ultime novità",
+        title: t("home.tools.autonomo.3.title"),
+        desc: t("home.tools.autonomo.3.desc"),
       },
     ],
     azienda: [
       {
         href: "/settori",
         icon: TrendingUp,
-        title: "Profili personalità",
-        desc: "Trova il profilo psicologico ideale",
+        title: t("home.tools.azienda.0.title"),
+        desc: t("home.tools.azienda.0.desc"),
       },
       {
         href: "/affiliazione",
         icon: Building2,
-        title: "Affiliazione",
-        desc: "Pubblica la tua opportunità",
+        title: t("home.tools.azienda.1.title"),
+        desc: t("home.tools.azienda.1.desc"),
       },
       {
         href: "/news",
         icon: Newspaper,
-        title: "Notizie HR",
-        desc: "Tendenze del mercato del lavoro",
+        title: t("home.tools.azienda.2.title"),
+        desc: t("home.tools.azienda.2.desc"),
       },
       {
         href: "/crescita",
         icon: Sparkles,
-        title: "Crescita aziendale",
-        desc: "Articoli su cultura e team",
+        title: t("home.tools.azienda.3.title"),
+        desc: t("home.tools.azienda.3.desc"),
       },
     ],
     investitore: [
       {
         href: "/settori",
         icon: BarChart3,
-        title: "Settori in crescita",
-        desc: "Analisi andamento del mercato italiano",
+        title: t("home.tools.investitore.0.title"),
+        desc: t("home.tools.investitore.0.desc"),
       },
       {
         href: "/news",
         icon: Newspaper,
-        title: "Notizie mercati",
-        desc: "Ultime notizie economia e finanza",
+        title: t("home.tools.investitore.1.title"),
+        desc: t("home.tools.investitore.1.desc"),
       },
       {
         href: "/crescita",
         icon: TrendingUp,
-        title: "Crescita settori",
-        desc: "Dati e analisi per investire",
+        title: t("home.tools.investitore.2.title"),
+        desc: t("home.tools.investitore.2.desc"),
       },
       {
         href: sessionId ? `/grafo` : "/settori",
         icon: Sparkles,
-        title: "Mappa delle conoscenze",
-        desc: "Collegamenti tra settori",
+        title: t("home.tools.investitore.3.title"),
+        desc: t("home.tools.investitore.3.desc"),
       },
     ],
   };
@@ -1135,15 +1094,16 @@ function QuickToolsSection({
           </div>
           <div>
             <h2 className="font-bold text-xl text-foreground">
-              I tuoi strumenti
+              {t("home.quickTools.heading")}
             </h2>
             <p className="text-xs text-muted-foreground">
-              Selezionati per il tuo percorso
+              {t("home.quickTools.subheading")}
             </p>
           </div>
           <Link href="/dashboard" className="ml-auto">
             <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:gap-2 transition-all">
-              Dashboard completa <ArrowRight className="w-3.5 h-3.5" />
+              {t("home.quickTools.dashboardLink")}{" "}
+              <ArrowRight className="w-3.5 h-3.5" />
             </div>
           </Link>
         </div>
@@ -1182,6 +1142,83 @@ function QuickToolsSection({
 /* ── Main Home component ──────────────────────────────── */
 export default function Home() {
   const { t } = useTranslation();
+  const personas: Persona[] = [
+    {
+      id: "indeciso",
+      icon: HelpCircle,
+      label: t("home.personas.indeciso.label"),
+      tagline: t("home.personas.indeciso.tagline"),
+      ctaLabel: t("home.personas.indeciso.ctaLabel"),
+      ctaHref: "/test",
+      tools: [
+        t("home.personas.indeciso.tools.0"),
+        t("home.personas.indeciso.tools.1"),
+        t("home.personas.indeciso.tools.2"),
+      ],
+      accentClass: "text-primary",
+      borderClass: "hover:border-primary/50",
+    },
+    {
+      id: "dipendente",
+      icon: TrendingUp,
+      label: t("home.personas.dipendente.label"),
+      tagline: t("home.personas.dipendente.tagline"),
+      ctaLabel: t("home.personas.dipendente.ctaLabel"),
+      ctaHref: "/test",
+      tools: [
+        t("home.personas.dipendente.tools.0"),
+        t("home.personas.dipendente.tools.1"),
+        t("home.personas.dipendente.tools.2"),
+      ],
+      accentClass: "text-growth",
+      borderClass: "hover:border-growth/50",
+    },
+    {
+      id: "autonomo",
+      icon: Rocket,
+      label: t("home.personas.autonomo.label"),
+      tagline: t("home.personas.autonomo.tagline"),
+      ctaLabel: t("home.personas.autonomo.ctaLabel"),
+      ctaHref: "/validatore-idea",
+      tools: [
+        t("home.personas.autonomo.tools.0"),
+        t("home.personas.autonomo.tools.1"),
+        t("home.personas.autonomo.tools.2"),
+      ],
+      accentClass: "text-primary",
+      borderClass: "hover:border-primary/50",
+    },
+    {
+      id: "azienda",
+      icon: Building2,
+      label: t("home.personas.azienda.label"),
+      tagline: t("home.personas.azienda.tagline"),
+      ctaLabel: t("home.personas.azienda.ctaLabel"),
+      ctaHref: "/settori",
+      tools: [
+        t("home.personas.azienda.tools.0"),
+        t("home.personas.azienda.tools.1"),
+        t("home.personas.azienda.tools.2"),
+      ],
+      accentClass: "text-growth",
+      borderClass: "hover:border-growth/50",
+    },
+    {
+      id: "investitore",
+      icon: BarChart3,
+      label: t("home.personas.investitore.label"),
+      tagline: t("home.personas.investitore.tagline"),
+      ctaLabel: t("home.personas.investitore.ctaLabel"),
+      ctaHref: "/settori",
+      tools: [
+        t("home.personas.investitore.tools.0"),
+        t("home.personas.investitore.tools.1"),
+        t("home.personas.investitore.tools.2"),
+      ],
+      accentClass: "text-primary",
+      borderClass: "hover:border-primary/50",
+    },
+  ];
   const { data: stats, isLoading: isStatsLoading } = useGetStatsSummary();
   const { data: trendingData } = useTrendingSectors();
   const { data: newsData, isLoading: isNewsLoading } = useHomeNews();
@@ -1238,7 +1275,10 @@ export default function Home() {
           latestResult={latestResult ?? null}
         />
       ) : (
-        <GuestPersonaHero onLoginClick={() => setLoginOpen(true)} />
+        <GuestPersonaHero
+          onLoginClick={() => setLoginOpen(true)}
+          personas={personas}
+        />
       )}
 
       {/* ── STATS BAR ──────────────────────────────────── */}
@@ -1314,15 +1354,17 @@ export default function Home() {
             <AnimateOnScroll>
               <div className="text-center mb-10">
                 <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide mb-4">
-                  <Sparkles className="w-3.5 h-3.5" /> Come funziona
+                  <Sparkles className="w-3.5 h-3.5" />{" "}
+                  {t("home.howItWorks.badge")}
                 </div>
                 <h2 className="text-3xl md:text-4xl font-bold text-foreground">
-                  Il percorso giusto per{" "}
-                  <span className="text-italic-serif text-primary">te</span>
+                  {t("home.howItWorks.heading")}{" "}
+                  <span className="text-italic-serif text-primary">
+                    {t("home.howItWorks.headingHighlight")}
+                  </span>
                 </h2>
                 <p className="text-muted-foreground mt-3 max-w-xl mx-auto">
-                  Tre semplici passi per capire dove sei, dove vuoi arrivare e
-                  come arrivarci.
+                  {t("home.howItWorks.subtitle")}
                 </p>
               </div>
             </AnimateOnScroll>
@@ -1335,28 +1377,28 @@ export default function Home() {
                 {
                   step: "01",
                   icon: Zap,
-                  title: "Scegli il tuo profilo",
-                  desc: "Seleziona il percorso che ti rappresenta: indeciso, dipendente, autonomo, azienda o investitore.",
+                  title: t("home.howItWorks.step1.title"),
+                  desc: t("home.howItWorks.step1.desc"),
                   href: "/percorso",
-                  label: "Scegli il percorso",
+                  label: t("home.howItWorks.step1.label"),
                   accent: "bg-primary/10 text-primary border-primary/20",
                 },
                 {
                   step: "02",
                   icon: CheckCircle2,
-                  title: "Completa il test",
-                  desc: "17 domande RIASEC per mappare la tua personalità professionale e preferenze di lavoro.",
+                  title: t("home.howItWorks.step2.title"),
+                  desc: t("home.howItWorks.step2.desc"),
                   href: "/test",
-                  label: "Inizia il test gratuito",
+                  label: t("home.howItWorks.step2.label"),
                   accent: "bg-growth/10 text-growth border-growth/20",
                 },
                 {
                   step: "03",
                   icon: Bot,
-                  title: "Strumenti con AI",
-                  desc: "Piani personalizzati, analisi competenze, simulazione colloqui e guida AI.",
+                  title: t("home.howItWorks.step3.title"),
+                  desc: t("home.howItWorks.step3.desc"),
                   href: "/premium",
-                  label: "Scopri gli strumenti",
+                  label: t("home.howItWorks.step3.label"),
                   accent: "bg-primary/10 text-primary border-primary/20",
                 },
               ].map(
@@ -1371,7 +1413,7 @@ export default function Home() {
                           )}
                         >
                           <Icon className="w-3.5 h-3.5" />
-                          Passo {step}
+                          {t("home.howItWorks.stepLabel")} {step}
                         </div>
                         <h3 className="font-bold text-foreground mb-2">
                           {title}

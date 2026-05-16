@@ -117,13 +117,13 @@ export default function Wiki() {
       textareaRef.current.style.height = "auto";
     }
 
-    try {
-      const history = messages.map((m) => ({ role: m.role, content: m.content }));
-      const res = await fetch(`${BASE}api/wiki/${id}/ask`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: trimmed, history }),
-      });
+     try {
+       const history = messages.map((m) => ({ role: m.role, content: m.content }));
+       const res = await fetch(`${BASE}api/wiki/${id}/ask`, {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({ message: trimmed, history }),
+       });
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));

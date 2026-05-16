@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd ../../apps/web && npx vite build --config vite.config.ts",
+  "outputDirectory": "dist/public",
+  "framework": "vite",
+  "installCommand": "cd ../.. && pnpm install"
+}

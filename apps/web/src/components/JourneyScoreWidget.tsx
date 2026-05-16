@@ -71,7 +71,7 @@ export function JourneyScoreWidget({ userId, compact = false }: { userId: number
         <div className="text-2xl">{data.levelEmoji}</div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Salute Percorso</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Salute Piano</span>
             <span className="text-sm font-bold text-primary">{data.score}%</span>
           </div>
           <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -90,7 +90,7 @@ export function JourneyScoreWidget({ userId, compact = false }: { userId: number
     <div className="bg-card border border-border rounded-2xl p-5">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h3 className="font-bold text-foreground">Salute del Percorso</h3>
+          <h3 className="font-bold text-foreground">Salute del Piano</h3>
           <p className="text-xs text-muted-foreground">Quanto è completo il tuo cammino su NorthStar</p>
         </div>
         <Link href="/profilo" className="text-xs text-primary hover:underline flex items-center gap-1">

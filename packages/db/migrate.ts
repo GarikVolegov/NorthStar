@@ -8,9 +8,12 @@
  * Run this in CI/CD BEFORE starting the API server.
  * Never run drizzle-kit push in production.
  */
+import dotenv from "dotenv";
+dotenv.config({ path: "../../.env" });
+
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import pg from "pg";
+import { pool } from "./src/index.ts";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,7 +25,6 @@ if (!DATABASE_URL) {
   process.exit(1);
 }
 
-const pool = new pg.Pool({ connectionString: DATABASE_URL });
 const db = drizzle(pool);
 
 console.log("[migrate] Running migrations...");

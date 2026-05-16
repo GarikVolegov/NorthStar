@@ -8,13 +8,14 @@
     "./schema": "./src/schema/index.ts"
   },
   "scripts": {
-    "push": "drizzle-kit push --config ./drizzle.config.ts",
+    "push": "node scripts/push.mjs",
     "push-force": "drizzle-kit push --force --config ./drizzle.config.ts",
     "generate": "drizzle-kit generate --config ./drizzle.config.ts",
     "migrate": "drizzle-kit migrate --config ./drizzle.config.ts",
     "migrate:check": "drizzle-kit check --config ./drizzle.config.ts"
   },
   "dependencies": {
+    "@neondatabase/serverless": "catalog:",
     "drizzle-orm": "catalog:",
     "drizzle-zod": "^0.8.3",
     "better-sqlite3": "^12.0.0",
@@ -22,7 +23,6 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@types/pg": "^8.18.0",
     "drizzle-kit": "^0.31.9"
   }
 }

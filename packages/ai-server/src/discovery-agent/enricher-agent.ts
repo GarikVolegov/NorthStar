@@ -42,6 +42,7 @@
  *   Chiamato ogni 2h dal cron (jobs/cron.ts).
  *   Può essere triggerato manualmente via POST /api/admin/discovery/enrich.
  */
+import { logger } from "../logger";
 import { openai } from "../client";
 import { db }     from "@workspace/db";
 import { discoveryItemsTable } from "@workspace/db";
@@ -337,6 +338,6 @@ export async function runEnricher(
     errors,
   };
 
-  console.log(`[enricher] run complete:`, result);
+  logger.info({ processed: result.processed, enriched: result.enriched, skipped: result.skipped, filtered: result.filtered, durationMs: result.durationMs }, "[enricher] run complete");
   return result;
 }

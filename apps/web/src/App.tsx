@@ -11,7 +11,7 @@ import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { WendyProvider } from "@/contexts/WendyProvider";
-import { WendyFloatingButton } from "@/components/WendyFloatingButton";
+
 import { WendyPanel } from "@/components/WendyPanel";
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import { useReducedMotion, easings } from "@/lib/motion";
@@ -75,7 +75,7 @@ const AffiliazioneDashboard = lazy(
 const Colloquio = lazy(() => import("@/pages/colloquio"));
 const SkillsGap = lazy(() => import("@/pages/skills-gap"));
 const Coach = lazy(() => import("@/pages/coach"));
-const ValidatoreIdea = lazy(() => import("@/pages/validatore-idea"));
+const IdeaPage = lazy(() => import("@/pages/validatore-idea"));
 const Percorso = lazy(() => import("@/pages/percorso"));
 const ScoreCard = lazy(() => import("@/pages/score-card"));
 const Lavori = lazy(() => import("@/pages/lavori"));
@@ -206,7 +206,7 @@ function AnimatedRoutes() {
       </Route>
       <Route path="/coach" component={Coach} />
       <Route path="/validatore-idea">
-        <ProtectedRoute component={ValidatoreIdea} />
+        <ProtectedRoute component={IdeaPage} />
       </Route>
       <Route path="/percorso">
         <ProtectedRoute component={Percorso} />
@@ -326,15 +326,15 @@ function Router() {
       </Route>
       <Route>
         <div className="flex flex-col min-h-dvh">
-          <Navbar />
-          <main className="flex-1 pb-16 md:pb-0">
+          <MobileBottomNav />
+          <main className="flex-1 pt-12 md:pt-14 pb-16 md:pb-16">
             <BackButton />
             <AnimatedRoutes />
           </main>
           <div className="hidden md:block">
             <Footer />
           </div>
-          <MobileBottomNav />
+          <Navbar />
         </div>
       </Route>
     </Switch>
@@ -351,7 +351,6 @@ function App() {
               <Router />
             </WouterRouter>
             <Toaster />
-            <WendyFloatingButton />
             <WendyPanel />
           </WendyProvider>
         </TooltipProvider>

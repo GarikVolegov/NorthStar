@@ -136,7 +136,7 @@ export default function ScoreCard() {
             {data.name}
           </h1>
           <p className="text-muted-foreground text-sm mb-8">
-            NorthStar Score — Percorso di orientamento professionale
+            NorthStar Score — Piano di orientamento professionale
           </p>
 
           <div className="flex items-center justify-center gap-3">

@@ -645,7 +645,7 @@ console.info('[AUDIT]', {
 
 // ❌ PROIBITO — log che espongono dati sensibili
 console.log('User data:', dbUser);       // potrebbe loggare passwordHash
-console.log('Stripe key:', process.env.STRIPE_SECRET_KEY);
+// console.log('Stripe key:', process.env.STRIPE_SECRET_KEY); // PROIBITO - mai loggare chiavi secret
 console.log('JWT payload:', decodedToken);
 ```
 

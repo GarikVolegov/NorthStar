@@ -13,6 +13,8 @@
  *   OTEL_DISABLED        — set to "true" to disable tracing entirely
  */
 
+import { rootLogger } from "./middleware/logger";
+
 const isDisabled = process.env.OTEL_DISABLED === "true";
 
 if (!isDisabled) {
@@ -45,7 +47,7 @@ if (!isDisabled) {
       });
 
       await sdk.start();
-      console.log("[tracing] OpenTelemetry started");
+      rootLogger.info("[tracing] OpenTelemetry started");
 
       process.on("SIGTERM", () => {
         sdk.shutdown().catch(() => {});
@@ -54,10 +56,7 @@ if (!isDisabled) {
         sdk.shutdown().catch(() => {});
       });
     } catch (err) {
-      console.warn(
-        "[tracing] OpenTelemetry not available — tracing disabled:",
-        (err as Error).message,
-      );
+      rootLogger.warn({ err }, "[tracing] OpenTelemetry not available — tracing disabled");
     }
   })();
 }

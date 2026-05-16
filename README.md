@@ -73,7 +73,7 @@ NorthStar è una piattaforma SaaS modulare composta da:
 ```bash
 cp .env.example .env   # compila i valori in .env
 pnpm install            # installa dipendenze
-pnpm dev                # avvia northstar-server :3001 + frontend :5173
+pnpm dev                # avvia Docker (postgres, redis) + northstar-server :3001 + frontend :5173
 ```
 
 ### Variabili d'Ambiente
@@ -98,7 +98,7 @@ Opzionali:
 
 ### Regole di Sicurezza (vedi `GIT_RULES.md`)
 - Controlli pre-commit impediscono l'aggiunta di segreti
-- Usare `git diff --staged -- README.md | grep -iE '(sk-|password|secret|key)=.'` per verificare
+- Usare `git diff --staged | grep -iE '(sk-|password|secret|key)=.'` per verificare
 
 ---
 
@@ -155,11 +155,11 @@ Il microservizio AI si trova nella radice del progetto come server FastAPI indip
 ### Esecuzione
 ```bash
 # Con uv (raccomandato)
-uv pip install -r pyproject.toml
+uv sync
 uvicorn main:app --host 0.0.0.0 --port 8000
 
 # Oppure con pip tradizionale
-pip install -r pyproject.toml
+pip install -e .
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -216,15 +216,14 @@ cat backup.sql | docker exec -i northstar-postgres-1 psql -U northstar northstar
 ## 📦 Script Disponibili
 
 ```bash
-pnpm dev               # sviluppo completo (server + frontend)
+pnpm dev               # sviluppo completo (Docker + server + frontend)
 pnpm dev:web           # solo frontend Vite
 pnpm dev:server        # solo northstar-server
 pnpm build             # build per produzione
 pnpm typecheck         # controlla tipi TypeScript (root + pacchetti)
 pnpm lint              # esegue ESLint
-pnpm test:unit         # test unitari (Vitest)
+pnpm test:ai           # test AI server
 pnpm test:e2e          # test end-to-end (Playwright)
-pnpm test:mobile       # test mobile QA
 pnpm db:generate       # genera migrazioni Drizzle
 pnpm db:migrate        # applica migrazioni
 pnpm db:push           # push schema in dev (drizzle-kit push)

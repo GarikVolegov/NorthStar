@@ -45,7 +45,7 @@ export function JourneyToolsSection({ journeyType, sectorId }: { journeyType: st
       { href: "/news",                          icon: Newspaper,   title: "News HR & Lavoro",       desc: "Tendenze del mercato del lavoro italiano" },
     ],
     investitore: [
-      { href: "/settori",                       icon: BarChart3,   title: "Settori in crescita",    desc: "Analisi approfondita dei settori più dinamici" },
+      { href: "/settori",                       icon: BarChart3,   title: "Aree in crescita",    desc: "Analisi approfondita dei settori più dinamici" },
       { href: "/news",                          icon: Newspaper,   title: "Notizie mercati",        desc: "Ultime notizie economia, finanza e mercati" },
       { href: "/crescita",                      icon: TrendingUp,  title: "Crescita di settore",   desc: "Dati e analisi per decisioni di investimento" },
       { href: "/grafo",                         icon: Network,     title: "Mappa delle conoscenze", desc: "Rete di connessioni tra settori e competenze" },

@@ -52,7 +52,7 @@ export function TrendingMobileStrip({
             <Flame className="w-3.5 h-3.5 text-primary" />
           </div>
           <span className="text-xs font-bold uppercase tracking-wider text-foreground">
-            Settori in crescita
+            Aree in crescita
           </span>
         </div>
         <Link href="/settori">

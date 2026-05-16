@@ -75,6 +75,16 @@ Thumbs.db
 # ── Replit-specific ────────────────────────────────────────────────────────
 .cache/
 .local/
+
+# Go CLI binaries (build artifacts)
+.tools/printed-clis/*/bin/
+.tools/printed-clis/*/northstar-pp-*.exe
+cli-printing-press/printing-press.exe
+
+# Go local installations
+go-install/
+go123-install/
+
 attached_assets/
 skills-lock.json
 .cursor/rules/nx-rules.mdc

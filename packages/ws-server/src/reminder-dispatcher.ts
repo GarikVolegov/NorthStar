@@ -10,6 +10,7 @@
  *   process.on("SIGTERM", stop);
  */
 
+import { logger } from "./logger";
 import { db } from "@workspace/db";
 import {
   eventRemindersTable,
@@ -42,13 +43,13 @@ export function startReminderDispatcher(
     try {
       await dispatchDueReminders(wss, options);
     } catch (err) {
-      console.error("[reminder-dispatcher] error:", err);
+      logger.error({ err }, "[reminder-dispatcher] error");
     }
   }, POLL_INTERVAL_MS);
 
   // Run once immediately on startup
   dispatchDueReminders(wss, options).catch((err) =>
-    console.error("[reminder-dispatcher] initial dispatch error:", err),
+    logger.error({ err }, "[reminder-dispatcher] initial dispatch error"),
   );
 
   return () => clearInterval(interval);

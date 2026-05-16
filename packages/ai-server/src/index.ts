@@ -43,5 +43,15 @@ export { wendyRequestsTotal, wendyLatencySeconds, wendySupervisorRewritesTotal, 
 // Feature flags
 export { FF } from "./feature-flags";
 
+// Cost tracking & model routing
+export { recordLlmUsage, estimateTokens, estimateCost, getProvider, MODEL_PRICING } from "./cost-tracking";
+export type { ModelPricing } from "./cost-tracking";
+export { selectModel } from "./model-router";
+export type { RouterOptions, ModelRoute, RequestComplexity } from "./model-router";
+
+// Search Router
+export { routeQuery } from "./search-router/router";
+export type { RouterInput, RouterOutput } from "./search-router/router";
+
 // Utilities
 export { withTimeout, gracefulDegrade } from "./utils";

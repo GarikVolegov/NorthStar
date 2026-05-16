@@ -294,7 +294,7 @@ export default function Grafo() {
       brand.setAttribute("font-size", "9");
       brand.setAttribute("fill", "hsl(var(--border))");
       brand.setAttribute("font-family", "system-ui, sans-serif");
-      brand.textContent = "NorthStar · Grafo della Conoscenza";
+      brand.textContent = "NorthStar · Mappa della Conoscenza";
       legendG.appendChild(brand);
       cloned.appendChild(legendG);
 

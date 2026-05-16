@@ -258,7 +258,7 @@ export default function CrescitaArticolo() {
                 <p className="text-sm font-semibold text-foreground">Contenuto collegato a</p>
                 {article.sectorLinks.length > 0 && (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-2">Settori</p>
+                    <p className="text-xs text-muted-foreground mb-2">Aree</p>
                     <div className="flex flex-wrap gap-2">
                       {article.sectorLinks.map(s => (
                         <Link key={s} href="/settori">

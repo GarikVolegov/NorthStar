@@ -456,7 +456,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export default function ValidatoreIdea() {
+export default function IdeaPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();

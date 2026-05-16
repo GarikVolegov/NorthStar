@@ -19,7 +19,7 @@ export function SavedItems() {
       <CardContent className="space-y-4">
         {savedSectors.length > 0 && (
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Settori</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Aree</p>
             <div className="space-y-2">
               {savedSectors.map((f) => (
                 <div key={f.id} className="flex items-center justify-between gap-3 rounded-xl border p-3">

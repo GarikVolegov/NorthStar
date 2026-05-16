@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import {
@@ -20,6 +20,7 @@ import {
   Compass,
   MapPin,
   HandCoins,
+  Search,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,8 +37,12 @@ import { LoginDialog } from "@/components/auth/LoginDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useReducedMotion } from "@/lib/motion";
+import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES, STORAGE_KEY } from "@/i18n";
+import { SearchDialog } from "@/components/search/SearchDialog";
+import { useWendy } from "@/contexts/WendyProvider";
+import { NAV_LABELS } from "@/lib/constants";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -116,56 +121,82 @@ export function Navbar() {
   const [location] = useLocation();
   const [pendingFriends, setPendingFriends] = useState<number | null>(null);
   const prefersReduced = useReducedMotion();
+  const search = useGlobalSearch();
+  const wendy = useWendy();
+  const [newsTitles, setNewsTitles] = useState<string[]>([]);
 
   const phase: NavPhase = !isLoggedIn ? 'guest'
     : !user?.journeyType ? 'new-user'
     : ['indeciso', 'dipendente', 'autonomo', 'azienda', 'investitore'].includes(user.journeyType) ? user.journeyType as NavPhase
     : 'new-user';
 
+  const JOURNEY_CATEGORIES: Record<string, string[]> = {
+    guest: ["technology", "business", "education"],
+    "new-user": ["technology", "education", "general"],
+    indeciso: ["education", "technology", "general"],
+    dipendente: ["technology", "business", "education"],
+    autonomo: ["business", "technology", "finance"],
+    azienda: ["business", "finance", "technology"],
+    investitore: ["finance", "business", "technology"],
+  };
+
+  useEffect(() => {
+    const cats = (JOURNEY_CATEGORIES[phase] ?? JOURNEY_CATEGORIES.guest).join(",");
+    const base = import.meta.env.BASE_URL || "/";
+    fetch(`${base}api/news?multi=true&categories=${cats}&perCategory=2`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.news?.length) {
+          setNewsTitles(data.news.map((n: { title: string }) => n.title));
+        }
+      })
+      .catch(() => {});
+  }, [phase]);
+
   const PHASE_LINKS: Record<NavPhase, Array<{ href: string; label: string; icon: LucideIcon }>> = {
     guest: [
-      { href: "/chi-siamo", label: "Chi siamo", icon: Users },
-      { href: "/come-funziona", label: "Come funziona", icon: BookOpenText },
-      { href: "/test", label: t("nav.test"), icon: FlaskConical },
-      { href: "/settori", label: t("nav.sectors"), icon: Layers },
+      { href: "/chi-siamo", label: NAV_LABELS.chiSiamo, icon: Users },
+      { href: "/come-funziona", label: NAV_LABELS.comeFunziona, icon: BookOpenText },
+      { href: "/test", label: NAV_LABELS.test, icon: FlaskConical },
+      { href: "/settori", label: NAV_LABELS.aree, icon: Layers },
     ],
     "new-user": [
-      { href: "/test", label: t("nav.test"), icon: FlaskConical },
-      { href: "/settori", label: t("nav.sectors"), icon: Layers },
-      { href: "/percorso", label: "Il mio percorso", icon: MapPin },
+      { href: "/test", label: NAV_LABELS.test, icon: FlaskConical },
+      { href: "/settori", label: NAV_LABELS.aree, icon: Layers },
+      { href: "/percorso", label: NAV_LABELS.piano, icon: MapPin },
     ],
     indeciso: [
-      { href: "/test", label: t("nav.test"), icon: FlaskConical },
-      { href: "/settori", label: t("nav.sectors"), icon: Layers },
-      { href: "/ruoli", label: "Ruoli", icon: Briefcase },
-      { href: "/lavori", label: "Lavori", icon: MapPin },
+      { href: "/test", label: NAV_LABELS.test, icon: FlaskConical },
+      { href: "/settori", label: NAV_LABELS.aree, icon: Layers },
+      { href: "/ruoli", label: NAV_LABELS.lavori, icon: Briefcase },
+      { href: "/lavori", label: NAV_LABELS.offerte, icon: MapPin },
     ],
     dipendente: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/lavori", label: "Lavori", icon: MapPin },
-      { href: "/coach", label: "Coach AI", icon: BrainCircuit },
-      { href: "/crescita", label: t("nav.growth"), icon: BookOpenText },
+      { href: "/dashboard", label: NAV_LABELS.dashboard, icon: LayoutDashboard },
+      { href: "/lavori", label: NAV_LABELS.offerte, icon: MapPin },
+      { href: "/coach", label: NAV_LABELS.coach, icon: BrainCircuit },
+      { href: "/crescita", label: NAV_LABELS.crescita, icon: BookOpenText },
     ],
     autonomo: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/validatore-idea", label: "Validatore", icon: Compass },
-      { href: "/coach", label: "Coach AI", icon: BrainCircuit },
-      { href: "/settori", label: t("nav.sectors"), icon: Layers },
-      { href: "/news", label: t("nav.news"), icon: Newspaper },
+      { href: "/dashboard", label: NAV_LABELS.dashboard, icon: LayoutDashboard },
+      { href: "/validatore-idea", label: NAV_LABELS.idea, icon: Compass },
+      { href: "/coach", label: NAV_LABELS.coach, icon: BrainCircuit },
+      { href: "/settori", label: NAV_LABELS.aree, icon: Layers },
+      { href: "/news", label: NAV_LABELS.news, icon: Newspaper },
     ],
     azienda: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/settori", label: t("nav.sectors"), icon: Layers },
-      { href: "/affiliazione", label: "Affiliazione", icon: HandCoins },
-      { href: "/crescita", label: t("nav.growth"), icon: BookOpenText },
-      { href: "/news", label: t("nav.news"), icon: Newspaper },
+      { href: "/dashboard", label: NAV_LABELS.dashboard, icon: LayoutDashboard },
+      { href: "/settori", label: NAV_LABELS.aree, icon: Layers },
+      { href: "/affiliazione", label: NAV_LABELS.partner, icon: HandCoins },
+      { href: "/crescita", label: NAV_LABELS.crescita, icon: BookOpenText },
+      { href: "/news", label: NAV_LABELS.news, icon: Newspaper },
     ],
     investitore: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/settori", label: t("nav.sectors"), icon: Layers },
-      { href: "/archivio", label: "Grafo", icon: Compass },
-      { href: "/news", label: t("nav.news"), icon: Newspaper },
-      { href: "/crescita", label: t("nav.growth"), icon: BookOpenText },
+      { href: "/dashboard", label: NAV_LABELS.dashboard, icon: LayoutDashboard },
+      { href: "/settori", label: NAV_LABELS.aree, icon: Layers },
+      { href: "/archivio", label: NAV_LABELS.mappa, icon: Compass },
+      { href: "/news", label: NAV_LABELS.news, icon: Newspaper },
+      { href: "/crescita", label: NAV_LABELS.crescita, icon: BookOpenText },
     ],
   };
 
@@ -199,23 +230,149 @@ export function Navbar() {
   return (
     <LazyMotion features={domAnimation} strict>
       <m.header
-        className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4"
-        initial={prefersReduced ? {} : { y: -80, opacity: 0 }}
+        className="fixed bottom-4 left-0 right-0 z-40 flex justify-center px-4"
+        initial={prefersReduced ? {} : { y: 80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       >
-        <div className="pill-nav flex items-center h-11 md:h-13 px-1.5 md:px-2 gap-0.5 md:gap-1 w-full max-w-3xl">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 shrink-0 px-2 mr-1">
-            <img
-              src="/logo.svg"
-              alt="NorthStar"
-              className="h-7 w-7 rounded-full object-cover"
-            />
-            <span className="font-bold text-sm tracking-tight text-foreground hidden sm:block">
+        <div className="pill-nav flex items-center h-10 md:h-11 px-1 gap-0.5 w-full max-w-5xl">
+          {/* Logo — link to dashboard */}
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-1.5 shrink-0 px-1.5"
+          >
+            <div className="relative">
+              <img
+                src="/logo.svg"
+                alt="NorthStar"
+                className="h-7 w-7 rounded-full object-cover"
+                style={{
+                  filter: location === "/dashboard" || location.startsWith("/dashboard/")
+                    ? "brightness(0) saturate(100%) sepia(60%) hue-rotate(5deg) brightness(85%)"
+                    : "none",
+                  opacity: location === "/dashboard" || location.startsWith("/dashboard/")
+                    ? 1
+                    : 0.85,
+                }}
+              />
+              {(location === "/dashboard" || location.startsWith("/dashboard/")) && (
+                <m.div
+                  className="absolute -inset-1.5 rounded-full blur-sm opacity-40"
+                  style={{
+                    background: "conic-gradient(from 0deg, #c19e4a, #7db89a, #5a9fd4, #9b80cc, #d96e66, #c19e4a)",
+                  }}
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                />
+              )}
+            </div>
+            <span
+              className={`font-bold text-sm tracking-tight hidden sm:block transition-colors duration-200 ${
+                location === "/dashboard" || location.startsWith("/dashboard/")
+                  ? "text-primary"
+                  : "text-foreground"
+              }`}
+            >
               NorthStar
             </span>
           </Link>
+
+          {/* Scrolling news ticker — clickable, fills space between logo and search */}
+          <Link
+            href="/news"
+            className="hidden md:flex items-center gap-1 flex-1 min-w-0 overflow-hidden hover:opacity-80 transition-opacity ml-1"
+          >
+            <Newspaper className="h-2.5 w-2.5 shrink-0 text-primary hidden sm:block" />
+            <div className="relative overflow-hidden w-full h-4">
+              <m.div
+                className="absolute whitespace-nowrap flex text-[10px] sm:text-[11px] leading-none text-muted-foreground font-medium"
+                animate={newsTitles.length > 0 ? { x: ["0%", "-50%"] } : {}}
+                transition={{
+                  duration: 35,
+                  repeat: Infinity,
+                  ease: "linear",
+                }}
+              >
+                <span className="flex gap-6 shrink-0">
+                  {newsTitles.length > 0
+                    ? newsTitles.map((t, i) => (
+                        <span key={i} className="flex items-center gap-1.5">
+                          <span className="w-1 h-1 rounded-full bg-primary/50 shrink-0" />
+                          <span className="truncate max-w-[180px] sm:max-w-[280px]">{t}</span>
+                        </span>
+                      ))
+                    : "Caricamento notizie..."}
+                </span>
+                <span className="flex gap-6 shrink-0">
+                  {newsTitles.length > 0
+                    ? newsTitles.map((t, i) => (
+                        <span key={i} className="flex items-center gap-1.5">
+                          <span className="w-1 h-1 rounded-full bg-primary/50 shrink-0" />
+                          <span className="truncate max-w-[180px] sm:max-w-[280px]">{t}</span>
+                        </span>
+                      ))
+                    : "Caricamento notizie..."}
+                </span>
+              </m.div>
+            </div>
+          </Link>
+
+          {/* Search trigger */}
+          <div className="hidden md:flex flex-[2] items-center px-3">
+            <button
+              onClick={() => search.setIsOpen(true)}
+              className="relative w-full group"
+            >
+              <div className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none z-10">
+                {wendy.phase === 'thinking' || wendy.phase === 'speaking' ? (
+                  <m.div
+                    className="h-5 w-5 rounded-full"
+                    style={{
+                      background: "conic-gradient(from 0deg, #c19e4a, #7db89a, #5a9fd4, #9b80cc, #d96e66, #c19e4a)",
+                      WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px))",
+                      mask: "radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px))",
+                    }}
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  />
+                ) : (
+                  <img
+                    src="/logo.svg"
+                    alt=""
+                    className="h-5 w-5 rounded-full object-cover opacity-30"
+                  />
+                )}
+              </div>
+              {wendy.phase === 'thinking' || wendy.phase === 'speaking' ? (
+                <>
+                  <m.div
+                    className="absolute inset-0 rounded-full opacity-40 blur-md"
+                    style={{
+                      background: "conic-gradient(from 0deg, #c19e4a, #7db89a, #5a9fd4, #9b80cc, #d96e66, #c19e4a)",
+                    }}
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                  />
+                  <m.div
+                    className="absolute inset-0 rounded-full"
+                    style={{
+                      background: "conic-gradient(from 0deg, #c19e4a, #7db89a, #5a9fd4, #9b80cc, #d96e66, #c19e4a)",
+                      WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px))",
+                      mask: "radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px))",
+                    }}
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                  />
+                </>
+              ) : null}
+              <span className={`flex items-center w-full pl-9 pr-4 py-2 rounded-full bg-white/5 border text-sm text-muted-foreground/50 text-left transition-all group-hover:bg-white/10 group-hover:border-white/20 ${wendy.isOpen ? 'border-primary/30' : 'border-white/10'} ${wendy.phase === 'thinking' || wendy.phase === 'speaking' ? 'border-transparent' : ''}`}>
+                <span className="flex-1">{t("search.placeholder")}</span>
+                <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono font-medium text-muted-foreground">
+                  ⌘K
+                </kbd>
+              </span>
+            </button>
+          </div>
 
           {/* Desktop nav links */}
           <nav className="hidden md:flex items-center gap-0.5 flex-1 justify-center">
@@ -228,7 +385,7 @@ export function Navbar() {
                   href={href}
                   onMouseEnter={() => prefetchRoute(href)}
                   onFocus={() => prefetchRoute(href)}
-                  className={`relative text-xs font-semibold tracking-wide px-3 py-1.5 rounded-full transition-all duration-200 uppercase whitespace-nowrap ${
+                  className={`relative text-xs font-semibold tracking-wide px-2.5 py-1 rounded-full transition-all duration-200 uppercase whitespace-nowrap ${
                     isActive
                       ? "text-primary bg-primary/10"
                       : "text-muted-foreground hover:text-foreground hover:bg-white/5"
@@ -241,11 +398,11 @@ export function Navbar() {
           </nav>
 
           {/* Right actions */}
-          <div className="hidden md:flex items-center gap-1.5 ml-auto">
+          <div className="hidden md:flex items-center gap-1 ml-auto">
             {/* Language pill */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-1 text-xs font-semibold border border-white/10 rounded-full px-2.5 py-1 text-muted-foreground hover:text-foreground hover:border-white/20 transition-all">
+                <button className="flex items-center gap-1 text-xs font-semibold border border-white/10 rounded-full px-2 py-0.5 text-muted-foreground hover:text-foreground hover:border-white/20 transition-all">
                   <Globe className="h-3 w-3" />
                   {currentLang}
                 </button>
@@ -276,7 +433,7 @@ export function Navbar() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <m.button
-                      className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary/40 hover:bg-primary/5 transition-all"
+                      className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-semibold text-foreground hover:border-primary/40 hover:bg-primary/5 transition-all"
                       onMouseEnter={() => {
                         prefetchRoute("/profilo");
                         prefetchRoute("/percorso");
@@ -347,16 +504,16 @@ export function Navbar() {
                       onMouseEnter={() => prefetchRoute("/coach")}
                       className="cursor-pointer"
                     >
-                      <BrainCircuit className="h-4 w-4 mr-2" /> Consulente AI
+                      <BrainCircuit className="h-4 w-4 mr-2" /> {NAV_LABELS.coach}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setLocation("/validatore-idea")}
                       onMouseEnter={() => prefetchRoute("/validatore-idea")}
                       className="cursor-pointer"
                     >
-                      <Compass className="h-4 w-4 mr-2" /> Validatore Idea
+                      <Compass className="h-4 w-4 mr-2" /> {NAV_LABELS.idea}
                     </DropdownMenuItem>
-                    {/* ── Fase 4: Dashboard Affiliazione ── */}
+                    {/* Partner */}
                     {isAffiliate && (
                       <>
                         <DropdownMenuSeparator />
@@ -367,8 +524,7 @@ export function Navbar() {
                           }
                           className="cursor-pointer text-primary focus:text-primary"
                         >
-                          <HandCoins className="h-4 w-4 mr-2" /> Dashboard
-                          Affiliazione
+                          <HandCoins className="h-4 w-4 mr-2" /> {NAV_LABELS.partner}
                         </DropdownMenuItem>
                       </>
                     )}
@@ -391,7 +547,7 @@ export function Navbar() {
                   {t("nav.login")}
                 </button>
                 <Link href="/test" onMouseEnter={() => prefetchRoute("/test")}>
-                  <div className="flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full px-4 py-1.5 hover:bg-primary/90 transition-colors">
+                  <div className="flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full px-3 py-1 hover:bg-primary/90 transition-colors">
                     {t("nav.startJourney")}
                   </div>
                 </Link>
@@ -399,8 +555,18 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Mobile right */}
-          <div className="flex md:hidden items-center gap-1.5 ml-auto">
+          {/* Mobile search + right */}
+          <div className="flex md:hidden items-center gap-1 flex-1 justify-end">
+            <div className="relative flex-1 max-w-[160px] sm:max-w-[220px]">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                <img src="/logo.svg" alt="" className="h-4 w-4 rounded-full object-cover opacity-40" />
+              </span>
+              <input
+                type="text"
+                placeholder="Cerca..."
+                className="w-full pl-8 pr-2.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary focus:bg-white/10 transition-all"
+              />
+            </div>
             {isLoggedIn && user && <NotificationBell userId={user.id} />}
 
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
@@ -440,29 +606,29 @@ export function Navbar() {
                 className="w-72 p-0 flex flex-col bg-card border-border"
               >
                 <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-                  <Link
-                    href="/"
-                    onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-2"
-                  >
-                    <img
-                      src="/logo.svg"
-                      alt="NorthStar"
-                      className="h-7 w-7 rounded-full object-cover"
-                    />
-                    <span className="font-bold text-sm text-foreground">
-                      NorthStar
-                    </span>
-                  </Link>
-                  <button
-                    onClick={() => setMenuOpen(false)}
-                    className="p-1 rounded-full hover:bg-muted transition-colors"
-                  >
-                    <X className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                </div>
+                <Link
+                  href="/"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2"
+                >
+                  <img
+                    src="/logo.svg"
+                    alt="NorthStar"
+                    className="h-7 w-7 rounded-full object-cover"
+                  />
+                  <span className="font-bold text-sm text-foreground">
+                    NorthStar
+                  </span>
+                </Link>
+                <button
+                  onClick={() => setMenuOpen(false)}
+                  className="p-1 rounded-full hover:bg-muted transition-colors"
+                >
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
 
-                <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+              <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
                   {navLinks.map(({ href, label, icon: Icon }, i) => {
                     const isActive = location === href;
                     return (
@@ -561,7 +727,7 @@ export function Navbar() {
                         onMouseEnter={() => prefetchRoute("/percorso")}
                         className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-primary hover:text-foreground hover:bg-primary/5 transition-colors font-semibold"
                       >
-                        <MapPin className="h-4 w-4" /> Il mio percorso
+                        <MapPin className="h-4 w-4" /> {NAV_LABELS.piano}
                       </button>
                       <button
                         onClick={() => {
@@ -571,7 +737,7 @@ export function Navbar() {
                         onMouseEnter={() => prefetchRoute("/validatore-idea")}
                         className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
                       >
-                        <Compass className="h-4 w-4" /> Validatore Idea
+                        <Compass className="h-4 w-4" /> {NAV_LABELS.idea}
                       </button>
                       <button
                         onClick={() => {
@@ -588,7 +754,7 @@ export function Navbar() {
                           </span>
                         )}
                       </button>
-                      {/* ── Fase 4: Dashboard Affiliazione (mobile) ── */}
+                      {/* Partner (mobile) */}
                       {isAffiliate && (
                         <button
                           onClick={() => {
@@ -600,8 +766,7 @@ export function Navbar() {
                           }
                           className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-primary hover:text-foreground hover:bg-primary/5 transition-colors font-semibold"
                         >
-                          <HandCoins className="h-4 w-4" /> Dashboard
-                          Affiliazione
+                          <HandCoins className="h-4 w-4" /> {NAV_LABELS.partner}
                         </button>
                       )}
                       <button
@@ -642,10 +807,20 @@ export function Navbar() {
         </div>
       </m.header>
 
-      {/* Spacer */}
-      <div className="h-20" />
-
       <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
+      <SearchDialog
+        query={search.query}
+        setQuery={search.setQuery}
+        results={search.results}
+        suggestions={search.suggestions}
+        route={search.route}
+        hasSemantic={search.hasSemantic}
+        isLoading={search.isLoading}
+        isOpen={search.isOpen}
+        setIsOpen={search.setIsOpen}
+        close={search.close}
+        trackClick={search.trackClick}
+      />
     </LazyMotion>
   );
 }

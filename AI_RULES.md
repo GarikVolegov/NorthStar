@@ -12,8 +12,8 @@
 
 ```typescript
 // ❌ SBAGLIATO — API key in console.log
-console.log('Inizializzo OpenAI con key:', process.env.OPENAI_API_KEY);
-console.log('Config AI:', { apiKey: openai.apiKey, model: 'gpt-4o' });
+// console.log('Inizializzo OpenAI con key:', process.env.OPENAI_API_KEY); // PROIBITO - mai loggare chiavi API
+// console.log('Config AI:', { apiKey: openai.apiKey, model: 'gpt-4o' }); // PROIBITO - oggetto con API key
 
 // ❌ SBAGLIATO — API key loggata da Pino (automatico su oggetti)
 logger.info({ config: openai }, 'Client OpenAI inizializzato'); // openai include la key!
@@ -177,8 +177,8 @@ Definiti in `packages/ai-server/src/feature-flags.ts`:
 
 | Flag | Default | Descrizione |
 |---|---|---|
-| `FF_PARALLEL_HANDOFF` | false | Dispatch multi-specialista parallelo |
-| `FF_GENERATIVE_UI` | false | Generazione UI tools (roadmap, grafi) |
+| `FF_PARALLEL_HANDOFF` | true | Dispatch multi-specialista parallelo |
+| `FF_GENERATIVE_UI` | true | Generazione UI tools (roadmap, grafi) |
 | `FF_CHAIN_OF_THOUGHT` | true | Ragionamento strutturato CoT |
 | `FF_SUPERVISOR` | true | Quality gate supervisor post-generazione |
 | `FF_MEMORY` | true | Memoria persistente utente |

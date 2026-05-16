@@ -20,6 +20,7 @@ export const businessIdeasTable = pgTable("business_ideas", {
   incubatorData: jsonb("incubator_data").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
 export type BusinessIdea = typeof businessIdeasTable.$inferSelect;

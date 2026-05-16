@@ -1,13 +1,14 @@
 /**
- * LLM Provider abstraction — supports OpenAI and Groq backends.
+ * LLM Provider abstraction — supports OpenAI, Groq and OpenRouter backends.
  *
  * Usage:
  *   const llm = getLLM();
  *   const stream = llm.chat(messages, { model: "gpt-4o-mini", temperature: 0.1 });
  *
  * Provider selection (first match):
- *   1. AI_PROVIDER=groq → Groq (requires GROQ_API_KEY)
- *   2. default → OpenAI (requires AI_INTEGRATIONS_OPENAI_*)
+ *   1. AI_PROVIDER=openrouter → OpenRouter (requires OPENROUTER_API_KEY)
+ *   2. AI_PROVIDER=groq → Groq (requires GROQ_API_KEY)
+ *   3. default → OpenAI (requires AI_INTEGRATIONS_OPENAI_*)
  */
 
 import OpenAI from "openai";
@@ -202,6 +203,72 @@ function createGroqProvider(): LLMProvider {
   };
 }
 
+// ── OpenRouter Provider ──────────────────────────────────────────
+
+function createOpenRouterProvider(): LLMProvider {
+  const baseURL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1";
+  const apiKey = process.env.OPENROUTER_API_KEY || "";
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY must be set when AI_PROVIDER=openrouter");
+  }
+  const client = new OpenAI({ apiKey, baseURL });
+
+  return {
+    async chat(messages, config = {}) {
+      const stream = await pRetry(
+        () => withTimeout(
+          client.chat.completions.create({
+            model: config.model ?? process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free",
+            messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+            stream: true,
+            temperature: config.temperature ?? 0.7,
+            max_tokens: config.maxTokens ?? 800,
+          }),
+          CHAT_TIMEOUT,
+          "openrouter chat stream",
+        ),
+        {
+          retries: 2,
+          onFailedAttempt: (err) => {
+            logger.warn({ err, attempt: err.attemptNumber }, "OpenRouter chat retry");
+          },
+        },
+      );
+
+      return {
+        async *[Symbol.asyncIterator]() {
+          for await (const chunk of stream) {
+            const delta = chunk.choices[0]?.delta?.content;
+            if (delta) yield delta;
+          }
+        },
+      };
+    },
+
+    async chatOnce(messages, config = {}) {
+      const res = await pRetry(
+        () => withTimeout(
+          client.chat.completions.create({
+            model: config.model ?? process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free",
+            messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+            temperature: config.temperature ?? 0.7,
+            max_tokens: config.maxTokens ?? 800,
+          }),
+          CHAT_ONCE_TIMEOUT,
+          "openrouter chatOnce",
+        ),
+        {
+          retries: 2,
+          onFailedAttempt: (err) => {
+            logger.warn({ err, attempt: err.attemptNumber }, "OpenRouter chatOnce retry");
+          },
+        },
+      );
+      return res.choices[0]?.message?.content ?? "";
+    },
+  };
+}
+
 // ── Singleton ──────────────────────────────────────────────────────
 
 let _provider: LLMProvider | null = null;
@@ -212,6 +279,9 @@ export function getLLM(): LLMProvider {
   const provider = (process.env.AI_PROVIDER ?? "openai").toLowerCase();
 
   switch (provider) {
+    case "openrouter":
+      _provider = createOpenRouterProvider();
+      break;
     case "groq":
       _provider = createGroqProvider();
       break;

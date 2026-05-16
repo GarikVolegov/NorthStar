@@ -52,6 +52,7 @@ export const coachMemoryFactsTable = pgTable(
     confirmedCount: integer("confirmed_count").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => ({
     userKeyUnique: uniqueIndex("coach_memory_facts_user_key").on(t.userId, t.key),
@@ -78,6 +79,7 @@ export const coachMemoryPatternsTable = pgTable(
     sessionIds: integer("session_ids").array().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => ({
     userIdx: index("coach_memory_patterns_user_idx").on(t.userId),

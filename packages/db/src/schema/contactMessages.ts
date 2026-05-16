@@ -8,6 +8,7 @@ export const contactMessagesTable = pgTable("contact_messages", {
   message: text("message").notNull(),
   read: boolean("read").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
 export type ContactMessage = typeof contactMessagesTable.$inferSelect;

@@ -1,10 +1,12 @@
 import { pgTable, serial, text, timestamp, real, index } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { vector } from "../custom-types";
 
 export const newsArticlesTable = pgTable(
   "news_articles",
   {
     id: serial("id").primaryKey(),
+    embedding: vector("embedding", { dimensions: 1536 }),
     title: text("title").notNull(),
     url: text("url").notNull().unique(),
     urlHash: text("url_hash").notNull().unique(),

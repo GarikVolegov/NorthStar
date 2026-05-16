@@ -4,6 +4,8 @@ import { z } from "zod/v4";
 import { db, coachSessionsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { getLLM } from "@workspace/ai-server/llm/client";
+import { wendyLimiter, wendyIpLimiter, planQuotaLimiter } from "../middleware/rate-limit";
+import { recordLlmUsage, estimateTokens, selectModel } from "@workspace/ai-server";
 
 const router = Router();
 
@@ -109,7 +111,7 @@ router.delete("/sessions/:id", requireAuth, async (req, res) => {
 });
 
 // ── ASK (SSE streaming) ──────────────────────────────────────
-router.post("/sessions/:id/ask", requireAuth, async (req, res) => {
+router.post("/sessions/:id/ask", requireAuth, wendyLimiter, wendyIpLimiter, planQuotaLimiter, async (req, res) => {
   const userId = req.user!.id;
   const id = parseInt(req.params.id);
   const data = askSchema.parse(req.body);
@@ -155,13 +157,21 @@ router.post("/sessions/:id/ask", requireAuth, async (req, res) => {
 
   try {
     const llm = getLLM();
+    const route = selectModel({
+      isPremium: !!req.user?.stripeSubscriptionId,
+      complexity: data.message.length > 500 ? "deep" : "standard",
+    });
+
+    const promptText = systemContent + "\n\n" + data.message;
+    const promptTokens = estimateTokens(promptText);
+
     const stream = await llm.chat(
       [
         { role: "system" as const, content: systemContent },
         ...history.slice(-20),
         { role: "user" as const, content: data.message },
       ],
-      { model: "gpt-4o-mini", temperature: 0.72, maxTokens: 800 },
+      { model: route.model, temperature: route.temperature, maxTokens: route.maxTokens },
     );
 
     const tokenBuffer: string[] = [];
@@ -171,6 +181,17 @@ router.post("/sessions/:id/ask", requireAuth, async (req, res) => {
     }
 
     const fullResponse = tokenBuffer.join("");
+    const completionTokens = estimateTokens(fullResponse);
+
+    recordLlmUsage({
+      userId,
+      model: route.model,
+      promptTokens,
+      completionTokens,
+      requestType: "coach_chat",
+      endpoint: "coach/sessions/:id/ask",
+      metadata: JSON.stringify({ sessionId: id, routeReason: route.reason }),
+    }).catch((err) => log.warn({ err }, "failed to record LLM usage"));
 
     // ── Save messages to session ─────────────────────────────
     const updatedMessages = [

@@ -5,7 +5,14 @@
  * Chunks by paragraph with overlap so long documents don't lose context
  * at boundaries.
  */
-import { openai } from "../client";
+import { OpenAI } from "openai";
+
+function getClient(): OpenAI {
+  return new OpenAI({
+    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1",
+    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || "",
+  });
+}
 
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const EMBEDDING_DIMS = 1536;
@@ -27,9 +34,10 @@ export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERL
 
 /** Embed a single string → number[] */
 export async function embedText(text: string): Promise<number[]> {
-  const res = await openai.embeddings.create({
+  const client = getClient();
+  const res = await client.embeddings.create({
     model: EMBEDDING_MODEL,
-    input: text.slice(0, 8000), // safety trim
+    input: text.slice(0, 8000),
   });
   return res.data[0].embedding;
 }
@@ -37,10 +45,11 @@ export async function embedText(text: string): Promise<number[]> {
 /** Embed multiple strings in batches of 100 */
 export async function embedBatch(texts: string[]): Promise<number[][]> {
   const BATCH = 100;
+  const client = getClient();
   const results: number[][] = [];
   for (let i = 0; i < texts.length; i += BATCH) {
     const batch = texts.slice(i, i + BATCH);
-    const res = await openai.embeddings.create({
+    const res = await client.embeddings.create({
       model: EMBEDDING_MODEL,
       input: batch,
     });

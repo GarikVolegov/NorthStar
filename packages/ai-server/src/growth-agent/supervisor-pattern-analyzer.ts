@@ -26,6 +26,7 @@
  *   import { runPatternAnalysis } from "./supervisor-pattern-analyzer";
  *   router.post("/admin/analyze-supervisor", adminOnly, () => runPatternAnalysis());
  */
+import { logger } from "../logger";
 import { openai } from "../client";
 import { db } from "../db/client";
 import { supervisorLogs } from "../db/schema";
@@ -41,7 +42,7 @@ export interface PatternProposal {
 
 export async function runPatternAnalysis(): Promise<PatternProposal | null> {
   if (!db) {
-    console.warn("[pattern-analyzer] DB not available, skipping.");
+    logger.warn("[pattern-analyzer] DB not available, skipping.");
     return null;
   }
 
@@ -54,11 +55,11 @@ export async function runPatternAnalysis(): Promise<PatternProposal | null> {
     .limit(200); // cap to avoid token overflow
 
   if (!logs.length) {
-    console.log("[pattern-analyzer] No rewrite logs in last 7 days. Nothing to analyze.");
+    logger.info("[pattern-analyzer] No rewrite logs in last 7 days. Nothing to analyze.");
     return null;
   }
 
-  console.log(`[pattern-analyzer] Analyzing ${logs.length} rewrite logs from last 7 days...`);
+  logger.info({ logCount: logs.length }, "[pattern-analyzer] Analyzing rewrite logs from last 7 days");
 
   // ── 2. Build compact batch for GPT-4o-mini ─────────────────────────────
   // Truncate drafts to 300 chars to keep prompt compact
@@ -121,20 +122,18 @@ Rispondi SOLO con JSON valido in questo formato:
       analyzedAt:           new Date().toISOString(),
     };
   } catch (err) {
-    console.error("[pattern-analyzer] GPT call failed:", err);
+    logger.error({ err }, "[pattern-analyzer] GPT call failed");
     return null;
   }
 
   // ── 4. Log proposal ───────────────────────────────────────────────────
-  console.log("\n=== SUPERVISOR PATTERN PROPOSAL ===");
-  console.log(`Analyzed: ${proposal.totalRewrites} rewrites | ${proposal.analyzedAt}`);
-  console.log("\nNew PLATITUDE_PATTERNS:");
-  proposal.newPlatitudePatterns.forEach((p) => console.log(`  /${p}/i`));
-  console.log("\nNew ACTION_PATTERNS:");
-  proposal.newActionPatterns.forEach((p) => console.log(`  /${p}/i`));
-  console.log("\nDominant failure reasons:");
-  proposal.dominantReasons.forEach((r) => console.log(`  - ${r}`));
-  console.log("==================================\n");
+  logger.info({
+    totalRewrites: proposal.totalRewrites,
+    analyzedAt: proposal.analyzedAt,
+    platitudePatterns: proposal.newPlatitudePatterns,
+    actionPatterns: proposal.newActionPatterns,
+    dominantReasons: proposal.dominantReasons,
+  }, "[pattern-analyzer] SUPERVISOR PATTERN PROPOSAL");
 
   // Optional: post to Slack if webhook is configured
   const slackUrl = process.env.SLACK_SUPERVISOR_WEBHOOK;
@@ -157,7 +156,7 @@ Rispondi SOLO con JSON valido in questo formato:
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ text }),
-    }).catch((e: unknown) => console.warn("[pattern-analyzer] Slack post failed:", e));
+    }).catch((e: unknown) => logger.warn({ err: e }, "[pattern-analyzer] Slack post failed"));
   }
 
   return proposal;
@@ -165,5 +164,5 @@ Rispondi SOLO con JSON valido in questo formato:
 
 // Allow running directly: npx tsx src/growth-agent/supervisor-pattern-analyzer.ts
 if (import.meta.url === `file://${process.argv[1]}`) {
-  runPatternAnalysis().then(() => process.exit(0)).catch(console.error);
+  runPatternAnalysis().then(() => process.exit(0)).catch((err) => logger.error({ err }, "[pattern-analyzer] run failed"));
 }

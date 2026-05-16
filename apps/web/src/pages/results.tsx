@@ -839,7 +839,7 @@ export default function Results() {
             emoji: "💼",
             title: "Trova offerte nel tuo settore",
             desc: "Esplora le posizioni aperte che corrispondono al tuo profilo RIASEC e al settore scelto.",
-            cta: "Vai ai Lavori",
+            cta: "Vai alle Offerte",
             href: "/lavori",
           },
           autonomo: {

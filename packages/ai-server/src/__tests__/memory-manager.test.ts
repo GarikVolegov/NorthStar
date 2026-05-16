@@ -130,7 +130,7 @@ describe("buildMemorySection", () => {
 
   it("includes facts section", () => {
     const result = buildMemorySection({
-      facts: [{ id: 1, userId: 1, key: "job", value: "dev", confirmedCount: 1, sourceSessionId: 1, createdAt: new Date(), updatedAt: new Date() }],
+      facts: [{ id: 1, userId: 1, key: "job", value: "dev", confirmedCount: 1, sourceSessionId: 1, createdAt: new Date(), updatedAt: new Date(), deletedAt: null }],
       patterns: [],
     });
     expect(result).toContain("Fatti biografici");
@@ -140,7 +140,7 @@ describe("buildMemorySection", () => {
   it("includes patterns section with confidence labels", () => {
     const result = buildMemorySection({
       facts: [],
-      patterns: [{ id: 1, userId: 1, patternType: "strength", description: "analitico", confidence: 0.7, observedCount: 2, sessionIds: [1], createdAt: new Date(), updatedAt: new Date() }],
+      patterns: [{ id: 1, userId: 1, patternType: "strength", description: "analitico", confidence: 0.7, observedCount: 2, sessionIds: [1], createdAt: new Date(), updatedAt: new Date(), deletedAt: null }],
     });
     expect(result).toContain("Pattern comportamentali");
     expect(result).toContain("media confidence");

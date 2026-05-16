@@ -220,7 +220,7 @@ function EducationForm({ initial, adminKey, onSaved, onCancel }: {
         </div>
         <ArrayField label="Step" value={steps} onChange={setSteps} />
         <ArrayField label="Sbocchi" value={careerOutcomes} onChange={setCareerOutcomes} />
-        <ArrayField label="Settori compatibili" value={sectorFit} onChange={setSectorFit} />
+        <ArrayField label="Aree compatibili" value={sectorFit} onChange={setSectorFit} />
         <div className="flex gap-2">
           <Button size="sm" onClick={save} disabled={saving || !path.trim()}>
             {saving ? <Loader2 size={13} className="animate-spin mr-1" /> : <Save size={13} className="mr-1" />}
@@ -318,7 +318,7 @@ function ListRow({ label, sub, active, onEdit, onDelete }: {
 }
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: "sectors", label: "Settori", icon: <Briefcase size={14} /> },
+  { id: "sectors", label: "Aree", icon: <Briefcase size={14} /> },
   { id: "professions", label: "Professioni", icon: <Users size={14} /> },
   { id: "education-paths", label: "Percorsi", icon: <GraduationCap size={14} /> },
   { id: "growth-articles", label: "Articoli Crescita", icon: <BookOpen size={14} /> },

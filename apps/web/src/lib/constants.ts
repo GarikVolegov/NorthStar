@@ -69,3 +69,157 @@ export const CONFRONTO_ACCENT = [
   colors.chart4,
   colors.chart3,
 ] as const;
+
+// Roadmap UI Text Constants
+export const ROADMAP_TEXT = {
+  // Header
+  header: {
+    title: "Roadmap personalizzata",
+    premiumBadge: "Premium",
+  },
+  
+  // Generate State
+  generateState: {
+    title: (sectorName: string) => `Tutti i percorsi verso ${sectorName}`,
+    description: [
+      "L'AI analizza il tuo profilo (test, preferenze, formazione) ed esplora i percorsi possibili",
+      "— laurea, ITS, bootcamp, apprendistato, autodidatta — confrontando vantaggi, svantaggi e costi.",
+    ],
+    button: "Esplora i percorsi",
+    error: {
+      aiUnavailable: "Servizio AI non disponibile. Riprova più tardi.",
+      invalidResponse: "Risposta dell'AI non valida. Riprova.",
+      emptyResponse: "Risposta dell'AI vuota. Riprova.",
+      networkError: "Errore di rete",
+    },
+  },
+  
+  // Loading State
+  loadingState: {
+    title: "Esplorando i percorsi possibili…",
+    progressLabel: (progress: number) => `${Math.round(progress)}%`,
+  },
+  
+  // Roadmap Content
+  content: {
+    // Profile Summary
+    profileSummary: {
+      title: "Il tuo profilo",
+    },
+    
+    // Path Selector
+    pathSelector: {
+      title: "Confronta i percorsi possibili",
+      alternativesCount: (count: number) => `${count} alternative analizzate`,
+    },
+    
+    // Recommendation Reason
+    recommendationReason: {
+      title: "Perché ti consigliamo questo percorso",
+    },
+    
+    // Selected Path Details
+    selectedPath: {
+      title: "Piano selezionato",
+      recommendedBadge: "Consigliato",
+      fitReason: {
+        title: "Adatto a te perché",
+        idealProfile: "Profilo ideale:",
+      },
+    },
+    
+    // Pros/Cons
+    prosCons: {
+      pros: "Vantaggi",
+      cons: "Svantaggi",
+    },
+    
+    // Phases
+    phases: {
+      title: "Le fasi di questo percorso",
+    },
+    
+    // Comparison
+    comparison: {
+      title: "Confronto onesto",
+    },
+    
+    // Alternative Formative Paths
+    alternativeFormativePaths: {
+      title: "Percorsi formativi laterali",
+      description: "Esperienze formative che rafforzano il tuo profilo, indipendentemente dal percorso principale che scegli.",
+    },
+    
+    // Salary Progression
+    salaryProgression: {
+      title: "Evoluzione salariale",
+    },
+    
+    // Top Roles
+    topRoles: {
+      title: "Lavori a cui puoi aspirare",
+    },
+    
+    // Key Tip
+    keyTip: {
+      title: "Consiglio chiave per te",
+    },
+    
+    // Regenerate Button
+    regenerateButton: "Rigenera la roadmap",
+  },
+  
+  // Authentication
+  auth: {
+    title: "Accesso richiesto",
+    description: "Registrati gratuitamente per generare la tua roadmap personalizzata.",
+    button: "Registrati gratis",
+  },
+  
+  // Phase Card
+  phaseCard: {
+    // Section Titles
+    sectionTitles: {
+      actions: "Azioni concrete",
+      resources: "Risorse consigliate",
+      milestone: "Traguardo",
+    },
+    
+    // Buttons
+    buttons: {
+      save: "Salva",
+      saving: "Salvataggio...",
+      cancel: "Annulla",
+    },
+    
+    // Phase Label
+    phaseLabel: (phaseNumber: number) => `Fase ${phaseNumber}`,
+  },
+};
+
+// Error Messages (can be used across the app)
+export const ERROR_MESSAGES = {
+  generic: {
+    saveFailed: "Impossibile salvare le modifiche. Riprova.",
+  },
+};
+
+// Navigation labels — vocabolario semplice e comprensibile
+export const NAV_LABELS = {
+  home: "Home",
+  test: "Test",
+  aree: "Aree",
+  lavori: "Offerte",
+  offerte: "Offerte",
+  piano: "Piano",
+  profilo: "Profilo",
+  coach: "Coach AI",
+  dashboard: "Dashboard",
+  idea: "Idea",
+  news: "News",
+  partner: "Partner",
+  mappa: "Mappa",
+  chiSiamo: "Chi siamo",
+  comeFunziona: "Come funziona",
+  crescita: "Crescita",
+} as const;

@@ -25,6 +25,7 @@ export const objectiveCommentsTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => ({
     // Fast fetch of all comments for a given objective

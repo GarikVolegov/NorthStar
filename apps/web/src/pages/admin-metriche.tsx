@@ -199,7 +199,7 @@ export default function AdminMetriche() {
             {metrics.topSectors.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Top Settori scelti</CardTitle>
+                  <CardTitle className="text-base">Top Aree scelte</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={200}>

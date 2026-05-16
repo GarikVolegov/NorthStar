@@ -198,7 +198,7 @@ export default function AdminHome() {
             <NavCard
               href="/admin/affiliazione"
               icon={<Users size={16} />}
-              title="Affiliazione"
+              title="Partner"
               description="Gestisci le richieste di affiliazione di scuole, università e agenzie"
             />
           </div>

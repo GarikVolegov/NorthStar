@@ -19,7 +19,7 @@ const JOURNEY_META: Record<JourneyId, JourneyMeta> = {
   dipendente:  { icon: TrendingUp,  headline: "Accelera la tua carriera",  subline: "Skill, colloqui e candidature mirate",   color: "text-growth",    bgColor: "bg-growth/10",    borderColor: "border-growth/30" },
   autonomo:    { icon: Rocket,      headline: "Scala la tua attività",     subline: "Idee, mercati e strategia",              color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30" },
   azienda:     { icon: Building2,   headline: "Trova i profili giusti",    subline: "Esplora, pubblica e assumi",             color: "text-growth",    bgColor: "bg-growth/10",    borderColor: "border-growth/30" },
-  investitore: { icon: BarChart3,   headline: "Analizza le opportunità",  subline: "Settori, trend e dati di mercato",        color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30" },
+  investitore: { icon: BarChart3,   headline: "Analizza le opportunità",  subline: "Aree, trend e dati di mercato",        color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30" },
 };
 
 interface Metrics {
@@ -30,8 +30,8 @@ interface Metrics {
 const PERSONA_METRICS: Record<string, (session: DashboardSession | null) => Metrics[]> = {
   indeciso: (s) => [
     { label: "Test", value: s ? "Completato" : "Da fare" },
-    { label: "Settori esplorati", value: s?.recommendations?.length ?? 0 },
-    { label: "Percorso", value: "Da scegliere" },
+    { label: "Aree esplorate", value: s?.recommendations?.length ?? 0 },
+    { label: "Piano", value: "Da scegliere" },
   ],
   dipendente: () => [
     { label: "Competenze", value: "0" },
@@ -40,16 +40,16 @@ const PERSONA_METRICS: Record<string, (session: DashboardSession | null) => Metr
   ],
   autonomo: () => [
     { label: "Idee validate", value: "0" },
-    { label: "Settori monitorati", value: "0" },
+    { label: "Aree monitorate", value: "0" },
     { label: "Strumenti usati", value: "0" },
   ],
   azienda: () => [
     { label: "Profili esplorati", value: "0" },
-    { label: "Settori analizzati", value: "21" },
+    { label: "Aree analizzate", value: "21" },
     { label: "Offerte pubblicate", value: "0" },
   ],
   investitore: () => [
-    { label: "Settori monitorati", value: "0" },
+    { label: "Aree monitorate", value: "0" },
     { label: "Report analizzati", value: "0" },
     { label: "Trend attivi", value: "0" },
   ],
@@ -80,7 +80,7 @@ export function DashboardHero({
                 <Icon className={cn("w-6 h-6", meta.color)} />
               </div>
               <div>
-                <p className="text-xs font-semibold text-white/50 uppercase tracking-wide">Percorso</p>
+                <p className="text-xs font-semibold text-white/50 uppercase tracking-wide">Piano</p>
                 <h2 className="font-bold text-white text-lg">{meta.headline}</h2>
                 <p className="text-xs text-white/60">{meta.subline}</p>
               </div>

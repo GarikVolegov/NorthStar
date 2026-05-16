@@ -17,9 +17,8 @@
  */
 
 import 'dotenv/config';
-import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
-import { Pool } from 'pg';
+import { db } from '@workspace/db';
 import * as crypto from 'crypto';
 
 // ─── Tipi minimi — evita dipendere dall'intero schema per non dover compilare ─
@@ -51,63 +50,62 @@ function hashPassword(plain: string): string {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
-  const pool = new Pool({ connectionString: DATABASE_URL });
-  const client = await pool.connect();
+  // Since we're using drizzle with neon/http, we need to execute raw queries differently
+  // For seed scripts, we'll use the db.execute method with raw SQL
+  
+  // Prende il primo settore disponibile (qualsiasi)
+  const sectorRes = await db.execute<{ id: number }[]>(
+    'SELECT id FROM sectors ORDER BY id LIMIT 1'
+  );
+  const sectorId: number | null = sectorRes[0]?.id ?? null;
 
-  try {
-    // Prende il primo settore disponibile (qualsiasi)
-    const sectorRes = await client.query(
-      'SELECT id FROM sectors ORDER BY id LIMIT 1'
+  const passwordHash = hashPassword(PASSWORD);
+
+  // Upsert utente base
+  const upsertRes = await db.execute<{ id: number }[]>(
+    `
+      INSERT INTO users
+        (email, password_hash, name, is_premium, is_affiliate, is_admin,
+         is_email_verified, sector_id, created_at, updated_at)
+      VALUES ($1, $2, $3, false, false, false, true, $4, NOW(), NOW())
+      ON CONFLICT (email) DO UPDATE SET
+        password_hash    = EXCLUDED.password_hash,
+        is_premium       = false,
+        is_affiliate     = false,
+        is_admin         = false,
+        is_email_verified= true,
+        sector_id        = EXCLUDED.sector_id,
+        updated_at       = NOW()
+      RETURNING id
+    `,
+    [EMAIL, passwordHash, 'E2E Test User', sectorId]
+  );
+
+  const userId: number = upsertRes[0].id;
+  console.log(`✅  Utente base upserted: ${EMAIL} (id=${userId})`);
+
+  // Cancella objectives precedenti e ricrea
+  await db.execute(
+    'DELETE FROM objectives WHERE user_id = $1',
+    [userId]
+  );
+
+  const objectives = [
+    { text: 'Diventare sviluppatore full-stack', category: 'skill',    progress: 30 },
+    { text: 'Trovare primo lavoro in tech',     category: 'career',   progress: 10 },
+    { text: 'Completare corso TypeScript',      category: 'learning', progress: 60 },
+  ];
+
+  for (const obj of objectives) {
+    await db.execute(
+      `INSERT INTO objectives (user_id, text, category, progress, created_at)
+       VALUES ($1, $2, $3, $4, NOW())`,
+      [userId, obj.text, obj.category, obj.progress]
     );
-    const sectorId: number | null = sectorRes.rows[0]?.id ?? null;
-
-    const passwordHash = hashPassword(PASSWORD);
-
-    // Upsert utente base
-    const upsertRes = await client.query(
-      `INSERT INTO users
-         (email, password_hash, name, is_premium, is_affiliate, is_admin,
-          is_email_verified, sector_id, created_at, updated_at)
-       VALUES ($1, $2, $3, false, false, false, true, $4, NOW(), NOW())
-       ON CONFLICT (email) DO UPDATE SET
-         password_hash    = EXCLUDED.password_hash,
-         is_premium       = false,
-         is_affiliate     = false,
-         is_admin         = false,
-         is_email_verified= true,
-         sector_id        = EXCLUDED.sector_id,
-         updated_at       = NOW()
-       RETURNING id`,
-      [EMAIL, passwordHash, 'E2E Test User', sectorId]
-    );
-
-    const userId: number = upsertRes.rows[0].id;
-    console.log(`✅  Utente base upserted: ${EMAIL} (id=${userId})`);
-
-    // Cancella objectives precedenti e ricrea
-    await client.query('DELETE FROM objectives WHERE user_id = $1', [userId]);
-
-    const objectives = [
-      { text: 'Diventare sviluppatore full-stack', category: 'skill',    progress: 30 },
-      { text: 'Trovare primo lavoro in tech',     category: 'career',   progress: 10 },
-      { text: 'Completare corso TypeScript',      category: 'learning', progress: 60 },
-    ];
-
-    for (const obj of objectives) {
-      await client.query(
-        `INSERT INTO objectives (user_id, text, category, progress, created_at)
-         VALUES ($1, $2, $3, $4, NOW())`,
-        [userId, obj.text, obj.category, obj.progress]
-      );
-    }
-
-    console.log(`✅  Objectives creati: ${objectives.length}`);
-    console.log(`ℹ️   sectorId assegnato: ${sectorId ?? 'null (tabella sectors vuota)'}`);
-
-  } finally {
-    client.release();
-    await pool.end();
   }
+
+  console.log(`✅  Objectives creati: ${objectives.length}`);
+  console.log(`ℹ️   sectorId assegnato: ${sectorId ?? 'null (tabella sectors vuota)'}`);
 }
 
 main().catch((err) => {

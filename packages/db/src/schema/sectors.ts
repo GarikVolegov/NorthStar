@@ -13,11 +13,13 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { vector } from "../custom-types";
 
 export const sectorsTable = pgTable("sectors", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description").notNull(),
+  embedding: vector("embedding", { dimensions: 1536 }),
   // FIXED: json → jsonb (enables GIN index, @> operator, faster reads)
   riasecTypes: jsonb("riasec_types").$type<string[]>().notNull().default([]),
   skills: jsonb("skills").$type<string[]>().notNull().default([]),

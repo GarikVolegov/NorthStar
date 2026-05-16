@@ -233,7 +233,7 @@ export default function Coach() {
       <aside className="w-64 border-r bg-muted/20 flex flex-col shrink-0 hidden md:flex">
         <div className="p-4 border-b flex items-center gap-2">
           <BrainCircuit className="w-5 h-5 text-primary" />
-          <span className="font-semibold text-sm">Consulente AI</span>
+          <span className="font-semibold text-sm">Coach AI</span>
           <Badge variant="outline" className="ml-auto text-xs">Beta</Badge>
         </div>
 

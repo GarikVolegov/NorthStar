@@ -1,9 +1,11 @@
 import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { vector } from "../custom-types";
 
 export const growthArticlesTable = pgTable("growth_articles", {
   id:                 serial("id").primaryKey(),
   title:              text("title").notNull(),
+  embedding:          vector("embedding", { dimensions: 1536 }),
   slug:               text("slug").notNull().unique(),
   category:           text("category").notNull(),
   subcategory:        text("subcategory"),

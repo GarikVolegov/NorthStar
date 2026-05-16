@@ -2,6 +2,7 @@ import { type Request, type Response, type NextFunction } from "express";
 import jwt from "jsonwebtoken";
 const { verify } = jwt;
 import { pool } from "@workspace/db";
+import { rootLogger } from "./logger";
 
 declare global {
   namespace Express {
@@ -22,7 +23,7 @@ declare global {
 
 const JWT_SECRET: string = process.env.JWT_SECRET ?? "";
 if (!JWT_SECRET) {
-  console.error("[auth] JWT_SECRET not configured — cannot authenticate");
+  rootLogger.fatal("[auth] JWT_SECRET not configured — cannot authenticate");
   process.exit(1);
 }
 

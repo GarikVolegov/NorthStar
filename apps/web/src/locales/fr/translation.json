@@ -55,6 +55,7 @@
     "seeAll": "Voir tout",
     "goBack": "Retour",
     "search": "Rechercher",
+    "searching": "Recherche...",
     "filter": "Filtrer",
     "clearFilters": "Supprimer tous les filtres",
     "results": "résultats",
@@ -88,7 +89,8 @@
       "exploreAll": "Explorer les 21 secteurs",
       "topThisWeek": "Le plus demandé cette semaine",
       "deepen": "En savoir plus",
-      "compareWith": "Comparer avec un autre secteur"
+      "compareWith": "Comparer avec un autre secteur",
+      "heading": "Domaines en croissance"
     },
     "personalized": {
       "badge": "Recommandations personnalisées",
@@ -110,7 +112,210 @@
       "step2Desc": "Le système traite vos réponses et vous montre les secteurs les plus compatibles avec votre personnalité.",
       "step3Title": "Construisez votre parcours",
       "step3Desc": "Explorez les secteurs recommandés, comparez-les et choisissez celui qui résonne vraiment avec vous.",
-      "startNow": "Commencer maintenant"
+      "startNow": "Commencer maintenant",
+      "heading": "Le bon parcours pour",
+      "headingHighlight": "vous",
+      "subtitle": "Trois étapes simples pour comprendre où vous êtes, où vous voulez aller et comment y arriver.",
+      "step1": {
+        "title": "Choisissez votre profil",
+        "desc": "Sélectionnez le parcours qui vous représente : indécis, salarié, indépendant, entreprise ou investisseur.",
+        "label": "Choisissez votre parcours"
+      },
+      "step2": {
+        "title": "Complétez le test",
+        "desc": "17 questions RIASEC pour cartographier votre personnalité professionnelle et vos préférences de travail.",
+        "label": "Commencez le test gratuit"
+      },
+      "step3": {
+        "title": "Outils avec IA",
+        "desc": "Plans personnalisés, analyse des compétences, simulation d'entretiens et guide IA.",
+        "label": "Découvrez les outils"
+      },
+      "stepLabel": "Étape"
+    },
+    "personas": {
+      "indeciso": {
+        "label": "Indécis",
+        "tagline": "Je ne sais pas encore quoi faire",
+        "ctaLabel": "Faites le test gratuit",
+        "tools": [
+          "Test de personnalité",
+          "Explorer les domaines",
+          "Coach IA"
+        ]
+      },
+      "dipendente": {
+        "label": "Salarié",
+        "tagline": "J'ai un emploi et je veux grandir",
+        "ctaLabel": "Analysez mes compétences",
+        "tools": [
+          "Compétences",
+          "Simulateur d'entretien",
+          "Plan de croissance"
+        ]
+      },
+      "autonomo": {
+        "label": "Indépendant",
+        "tagline": "Je travaille à mon compte et veux évoluer",
+        "ctaLabel": "Validez mon idée",
+        "tools": [
+          "Analyse d'idée",
+          "Plan d'affaires",
+          "Coach IA"
+        ]
+      },
+      "azienda": {
+        "label": "Entreprise",
+        "tagline": "Je cherche le bon profil",
+        "ctaLabel": "Explorez les profils",
+        "tools": [
+          "Profils de personnalité",
+          "Domaines en croissance",
+          "Partenaire"
+        ]
+      },
+      "investitore": {
+        "label": "Investisseur",
+        "tagline": "J'évalue les opportunités de marché",
+        "ctaLabel": "Voir les tendances",
+        "tools": [
+          "Domaines en croissance",
+          "Analyse des tendances",
+          "Carte des connaissances"
+        ]
+      }
+    },
+    "journeyLabels": {
+      "indeciso": "Indécis",
+      "dipendente": "Salarié",
+      "autonomo": "Indépendant",
+      "azienda": "Entreprise",
+      "investitore": "Investisseur"
+    },
+    "nextStep": {
+      "indeciso": {
+        "label": "Faites le test",
+        "desc": "Découvrez votre personnalité professionnelle"
+      },
+      "dipendente": {
+        "label": "Analysez les compétences",
+        "desc": "Identifiez les compétences qui vous manquent"
+      },
+      "autonomo": {
+        "label": "Validez votre idée",
+        "desc": "Recevez une évaluation de votre activité"
+      },
+      "azienda": {
+        "label": "Explorez les profils",
+        "desc": "Trouvez les profils idéaux pour votre équipe"
+      },
+      "investitore": {
+        "label": "Voir les domaines en croissance",
+        "desc": "Analysez les tendances et opportunités du marché italien"
+      }
+    },
+    "tools": {
+      "indeciso": [
+        {
+          "title": "Test de personnalité",
+          "desc": "17 questions pour cartographier votre personnalité"
+        },
+        {
+          "title": "Explorer les domaines",
+          "desc": "28 domaines avec salaires et croissance"
+        },
+        {
+          "title": "Coach IA",
+          "desc": "Sessions de conseil personnalisées"
+        },
+        {
+          "title": "Actualités emploi",
+          "desc": "Dernières nouvelles du marché"
+        }
+      ],
+      "dipendente": [
+        {
+          "title": "Compétences à développer",
+          "desc": "Identifiez ce qui vous manque"
+        },
+        {
+          "title": "Simulateur d'Entretien",
+          "desc": "Entraînez-vous avec des questions réelles"
+        },
+        {
+          "title": "Coach de Carrière",
+          "desc": "Plan de croissance personnalisé"
+        },
+        {
+          "title": "Mes candidatures",
+          "desc": "Gérez vos demandes d'emploi"
+        }
+      ],
+      "autonomo": [
+        {
+          "title": "Analyse d'idée",
+          "desc": "Évaluation détaillée avec IA"
+        },
+        {
+          "title": "Coach d'Affaires",
+          "desc": "Conseils stratégiques"
+        },
+        {
+          "title": "Marchés en croissance",
+          "desc": "Trouvez le secteur le plus adapté"
+        },
+        {
+          "title": "Actualités entreprises",
+          "desc": "Dernières nouveautés"
+        }
+      ],
+      "azienda": [
+        {
+          "title": "Profils de personnalité",
+          "desc": "Trouvez le profil psychologique idéal"
+        },
+        {
+          "title": "Partenaire",
+          "desc": "Publiez votre opportunité"
+        },
+        {
+          "title": "Actualités RH",
+          "desc": "Tendances du marché du travail"
+        },
+        {
+          "title": "Croissance d'entreprise",
+          "desc": "Articles sur la culture et l'équipe"
+        }
+      ],
+      "investitore": [
+        {
+          "title": "Domaines en croissance",
+          "desc": "Analyse des tendances du marché italien"
+        },
+        {
+          "title": "Actualités marchés",
+          "desc": "Dernières nouvelles économiques et financières"
+        },
+        {
+          "title": "Croissance des secteurs",
+          "desc": "Données et analyses pour investir"
+        },
+        {
+          "title": "Carte des connaissances",
+          "desc": "Connexions entre secteurs"
+        }
+      ]
+    },
+    "quickTools": {
+      "heading": "Vos outils",
+      "subheading": "Sélectionnés pour votre parcours",
+      "dashboardLink": "Tableau de bord complet"
+    },
+    "hero": {
+      "badge": "Orientation professionnelle personnalisée",
+      "heading": "Quel est votre",
+      "headingHighlight": "objectif ?",
+      "subtitle": "NorthStar s'adapte à votre parcours. Choisissez le profil qui vous représente et recevez des outils et des conseils sur mesure pour vous."
     }
   },
   "test": {
@@ -1038,7 +1243,12 @@
     },
     "read": "Lire",
     "save": "Sauvegarder",
-    "saved": "Sauvegardé"
+    "saved": "Sauvegardé",
+    "myCategories": "Mes catégories",
+    "subscribe": "Suivre",
+    "subscribed": "Abonné",
+    "active": "actives",
+    "subscribeHint": "Cliquez sur une catégorie pour recevoir des mises à jour personnalisées."
   },
   "profilo": {
     "title": "Votre profil",
@@ -2478,5 +2688,17 @@
     "noRoles": "Aucun rôle disponible pour ce secteur.",
     "rolesTab": "Rôles",
     "viewRole": "En savoir plus"
+  },
+  "search": {
+    "placeholder": "Rechercher secteurs, rôles, articles...",
+    "noResults": "Aucun résultat pour \"{{query}}\"",
+    "sectors": "Secteurs",
+    "roles": "Rôles",
+    "articles": "Articles",
+    "news": "Actualités",
+    "hint": "Rechercher sur toute la plateforme",
+    "suggestions": "Suggestions",
+    "askWendy": "Demande à Wendy: \"{{query}}\"",
+    "askWendyDesc": "Discute avec l'assistante IA"
   }
 }

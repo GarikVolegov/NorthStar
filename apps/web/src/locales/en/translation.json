@@ -55,6 +55,7 @@
     "seeAll": "See all",
     "goBack": "Go back",
     "search": "Search",
+    "searching": "Searching...",
     "filter": "Filter",
     "clearFilters": "Clear all filters",
     "results": "results",
@@ -88,7 +89,8 @@
       "exploreAll": "Explore all 21 sectors",
       "topThisWeek": "Most requested this week",
       "deepen": "Learn more",
-      "compareWith": "Compare with another sector"
+      "compareWith": "Compare with another sector",
+      "heading": "Growing areas"
     },
     "personalized": {
       "badge": "Personalized recommendations",
@@ -110,7 +112,210 @@
       "step2Desc": "The system processes your answers and shows you the sectors most compatible with your personality.",
       "step3Title": "Build your path",
       "step3Desc": "Explore recommended sectors, compare them, and choose the one that truly resonates with you.",
-      "startNow": "Start now"
+      "startNow": "Start now",
+      "heading": "The right path for",
+      "headingHighlight": "you",
+      "subtitle": "Three simple steps to understand where you are, where you want to go, and how to get there.",
+      "step1": {
+        "title": "Choose your profile",
+        "desc": "Select the path that represents you: undecided, employee, self-employed, company, or investor.",
+        "label": "Choose your path"
+      },
+      "step2": {
+        "title": "Complete the test",
+        "desc": "17 RIASEC questions to map your professional personality and work preferences.",
+        "label": "Start the free test"
+      },
+      "step3": {
+        "title": "AI Tools",
+        "desc": "Personalized plans, skills analysis, interview simulation, and AI guidance.",
+        "label": "Discover the tools"
+      },
+      "stepLabel": "Step"
+    },
+    "personas": {
+      "indeciso": {
+        "label": "Undecided",
+        "tagline": "I don't know what to do yet",
+        "ctaLabel": "Take the free test",
+        "tools": [
+          "Personality test",
+          "Explore areas",
+          "AI Coach"
+        ]
+      },
+      "dipendente": {
+        "label": "Employee",
+        "tagline": "I have a job and want to grow",
+        "ctaLabel": "Analyze my skills",
+        "tools": [
+          "Skills",
+          "Interview simulator",
+          "Growth plan"
+        ]
+      },
+      "autonomo": {
+        "label": "Self-employed",
+        "tagline": "I work for myself and want to scale",
+        "ctaLabel": "Validate my idea",
+        "tools": [
+          "Idea analysis",
+          "Business plan",
+          "AI Coach"
+        ]
+      },
+      "azienda": {
+        "label": "Company",
+        "tagline": "I'm looking for the right profile",
+        "ctaLabel": "Explore profiles",
+        "tools": [
+          "Personality profiles",
+          "Growing areas",
+          "Partner"
+        ]
+      },
+      "investitore": {
+        "label": "Investor",
+        "tagline": "I evaluate market opportunities",
+        "ctaLabel": "See trends",
+        "tools": [
+          "Growing areas",
+          "Trend analysis",
+          "Knowledge map"
+        ]
+      }
+    },
+    "journeyLabels": {
+      "indeciso": "Undecided",
+      "dipendente": "Employee",
+      "autonomo": "Self-employed",
+      "azienda": "Company",
+      "investitore": "Investor"
+    },
+    "nextStep": {
+      "indeciso": {
+        "label": "Take the test",
+        "desc": "Discover your professional personality"
+      },
+      "dipendente": {
+        "label": "Analyze skills",
+        "desc": "Identify the skills you're missing"
+      },
+      "autonomo": {
+        "label": "Validate your idea",
+        "desc": "Get an evaluation of your business"
+      },
+      "azienda": {
+        "label": "Explore profiles",
+        "desc": "Find the best profiles for your team"
+      },
+      "investitore": {
+        "label": "See growing areas",
+        "desc": "Analyze trends and opportunities in the Italian market"
+      }
+    },
+    "tools": {
+      "indeciso": [
+        {
+          "title": "Personality test",
+          "desc": "17 questions to map your personality"
+        },
+        {
+          "title": "Explore areas",
+          "desc": "28 areas with salaries and growth"
+        },
+        {
+          "title": "AI Coach",
+          "desc": "Personalized coaching sessions"
+        },
+        {
+          "title": "Job news",
+          "desc": "Latest market news"
+        }
+      ],
+      "dipendente": [
+        {
+          "title": "Skills to develop",
+          "desc": "Identify what you're missing"
+        },
+        {
+          "title": "Interview Simulator",
+          "desc": "Practice with real questions"
+        },
+        {
+          "title": "Career Coach",
+          "desc": "Personalized growth plan"
+        },
+        {
+          "title": "My applications",
+          "desc": "Manage your job applications"
+        }
+      ],
+      "autonomo": [
+        {
+          "title": "Idea analysis",
+          "desc": "Detailed AI evaluation"
+        },
+        {
+          "title": "Business Coach",
+          "desc": "Strategic advice"
+        },
+        {
+          "title": "Growing markets",
+          "desc": "Find the most suitable sector"
+        },
+        {
+          "title": "Business news",
+          "desc": "Latest updates"
+        }
+      ],
+      "azienda": [
+        {
+          "title": "Personality profiles",
+          "desc": "Find the ideal psychological profile"
+        },
+        {
+          "title": "Partner",
+          "desc": "Publish your opportunity"
+        },
+        {
+          "title": "HR News",
+          "desc": "Labor market trends"
+        },
+        {
+          "title": "Business growth",
+          "desc": "Articles on culture and team"
+        }
+      ],
+      "investitore": [
+        {
+          "title": "Growing areas",
+          "desc": "Italian market trend analysis"
+        },
+        {
+          "title": "Market news",
+          "desc": "Latest economics and finance news"
+        },
+        {
+          "title": "Sector growth",
+          "desc": "Data and analysis for investing"
+        },
+        {
+          "title": "Knowledge map",
+          "desc": "Connections between sectors"
+        }
+      ]
+    },
+    "quickTools": {
+      "heading": "Your tools",
+      "subheading": "Selected for your path",
+      "dashboardLink": "Full dashboard"
+    },
+    "hero": {
+      "badge": "Personalized career guidance",
+      "heading": "What is your",
+      "headingHighlight": "goal?",
+      "subtitle": "NorthStar adapts to your path. Choose the profile that represents you and get tools and advice tailored for you."
     }
   },
   "test": {
@@ -1038,7 +1243,12 @@
     },
     "read": "Read",
     "save": "Save",
-    "saved": "Saved"
+    "saved": "Saved",
+    "myCategories": "My categories",
+    "subscribe": "Follow",
+    "subscribed": "Following",
+    "active": "active",
+    "subscribeHint": "Click a category to receive personalized updates."
   },
   "profilo": {
     "title": "Your profile",
@@ -2475,5 +2685,17 @@
     "noRoles": "No roles available for this sector.",
     "rolesTab": "Roles",
     "viewRole": "Learn more"
+  },
+  "search": {
+    "placeholder": "Search sectors, roles, articles...",
+    "noResults": "No results for \"{{query}}\"",
+    "sectors": "Sectors",
+    "roles": "Roles",
+    "articles": "Articles",
+    "news": "News",
+    "hint": "Search across the entire platform",
+    "suggestions": "Suggestions",
+    "askWendy": "Ask Wendy: \"{{query}}\"",
+    "askWendyDesc": "Chat with the AI assistant to learn more"
   }
 }

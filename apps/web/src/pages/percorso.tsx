@@ -33,7 +33,7 @@ const PERSONAS: Persona[] = [
     tagline: "Non so ancora cosa fare",
     description:
       "Stai cercando la tua strada. Hai curiosità, idee confuse o semplicemente vuoi capire cosa ti appassiona davvero e dove potresti eccellere.",
-    tools: ["Test di personalità", "Esplora settori", "Consulente AI", "Confronta carriere"],
+    tools: ["Test di personalità", "Esplora settori", "Coach AI", "Confronta carriere"],
     color: "from-[hsl(43 20% 9%)] to-[hsl(43 15% 13%)]",
     accent: "text-primary",
     border: "border-primary/40",
@@ -57,7 +57,7 @@ const PERSONAS: Persona[] = [
     tagline: "Lavoro in proprio e voglio crescere",
     description:
       "Sei freelance, imprenditore o professionista autonomo. Vuoi scalare il tuo business, trovare nuovi clienti o validare un'idea.",
-    tools: ["Validatore Idea", "Analisi mercato", "Roadmap business", "Coach AI"],
+    tools: ["Idea", "Analisi mercato", "Roadmap business", "Coach AI"],
     color: "from-[hsl(43 20% 9%)] to-[hsl(43 18% 11%)]",
     accent: "text-primary",
     border: "border-primary/40",
@@ -69,7 +69,7 @@ const PERSONAS: Persona[] = [
     tagline: "Cerco professionisti qualificati",
     description:
       "Sei HR, recruiter o manager. Stai cercando i profili giusti per il tuo team e vuoi capire il mercato dei talenti italiano.",
-    tools: ["Profili RIASEC", "Settori in crescita", "Analisi competenze", "Affilazione"],
+    tools: ["Profili RIASEC", "Aree in crescita", "Analisi competenze", "Partner"],
     color: "from-growth/5 to-[hsl(43 20% 9%)]",
     accent: "text-growth",
     border: "border-growth/40",
@@ -81,7 +81,7 @@ const PERSONAS: Persona[] = [
     tagline: "Valuto opportunità di mercato",
     description:
       "Sei un investitore,           investitore o fondo. Vuoi capire i settori in crescita, i trend del mercato del lavoro italiano e le opportunità.",
-    tools: ["Settori in crescita", "Analisi trend", "Report mercato", "Knowledge Graph"],
+    tools: ["Aree in crescita", "Analisi trend", "Report mercato", "Mappa conoscenze"],
     color: "from-[hsl(43 18% 11%)] to-[hsl(43 15% 13%)]",
     accent: "text-primary",
     border: "border-primary/40",
@@ -116,9 +116,9 @@ export default function Percorso() {
           body: JSON.stringify({ journeyType: selected }),
         });
         login({ ...user, journeyType: selected }, token);
-        toast({ title: "Percorso salvato!", description: `Hai scelto: ${PERSONAS.find((p) => p.id === selected)?.label}` });
+        toast({ title: "Piano salvato!", description: `Hai scelto: ${PERSONAS.find((p) => p.id === selected)?.label}` });
       } catch {
-        toast({ title: "Errore", description: "Non è stato possibile salvare il percorso.", variant: "destructive" });
+        toast({ title: "Errore", description: "Non è stato possibile salvare il piano.", variant: "destructive" });
       } finally {
         setSaving(false);
       }

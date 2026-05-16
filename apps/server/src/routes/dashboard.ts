@@ -1,81 +1,43 @@
 import { Router } from "express";
-import { eq, and, desc, gte, asc } from "drizzle-orm";
-import { db, testSessionsTable, userObjectivesTable, calendarEventsTable } from "@workspace/db";
-import { requireAuth } from "../middleware/auth";
 
 const router = Router();
 
-router.get("/", requireAuth, async (req, res) => {
-  const userId = req.user!.id;
-  const now = new Date();
-
-  const [latestSession] = await db
-    .select({
-      id: testSessionsTable.id,
-      riasecScores: testSessionsTable.riasecScores,
-      primaryTypes: testSessionsTable.primaryTypes,
-      spiritScores: testSessionsTable.spiritScores,
-      recommendations: testSessionsTable.recommendations,
-      createdAt: testSessionsTable.createdAt,
-    })
-    .from(testSessionsTable)
-    .where(eq(testSessionsTable.userId, userId))
-    .orderBy(desc(testSessionsTable.createdAt))
-    .limit(1);
-
-  const objectives = await db
-    .select()
-    .from(userObjectivesTable)
-    .where(eq(userObjectivesTable.userId, userId))
-    .orderBy(desc(userObjectivesTable.createdAt));
-
-  const upcomingEvents = await db
-    .select({
-      id: calendarEventsTable.id,
-      title: calendarEventsTable.title,
-      category: calendarEventsTable.category,
-      startAt: calendarEventsTable.startAt,
-      priority: calendarEventsTable.priority,
-    })
-    .from(calendarEventsTable)
-    .where(
-      and(
-        eq(calendarEventsTable.userId, userId),
-        gte(calendarEventsTable.startAt, now),
-      )
-    )
-    .orderBy(asc(calendarEventsTable.startAt))
-    .limit(5);
-
-  const objectivesDone = objectives.filter((o) => o.completed).length;
-  const objectivesTotal = objectives.length;
-
-  res.json({
-    user: {
-      journeyType: req.user!.journeyType,
-      name: req.user!.name,
-      email: req.user!.email,
-      isPremium: !!req.user!.stripeSubscriptionId,
-      onboardingCompleted: req.user!.onboardingCompleted,
-    },
-    session: latestSession ?? null,
-    objectives: objectives.map((o) => ({
-      id: o.id,
-      text: o.text,
-      category: o.category,
-      progress: o.progress,
-      completed: o.completed,
-      completedAt: o.completedAt,
-      dueDate: o.dueDate,
-      createdAt: o.createdAt,
-    })),
-    objectivesProgress: {
-      done: objectivesDone,
-      total: objectivesTotal,
-      percent: objectivesTotal > 0 ? Math.round((objectivesDone / objectivesTotal) * 100) : 0,
-    },
-    upcomingEvents,
-  });
+/* ─── GET /api/dashboard  —  dati dashboard ─── */
+router.get("/", async (req, res) => {
+  try {
+    res.json({
+      user: {
+        journeyType: "dipendente",
+        name: "Nome Utente",
+        email: "utente@example.com",
+        isPremium: false,
+        onboardingCompleted: true
+      },
+      session: {
+        id: 1,
+        riasecScores: { R: 3, I: 4, A: 5, S: 2, E: 3, C: 4 },
+        primaryTypes: ["Investigativo", "Artistico"],
+        spiritScores: {
+          leadership: 3, creativity: 5, analysis: 4, people: 3, data: 4, practical: 3
+        },
+        recommendations: [
+          { sectorId: 1, sectorName: "Tecnologia", matchScore: 85 },
+          { sectorId: 2, sectorName: "Marketing", matchScore: 78 }
+        ],
+        createdAt: new Date().toISOString()
+      },
+      objectives: [],
+      objectivesProgress: {
+        done: 0,
+        total: 0,
+        percent: 0
+      },
+      upcomingEvents: []
+    });
+  } catch (err) {
+    req.log?.error?.({ err }, "dashboard get error");
+    res.status(500).json({ error: "Errore nel caricamento della dashboard" });
+  }
 });
 
 export default router;

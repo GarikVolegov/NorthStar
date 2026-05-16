@@ -72,5 +72,36 @@ export const adminLimiter = rateLimit(
   buildOptions({ windowMs: 60 * 1000, max: 200 })
 );
 
+// ── Per-plan AI quota ───────────────────────────────────────────────
+// Free users get {FREE_AI_DAILY_LIMIT} Wendy messages per day.
+// Pro / premium users get {PRO_AI_DAILY_LIMIT} per day.
+// Resets daily (86400s window).
+const FREE_AI_DAILY_LIMIT = parseInt(process.env.FREE_AI_DAILY_LIMIT ?? "10", 10);
+const PRO_AI_DAILY_LIMIT = parseInt(process.env.PRO_AI_DAILY_LIMIT ?? "200", 10);
+
+export const planQuotaLimiter = rateLimit(
+   buildOptions({
+     windowMs: 86400 * 1000,
+     max: (req: Request) => {
+       const isPremium = (req as any).user?.stripeSubscriptionId != null;
+       return isPremium ? PRO_AI_DAILY_LIMIT : FREE_AI_DAILY_LIMIT;
+     },
+     keyGenerator: (req: Request) => {
+       const userId = (req as any).user?.id;
+       if (userId) {
+         return `plan-${userId}`;
+       } else {
+         return `plan-${ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? "unknown")}`;
+       }
+     },
+     skip: (req: Request) =>
+       process.env.NODE_ENV === "test" || process.env.USE_MOCK_AI === "true",
+     message: {
+       error: "Hai raggiunto il limite giornaliero dei messaggi.",
+       code: "QUOTA_EXCEEDED",
+     },
+   })
+ );
+
 // Kick off Redis init eagerly but don't block startup
 initRedisStore();

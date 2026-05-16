@@ -447,7 +447,7 @@ export function OnboardingWizard({
                   {/* Recap chips */}
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { icon: MapPin,      label: "Percorso",    value: persona.label },
+                      { icon: MapPin,      label: "Piano",    value: persona.label },
                       { icon: Target,      label: "Obiettivi",   value: `${savedCount} salvati` },
                       { icon: Sparkles,    label: "Strumenti",   value: "Personalizzati" },
                     ].map(({ icon: Icon, label, value }) => (

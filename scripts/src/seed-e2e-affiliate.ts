@@ -21,7 +21,7 @@
  */
 
 import 'dotenv/config';
-import { Pool } from 'pg';
+import { Pool } from '@neondatabase/serverless';
 import * as crypto from 'crypto';
 
 // ─── Config ───────────────────────────────────────────────────────────────────

@@ -58,7 +58,7 @@ const JOURNEY_META: Record<JourneyId, {
   dipendente:  { label: "Dipendente", Icon: TrendingUp,  color: "text-growth",    bgColor: "bg-growth/10",    borderColor: "border-growth/30",    headline: "Accelera la tua carriera",        subline: "Analizza le tue skill, allenati per i colloqui, ottieni un piano di crescita" },
   autonomo:    { label: "Autonomo",   Icon: Rocket,      color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30",      headline: "Scala il tuo business",          subline: "Valida idee, trova mercati, costruisci il tuo piano strategico con l'AI" },
   azienda:     { label: "Azienda",    Icon: Building2,   color: "text-growth",    bgColor: "bg-growth/10",    borderColor: "border-growth/30",    headline: "Trova i profili giusti",          subline: "Esplora i profili RIASEC, pubblica le tue opportunità, analizza il mercato" },
-  investitore: { label: "Investitore",Icon: BarChart3,   color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30",      headline: "Analizza le opportunità",         subline: "Settori in crescita, trend di mercato e analisi delle competenze richieste" },
+  investitore: { label: "Investitore",Icon: BarChart3,   color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30",      headline: "Analizza le opportunità",         subline: "Aree in crescita, trend di mercato e analisi delle competenze richieste" },
 };
 
 function useLatestSession() {
@@ -256,7 +256,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                   { href: `${BASE}wiki/${topSectorId ?? ""}`,    icon: MessageSquare, title: "Guida AI",          desc: "Chiedi tutto sul tuo settore" },
-                  { href: `${BASE}roadmap/${topSectorId ?? ""}`, icon: Map,           title: "Piano di crescita", desc: "Percorso formativo personalizzato" },
+                  { href: `${BASE}roadmap/${topSectorId ?? ""}`, icon: Map,           title: "Piano di crescita", desc: "Piano formativo personalizzato" },
                   { href: "/grafo",                              icon: Network,       title: "Mappa delle conoscenze", desc: "Note, competenze e documenti collegati" },
                   { href: "/news",                               icon: Newspaper,     title: "Notizie del settore",   desc: "Aggiornamenti live dal mondo del lavoro" },
                 ].map(({ href, icon: Icon, title, desc }) => (

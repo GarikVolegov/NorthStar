@@ -16,6 +16,7 @@ export const chatMessagesTable = pgTable("chat_messages", {
   iv: text("iv").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   readAt: timestamp("read_at", { withTimezone: true }),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
 export const insertChatMessageSchema = createInsertSchema(chatMessagesTable).omit({

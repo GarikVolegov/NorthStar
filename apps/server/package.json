@@ -17,6 +17,7 @@
     "@workspace/ws-server": "workspace:*",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
+    "date-fns": "^3.6.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "catalog:",
     "express": "^4.18.2",

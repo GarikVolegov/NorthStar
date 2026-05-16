@@ -27,6 +27,7 @@
  * SCHEDULE:
  *   Cron ogni 6 ore + trigger manuale POST /api/admin/discovery/collect.
  */
+import { logger } from "../logger";
 import { db } from "@workspace/db";
 import { discoveryItemsTable, discoverySourcesTable } from "@workspace/db";
 import { createHash } from "node:crypto";
@@ -157,7 +158,7 @@ async function fetchRSS(feedUrl: string, limit = 8): Promise<RSSEntry[]> {
   const xml = await res.text();
   // Se la risposta è HTML (es. redirect a login page) → restituisci [] senza crash
   if (xml.trimStart().startsWith("<!DOCTYPE") || xml.trimStart().startsWith("<html")) {
-    console.warn(`[collector] fetchRSS got HTML instead of XML for ${feedUrl}`);
+    logger.warn({ feedUrl }, "[collector] fetchRSS got HTML instead of XML for %s", feedUrl);
     return [];
   }
 
@@ -289,7 +290,7 @@ async function collectCourseraRSS(): Promise<RawItem[]> {
       for (const e of entries) {
         results.push({ type: "formation", title: e.title, url: e.url, source: "Coursera Blog", summary: e.summary || `Articolo Coursera: ${e.title}`, imageUrl: e.imageUrl, publishedAt: e.publishedAt, category, sectorNames: [sector, "Online Learning"], collectorSource: "coursera_rss", searchQuery: sector });
       }
-    } catch (err) { console.warn(`[collector] Coursera RSS failed:`, String(err)); }
+    } catch (err) { logger.warn({ err }, "[collector] Coursera RSS failed"); }
   }));
   return results;
 }
@@ -311,7 +312,7 @@ async function collectUdemyRSS(): Promise<RawItem[]> {
         const isReport = /trend|report|top \d|in \d{4}|stat|survey/i.test(e.title);
         results.push({ type: isReport ? "sector_trend" : "formation", title: e.title, url: e.url, source: "Udemy Blog", summary: e.summary || `Guida Udemy: ${e.title}`, imageUrl: e.imageUrl, publishedAt: e.publishedAt, category, sectorNames: [sector, "Skills Development"], collectorSource: "udemy_rss", searchQuery: sector });
       }
-    } catch (err) { console.warn(`[collector] Udemy RSS failed:`, String(err)); }
+    } catch (err) { logger.warn({ err }, "[collector] Udemy RSS failed"); }
   }));
   return results;
 }
@@ -330,7 +331,7 @@ async function collectMITOpenCourseWare(): Promise<RawItem[]> {
       for (const e of entries) {
         results.push({ type: "formation", title: `[MIT OCW] ${e.title}`, url: e.url, source: "MIT OpenCourseWare", summary: e.summary || `Corso MIT gratuito: ${e.title}`, imageUrl: e.imageUrl, publishedAt: e.publishedAt, category: "university_course", sectorNames: ["Academic", "University", "STEM"], collectorSource: "mit_ocw_rss", searchQuery: "mit opencourseware" });
       }
-    } catch (err) { console.warn(`[collector] MIT OCW RSS failed:`, String(err)); }
+    } catch (err) { logger.warn({ err }, "[collector] MIT OCW RSS failed"); }
   }));
   return results;
 }
@@ -354,7 +355,7 @@ async function collectYouTubeEDU(): Promise<RawItem[]> {
         const imageUrl = e.imageUrl ?? (videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : undefined);
         results.push({ type, title: e.title, url: e.url, source: `YouTube — ${name}`, summary: e.summary || `Video di ${name}: ${e.title}`, imageUrl, publishedAt: e.publishedAt, category, sectorNames: [sector], collectorSource: "youtube_edu", searchQuery: name });
       }
-    } catch (err) { console.warn(`[collector] YouTube RSS ${name} failed:`, String(err)); }
+    } catch (err) { logger.warn({ err, channel: name }, "[collector] YouTube RSS failed"); }
   }));
   return results;
 }
@@ -387,7 +388,7 @@ async function collectIlSole24Ore(): Promise<RawItem[]> {
       for (const e of entries) {
         results.push({ type, title: e.title, url: e.url, source: "Il Sole 24 Ore", summary: e.summary || `Notizia Il Sole 24 Ore: ${e.title}`, imageUrl: e.imageUrl, publishedAt: e.publishedAt, category, sectorNames: [sector, "Italy", "Italian News"], collectorSource: "sole24ore_rss", searchQuery: sector });
       }
-    } catch (err) { console.warn(`[collector] IlSole24Ore RSS (${url}) failed:`, String(err)); }
+    } catch (err) { logger.warn({ err, feedUrl: url }, "[collector] IlSole24Ore RSS failed"); }
   }));
   return results;
 }
@@ -416,7 +417,7 @@ async function collectNinjaMarketing(): Promise<RawItem[]> {
       for (const e of entries) {
         results.push({ type, title: e.title, url: e.url, source: "Ninja Marketing", summary: e.summary || `Articolo Ninja Marketing: ${e.title}`, imageUrl: e.imageUrl, publishedAt: e.publishedAt, category, sectorNames: [sector, "Italy", "Digital"], collectorSource: "ninja_marketing_rss", searchQuery: sector });
       }
-    } catch (err) { console.warn(`[collector] NinjaMarketing RSS (${url}) failed:`, String(err)); }
+    } catch (err) { logger.warn({ err, feedUrl: url }, "[collector] NinjaMarketing RSS failed"); }
   }));
   return results;
 }
@@ -444,7 +445,7 @@ async function collectDynamicSources(): Promise<RawItem[]> {
       .from(discoverySourcesTable)
       .where(eq(discoverySourcesTable.enabled, true));
   } catch (err) {
-    console.warn("[collector] dynamic sources DB read failed:", String(err));
+    logger.warn({ err }, "[collector] dynamic sources DB read failed");
     return [];
   }
 
@@ -469,7 +470,7 @@ async function collectDynamicSources(): Promise<RawItem[]> {
           });
         }
       } catch (err) {
-        console.warn(`[collector] dynamic source "${src.name}" (${src.feedUrl}) failed:`, String(err));
+        logger.warn({ err, sourceName: src.name, feedUrl: src.feedUrl }, "[collector] dynamic source failed");
       }
     }),
   );
@@ -495,7 +496,7 @@ async function bulkInsert(items: RawItem[]): Promise<number> {
     try {
       const result = await db.insert(discoveryItemsTable).values(unique.slice(i, i + CHUNK)).onConflictDoNothing({ target: discoveryItemsTable.urlHash });
       inserted += (result.rowCount ?? 0);
-    } catch (err) { console.warn(`[collector] bulk insert chunk failed:`, err); }
+    } catch (err) { logger.warn({ err }, "[collector] bulk insert chunk failed"); }
   }
   return inserted;
 }
@@ -524,12 +525,12 @@ export async function runCollector(): Promise<CollectorResult> {
     const locked = existing.rows[0]?.locked;
     if (!locked) {
       const msg = "[collector] Another run is already in progress — skipping";
-      console.warn(msg);
+      logger.warn(msg);
       return { totalCollected: 0, totalInserted: 0, bySource, errors: [msg], durationMs: 0 };
     }
   } catch {
     // pg_try_advisory_lock not available (e.g. SQLite fallback) — proceed without lock
-    console.warn("[collector] Advisory lock not available, proceeding without lock");
+    logger.warn("[collector] Advisory lock not available, proceeding without lock");
   }
 
   const sources: Array<{ name: string; fn: () => Promise<RawItem[]> }> = [
@@ -561,7 +562,7 @@ export async function runCollector(): Promise<CollectorResult> {
 
   const totalInserted = await bulkInsert(allItems);
   const result: CollectorResult = { totalCollected: allItems.length, totalInserted, bySource, errors, durationMs: Date.now() - startedAt };
-  console.log(`[collector] run complete:`, result);
+  logger.info({ totalCollected: result.totalCollected, totalInserted: result.totalInserted, bySource: result.bySource, durationMs: result.durationMs }, "[collector] run complete");
 
   // Release advisory lock
   try {

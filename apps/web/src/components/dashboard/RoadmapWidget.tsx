@@ -13,7 +13,7 @@ export function RoadmapWidget({ sectorId }: { sectorId: number }) {
         </div>
         <div>
           <h2 className="font-bold text-xl text-foreground">Piano di crescita</h2>
-          <p className="text-xs text-muted-foreground">Percorso formativo personalizzato</p>
+          <p className="text-xs text-muted-foreground">Piano formativo personalizzato</p>
         </div>
         <Link href={`${BASE}roadmap/${sectorId}`} className="ml-auto">
           <Button variant="outline" size="sm" className="rounded-full gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/5">

@@ -157,7 +157,7 @@ Tutte le tabelle sono definite in `packages/db/src/schema/` e re-esportate da `i
 | `businessIdeas` | `businessIdeas.ts` | Validazione idee imprenditoriali |
 | `certifications` | `certifications.ts` | Certificazioni utente |
 | `linkedinImports` | `linkedinImports.ts` | Import dati LinkedIn |
-| `job_applications` | `users.ts` | Candidature lavorative (nella tabella users) |
+| `job_applications` | `users.ts` | Candidature lavorative (definita nello stesso file di users) |
 
 #### Knowledge Graph
 | Tabella | File | Descrizione |

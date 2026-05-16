@@ -10,11 +10,21 @@
     "./audio": "./src/audio/index.ts",
     "./db": "./src/db/client.ts",
     "./growth-agent": "./src/growth-agent/index.ts",
+    "./growth-agent/router-agent": "./src/growth-agent/router-agent.ts",
+    "./growth-agent/specialist-agent": "./src/growth-agent/specialist-agent.ts",
+    "./growth-agent/prompt-builder": "./src/growth-agent/prompt-builder.ts",
+    "./growth-agent/retriever": "./src/growth-agent/retriever.ts",
+    "./growth-agent/chain-of-thought": "./src/growth-agent/chain-of-thought.ts",
+    "./growth-agent/self-evaluator": "./src/growth-agent/self-evaluator.ts",
+    "./growth-agent/supervisor-agent": "./src/growth-agent/supervisor-agent.ts",
+    "./growth-agent/memory-manager": "./src/growth-agent/memory-manager.ts",
+    "./growth-agent/agent": "./src/growth-agent/agent.ts",
     "./llm/client": "./src/llm/client.ts",
     "./logger": "./src/logger.ts",
     "./metrics": "./src/metrics.ts",
     "./feature-flags": "./src/feature-flags.ts",
-    "./utils": "./src/utils.ts"
+    "./search-router": "./src/search-router/router.ts",
+    "./embeddings/generate": "./src/embeddings/generate.ts"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",

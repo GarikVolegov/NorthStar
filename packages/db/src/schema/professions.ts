@@ -1,11 +1,13 @@
 import { pgTable, serial, text, boolean, timestamp, integer } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { sectorsTable } from "./sectors";
+import { vector } from "../custom-types";
 
 export const professionsTable = pgTable("professions", {
   id:               serial("id").primaryKey(),
   title:            text("title").notNull(),
   sector:           text("sector").notNull(),
+  embedding:        vector("embedding", { dimensions: 1536 }),
   sectorId:         integer("sector_id").references(() => sectorsTable.id),
   description:      text("description"),
   riasecFit:        text("riasec_fit").array().notNull().default(sql`'{}'::text[]`),
