@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 import { db, protectedDbQuery, usersTable, userProfileSettingsTable, generateUsername } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { authLimiter } from "../middleware/rate-limit";
-import { sendVerificationCode, sendPasswordReset, sendWelcomeEmail } from "../lib/email";
+import { sendVerificationCode, send2faCode, sendPasswordReset, sendWelcomeEmail } from "../lib/email";
 
 const router = Router();
 
@@ -31,7 +31,7 @@ function generateToken(user: JwtPayload): string {
 }
 
 function generateVerificationCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return crypto.randomInt(100000, 999999).toString();
 }
 
 /** Fields to select when we need stable data for the JWT */
@@ -131,7 +131,7 @@ router.post("/register", async (req, res) => {
       token,
     };
 
-    sendVerificationCode(user.email, user.name, verificationCode);
+    void sendVerificationCode(user.email, user.name, verificationCode);
 
     if (DEV_MODE) {
       response.devCode = verificationCode;
@@ -176,40 +176,48 @@ router.post("/login", authLimiter, async (req, res) => {
       return;
     }
 
+    // Email non ancora verificata → flusso verifica email
     if (!user.emailVerified) {
       const verificationCode = generateVerificationCode();
       const verificationCodeExpires = new Date(Date.now() + 30 * 60 * 1000);
 
-    await protectedDbQuery(async () => {
-      return await db
-        .update(usersTable)
-        .set({ verificationCode, verificationCodeExpires })
-        .where(eq(usersTable.id, user.id));
-    });
+      await protectedDbQuery(async () => {
+        return await db
+          .update(usersTable)
+          .set({ verificationCode, verificationCodeExpires })
+          .where(eq(usersTable.id, user.id));
+      });
 
-      sendVerificationCode(user.email, user.name, verificationCode);
+      void sendVerificationCode(user.email, user.name, verificationCode);
 
       const response: Record<string, unknown> = {
         needsVerification: true,
         email: user.email,
       };
-
-      if (DEV_MODE) {
-        response.devCode = verificationCode;
-      }
-
+      if (DEV_MODE) response.devCode = verificationCode;
       res.json(response);
       return;
     }
 
-    const token = generateToken(buildJwtPayload(user));
+    // Email verificata → 2FA: invia OTP via email prima di emettere il JWT
+    const twoFaCode    = generateVerificationCode();
+    const twoFaExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minuti
 
-    const { passwordHash: _, verificationCode: __, verificationCodeExpires: ___, resetToken: ____, resetTokenExpires: ______, ...safeUser } = user;
-
-    res.json({
-      ...safeUser,
-      token,
+    await protectedDbQuery(async () => {
+      return await db
+        .update(usersTable)
+        .set({ verificationCode: twoFaCode, verificationCodeExpires: twoFaExpires })
+        .where(eq(usersTable.id, user.id));
     });
+
+    void send2faCode(user.email, user.name, twoFaCode);
+
+    const response: Record<string, unknown> = {
+      needs2fa: true,
+      email: user.email,
+    };
+    if (DEV_MODE) response.devCode = twoFaCode;
+    res.json(response);
   } catch (err) {
     req.log?.error?.({ err }, "login error");
     res.status(500).json({ error: "Errore durante il login" });
@@ -269,6 +277,56 @@ router.post("/verify-email", async (req, res) => {
   } catch (err) {
     req.log?.error?.({ err }, "verify-email error");
     res.status(500).json({ error: "Errore durante la verifica" });
+  }
+});
+
+/* ─── POST /api/auth/verify-2fa  —  conferma codice 2FA ─────────── */
+router.post("/verify-2fa", authLimiter, async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) {
+      res.status(400).json({ error: "Email e codice richiesti" });
+      return;
+    }
+
+    const [user] = await protectedDbQuery(async () => {
+      return await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.verificationCode, code))
+        .limit(1);
+    });
+
+    if (!user || user.email !== email.toLowerCase()) {
+      res.status(400).json({ error: "Codice non valido" });
+      return;
+    }
+
+    if (user.verificationCodeExpires && new Date() > user.verificationCodeExpires) {
+      res.status(400).json({ error: "Codice scaduto. Rieffettua il login per riceverne uno nuovo." });
+      return;
+    }
+
+    // Pulisce il codice OTP e aggiorna lastActiveAt
+    await protectedDbQuery(async () => {
+      return await db
+        .update(usersTable)
+        .set({
+          verificationCode: null,
+          verificationCodeExpires: null,
+          lastActiveAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(usersTable.id, user.id));
+    });
+
+    const token = generateToken(buildJwtPayload(user));
+    const { passwordHash: _, verificationCode: __, verificationCodeExpires: ___, resetToken: ____, resetTokenExpires: _____, ...safeUser } = user;
+
+    res.json({ ...safeUser, token });
+  } catch (err) {
+    req.log?.error?.({ err }, "verify-2fa error");
+    res.status(500).json({ error: "Errore durante la verifica 2FA" });
   }
 });
 

@@ -24,7 +24,7 @@ declare global {
   }
 }
 
-type View = "login" | "register" | "verify" | "forgot" | "forgot-sent" | "reset-sent";
+type View = "login" | "register" | "verify" | "2fa" | "forgot" | "forgot-sent" | "reset-sent";
 
 interface LoginDialogProps {
   open: boolean;
@@ -172,6 +172,11 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
           setVerifyEmail(data.email ?? loginEmail);
           if (data.devCode) setDevHint(data.devCode);
           goTo("verify");
+        } else if (data.needs2fa) {
+          setVerifyEmail(data.email ?? loginEmail);
+          setVerifyCode(["", "", "", "", "", ""]);
+          if (data.devCode) setDevHint(data.devCode);
+          goTo("2fa");
         } else {
           login(data, data.token ?? "");
           onOpenChange(false);
@@ -244,6 +249,36 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
     }
   }
 
+  async function handle2fa(e: React.FormEvent) {
+    e.preventDefault();
+    const code = verifyCode.join("");
+    if (code.length < 6) {
+      setError(t("auth.errors.enterCode"));
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${BASE}api/auth/verify-2fa`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: verifyEmail, code }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || t("auth.errors.invalidCode"));
+      } else {
+        login(data, data.token ?? "");
+        onOpenChange(false);
+        resetAll();
+      }
+    } catch {
+      setError(t("auth.errors.networkError"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleResend() {
     setLoading(true);
     setError(null);
@@ -287,6 +322,7 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
     login: t("auth.titles.login"),
     register: t("auth.titles.register"),
     verify: t("auth.titles.verify"),
+    "2fa": t("auth.titles.twoFa", { defaultValue: "Verifica identità" }),
     forgot: t("auth.titles.forgot"),
     "forgot-sent": t("auth.titles.forgotSent"),
     "reset-sent": t("auth.titles.resetSent"),
@@ -295,6 +331,7 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
     login: t("auth.descriptions.login"),
     register: t("auth.descriptions.register"),
     verify: t("auth.descriptions.verify", { email: verifyEmail }),
+    "2fa": t("auth.descriptions.twoFa", { email: verifyEmail, defaultValue: `Codice inviato a ${verifyEmail}. Scade in 10 minuti.` }),
     forgot: t("auth.descriptions.forgot"),
     "forgot-sent": t("auth.descriptions.forgotSent", { email: forgotEmail }),
     "reset-sent": t("auth.descriptions.resetSent"),
@@ -321,7 +358,7 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
           </div>
         )}
 
-        {(view === "verify" || view === "forgot") && (
+        {(view === "verify" || view === "2fa" || view === "forgot") && (
           <button onClick={() => goTo("login")} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2 transition-colors w-fit">
             <ArrowLeft className="w-3.5 h-3.5" /> {t("auth.backToLogin")}
           </button>
@@ -451,6 +488,39 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
                 {t("auth.devCodeLabel")} <span className="font-mono font-semibold text-foreground">{devHint}</span>
               </p>
             )}
+          </form>
+        )}
+
+        {view === "2fa" && (
+          <form onSubmit={handle2fa} className="space-y-5">
+            <div className="flex justify-center">
+              <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center">
+                <KeyRound className="w-7 h-7 text-primary" />
+              </div>
+            </div>
+
+            {devHint && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+                <p className="text-xs text-amber-700 font-medium mb-1">{t("auth.devMode")}</p>
+                <p className="text-2xl font-mono font-bold tracking-widest text-amber-800">{devHint}</p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label className="text-center block">{t("auth.verifyCode", { defaultValue: "Codice di accesso" })}</Label>
+              <div className="flex gap-2 justify-center" onPaste={handleCodePaste}>
+                {verifyCode.map((digit, idx) => (
+                  <input key={idx} ref={(el) => { codeRefs.current[idx] = el; }} type="text" inputMode="numeric" maxLength={1} value={digit} onChange={(e) => handleCodeInput(idx, e.target.value)} onKeyDown={(e) => handleCodeKeyDown(idx, e)} className="w-11 h-13 text-center text-xl font-bold border-2 rounded-xl outline-none focus:border-primary transition-colors bg-background" />
+                ))}
+              </div>
+            </div>
+
+            {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2 text-center">{error}</p>}
+
+            <Button type="submit" className="w-full rounded-full font-medium" disabled={loading || verifyCode.join("").length < 6}>
+              {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {t("auth.verifyBtn", { defaultValue: "Conferma" })}
+            </Button>
           </form>
         )}
 
