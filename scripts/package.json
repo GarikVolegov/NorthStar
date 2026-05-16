@@ -8,7 +8,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "seed-products": "tsx ./src/seed-products.ts",
     "seed:e2e": "tsx ./src/seed-e2e.ts",
-    "seed:e2e-affiliate": "tsx ./src/seed-e2e-affiliate.ts"
+    "seed:e2e-affiliate": "tsx ./src/seed-e2e-affiliate.ts",
+    "security:scan": "tsx ./src/security-agent.ts",
+    "security:scan:all": "tsx ./src/security-agent.ts -- --all"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",

@@ -53,5 +53,9 @@ export type { RouterOptions, ModelRoute, RequestComplexity, AgentRole } from "./
 export { routeQuery } from "./search-router/router";
 export type { RouterInput, RouterOutput } from "./search-router/router";
 
+// Security Agent
+export { runSecurityAgent } from "./security-agent/index";
+export type { SecurityScanOptions, SecurityAgentEvent, SecurityFinding, Severity, VulnCategory } from "./security-agent/index";
+
 // Utilities
 export { withTimeout, gracefulDegrade } from "./utils";

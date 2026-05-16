@@ -54,7 +54,10 @@ export type AgentRole =
   | "wiki-chat"
   | "wiki-suggest"
   // deep reasoning
-  | "chain-of-thought";
+  | "chain-of-thought"
+  // Security agent
+  | "security-scan"
+  | "security-fix";
 
 export interface RouterOptions {
   isPremium?: boolean;
@@ -161,6 +164,10 @@ const ROLE_CONFIG: Record<AgentRole, RoleConfig> = {
 
   // Deep reasoning — DeepSeek R1 free is excellent here
   "chain-of-thought":        { tier: "reasoning", temperature: 0.2, maxTokens: 800, upgradeOnPremiumDeep: true },
+
+  // Security — deep analysis first, targeted fix generation second
+  "security-scan":           { tier: "reasoning", temperature: 0.1, maxTokens: 2000 },
+  "security-fix":            { tier: "standard",  temperature: 0.2, maxTokens: 1500 },
 };
 
 // ── Public API ────────────────────────────────────────────────────────────────
