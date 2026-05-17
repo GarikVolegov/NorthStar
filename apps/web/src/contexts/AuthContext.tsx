@@ -13,7 +13,7 @@ import {
 } from "react";
 import { useUser, useAuth as useClerkAuth, useClerk } from "@clerk/react";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
-import { AUTH_EXPIRED_EVENT, TOKEN_STORAGE_KEY, USER_STORAGE_KEY } from "@/lib/storage-keys";
+import { AUTH_EXPIRED_EVENT } from "@/lib/storage-keys";
 import { useQueryClient } from "@tanstack/react-query";
 
 export interface AuthUser {
@@ -115,37 +115,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, logout);
   }, [logout]);
 
-  const didMountSync = useRef(false);
-  useEffect(() => {
-    if (didMountSync.current) return;
-    didMountSync.current = true;
+  // Sync con server — eseguito una volta quando Clerk carica.
+  // NON usa didMountSync (causava authReady bloccato a false).
+  // Strategia non bloccante:
+  //   1. Se non loggato: authReady=true immediatamente
+  //   2. Se loggato: mostra subito dati Clerk (authReady=true), poi arricchisce con dati server
+  const syncedClerkIdRef = useRef<string | null>(null);
 
-    if (!clerkLoaded) {
-      return;
-    }
+  useEffect(() => {
+    if (!clerkLoaded) return;  // Aspetta che Clerk sia pronto
 
     if (!isSignedIn || !clerkUser) {
-      setAuthReady(true);
+      setUser(null);
+      setToken(null);
+      setAuthReady(true);  // Guest: pronto immediatamente
       return;
     }
 
-    const ctrl = new AbortController();
+    // Già sincronizzato per questo utente Clerk — evita re-sync su re-render
+    if (syncedClerkIdRef.current === clerkUser.id) return;
+    syncedClerkIdRef.current = clerkUser.id;
 
-    const syncUser = async () => {
+    // Mostra subito i dati di Clerk — l'app diventa interattiva immediatamente
+    const clerkOnlyUser = clerkUserToAuthUser(clerkUser);
+    setUser(clerkOnlyUser);
+    setAuthReady(true);  // ← Sblocca l'app subito, senza aspettare il server
+
+    // Sync con il server in background — aggiorna i dati senza bloccare
+    const ctrl = new AbortController();
+    const syncWithServer = async () => {
       try {
-        // Prima prova il template "NorthStar" (con userId custom claim),
-        // poi fallback al token Clerk standard — evita che il sync fallisca
-        // se il JWT template non è ancora configurato nel Clerk Dashboard.
         let clerkToken = await getToken({ template: "NorthStar" }).catch(() => null);
-        if (!clerkToken) {
-          clerkToken = await getToken().catch(() => null);
-        }
-        if (!clerkToken) {
-          // Nessun token disponibile — usa dati Clerk senza sync server
-          setUser(clerkUserToAuthUser(clerkUser));
-          setAuthReady(true);
-          return;
-        }
+        if (!clerkToken) clerkToken = await getToken().catch(() => null);
+        if (!clerkToken) return;  // Nessun token — mantieni dati Clerk puri
 
         setToken(clerkToken);
 
@@ -165,23 +167,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (res.ok) {
           const serverUser = (await res.json()) as AuthUser;
-          const authUser = {
-            ...clerkUserToAuthUser(clerkUser),
-            ...serverUser,
-          };
-          setUser(authUser);
-        } else {
-          setUser(clerkUserToAuthUser(clerkUser));
+          // Merge: dati server sovrascrivono dati Clerk (più completi)
+          setUser({ ...clerkOnlyUser, ...serverUser });
         }
       } catch {
-        setUser(clerkUserToAuthUser(clerkUser));
-      } finally {
-        setAuthReady(true);
+        // Sync fallita — utente rimane con dati Clerk puri, è accettabile
       }
     };
 
-    syncUser();
-
+    void syncWithServer();
     return () => ctrl.abort();
   }, [clerkLoaded, isSignedIn, clerkUser, getToken]);
 

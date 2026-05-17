@@ -66,6 +66,11 @@
     <!-- API origin: preconnect riduce la latenza delle prime chiamate fetch -->
     <link rel="preconnect" href="https://northstar.app" crossorigin />
 
+    <!-- Clerk: preconnect riduce la latenza dell'inizializzazione auth -->
+    <link rel="preconnect" href="https://clerk.com" />
+    <link rel="preconnect" href="https://api.clerk.com" />
+    <link rel="dns-prefetch" href="https://clerk.accounts.dev" />
+
     <!-- Google GSI: dns-prefetch sufficiente, il connect avviene già con il tag script -->
     <link rel="dns-prefetch" href="https://accounts.google.com" />
 
