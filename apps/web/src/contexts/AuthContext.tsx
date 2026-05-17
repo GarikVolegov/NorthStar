@@ -13,7 +13,7 @@ import {
 } from "react";
 import { useUser, useAuth as useClerkAuth, useClerk } from "@clerk/react";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
-import { AUTH_EXPIRED_EVENT } from "@/lib/storage-keys";
+import { AUTH_EXPIRED_EVENT, TOKEN_STORAGE_KEY } from "@/lib/storage-keys";
 import { useQueryClient } from "@tanstack/react-query";
 
 export interface AuthUser {
@@ -128,6 +128,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isSignedIn || !clerkUser) {
       setUser(null);
       setToken(null);
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+      setAuthTokenGetter(null);
       setAuthReady(true);  // Guest: pronto immediatamente
       return;
     }
@@ -150,6 +152,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!clerkToken) return;  // Nessun token — mantieni dati Clerk puri
 
         setToken(clerkToken);
+        // Scrive il token in sessionStorage — necessario per useWendyChat e altri hook
+        // che leggono il token direttamente da sessionStorage per le chiamate SSE
+        sessionStorage.setItem(TOKEN_STORAGE_KEY, clerkToken);
+        setAuthTokenGetter(() => clerkToken);
 
         const res = await fetch(`${BASE}api/auth/clerk-sync`, {
           method: "POST",

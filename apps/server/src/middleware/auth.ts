@@ -166,14 +166,70 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
           next();
           return;
         }
-      } catch (dbErr) {
-        rootLogger.warn({ dbErr }, "[auth] DB lookup for Clerk user failed");
-      }
 
-      // Utente Clerk non ancora sincronizzato — accesso limitato
-      // Il client deve chiamare /api/auth/clerk-sync prima di usare le API protette
-      if (req.log) {
-        req.log.warn({ clerkId: clerkPayload.sub }, "[auth] Clerk user not yet synced");
+        // Utente Clerk non in DB → auto-upsert (evita 401 per nuovi utenti o utenti pre-migrazione)
+        // Estrae email e nome dai claim del token Clerk (se presenti) o usa fallback
+        const rawPayload = clerkPayload as unknown as Record<string, unknown>;
+        const clerkEmail = rawPayload.email as string | undefined;
+        const clerkName  = (rawPayload.name as string | undefined)
+          ?? (rawPayload.username as string | undefined)
+          ?? "Utente";
+        const clerkSub = clerkPayload.sub;
+
+        if (clerkEmail) {
+          try {
+            // Cerca per email per collegare account pre-esistenti
+            const [existingByEmail] = await db
+              .select({ id: usersTable.id })
+              .from(usersTable)
+              .where(eq(usersTable.email, clerkEmail.toLowerCase()))
+              .limit(1);
+
+            let userId: number;
+
+            if (existingByEmail) {
+              // Collega clerkId all'account esistente
+              await db.update(usersTable)
+                .set({ clerkId: clerkSub, emailVerified: true, updatedAt: new Date() })
+                .where(eq(usersTable.id, existingByEmail.id));
+              userId = existingByEmail.id;
+            } else {
+              // Crea nuovo utente
+              const [newUser] = await db.insert(usersTable)
+                .values({
+                  clerkId:       clerkSub,
+                  email:         clerkEmail.toLowerCase(),
+                  name:          clerkName,
+                  emailVerified: true,
+                  role:          "user",
+                  passwordHash:  "",
+                })
+                .returning({ id: usersTable.id });
+              userId = newUser.id;
+            }
+
+            req.user = {
+              id:                   userId,
+              name:                 clerkName,
+              email:                clerkEmail,
+              role:                 "user",
+              stripeSubscriptionId: null,
+              journeyType:          null,
+              testSessionId:        null,
+              onboardingCompleted:  false,
+            };
+
+            if (req.log) req.log = req.log.child({ userId });
+            next();
+            return;
+          } catch (upsertErr) {
+            rootLogger.warn({ upsertErr, clerkSub }, "[auth] auto-upsert Clerk user failed");
+          }
+        }
+
+        rootLogger.warn({ clerkId: clerkSub }, "[auth] Clerk user not synced, no email in token");
+      } catch (dbErr) {
+        rootLogger.warn({ dbErr }, "[auth] DB lookup/upsert for Clerk user failed");
       }
     }
 
