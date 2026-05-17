@@ -23,6 +23,17 @@ export const userProfileSettingsTable = pgTable("user_profile_settings", {
   stabilityPreference: integer("stability_preference").default(5),
   userMode: text("user_mode").notNull().default("explorer"),
 
+  // Step 7: onboarding adattivo
+  horizon:       text("horizon", {
+                   enum: ["short", "medium", "open"],
+                 }).default("open"),
+  onboardingStep: integer("onboarding_step").notNull().default(0), // 0=non iniziato, 4=completato
+
+  // Step 7: tono Wendy personalizzato
+  wendyTonePreference: text("wendy_tone_preference", {
+                          enum: ["auto", "concise", "detailed", "formal", "casual"],
+                        }).default("auto"),
+
   city: text("city"),
   cityPlaceId: text("city_place_id"),
   bio: text("bio"),

@@ -70,6 +70,14 @@ export * from "./weeklyLeaderboard";
 export * from "./search";
 // ── News Subscriptions ─────────────────────────────────────────
 export * from "./newsSubscriptions";
+// ── Step 7: SaaS maturo — subscription, workspace, collab, briefing ─────
+export * from "./subscription";
+export * from "./workspace";
+export * from "./workspaceMember";
+export * from "./sharedPlan";
+export * from "./planComment";
+export * from "./mentorRelationship";
+export * from "./wendyBriefing";
 // ── Step 6: RAG, Weak Signals, Job Market Intelligence ─────────
 export * from "./ragSource";
 export * from "./ragChunk";

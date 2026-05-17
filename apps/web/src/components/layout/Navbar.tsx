@@ -22,6 +22,7 @@ import {
   HandCoins,
   Search,
   Sparkles,
+  Brain,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -519,6 +520,13 @@ export function Navbar() {
                     >
                       <BrainCircuit className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2 text-primary" /> Chiedi a Wendy
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setLocation("/wendy/memoria")}
+                      onMouseEnter={() => prefetchRoute("/wendy/memoria")}
+                      className="cursor-pointer text-xs text-muted-foreground"
+                    >
+                      <Brain className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2" /> Memoria di Wendy
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <div className="px-2 py-1.5">
                       <p className="text-xs text-muted-foreground mb-1.5 font-semibold uppercase tracking-wide">Tema</p>
@@ -569,7 +577,7 @@ export function Navbar() {
           {/* Mobile search + right */}
           <div className="flex md:hidden items-center gap-1 flex-1 justify-end">
             <div
-              className="relative flex-1 max-w-[160px] sm:max-w-[220px] cursor-pointer"
+              className="relative flex-1 max-w-40 sm:max-w-55 cursor-pointer"
               onClick={() => search.setIsOpen(true)}
             >
               <span className="absolute left-2.5 lefty:left-auto lefty:right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">

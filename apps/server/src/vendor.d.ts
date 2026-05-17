@@ -1,4 +1,18 @@
 // Type shims per moduli senza @types nel pacchetto server.
+
+declare module "stripe" {
+  class Stripe {
+    constructor(apiKey: string, options?: Record<string, unknown>);
+    webhooks: {
+      constructEvent(payload: string | Buffer, sig: string, secret: string): {
+        type: string;
+        data: { object: Record<string, unknown> };
+        [key: string]: unknown;
+      };
+    };
+  }
+  export = Stripe;
+}
 // opossum e pg sono usati in packages/db/src/index.ts come deps runtime.
 
 declare module "opossum" {
