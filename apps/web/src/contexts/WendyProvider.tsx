@@ -1,5 +1,9 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
 import { useWendyOpenAITTS } from '../hooks/useWendyOpenAITTS';
+import { useBrowserTTS } from '../hooks/useBrowserTTS';
+
+// TTS attivo: OpenAI se VITE_OPENAI_TTS_ENABLED=true, altrimenti Web Speech API gratuito
+const USE_OPENAI_TTS = import.meta.env.VITE_OPENAI_TTS_ENABLED === 'true';
 
 export type WendyPhase = 'idle' | 'thinking' | 'speaking' | 'listening';
 
@@ -87,22 +91,31 @@ export function useWendy(): WendyContextValue {
 }
 
 function WendyTTSBridge({ onSpeakingChange, onPhaseChange }: { onSpeakingChange: (v: boolean) => void; onPhaseChange: (p: WendyPhase) => void }) {
-  const { play } = useWendyOpenAITTS({
-    onStart: () => {
-      onSpeakingChange(true);
-      onPhaseChange('speaking');
-    },
-    onEnd: () => {
-      onSpeakingChange(false);
-      onPhaseChange('idle');
-    },
+  // OpenAI TTS (alta qualità, richiede chiave)
+  const { play: playOpenAI } = useWendyOpenAITTS({
+    onStart: () => { onSpeakingChange(true);  onPhaseChange('speaking'); },
+    onEnd:   () => { onSpeakingChange(false); onPhaseChange('idle');     },
   });
 
-  const speakRef = useRef(play);
+  // Browser TTS (gratuito, fallback automatico)
+  const browserTts = useBrowserTTS();
+
+  const speakRef = useRef<(text: string) => void>(() => {});
 
   useEffect(() => {
-    speakRef.current = play;
-  }, [play]);
+    speakRef.current = (text: string) => {
+      if (USE_OPENAI_TTS) {
+        playOpenAI(text);
+      } else if (browserTts.isSupported) {
+        onSpeakingChange(true);
+        onPhaseChange('speaking');
+        browserTts.play(text, navigator.language ?? 'it-IT');
+        // Il browser TTS non espone onEnd affidabile su tutti i browser — reset dopo stima
+        const estimatedMs = Math.max(2000, text.length * 60);
+        setTimeout(() => { onSpeakingChange(false); onPhaseChange('idle'); }, estimatedMs);
+      }
+    };
+  }, [playOpenAI, browserTts, onSpeakingChange, onPhaseChange]);
 
   useEffect(() => {
     (window as any).__wendySpeak = (text: string) => speakRef.current(text);

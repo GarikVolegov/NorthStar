@@ -23,6 +23,7 @@ import {
   resolveWendyRoute,
   buildLightPrompt,
   toolsToOpenAIFormat,
+  executeToolCall,
   recordAiCall,
   getLLMForRoute,
   estimateTokens,
@@ -136,16 +137,40 @@ router.post("/", requireAuth, wendyLimiter, async (req: Request, res: Response) 
 
       outputTokens = estimateTokens(response);
 
-      // Prova a parsare tool call JSON (navigation), altrimenti manda come token
+      // Prova a parsare tool call JSON, altrimenti testo normale
+      let toolCallHandled = false;
       try {
         const parsed = JSON.parse(response);
-        if (parsed?.tool || parsed?.type === "tool_call") {
-          send({ type: "tool_call", name: parsed.tool ?? parsed.name, args: parsed.args ?? parsed.arguments ?? {} });
-        } else {
-          send({ type: "token", value: response });
+        const toolName = parsed?.tool ?? parsed?.name ?? parsed?.function?.name;
+        const toolArgs = parsed?.args ?? parsed?.arguments ?? parsed?.function?.arguments ?? {};
+        if (toolName) {
+          // Esegui il tool call e rimanda il risultato
+          const result = await executeToolCall(toolName, toolArgs, userId);
+          send({ type: "tool_call", name: toolName, args: toolArgs, result: result.ok ? result.data : null });
+          toolCallHandled = true;
+
+          // Se è client-side (navigate, filter_list), non serve risposta testuale
+          if (result.ok && (result.data as any)?.clientSide) {
+            send({ type: "done", intent, usage: { model: decision.model, inputTokens, outputTokens } });
+            return;
+          }
+
+          // Altrimenti: manda il risultato al LLM per generare una risposta testuale
+          const followUpResponse = await llm.chatOnce(
+            [
+              { role: "system",    content: buildLightPrompt({ locale, intent, pageContext: pageContext as any }) },
+              { role: "user",      content: message },
+              { role: "assistant", content: response },
+              { role: "tool" as any, content: JSON.stringify(result.ok ? result.data : { error: result.error }) },
+            ],
+            { model: decision.model, temperature: 0.3, maxTokens: 400 },
+          );
+          outputTokens += estimateTokens(followUpResponse);
+          send({ type: "token", value: followUpResponse });
         }
-      } catch {
-        // Testo normale
+      } catch { /* non è JSON valido */ }
+
+      if (!toolCallHandled) {
         send({ type: "token", value: response });
       }
 

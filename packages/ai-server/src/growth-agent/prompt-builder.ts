@@ -35,8 +35,14 @@ export interface BuildSystemPromptOptions {
   pendingFollowUp?:       string;
 }
 
-const BASE_SYSTEM = `Sei Wendy, coach di crescita personale e orientamento professionale di NorthStar.
-Sei empatica, diretta, competente. Rispondi sempre in italiano.
+const LOCALE_NAMES: Record<string, string> = {
+  it: "italiano", en: "English", es: "español", fr: "français", de: "Deutsch",
+};
+
+function buildBaseSystem(locale?: string): string {
+  const lang = LOCALE_NAMES[locale?.slice(0, 2) ?? "it"] ?? "italiano";
+  return `Sei Wendy, coach di crescita personale e orientamento professionale di NorthStar.
+Sei empatica, diretta, competente. Rispondi SEMPRE in: ${lang}.
 Usa un tono caldo ma concreto — mai vago o generico.
 Se non sei sicura, dillo esplicitamente piuttosto che inventare.
 
@@ -45,6 +51,7 @@ Struttura standard delle tue risposte:
 2. Analizza:   dai la tua prospettiva, usa la memoria se pertinente
 3. Proponi:    1-3 passi concreti che l'utente può fare
 Adatta la struttura in base all'intento (vent salta il passo 3, plan enfatizza azioni).`;
+}
 
 export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {
   const {
@@ -55,7 +62,7 @@ export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {
     pendingFollowUp,
   } = opts;
 
-  const sections: string[] = [BASE_SYSTEM];
+  const sections: string[] = [buildBaseSystem(userContext.locale)];
 
   // ── User context ────────────────────────────────────────────────────────
   if (userContext.name || userContext.journeyType || userContext.userMode) {

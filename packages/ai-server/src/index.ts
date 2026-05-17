@@ -68,6 +68,7 @@ export { runSearchOrchestrator } from "./search-agent/orchestrator";
 export type { SearchOrchestratorOptions, SearchOrchestratorEvent, SearchResult as OrchestratorSearchResult } from "./search-agent/orchestrator";
 
 // Wendy Router
+export { executeToolCall }   from "./wendy-router/tool-handlers";
 export { classifyIntent }    from "./wendy-router/intent-classifier";
 export { getToolsForIntent, toolsToOpenAIFormat } from "./wendy-router/tool-registry";
 export { resolveWendyRoute } from "./wendy-router/router";

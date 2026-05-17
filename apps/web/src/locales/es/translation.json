@@ -2700,5 +2700,20 @@
     "suggestions": "Sugerencias",
     "askWendy": "Pregunta a Wendy: \"{{query}}\"",
     "askWendyDesc": "Habla con la asistente AI para saber más"
+  },
+  "wendy": {
+    "placeholder": "Escribe a Wendy...",
+    "send": "Enviar",
+    "stop": "Detener",
+    "voice": "Voz",
+    "clear": "Nueva chat",
+    "status": {
+      "thinking": "Procesando...",
+      "searching": "Buscando...",
+      "writing": "Escribiendo...",
+      "analyzing": "Analizando...",
+      "loading": "Cargando perfil...",
+      "web": "Buscando en la web..."
+    }
   }
 }

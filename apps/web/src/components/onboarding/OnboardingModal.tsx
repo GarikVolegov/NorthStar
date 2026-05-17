@@ -1,172 +1,200 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link } from "wouter";
-import { ArrowRight, Target, BookOpen, Map, Network, BrainCircuit, CheckCircle2, X } from "lucide-react";
+import { ArrowRight, Map, BookOpen, BrainCircuit, Network, CheckCircle2, X } from "lucide-react";
+import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
 interface Recommendation {
-  sectorId: number;
+  sectorId:   number;
   sectorName: string;
   matchScore: number;
 }
 
 interface OnboardingModalProps {
-  sessionId: string;
+  sessionId:       string;
   recommendations: Recommendation[];
-  riasecTypes: string[];
-  dominantSpirit: string;
+  riasecTypes:     string[];   // usato internamente, non mostrato come codici raw
+  dominantSpirit:  string;
 }
 
-const SPIRIT_META: Record<string, { emoji: string; label: string }> = {
-  shen: { emoji: "✨", label: "Presenza" },
-  hun:  { emoji: "🌙", label: "Visione" },
-  po:   { emoji: "⚡", label: "Istinto" },
-  yi:   { emoji: "🔮", label: "Focus" },
-  zhi:  { emoji: "🔥", label: "Tenacia" },
+// ── Journey type ──────────────────────────────────────────────────────────────
+
+const JOURNEY_OPTIONS = [
+  { value: "indeciso",    emoji: "🧭", label: "Sto cercando la mia strada",      desc: "Non sai ancora bene cosa vuoi fare" },
+  { value: "dipendente",  emoji: "📈", label: "Voglio crescere nel mio lavoro",   desc: "Hai un lavoro e vuoi avanzare" },
+  { value: "autonomo",    emoji: "🚀", label: "Lavoro o voglio lavorare in autonomia", desc: "Freelance, consulente o imprenditore" },
+  { value: "azienda",     emoji: "🏢", label: "Gestisco o costruisco un'azienda", desc: "Hai un team o vuoi crearne uno" },
+  { value: "investitore", emoji: "💰", label: "Investo o voglio capire i mercati",desc: "Finanza, asset e opportunità" },
+] as const;
+
+// Mappa i codici RIASEC in caratteristiche leggibili
+const RIASEC_TRAITS: Record<string, string> = {
+  R: "Pratico e concreto",
+  I: "Analitico e curioso",
+  A: "Creativo e originale",
+  S: "Empatico e collaborativo",
+  E: "Intraprendente e persuasivo",
+  C: "Preciso e organizzato",
 };
 
 const CATEGORY_OPTIONS = [
-  { value: "formazione", label: "Formazione" },
-  { value: "certificazione", label: "Certificazione" },
-  { value: "networking", label: "Networking" },
-  { value: "esperienza", label: "Esperienza" },
+  { value: "formazione",    label: "Formazione" },
+  { value: "certificazione",label: "Certificazione" },
+  { value: "networking",    label: "Networking" },
+  { value: "esperienza",    label: "Esperienza pratica" },
 ];
 
 const TOTAL_STEPS = 4;
 
 export function OnboardingModal({ sessionId, recommendations, riasecTypes, dominantSpirit }: OnboardingModalProps) {
-  const [open, setOpen] = useState(false);
-  const [step, setStep] = useState(1);
-  const [objectiveText, setObjectiveText] = useState("");
+  const [open,              setOpen]              = useState(false);
+  const [step,              setStep]              = useState(1);
+  const [selectedJourney,   setSelectedJourney]   = useState<string | null>(null);
+  const [savingJourney,     setSavingJourney]     = useState(false);
+  const [objectiveText,     setObjectiveText]     = useState("");
   const [objectiveCategory, setObjectiveCategory] = useState("formazione");
-  const [objectiveDue, setObjectiveDue] = useState("");
-  const [objectiveSaved, setObjectiveSaved] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [objectiveDue,      setObjectiveDue]      = useState("");
+  const [objectiveSaved,    setObjectiveSaved]    = useState(false);
+  const [saving,            setSaving]            = useState(false);
 
-   useEffect(() => {
-     const done = localStorage.getItem("northstar_onboarding_done");
-     let timer: NodeJS.Timeout | null = null;
-     if (!done) {
-       timer = setTimeout(() => setOpen(true), 1200);
-     }
-     return () => {
-       if (timer) clearTimeout(timer);
-     };
-   }, []);
+  useEffect(() => {
+    const done = localStorage.getItem("northstar_onboarding_done");
+    if (done) return;
+    const t = setTimeout(() => setOpen(true), 1200);
+    return () => clearTimeout(t);
+  }, []);
 
   function finish() {
     localStorage.setItem("northstar_onboarding_done", "1");
     setOpen(false);
   }
 
+  async function handleJourneySelect(value: string) {
+    setSelectedJourney(value);
+    setSavingJourney(true);
+    try {
+      await apiFetch(`${BASE}api/profile/me/journey-type`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ journeyType: value }),
+      });
+    } catch { /* non bloccante */ }
+    setSavingJourney(false);
+    setStep(2);
+  }
+
   async function saveObjective() {
     if (!objectiveText.trim()) return;
     setSaving(true);
     try {
-      await fetch(`${BASE}api/objectives`, {
+      await apiFetch(`${BASE}api/objectives`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          text: objectiveText.trim(),
-          category: objectiveCategory,
-          dueDate: objectiveDue || null,
-        }),
+        body: JSON.stringify({ text: objectiveText.trim(), category: objectiveCategory, dueDate: objectiveDue || null }),
       });
       setObjectiveSaved(true);
     } catch { /* ignore */ }
     setSaving(false);
   }
 
-  const spirit = SPIRIT_META[dominantSpirit];
+  // Caratteristiche leggibili invece dei codici RIASEC
+  const traits = riasecTypes.slice(0, 3).map((c) => RIASEC_TRAITS[c]).filter(Boolean);
 
   return (
-         <Dialog open={open} onOpenChange={(open) => { if (!open) finish(); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) finish(); }}>
       <DialogContent className="max-w-lg p-0 gap-0 overflow-hidden" onPointerDownOutside={(e) => e.preventDefault()}>
-        {/* Progress bar */}
+        {/* Barra progresso */}
         <div className="h-1 bg-muted">
-          <div
-            className="h-full bg-primary transition-all duration-500"
-            style={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
-          />
+          <div className="h-full bg-primary transition-all duration-500" style={{ width: `${(step / TOTAL_STEPS) * 100}%` }} />
         </div>
 
-        <button
-          className="absolute top-3 right-3 p-1.5 rounded-full hover:bg-muted transition-colors z-10"
-          onClick={finish}
-        >
+        <button className="absolute top-3 right-3 p-1.5 rounded-full hover:bg-muted transition-colors z-10" onClick={finish}>
           <X className="w-4 h-4 text-muted-foreground" />
         </button>
 
         <div className="px-6 pt-6 pb-5">
           <div className="text-xs text-muted-foreground mb-4">Passo {step} di {TOTAL_STEPS}</div>
 
-          {/* Step 1 — Test completato */}
+          {/* ── Step 1 — Scegli il tuo percorso ── */}
           {step === 1 && (
-            <div className="text-center">
-              <div className="text-4xl mb-3">🎉</div>
-              <h2 className="text-xl font-bold mb-2">Hai completato il test!</h2>
-              <p className="text-sm text-muted-foreground mb-6">
-                Ecco il tuo profilo professionale. Salvalo per accedere a tutti gli strumenti AI.
+            <div>
+              <div className="text-3xl mb-3 text-center">🧭</div>
+              <h2 className="text-xl font-bold mb-1 text-center">Dove sei adesso?</h2>
+              <p className="text-sm text-muted-foreground mb-5 text-center">
+                Scegli il percorso che ti descrive meglio. Wendy adatterà i consigli per te.
               </p>
-              <div className="flex flex-wrap justify-center gap-2 mb-4">
-                {riasecTypes.slice(0, 3).map((t) => (
-                  <Badge key={t} variant="outline" className="text-base font-bold px-3 py-1">{t}</Badge>
+              <div className="space-y-2">
+                {JOURNEY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => handleJourneySelect(opt.value)}
+                    disabled={savingJourney}
+                    className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all hover:border-primary/50 hover:bg-muted/30 disabled:opacity-60 ${selectedJourney === opt.value ? "border-primary bg-primary/5" : ""}`}
+                  >
+                    <span className="text-2xl shrink-0">{opt.emoji}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate">{opt.label}</p>
+                      <p className="text-xs text-muted-foreground truncate">{opt.desc}</p>
+                    </div>
+                    {selectedJourney === opt.value && <CheckCircle2 className="w-4 h-4 text-primary ml-auto shrink-0" />}
+                  </button>
                 ))}
-                {spirit && (
-                  <Badge variant="secondary" className="px-3 py-1">
-                    {spirit.emoji} {spirit.label}
-                  </Badge>
-                )}
               </div>
-              <Button className="w-full" size="lg" onClick={() => setStep(2)}>
-                Continua <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
             </div>
           )}
 
-          {/* Step 2 — Settore ideale */}
+          {/* ── Step 2 — Profilo di orientamento (ex RIASEC) ── */}
           {step === 2 && (
-            <div>
-              <div className="text-3xl mb-3 text-center">🎯</div>
-              <h2 className="text-xl font-bold mb-1 text-center">Il tuo settore ideale</h2>
-              <p className="text-sm text-muted-foreground mb-5 text-center">
-                Basandoci sul tuo profilo, ti consigliamo questi settori
+            <div className="text-center">
+              <div className="text-4xl mb-3">🎉</div>
+              <h2 className="text-xl font-bold mb-2">Il tuo profilo di orientamento</h2>
+              <p className="text-sm text-muted-foreground mb-5">
+                Ecco le tue caratteristiche principali. Wendy le userà per personalizzare ogni risposta.
               </p>
-              <div className="space-y-3 mb-5">
+              <div className="flex flex-wrap justify-center gap-2 mb-6">
+                {traits.map((trait) => (
+                  <span key={trait} className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold border border-primary/20">
+                    {trait}
+                  </span>
+                ))}
+                {recommendations[0] && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-muted text-muted-foreground text-xs font-semibold">
+                    🎯 {recommendations[0].sectorName}
+                  </span>
+                )}
+              </div>
+              {/* Settori consigliati */}
+              <div className="space-y-2 mb-5 text-left">
                 {recommendations.slice(0, 3).map((rec) => (
                   <Link key={rec.sectorId} href={`/settore/${rec.sectorId}`} onClick={finish}>
                     <div className="flex items-center justify-between rounded-xl border p-3 hover:border-primary/40 hover:bg-muted/30 transition-all cursor-pointer">
-                      <div>
-                        <p className="font-semibold text-sm">{rec.sectorName}</p>
-                        <p className="text-xs text-muted-foreground">{rec.matchScore}% compatibilità</p>
-                      </div>
+                      <p className="font-semibold text-sm">{rec.sectorName}</p>
                       <div className="flex items-center gap-2">
-                        <div className="h-2 w-20 rounded-full bg-muted overflow-hidden">
+                        <div className="h-1.5 w-16 rounded-full bg-muted overflow-hidden">
                           <div className="h-full bg-primary rounded-full" style={{ width: `${rec.matchScore}%` }} />
                         </div>
-                        <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <span className="text-xs text-muted-foreground">{rec.matchScore}%</span>
                       </div>
                     </div>
                   </Link>
                 ))}
               </div>
-              <Button className="w-full" onClick={() => setStep(3)}>
+              <Button className="w-full" size="lg" onClick={() => setStep(3)}>
                 Continua <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
           )}
 
-          {/* Step 3 — Primo obiettivo */}
+          {/* ── Step 3 — Primo obiettivo ── */}
           {step === 3 && (
             <div>
               <div className="text-3xl mb-3 text-center">📋</div>
-              <h2 className="text-xl font-bold mb-1 text-center">Imposta il tuo primo obiettivo</h2>
+              <h2 className="text-xl font-bold mb-1 text-center">Il tuo primo obiettivo</h2>
               <p className="text-sm text-muted-foreground mb-5 text-center">
                 Cosa vuoi raggiungere nei prossimi 3 mesi?
               </p>
@@ -187,6 +215,7 @@ export function OnboardingModal({ sessionId, recommendations, riasecTypes, domin
                       placeholder="es. Completare un corso di Python"
                       value={objectiveText}
                       onChange={(e) => setObjectiveText(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && !saving && objectiveText.trim() && saveObjective()}
                     />
                   </div>
                   <div>
@@ -196,9 +225,7 @@ export function OnboardingModal({ sessionId, recommendations, riasecTypes, domin
                         <button
                           key={c.value}
                           onClick={() => setObjectiveCategory(c.value)}
-                          className={`rounded-lg border py-2 text-xs font-medium transition-colors ${
-                            objectiveCategory === c.value ? "bg-primary text-primary-foreground border-primary" : "hover:border-primary/40"
-                          }`}
+                          className={`rounded-lg border py-2 text-xs font-medium transition-colors ${objectiveCategory === c.value ? "bg-primary text-primary-foreground border-primary" : "hover:border-primary/40"}`}
                         >
                           {c.label}
                         </button>
@@ -220,21 +247,21 @@ export function OnboardingModal({ sessionId, recommendations, riasecTypes, domin
             </div>
           )}
 
-          {/* Step 4 — Cosa fare adesso */}
+          {/* ── Step 4 — Cosa fare adesso ── */}
           {step === 4 && (
             <div>
               <div className="text-3xl mb-3 text-center">🚀</div>
-              <h2 className="text-xl font-bold mb-1 text-center">Cosa fare adesso?</h2>
+              <h2 className="text-xl font-bold mb-1 text-center">Sei pronto!</h2>
               <p className="text-sm text-muted-foreground mb-5 text-center">
-                Hai tutto quello che ti serve. Inizia il tuo percorso!
+                Wendy ti accompagnerà in ogni passo del tuo percorso.
               </p>
               {recommendations[0] && (
                 <div className="grid grid-cols-2 gap-3 mb-5">
                   {[
                     { href: `/roadmap/${recommendations[0].sectorId}`, icon: <Map className="w-4 h-4" />, label: "Roadmap AI", color: "text-emerald-600 bg-emerald-50" },
                     { href: `/wiki/${recommendations[0].sectorId}`, icon: <BookOpen className="w-4 h-4" />, label: "Wiki Settore", color: "text-indigo-600 bg-indigo-50" },
-                    { href: "/coach", icon: <BrainCircuit className="w-4 h-4" />, label: "Coach AI", color: "text-violet-600 bg-violet-50" },
-                    { href: `/grafo/${recommendations[0].sectorId}`, icon: <Network className="w-4 h-4" />, label: "Mappa Conoscenza", color: "text-orange-600 bg-orange-50" },
+                    { href: "/coach", icon: <BrainCircuit className="w-4 h-4" />, label: "Parla con Wendy", color: "text-violet-600 bg-violet-50" },
+                    { href: `/archivio/${recommendations[0].sectorId}`, icon: <Network className="w-4 h-4" />, label: "Mappa Conoscenza", color: "text-orange-600 bg-orange-50" },
                   ].map((item) => (
                     <Link key={item.href} href={item.href} onClick={finish}>
                       <div className="rounded-xl border p-3 hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer flex flex-col items-center gap-2 text-center">
