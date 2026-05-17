@@ -62,10 +62,11 @@ export interface ToolDefinition {
 // ── Router decision ───────────────────────────────────────────────────────────
 
 export interface WendyRouterDecision {
-  intent:          WendyIntent;
-  tier:            "nano" | "micro" | "standard" | "reasoning";
-  model:           string;
-  toolsEnabled:    ToolDefinition[];
+  intent:           WendyIntent;
+  tier:             "nano" | "micro" | "standard" | "reasoning";
+  model:            string;
+  provider:         "openai" | "groq" | "openrouter";
+  toolsEnabled:     ToolDefinition[];
   skipFullPipeline: boolean;   // true per navigation/simple_qa → bypassa growth agent
-  reasoning:       string;     // debug: "planning keyword detected"
+  reasoning:        string;    // debug: "planning keyword detected"
 }

@@ -17,8 +17,9 @@ import pRetry from "p-retry";
 import { logger } from "../logger";
 
 export interface LLMMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  tool_call_id?: string;
 }
 
 export interface LLMConfig {
@@ -27,9 +28,31 @@ export interface LLMConfig {
   maxTokens?: number;
 }
 
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface ChatWithToolsResult {
+  content: string;
+  toolCalls: ToolCall[];
+  finishReason: "stop" | "tool_calls" | "length";
+}
+
+export type ToolDefinitionOpenAI = {
+  type: "function";
+  function: { name: string; description: string; parameters: object };
+};
+
 export interface LLMProvider {
   chat(messages: LLMMessage[], config?: LLMConfig): Promise<AsyncIterable<string>>;
   chatOnce(messages: LLMMessage[], config?: LLMConfig): Promise<string>;
+  chatWithTools(
+    messages: LLMMessage[],
+    tools: ToolDefinitionOpenAI[],
+    config?: LLMConfig,
+  ): Promise<ChatWithToolsResult>;
 }
 
 // ── Retry + timeout helpers ───────────────────────────────────────
@@ -130,6 +153,35 @@ function createOpenAIProvider(): LLMProvider {
       );
       return res.choices[0]?.message?.content ?? "";
     },
+
+    async chatWithTools(messages, tools, config = {}) {
+      const res = await pRetry(
+        () => withTimeout(
+          client.chat.completions.create({
+            model: config.model ?? DEFAULT_MODEL,
+            messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+            tools:       tools as OpenAI.Chat.ChatCompletionTool[],
+            tool_choice: "auto",
+            temperature: config.temperature ?? 0.1,
+            max_tokens:  config.maxTokens ?? 500,
+          }),
+          CHAT_ONCE_TIMEOUT,
+          "openai chatWithTools",
+        ),
+        { retries: 2, onFailedAttempt: (err) => logger.warn({ err, attempt: err.attemptNumber }, "LLM chatWithTools retry") },
+      );
+      const msg = res.choices[0]?.message;
+      const toolCalls: ToolCall[] = (msg?.tool_calls ?? []).map((tc: any) => ({
+        id:        tc.id,
+        name:      tc.function?.name ?? "",
+        arguments: (() => { try { return JSON.parse(tc.function?.arguments ?? "{}"); } catch { return {}; } })(),
+      }));
+      return {
+        content:      msg?.content ?? "",
+        toolCalls,
+        finishReason: (res.choices[0]?.finish_reason ?? "stop") as ChatWithToolsResult["finishReason"],
+      };
+    },
   };
 }
 
@@ -206,6 +258,36 @@ function createGroqProvider(): LLMProvider {
       );
       return res.choices[0]?.message?.content ?? "";
     },
+
+    async chatWithTools(messages, tools, config = {}) {
+      const model = GROQ_MODEL_MAP[config.model ?? ""] ?? "llama-3.3-70b-versatile";
+      const res = await pRetry(
+        () => withTimeout(
+          client.chat.completions.create({
+            model,
+            messages:    messages as Groq.Chat.ChatCompletionMessageParam[],
+            tools:       tools as Groq.Chat.ChatCompletionTool[],
+            tool_choice: "auto",
+            temperature: config.temperature ?? 0.1,
+            max_tokens:  config.maxTokens ?? 500,
+          }),
+          CHAT_ONCE_TIMEOUT,
+          "groq chatWithTools",
+        ),
+        { retries: 2, onFailedAttempt: (err) => logger.warn({ err, attempt: err.attemptNumber }, "Groq chatWithTools retry") },
+      );
+      const msg = res.choices[0]?.message;
+      const toolCalls: ToolCall[] = (msg?.tool_calls ?? []).map((tc: any) => ({
+        id:        tc.id,
+        name:      tc.function.name,
+        arguments: (() => { try { return JSON.parse(tc.function.arguments); } catch { return {}; } })(),
+      }));
+      return {
+        content:      msg?.content ?? "",
+        toolCalls,
+        finishReason: (res.choices[0]?.finish_reason ?? "stop") as ChatWithToolsResult["finishReason"],
+      };
+    },
   };
 }
 
@@ -271,6 +353,35 @@ function createOpenRouterProvider(): LLMProvider {
         },
       );
       return res.choices[0]?.message?.content ?? "";
+    },
+
+    async chatWithTools(messages, tools, config = {}) {
+      const res = await pRetry(
+        () => withTimeout(
+          client.chat.completions.create({
+            model:       config.model ?? process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free",
+            messages:    messages as OpenAI.Chat.ChatCompletionMessageParam[],
+            tools:       tools as OpenAI.Chat.ChatCompletionTool[],
+            tool_choice: "auto",
+            temperature: config.temperature ?? 0.1,
+            max_tokens:  config.maxTokens ?? 500,
+          }),
+          CHAT_ONCE_TIMEOUT,
+          "openrouter chatWithTools",
+        ),
+        { retries: 2, onFailedAttempt: (err) => logger.warn({ err, attempt: err.attemptNumber }, "OpenRouter chatWithTools retry") },
+      );
+      const msg = res.choices[0]?.message;
+      const toolCalls: ToolCall[] = (msg?.tool_calls ?? []).map((tc: any) => ({
+        id:        tc.id,
+        name:      tc.function?.name ?? "",
+        arguments: (() => { try { return JSON.parse(tc.function?.arguments ?? "{}"); } catch { return {}; } })(),
+      }));
+      return {
+        content:      msg?.content ?? "",
+        toolCalls,
+        finishReason: (res.choices[0]?.finish_reason ?? "stop") as ChatWithToolsResult["finishReason"],
+      };
     },
   };
 }

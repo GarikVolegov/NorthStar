@@ -19,6 +19,7 @@ export { adaptDifficulty } from "./interview/adapt";
 export type { DifficultyLevel } from "./interview/adapt";
 
 export { runGrowthAgent } from "./growth-agent/agent";
+export { loadMemory, buildMemorySection } from "./growth-agent/memory-manager";
 export { ingestText, ingestPersonaExample, ingestUrl } from "./growth-agent/ingest";
 export { retrieve } from "./growth-agent/retriever";
 export { buildSystemPrompt } from "./growth-agent/prompt-builder";
@@ -99,7 +100,7 @@ export type { SectorDataResult } from "./sector-data-agent/agent";
 
 // LLM client (per uso diretto in route server)
 export { getLLM, getLLMForRoute, resetLLM } from "./llm/client";
-export type { LLMProvider, LLMMessage, LLMConfig } from "./llm/client";
+export type { LLMProvider, LLMMessage, LLMConfig, ToolCall, ChatWithToolsResult, ToolDefinitionOpenAI } from "./llm/client";
 
 // Utilities
 export { withTimeout, gracefulDegrade } from "./utils";

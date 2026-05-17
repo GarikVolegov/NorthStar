@@ -63,6 +63,7 @@ export function resolveWendyRoute(opts: {
                      modelRoute.reason.includes("micro")     ? "micro" :
                      modelRoute.reason.includes("reasoning") ? "reasoning" : "standard",
     model:           modelRoute.model,
+    provider:        modelRoute.provider,
     toolsEnabled,
     skipFullPipeline,
     reasoning:       `intent=${intent}, role=${role}, model=${modelRoute.model}`,

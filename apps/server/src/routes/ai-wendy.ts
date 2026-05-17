@@ -121,66 +121,65 @@ router.post("/", requireAuth, wendyLimiter, async (req: Request, res: Response) 
         pageContext: pageContext as WendyPageContext | undefined,
       });
 
-      const tools = toolsToOpenAIFormat(decision.toolsEnabled);
-      const llm   = getLLMForRoute({
-        provider: (decision.model.includes("llama") || decision.model.includes("groq"))
-          ? "groq"
-          : decision.model.includes("openai") || decision.model.includes("gpt")
-            ? "openai"
-            : "openrouter",
-      });
+      const openAiTools = toolsToOpenAIFormat(decision.toolsEnabled);
+      const llm = getLLMForRoute({ provider: decision.provider ?? "openrouter" });
 
       inputTokens = estimateTokens(systemPrompt + message);
-
       send({ type: "status", value: intent === "navigation" ? "⚡" : "💬" });
 
-      const response = await llm.chatOnce(
-        [
-          { role: "system",  content: systemPrompt },
-          { role: "user",    content: message },
-        ],
-        { model: decision.model, temperature: 0.1, maxTokens: 300 },
-      );
+      // Tool calling loop — max 3 turni per evitare loop infiniti
+      const msgs: Array<{ role: string; content: string; tool_call_id?: string; tool_calls?: unknown[] }> = [
+        { role: "system", content: systemPrompt },
+        { role: "user",   content: message },
+      ];
 
-      outputTokens = estimateTokens(response);
+      const MAX_TOOL_TURNS = 3;
+      let toolTurns = 0;
+      let finalText  = "";
 
-      // Prova a parsare tool call JSON, altrimenti testo normale
-      let toolCallHandled = false;
-      try {
-        const parsed = JSON.parse(response);
-        const toolName = parsed?.tool ?? parsed?.name ?? parsed?.function?.name;
-        const toolArgs = parsed?.args ?? parsed?.arguments ?? parsed?.function?.arguments ?? {};
-        if (toolName) {
-          // Esegui il tool call e rimanda il risultato
-          const result = await executeToolCall(toolName, toolArgs, userId);
-          send({ type: "tool_call", name: toolName, args: toolArgs, result: result.ok ? result.data : null });
-          toolCallHandled = true;
+      while (toolTurns < MAX_TOOL_TURNS) {
+        const result = await llm.chatWithTools(
+          msgs as any,
+          openAiTools,
+          { model: decision.model, temperature: 0.1, maxTokens: 400 },
+        );
+        outputTokens += estimateTokens(result.content);
 
-          // Se è client-side (navigate, filter_list), non serve risposta testuale
-          if (result.ok && (result.data as any)?.clientSide) {
+        if (result.toolCalls.length === 0 || result.finishReason === "stop") {
+          finalText = result.content;
+          break;
+        }
+
+        // Appende il messaggio assistant con tool_calls al thread
+        msgs.push({
+          role:       "assistant",
+          content:    result.content ?? "",
+          tool_calls: result.toolCalls.map((tc) => ({
+            id:       tc.id,
+            type:     "function",
+            function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+          })),
+        });
+
+        // Esegui ogni tool call e aggiungi i risultati al thread
+        for (const tc of result.toolCalls) {
+          const toolResult = await executeToolCall(tc.name, tc.arguments, userId);
+          const toolData   = toolResult.ok ? toolResult.data : { error: (toolResult as any).message };
+          send({ type: "tool_call", name: tc.name, args: tc.arguments, result: toolResult.ok ? toolData : null });
+
+          // Navigazione client-side — termina subito senza risposta testuale
+          if (toolResult.ok && (toolData as any)?.clientSide) {
             send({ type: "done", intent, usage: { model: decision.model, inputTokens, outputTokens } });
             return;
           }
 
-          // Altrimenti: manda il risultato al LLM per generare una risposta testuale
-          const followUpResponse = await llm.chatOnce(
-            [
-              { role: "system",    content: buildLightPrompt({ locale, intent, pageContext: pageContext as any }) },
-              { role: "user",      content: message },
-              { role: "assistant", content: response },
-              { role: "tool" as any, content: JSON.stringify(result.ok ? result.data : { error: result.error }) },
-            ],
-            { model: decision.model, temperature: 0.3, maxTokens: 400 },
-          );
-          outputTokens += estimateTokens(followUpResponse);
-          send({ type: "token", value: followUpResponse });
+          msgs.push({ role: "tool", content: JSON.stringify(toolData), tool_call_id: tc.id });
         }
-      } catch { /* non è JSON valido */ }
 
-      if (!toolCallHandled) {
-        send({ type: "token", value: response });
+        toolTurns++;
       }
 
+      if (finalText) send({ type: "token", value: finalText });
       send({ type: "done", intent, usage: { model: decision.model, inputTokens, outputTokens } });
 
     } else {
@@ -202,15 +201,15 @@ router.post("/", requireAuth, wendyLimiter, async (req: Request, res: Response) 
         userId,
         sessionId:  threadId ? Number(threadId) : undefined,
         userContext: {
-          userId,
           isPremium,
           memorySection,
           locale,
           journeyType: pageContext?.journeyType,
         },
-        history:     flatHistory,
-        userMessage: message,
+        history:      flatHistory,
+        userMessage:  message,
         requestId,
+        wendyIntent:  intent,   // abilita i Wendy domain tools nel full path
       })) {
         if (aborted) break;
         send(event);

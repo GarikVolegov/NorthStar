@@ -11,8 +11,8 @@
  */
 
 import "dotenv/config";
-import { eq } from "drizzle-orm";
-import { db, sectorsTable, professionsTable, educationPathsTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
+import { db, sectorsTable, professionsTable, educationPathsTable, professionEducationPathsTable } from "@workspace/db";
 
 // ── Dati settori ─────────────────────────────────────────────────────────────
 
@@ -271,6 +271,83 @@ async function main() {
     if (id) { epDone++; process.stdout.write("."); }
   }
   console.log(`\n✅  Percorsi formativi: ${epDone} salvati`);
+
+  // Profession → Education Paths mapping (by title e path)
+  const PROF_EDU_LINKS: Array<{ professionTitle: string; pathName: string }> = [
+    // Tecnologia & Software
+    { professionTitle: "Software Developer",           pathName: "Laurea Triennale in Informatica o Ingegneria del Software" },
+    { professionTitle: "Software Developer",           pathName: "Bootcamp Full-Stack Web Development (online o in-presenza)" },
+    { professionTitle: "DevOps / Platform Engineer",   pathName: "Laurea Triennale in Informatica o Ingegneria del Software" },
+    { professionTitle: "Product Manager (Tech)",       pathName: "Bootcamp Full-Stack Web Development (online o in-presenza)" },
+    { professionTitle: "Product Manager (Tech)",       pathName: "MBA o Master in Business Administration" },
+    { professionTitle: "Cybersecurity Analyst",        pathName: "Laurea Triennale in Informatica o Ingegneria del Software" },
+    { professionTitle: "QA / Test Engineer",           pathName: "Bootcamp Full-Stack Web Development (online o in-presenza)" },
+    // Dati & AI
+    { professionTitle: "Data Scientist",               pathName: "Corso online Data Science (Coursera, edX, Kaggle)" },
+    { professionTitle: "Machine Learning Engineer",    pathName: "Corso online Data Science (Coursera, edX, Kaggle)" },
+    { professionTitle: "Business Intelligence Analyst",pathName: "Corso online Data Science (Coursera, edX, Kaggle)" },
+    { professionTitle: "Data Engineer",                pathName: "Laurea Triennale in Informatica o Ingegneria del Software" },
+    { professionTitle: "Data Engineer",                pathName: "Corso online Data Science (Coursera, edX, Kaggle)" },
+    // Marketing & E-commerce
+    { professionTitle: "Digital Marketing Manager",    pathName: "Certificazione Google Digital Marketing & E-commerce" },
+    { professionTitle: "Growth Hacker",                pathName: "Certificazione Google Digital Marketing & E-commerce" },
+    { professionTitle: "E-commerce Manager",           pathName: "Certificazione Google Digital Marketing & E-commerce" },
+    // Design & UX
+    { professionTitle: "UX Designer",                  pathName: "Percorso UX Design (Google UX Design Certificate o Interaction Design Foundation)" },
+    { professionTitle: "Product Designer",             pathName: "Percorso UX Design (Google UX Design Certificate o Interaction Design Foundation)" },
+    { professionTitle: "Design Lead / Head of Design", pathName: "Percorso UX Design (Google UX Design Certificate o Interaction Design Foundation)" },
+    // Finance
+    { professionTitle: "Financial Analyst",            pathName: "MBA o Master in Business Administration" },
+    { professionTitle: "CFO / Direttore Finanziario",  pathName: "MBA o Master in Business Administration" },
+    // Consulting & Management
+    { professionTitle: "Management Consultant",        pathName: "MBA o Master in Business Administration" },
+    { professionTitle: "Management Consultant",        pathName: "Certificazione PMP (Project Management Professional)" },
+    { professionTitle: "Project Manager (PMP)",        pathName: "Certificazione PMP (Project Management Professional)" },
+    // Energia & Sostenibilità
+    { professionTitle: "Sustainability Manager / ESG", pathName: "Corso ESG & Sostenibilità (Politecnico o provider specializzato)" },
+    { professionTitle: "Renewable Energy Project Manager", pathName: "Corso ESG & Sostenibilità (Politecnico o provider specializzato)" },
+    { professionTitle: "Renewable Energy Project Manager", pathName: "Certificazione PMP (Project Management Professional)" },
+    // Logistica
+    { professionTitle: "Supply Chain Manager",         pathName: "Certificazione PMP (Project Management Professional)" },
+  ];
+
+  console.log(`🔗  Collego professioni ↔ percorsi formativi...`);
+  let linksOk = 0; let linksSkip = 0;
+
+  for (const link of PROF_EDU_LINKS) {
+    const [prof] = await db
+      .select({ id: professionsTable.id })
+      .from(professionsTable)
+      .where(eq(professionsTable.title, link.professionTitle))
+      .limit(1);
+    const [ep] = await db
+      .select({ id: educationPathsTable.id })
+      .from(educationPathsTable)
+      .where(eq(educationPathsTable.path, link.pathName))
+      .limit(1);
+
+    if (!prof || !ep) { linksSkip++; continue; }
+
+    // Idempotente: verifica se il link esiste già
+    const [existing] = await db
+      .select({ id: professionEducationPathsTable.id })
+      .from(professionEducationPathsTable)
+      .where(and(
+        eq(professionEducationPathsTable.professionId, prof.id),
+        eq(professionEducationPathsTable.educationPathId, ep.id),
+      ))
+      .limit(1);
+
+    if (!existing) {
+      await db.insert(professionEducationPathsTable).values({
+        professionId:    prof.id,
+        educationPathId: ep.id,
+      });
+    }
+    linksOk++;
+    process.stdout.write(".");
+  }
+  console.log(`\n✅  Link profession↔path: ${linksOk} creati/verificati, ${linksSkip} saltati (titolo non trovato)`);
 
   console.log("\n🎉  Seed completato!");
   console.log("👉  Prossimo passo: POST /api/admin/agents/backfill per generare gli embedding");

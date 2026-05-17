@@ -12,6 +12,9 @@ import { supervisorAgent } from "./supervisor-agent";
 import { loadMemory, buildMemorySection, extractMemory, mergeMemory, type UserMemory } from "./memory-manager";
 import { runParallelHandoff } from "./parallel-handoff";
 import { UI_TOOLS, type UiToolName, type UiToolArgs } from "./ui-tools";
+import { getToolsForIntent, toolsToOpenAIFormat } from "../wendy-router/tool-registry";
+import { executeToolCall } from "../wendy-router/tool-handlers";
+import type { WendyIntent } from "../wendy-router/types";
 import type { RetrievedChunk } from "./retriever";
 import type { CoTResult } from "./chain-of-thought";
 import type { RouteDecision } from "./router-agent";
@@ -44,6 +47,11 @@ export interface ChatMessage {
   domain?: RouteDecision["domain"];
 }
 
+// Set dei nomi tool UI (generative UI) per distinguerli dai Wendy domain tools
+const UI_TOOL_NAMES = new Set<string>(
+  (UI_TOOLS as Array<{ function: { name: string } }>).map((t) => t.function.name),
+);
+
 export interface GrowthAgentOptions {
   userId:           number;
   sessionId?:       number;
@@ -54,6 +62,7 @@ export interface GrowthAgentOptions {
   memoryFactCount?: number;
   voiceMode?:       boolean;
   requestId?:       string;
+  wendyIntent?:     WendyIntent;   // passato da ai-wendy.ts per scegliere i tool di dominio
 }
 
 function buildConversationSummary(history: ChatMessage[]): string {
@@ -66,15 +75,17 @@ function buildConversationSummary(history: ChatMessage[]): string {
 export async function* runGrowthAgent(
   opts: GrowthAgentOptions,
 ): AsyncGenerator<
-  | { type: "token";    value: string }
-  | { type: "status";   value: string; domain?: RouteDecision["domain"] }
-  | { type: "ui_tool";  name: UiToolName; args: UiToolArgs }
+  | { type: "token";     value: string }
+  | { type: "status";    value: string; domain?: RouteDecision["domain"] }
+  | { type: "ui_tool";   name: UiToolName; args: UiToolArgs }
+  | { type: "tool_call"; name: string; result: unknown }
   | { type: "done";     sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult; routeDecision?: RouteDecision; supervisorResult?: SupervisorResult }
   | { type: "error";    message: string }
 > {
   const {
     userId, sessionId, userContext, history, userMessage,
     maxHistory = 12, voiceMode = false, requestId,
+    wendyIntent,
   } = opts;
 
   const logFields: LoggerFields = { userId, sessionId, requestId };
@@ -327,20 +338,31 @@ export async function* runGrowthAgent(
       complexity: evalResult.level === "high" ? "deep" : "standard",
     });
 
+    // Combina UI tools e Wendy domain tools (solo per intent rilevanti)
+    const wendyDomainTools = wendyIntent
+      ? toolsToOpenAIFormat(getToolsForIntent(wendyIntent))
+      : [];
+    const allTools: OpenAI.Chat.ChatCompletionTool[] = [
+      ...(FF.generativeUI ? (UI_TOOLS as OpenAI.Chat.ChatCompletionTool[]) : []),
+      ...wendyDomainTools as OpenAI.Chat.ChatCompletionTool[],
+    ];
+    const hasTools = allTools.length > 0;
+
     const stream = await openai.chat.completions.create({
       model: route.model,
       messages,
       stream: true,
       temperature,
       max_tokens: evalResult.level === "low" ? 300 : 600,
-      tools: FF.generativeUI ? UI_TOOLS : undefined,
-      tool_choice: FF.generativeUI ? "auto" : undefined,
+      tools:       hasTools ? allTools : undefined,
+      tool_choice: hasTools ? "auto"   : undefined,
       stream_options: { include_usage: false },
     });
 
     const tokenBuffer:   string[] = [];
     let   toolCallName:  string   = "";
     let   toolCallArgs:  string   = "";
+    let   toolCallId:    string   = "";
     let   finishReason:  string   = "stop";
 
     for await (const chunk of stream) {
@@ -354,7 +376,8 @@ export async function* runGrowthAgent(
 
       if (choice.delta?.tool_calls) {
         for (const tc of choice.delta.tool_calls) {
-          if (tc.function?.name)      toolCallName += tc.function.name;
+          if (tc.id)              toolCallId   += tc.id;
+          if (tc.function?.name)  toolCallName += tc.function.name;
           if (tc.function?.arguments) toolCallArgs += tc.function.arguments;
         }
       }
@@ -369,8 +392,53 @@ export async function* runGrowthAgent(
     const supervisorSpan = startSpan("supervisor_evaluation", { requestId, domain: routeDecision.domain, intent: routeDecision.intent });
 
     if (finishReason === "tool_calls" && toolCallName) {
-    supervisorSpan.end();
-    endSupervisorTimer();
+      supervisorSpan.end();
+      endSupervisorTimer();
+
+      // ── Wendy domain tool (settori, professioni, obiettivi, ecc.) ───────────
+      if (!UI_TOOL_NAMES.has(toolCallName)) {
+        let parsedArgs: Record<string, unknown> = {};
+        try { parsedArgs = JSON.parse(toolCallArgs); } catch { /* args malformati — procedi vuoto */ }
+
+        const toolResult = await executeToolCall(toolCallName, parsedArgs, userId);
+        const toolData   = toolResult.ok ? toolResult.data : { error: (toolResult as any).message };
+
+        // Navigazione client-side → nessuna risposta testuale
+        if (toolResult.ok && (toolData as any)?.clientSide) {
+          yield { type: "tool_call" as any, name: toolCallName, result: toolData };
+          yield { type: "done", sources: [], evalResult, routeDecision };
+          scheduleMemorySave(`[tool: ${toolCallName}]`, sessionId ?? Date.now());
+          return;
+        }
+
+        // Turno 2: LLM genera risposta finale con i dati del tool
+        const followUpMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+          ...messages,
+          {
+            role: "assistant",
+            content:    null,
+            tool_calls: [{ id: toolCallId || "tc_0", type: "function", function: { name: toolCallName, arguments: toolCallArgs } }],
+          },
+          { role: "tool", tool_call_id: toolCallId || "tc_0", content: JSON.stringify(toolData) },
+        ];
+
+        const followUp = await openai.chat.completions.create({
+          model: route.model, messages: followUpMessages,
+          temperature: 0.55, max_tokens: 600,
+        });
+        const followUpText = followUp.choices[0]?.message?.content ?? "";
+
+        yield { type: "tool_call" as any, name: toolCallName, result: toolData };
+        const CHUNK = 4;
+        for (let i = 0; i < followUpText.length; i += CHUNK) {
+          yield { type: "token", value: followUpText.slice(i, i + CHUNK) };
+        }
+        yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], evalResult, routeDecision };
+        scheduleMemorySave(followUpText, sessionId ?? Date.now());
+        return;
+      }
+
+      // ── UI tool (generative UI) — comportamento originale ───────────────────
       let args: UiToolArgs;
       try {
         args = JSON.parse(toolCallArgs) as UiToolArgs;
@@ -380,7 +448,7 @@ export async function* runGrowthAgent(
         return;
       }
 
-      yield { type: "ui_tool", name: toolCallName as UiToolName, args };
+      yield { type: "ui_tool" as const, name: toolCallName as UiToolName, args };
       yield {
         type: "done",
         sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults],
