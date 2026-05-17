@@ -10,6 +10,7 @@
     "seed:e2e": "tsx ./src/seed-e2e.ts",
     "seed:e2e-affiliate": "tsx ./src/seed-e2e-affiliate.ts",
     "seed:catalog": "tsx ./src/seed-catalog.ts",
+    "backfill:embeddings": "tsx ./src/backfill-embeddings.ts",
     "security:scan": "tsx ./src/security-agent.ts",
     "security:scan:all": "tsx ./src/security-agent.ts -- --all"
   },
