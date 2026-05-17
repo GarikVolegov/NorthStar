@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { Analytics } from "@vercel/analytics/react";
 import App from "./App";
 import "./index.css";
 import "./i18n";
@@ -39,4 +40,9 @@ function registerSW() {
 
 registerSW();
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <>
+    <App />
+    <Analytics />
+  </>
+);
