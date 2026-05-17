@@ -5,6 +5,7 @@ import { register } from "@workspace/ai-server/metrics";
 import { runCollector, runEnricher, runSectorDataAgent, generateEmbeddingsBatch, buildEmbeddingText } from "@workspace/ai-server";
 import { writeAuditLog } from "../middleware/audit";
 import { rootLogger } from "../middleware/logger";
+import { executionMonitor } from "../lib/execution-monitor";
 
 const router = Router();
 
@@ -268,6 +269,26 @@ router.post("/agents/backfill", async (req: Request, res: Response) => {
     rootLogger.error({ err }, "[admin/agents/backfill] error");
     res.status(500).json({ error: String(err) });
   }
+});
+
+// ── GET /api/admin/error-report (Step Foundation refactor) ──
+// Restituisce snapshot strutturato degli errori catturati da ExecutionMonitor
+router.get("/error-report", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  try {
+    const report = executionMonitor.getReport();
+    res.json(report);
+  } catch (err) {
+    rootLogger.error({ err }, "[admin/error-report] error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ── DELETE /api/admin/error-report — pulisce il buffer ──
+router.delete("/error-report", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  executionMonitor.clear();
+  res.json({ ok: true });
 });
 
 export default router;

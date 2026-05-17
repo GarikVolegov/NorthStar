@@ -231,9 +231,17 @@ app.use(
     err: any,
     req: express.Request,
     res: express.Response,
-    next: express.NextFunction,
+    _next: express.NextFunction,
   ) => {
     (req.log ?? rootLogger).error({ err }, "unhandled error");
+    // Step Foundation: cattura strutturata per /api/admin/error-report
+    try {
+      const { executionMonitor } = require("./lib/execution-monitor") as typeof import("./lib/execution-monitor");
+      executionMonitor.capture(err, {
+        file:     "app.ts",
+        function: `${req.method} ${req.originalUrl ?? req.url ?? "<unknown>"}`,
+      });
+    } catch { /* fire-and-forget */ }
     res.status(500).json({
       error: "Internal Server Error",
       message: "Something went wrong",

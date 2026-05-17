@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { API_ENDPOINTS } from "@/lib/constants";
 import {
   ShieldAlert,
   RefreshCw,
@@ -518,7 +519,9 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
   const loadStatus = useCallback(async () => {
     setStatusLoading(true);
     try {
-      const data = await apiFetch("/api/health"); // Using the health endpoint
+      // /api/health è pubblico (no admin-key) — usa fetch nativo bypassando apiFetch locale
+      const healthRes = await fetch(API_ENDPOINTS.health);
+      const data = healthRes.ok ? await healthRes.json() : {};
       setStatusData(data);
 
     } catch {

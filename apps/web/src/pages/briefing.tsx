@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-fetch";
+import { API_ENDPOINTS, withParams } from "@/lib/constants";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageMeta } from "@/lib/seo";
 import { Sparkles, Calendar, Loader2, RefreshCw, BookOpen } from "lucide-react";
@@ -23,22 +24,22 @@ interface Briefing {
 }
 
 async function fetchBriefings(): Promise<{ briefings: Briefing[] }> {
-  const res = await apiFetch("/api/briefings");
+  const res = await apiFetch(API_ENDPOINTS.briefings.list);
   if (!res.ok) return { briefings: [] };
   return res.json();
 }
 
 async function generateBriefing(): Promise<{ content: string; briefingId: number }> {
-  const res = await apiFetch("/api/briefings/generate", { method: "POST" });
+  const res = await apiFetch(API_ENDPOINTS.briefings.generate, { method: "POST" });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error((err as any).error ?? "Generazione fallita");
+    throw new Error((err as { error?: string }).error ?? "Generazione fallita");
   }
   return res.json();
 }
 
 async function markRead(id: number) {
-  await apiFetch(`/api/briefings/${id}/read`, { method: "PATCH" });
+  await apiFetch(withParams(API_ENDPOINTS.briefings.markRead, { id }), { method: "PATCH" });
 }
 
 const TYPE_LABELS: Record<string, string> = {

@@ -45,6 +45,9 @@
     "northstar": ".tools/printed-clis/northstar/bin/northstar-pp-cli.exe",
     "northstar:mcp": ".tools/printed-clis/northstar/bin/northstar-pp-mcp.exe",
     "northstar:regen": "cli-printing-press/printing-press.exe generate --spec packages/api-spec/openapi.yaml --name northstar --output .tools/printed-clis/northstar --force",
+    "// ── AUDIT ────────────────────────────────────────": "---",
+    "audit:dead-code": "knip --reporter compact",
+    "audit:dead-code:detail": "knip",
     "// ── CLEAN ────────────────────────────────────────": "---",
     "clean": "find . -name dist -not -path '*/node_modules/*' -exec rm -rf {} + ; find . -name .turbo -exec rm -rf {} +"
   },
@@ -59,6 +62,7 @@
     "@rollup/rollup-win32-x64-msvc": "^4.59.0",
     "concurrently": "^9.1.2",
     "dotenv": "^17.4.2",
+    "knip": "^5.30.0",
     "prettier": "^3.8.1",
     "tsx": "catalog:",
     "typescript": "~5.9.2"

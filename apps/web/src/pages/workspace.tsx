@@ -8,6 +8,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-fetch";
+import { API_ENDPOINTS } from "@/lib/constants";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageMeta } from "@/lib/seo";
 import { Users, Plus, Crown, ArrowRight, Loader2, Building2, Heart } from "lucide-react";
@@ -30,13 +31,13 @@ const TYPE_META = {
 };
 
 async function fetchWorkspaces(): Promise<{ workspaces: WorkspaceItem[] }> {
-  const res = await apiFetch("/api/workspaces");
+  const res = await apiFetch(API_ENDPOINTS.workspaces.list);
   if (!res.ok) return { workspaces: [] };
   return res.json();
 }
 
 async function createWorkspace(data: { name: string; type: string; description?: string }) {
-  const res = await apiFetch("/api/workspaces", {
+  const res = await apiFetch(API_ENDPOINTS.workspaces.create, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify(data),

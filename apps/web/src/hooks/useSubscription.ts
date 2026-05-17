@@ -9,6 +9,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-fetch";
+import { API_ENDPOINTS } from "@/lib/constants";
 import { useAuth } from "@/contexts/AuthContext";
 
 export type Plan = "free" | "pro" | "team";
@@ -38,7 +39,7 @@ const FEATURE_GATES: Record<string, Plan> = {
 const PLAN_RANK: Record<Plan, number> = { free: 0, pro: 1, team: 2 };
 
 async function fetchSubscription(): Promise<SubscriptionData> {
-  const res = await apiFetch("/api/subscription");
+  const res = await apiFetch(API_ENDPOINTS.subscriptionV2.current);
   if (!res.ok) return { plan: "free", validUntil: null, cancelledAt: null };
   return res.json() as Promise<SubscriptionData>;
 }

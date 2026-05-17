@@ -280,7 +280,77 @@ export const API_ENDPOINTS = {
     markRead: "/api/notifications/:id/read",
     markAllRead: "/api/notifications/read-all",
   },
+  // ── Step 6/7: RAG, briefing, workspace, coach memory ──
+  briefings: {
+    list:     "/api/briefings",
+    generate: "/api/briefings/generate",
+    markRead: "/api/briefings/:id/read",
+  },
+  coachMemory: {
+    list:   "/api/coach/memory",
+    add:    "/api/coach/memory",
+    remove: "/api/coach/memory/:id",
+  },
+  workspaces: {
+    list:   "/api/workspaces",
+    create: "/api/workspaces",
+  },
+  proactiveInsights: {
+    list:        "/api/users/me/proactive-insights",
+    listUnread:  "/api/users/me/proactive-insights?unread=true",
+    action:      "/api/users/me/proactive-insights/:id/:action",
+  },
+  subscriptionV2: {
+    current: "/api/subscription",
+  },
+  aiWendy: {
+    chat:     "/api/ai/wendy",
+    feedback: "/api/ai/wendy/feedback",
+  },
+  voice: {
+    start:    "/api/voice/start",
+    complete: "/api/voice/complete",
+    abandon:  "/api/voice/abandon",
+    stats:    "/api/voice/stats",
+  },
+  affiliate: {
+    dashboard: "/api/affiliate/dashboard",
+    withdraw:  "/api/affiliate/withdraw",
+  },
+  leaderboard: {
+    list: "/api/leaderboard",
+  },
+  roles: {
+    detail: "/api/roles/:id",
+  },
+  health: "/api/health",
+  // ── Admin (RAG, weak signals, error report) ──
+  admin: {
+    rag: {
+      sourcesStats:    "/api/admin/rag-sources/stats",
+      sources:         "/api/admin/rag-sources",
+      ingestRss:       "/api/admin/rag-sources/:id/ingest-rss",
+    },
+    weakSignals: {
+      list:    "/api/admin/weak-signals",
+      approve: "/api/admin/weak-signals/:id/approve",
+      dismiss: "/api/admin/weak-signals/:id/dismiss",
+    },
+    errorReport: "/api/admin/error-report",
+  },
 } as const;
+
+/** Sostituisce i placeholder `:id`, `:action`, etc. con valori reali. */
+export function withParams(
+  template: string,
+  params: Record<string, string | number>,
+): string {
+  let out = template;
+  for (const [key, value] of Object.entries(params)) {
+    out = out.replace(`:${key}`, String(value));
+  }
+  return out;
+}
 
 // ── Route Paths ──
 export const ROUTES = {

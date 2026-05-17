@@ -10,6 +10,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api-fetch";
+import { API_ENDPOINTS, withParams } from "@/lib/constants";
 import { Brain, Plus, Trash2, Shield, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,17 +37,17 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 async function fetchMemory(): Promise<MemoryResponse> {
-  const res = await apiFetch("/api/coach/memory");
+  const res = await apiFetch(API_ENDPOINTS.coachMemory.list);
   if (!res.ok) return { facts: [] };
   return res.json() as Promise<MemoryResponse>;
 }
 
 async function deleteFact(id: number): Promise<void> {
-  await apiFetch(`/api/coach/memory/${id}`, { method: "DELETE" });
+  await apiFetch(withParams(API_ENDPOINTS.coachMemory.remove, { id }), { method: "DELETE" });
 }
 
 async function addFact(value: string): Promise<void> {
-  await apiFetch("/api/coach/memory", {
+  await apiFetch(API_ENDPOINTS.coachMemory.add, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify({ key: "user_manual", value, source: "user_manual" }),

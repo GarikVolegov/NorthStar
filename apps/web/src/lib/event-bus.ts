@@ -1,6 +1,9 @@
 /**
  * EventBus — Cross-page communication via BroadcastChannel + in-process emitter.
  * Enables real-time sync between tabs and within the same app instance.
+ *
+ * @pattern Singleton + Observer + BroadcastChannel cross-tab
+ * @see hooks/usePageBus.ts per la wrapper React-idiomatic
  */
 
 export type EventName =
@@ -25,7 +28,11 @@ export type EventName =
   | "state:sync_response"
   | "notification:new"
   | "wendy:response"
-  | "cache:invalidate";
+  | "cache:invalidate"
+  // Step 7+: page lifecycle e comunicazione inter-pagina (foundation refactor)
+  | "page:mounted"
+  | "page:unmounted"
+  | "page:message";
 
 export interface AppEvent<T = unknown> {
   name: EventName;

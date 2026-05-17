@@ -5,6 +5,11 @@ import { AlertTriangle, RefreshCw, Home } from "lucide-react";
  * Boundary leggero per aree di streaming SSE.
  * Cattura errori di render e mostra un bottone "Riprova" inline
  * che resetta il boundary senza ricaricare la pagina.
+ *
+ * @pattern Template Method (React Component lifecycle):
+ *   - getDerivedStateFromError → updates state in response to error
+ *   - componentDidCatch        → side effects (logging) hook
+ *   - render                   → fallback UI o children
  * ─────────────────────────────────────────────────────────────────────────── */
 
 interface StreamBoundaryProps {

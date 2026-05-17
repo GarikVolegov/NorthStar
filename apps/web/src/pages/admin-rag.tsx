@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-fetch";
+import { API_ENDPOINTS, withParams } from "@/lib/constants";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
@@ -45,13 +46,13 @@ interface WeakSignal {
 // ── Fetch helpers ─────────────────────────────────────────────────────────────
 
 async function fetchSourceStats(): Promise<{ sources: RagSourceStats[] }> {
-  const res = await apiFetch("/api/admin/rag-sources/stats");
+  const res = await apiFetch(API_ENDPOINTS.admin.rag.sourcesStats);
   if (!res.ok) throw new Error("Errore nel recupero delle fonti");
   return res.json();
 }
 
 async function fetchWeakSignals(status: string): Promise<{ signals: WeakSignal[] }> {
-  const res = await apiFetch(`/api/admin/weak-signals?status=${status}&limit=30`);
+  const res = await apiFetch(`${API_ENDPOINTS.admin.weakSignals.list}?status=${status}&limit=30`);
   if (!res.ok) throw new Error("Errore nel recupero dei segnali");
   return res.json();
 }
@@ -105,7 +106,7 @@ export default function AdminRag() {
   // RSS ingest mutation
   const ingestRss = useMutation({
     mutationFn: async (sourceId: number) => {
-      const res = await apiFetch(`/api/admin/rag-sources/${sourceId}/ingest-rss`, {
+      const res = await apiFetch(withParams(API_ENDPOINTS.admin.rag.ingestRss, { id: sourceId }), {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ maxAgeDays: 30, maxItems: 20 }),
@@ -122,7 +123,7 @@ export default function AdminRag() {
   // Approve/dismiss signal mutations
   const approveSignal = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiFetch(`/api/admin/weak-signals/${id}/approve`, { method: "POST" });
+      const res = await apiFetch(withParams(API_ENDPOINTS.admin.weakSignals.approve, { id }), { method: "POST" });
       if (!res.ok) throw new Error(await res.text());
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-weak-signals"] }),
@@ -130,7 +131,7 @@ export default function AdminRag() {
 
   const dismissSignal = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiFetch(`/api/admin/weak-signals/${id}/dismiss`, { method: "POST" });
+      const res = await apiFetch(withParams(API_ENDPOINTS.admin.weakSignals.dismiss, { id }), { method: "POST" });
       if (!res.ok) throw new Error(await res.text());
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-weak-signals"] }),
@@ -139,7 +140,7 @@ export default function AdminRag() {
   // Add source mutation
   const addSource = useMutation({
     mutationFn: async () => {
-      const res = await apiFetch("/api/admin/rag-sources", {
+      const res = await apiFetch(API_ENDPOINTS.admin.rag.sources, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({

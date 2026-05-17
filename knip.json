@@ -1,0 +1,45 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    ".": {
+      "ignore": ["scripts/preinstall.js", "cli-printing-press/**"]
+    },
+    "apps/web": {
+      "entry": ["src/main.tsx", "index.html"],
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignore": [
+        "src/components/ui/**",
+        "src/__tests__/**"
+      ],
+      "ignoreDependencies": [
+        "next-themes"
+      ]
+    },
+    "apps/server": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"],
+      "ignore": [
+        "src/vendor.d.ts"
+      ]
+    },
+    "packages/*": {
+      "entry": ["src/index.ts", "src/index.tsx"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "scripts": {
+      "entry": ["src/*.ts"],
+      "project": ["src/**/*.ts"]
+    }
+  },
+  "ignore": [
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/build/**",
+    "**/.turbo/**",
+    "e2e/**",
+    "eval/**",
+    "artifacts/**"
+  ],
+  "ignoreBinaries": ["docker", "concurrently"],
+  "reporters": ["compact"]
+}

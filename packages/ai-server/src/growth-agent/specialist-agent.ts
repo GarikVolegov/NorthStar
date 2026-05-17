@@ -278,13 +278,30 @@ export abstract class SpecialistAgent {
 
 // ── Registry ──────────────────────────────────────────────────────────────────
 
+/**
+ * Registry centrale degli SpecialistAgent.
+ *
+ * @pattern Factory + Registry
+ * - I singoli specialist (career, mindset, habits, trading, health) si registrano
+ *   tramite `registerSpecialist()` al boot del processo.
+ * - `getSpecialist(domain)` agisce come Factory che restituisce l'istanza corretta
+ *   in base al dominio richiesto dal router.
+ */
 const registry = new Map<Domain, SpecialistAgent>();
 
+/**
+ * Registra uno SpecialistAgent nel registry globale.
+ * @pattern Factory registration
+ */
 export function registerSpecialist(agent: SpecialistAgent): void {
   registry.set(agent.DOMAIN, agent);
   logger.info({ domain: agent.DOMAIN }, "specialist registered");
 }
 
+/**
+ * Recupera lo SpecialistAgent registrato per il dominio dato.
+ * @pattern Factory lookup
+ */
 export function getSpecialist(domain: Domain): SpecialistAgent | null {
   return registry.get(domain) ?? null;
 }

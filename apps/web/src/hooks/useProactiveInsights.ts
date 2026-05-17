@@ -6,6 +6,7 @@
  */
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-fetch";
+import { API_ENDPOINTS, withParams } from "@/lib/constants";
 import { useAuth } from "@/contexts/AuthContext";
 
 export interface ProactiveInsight {
@@ -27,13 +28,13 @@ interface InsightsResponse {
 }
 
 async function fetchInsights(): Promise<InsightsResponse> {
-  const res = await apiFetch("/api/users/me/proactive-insights?unread=true");
+  const res = await apiFetch(API_ENDPOINTS.proactiveInsights.listUnread);
   if (!res.ok) return { insights: [], unreadCount: 0 };
   return res.json() as Promise<InsightsResponse>;
 }
 
 async function postInsightAction(id: number, action: "read" | "dismiss"): Promise<void> {
-  await apiFetch(`/api/users/me/proactive-insights/${id}/${action}`, { method: "POST" });
+  await apiFetch(withParams(API_ENDPOINTS.proactiveInsights.action, { id, action }), { method: "POST" });
 }
 
 export function useProactiveInsights() {
