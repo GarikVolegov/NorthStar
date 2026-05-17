@@ -4,6 +4,7 @@ import { useTTS } from './useTTS.js';
 import { useSTT } from './useSTT.js';
 import { useWendyOpenAITTS } from './useWendyOpenAITTS.js';
 import { useWendy } from '../contexts/WendyProvider';
+import { TOKEN_STORAGE_KEY } from '../lib/storage-keys';
 
 /**
  * useWendyChat — orchestratore stato completo chat Wendy
@@ -87,9 +88,55 @@ export interface UseWendyChatReturn {
   commitSTT:               () => void;
 }
 
+// ── Compressione history ────────────────────────────────────────────────────
+
+const KEEP_RAW_TURNS = 6; // turni raw nel prompt; i precedenti diventano summary
+const COMPRESS_AFTER = 8; // soglia: oltre N turni si attiva la compressione
+
+interface CompressedHistory {
+  summary?:       string;
+  recentMessages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  totalTurns:     number;
+}
+
+function buildCompressedHistory(
+  rawHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
+  existingSummary?: string,
+): CompressedHistory {
+  const totalTurns = rawHistory.length;
+
+  if (totalTurns <= COMPRESS_AFTER) {
+    // Nessuna compressione necessaria: passa tutto
+    return { summary: existingSummary, recentMessages: rawHistory, totalTurns };
+  }
+
+  // Tieni solo gli ultimi KEEP_RAW_TURNS messaggi raw
+  const recentMessages = rawHistory.slice(-KEEP_RAW_TURNS);
+
+  // Il summary dei turni vecchi viene mantenuto da fuori (sessionStorage o prop)
+  // Se non c'è ancora un summary, creiamo un placeholder strutturato
+  const summary = existingSummary ?? _buildFallbackSummary(rawHistory.slice(0, -KEEP_RAW_TURNS));
+
+  return { summary, recentMessages, totalTurns };
+}
+
+/** Costruisce un summary minimale dai messaggi vecchi (nessuna LLM call). */
+function _buildFallbackSummary(
+  oldMessages: Array<{ role: 'user' | 'assistant'; content: string }>,
+): string {
+  if (oldMessages.length === 0) return '';
+  const lines = oldMessages
+    .filter((m) => m.role === 'user')
+    .slice(-4)
+    .map((m) => `• ${m.content.slice(0, 120)}`);
+  return `[Riepilogo turni precedenti]\n${lines.join('\n')}`;
+}
+
+// ── Hook principale ─────────────────────────────────────────────────────────
+
 export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatReturn {
   const {
-    apiUrl    = '/api/v1/ai/chat/stream',
+    apiUrl    = '/api/ai/wendy',  // nuovo entrypoint unificato
     ttsEnabled: initTts = true,
     sttLang   = 'it-IT',
     maxRetries = 2,
@@ -113,13 +160,17 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
   // Mantiene la history da inviare al backend (ultime 20 coppie user/assistant)
   const historyRef = useRef<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
 
+  // Summary dei turni compressi (aggiornato dal backend via SSE "summary" event)
+  const threadSummaryRef = useRef<string | undefined>(undefined);
+
   const tts = useTTS();
   const stt = useSTT({ lang: sttLang });
   const openaiTts = useWendyOpenAITTS();
 
-  // Global Wendy phase
+  // Global Wendy phase + page context
   let _setPhase: ((p: 'idle' | 'thinking' | 'speaking' | 'listening') => void) | null = null;
-  try { _setPhase = useWendy().setPhase; } catch {}
+  let _wendyCtx: ReturnType<typeof useWendy> | null = null;
+  try { _wendyCtx = useWendy(); _setPhase = _wendyCtx.setPhase; } catch {}
 
   // ─── SSE stream ──────────────────────────────────────────────────────────────
 
@@ -257,15 +308,33 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
 
     if (_setPhase) _setPhase('thinking');
 
+    const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    // Comprimi la history prima di inviarla
+    const compressed = buildCompressedHistory(historyRef.current, threadSummaryRef.current);
+
+    // Page context dal WendyProvider (se disponibile)
+    const currentPage = _wendyCtx?.pageContext;
+    const pageContext = currentPage ? {
+      page:       currentPage.page,
+      entityType: (currentPage.data?.entityType as string) ?? undefined,
+      entityId:   (currentPage.data?.entityId as number)   ?? undefined,
+      entityName: (currentPage.data?.entityName as string) ?? undefined,
+      journeyType:(currentPage.data?.journeyType as string)?? undefined,
+    } : undefined;
+
     await startStream(apiUrl, {
       method:      'POST',
-      headers:     { 'Content-Type': 'application/json' },
+      headers,
       credentials: 'include',
       body: JSON.stringify({
-        message: contextPrompt ?? text,
-        history: historyRef.current,
-        // skipRag solo per messaggi molto corti (saluti)
-        skipRag: (contextPrompt ?? text).trim().length < 10,
+        message:           contextPrompt ?? text,
+        compressedHistory: compressed,
+        pageContext,
+        locale:            navigator.language?.slice(0, 2) ?? 'it',
+        // threadId opzionale — da passare se si gestiscono sessioni multiple
       }),
     });
   }

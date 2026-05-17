@@ -100,6 +100,7 @@ import searchRouteRouter from "./routes/search-route";
 import searchHybridRouter from "./routes/search-hybrid";
 import searchTrackRouter from "./routes/search-track";
 import securityRouter from "./routes/security";
+import aiWendyRouter  from "./routes/ai-wendy";
 
 app.use("/api/auth", authRouter);
 app.use("/api/profile", profileRouter);
@@ -137,6 +138,7 @@ app.use("/api/search/route", searchRouteRouter);
 app.use("/api/search/hybrid", searchHybridRouter);
 app.use("/api/search/track", searchTrackRouter);
 app.use("/api/security",    securityRouter);
+app.use("/api/ai/wendy",   aiWendyRouter);
 
 app.get("/api/health/live", (req, res) => {
   res.json({ status: "alive" });

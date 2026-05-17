@@ -59,8 +59,9 @@ export * from "./voiceSessions";
 export * from "./routingLogs";
 export * from "./qualityMetrics";
 export * from "./chatMessages";
-// ── AI Cost tracking ────────────────────────────────────────────────
+// ── AI Cost tracking & request logging ──────────────────────────────
 export * from "./llmUsage";
+export * from "./aiRequestLog";
 export * from "./userKeys";
 export * from "./userBadges";
 export * from "./weeklyLeaderboard";

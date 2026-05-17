@@ -67,6 +67,17 @@ export { generateEmbedding, generateEmbeddingsBatch, buildEmbeddingText } from "
 export { runSearchOrchestrator } from "./search-agent/orchestrator";
 export type { SearchOrchestratorOptions, SearchOrchestratorEvent, SearchResult as OrchestratorSearchResult } from "./search-agent/orchestrator";
 
+// Wendy Router
+export { classifyIntent }    from "./wendy-router/intent-classifier";
+export { getToolsForIntent, toolsToOpenAIFormat } from "./wendy-router/tool-registry";
+export { resolveWendyRoute } from "./wendy-router/router";
+export { buildLightPrompt }  from "./wendy-router/light-prompt";
+export type { WendyIntent, WendyPageContext, CompressedHistory, WendyRouterDecision, ToolDefinition } from "./wendy-router/types";
+
+// AI Request Log
+export { recordAiCall }      from "./ai-request-log";
+export type { RecordAiCallInput, AiRequestStatus } from "./ai-request-log";
+
 // Security Agent
 export { runSecurityAgent } from "./security-agent/index";
 export type { SecurityScanOptions, SecurityAgentEvent, SecurityFinding, Severity, VulnCategory } from "./security-agent/index";
