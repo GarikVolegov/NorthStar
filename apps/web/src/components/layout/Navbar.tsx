@@ -35,7 +35,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { LoginDialog } from "@/components/auth/LoginDialog";
+import { Show, SignInButton, SignUpButton, UserButton, useClerk } from "@clerk/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useProactiveInsights } from "@/hooks/useProactiveInsights";
@@ -118,8 +118,8 @@ function prefetchRoute(path: string) {
 
 export function Navbar() {
   const { t, i18n } = useTranslation();
-  const { user, logout, isLoggedIn } = useAuth();
-  const [loginOpen, setLoginOpen] = useState(false);
+  const { user, isLoggedIn } = useAuth();
+  const { signOut } = useClerk();
   const [menuOpen, setMenuOpen] = useState(false);
   const [, setLocation] = useLocation();
   const [location] = useLocation();
@@ -430,7 +430,8 @@ export function Navbar() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {isLoggedIn && user ? (
+            <Show when="signed-in">
+              {user && (
               <>
                 <NotificationBell userId={user.id} />
                 {insightsUnread > 0 && (
@@ -565,29 +566,31 @@ export function Navbar() {
                     )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      onClick={logout}
+                      onClick={() => signOut()}
                       className="text-destructive focus:text-destructive cursor-pointer"
                     >
                       <LogOut className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2" /> {t("nav.logout")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                <UserButton />
               </>
-            ) : (
-              <>
+              )}
+            </Show>
+            <Show when="signed-out">
+              <SignInButton mode="modal">
                 <button
-                  onClick={() => setLoginOpen(true)}
                   className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors px-2"
                 >
                   {t("nav.login")}
                 </button>
-                <Link href="/test" onMouseEnter={() => prefetchRoute("/test")}>
-                  <div className="flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full px-3 py-1 hover:bg-primary/90 transition-colors">
-                    {t("nav.startJourney")}
-                  </div>
-                </Link>
-              </>
-            )}
+              </SignInButton>
+              <Link href="/test" onMouseEnter={() => prefetchRoute("/test")}>
+                <div className="flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full px-3 py-1 hover:bg-primary/90 transition-colors">
+                  {t("nav.startJourney")}
+                </div>
+              </Link>
+            </Show>
           </div>
 
           {/* Mobile search + right */}
@@ -606,7 +609,9 @@ export function Navbar() {
                 className="w-full pl-8 pr-2.5 lefty:pl-2.5 lefty:pr-8 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none transition-all pointer-events-none"
               />
             </div>
-            {isLoggedIn && user && <NotificationBell userId={user.id} />}
+            <Show when="signed-in">
+              {user && <NotificationBell userId={user.id} />}
+            </Show>
 
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger asChild>
@@ -721,7 +726,8 @@ export function Navbar() {
                 </nav>
 
                 <div className="px-5 pb-8 pt-4 border-t border-border space-y-2">
-                  {isLoggedIn && user ? (
+              <Show when="signed-in">
+                {user && (
                     <>
                       <div className="flex items-center gap-3 px-1 mb-3">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
@@ -828,7 +834,7 @@ export function Navbar() {
                       </div>
                       <button
                         onClick={() => {
-                          logout();
+                          signOut();
                           setMenuOpen(false);
                         }}
                         className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-destructive/80 hover:text-destructive hover:bg-destructive/5 transition-colors"
@@ -836,27 +842,33 @@ export function Navbar() {
                         <LogOut className="h-4 w-4" /> {t("nav.logout")}
                       </button>
                     </>
-                  ) : (
+                )}
+                  </Show>
+                  <Show when="signed-out">
                     <>
-                      <Link
-                        href="/test"
-                        onClick={() => setMenuOpen(false)}
-                        onMouseEnter={() => prefetchRoute("/test")}
-                        className="w-full flex items-center justify-center bg-primary text-primary-foreground text-sm font-bold rounded-full py-2.5 hover:bg-primary/90 transition-colors"
-                      >
-                        {t("nav.startFreeTest")}
-                      </Link>
-                      <button
-                        onClick={() => {
-                          setMenuOpen(false);
-                          setTimeout(() => setLoginOpen(true), 150);
-                        }}
-                        className="w-full flex items-center justify-center border border-border text-sm font-semibold rounded-full py-2.5 text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors"
-                      >
-                        {t("nav.login")}
-                      </button>
+                      <SignUpButton mode="modal">
+                        <button
+                          onClick={() => setMenuOpen(false)}
+                          className="w-full flex items-center justify-center bg-primary text-primary-foreground text-sm font-bold rounded-full py-2.5 hover:bg-primary/90 transition-colors gap-2"
+                        >
+                          {t("nav.startJourney")}
+                        </button>
+                      </SignUpButton>
+                      <SignInButton mode="modal">
+                        <button
+                          onClick={() => setMenuOpen(false)}
+                          className="w-full flex items-center justify-center border border-border text-sm font-semibold rounded-full py-2.5 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-colors"
+                        >
+                          {t("nav.login")}
+                        </button>
+                      </SignInButton>
+                      {/* Theme toggle anche per ospiti */}
+                      <div className="px-2 pt-2">
+                        <p className="text-xs text-muted-foreground mb-1.5 font-semibold uppercase tracking-wide px-2">Tema</p>
+                        <ThemeToggle />
+                      </div>
                     </>
-                  )}
+                  </Show>
                 </div>
               </SheetContent>
             </Sheet>
@@ -864,7 +876,6 @@ export function Navbar() {
         </div>
       </m.header>
 
-      <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
       <SearchDialog
         query={search.query}
         setQuery={search.setQuery}

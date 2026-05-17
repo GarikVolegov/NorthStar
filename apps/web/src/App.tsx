@@ -93,6 +93,8 @@ const MemoriaWendy = lazy(() => import("@/pages/memoria-wendy"));
 const WorkspacePage = lazy(() => import("@/pages/workspace"));
 const BriefingPage = lazy(() => import("@/pages/briefing"));
 const CertificatePage = lazy(() => import("@/pages/certificato"));
+const SignInPage  = lazy(() => import("@/pages/sign-in"));
+const SignUpPage  = lazy(() => import("@/pages/sign-up"));
 
 /**
  * QueryClient ottimizzato:
@@ -130,6 +132,35 @@ function AnimatedRoutes() {
       <Route path="/ruolo/:id" component={Ruolo} />
       <Route path="/registra">
         <PublicOnlyRoute component={Register} />
+      </Route>
+      {/* Clerk auth pages — routing="path" richiede route dedicate */}
+      <Route path="/sign-in">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <SignInPage />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+      <Route path="/sign-in/:rest*">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <SignInPage />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+      <Route path="/sign-up">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <SignUpPage />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+      <Route path="/sign-up/:rest*">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <SignUpPage />
+          </Suspense>
+        </ErrorBoundary>
       </Route>
       <Route path="/reset-password">
         <PublicOnlyRoute component={ResetPassword} />
