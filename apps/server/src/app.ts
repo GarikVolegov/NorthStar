@@ -100,8 +100,10 @@ import searchRouteRouter from "./routes/search-route";
 import searchHybridRouter from "./routes/search-hybrid";
 import searchTrackRouter from "./routes/search-track";
 import securityRouter from "./routes/security";
-import aiWendyRouter      from "./routes/ai-wendy";
-import wendyFeedbackRouter from "./routes/wendy-feedback";
+import aiWendyRouter        from "./routes/ai-wendy";
+import wendyFeedbackRouter  from "./routes/wendy-feedback";
+import ragAdminRouter        from "./routes/rag-admin";
+import proactiveInsightsRouter from "./routes/proactive-insights";
 
 app.use("/api/auth", authRouter);
 app.use("/api/profile", profileRouter);
@@ -141,6 +143,9 @@ app.use("/api/search/track", searchTrackRouter);
 app.use("/api/security",    securityRouter);
 app.use("/api/ai/wendy",            aiWendyRouter);
 app.use("/api/ai/wendy/feedback",   wendyFeedbackRouter);
+// Step 6: RAG admin + proactive insights
+app.use("/api/admin",                   ragAdminRouter);
+app.use("/api/users/me/proactive-insights", proactiveInsightsRouter);
 
 app.get("/api/health/live", (req, res) => {
   res.json({ status: "alive" });

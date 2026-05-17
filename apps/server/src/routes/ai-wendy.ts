@@ -91,11 +91,23 @@ router.post("/", requireAuth, wendyLimiter, async (req: Request, res: Response) 
     const d = data as Record<string, unknown>;
     if (d.type === "tool_call" && typeof d.name === "string") {
       toolsUsedInRequest.push(d.name);
-      // Rileva modalità ricerca semantica se presente nel risultato
-      if (d.result && (d.result as any)?.searchMode === "semantic") {
-        searchModeUsed = "semantic";
-      } else if (d.result && (d.result as any)?.searchMode === "keyword" && searchModeUsed === "none") {
-        searchModeUsed = "keyword";
+      const result = d.result as Record<string, unknown> | null;
+      // Ricerca semantica
+      if (result?.searchMode === "semantic") searchModeUsed = "semantic";
+      else if (result?.searchMode === "keyword" && searchModeUsed === "none") searchModeUsed = "keyword";
+      // RAG telemetria: cattura dati da search_rag
+      if (d.name === "search_rag" && result) {
+        const chunks = (result.chunks as Array<{ similarity?: number; sourceName?: string }>) ?? [];
+        ragChunksRetrieved += chunks.length;
+        const topSim = chunks[0]?.similarity;
+        if (typeof topSim === "number" && (ragTopSimilarity === null || topSim > ragTopSimilarity)) {
+          ragTopSimilarity = topSim;
+        }
+        for (const chunk of chunks) {
+          if (chunk.sourceName && !ragSourcesUsed.includes(chunk.sourceName)) {
+            ragSourcesUsed.push(chunk.sourceName);
+          }
+        }
       }
     }
   };
@@ -115,6 +127,11 @@ router.post("/", requireAuth, wendyLimiter, async (req: Request, res: Response) 
   const toolsUsedInRequest: string[] = [];
   let responseCategory: "success" | "insufficient_data" | "refused" | "error_tool" | "error_model" = "success";
   let searchModeUsed: "semantic" | "keyword" | "none" = "none";
+
+  // Telemetria Step 6 — RAG
+  let ragChunksRetrieved = 0;
+  let ragTopSimilarity: number | null = null;
+  const ragSourcesUsed: string[] = [];
 
   // Routing fuori dal try — serve nel finally per il logging
   const { intent, decision } = resolveWendyRoute({
@@ -284,7 +301,10 @@ router.post("/", requireAuth, wendyLimiter, async (req: Request, res: Response) 
       toolCallsCount:   toolsUsedInRequest.length,
       toolsUsed:        [...new Set(toolsUsedInRequest)],
       responseCategory,
-      searchMode:       searchModeUsed,
+      searchMode:          searchModeUsed,
+      ragChunksRetrieved,
+      ragTopSimilarity,
+      ragSourcesUsed:      [...new Set(ragSourcesUsed)],
     });
 
     if (!res.writableEnded) res.end();

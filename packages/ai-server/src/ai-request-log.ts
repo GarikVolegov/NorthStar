@@ -36,11 +36,15 @@ export interface RecordAiCallInput {
   status:           AiRequestStatus;
   errorCode?:       string;
   locale?:          string;
-  // Nuovi campi Step 5
-  toolCallsCount?:  number;
-  toolsUsed?:       string[];
-  responseCategory?: AiResponseCategory;
-  searchMode?:      "semantic" | "keyword" | "none";
+  // Step 5
+  toolCallsCount?:    number;
+  toolsUsed?:         string[];
+  responseCategory?:  AiResponseCategory;
+  searchMode?:        "semantic" | "keyword" | "none";
+  // Step 6: RAG telemetria
+  ragChunksRetrieved?: number;
+  ragTopSimilarity?:   number | null;
+  ragSourcesUsed?:     string[];
 }
 
 export function recordAiCall(input: RecordAiCallInput): void {
@@ -59,10 +63,13 @@ export function recordAiCall(input: RecordAiCallInput): void {
     status:           input.status,
     errorCode:        input.errorCode,
     locale:           input.locale ?? "it",
-    toolCallsCount:   input.toolCallsCount ?? 0,
-    toolsUsed:        input.toolsUsed ?? [],
-    responseCategory: input.responseCategory,
-    searchMode:       input.searchMode,
+    toolCallsCount:      input.toolCallsCount ?? 0,
+    toolsUsed:           input.toolsUsed ?? [],
+    responseCategory:    input.responseCategory,
+    searchMode:          input.searchMode,
+    ragChunksRetrieved:  input.ragChunksRetrieved ?? 0,
+    ragTopSimilarity:    input.ragTopSimilarity ?? null,
+    ragSourcesUsed:      input.ragSourcesUsed ?? [],
   }).catch((err) => {
     logger.warn({ err, requestId: input.requestId }, "[ai-request-log] insert failed");
   });

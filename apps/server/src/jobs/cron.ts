@@ -1,9 +1,13 @@
 import { runCollector, runEnricher, runSectorDataAgent } from "@workspace/ai-server";
 import { rootLogger } from "../middleware/logger";
+import { runWeakSignalDetector } from "./weak-signal-detector";
+import { runProactiveInsightGenerator } from "./proactive-insight-generator";
 
-const COLLECTOR_INTERVAL_MS = Number(process.env.COLLECTOR_INTERVAL_MS) || 6 * 60 * 60 * 1000; // 6 ore
-const ENRICHER_INTERVAL_MS  = Number(process.env.ENRICHER_INTERVAL_MS)  || 2 * 60 * 60 * 1000; // 2 ore
-const STARTUP_DELAY_MS      = Number(process.env.CRON_STARTUP_DELAY_MS) || 30_000;              // 30s
+const COLLECTOR_INTERVAL_MS        = Number(process.env.COLLECTOR_INTERVAL_MS) || 6 * 60 * 60 * 1000;       // 6 ore
+const ENRICHER_INTERVAL_MS         = Number(process.env.ENRICHER_INTERVAL_MS)  || 2 * 60 * 60 * 1000;       // 2 ore
+const STARTUP_DELAY_MS             = Number(process.env.CRON_STARTUP_DELAY_MS) || 30_000;                    // 30s
+const WEAK_SIGNAL_INTERVAL_MS      = Number(process.env.WEAK_SIGNAL_INTERVAL_MS) || 7 * 24 * 60 * 60 * 1000; // 7 giorni
+const PROACTIVE_INSIGHT_INTERVAL_MS = Number(process.env.PROACTIVE_INSIGHT_INTERVAL_MS) || 24 * 60 * 60 * 1000; // 24 ore
 
 async function safeRunCollector(): Promise<void> {
   try {
@@ -37,11 +41,33 @@ async function safeRunSectorData(): Promise<void> {
 
 const SECTOR_DATA_INTERVAL_MS = Number(process.env.SECTOR_DATA_INTERVAL_MS) || 7 * 24 * 60 * 60 * 1000; // 7 giorni
 
+async function safeRunWeakSignalDetector(): Promise<void> {
+  try {
+    rootLogger.info("[cron] weak-signal-detector starting");
+    const result = await runWeakSignalDetector();
+    rootLogger.info({ ...result }, "[cron] weak-signal-detector complete");
+  } catch (err) {
+    rootLogger.error({ err }, "[cron] weak-signal-detector failed");
+  }
+}
+
+async function safeRunProactiveInsightGenerator(): Promise<void> {
+  try {
+    rootLogger.info("[cron] proactive-insight-generator starting");
+    const result = await runProactiveInsightGenerator();
+    rootLogger.info({ ...result }, "[cron] proactive-insight-generator complete");
+  } catch (err) {
+    rootLogger.error({ err }, "[cron] proactive-insight-generator failed");
+  }
+}
+
 export function startCronJobs(): void {
   rootLogger.info({
-    collectorIntervalH:   COLLECTOR_INTERVAL_MS   / 3_600_000,
-    enricherIntervalH:    ENRICHER_INTERVAL_MS    / 3_600_000,
-    sectorDataIntervalD:  SECTOR_DATA_INTERVAL_MS / 86_400_000,
+    collectorIntervalH:        COLLECTOR_INTERVAL_MS        / 3_600_000,
+    enricherIntervalH:         ENRICHER_INTERVAL_MS         / 3_600_000,
+    sectorDataIntervalD:       SECTOR_DATA_INTERVAL_MS      / 86_400_000,
+    weakSignalIntervalD:       WEAK_SIGNAL_INTERVAL_MS      / 86_400_000,
+    proactiveInsightIntervalH: PROACTIVE_INSIGHT_INTERVAL_MS / 3_600_000,
   }, "[cron] starting scheduled jobs");
 
   // Run iniziale dopo startup delay (dà tempo al DB di inizializzarsi)
@@ -58,4 +84,18 @@ export function startCronJobs(): void {
 
   // Sector data agent settimanale (aggiorna skill, trend, salari)
   setInterval(() => { void safeRunSectorData(); }, SECTOR_DATA_INTERVAL_MS);
+
+  // Weak signal detector settimanale (rileva professioni emergenti)
+  // Delay di 5 min dopo startup per non sovraccaricare il DB all'avvio
+  setTimeout(() => {
+    void safeRunWeakSignalDetector();
+    setInterval(() => { void safeRunWeakSignalDetector(); }, WEAK_SIGNAL_INTERVAL_MS);
+  }, 5 * 60 * 1000);
+
+  // Proactive insight generator giornaliero (genera insight per utenti attivi)
+  // Delay di 10 min dopo startup
+  setTimeout(() => {
+    void safeRunProactiveInsightGenerator();
+    setInterval(() => { void safeRunProactiveInsightGenerator(); }, PROACTIVE_INSIGHT_INTERVAL_MS);
+  }, 10 * 60 * 1000);
 }

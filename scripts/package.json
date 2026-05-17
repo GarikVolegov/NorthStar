@@ -13,7 +13,9 @@
     "backfill:embeddings": "tsx ./src/backfill-embeddings.ts",
     "security:scan": "tsx ./src/security-agent.ts",
     "security:scan:all": "tsx ./src/security-agent.ts -- --all",
-    "test:wendy-tools": "tsx ./src/test-wendy-tools.ts"
+    "test:wendy-tools": "tsx ./src/test-wendy-tools.ts",
+    "seed:rag": "tsx ./src/seed-rag.ts",
+    "rag:weak-signals": "tsx ./src/run-weak-signal-detector.ts"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",

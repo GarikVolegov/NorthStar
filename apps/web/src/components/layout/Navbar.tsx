@@ -21,6 +21,7 @@ import {
   MapPin,
   HandCoins,
   Search,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,8 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { LoginDialog } from "@/components/auth/LoginDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { useProactiveInsights } from "@/hooks/useProactiveInsights";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useReducedMotion } from "@/lib/motion";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { useLefty } from "@/hooks/useLefty";
@@ -124,6 +127,7 @@ export function Navbar() {
   const wendy = useWendy();
   const { isLefty } = useLefty();
   const [newsTitles, setNewsTitles] = useState<string[]>([]);
+  const { unreadCount: insightsUnread } = useProactiveInsights();
 
   const phase: NavPhase = !isLoggedIn ? 'guest'
     : !user?.journeyType ? 'new-user'
@@ -427,6 +431,19 @@ export function Navbar() {
             {isLoggedIn && user ? (
               <>
                 <NotificationBell userId={user.id} />
+                {insightsUnread > 0 && (
+                  <Link href="/dashboard">
+                    <button
+                      aria-label={`${insightsUnread} insight da Wendy`}
+                      className="relative flex items-center justify-center w-8 h-8 rounded-full hover:bg-amber-500/10 transition-colors"
+                    >
+                      <Sparkles className="h-4 w-4 text-amber-500" />
+                      <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-4 h-4 rounded-full bg-amber-500 text-[10px] font-bold text-white px-1 leading-none">
+                        {insightsUnread > 9 ? "9+" : insightsUnread}
+                      </span>
+                    </button>
+                  </Link>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <m.button
@@ -502,6 +519,11 @@ export function Navbar() {
                     >
                       <BrainCircuit className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2 text-primary" /> Chiedi a Wendy
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <div className="px-2 py-1.5">
+                      <p className="text-xs text-muted-foreground mb-1.5 font-semibold uppercase tracking-wide">Tema</p>
+                      <ThemeToggle />
+                    </div>
                     {/* Partner */}
                     {isAffiliate && (
                       <>
@@ -747,6 +769,19 @@ export function Navbar() {
                           </span>
                         )}
                       </button>
+                      {/* Wendy Insights (mobile) */}
+                      {insightsUnread > 0 && (
+                        <button
+                          onClick={() => {
+                            setLocation("/dashboard");
+                            setMenuOpen(false);
+                          }}
+                          className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-amber-500 hover:text-amber-600 hover:bg-amber-500/5 transition-colors font-semibold"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          Wendy ha {insightsUnread} insight per te
+                        </button>
+                      )}
                       {/* Partner (mobile) */}
                       {isAffiliate && (
                         <button
@@ -762,6 +797,11 @@ export function Navbar() {
                           <HandCoins className="h-4 w-4" /> {NAV_LABELS.partner}
                         </button>
                       )}
+                      {/* Theme toggle (mobile) */}
+                      <div className="px-2 py-1">
+                        <p className="text-xs text-muted-foreground mb-1.5 font-semibold uppercase tracking-wide px-2">Tema</p>
+                        <ThemeToggle />
+                      </div>
                       <button
                         onClick={() => {
                           logout();

@@ -70,3 +70,10 @@ export * from "./weeklyLeaderboard";
 export * from "./search";
 // ── News Subscriptions ─────────────────────────────────────────
 export * from "./newsSubscriptions";
+// ── Step 6: RAG, Weak Signals, Job Market Intelligence ─────────
+export * from "./ragSource";
+export * from "./ragChunk";
+export * from "./weakSignal";
+export * from "./jobPostingSnapshot";
+export * from "./skillCooccurrence";
+export * from "./proactiveInsight";

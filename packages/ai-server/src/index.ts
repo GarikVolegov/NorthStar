@@ -104,3 +104,14 @@ export type { LLMProvider, LLMMessage, LLMConfig, ToolCall, ChatWithToolsResult,
 
 // Utilities
 export { withTimeout, gracefulDegrade } from "./utils";
+
+// Step 6/7: RAG pipeline
+export { chunkDocument, chunkReport, chunkNews } from "./rag/chunker";
+export { indexChunks } from "./rag/indexer";
+export type { IndexOptions, IndexResult } from "./rag/indexer";
+export { ingestPdfToRag } from "./rag/ingestors/pdf-ingestor";
+export type { PdfIngestOptions, PdfIngestResult } from "./rag/ingestors/pdf-ingestor";
+export { ingestRssToRag } from "./rag/ingestors/rss-ingestor";
+export type { RssIngestOptions, RssIngestResult } from "./rag/ingestors/rss-ingestor";
+export { ingestJsonToRag } from "./rag/ingestors/json-ingestor";
+export type { JsonIngestOptions, JsonIngestResult } from "./rag/ingestors/json-ingestor";

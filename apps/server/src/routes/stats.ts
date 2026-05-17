@@ -30,7 +30,7 @@ router.get("/summary", async (req, res) => {
     res.json({
       totalSectors: Number(sectorCount?.count ?? 0),
       totalTestsTaken: Number(sessionCount?.count ?? 0),
-      topSectors: topSectorsResult.map((s) => ({ name: s.name, count: s.count })),
+      topSectors: topSectorsResult.map((s: { name: string; count: number }) => ({ name: s.name, count: s.count })),
       avgGrowthRate: Number(avgGrowth?.avg ?? 0),
     });
   } catch (err) {

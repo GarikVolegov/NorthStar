@@ -39,6 +39,8 @@ export interface AuthUser {
   isAffiliate?: boolean;
   /** Onboarding completato — viene da users.onboarding_completed */
   onboardingCompleted?: boolean;
+  /** Ruolo utente — 'user' | 'admin' */
+  role?: "user" | "admin";
 }
 
 const JOURNEY_CACHE_KEY = "ns_journey";

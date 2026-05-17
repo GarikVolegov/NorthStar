@@ -60,6 +60,11 @@ export const aiRequestLogTable = pgTable(
       enum: ["semantic", "keyword", "none"],
     }),
 
+    // ── RAG telemetria (Step 6) ────────────────────────────────────────────
+    ragChunksRetrieved: integer("rag_chunks_retrieved").notNull().default(0),
+    ragTopSimilarity:   real("rag_top_similarity"),          // 0–1, null = RAG non usato
+    ragSourcesUsed:     text("rag_sources_used").array().notNull().default([]), // nomi fonti
+
     // ── Localizzazione ────────────────────────────────────────────────────
     locale: text("locale").notNull().default("it"),
 

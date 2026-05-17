@@ -13,7 +13,7 @@ router.get("/", async (req, res) => {
       GROUP BY r->>'sectorName'
     `);
 
-    const pickMap = new Map(pickCounts.map((p) => [p.name, p.total_picks]));
+    const pickMap = new Map(pickCounts.map((p: { name: string; total_picks: number }) => [p.name, p.total_picks]));
 
     const sectors = await db
       .select({

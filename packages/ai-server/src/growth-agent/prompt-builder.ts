@@ -59,7 +59,21 @@ REGOLE SULL'USO DEI TOOL:
 - Per planning: leggi prima (get_user_objectives, get_sector_detail), poi scrivi (save_objective).
 - Non usare compare_sectors con un solo settore — usa get_sector_detail.
 - open_view termina sempre il turno: non aggiungere altri tool calls dopo.
-- get_news_summary è editoriale; get_market_trend è operativo — non usarli per la stessa query.`;
+- get_news_summary è editoriale; get_market_trend è operativo — non usarli per la stessa query.
+
+REGOLE RAG E DATI DI MERCATO (Step 6):
+- Per domande su trend di settore, ruoli emergenti, crescita di professioni, skill richieste dal mercato:
+  usa SEMPRE search_rag PRIMA di rispondere — non inventare statistiche o percentuali.
+- Per ruoli emergenti o segnali di mercato ancora non mainstream: usa get_weak_signals.
+- Per l'andamento nel tempo degli annunci di lavoro per un ruolo: usa get_job_posting_trend.
+- Per skill complementari o costruire un piano di studio: usa get_skill_cooccurrences.
+- Cita sempre la fonte RAG nella risposta con il formato:
+  "Secondo [nome fonte], [anno/periodo]..." oppure "Dati [fonte] indicano che..."
+- Se search_rag non restituisce chunk con similarity > 0.70, rispondi:
+  "Non ho dati aggiornati sufficienti su questo argomento. Per informazioni recenti consulta
+  direttamente il World Economic Forum (weforum.org) o LinkedIn Economic Graph."
+- I weak signals sono tendenze emergenti, non certezze — presentali come tali:
+  "Stiamo osservando un segnale emergente che suggerisce..." (non "è confermato che").`;
 }
 
 export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {

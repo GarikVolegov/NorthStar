@@ -161,6 +161,46 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
     description: "Legge il profilo compatto dell'utente: tipo percorso, obiettivi attivi, fatti biografici, settori preferiti. Chiamare al massimo UNA VOLTA per sessione.",
     parameters: [],
   },
+
+  // ── Step 6: RAG + Job Market Intelligence ──────────────────────────────────
+  search_rag: {
+    name:        "search_rag",
+    description: "Cerca nel knowledge base RAG (report WEF, LinkedIn, ONET, news) con ricerca semantica. USARE OBBLIGATORIAMENTE per domande su trend di mercato, ruoli emergenti, statistiche di settore. Restituisce chunk con fonte e data per citazione.",
+    parameters: [
+      { name: "query",   type: "string", description: "Query semantica in italiano o inglese", required: true },
+      { name: "filters", type: "string", description: "JSON opzionale: { geography: ['IT','EU'], sourceTypes: ['report','news'], minTrustScore: 0.6, maxAgeMonths: 24 }" },
+      { name: "topK",    type: "number", description: "Numero di chunk da recuperare (default 5, max 10)" },
+    ],
+  },
+  get_weak_signals: {
+    name:        "get_weak_signals",
+    description: "Recupera segnali deboli di professioni o skill emergenti (nuovi ruoli, skill insolite, trend nascenti). Utile per rispondere a domande su futuro del lavoro e ruoli emergenti.",
+    parameters: [
+      { name: "sectorId",  type: "string", description: "ID settore per filtrare i segnali (opzionale)" },
+      { name: "status",    type: "string", description: "emerging | confirmed (default: confirmed)" },
+      { name: "geography", type: "string", description: "Filtra per area geografica: IT | EU | US" },
+      { name: "limit",     type: "number", description: "Max segnali (default 5)" },
+    ],
+  },
+  get_job_posting_trend: {
+    name:        "get_job_posting_trend",
+    description: "Recupera l'andamento nel tempo degli annunci di lavoro per un ruolo specifico. Utile per domande su crescita di un ruolo, confronto periodi, evoluzione della domanda.",
+    parameters: [
+      { name: "roleTitle",    type: "string", description: "Titolo del ruolo (es. 'Data Engineer')" },
+      { name: "professionId", type: "number", description: "ID professione (alternativo a roleTitle)" },
+      { name: "geography",    type: "string", description: "Area geografica: IT | EU | US | Global", required: true },
+      { name: "periods",      type: "array",  description: "Array di periodi YYYY-MM (es. ['2024-10','2025-01'])", required: true },
+    ],
+  },
+  get_skill_cooccurrences: {
+    name:        "get_skill_cooccurrences",
+    description: "Restituisce le skill che compaiono più spesso insieme a una skill data negli annunci di lavoro. Utile per suggerire skill complementari e costruire piani di studio.",
+    parameters: [
+      { name: "skillName",    type: "string", description: "Nome della skill principale (es. 'Python')", required: true },
+      { name: "professionId", type: "number", description: "Restringe al contesto di una professione specifica" },
+      { name: "limit",        type: "number", description: "Max skill correlate (default 8)" },
+    ],
+  },
 };
 
 // ── Matrice intent → tool abilitati ──────────────────────────────────────────
@@ -176,6 +216,8 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_profession_detail",
     "search_professions",
     "get_news_summary",
+    "search_rag",          // Step 6: grounding RAG per domande su trend/ruoli
+    "get_weak_signals",    // Step 6: segnali emergenti
   ],
   conversation: [
     "get_sector_detail",
@@ -187,6 +229,8 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_market_trend",
     "get_user_context",
     "get_growth_articles",
+    "search_rag",          // Step 6: grounding su domande di mercato
+    "get_weak_signals",    // Step 6: anticipare trend nel settore utente
   ],
   planning: [
     "get_sector_detail",
@@ -202,6 +246,10 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "save_business_idea",
     "add_calendar_event",
     "get_user_context",
+    "search_rag",                // Step 6: grounding per piano basato su dati reali
+    "get_weak_signals",          // Step 6: ruoli emergenti rilevanti per il piano
+    "get_job_posting_trend",     // Step 6: trend domanda per il ruolo target
+    "get_skill_cooccurrences",   // Step 6: skill complementari per il piano
   ],
   deep_analysis: [
     "get_sector_detail",
@@ -213,6 +261,10 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_growth_articles",
     "get_user_context",
     "get_user_objectives",
+    "search_rag",                // Step 6: analisi profonda con fonti autorevoli
+    "get_weak_signals",          // Step 6: segnali emergenti nel settore
+    "get_job_posting_trend",     // Step 6: confronto periodi e crescita domanda
+    "get_skill_cooccurrences",   // Step 6: mappa skill correlate
   ],
 };
 

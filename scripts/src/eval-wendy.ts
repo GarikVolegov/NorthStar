@@ -408,11 +408,19 @@ async function main() {
   console.log(`\n📈 BY CATEGORY`);
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
   for (const cat of report.summary) {
+    const ragMark = cat.category === "rag_grounding" ? " 🔍" : "";
     console.log(
-      `${cat.category.padEnd(20)} ${cat.passed}/${cat.total} ` +
+      `${cat.category.padEnd(22)} ${cat.passed}/${cat.total} ` +
         `(${(cat.avgScore * 100).toFixed(0)}%) ` +
-        `[${cat.avgResponseTime.toFixed(0)}ms]`
+        `[${cat.avgResponseTime.toFixed(0)}ms]${ragMark}`
     );
+  }
+
+  // KPI RAG grounding target
+  const ragCat = report.summary.find((c) => c.category === "rag_grounding");
+  if (ragCat) {
+    const ragOk = ragCat.avgScore >= 0.7;
+    console.log(`\n🔍 RAG GROUNDING KPI: ${(ragCat.avgScore * 100).toFixed(0)}% ${ragOk ? "✅ (target ≥70%)" : "❌ (target ≥70%)"}`);
   }
 
   // Identify test cases requiring manual judge review

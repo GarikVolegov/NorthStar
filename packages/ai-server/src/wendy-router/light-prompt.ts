@@ -11,7 +11,7 @@ const ROLE_BASE = (locale: string) =>
 
 const INTENT_INSTRUCTIONS: Record<"navigation" | "simple_qa", string> = {
   navigation: `Il tuo unico compito è determinare quale azione di navigazione compiere. Usa il tool "navigate" o "filter_list". Non generare testo — solo la tool call JSON.`,
-  simple_qa:  `Rispondi in 2-4 frasi. Se hai bisogno di dati strutturati (settore, professione), usa il tool corrispondente. Non inventare numeri o statistiche.`,
+  simple_qa:  `Rispondi in 2-4 frasi. Se hai bisogno di dati strutturati (settore, professione), usa il tool corrispondente. Non inventare numeri o statistiche. Per domande su trend di mercato, ruoli emergenti o statistiche di crescita usa search_rag. Se non ottieni dati, dì esplicitamente che non hai dati sufficienti invece di inventare.`,
 };
 
 export function buildLightPrompt(params: {

@@ -223,7 +223,7 @@ router.post("/sessions/:id/ask", requireAuth, costGuard, wendyLimiter, wendyIpLi
     (async () => {
       try {
         const { extractMemory, mergeMemory } = await import("@workspace/ai-server/growth-agent");
-        const { withTimeout } = await import("@workspace/ai-server/utils");
+        const { withTimeout } = await import("@workspace/ai-server");
         const lastTurns = updatedMessages.slice(-8);
         const extracted = await withTimeout(
           extractMemory(lastTurns.map((m: { role: string; content: string }) => ({ role: m.role, content: m.content }))),

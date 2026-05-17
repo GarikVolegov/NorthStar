@@ -97,6 +97,13 @@ export default function AdminHome() {
               description="Revisiona e valida i contenuti generati dall'AI prima della pubblicazione"
             />
             <NavCard
+              href="/admin/rag"
+              icon={<Brain size={16} />}
+              title="RAG & Intelligence"
+              description="Gestione knowledge base, ingestione fonti, segnali deboli e job market"
+              badge="Step 6-8"
+            />
+            <NavCard
               href="/admin/messaggi"
               icon={<MessageSquare size={16} />}
               title="Messaggi"

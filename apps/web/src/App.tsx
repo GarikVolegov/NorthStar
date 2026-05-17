@@ -88,6 +88,7 @@ const AdminHome = lazy(() => import("@/pages/admin-home"));
 const AdminAgenti = lazy(() => import("@/pages/admin-agenti"));
 const AdminCataloghi = lazy(() => import("@/pages/admin-cataloghi"));
 const AdminCrescita = lazy(() => import("@/pages/admin-crescita"));
+const AdminRag = lazy(() => import("@/pages/admin-rag"));
 const CertificatePage = lazy(() => import("@/pages/certificato"));
 
 /**
@@ -310,6 +311,13 @@ function Router() {
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <AdminCrescita />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+      <Route path="/admin/rag">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <AdminRag />
           </Suspense>
         </ErrorBoundary>
       </Route>

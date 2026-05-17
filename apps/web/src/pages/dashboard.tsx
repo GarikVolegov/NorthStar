@@ -26,6 +26,8 @@ import { DashboardObjectives } from "@/components/dashboard/DashboardObjectives"
 import { DashboardPersonality } from "@/components/dashboard/DashboardPersonality";
 import { DashboardCalendar } from "@/components/dashboard/DashboardCalendar";
 import { DashboardGrowth } from "@/components/dashboard/DashboardGrowth";
+import { ProactiveInsightCard } from "@/components/wendy/ProactiveInsightCard";
+import { useProactiveInsights } from "@/hooks/useProactiveInsights";
 
 import { JourneyToolsSection } from "@/components/dashboard/JourneyToolsSection";
 import { ProfessionCard } from "@/components/dashboard/ProfessionCard";
@@ -126,6 +128,7 @@ export default function Dashboard() {
   const workMode = summary?.workMode;
 
   const { data: dashData, isLoading: dashLoading } = useDashboardData();
+  const { insights, markRead, dismiss } = useProactiveInsights();
   const objectives = dashData?.objectives ?? [];
   const objectivesProgress = dashData?.objectivesProgress ?? { done: 0, total: 0, percent: 0 };
   const upcomingEvents = dashData?.upcomingEvents ?? [];
@@ -230,6 +233,30 @@ export default function Dashboard() {
         onDelete={deleteObjective}
         onCreate={createObjective}
       />
+
+      {insights.length > 0 && (
+        <section>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+            </div>
+            <div>
+              <h2 className="font-bold text-lg text-foreground">Wendy ha notato qualcosa per te</h2>
+              <p className="text-xs text-muted-foreground">Segnali e insight dal mercato del lavoro</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {insights.slice(0, 3).map((insight: import("@/hooks/useProactiveInsights").ProactiveInsight) => (
+              <ProactiveInsightCard
+                key={insight.id}
+                insight={insight}
+                onRead={markRead}
+                onDismiss={dismiss}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section>
         <div className="flex items-center gap-3 mb-5">

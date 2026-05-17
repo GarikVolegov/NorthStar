@@ -30,37 +30,32 @@ router.get("/events", requireAuth, async (req, res) => {
       endDate = endOfWeek(endOfMonth(now), { locale: it });
     }
     
-    let query = db
+    const conditions: ReturnType<typeof eq>[] = [eq(calendarEventsTable.userId, userId) as any];
+    if (startDate) conditions.push(gte(calendarEventsTable.startAt, startDate) as any);
+    if (endDate)   conditions.push(sql`${calendarEventsTable.endAt} <= ${endDate}` as any);
+
+    const events = await db
       .select({
-        id: calendarEventsTable.id,
-        title: calendarEventsTable.title,
-        description: calendarEventsTable.description,
-        startAt: calendarEventsTable.startAt,
-        endAt: calendarEventsTable.endAt,
-        allDay: calendarEventsTable.allDay,
-        category: calendarEventsTable.category,
-        priority: calendarEventsTable.priority,
-        status: calendarEventsTable.status,
-        color: calendarEventsTable.color,
-        tags: calendarEventsTable.tags,
-        linkedSectorId: calendarEventsTable.linkedSectorId,
-        linkedGoal: calendarEventsTable.linkedGoal,
+        id:               calendarEventsTable.id,
+        title:            calendarEventsTable.title,
+        description:      calendarEventsTable.description,
+        startAt:          calendarEventsTable.startAt,
+        endAt:            calendarEventsTable.endAt,
+        allDay:           calendarEventsTable.allDay,
+        category:         calendarEventsTable.category,
+        priority:         calendarEventsTable.priority,
+        status:           calendarEventsTable.status,
+        color:            calendarEventsTable.color,
+        tags:             calendarEventsTable.tags,
+        linkedSectorId:   calendarEventsTable.linkedSectorId,
+        linkedGoal:       calendarEventsTable.linkedGoal,
         linkedContentIds: calendarEventsTable.linkedContentIds,
-        isRecurring: calendarEventsTable.isRecurring,
-        recurrenceRule: calendarEventsTable.recurrenceRule,
-        reminders: calendarEventsTable.reminders,
+        isRecurring:      calendarEventsTable.isRecurring,
+        recurrenceRule:   calendarEventsTable.recurrenceRule,
       })
       .from(calendarEventsTable)
-      .where(eq(calendarEventsTable.userId, userId));
-    
-    if (startDate) {
-      query = query.where(gte(calendarEventsTable.startAt, startDate));
-    }
-    if (endDate) {
-      query = query.where(sql`${calendarEventsTable.endAt} <= ${endDate}`);
-    }
-    
-    const events = await query.orderBy(asc(calendarEventsTable.startAt));
+      .where(and(...conditions))
+      .orderBy(asc(calendarEventsTable.startAt));
     
     res.json({ events });
   } catch (err) {
@@ -93,7 +88,6 @@ router.get("/events/:id", requireAuth, async (req, res) => {
         linkedContentIds: calendarEventsTable.linkedContentIds,
         isRecurring: calendarEventsTable.isRecurring,
         recurrenceRule: calendarEventsTable.recurrenceRule,
-        reminders: calendarEventsTable.reminders,
       })
       .from(calendarEventsTable)
       .where(
@@ -135,9 +129,8 @@ router.post("/events", requireAuth, async (req, res) => {
       linkedContentIds,
       isRecurring,
       recurrenceRule,
-      reminders
     } = req.body;
-    
+
     const [event] = await db
       .insert(calendarEventsTable)
       .values({
@@ -157,7 +150,6 @@ router.post("/events", requireAuth, async (req, res) => {
         linkedContentIds,
         isRecurring,
         recurrenceRule,
-        reminders
       })
       .returning();
     
