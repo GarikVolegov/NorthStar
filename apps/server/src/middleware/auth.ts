@@ -2,6 +2,8 @@ import { type Request, type Response, type NextFunction } from "express";
 import jwt from "jsonwebtoken";
 const { verify } = jwt;
 import { rootLogger } from "./logger";
+import { db, usersTable, userProfileSettingsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 declare global {
   namespace Express {
@@ -26,6 +28,16 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
+const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY ?? "";
+const CLERK_JWKS_URL = process.env.CLERK_JWKS_URL ?? "https://api.clerk.com/v1/jwks";
+
+interface ClerkJwtPayload {
+  sub: string;
+  email?: string;
+  name?: string;
+  userId?: number;
+}
+
 /** Shape of the stable user data embedded in every JWT at login/register time */
 interface JwtPayload {
   userId: number;
@@ -36,6 +48,48 @@ interface JwtPayload {
   journeyType: string | null;
   stripeSubscriptionId: string | null;
   testSessionId: number | null;
+}
+
+let jwksCache: { keys: Array<{ kid: string; n: string; e: string }> } | null = null;
+let jwksCacheTime = 0;
+
+async function getClerkJwks() {
+  const now = Date.now();
+  if (jwksCache && now - jwksCacheTime < 3600000) {
+    return jwksCache;
+  }
+  const res = await fetch(CLERK_JWKS_URL);
+  jwksCache = await res.json();
+  jwksCacheTime = now;
+  return jwksCache;
+}
+
+async function verifyClerkToken(token: string): Promise<ClerkJwtPayload | null> {
+  try {
+    if (!CLERK_SECRET_KEY) return null;
+
+    const jwks = await getClerkJwks();
+    if (!jwks) return null;
+
+    const header = JSON.parse(Buffer.from(token.split(".")[0], "base64").toString());
+    const key = jwks.keys.find((k) => k.kid === header.kid);
+    if (!key) return null;
+
+    const n = Buffer.from(key.n, "base64");
+    const e = Buffer.from(key.e, "base64");
+
+    const pem = `-----BEGIN PUBLIC KEY-----\n${Buffer.concat([
+      Buffer.from([0x30]),
+      Buffer.from([0x82, (n.length + e.length + 4) >> 8, (n.length + e.length + 4) & 0xff]),
+      Buffer.from([0x02, n.length + 1, 0x00, ...n]),
+      Buffer.from([0x02, e.length, ...e]),
+    ]).toString("base64").match(/.{1,64}/g)!.join("\n")}\n-----END PUBLIC KEY-----`;
+
+    const payload = verify(token, pem, { algorithms: ["RS256"] }) as ClerkJwtPayload;
+    return payload;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -75,9 +129,56 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
 
     next();
-  } catch (err) {
+  } catch {
+    // Fallback: prova a verificare come Clerk JWT
+    const clerkPayload = await verifyClerkToken(token);
+    if (clerkPayload?.sub) {
+      // Cerca l'utente nel DB tramite clerkId (sub)
+      try {
+        const [dbUser] = await db
+          .select({
+            id:                   usersTable.id,
+            name:                 usersTable.name,
+            email:                usersTable.email,
+            role:                 usersTable.role,
+            stripeSubscriptionId: usersTable.stripeSubscriptionId,
+            journeyType:          usersTable.journeyType,
+            testSessionId:        usersTable.testSessionId,
+            onboardingCompleted:  usersTable.onboardingCompleted,
+          })
+          .from(usersTable)
+          .where(eq(usersTable.clerkId, clerkPayload.sub))
+          .limit(1);
+
+        if (dbUser) {
+          req.user = {
+            id:                   dbUser.id,
+            name:                 dbUser.name,
+            email:                dbUser.email,
+            role:                 (dbUser.role as "user" | "admin") ?? "user",
+            stripeSubscriptionId: dbUser.stripeSubscriptionId,
+            journeyType:          dbUser.journeyType,
+            testSessionId:        dbUser.testSessionId,
+            onboardingCompleted:  dbUser.onboardingCompleted ?? false,
+          };
+
+          if (req.log) req.log = req.log.child({ userId: dbUser.id });
+          next();
+          return;
+        }
+      } catch (dbErr) {
+        rootLogger.warn({ dbErr }, "[auth] DB lookup for Clerk user failed");
+      }
+
+      // Utente Clerk non ancora sincronizzato — accesso limitato
+      // Il client deve chiamare /api/auth/clerk-sync prima di usare le API protette
+      if (req.log) {
+        req.log.warn({ clerkId: clerkPayload.sub }, "[auth] Clerk user not yet synced");
+      }
+    }
+
     if (req.log) {
-      req.log.error({ err }, "JWT verification failed");
+      req.log.error({ err: "auth_failed" }, "JWT verification failed");
     }
     res.status(401).json({ error: "Token non valido" });
   }
@@ -129,7 +230,23 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
       req.log = req.log.child({ userId: payload.userId });
     }
   } catch {
-    // Invalid token — silently ignore, user stays unauthenticated
+    const clerkPayload = await verifyClerkToken(token);
+    if (clerkPayload && clerkPayload.userId) {
+      req.user = {
+        id: clerkPayload.userId,
+        name: clerkPayload.name ?? "",
+        email: clerkPayload.email ?? "",
+        role: "user",
+        stripeSubscriptionId: null,
+        journeyType: null,
+        testSessionId: null,
+        onboardingCompleted: false,
+      };
+
+      if (req.log) {
+        req.log = req.log.child({ userId: clerkPayload.userId });
+      }
+    }
   }
 
   next();

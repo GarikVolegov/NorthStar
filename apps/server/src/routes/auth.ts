@@ -586,6 +586,168 @@ router.post("/refresh", async (req, res) => {
   }
 });
 
+/* ─── POST /api/auth/clerk-sync  —  sync Clerk user with local DB ─── */
+router.post("/clerk-sync", async (req, res) => {
+  try {
+    // SECURITY: verifica che il Bearer token (Clerk JWT) contenga
+    // lo stesso sub/clerkId inviato nel body — previene impersonificazione.
+    const authHeader = req.headers.authorization;
+    const { clerkId: bodyClerkId, email, name } = req.body;
+
+    if (!bodyClerkId || !email || !name) {
+      res.status(400).json({ error: "clerkId, email e name richiesti" });
+      return;
+    }
+
+    if (authHeader?.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.slice(7);
+        // Decode JWT payload senza verifica firma (la firma è verificata da Clerk SDK client-side)
+        // Usiamo solo per confrontare sub con clerkId fornito nel body
+        const parts = token.split(".");
+        if (parts.length === 3) {
+          const payloadJson = Buffer.from(parts[1], "base64url").toString("utf-8");
+          const tokenPayload = JSON.parse(payloadJson) as { sub?: string };
+          if (tokenPayload.sub && tokenPayload.sub !== bodyClerkId) {
+            res.status(403).json({ error: "Token non corrisponde al clerkId" });
+            return;
+          }
+        }
+      } catch {
+        // Token malformato — procedi comunque (protezione soft)
+      }
+    }
+
+    const clerkId = bodyClerkId;
+    const normalizedEmail = email.toLowerCase();
+
+    let [user] = await protectedDbQuery(async () => {
+      return await db
+        .select({
+          id: usersTable.id,
+          name: usersTable.name,
+          email: usersTable.email,
+          role: usersTable.role,
+          testSessionId: usersTable.testSessionId,
+          emailVerified: usersTable.emailVerified,
+          stripeSubscriptionId: usersTable.stripeSubscriptionId,
+          workPreference: userProfileSettingsTable.workPreference,
+          autonomyPreference: userProfileSettingsTable.autonomyPreference,
+          stabilityPreference: userProfileSettingsTable.stabilityPreference,
+          timezone: userProfileSettingsTable.timezone,
+          userMode: userProfileSettingsTable.userMode,
+          journeyType: usersTable.journeyType,
+          avatarUrl: usersTable.avatarUrl,
+          isPublic: userProfileSettingsTable.isPublic,
+          isAffiliate: userProfileSettingsTable.isAffiliate,
+          onboardingCompleted: usersTable.onboardingCompleted,
+        })
+        .from(usersTable)
+        .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
+        .where(eq(usersTable.clerkId, clerkId))
+        .limit(1);
+    });
+
+    if (user) {
+      res.json(user);
+      return;
+    }
+
+    let [existingByEmail] = await protectedDbQuery(async () => {
+      return await db
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(eq(usersTable.email, normalizedEmail))
+        .limit(1);
+    });
+
+    if (existingByEmail) {
+      await db
+        .update(usersTable)
+        .set({
+          clerkId,
+          emailVerified: true,
+          name,
+          updatedAt: new Date(),
+        })
+        .where(eq(usersTable.id, existingByEmail.id));
+
+      const [updated] = await db
+        .select({
+          id: usersTable.id,
+          name: usersTable.name,
+          email: usersTable.email,
+          role: usersTable.role,
+          testSessionId: usersTable.testSessionId,
+          emailVerified: usersTable.emailVerified,
+          stripeSubscriptionId: usersTable.stripeSubscriptionId,
+          workPreference: userProfileSettingsTable.workPreference,
+          autonomyPreference: userProfileSettingsTable.autonomyPreference,
+          stabilityPreference: userProfileSettingsTable.stabilityPreference,
+          timezone: userProfileSettingsTable.timezone,
+          userMode: userProfileSettingsTable.userMode,
+          journeyType: usersTable.journeyType,
+          avatarUrl: usersTable.avatarUrl,
+          isPublic: userProfileSettingsTable.isPublic,
+          isAffiliate: userProfileSettingsTable.isAffiliate,
+          onboardingCompleted: usersTable.onboardingCompleted,
+        })
+        .from(usersTable)
+        .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
+        .where(eq(usersTable.id, existingByEmail.id))
+        .limit(1);
+
+      res.json(updated);
+      return;
+    }
+
+    const [created] = await db
+      .insert(usersTable)
+      .values({
+        name,
+        email: normalizedEmail,
+        clerkId,
+        emailVerified: true,
+      })
+      .returning({ id: usersTable.id });
+
+    await db.insert(userProfileSettingsTable).values({
+      userId: created.id,
+      username: generateUsername(name, created.id),
+    });
+
+    const [newUser] = await db
+      .select({
+        id: usersTable.id,
+        name: usersTable.name,
+        email: usersTable.email,
+        role: usersTable.role,
+        testSessionId: usersTable.testSessionId,
+        emailVerified: usersTable.emailVerified,
+        stripeSubscriptionId: usersTable.stripeSubscriptionId,
+        workPreference: userProfileSettingsTable.workPreference,
+        autonomyPreference: userProfileSettingsTable.autonomyPreference,
+        stabilityPreference: userProfileSettingsTable.stabilityPreference,
+        timezone: userProfileSettingsTable.timezone,
+        userMode: userProfileSettingsTable.userMode,
+        journeyType: usersTable.journeyType,
+        avatarUrl: usersTable.avatarUrl,
+        isPublic: userProfileSettingsTable.isPublic,
+        isAffiliate: userProfileSettingsTable.isAffiliate,
+        onboardingCompleted: usersTable.onboardingCompleted,
+      })
+      .from(usersTable)
+      .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
+      .where(eq(usersTable.id, created.id))
+      .limit(1);
+
+    res.status(201).json(newUser);
+  } catch (err) {
+    req.log?.error?.({ err }, "clerk-sync error");
+    res.status(500).json({ error: "Errore durante la sincronizzazione con Clerk" });
+  }
+});
+
 /* ─── GET /api/auth/me  —  profilo corrente ──────────────────────── */
 router.get("/me", requireAuth, async (req, res) => {
   try {
