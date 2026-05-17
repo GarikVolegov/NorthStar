@@ -12,10 +12,12 @@
     "seed:catalog": "tsx ./src/seed-catalog.ts",
     "backfill:embeddings": "tsx ./src/backfill-embeddings.ts",
     "security:scan": "tsx ./src/security-agent.ts",
-    "security:scan:all": "tsx ./src/security-agent.ts -- --all"
+    "security:scan:all": "tsx ./src/security-agent.ts -- --all",
+    "test:wendy-tools": "tsx ./src/test-wendy-tools.ts"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",
+    "@workspace/ai-server": "workspace:*",
     "@neondatabase/serverless": "catalog:",
     "bcryptjs": "^2.4.3",
     "drizzle-orm": "catalog:",

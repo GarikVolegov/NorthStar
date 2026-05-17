@@ -5,10 +5,20 @@ const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMENSIONS = 1536;
 
 function getClient(): OpenAI {
-  return new OpenAI({
-    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1",
-    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || "",
-  });
+  // Usa OpenAI se configurato, altrimenti OpenRouter (supporta text-embedding-3-small)
+  if (process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+    return new OpenAI({
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1",
+      apiKey:  process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+    });
+  }
+  if (process.env.OPENROUTER_API_KEY) {
+    return new OpenAI({
+      baseURL: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
+      apiKey:  process.env.OPENROUTER_API_KEY,
+    });
+  }
+  throw new Error("Nessun provider embedding configurato: imposta AI_INTEGRATIONS_OPENAI_API_KEY o OPENROUTER_API_KEY");
 }
 
 export async function generateEmbedding(text: string): Promise<number[] | null> {

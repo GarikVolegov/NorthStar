@@ -411,7 +411,7 @@ export async function* runGrowthAgent(
           return;
         }
 
-        // Turno 2: LLM genera risposta finale con i dati del tool
+        // Turno 2: LLM genera risposta finale con i dati del tool — streaming
         const followUpMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
           ...messages,
           {
@@ -422,17 +422,23 @@ export async function* runGrowthAgent(
           { role: "tool", tool_call_id: toolCallId || "tc_0", content: JSON.stringify(toolData) },
         ];
 
-        const followUp = await openai.chat.completions.create({
-          model: route.model, messages: followUpMessages,
-          temperature: 0.55, max_tokens: 600,
-        });
-        const followUpText = followUp.choices[0]?.message?.content ?? "";
-
         yield { type: "tool_call" as any, name: toolCallName, result: toolData };
-        const CHUNK = 4;
-        for (let i = 0; i < followUpText.length; i += CHUNK) {
-          yield { type: "token", value: followUpText.slice(i, i + CHUNK) };
+
+        const followUpStream = await openai.chat.completions.create({
+          model: route.model, messages: followUpMessages,
+          stream: true, temperature: 0.55, max_tokens: 700,
+        });
+
+        const followUpBuffer: string[] = [];
+        for await (const chunk of followUpStream) {
+          const delta = chunk.choices[0]?.delta?.content;
+          if (delta) {
+            followUpBuffer.push(delta);
+            yield { type: "token", value: delta };
+          }
         }
+
+        const followUpText = followUpBuffer.join("");
         yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], evalResult, routeDecision };
         scheduleMemorySave(followUpText, sessionId ?? Date.now());
         return;

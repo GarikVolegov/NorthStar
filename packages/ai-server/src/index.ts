@@ -39,7 +39,7 @@ export type { SupervisorResult, SupervisorDimensions } from "./growth-agent/supe
 
 // Observability
 export { logger, type LoggerFields } from "./logger";
-export { wendyRequestsTotal, wendyLatencySeconds, wendySupervisorRewritesTotal, wendyLlmTokensTotal, wendyErrorsTotal, recordRequest, recordError, recordSupervisorRewrite, recordLlmTokens, getMetricsContentType, getMetrics, register } from "./metrics";
+export { wendyRequestsTotal, wendyLatencySeconds, wendySupervisorRewritesTotal, wendyLlmTokensTotal, wendyErrorsTotal, wendyToolCallsTotal, wendyToolCallDuration, recordRequest, recordError, recordSupervisorRewrite, recordLlmTokens, recordToolCall, getMetricsContentType, getMetrics, register } from "./metrics";
 
 // Feature flags
 export { FF } from "./feature-flags";

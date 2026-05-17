@@ -10,7 +10,8 @@
  *   - get_user_context: max 5 fatti biografici, nessun dato finanziario
  *   - Tutti i dati restituiti al LLM sono già in DB, non generati ex-novo
  */
-import { eq, and, ilike, or, isNull, desc, inArray } from "drizzle-orm";
+import { eq, and, ilike, or, isNull, desc, inArray, isNotNull } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import {
   db,
   sectorsTable,
@@ -27,7 +28,27 @@ import {
   professionEducationPathsTable,
   usersTable,
 } from "@workspace/db";
+import { generateEmbedding } from "../embeddings/generate";
+import { recordToolCall } from "../metrics";
 import { logger } from "../logger";
+
+// ── Cache embedding query (LRU semplice con TTL 5 min) ───────────────────────
+const _embCache = new Map<string, { vec: number[]; ts: number }>();
+const EMB_TTL_MS = 5 * 60 * 1000;
+
+async function queryEmbedding(text: string): Promise<number[] | null> {
+  const key = text.slice(0, 200);
+  const cached = _embCache.get(key);
+  if (cached && Date.now() - cached.ts < EMB_TTL_MS) return cached.vec;
+  const vec = await generateEmbedding(text);
+  if (vec) _embCache.set(key, { vec, ts: Date.now() });
+  // Limita la cache a 200 entry
+  if (_embCache.size > 200) {
+    const oldest = [..._embCache.entries()].sort((a, b) => a[1].ts - b[1].ts)[0];
+    if (oldest) _embCache.delete(oldest[0]);
+  }
+  return vec;
+}
 
 // ── Tipo risposta uniforme ────────────────────────────────────────────────────
 
@@ -118,10 +139,42 @@ export async function handleGetSectorDetail(
 // ── 4. list_sectors ──────────────────────────────────────────────────────────
 
 export async function handleListSectors(
-  args: { trend?: string; limit?: number },
+  args: { trend?: string; limit?: number; query?: string },
 ): Promise<ToolResult> {
+  const limit = Math.min(args.limit ?? 5, 10);
   try {
-    const limit = Math.min(args.limit ?? 5, 10);
+    // Ricerca semantica se viene passata una query testuale (e nessun filtro trend)
+    if (args.query && !args.trend) {
+      const vec = await queryEmbedding(args.query).catch(() => null);
+      if (vec) {
+        const vectorLiteral = `[${vec.join(",")}]`;
+        const rows = await db.execute<{
+          id: number; name: string; trend: string;
+          automation_risk: string; avg_salary_max: number; score: number;
+        }>(sql`
+          SELECT id, name, trend, automation_risk, avg_salary_max,
+                 1 - (embedding <=> ${vectorLiteral}::vector) AS score
+          FROM sectors
+          WHERE embedding IS NOT NULL
+          ORDER BY embedding <=> ${vectorLiteral}::vector
+          LIMIT ${limit}
+        `);
+        if (rows.rows.length > 0) {
+          return {
+            ok: true,
+            data: {
+              sectors: rows.rows.map((r) => ({
+                id: r.id, name: r.name, trend: r.trend,
+                automationRisk: r.automation_risk, avgSalaryMax: r.avg_salary_max,
+              })),
+              searchMode: "semantic",
+            },
+          };
+        }
+      }
+    }
+
+    // Default: filtra per trend (o tutti ordinati per growthRate)
     const rows = await db
       .select({
         id: sectorsTable.id, name: sectorsTable.name,
@@ -169,9 +222,50 @@ export async function handleGetProfessionDetail(
 export async function handleSearchProfessions(
   args: { query: string; sectorId?: number; limit?: number },
 ): Promise<ToolResult> {
+  const limit = Math.min(args.limit ?? 5, 8);
+
   try {
+    // Prova prima la ricerca semantica (pgvector) se il DB ha gli embedding
+    const vec = await queryEmbedding(args.query).catch(() => null);
+
+    if (vec) {
+      const vectorLiteral = `[${vec.join(",")}]`;
+      const sectorFilter = args.sectorId
+        ? sql`AND sector_id = ${args.sectorId}`
+        : sql``;
+
+      const rows = await db.execute<{
+        id: number; title: string; sector: string;
+        salary_range: string; growth_outlook: string;
+        autonomy_score: number; stability_score: number; score: number;
+      }>(sql`
+        SELECT id, title, sector, salary_range, growth_outlook,
+               autonomy_score, stability_score,
+               1 - (embedding <=> ${vectorLiteral}::vector) AS score
+        FROM professions
+        WHERE is_active = true
+          AND embedding IS NOT NULL
+          ${sectorFilter}
+        ORDER BY embedding <=> ${vectorLiteral}::vector
+        LIMIT ${limit}
+      `);
+
+      if (rows.rows.length > 0) {
+        const professions = rows.rows.map((r) => ({
+          id:             r.id,
+          title:          r.title,
+          sector:         r.sector,
+          salaryRange:    r.salary_range,
+          growthOutlook:  r.growth_outlook,
+          autonomyScore:  r.autonomy_score,
+          stabilityScore: r.stability_score,
+        }));
+        return { ok: true, data: { professions, searchMode: "semantic" } };
+      }
+    }
+
+    // Fallback ILIKE — embedding non disponibile o nessun risultato semantico
     const pattern = `%${args.query}%`;
-    const limit = Math.min(args.limit ?? 5, 8);
     const rows = await db
       .select({
         id: professionsTable.id, title: professionsTable.title,
@@ -187,7 +281,8 @@ export async function handleSearchProfessions(
         ),
       )
       .limit(limit);
-    return { ok: true, data: { professions: rows } };
+    return { ok: true, data: { professions: rows, searchMode: "keyword" } };
+
   } catch (e) {
     logger.warn({ e, args }, "[tool] search_professions error");
     return err("UNAVAILABLE", "Ricerca professioni temporaneamente non disponibile");
@@ -552,34 +647,40 @@ export async function executeToolCall(
   args: Record<string, unknown>,
   userId: number,
 ): Promise<ToolResult> {
-  switch (name) {
-    case "open_view":                  return handleOpenView(args as any);
-    case "set_filters":                return handleSetFilters(args as any);
-    case "get_sector_detail":          return handleGetSectorDetail(args as any);
-    case "list_sectors":               return handleListSectors(args as any);
-    case "get_profession_detail":      return handleGetProfessionDetail(args as any);
-    case "search_professions":         return handleSearchProfessions(args as any);
-    case "compare_sectors":            return handleCompareSectors(args as any);
-    case "get_market_trend":           return handleGetMarketTrend(args as any);
-    case "get_user_objectives":        return handleGetUserObjectives({} as any, userId);
-    case "save_objective":             return handleSaveObjective(args as any, userId);
-    case "update_objective_progress":  return handleUpdateObjectiveProgress(args as any, userId);
-    case "get_growth_articles":        return handleGetGrowthArticles(args as any);
-    case "get_news_summary":           return handleGetNewsSummary(args as any);
-    case "get_learning_paths":         return handleGetLearningPaths(args as any);
-    case "save_business_idea":         return handleSaveBusinessIdea(args as any, userId);
-    case "add_calendar_event":         return handleAddCalendarEvent(args as any, userId);
-    case "get_user_context":           return handleGetUserContext({} as any, userId);
+  const t0 = Date.now();
+  let result: ToolResult;
 
-    // Legacy aliases (compatibilità con tool già esistenti)
-    case "get_sector":         return handleGetSectorDetail({ sectorId: (args.id as number) });
-    case "get_profession":     return handleGetProfessionDetail({ professionId: (args.id as number) });
-    case "navigate":           return handleOpenView({ viewId: "dashboard", ...args } as any);
-    case "filter_list":        return handleSetFilters({ listType: (args.type ?? "sectors") as string, filters: args } );
-    case "save_objective":     return handleSaveObjective(args as any, userId);
+  switch (name) {
+    case "open_view":                  result = await handleOpenView(args as any); break;
+    case "set_filters":                result = await handleSetFilters(args as any); break;
+    case "get_sector_detail":          result = await handleGetSectorDetail(args as any); break;
+    case "list_sectors":               result = await handleListSectors(args as any); break;
+    case "get_profession_detail":      result = await handleGetProfessionDetail(args as any); break;
+    case "search_professions":         result = await handleSearchProfessions(args as any); break;
+    case "compare_sectors":            result = await handleCompareSectors(args as any); break;
+    case "get_market_trend":           result = await handleGetMarketTrend(args as any); break;
+    case "get_user_objectives":        result = await handleGetUserObjectives({} as any, userId); break;
+    case "save_objective":             result = await handleSaveObjective(args as any, userId); break;
+    case "update_objective_progress":  result = await handleUpdateObjectiveProgress(args as any, userId); break;
+    case "get_growth_articles":        result = await handleGetGrowthArticles(args as any); break;
+    case "get_news_summary":           result = await handleGetNewsSummary(args as any); break;
+    case "get_learning_paths":         result = await handleGetLearningPaths(args as any); break;
+    case "save_business_idea":         result = await handleSaveBusinessIdea(args as any, userId); break;
+    case "add_calendar_event":         result = await handleAddCalendarEvent(args as any, userId); break;
+    case "get_user_context":           result = await handleGetUserContext({} as any, userId); break;
+
+    // Legacy aliases
+    case "get_sector":    result = await handleGetSectorDetail({ sectorId: (args.id as number) }); break;
+    case "get_profession":result = await handleGetProfessionDetail({ professionId: (args.id as number) }); break;
+    case "navigate":      result = await handleOpenView({ viewId: "dashboard", ...args } as any); break;
+    case "filter_list":   result = await handleSetFilters({ listType: (args.type ?? "sectors") as string, filters: args }); break;
 
     default:
       logger.warn({ name }, "[tool] unknown tool call");
-      return err("NOT_FOUND", `Tool "${name}" non riconosciuto`);
+      result = err("NOT_FOUND", `Tool "${name}" non riconosciuto`);
   }
+
+  // Metriche Prometheus per ogni tool call
+  recordToolCall(name, result.ok ? "ok" : "error", (Date.now() - t0) / 1000);
+  return result;
 }
