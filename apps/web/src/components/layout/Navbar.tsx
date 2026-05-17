@@ -35,7 +35,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { SignInButton, SignUpButton, UserButton, useClerk } from "@clerk/react";
+import { UserButton, useClerk } from "@clerk/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useProactiveInsights } from "@/hooks/useProactiveInsights";
@@ -577,14 +577,12 @@ export function Navbar() {
             )}
             {!isLoggedIn && (
               <>
-                <SignInButton mode="modal">
-                  <button
-                    className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors px-2"
-                  >
+                <Link href="/sign-in" onMouseEnter={() => prefetchRoute("/sign-in")}>
+                  <button className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors px-2">
                     {t("nav.login")}
                   </button>
-                </SignInButton>
-                <Link href="/test" onMouseEnter={() => prefetchRoute("/test")}>
+                </Link>
+                <Link href="/sign-up" onMouseEnter={() => prefetchRoute("/sign-up")}>
                   <div className="flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full px-3 py-1 hover:bg-primary/90 transition-colors">
                     {t("nav.startJourney")}
                   </div>
@@ -841,22 +839,16 @@ export function Navbar() {
                     </>
               ) : (
                     <>
-                      <SignUpButton mode="modal">
-                        <button
-                          onClick={() => setMenuOpen(false)}
-                          className="w-full flex items-center justify-center bg-primary text-primary-foreground text-sm font-bold rounded-full py-2.5 hover:bg-primary/90 transition-colors gap-2"
-                        >
+                      <Link href="/sign-up" onClick={() => setMenuOpen(false)}>
+                        <div className="w-full flex items-center justify-center bg-primary text-primary-foreground text-sm font-bold rounded-full py-2.5 hover:bg-primary/90 transition-colors gap-2">
                           {t("nav.startJourney")}
-                        </button>
-                      </SignUpButton>
-                      <SignInButton mode="modal">
-                        <button
-                          onClick={() => setMenuOpen(false)}
-                          className="w-full flex items-center justify-center border border-border text-sm font-semibold rounded-full py-2.5 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-colors"
-                        >
+                        </div>
+                      </Link>
+                      <Link href="/sign-in" onClick={() => setMenuOpen(false)}>
+                        <div className="w-full flex items-center justify-center border border-border text-sm font-semibold rounded-full py-2.5 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-colors">
                           {t("nav.login")}
-                        </button>
-                      </SignInButton>
+                        </div>
+                      </Link>
                       {/* Theme toggle anche per ospiti */}
                       <div className="px-2 pt-2">
                         <p className="text-xs text-muted-foreground mb-1.5 font-semibold uppercase tracking-wide px-2">Tema</p>
