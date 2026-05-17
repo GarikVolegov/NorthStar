@@ -105,6 +105,7 @@ import wendyFeedbackRouter  from "./routes/wendy-feedback";
 import ragAdminRouter          from "./routes/rag-admin";
 import proactiveInsightsRouter from "./routes/proactive-insights";
 import onboardingRouter        from "./routes/onboarding";
+import mlRouter                from "./routes/ml";
 import subscriptionRouter      from "./routes/subscription";
 import workspaceRouter         from "./routes/workspace";
 import briefingsRouter         from "./routes/briefings";
@@ -150,6 +151,8 @@ app.use("/api/ai/wendy/feedback",   wendyFeedbackRouter);
 // Step 6: RAG admin + proactive insights
 app.use("/api/admin",                       ragAdminRouter);
 app.use("/api/users/me/proactive-insights", proactiveInsightsRouter);
+// Python ML Service proxy
+app.use("/api/ml",                          mlRouter);
 // Step 7: onboarding, subscription, workspace, briefing
 app.use("/api/onboarding",                  onboardingRouter);
 app.use("/api/subscription",                subscriptionRouter);
