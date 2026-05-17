@@ -70,6 +70,8 @@ export * from "./weeklyLeaderboard";
 export * from "./search";
 // ── News Subscriptions ─────────────────────────────────────────
 export * from "./newsSubscriptions";
+// ── Agenti AI dipendenti ──────────────────────────────────────────────────
+export * from "./agentEmployees";
 // ── Step 7: SaaS maturo — subscription, workspace, collab, briefing ─────
 export * from "./subscription";
 export * from "./workspace";

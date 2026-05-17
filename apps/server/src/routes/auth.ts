@@ -649,7 +649,8 @@ router.post("/clerk-sync", async (req, res) => {
     });
 
     if (user) {
-      res.json(user);
+      const northstarToken = generateToken(buildJwtPayload(user));
+      res.json({ ...user, northstar_token: northstarToken });
       return;
     }
 
@@ -697,7 +698,12 @@ router.post("/clerk-sync", async (req, res) => {
         .where(eq(usersTable.id, existingByEmail.id))
         .limit(1);
 
-      res.json(updated);
+      if (updated) {
+        const northstarToken = generateToken(buildJwtPayload(updated));
+        res.json({ ...updated, northstar_token: northstarToken });
+      } else {
+        res.status(500).json({ error: "Errore aggiornamento utente" });
+      }
       return;
     }
 
@@ -741,7 +747,12 @@ router.post("/clerk-sync", async (req, res) => {
       .where(eq(usersTable.id, created.id))
       .limit(1);
 
-    res.status(201).json(newUser);
+    if (newUser) {
+      const northstarToken = generateToken(buildJwtPayload(newUser));
+      res.status(201).json({ ...newUser, northstar_token: northstarToken });
+    } else {
+      res.status(500).json({ error: "Errore creazione utente" });
+    }
   } catch (err) {
     req.log?.error?.({ err }, "clerk-sync error");
     res.status(500).json({ error: "Errore durante la sincronizzazione con Clerk" });

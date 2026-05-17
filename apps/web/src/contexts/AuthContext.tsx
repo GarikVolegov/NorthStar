@@ -172,8 +172,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         if (res.ok) {
-          const serverUser = (await res.json()) as AuthUser;
-          // Merge: dati server sovrascrivono dati Clerk (più completi)
+          const data = (await res.json()) as AuthUser & { northstar_token?: string };
+          const { northstar_token: nsToken, ...serverUser } = data;
+
+          // Il NorthStar JWT (firmato con JWT_SECRET) funziona con requireAuth
+          // senza dover verificare Clerk su ogni request — più semplice e affidabile.
+          if (nsToken) {
+            sessionStorage.setItem(TOKEN_STORAGE_KEY, nsToken);
+            setToken(nsToken);
+            setAuthTokenGetter(() => nsToken);
+          }
+
           setUser({ ...clerkOnlyUser, ...serverUser });
         }
       } catch {
