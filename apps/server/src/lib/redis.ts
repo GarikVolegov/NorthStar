@@ -111,5 +111,23 @@ export async function cacheClose(): Promise<void> {
   }
 }
 
+/**
+ * Incrementa un counter intero e imposta TTL (in secondi) solo alla prima creazione.
+ * Restituisce il nuovo valore del counter, o null se Redis non disponibile.
+ */
+export async function cacheIncr(key: string, ttlSeconds: number): Promise<number | null> {
+  if (!enabled) return null;
+  if (!client) await init();
+  if (!client) return null;
+  try {
+    const val = await client.incr(key);
+    // Imposta TTL solo alla prima creazione (val === 1)
+    if (val === 1) await client.expire(key, ttlSeconds);
+    return val;
+  } catch {
+    return null;
+  }
+}
+
 // Eager init on module load — won't block startup
 init();

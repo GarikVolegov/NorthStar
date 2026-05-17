@@ -107,6 +107,7 @@ import proactiveInsightsRouter from "./routes/proactive-insights";
 import onboardingRouter        from "./routes/onboarding";
 import subscriptionRouter      from "./routes/subscription";
 import workspaceRouter         from "./routes/workspace";
+import briefingsRouter         from "./routes/briefings";
 
 app.use("/api/auth", authRouter);
 app.use("/api/profile", profileRouter);
@@ -149,10 +150,11 @@ app.use("/api/ai/wendy/feedback",   wendyFeedbackRouter);
 // Step 6: RAG admin + proactive insights
 app.use("/api/admin",                       ragAdminRouter);
 app.use("/api/users/me/proactive-insights", proactiveInsightsRouter);
-// Step 7: onboarding, subscription, workspace
+// Step 7: onboarding, subscription, workspace, briefing
 app.use("/api/onboarding",                  onboardingRouter);
 app.use("/api/subscription",                subscriptionRouter);
 app.use("/api/workspaces",                  workspaceRouter);
+app.use("/api/briefings",                   briefingsRouter);
 
 app.get("/api/health/live", (req, res) => {
   res.json({ status: "alive" });

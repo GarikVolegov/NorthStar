@@ -40,6 +40,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useProactiveInsights } from "@/hooks/useProactiveInsights";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { SubscriptionChip } from "@/components/subscription/SubscriptionStatus";
 import { useReducedMotion } from "@/lib/motion";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { useLefty } from "@/hooks/useLefty";
@@ -483,6 +484,7 @@ export function Navbar() {
                               {JOURNEY_LABELS[user.journeyType].label}
                             </span>
                           )}
+                        <SubscriptionChip />
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
@@ -526,6 +528,20 @@ export function Navbar() {
                       className="cursor-pointer text-xs text-muted-foreground"
                     >
                       <Brain className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2" /> Memoria di Wendy
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setLocation("/profilo/briefing")}
+                      onMouseEnter={() => prefetchRoute("/profilo/briefing")}
+                      className="cursor-pointer text-xs text-muted-foreground"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2" /> Briefing Wendy
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setLocation("/workspace")}
+                      onMouseEnter={() => prefetchRoute("/workspace")}
+                      className="cursor-pointer text-xs text-muted-foreground"
+                    >
+                      <Users className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2" /> Workspace
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <div className="px-2 py-1.5">

@@ -33,11 +33,81 @@ export interface BuildSystemPromptOptions {
   sessionMessageCount?:   number;
   hasSessionGoal?:        boolean;
   pendingFollowUp?:       string;
+  // Step 7: tono adattivo
+  localHour?:             number;          // 0-23, ora locale dell'utente
+  localDayOfWeek?:        number;          // 0=Dom, 1=Lun, …, 6=Sab
+  wendyTonePreference?:   string;          // "auto" | "concise" | "detailed" | "formal" | "casual"
 }
 
 const LOCALE_NAMES: Record<string, string> = {
   it: "italiano", en: "English", es: "español", fr: "français", de: "Deutsch",
 };
+
+// ── Tono adattivo ─────────────────────────────────────────────────────────────
+
+const TONE_BY_JOURNEY: Record<string, string> = {
+  job_search:        "Tono pratico e urgente: ogni risposta include almeno 1 azione immediata. Frasi brevi. Niente filosofia.",
+  career_pivot:      "Tono empatico e rassicurante ma concreto. Riconosci l'incertezza prima di proporre soluzioni. Focus su trasferibilità delle skill.",
+  skill_up:          "Tono pedagogico e incoraggiante. Suddividi i concetti, celebra i progressi, suggerisci risorse concrete.",
+  startup_ideation:  "Tono creativo e stimolante. Fai domande che aprono prospettive. Guida verso la validazione senza demotivare.",
+  explorer:          "Tono curioso e aperto. Proponi opzioni senza forzare scelte. Alimenta la curiosità.",
+  dipendente:        "Tono orientato alla crescita professionale: pratico, concreto, focalizzato su risultati misurabili.",
+  autonomo:          "Tono imprenditoriale: focus su opportunità, mercato, scalabilità e validazione delle idee.",
+  indeciso:          "Tono esplorativo: aiuta a fare chiarezza senza pressione, proponi strumenti di auto-scoperta.",
+};
+
+const TONE_BY_HOUR: Record<string, string> = {
+  morning:  "È mattina: proponi obiettivi del giorno, energia alta.",
+  evening:  "È sera: tono più riflessivo, recap di giornata, nessuna pressione.",
+  night:    "È notte tarda: tono calmo e non urgente.",
+};
+
+const TONE_BY_DAY: Record<string, string> = {
+  monday: "È inizio settimana: buon momento per pianificare e fissare obiettivi.",
+  friday: "È venerdì: focus su recap della settimana e preparazione del weekend.",
+  weekend:"È weekend: tono più leggero, esplorazione libera.",
+};
+
+const USER_TONE_MAP: Record<string, string> = {
+  concise:  "Rispondi sempre in modo conciso: max 3-4 frasi per punto, niente elenchi lunghi.",
+  detailed: "Rispondi in modo approfondito con esempi e contesto, anche se il messaggio è breve.",
+  formal:   "Usa un tono formale e professionale, evita informalità.",
+  casual:   "Usa un tono informale e amichevole, come se parlassi con un amico.",
+};
+
+function buildAdaptiveTone(opts: {
+  journeyType?:       string;
+  localHour?:         number;
+  localDayOfWeek?:    number;
+  tonePreference?:    string;
+}): string | null {
+  const { journeyType, localHour, localDayOfWeek, tonePreference } = opts;
+  const parts: string[] = [];
+
+  if (journeyType && TONE_BY_JOURNEY[journeyType]) {
+    parts.push(TONE_BY_JOURNEY[journeyType]);
+  }
+
+  if (typeof localHour === "number") {
+    if (localHour >= 6 && localHour < 10)       parts.push(TONE_BY_HOUR.morning);
+    else if (localHour >= 20 && localHour < 23)  parts.push(TONE_BY_HOUR.evening);
+    else if (localHour >= 23 || localHour < 5)   parts.push(TONE_BY_HOUR.night);
+  }
+
+  if (typeof localDayOfWeek === "number") {
+    if (localDayOfWeek === 1)                         parts.push(TONE_BY_DAY.monday);
+    else if (localDayOfWeek === 5)                    parts.push(TONE_BY_DAY.friday);
+    else if (localDayOfWeek === 0 || localDayOfWeek === 6) parts.push(TONE_BY_DAY.weekend);
+  }
+
+  if (tonePreference && tonePreference !== "auto" && USER_TONE_MAP[tonePreference]) {
+    // La preferenza utente sovrascrive le regole automatiche
+    return `## Preferenza tono\n${USER_TONE_MAP[tonePreference]}`;
+  }
+
+  if (parts.length === 0) return null;
+  return `## Tono adattivo\n${parts.join(" ")}`;
+}
 
 function buildBaseSystem(locale?: string): string {
   const lang = LOCALE_NAMES[locale?.slice(0, 2) ?? "it"] ?? "italiano";
@@ -82,10 +152,19 @@ export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {
     cot, userMessage, evalResult, platformChunks = [],
     routeDecision, behaviorPatterns, routingHistorySummary,
     fallbackInstruction, sessionMessageCount = 0, hasSessionGoal,
-    pendingFollowUp,
+    pendingFollowUp, localHour, localDayOfWeek, wendyTonePreference,
   } = opts;
 
   const sections: string[] = [buildBaseSystem(userContext.locale)];
+
+  // ── Tono adattivo (Step 7) ──────────────────────────────────────────────
+  const adaptiveTone = buildAdaptiveTone({
+    journeyType:    userContext.journeyType ?? undefined,
+    localHour,
+    localDayOfWeek,
+    tonePreference: wendyTonePreference,
+  });
+  if (adaptiveTone) sections.push(adaptiveTone);
 
   // ── User context ────────────────────────────────────────────────────────
   if (userContext.name || userContext.journeyType || userContext.userMode) {

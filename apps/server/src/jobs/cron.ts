@@ -2,12 +2,15 @@ import { runCollector, runEnricher, runSectorDataAgent } from "@workspace/ai-ser
 import { rootLogger } from "../middleware/logger";
 import { runWeakSignalDetector } from "./weak-signal-detector";
 import { runProactiveInsightGenerator } from "./proactive-insight-generator";
+import { runBriefingGenerator } from "./briefing-generator";
 
 const COLLECTOR_INTERVAL_MS        = Number(process.env.COLLECTOR_INTERVAL_MS) || 6 * 60 * 60 * 1000;       // 6 ore
 const ENRICHER_INTERVAL_MS         = Number(process.env.ENRICHER_INTERVAL_MS)  || 2 * 60 * 60 * 1000;       // 2 ore
 const STARTUP_DELAY_MS             = Number(process.env.CRON_STARTUP_DELAY_MS) || 30_000;                    // 30s
-const WEAK_SIGNAL_INTERVAL_MS      = Number(process.env.WEAK_SIGNAL_INTERVAL_MS) || 7 * 24 * 60 * 60 * 1000; // 7 giorni
+const WEAK_SIGNAL_INTERVAL_MS       = Number(process.env.WEAK_SIGNAL_INTERVAL_MS)       || 7 * 24 * 60 * 60 * 1000; // 7 giorni
 const PROACTIVE_INSIGHT_INTERVAL_MS = Number(process.env.PROACTIVE_INSIGHT_INTERVAL_MS) || 24 * 60 * 60 * 1000; // 24 ore
+const BRIEFING_WEEKLY_INTERVAL_MS   = Number(process.env.BRIEFING_WEEKLY_INTERVAL_MS)   || 7 * 24 * 60 * 60 * 1000; // 7 giorni (lunedì)
+const BRIEFING_DAILY_INTERVAL_MS    = Number(process.env.BRIEFING_DAILY_INTERVAL_MS)    || 24 * 60 * 60 * 1000; // 24 ore
 
 async function safeRunCollector(): Promise<void> {
   try {
@@ -68,6 +71,8 @@ export function startCronJobs(): void {
     sectorDataIntervalD:       SECTOR_DATA_INTERVAL_MS      / 86_400_000,
     weakSignalIntervalD:       WEAK_SIGNAL_INTERVAL_MS      / 86_400_000,
     proactiveInsightIntervalH: PROACTIVE_INSIGHT_INTERVAL_MS / 3_600_000,
+    briefingWeeklyIntervalD:   BRIEFING_WEEKLY_INTERVAL_MS  / 86_400_000,
+    briefingDailyIntervalH:    BRIEFING_DAILY_INTERVAL_MS   / 3_600_000,
   }, "[cron] starting scheduled jobs");
 
   // Run iniziale dopo startup delay (dà tempo al DB di inizializzarsi)
@@ -98,4 +103,32 @@ export function startCronJobs(): void {
     void safeRunProactiveInsightGenerator();
     setInterval(() => { void safeRunProactiveInsightGenerator(); }, PROACTIVE_INSIGHT_INTERVAL_MS);
   }, 10 * 60 * 1000);
+
+  // Briefing settimanale (lunedì mattina — Pro+)
+  // Delay di 15 min per evitare sovrapposizione con altri job di startup
+  setTimeout(() => {
+    // Esegui solo se è lunedì (o se il job non è mai stato eseguito)
+    const dayOfWeek = new Date().getDay();
+    if (dayOfWeek === 1) {
+      void runBriefingGenerator("weekly").catch((e) => rootLogger.error({ e }, "[cron] briefing weekly failed"));
+    }
+    setInterval(() => {
+      if (new Date().getDay() === 1) {
+        void runBriefingGenerator("weekly").catch((e) => rootLogger.error({ e }, "[cron] briefing weekly failed"));
+      }
+    }, BRIEFING_WEEKLY_INTERVAL_MS);
+  }, 15 * 60 * 1000);
+
+  // Briefing giornaliero (ore 7:00 circa — Team)
+  setTimeout(() => {
+    const hour = new Date().getHours();
+    if (hour >= 7 && hour < 8) {
+      void runBriefingGenerator("daily").catch((e) => rootLogger.error({ e }, "[cron] briefing daily failed"));
+    }
+    setInterval(() => {
+      if (new Date().getHours() >= 7 && new Date().getHours() < 8) {
+        void runBriefingGenerator("daily").catch((e) => rootLogger.error({ e }, "[cron] briefing daily failed"));
+      }
+    }, BRIEFING_DAILY_INTERVAL_MS);
+  }, 20 * 60 * 1000);
 }

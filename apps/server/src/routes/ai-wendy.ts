@@ -16,6 +16,8 @@ import { randomUUID } from "node:crypto";
 import { requireAuth } from "../middleware/auth";
 import { wendyLimiter } from "../middleware/rate-limit";
 import { rootLogger } from "../middleware/logger";
+import { checkFeatureAccess } from "../middleware/check-feature";
+import { cacheIncr } from "../lib/redis";
 import {
   runGrowthAgent,
   loadMemory,
@@ -59,6 +61,9 @@ const WendyRequestSchema = z.object({
   pageContext:       WendyPageContextSchema.optional(),
   locale:            z.string().max(5).default("it"),
   hasFileAttached:   z.boolean().optional().default(false),
+  localHour:         z.number().int().min(0).max(23).optional(),
+  localDayOfWeek:    z.number().int().min(0).max(6).optional(),
+  focusMode:         z.boolean().optional().default(false),
 });
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -77,6 +82,32 @@ router.post("/", requireAuth, wendyLimiter, async (req: Request, res: Response) 
   const isPremium = !!req.user!.stripeSubscriptionId;
   const requestId = randomUUID();
   const startedAt = Date.now();
+
+  // ── Daily message limit per piano ─────────────────────────────────────────
+  const FREE_DAILY_LIMIT = parseInt(process.env.WENDY_FREE_DAILY_LIMIT ?? "10");
+  const { allowed: isUnlimited } = await checkFeatureAccess(userId, "wendy_unlimited");
+
+  if (!isUnlimited) {
+    const today   = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const key     = `wendy:daily:${userId}:${today}`;
+    const secondsUntilMidnight = 86400 - (Date.now() / 1000 % 86400 | 0);
+    const count   = await cacheIncr(key, secondsUntilMidnight);
+
+    if (count !== null && count > FREE_DAILY_LIMIT) {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.flushHeaders();
+      res.write(`data: ${JSON.stringify({
+        type: "gate",
+        feature: "wendy_unlimited",
+        requiredPlan: "pro",
+        used: count - 1,
+        limit: FREE_DAILY_LIMIT,
+        message: `Hai usato i tuoi ${FREE_DAILY_LIMIT} messaggi gratuiti oggi. Passa a Pro per continuare senza limiti.`,
+      })}\n\n`);
+      res.end();
+      return;
+    }
+  }
 
   // ── SSE headers ───────────────────────────────────────────────────────────
   res.setHeader("Content-Type",    "text/event-stream");
