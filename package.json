@@ -53,6 +53,13 @@
     "node": ">=20.0.0",
     "pnpm": ">=10.0.0"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "protobufjs"
+    ]
+  },
   "devDependencies": {
     "@esbuild/win32-x64": "0.27.3",
     "@playwright/test": "^1.59.1",
