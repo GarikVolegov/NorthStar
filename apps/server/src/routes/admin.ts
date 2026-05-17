@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { db, supervisorLogs, qualityMetrics, agentRunsTable, sectorsTable, professionsTable } from "@workspace/db";
 import { desc, isNull, eq, sql } from "drizzle-orm";
 import { register } from "@workspace/ai-server/metrics";
-import { runCollector, runEnricher, generateEmbeddingsBatch, buildEmbeddingText } from "@workspace/ai-server";
+import { runCollector, runEnricher, runSectorDataAgent, generateEmbeddingsBatch, buildEmbeddingText } from "@workspace/ai-server";
 import { writeAuditLog } from "../middleware/audit";
 import { rootLogger } from "../middleware/logger";
 
@@ -183,6 +183,21 @@ router.get("/agents/status", async (req: Request, res: Response) => {
     res.json({ runs });
   } catch (err) {
     rootLogger.error({ err }, "[admin/agents/status] error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+/** POST /api/admin/agents/sector-data — aggiorna dati mercato settori/professioni via LLM */
+router.post("/agents/sector-data", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  try {
+    const maxSectors     = Number(req.query.maxSectors)     || 5;
+    const maxProfessions = Number(req.query.maxProfessions) || 10;
+    const result = await runSectorDataAgent({ maxSectors, maxProfessions });
+    rootLogger.info({ result }, "[admin] sector-data agent triggered");
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    rootLogger.error({ err }, "[admin/agents/sector-data] error");
     res.status(500).json({ error: String(err) });
   }
 });

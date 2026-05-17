@@ -83,5 +83,13 @@ export type { RecordAiCallInput, AiRequestStatus } from "./ai-request-log";
 export { runSecurityAgent } from "./security-agent/index";
 export type { SecurityScanOptions, SecurityAgentEvent, SecurityFinding, Severity, VulnCategory } from "./security-agent/index";
 
+// Sector Data Agent
+export { runSectorDataAgent } from "./sector-data-agent/agent";
+export type { SectorDataResult } from "./sector-data-agent/agent";
+
+// LLM client (per uso diretto in route server)
+export { getLLM, getLLMForRoute, resetLLM } from "./llm/client";
+export type { LLMProvider, LLMMessage, LLMConfig } from "./llm/client";
+
 // Utilities
 export { withTimeout, gracefulDegrade } from "./utils";

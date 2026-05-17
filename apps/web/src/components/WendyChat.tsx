@@ -21,7 +21,7 @@ export interface WendyChatProps {
 }
 
 export function WendyChat({
-  apiUrl = '/api/v1/ai/chat/stream',
+  apiUrl = '/api/ai/wendy',
   className = '',
   placeholder = 'Scrivi a Wendy…',
   welcomeMessage = 'Ciao! Sono Wendy, la tua assistente di orientamento. Come posso aiutarti oggi?',

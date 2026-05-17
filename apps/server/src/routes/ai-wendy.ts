@@ -100,17 +100,18 @@ router.post("/", requireAuth, wendyLimiter, async (req: Request, res: Response) 
   let inputTokens = 0;
   let outputTokens = 0;
 
-  try {
-    // ── 1. Routing decision ───────────────────────────────────────────────
-    const { intent, decision } = resolveWendyRoute({
-      userMessage:       message,
-      pageContext:       pageContext as WendyPageContext | undefined,
-      compressedHistory: compressedHistory as CompressedHistory | undefined,
-      isPremium,
-      hasFileAttached,
-    });
+  // Routing fuori dal try — serve nel finally per il logging
+  const { intent, decision } = resolveWendyRoute({
+    userMessage:       message,
+    pageContext:       pageContext as WendyPageContext | undefined,
+    compressedHistory: compressedHistory as CompressedHistory | undefined,
+    isPremium,
+    hasFileAttached,
+  });
 
-    rootLogger.debug({ userId, intent, model: decision.model, tier: decision.tier }, "[ai/wendy] routed");
+  rootLogger.debug({ userId, intent, model: decision.model, tier: decision.tier }, "[ai/wendy] routed");
+
+  try {
 
     // ── 2. Fast path: navigation / simple_qa ────────────────────────────
     if (decision.skipFullPipeline) {
@@ -121,7 +122,13 @@ router.post("/", requireAuth, wendyLimiter, async (req: Request, res: Response) 
       });
 
       const tools = toolsToOpenAIFormat(decision.toolsEnabled);
-      const llm   = getLLMForRoute({ provider: decision.tier === "nano" ? "openrouter" : "openrouter" });
+      const llm   = getLLMForRoute({
+        provider: (decision.model.includes("llama") || decision.model.includes("groq"))
+          ? "groq"
+          : decision.model.includes("openai") || decision.model.includes("gpt")
+            ? "openai"
+            : "openrouter",
+      });
 
       inputTokens = estimateTokens(systemPrompt + message);
 
@@ -230,12 +237,12 @@ router.post("/", requireAuth, wendyLimiter, async (req: Request, res: Response) 
       requestId,
       userId,
       threadId,
-      intent:      "conversation", // override con decision.intent se disponibile
-      tier:        "standard",
-      model:       "unknown",
+      intent:      intent,
+      tier:        decision.tier,
+      model:       decision.model,
       inputTokens,
       outputTokens,
-      costUsdEst:  estimateCost("deepseek/deepseek-chat-v3-0324:free", inputTokens, outputTokens),
+      costUsdEst:  estimateCost(decision.model, inputTokens, outputTokens),
       latencyMs,
       totalTurns:  compressedHistory?.totalTurns ?? 0,
       status,
