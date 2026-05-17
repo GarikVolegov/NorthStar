@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { AdminAuthGate } from "@/components/AdminAuthGate";
+import { usePageModule } from "@/hooks/usePageModule";
 
 function NavCard({ href, icon, title, description, badge }: {
   href: string; icon: React.ReactNode; title: string; description: string; badge?: string;
@@ -48,6 +49,7 @@ function SectionHeader({ title, subtitle, color }: { title: string; subtitle: st
 
 export default function AdminHome() {
   const { logout } = useAdminAuth();
+  usePageModule({ pageId: "admin-home" });
 
   return (
     <AdminAuthGate title="Admin Console" description="Panoramica completa â€” Discovery Â· Execution Â· Monitoraggio">

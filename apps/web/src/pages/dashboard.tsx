@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-fetch";
+import { usePageModule } from "@/hooks/usePageModule";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useAgentAnalysis } from "@/hooks/useAgentAnalysis";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
@@ -95,6 +96,7 @@ export default function Dashboard() {
     description: "La tua analisi AI personalizzata: professioni consigliate, percorsi formativi e modalità di lavoro ottimale per il tuo profilo RIASEC.",
   });
   useWendyPageContext({ page: 'dashboard', title: 'Dashboard' });
+  usePageModule({ pageId: "dashboard" });
 
   const { user, authReady } = useAuth();
   const [, navigate] = useLocation();

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 import { Linkedin, TrendingUp } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
+import { usePageModule } from "@/hooks/usePageModule";
 import { ProfileSettings } from "@/components/profile/ProfileSettings";
 import { BadgesAchievements } from "@/components/profile/sections/BadgesAchievements";
 import { JourneySectionRenderer, type JourneyType } from "@/components/profile/profile-sections";
@@ -25,7 +26,7 @@ function useProfile(userId: number) {
   return useQuery<ProfileData>({
     queryKey: ["profile", userId],
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/profile/${userId}`);
+      const res = await apiFetch(`${BASE}api/profile/${userId}`);
       if (!res.ok) throw new Error("Errore caricamento profilo");
       return res.json();
     },
@@ -47,6 +48,7 @@ type CompletionResponse = {
 export default function Profilo() {
   const { t } = useTranslation();
   const { user, logout, isLoggedIn, updateUser } = useAuth();
+  usePageModule({ pageId: "profilo" });
   const [avatarUrl, setAvatarUrl] = useState<string | null | undefined>(user?.avatarUrl);
   const [bannerUrl, setBannerUrl] = useState<string | null | undefined>();
   const [linkedinWizardOpen, setLinkedinWizardOpen] = useState(false);
