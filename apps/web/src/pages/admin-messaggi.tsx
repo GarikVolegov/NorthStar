@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+﻿import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -7,9 +7,10 @@ import {
   Eye, Filter, ChevronDown, ChevronUp, Inbox, Circle,
   ShieldAlert,
 } from "lucide-react";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { AdminAuthGate } from "@/components/AdminAuthGate";
 
 const BASE = import.meta.env.BASE_URL || "/";
-const LS_KEY = "ns_admin_key";
 
 const SUBJECTS: Record<string, string> = {
   info:      "Informazioni",
@@ -48,13 +49,10 @@ function fmtDate(iso: string) {
 
 export default function AdminMessaggi() {
   useEffect(() => {
-    document.title = "Admin Messaggi — NorthStar";
+    document.title = "Admin Messaggi â€” NorthStar";
   }, []);
 
-  const [key, setKey] = useState(() => localStorage.getItem(LS_KEY) || "");
-  const [inputKey, setInputKey] = useState("");
-  const [authed, setAuthed] = useState(false);
-  const [authError, setAuthError] = useState(false);
+  const { key, logout } = useAdminAuth();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
@@ -71,34 +69,15 @@ export default function AdminMessaggi() {
       const res = await fetch(`${BASE}api/contact/messages`, {
         headers: { "x-admin-key": adminKey },
       });
-      if (res.status === 403) { setAuthed(false); setAuthError(true); return; }
       if (!res.ok) throw new Error("Errore caricamento");
       const data: Message[] = await res.json();
       setMessages(data);
-      setAuthed(true);
     } catch {
       setError("Errore di rete. Riprova.");
     } finally {
       setLoading(false);
     }
   }, []);
-
-  function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = inputKey.trim();
-    if (!trimmed) return;
-    localStorage.setItem(LS_KEY, trimmed);
-    setKey(trimmed);
-    setAuthError(false);
-    fetchMessages(trimmed);
-  }
-
-  function handleLogout() {
-    localStorage.removeItem(LS_KEY);
-    setKey("");
-    setAuthed(false);
-    setMessages([]);
-  }
 
   useEffect(() => {
     if (key) fetchMessages(key);
@@ -131,42 +110,9 @@ export default function AdminMessaggi() {
     return acc;
   }, {});
 
-  if (!authed) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-background flex items-center justify-center px-4">
-        <div className="w-full max-w-sm">
-          <div className="rounded-3xl border bg-card p-8 shadow-sm">
-            <div className="flex flex-col items-center mb-8">
-              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-                <ShieldAlert className="w-7 h-7 text-primary" />
-              </div>
-              <h1 className="text-xl font-serif font-bold text-foreground">Accesso Admin</h1>
-              <p className="text-sm text-muted-foreground text-center mt-1">Inserisci la chiave segreta per accedere ai messaggi</p>
-            </div>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <Input
-                type="password"
-                placeholder="Chiave admin…"
-                value={inputKey}
-                onChange={(e) => { setInputKey(e.target.value); setAuthError(false); }}
-                className={cn("rounded-xl", authError && "border-destructive focus:ring-destructive/20")}
-                autoFocus
-              />
-              {authError && (
-                <p className="text-sm text-destructive text-center">Chiave non valida. Riprova.</p>
-              )}
-              <Button type="submit" className="w-full rounded-full" disabled={!inputKey.trim()}>
-                Accedi
-              </Button>
-            </form>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-slate-50/50">
+    <AdminAuthGate title="Admin Messaggi" description="Gestisci i messaggi di contatto degli utenti">
+      <div className="min-h-screen bg-slate-50/50">
       {/* Top bar */}
       <div className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
         <div className="container mx-auto px-4 max-w-5xl flex h-14 items-center justify-between gap-4">
@@ -174,7 +120,7 @@ export default function AdminMessaggi() {
             <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
               <Inbox className="w-4 h-4 text-primary" />
             </div>
-            <span className="font-serif font-bold text-foreground">Admin · Messaggi</span>
+            <span className="font-serif font-bold text-foreground">Admin Â· Messaggi</span>
             {unreadCount > 0 && (
               <span className="bg-primary text-primary-foreground text-xs font-bold px-2 py-0.5 rounded-full">
                 {unreadCount} nuovi
@@ -186,7 +132,7 @@ export default function AdminMessaggi() {
               <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
               Aggiorna
             </Button>
-            <Button variant="ghost" size="sm" className="rounded-full gap-1.5 text-muted-foreground" onClick={handleLogout}>
+            <Button variant="ghost" size="sm" className="rounded-full gap-1.5 text-muted-foreground" onClick={logout}>
               <LogOut className="w-3.5 h-3.5" />
               Esci
             </Button>
@@ -252,7 +198,7 @@ export default function AdminMessaggi() {
             ))}
             <div className="ml-auto">
               <Input
-                placeholder="Cerca nome, email, testo…"
+                placeholder="Cerca nome, email, testoâ€¦"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-8 text-xs rounded-xl w-52"
@@ -270,7 +216,7 @@ export default function AdminMessaggi() {
         {loading && messages.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
             <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 opacity-40" />
-            Caricamento messaggi…
+            Caricamento messaggiâ€¦
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
@@ -346,7 +292,7 @@ export default function AdminMessaggi() {
                     <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{msg.message}</p>
                     <div className="mt-4 pt-3 border-t flex items-center gap-3">
                       <a
-                        href={`mailto:${msg.email}?subject=Re: ${SUBJECTS[msg.subject] ?? msg.subject} — NorthStar`}
+                        href={`mailto:${msg.email}?subject=Re: ${SUBJECTS[msg.subject] ?? msg.subject} â€” NorthStar`}
                         className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
                       >
                         <Mail className="w-3.5 h-3.5" />
@@ -369,6 +315,7 @@ export default function AdminMessaggi() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </AdminAuthGate>
   );
 }

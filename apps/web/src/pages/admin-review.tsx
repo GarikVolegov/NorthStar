@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+﻿import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -41,10 +41,12 @@ import {
   Home,
   MessageCircle,
   Handshake,
+  Shield,
 } from "lucide-react";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { AdminAuthGate } from "@/components/AdminAuthGate";
 
 const BASE = import.meta.env.BASE_URL || "/";
-const LS_KEY = "ns_admin_key";
 
 type SuggestionStatus =
   | "draft"
@@ -256,13 +258,10 @@ function ConfidenceBadge({ score }: { score: number | null }) {
 
 export default function AdminReview() {
   useEffect(() => {
-    document.title = "Admin Review — NorthStar";
+    document.title = "Admin Review â€” NorthStar";
   }, []);
 
-  const [key, setKey] = useState(() => localStorage.getItem(LS_KEY) || "");
-  const [inputKey, setInputKey] = useState("");
-  const [authed, setAuthed] = useState(false);
-  const [authError, setAuthError] = useState(false);
+  const { key, isAuthenticated, authError, login, logout, setAuthError } = useAdminAuth();
 
   const [section, setSection] = useState<SidebarSection>("queue");
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -347,7 +346,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
         },
       });
       if (res.status === 403) {
-        setAuthed(false);
+        setAuthError(true);
         setAuthError(true);
         throw new Error("auth");
       }
@@ -361,7 +360,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     try {
       const data = await apiFetch("/admin/stats");
       setStats(data);
-      setAuthed(true);
+
     } catch {
       /* handled by apiFetch */
     }
@@ -378,7 +377,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
       const data = await apiFetch(`/admin/suggestions?${params}`);
       setSuggestions(data.items);
       setSuggestionsTotal(data.total);
-      setAuthed(true);
+
     } catch {
       /* handled */
     }
@@ -390,7 +389,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     try {
       const data = await apiFetch("/admin/agent-runs?limit=100");
       setRuns(data);
-      setAuthed(true);
+
     } catch {
       /* handled */
     }
@@ -402,7 +401,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     try {
       const data = await apiFetch("/admin/logs?limit=100");
       setLogs(data);
-      setAuthed(true);
+
     } catch {
       /* handled */
     }
@@ -431,7 +430,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
       const vals: Record<string, string> = {};
       for (const p of data as AgentPrompt[]) vals[p.key] = p.currentValue;
       setPromptEditValues(vals);
-      setAuthed(true);
+
     } catch {
       /* handled */
     }
@@ -443,7 +442,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     try {
       const data = await apiFetch("/admin/research/runs");
       setRunHistory(data as AgentRunRecord[]);
-      setAuthed(true);
+
     } catch {
       /* handled */
     }
@@ -455,7 +454,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     try {
       const data = await apiFetch("/admin/quality");
       setQualitaData(data);
-      setAuthed(true);
+
     } catch {
       /* handled */
     }
@@ -469,7 +468,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
       // For simplicity, we'll fetch sectors as representative data
       const data = await apiFetch("/admin/catalogs/sectors");
       setCataloghiData(data);
-      setAuthed(true);
+
     } catch {
       /* handled */
     }
@@ -481,7 +480,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     try {
       const data = await apiFetch("/admin/agent-health");
       setAgentiSaluteData(data);
-      setAuthed(true);
+
     } catch {
       /* handled */
     }
@@ -497,7 +496,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
       ]);
       setMetricheData(metricsRes);
       setWendyMetricsData(wendyRes);
-      setAuthed(true);
+
     } catch {
       /* handled */
     }
@@ -509,7 +508,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     try {
       // Home page doesn't have a specific API endpoint, so we'll set a flag
       setHomeData({ loaded: true });
-      setAuthed(true);
+
     } catch {
       /* handled */
     }
@@ -521,7 +520,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     try {
       const data = await apiFetch("/api/health"); // Using the health endpoint
       setStatusData(data);
-      setAuthed(true);
+
     } catch {
       /* handled */
     }
@@ -533,7 +532,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     try {
       const data = await apiFetch("/contact/messages");
       setMessaggiData(data);
-      setAuthed(true);
+
     } catch {
       /* handled */
     }
@@ -545,7 +544,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     try {
       const data = await apiFetch("/admin/growth-queue");
       setCrescitaData(data);
-      setAuthed(true);
+
     } catch {
       /* handled */
     }
@@ -557,7 +556,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     try {
       const data = await apiFetch("/affiliazione/leads");
       setAffiliazioneData(data);
-      setAuthed(true);
+
     } catch {
       /* handled */
     }
@@ -570,7 +569,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
       setAgentsRunning((prev) => new Set(prev).add(agentKey));
       setAgentsResult((prev) => ({
         ...prev,
-        [agentKey]: { ok: false, data: { status: "running…" } },
+        [agentKey]: { ok: false, data: { status: "runningâ€¦" } },
       }));
       try {
         const data = await apiFetch(path, {
@@ -642,7 +641,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
   }, [key, loadStats]);
 
   useEffect(() => {
-    if (!authed) return;
+    if (!isAuthenticated) return;
     if (section === "suggestions" || section === "queue") loadSuggestions();
     else if (section === "runs") loadRuns();
     else if (section === "logs") loadLogs();
@@ -658,7 +657,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     else if (section === "crescita") loadCrescita();
     else if (section === "affiliazione") loadAffiliazione();
   }, [
-    authed,
+    isAuthenticated,
     section,
     loadSuggestions,
     loadRuns,
@@ -676,19 +675,8 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     loadAffiliazione,
   ]);
 
-  function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = inputKey.trim();
-    if (!trimmed) return;
-    localStorage.setItem(LS_KEY, trimmed);
-    setKey(trimmed);
-    setAuthError(false);
-  }
-
   function handleLogout() {
-    localStorage.removeItem(LS_KEY);
-    setKey("");
-    setAuthed(false);
+    logout();
     setStats(null);
     setSuggestions([]);
     setDetail(null);
@@ -749,45 +737,6 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     }
   }
 
-  if (!authed) {
-    return (
-      <div className="min-h-screen bg-linear-to-b from-slate-50 to-background flex items-center justify-center px-4">
-        <div className="w-full max-w-sm">
-          <div className="rounded-3xl border bg-card p-8 shadow-sm">
-            <div className="flex flex-col items-center mb-8">
-              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-                <ShieldAlert className="w-7 h-7 text-primary" />
-              </div>
-              <h1 className="text-xl font-serif font-bold text-foreground">
-                Admin Review
-              </h1>
-              <p className="text-sm text-muted-foreground text-center mt-1">
-                Pannello di controllo per la revisione dei risultati AI
-              </p>
-            </div>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <Input
-                type="password"
-                value={inputKey}
-                onChange={(e) => setInputKey(e.target.value)}
-                placeholder="Chiave admin…"
-                className="text-center"
-              />
-              {authError && (
-                <p className="text-destructive text-sm text-center">
-                  Chiave non valida.
-                </p>
-              )}
-              <Button type="submit" className="w-full">
-                Accedi
-              </Button>
-            </form>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const sidebarItems: {
     key: SidebarSection;
     label: string;
@@ -800,7 +749,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     { key: "logs", label: "Audit Log", icon: FileText },
     { key: "agents", label: "Lancia Agenti", icon: Terminal },
     { key: "prompts", label: "Prompt Agenti", icon: Code2 },
-    { key: "qualita", label: "Qualità Wendy", icon: BarChart3 },
+    { key: "qualita", label: "QualitÃ  Wendy", icon: BarChart3 },
     { key: "cataloghi", label: "Cataloghi", icon: BookOpen },
     { key: "agenti-salute", label: "Agent Health", icon: Activity },
     { key: "metriche", label: "Metriche Business", icon: BarChart3 },
@@ -819,7 +768,8 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
       : suggestions;
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <AdminAuthGate title="Admin Review" description="Pannello di controllo per la revisione dei risultati AI">
+      <div className="min-h-screen bg-background flex">
       {/* Sidebar */}
       <aside className="w-64 border-r bg-card flex flex-col shrink-0">
         <div className="p-6 border-b">
@@ -961,7 +911,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
-                        placeholder="Cerca per nome…"
+                        placeholder="Cerca per nomeâ€¦"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-9 h-9"
@@ -1016,7 +966,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
 
                 {loading ? (
                   <div className="p-8 text-center text-muted-foreground">
-                    Caricamento…
+                    Caricamentoâ€¦
                   </div>
                 ) : queueSuggestions.length === 0 ? (
                   <div className="p-12 text-center">
@@ -1137,7 +1087,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium capitalize">
-                          {log.action} — {log.targetType} #{log.targetId}
+                          {log.action} â€” {log.targetType} #{log.targetId}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {fmtDate(log.createdAt)}
@@ -1152,7 +1102,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
             {section === "agents" && (
               <div className="p-6 space-y-6 max-w-2xl">
                 <p className="text-sm text-muted-foreground">
-                  Avvia manualmente una sessione di ricerca AI. Il processo può
+                  Avvia manualmente una sessione di ricerca AI. Il processo puÃ²
                   richiedere 1-3 minuti.
                 </p>
 
@@ -1196,7 +1146,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                       {agentsRunning.has("news") ? (
                         <>
                           <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> In
-                          esecuzione…
+                          esecuzioneâ€¦
                         </>
                       ) : (
                         <>
@@ -1216,7 +1166,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                     >
                       {agentsResult["news"].ok ? (
                         <p>
-                          Completato — aggiunti:{" "}
+                          Completato â€” aggiunti:{" "}
                           <strong>
                             {String(agentsResult["news"].data.added ?? 0)}
                           </strong>
@@ -1256,7 +1206,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                     {agentsRunning.has("growth") ? (
                       <>
                         <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> In
-                        esecuzione…
+                        esecuzioneâ€¦
                       </>
                     ) : (
                       <>
@@ -1275,7 +1225,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                     >
                       {agentsResult["growth"].ok ? (
                         <p>
-                          Completato — aggiunti:{" "}
+                          Completato â€” aggiunti:{" "}
                           <strong>
                             {String(agentsResult["growth"].data.added ?? 0)}
                           </strong>
@@ -1385,7 +1335,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                                     ? "Completato"
                                     : run.status === "failed"
                                       ? "Fallito"
-                                      : "In esecuzione…"}
+                                      : "In esecuzioneâ€¦"}
                                 </span>
                                 {secs && (
                                   <span className="text-xs text-muted-foreground">
@@ -1397,7 +1347,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                                 {fmtDate(run.startedAt)}
                                 {sectors && (
                                   <span className="ml-2">
-                                    · Aree: {sectors}
+                                    Â· Aree: {sectors}
                                   </span>
                                 )}
                               </div>
@@ -1436,7 +1386,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
 
                  {promptsLoading ? (
                    <div className="p-8 text-center text-muted-foreground">
-                     Caricamento prompt…
+                     Caricamento promptâ€¦
                    </div>
                  ) : (
                    prompts.map((prompt) => {
@@ -1483,9 +1433,10 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                                      {p}
                                    </code>
                                  ))}
-                               </div>
-                             )}
-                           </div>
+               </div>
+             )}
+
+           </div>
                            {isExpanded ? (
                              <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
                            ) : (
@@ -1546,8 +1497,8 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                                )}
                              </div>
                            </div>
-                         )}
-                       </div>
+             )}
+           </div>
                      );
                    })
                  )}
@@ -1556,15 +1507,15 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
              {section === "qualita" && (
                <div className="p-8">
                  <h3 className="text-lg font-serif font-bold mb-4">
-                   Qualità Wendy
+                   QualitÃ  Wendy
                  </h3>
                  {qualitaLoading ? (
                    <div className="text-center py-8 text-muted-foreground">
-                     Caricamento dati qualità...
+                     Caricamento dati qualitÃ ...
                    </div>
                  ) : !qualitaData ? (
                    <div className="text-center py-8 text-muted-foreground">
-                     Nessun dato qualità disponibile
+                     Nessun dato qualitÃ  disponibile
                    </div>
                  ) : (
                    <>
@@ -1635,7 +1586,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                      {qualitaData.qualityStats && qualitaData.qualityStats.length > 0 && (
                        <div className="mb-6">
                          <h4 className="font-semibold mb-4">Metriche per dominio</h4>
-                         <div class="overflow-x-auto">
+                          <div className="overflow-x-auto">
                            <table className="w-full text-sm">
                              <thead>
                                <tr className="border-b border-gray-200 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 uppercase">
@@ -1649,12 +1600,12 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                                </tr>
                              </thead>
                              <tbody>
-                               {qualitaData.qualityStats.map((s) => (
+                                {qualitaData.qualityStats.map((s: any) => (
                                  <tr key={s.domain} className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-900/50">
                                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 capitalize">{s.domain}</td>
                                    <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.total}</td>
                                    <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{(s.avgEvalScore * 100).toFixed(0)}%</td>
-                                   <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.avgSupervisorScore ? `${(s.avgSupervisorScore * 100).toFixed(0)}%` : "—"}</td>
+                                   <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.avgSupervisorScore ? `${(s.avgSupervisorScore * 100).toFixed(0)}%` : "â€”"}</td>
                                    <td className="px-4 py-3 text-right">
                                      <span className={s.rewrites > 0 ? "text-amber-500 font-medium" : "text-gray-400"}>
                                        {s.rewrites} ({(s.rewrites / Math.max(s.total, 1) * 100).toFixed(0)}%)
@@ -1681,7 +1632,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                      {/* Supervisor stats */}
                      {qualitaData.supervisorStats && qualitaData.supervisorStats.length > 0 && (
                        <div className="mb-6">
-                         <h4 className="font-semibold mb-4">Supervisor — score prima/dopo rewrite</h4>
+                         <h4 className="font-semibold mb-4">Supervisor â€” score prima/dopo rewrite</h4>
                          <div className="overflow-x-auto">
                            <table className="w-full text-sm">
                              <thead>
@@ -1694,19 +1645,19 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                                </tr>
                              </thead>
                              <tbody>
-                               {qualitaData.supervisorStats.map((s) => {
+                                {qualitaData.supervisorStats.map((s: any) => {
                                  const improvement = s.avgScoreAfter && s.avgScoreBefore
                                    ? ((s.avgScoreAfter - s.avgScoreBefore) * 100).toFixed(1)
-                                   : "—";
+                                   : "â€”";
                                  const isPositive = s.avgScoreAfter && s.avgScoreAfter > s.avgScoreBefore;
                                  return (
                                    <tr key={s.domain} className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-900/50">
                                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 capitalize">{s.domain}</td>
                                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.total}</td>
-                                     <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.avgScoreBefore ? `${(s.avgScoreBefore * 100).toFixed(0)}%` : "—"}</td>
-                                     <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.avgScoreAfter ? `${(s.avgScoreAfter * 100).toFixed(0)}%` : "—"}</td>
+                                     <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.avgScoreBefore ? `${(s.avgScoreBefore * 100).toFixed(0)}%` : "â€”"}</td>
+                                     <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.avgScoreAfter ? `${(s.avgScoreAfter * 100).toFixed(0)}%` : "â€”"}</td>
                                      <td className={`px-4 py-3 text-right font-medium ${isPositive ? "text-green-500" : "text-red-400"}`}>
-                                       {improvement !== "—" ? `${isPositive ? "+" : ""}${improvement}%` : improvement}
+                                       {improvement !== "â€”" ? `${isPositive ? "+" : ""}${improvement}%` : improvement}
                                      </td>
                                    </tr>
                                  );
@@ -1782,9 +1733,401 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Detail Panel */}
+            {/* ── Home Admin ── */}
+            {section === "home" && (
+              <div className="p-8">
+                <h3 className="text-lg font-serif font-bold mb-4">
+                  <Home className="w-5 h-5 inline mr-2 text-primary" />
+                  Panoramica Admin
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[
+                    { label: "In Attesa", value: stats?.pending ?? 0, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-950/30" },
+                    { label: "Approvati", value: stats?.approved ?? 0, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-950/30" },
+                    { label: "Rifiutati", value: stats?.rejected ?? 0, color: "text-red-600", bg: "bg-red-50 dark:bg-red-950/30" },
+                    { label: "Archiviati", value: stats?.archived ?? 0, color: "text-slate-600", bg: "bg-slate-50 dark:bg-slate-950/30" },
+                    { label: "Esecuzioni Agenti", value: stats?.totalRuns ?? 0, color: "text-primary", bg: "bg-primary/5" },
+                    { label: "Suggerimenti Totali", value: suggestionsTotal, color: "text-primary", bg: "bg-primary/5" },
+                  ].map((card) => (
+                    <div key={card.label} className={`rounded-xl p-4 ${card.bg} border`}>
+                      <p className={`text-2xl font-bold ${card.color}`}>{card.value}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{card.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Cataloghi ── */}
+            {section === "cataloghi" && (
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-serif font-bold">
+                    <BookOpen className="w-5 h-5 inline mr-2 text-primary" />
+                    Cataloghi
+                  </h3>
+                  <Button size="sm" variant="outline" onClick={loadCataloghi} disabled={cataloghiLoading}>
+                    {cataloghiLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
+                    Aggiorna
+                  </Button>
+                </div>
+                {cataloghiLoading ? (
+                  <p className="text-sm text-muted-foreground">Caricamento...</p>
+                ) : cataloghiData ? (
+                  <div className="space-y-2">
+                    {(Array.isArray(cataloghiData) ? cataloghiData : []).map((item: any) => (
+                      <div key={item.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                        <div>
+                          <p className="text-sm font-medium">{item.name}</p>
+                          <p className="text-xs text-muted-foreground truncate max-w-md">{item.description}</p>
+                        </div>
+                        <Badge variant="outline" className="capitalize">{item.trend}</Badge>
+                      </div>
+                    ))}
+                    {Array.isArray(cataloghiData) && cataloghiData.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-8">Nessun settore trovato.</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">Nessun dato disponibile.</p>
+                )}
+              </div>
+            )}
+
+            {/* ── Agent Health ── */}
+            {section === "agenti-salute" && (
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-serif font-bold">
+                    <Activity className="w-5 h-5 inline mr-2 text-primary" />
+                    Salute Agenti
+                  </h3>
+                  <Button size="sm" variant="outline" onClick={loadAgentiSalute} disabled={agentiSaluteLoading}>
+                    {agentiSaluteLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
+                    Aggiorna
+                  </Button>
+                </div>
+                {agentiSaluteLoading ? (
+                  <p className="text-sm text-muted-foreground">Caricamento...</p>
+                ) : agentiSaluteData?.agents ? (
+                  <div className="space-y-3">
+                    {agentiSaluteData.agents.map((agent: any) => (
+                      <div key={agent.agentName} className="p-4 rounded-xl border bg-card">
+                        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <Bot size={16} className="text-muted-foreground" />
+                            <span className="font-semibold font-mono text-sm">{agent.agentName}</span>
+                            <Badge className={
+                              agent.status === "healthy" ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
+                              agent.status === "degraded" ? "bg-amber-100 text-amber-700 border-amber-200" :
+                              "bg-red-100 text-red-700 border-red-200"
+                            }>
+                              {agent.status === "healthy" ? "Sano" : agent.status === "degraded" ? "Degradato" : "Critico"}
+                            </Badge>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{agent.totalCalls30d} chiamate / 30g</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="text-center p-2 rounded-lg bg-muted/40">
+                            <p className={`text-lg font-bold ${agent.successRate30d >= 95 ? "text-emerald-600" : agent.successRate30d >= 80 ? "text-amber-500" : "text-red-500"}`}>{agent.successRate30d}%</p>
+                            <p className="text-xs text-muted-foreground">Successo 30g</p>
+                          </div>
+                          <div className="text-center p-2 rounded-lg bg-muted/40">
+                            <p className="text-lg font-bold text-red-500">{agent.errorCount30d}</p>
+                            <p className="text-xs text-muted-foreground">Errori 30g</p>
+                          </div>
+                          <div className="text-center p-2 rounded-lg bg-muted/40">
+                            <p className="text-lg font-bold">{agent.avgDurationMs ? `${agent.avgDurationMs}ms` : "—"}</p>
+                            <p className="text-xs text-muted-foreground">Latenza media</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">Nessun dato disponibile.</p>
+                )}
+              </div>
+            )}
+
+            {/* ── Metriche Business ── */}
+            {section === "metriche" && (
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-serif font-bold">
+                    <BarChart3 className="w-5 h-5 inline mr-2 text-primary" />
+                    Metriche Business
+                  </h3>
+                  <Button size="sm" variant="outline" onClick={loadMetriche} disabled={metricheLoading}>
+                    {metricheLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
+                    Aggiorna
+                  </Button>
+                </div>
+                {metricheLoading ? (
+                  <p className="text-sm text-muted-foreground">Caricamento...</p>
+                ) : metricheData ? (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="rounded-xl p-4 bg-card border text-center">
+                        <p className="text-2xl font-bold">{metricheData.users?.total ?? 0}</p>
+                        <p className="text-xs text-muted-foreground">Utenti Totali</p>
+                      </div>
+                      <div className="rounded-xl p-4 bg-card border text-center">
+                        <p className="text-2xl font-bold text-primary">{metricheData.users?.premium ?? 0}</p>
+                        <p className="text-xs text-muted-foreground">Premium</p>
+                      </div>
+                      <div className="rounded-xl p-4 bg-card border text-center">
+                        <p className="text-2xl font-bold">{metricheData.tests?.total ?? 0}</p>
+                        <p className="text-xs text-muted-foreground">Test Completati</p>
+                      </div>
+                      <div className="rounded-xl p-4 bg-card border text-center">
+                        <p className="text-2xl font-bold">{metricheData.users?.new30d ?? 0}</p>
+                        <p className="text-xs text-muted-foreground">Nuovi (30gg)</p>
+                      </div>
+                    </div>
+                    {metricheData.topSectors && metricheData.topSectors.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold mb-2 text-sm">Settori più popolari</h4>
+                        <div className="space-y-1">
+                          {metricheData.topSectors.slice(0, 5).map((s: any) => (
+                            <div key={s.sectorId} className="flex items-center justify-between p-2 rounded-lg bg-muted/40">
+                              <span className="text-sm">{s.name}</span>
+                              <Badge variant="outline">{s.count}</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {wendyMetricsData && (
+                      <div>
+                        <h4 className="font-semibold mb-2 text-sm">Wendy AI — Richieste per Dominio</h4>
+                        <div className="space-y-1">
+                          {Object.entries(wendyMetricsData.volumeByDomain ?? {}).map(([domain, count]) => (
+                            <div key={domain} className="flex items-center justify-between p-2 rounded-lg bg-muted/40">
+                              <span className="text-sm capitalize">{domain}</span>
+                              <Badge variant="outline">{String(count)}</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">Nessun dato disponibile.</p>
+                )}
+              </div>
+            )}
+
+            {/* ── Status & Setup ── */}
+            {section === "status" && (
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-serif font-bold">
+                    <Settings className="w-5 h-5 inline mr-2 text-primary" />
+                    Status & Setup
+                  </h3>
+                  <Button size="sm" variant="outline" onClick={loadStatus} disabled={statusLoading}>
+                    {statusLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
+                    Aggiorna
+                  </Button>
+                </div>
+                {statusLoading ? (
+                  <p className="text-sm text-muted-foreground">Caricamento...</p>
+                ) : statusData ? (
+                  <div className="space-y-4">
+                    <div className={`rounded-xl p-4 border ${
+                      statusData.status === "ok" ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30" :
+                      statusData.status === "degraded" ? "bg-amber-50 border-amber-200 dark:bg-amber-950/30" :
+                      "bg-red-50 border-red-200 dark:bg-red-950/30"
+                    }`}>
+                      <h4 className="font-semibold mb-2">Stato Generale: <span className="capitalize">{statusData.status}</span></h4>
+                      <p className="text-xs text-muted-foreground">Uptime: {Math.floor(statusData.uptimeSeconds / 3600)}h {Math.floor((statusData.uptimeSeconds % 3600) / 60)}m</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {Object.entries(statusData.services ?? {}).map(([name, svc]: [string, any]) => (
+                        <div key={name} className={`rounded-xl p-3 border ${
+                          svc.status === "ok" ? "bg-emerald-50 border-emerald-200" :
+                          svc.status === "not_configured" ? "bg-amber-50 border-amber-200" :
+                          "bg-red-50 border-red-200"
+                        }`}>
+                          <p className="text-sm font-medium capitalize">{name}</p>
+                          <p className={`text-xs ${
+                            svc.status === "ok" ? "text-emerald-600" :
+                            svc.status === "not_configured" ? "text-amber-600" :
+                            "text-red-600"
+                          }`}>{svc.status.replace("_", " ")}</p>
+                          {svc.latencyMs > 0 && <p className="text-xs text-muted-foreground">{svc.latencyMs}ms</p>}
+                        </div>
+                      ))}
+                    </div>
+                    {statusData.env && (
+                      <div>
+                        <h4 className="font-semibold mb-2 text-sm">Environment Variables</h4>
+                        <p className="text-xs text-muted-foreground">Configurate: {statusData.env.configured}/{statusData.env.total}</p>
+                        {statusData.env.missingRequired && statusData.env.missingRequired.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-xs text-red-600 font-medium">Mancanti (richieste):</p>
+                            <p className="text-xs text-red-500 font-mono">{statusData.env.missingRequired.join(", ")}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">Nessun dato disponibile.</p>
+                )}
+              </div>
+            )}
+
+            {/* ── Messaggi ── */}
+            {section === "messaggi" && (
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-serif font-bold">
+                    <MessageCircle className="w-5 h-5 inline mr-2 text-primary" />
+                    Messaggi
+                  </h3>
+                  <Button size="sm" variant="outline" onClick={loadMessaggi} disabled={messaggiLoading}>
+                    {messaggiLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
+                    Aggiorna
+                  </Button>
+                </div>
+                {messaggiLoading ? (
+                  <p className="text-sm text-muted-foreground">Caricamento...</p>
+                ) : messaggiData.length > 0 ? (
+                  <div className="space-y-2">
+                    {messaggiData.map((msg: any) => (
+                      <div key={msg.id} className="p-4 rounded-xl border bg-card">
+                        <div className="flex items-start justify-between gap-2 flex-wrap">
+                          <div>
+                            <p className="text-sm font-medium">{msg.name}</p>
+                            <p className="text-xs text-muted-foreground">{msg.email}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {msg.subject && (
+                              <Badge variant="outline" className="capitalize">{msg.subject}</Badge>
+                            )}
+                            <span className="text-xs text-muted-foreground">{new Date(msg.createdAt).toLocaleDateString("it-IT")}</span>
+                          </div>
+                        </div>
+                        <p className="text-sm mt-2 text-muted-foreground line-clamp-2">{msg.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">Nessun messaggio.</p>
+                )}
+              </div>
+            )}
+
+            {/* ── Coda Crescita ── */}
+            {section === "crescita" && (
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-serif font-bold">
+                    <Sparkles className="w-5 h-5 inline mr-2 text-primary" />
+                    Coda Articoli Crescita
+                  </h3>
+                  <Button size="sm" variant="outline" onClick={loadCrescita} disabled={crescitaLoading}>
+                    {crescitaLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
+                    Aggiorna
+                  </Button>
+                </div>
+                {crescitaLoading ? (
+                  <p className="text-sm text-muted-foreground">Caricamento...</p>
+                ) : crescitaData?.queue ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      <div className="rounded-xl p-3 bg-amber-50 dark:bg-amber-950/30 border text-center">
+                        <p className="text-xl font-bold text-amber-600">{crescitaData.stats?.pending ?? 0}</p>
+                        <p className="text-xs text-muted-foreground">In coda</p>
+                      </div>
+                      <div className="rounded-xl p-3 bg-emerald-50 dark:bg-emerald-950/30 border text-center">
+                        <p className="text-xl font-bold text-emerald-600">{crescitaData.stats?.published ?? 0}</p>
+                        <p className="text-xs text-muted-foreground">Pubblicati</p>
+                      </div>
+                      <div className="rounded-xl p-3 bg-red-50 dark:bg-red-950/30 border text-center">
+                        <p className="text-xl font-bold text-red-600">{crescitaData.stats?.rejected ?? 0}</p>
+                        <p className="text-xs text-muted-foreground">Scartati</p>
+                      </div>
+                    </div>
+                    {crescitaData.queue.map((article: any) => (
+                      <div key={article.id} className="p-4 rounded-xl border bg-card">
+                        <div className="flex items-start justify-between gap-2 flex-wrap">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-sm">{article.title}</h4>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {article.category}{article.subcategory ? ` / ${article.subcategory}` : ""}
+                              {" · "}
+                              {article.readTimeMinutes} min
+                              {" · "}
+                              {new Date(article.createdAt).toLocaleDateString("it-IT")}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="capitalize">{article.difficulty}</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{article.description}</p>
+                      </div>
+                    ))}
+                    {crescitaData.queue.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-8">Nessun articolo in coda.</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">Nessun dato disponibile.</p>
+                )}
+              </div>
+            )}
+
+            {/* ── Partner / Affiliazione ── */}
+            {section === "affiliazione" && (
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-serif font-bold">
+                    <Handshake className="w-5 h-5 inline mr-2 text-primary" />
+                    Partner & Affiliazioni
+                  </h3>
+                  <Button size="sm" variant="outline" onClick={loadAffiliazione} disabled={affiliazioneLoading}>
+                    {affiliazioneLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
+                    Aggiorna
+                  </Button>
+                </div>
+                {affiliazioneLoading ? (
+                  <p className="text-sm text-muted-foreground">Caricamento...</p>
+                ) : affiliazioneData.length > 0 ? (
+                  <div className="space-y-2">
+                    {affiliazioneData.map((lead: any) => (
+                      <div key={lead.id} className="p-4 rounded-xl border bg-card">
+                        <div className="flex items-start justify-between gap-2 flex-wrap">
+                          <div>
+                            <p className="text-sm font-medium">{lead.institutionName}</p>
+                            <p className="text-xs text-muted-foreground">{lead.contactName} · {lead.email}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="capitalize">{lead.partnerType?.replace("_", " ")}</Badge>
+                            <Badge className={
+                              lead.status === "nuovo" ? "bg-primary/10 text-primary border-primary/30" :
+                              lead.status === "contattato" ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
+                              lead.status === "in_trattativa" ? "bg-orange-100 text-orange-700 border-orange-200" :
+                              "bg-emerald-100 text-emerald-700 border-emerald-200"
+                            }>
+                              {lead.status}
+                            </Badge>
+                          </div>
+                        </div>
+                        {lead.message && <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{lead.message}</p>}
+                        <p className="text-xs text-muted-foreground mt-1">{new Date(lead.createdAt).toLocaleDateString("it-IT")}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">Nessuna richiesta di affiliazione.</p>
+                )}
+              </div>
+            )}
+
+          </div>
           {detail && (
             <div className="w-full lg:w-1/2 overflow-y-auto border-l bg-card">
               <div className="sticky top-0 bg-card border-b p-4 flex items-center justify-between z-10">
@@ -1802,7 +2145,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
 
               {detailLoading ? (
                 <div className="p-8 text-center text-muted-foreground">
-                  Caricamento dettagli…
+                  Caricamento dettagliâ€¦
                 </div>
               ) : (
                 <div className="p-6 space-y-6">
@@ -1921,7 +2264,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                       {showEditNotes && (
                         <div className="space-y-2">
                           <Input
-                            placeholder="Motivo del rifiuto (opzionale)…"
+                            placeholder="Motivo del rifiuto (opzionale)â€¦"
                             value={editNotes}
                             onChange={(e) => setEditNotes(e.target.value)}
                           />
@@ -1970,5 +2313,6 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
         </div>
       </main>
     </div>
+    </AdminAuthGate>
   );
 }

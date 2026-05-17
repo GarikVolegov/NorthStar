@@ -12,7 +12,13 @@
       "Bash(pnpm db:push)",
       "Bash(pnpm --filter @workspace/db exec tsx migrate.ts)",
       "Bash(pnpm --filter @workspace/scripts run seed:catalog)",
-      "Bash(pnpm --filter @workspace/scripts run backfill:embeddings)"
+      "Bash(pnpm --filter @workspace/scripts run backfill:embeddings)",
+      "Bash(node -e ' *)",
+      "Bash(pnpm tsc *)",
+      "Bash(pnpm --filter @workspace/scripts exec tsx ./src/test-wendy-tools.ts)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm --filter @workspace/scripts run test:wendy-tools)",
+      "Bash(npx ts-node *)"
     ]
   }
 }

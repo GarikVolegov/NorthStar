@@ -88,7 +88,7 @@ export type { WendyIntent, WendyPageContext, CompressedHistory, WendyRouterDecis
 
 // AI Request Log
 export { recordAiCall }      from "./ai-request-log";
-export type { RecordAiCallInput, AiRequestStatus } from "./ai-request-log";
+export type { RecordAiCallInput, AiRequestStatus, AiResponseCategory } from "./ai-request-log";
 
 // Security Agent
 export { runSecurityAgent } from "./security-agent/index";

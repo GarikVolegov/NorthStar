@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+﻿import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -7,14 +7,15 @@ import {
   Eye, Filter, ChevronDown, ChevronUp, Circle,
   ShieldAlert, Phone, Users, Building2, ExternalLink, Loader2,
 } from "lucide-react";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { AdminAuthGate } from "@/components/AdminAuthGate";
 
 const BASE = import.meta.env.BASE_URL || "/";
-const LS_KEY = "ns_admin_key";
 
 const PARTNER_LABELS: Record<string, string> = {
   scuola_media:       "Scuola media",
   scuola_superiore:   "Scuola superiore",
-  universita:         "Università",
+  universita:         "UniversitÃ ",
   agenzia_lavoro:     "Agenzia per il lavoro",
   centro_formazione:  "Centro di formazione",
   ente_pubblico:      "Ente pubblico",
@@ -69,12 +70,9 @@ function fmtDate(iso: string) {
 }
 
 export default function AdminAffiliazione() {
-  useEffect(() => { document.title = "Admin Affiliazione — NorthStar"; }, []);
+  useEffect(() => { document.title = "Admin Affiliazione â€” NorthStar"; }, []);
 
-  const [key, setKey]           = useState(() => localStorage.getItem(LS_KEY) || "");
-  const [inputKey, setInputKey] = useState("");
-  const [authed, setAuthed]     = useState(false);
-  const [authError, setAuthError] = useState(false);
+  const { key, logout } = useAdminAuth();
 
   const [leads, setLeads]     = useState<Lead[]>([]);
   const [loading, setLoading] = useState(false);
@@ -92,32 +90,15 @@ export default function AdminAffiliazione() {
       const res = await fetch(`${BASE}api/affiliazione/leads`, {
         headers: { "x-admin-key": adminKey },
       });
-      if (res.status === 403) { setAuthed(false); setAuthError(true); return; }
       if (!res.ok) throw new Error("Errore caricamento");
       const data: Lead[] = await res.json();
       setLeads(data);
-      setAuthed(true);
     } catch {
       setError("Errore di rete. Riprova.");
     } finally {
       setLoading(false);
     }
   }, []);
-
-  function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = inputKey.trim();
-    if (!trimmed) return;
-    localStorage.setItem(LS_KEY, trimmed);
-    setKey(trimmed);
-    setAuthError(false);
-    fetchLeads(trimmed);
-  }
-
-  function handleLogout() {
-    localStorage.removeItem(LS_KEY);
-    setKey(""); setAuthed(false); setLeads([]);
-  }
 
   useEffect(() => { if (key) fetchLeads(key); }, [key, fetchLeads]);
 
@@ -173,40 +154,10 @@ export default function AdminAffiliazione() {
   const newCount    = leads.filter(l => !l.read).length;
   const activeCount = leads.filter(l => l.status === "attivo").length;
 
-  // ── Login screen ──
-  if (!authed) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-background flex items-center justify-center px-4">
-        <div className="w-full max-w-sm">
-          <div className="rounded-3xl border bg-card p-8 shadow-sm">
-            <div className="flex flex-col items-center mb-8">
-              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-                <ShieldAlert className="w-7 h-7 text-primary" />
-              </div>
-              <h1 className="text-xl font-serif font-bold">Accesso Admin</h1>
-              <p className="text-sm text-muted-foreground text-center mt-1">Inserisci la chiave segreta per accedere ai lead affiliazione</p>
-            </div>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <Input
-                type="password"
-                placeholder="Chiave admin…"
-                value={inputKey}
-                onChange={e => { setInputKey(e.target.value); setAuthError(false); }}
-                className={cn("rounded-xl", authError && "border-destructive")}
-                autoFocus
-              />
-              {authError && <p className="text-sm text-destructive text-center">Chiave non valida. Riprova.</p>}
-              <Button type="submit" className="w-full rounded-full" disabled={!inputKey.trim()}>Accedi</Button>
-            </form>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Main panel ──
+  // â”€â”€ Main panel â”€â”€
   return (
-    <div className="min-h-screen bg-slate-50/50">
+    <AdminAuthGate title="Admin Affiliazione" description="Gestisci le richieste di affiliazione">
+      <div className="min-h-screen bg-slate-50/50">
 
       {/* Top bar */}
       <div className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
@@ -215,7 +166,7 @@ export default function AdminAffiliazione() {
             <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
               <Handshake className="w-4 h-4 text-primary" />
             </div>
-            <span className="font-serif font-bold">Admin · Affiliazione</span>
+            <span className="font-serif font-bold">Admin Â· Affiliazione</span>
             {newCount > 0 && (
               <span className="bg-primary text-primary-foreground text-xs font-bold px-2 py-0.5 rounded-full">
                 {newCount} nuovi
@@ -227,7 +178,7 @@ export default function AdminAffiliazione() {
               <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
               Aggiorna
             </Button>
-            <Button variant="ghost" size="sm" className="rounded-full gap-1.5 text-muted-foreground" onClick={handleLogout}>
+            <Button variant="ghost" size="sm" className="rounded-full gap-1.5 text-muted-foreground" onClick={logout}>
               <LogOut className="w-3.5 h-3.5" />
               Esci
             </Button>
@@ -291,7 +242,7 @@ export default function AdminAffiliazione() {
             ))}
             <div className="ml-auto">
               <Input
-                placeholder="Cerca istituzione, referente, email…"
+                placeholder="Cerca istituzione, referente, emailâ€¦"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="h-8 text-xs rounded-xl w-56"
@@ -307,7 +258,7 @@ export default function AdminAffiliazione() {
         {loading && leads.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
             <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 opacity-40" />
-            Caricamento lead…
+            Caricamento leadâ€¦
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
@@ -441,7 +392,7 @@ export default function AdminAffiliazione() {
                     {/* Actions */}
                     <div className="pt-3 border-t flex flex-wrap items-center gap-3">
                       <a
-                        href={`mailto:${lead.email}?subject=Partnership NorthStar — ${lead.institutionName}`}
+                        href={`mailto:${lead.email}?subject=Partnership NorthStar â€” ${lead.institutionName}`}
                         className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
                       >
                         <Mail className="w-3.5 h-3.5" />
@@ -479,5 +430,6 @@ export default function AdminAffiliazione() {
         )}
       </div>
     </div>
+    </AdminAuthGate>
   );
 }

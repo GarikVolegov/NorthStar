@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,8 @@ import {
   Users, Calendar, TrendingUp, Brain, GraduationCap, FileText,
   Target, MessageSquare, ChevronRight, Shield, FlaskConical,
 } from "lucide-react";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { AdminAuthGate } from "@/components/AdminAuthGate";
 
 function NavCard({ href, icon, title, description, badge }: {
   href: string; icon: React.ReactNode; title: string; description: string; badge?: string;
@@ -45,48 +47,11 @@ function SectionHeader({ title, subtitle, color }: { title: string; subtitle: st
 }
 
 export default function AdminHome() {
-  const [adminKey, setAdminKey] = useState(() => localStorage.getItem("northstar_admin_key") ?? "");
-  const [keyInput, setKeyInput] = useState("");
-
-  if (!adminKey) {
-    return (
-      <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <div className="flex items-center justify-center mb-2">
-              <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <Shield size={24} className="text-primary" />
-              </div>
-            </div>
-            <CardTitle className="text-center">Admin — NorthStar</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Input
-              type="password"
-              placeholder="Chiave admin"
-              value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  localStorage.setItem("northstar_admin_key", keyInput.trim());
-                  setAdminKey(keyInput.trim());
-                }
-              }}
-            />
-            <Button className="w-full" onClick={() => {
-              localStorage.setItem("northstar_admin_key", keyInput.trim());
-              setAdminKey(keyInput.trim());
-            }}>
-              Accedi al pannello admin
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const { logout } = useAdminAuth();
 
   return (
-    <div className="min-h-screen bg-muted/20 p-4 md:p-8">
+    <AdminAuthGate title="Admin Console" description="Panoramica completa â€” Discovery Â· Execution Â· Monitoraggio">
+      <div className="min-h-screen bg-muted/20 p-4 md:p-8">
       <div className="max-w-5xl mx-auto space-y-8">
 
         {/* Header */}
@@ -97,17 +62,14 @@ export default function AdminHome() {
               NorthStar Admin Console
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Panoramica completa — Discovery · Execution · Monitoraggio
+              Panoramica completa â€” Discovery Â· Execution Â· Monitoraggio
             </p>
           </div>
           <Button
             variant="outline"
             size="sm"
             className="text-xs text-red-500"
-            onClick={() => {
-              localStorage.removeItem("northstar_admin_key");
-              setAdminKey("");
-            }}
+            onClick={logout}
           >
             Disconnetti
           </Button>
@@ -117,7 +79,7 @@ export default function AdminHome() {
         <div>
           <SectionHeader
             title="Discovery"
-            subtitle="Strumenti per esplorare e mappare il mondo del lavoro — test, settori, ruoli, percorsi"
+            subtitle="Strumenti per esplorare e mappare il mondo del lavoro â€” test, settori, ruoli, percorsi"
             color="bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900"
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -147,7 +109,7 @@ export default function AdminHome() {
         <div>
           <SectionHeader
             title="Execution"
-            subtitle="Strumenti operativi — obiettivi, calendario, crescita personale, coaching"
+            subtitle="Strumenti operativi â€” obiettivi, calendario, crescita personale, coaching"
             color="bg-violet-50 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-900"
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -186,7 +148,7 @@ export default function AdminHome() {
               href="/admin/metriche"
               icon={<BarChart3 size={16} />}
               title="Metriche Business"
-              description="Utenti, test completati, settori più popolari, conversioni premium"
+              description="Utenti, test completati, settori piÃ¹ popolari, conversioni premium"
             />
             <NavCard
               href="/admin/status"
@@ -199,7 +161,7 @@ export default function AdminHome() {
               href="/admin/affiliazione"
               icon={<Users size={16} />}
               title="Partner"
-              description="Gestisci le richieste di affiliazione di scuole, università e agenzie"
+              description="Gestisci le richieste di affiliazione di scuole, universitÃ  e agenzie"
             />
           </div>
         </div>
@@ -230,5 +192,6 @@ export default function AdminHome() {
 
       </div>
     </div>
+    </AdminAuthGate>
   );
 }

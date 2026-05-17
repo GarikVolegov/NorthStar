@@ -87,6 +87,17 @@ router.post("/", requireAuth, wendyLimiter, async (req: Request, res: Response) 
 
   const send = (data: object) => {
     if (!res.writableEnded) res.write(`data: ${JSON.stringify(data)}\n\n`);
+    // Intercetta tool_call per telemetria — senza rileggere il body
+    const d = data as Record<string, unknown>;
+    if (d.type === "tool_call" && typeof d.name === "string") {
+      toolsUsedInRequest.push(d.name);
+      // Rileva modalità ricerca semantica se presente nel risultato
+      if (d.result && (d.result as any)?.searchMode === "semantic") {
+        searchModeUsed = "semantic";
+      } else if (d.result && (d.result as any)?.searchMode === "keyword" && searchModeUsed === "none") {
+        searchModeUsed = "keyword";
+      }
+    }
   };
 
   // Cleanup se il client chiude la connessione
@@ -99,6 +110,11 @@ router.post("/", requireAuth, wendyLimiter, async (req: Request, res: Response) 
   let errorCode: string | undefined;
   let inputTokens = 0;
   let outputTokens = 0;
+
+  // Telemetria Step 5
+  const toolsUsedInRequest: string[] = [];
+  let responseCategory: "success" | "insufficient_data" | "refused" | "error_tool" | "error_model" = "success";
+  let searchModeUsed: "semantic" | "keyword" | "none" = "none";
 
   // Routing fuori dal try — serve nel finally per il logging
   const { intent, decision } = resolveWendyRoute({
@@ -169,7 +185,7 @@ router.post("/", requireAuth, wendyLimiter, async (req: Request, res: Response) 
 
           // Navigazione client-side — termina subito senza risposta testuale
           if (toolResult.ok && (toolData as any)?.clientSide) {
-            send({ type: "done", intent, usage: { model: decision.model, inputTokens, outputTokens } });
+            send({ type: "done", intent, requestId, usage: { model: decision.model, inputTokens, outputTokens } });
             return;
           }
 
@@ -215,7 +231,15 @@ router.post("/", requireAuth, wendyLimiter, async (req: Request, res: Response) 
         send(event);
         if (event.type === "token") outputTokens += estimateTokens(event.value);
         if (event.type === "done" || event.type === "error") {
-          if (event.type === "error") { status = "error_model"; errorCode = "GROWTH_AGENT_ERROR"; }
+          if (event.type === "error") {
+            status = "error_model";
+            errorCode = "GROWTH_AGENT_ERROR";
+            responseCategory = "error_model";
+          }
+          // Rileva insufficient_data dal done event dell'agente
+          if (event.type === "done" && (event as any).evalResult?.level === "low") {
+            responseCategory = "insufficient_data";
+          }
           break;
         }
       }
@@ -223,30 +247,44 @@ router.post("/", requireAuth, wendyLimiter, async (req: Request, res: Response) 
 
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    status    = msg.includes("timeout") ? "error_timeout" :
-                msg.includes("rate")    ? "error_ratelimit" : "error_internal";
-    errorCode = msg.slice(0, 50);
+    status           = msg.includes("timeout") ? "error_timeout" :
+                       msg.includes("rate")    ? "error_ratelimit" : "error_internal";
+    errorCode        = msg.slice(0, 50);
+    responseCategory = status.startsWith("error") ? "error_model" : responseCategory;
     rootLogger.error({ err, userId, requestId }, "[ai/wendy] unhandled error");
     send({ type: "error", message: "Qualcosa è andato storto. Riprova.", code: status });
 
   } finally {
-    // ── 4. Telemetria fire-and-forget ─────────────────────────────────
+    // Inferisci responseCategory da status se non già impostato
+    if (responseCategory === "success" && status !== "success") {
+      responseCategory = status.includes("tool") ? "error_tool" : "error_model";
+    }
+    // Se ci sono stati tool failure e responseCategory è ancora success, segnalalo
+    if (toolsUsedInRequest.length > 0 && responseCategory === "success" &&
+        toolsUsedInRequest.some(t => t === "__failed")) {
+      responseCategory = "error_tool";
+    }
+
     const latencyMs = Date.now() - startedAt;
     recordAiCall({
       requestId,
       userId,
       threadId,
-      intent:      intent,
-      tier:        decision.tier,
-      model:       decision.model,
+      intent:           intent,
+      tier:             decision.tier,
+      model:            decision.model,
       inputTokens,
       outputTokens,
-      costUsdEst:  estimateCost(decision.model, inputTokens, outputTokens),
+      costUsdEst:       estimateCost(decision.model, inputTokens, outputTokens),
       latencyMs,
-      totalTurns:  compressedHistory?.totalTurns ?? 0,
+      totalTurns:       compressedHistory?.totalTurns ?? 0,
       status,
       errorCode,
       locale,
+      toolCallsCount:   toolsUsedInRequest.length,
+      toolsUsed:        [...new Set(toolsUsedInRequest)],
+      responseCategory,
+      searchMode:       searchModeUsed,
     });
 
     if (!res.writableEnded) res.end();

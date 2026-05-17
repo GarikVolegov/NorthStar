@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell,
 } from "recharts";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { AdminAuthGate } from "@/components/AdminAuthGate";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -46,23 +48,21 @@ function KpiCard({ label, value, sub, icon }: { label: string; value: string | n
 }
 
 export default function AdminMetriche() {
-  const [adminKey, setAdminKey] = useState(() => localStorage.getItem("northstar_admin_key") ?? "");
-  const [keyInput, setKeyInput] = useState("");
+  const { key } = useAdminAuth();
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [wendyMetrics, setWendyMetrics] = useState<WendyMetrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
-  const fetchMetrics = useCallback(async (key: string) => {
+  const fetchMetrics = useCallback(async (adminKey: string) => {
     setLoading(true);
     setError(null);
     try {
       const [metricsRes, wendyRes] = await Promise.all([
-        fetch(`${BASE}api/admin/metrics`, { headers: { "x-admin-key": key } }),
-        fetch(`${BASE}api/admin/wendy-metrics`, { headers: { "x-admin-key": key } }),
+        fetch(`${BASE}api/admin/metrics`, { headers: { "x-admin-key": adminKey } }),
+        fetch(`${BASE}api/admin/wendy-metrics`, { headers: { "x-admin-key": adminKey } }),
       ]);
-      if (metricsRes.status === 401) { setError("Chiave admin non valida."); return; }
       if (!metricsRes.ok) throw new Error("Errore server");
       const metricsData = await metricsRes.json();
       setMetrics(metricsData);
@@ -79,51 +79,23 @@ export default function AdminMetriche() {
   }, []);
 
   useEffect(() => {
-    if (adminKey) fetchMetrics(adminKey);
-  }, [adminKey, fetchMetrics]);
+    if (key) fetchMetrics(key);
+  }, [key, fetchMetrics]);
 
   useEffect(() => {
-    if (!adminKey) return;
-    const interval = setInterval(() => fetchMetrics(adminKey), 60_000);
+    if (!key) return;
+    const interval = setInterval(() => fetchMetrics(key), 60_000);
     return () => clearInterval(interval);
-  }, [adminKey, fetchMetrics]);
-
-  function handleKeySubmit() {
-    const k = keyInput.trim();
-    if (!k) return;
-    localStorage.setItem("northstar_admin_key", k);
-    setAdminKey(k);
-  }
-
-  if (!adminKey) {
-    return (
-      <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <CardTitle className="text-center">Admin — NorthStar</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Input
-              type="password"
-              placeholder="Chiave admin"
-              value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleKeySubmit()}
-            />
-            <Button className="w-full" onClick={handleKeySubmit}>Accedi</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  }, [key, fetchMetrics]);
 
   return (
-    <div className="min-h-screen bg-muted/20 p-4 md:p-8">
+    <AdminAuthGate title="Metriche Business" description="Utenti, test, conversioni e revenue">
+      <div className="min-h-screen bg-muted/20 p-4 md:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold">NorthStar — Metriche Business</h1>
+            <h1 className="text-2xl font-bold">NorthStar â€” Metriche Business</h1>
             {lastRefresh && (
               <p className="text-xs text-muted-foreground mt-0.5">
                 Aggiornato il: {lastRefresh.toLocaleString("it-IT")}
@@ -131,12 +103,9 @@ export default function AdminMetriche() {
             )}
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => fetchMetrics(adminKey)} disabled={loading}>
+            <Button variant="outline" size="sm" onClick={() => fetchMetrics(key)} disabled={loading}>
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               <span className="ml-2">Aggiorna</span>
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => { localStorage.removeItem("northstar_admin_key"); setAdminKey(""); }}>
-              Esci
             </Button>
           </div>
         </div>
@@ -158,13 +127,13 @@ export default function AdminMetriche() {
               <KpiCard label="Nuovi (30gg)" value={metrics.users.new30d.toLocaleString("it-IT")} icon={<TrendingUp className="w-4 h-4" />} />
               <KpiCard
                 label="MRR"
-                value={metrics.revenue ? `€${metrics.revenue.mrr.toLocaleString("it-IT")}` : "N/D"}
-                sub={metrics.revenue ? `ARR ~€${metrics.revenue.total.toLocaleString("it-IT")}` : "Stripe non configurato"}
-                icon={<Badge variant="outline" className="text-xs">€</Badge>}
+                value={metrics.revenue ? `â‚¬${metrics.revenue.mrr.toLocaleString("it-IT")}` : "N/D"}
+                sub={metrics.revenue ? `ARR ~â‚¬${metrics.revenue.total.toLocaleString("it-IT")}` : "Stripe non configurato"}
+                icon={<Badge variant="outline" className="text-xs">â‚¬</Badge>}
               />
               <KpiCard label="Test Completati" value={metrics.tests.total.toLocaleString("it-IT")} sub={`${metrics.tests.last30d} ultimi 30gg`} icon={<FlaskConical className="w-4 h-4" />} />
               <KpiCard label="Test con Account" value={metrics.tests.withUser.toLocaleString("it-IT")} sub={`${metrics.tests.completionRate}% con account`} icon={<BarChart3 className="w-4 h-4" />} />
-              <KpiCard label="Conversione %" value={`${metrics.users.conversionRate}%`} sub="free → premium" icon={<TrendingUp className="w-4 h-4" />} />
+              <KpiCard label="Conversione %" value={`${metrics.users.conversionRate}%`} sub="free â†’ premium" icon={<TrendingUp className="w-4 h-4" />} />
               <KpiCard label="Nuovi (7gg)" value={metrics.users.new7d.toLocaleString("it-IT")} icon={<Users className="w-4 h-4" />} />
             </div>
 
@@ -221,12 +190,12 @@ export default function AdminMetriche() {
           </>
         ) : null}
 
-        {/* ── Wendy AI Metrics ─────────────────────────────────────────────── */}
+        {/* â”€â”€ Wendy AI Metrics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {wendyMetrics && (
           <section className="space-y-4">
             <h2 className="text-xl font-bold flex items-center gap-2">
               <Brain className="w-5 h-5" />
-              Wendy AI — Metriche
+              Wendy AI â€” Metriche
             </h2>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -244,8 +213,8 @@ export default function AdminMetriche() {
               {Object.entries(wendyMetrics.latencyByPhase ?? {}).slice(0, 2).map(([phase, data]) => (
                 <KpiCard
                   key={phase}
-                  label={`Tempo medio — ${phase}`}
-                  value={`${data.count > 0 ? ((data.sum / data.count) * 1000).toFixed(0) : "—"}ms`}
+                  label={`Tempo medio â€” ${phase}`}
+                  value={`${data.count > 0 ? ((data.sum / data.count) * 1000).toFixed(0) : "â€”"}ms`}
                   sub={`${data.count} campioni`}
                   icon={<BarChart3 className="w-4 h-4" />}
                 />
@@ -314,5 +283,6 @@ export default function AdminMetriche() {
         )}
       </div>
     </div>
+    </AdminAuthGate>
   );
 }

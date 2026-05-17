@@ -223,3 +223,271 @@ export const NAV_LABELS = {
   comeFunziona: "Come funziona",
   crescita: "Crescita",
 } as const;
+
+// ── API Endpoints ──
+export const API_ENDPOINTS = {
+  auth: {
+    login: "/api/auth/login",
+    register: "/api/auth/register",
+    logout: "/api/auth/logout",
+    refresh: "/api/auth/refresh",
+    me: "/api/auth/me",
+  },
+  user: {
+    profile: "/api/user/profile",
+    updateProfile: "/api/user/profile",
+    preferences: "/api/user/preferences",
+  },
+  test: {
+    list: "/api/tests",
+    start: "/api/tests/:id/start",
+    submit: "/api/tests/:id/submit",
+    results: "/api/tests/:id/results",
+    saveProgress: "/api/tests/:id/progress",
+  },
+  roadmap: {
+    generate: "/api/roadmap/generate",
+    get: "/api/roadmap/:id",
+    list: "/api/roadmap",
+    update: "/api/roadmap/:id",
+    delete: "/api/roadmap/:id",
+  },
+  graph: {
+    nodes: "/api/graph/nodes",
+    node: "/api/graph/nodes/:id",
+    edges: "/api/graph/edges",
+    createNode: "/api/graph/nodes",
+    deleteNode: "/api/graph/nodes/:id",
+  },
+  sector: {
+    list: "/api/sectors",
+    detail: "/api/sectors/:id",
+    roles: "/api/sectors/:id/roles",
+  },
+  subscription: {
+    current: "/api/subscription/current",
+    upgrade: "/api/subscription/upgrade",
+    cancel: "/api/subscription/cancel",
+    webhooks: "/api/subscription/webhooks",
+  },
+  ai: {
+    chat: "/api/ai/chat",
+    analyze: "/api/ai/analyze",
+    suggest: "/api/ai/suggest",
+  },
+  notification: {
+    list: "/api/notifications",
+    markRead: "/api/notifications/:id/read",
+    markAllRead: "/api/notifications/read-all",
+  },
+} as const;
+
+// ── Route Paths ──
+export const ROUTES = {
+  home: "/",
+  login: "/login",
+  register: "/register",
+  dashboard: "/dashboard",
+  test: "/test",
+  testResults: "/test/:id/results",
+  roadmap: "/roadmap",
+  roadmapDetail: "/roadmap/:id",
+  graph: "/graph",
+  graphNode: "/graph/node/:id",
+  sectors: "/sectors",
+  sectorDetail: "/sectors/:id",
+  profile: "/profile",
+  settings: "/settings",
+  subscription: "/subscription",
+  pricing: "/pricing",
+  wiki: "/wiki",
+  wikiArticle: "/wiki/:slug",
+  news: "/news",
+  newsArticle: "/news/:slug",
+  partner: "/partner",
+  about: "/about",
+  howItWorks: "/how-it-works",
+  growth: "/growth",
+  idea: "/idea",
+  coach: "/coach",
+  offers: "/offers",
+  offerDetail: "/offers/:id",
+  certificates: "/certificates",
+  certificateDetail: "/certificates/:id",
+  comparison: "/comparison",
+  sitemap: "/sitemap",
+  agents: "/agents",
+  agentDetail: "/agents/:id",
+  notFound: "/404",
+} as const;
+
+// ── Pagination & Limits ──
+export const PAGINATION = {
+  defaultPageSize: 20,
+  maxPageSize: 100,
+  graphNodesPerPage: 50,
+  roadmapNodesPerPage: 30,
+  offersPerPage: 15,
+  newsPerPage: 10,
+} as const;
+
+export const LIMITS = {
+  freeUser: {
+    testsPerDay: 3,
+    roadmapGenerationsPerMonth: 5,
+    aiMessagesPerDay: 10,
+    graphNodes: 50,
+    certificates: 10,
+  },
+  premiumUser: {
+    testsPerDay: -1,
+    roadmapGenerationsPerMonth: -1,
+    aiMessagesPerDay: 100,
+    graphNodes: -1,
+    certificates: -1,
+  },
+} as const;
+
+// ── Cache & Timeout ──
+export const CACHE_DURATIONS = {
+  sectors: 1000 * 60 * 30, // 30 min
+  roles: 1000 * 60 * 30,
+  graphNodes: 1000 * 60 * 5, // 5 min
+  userProfile: 1000 * 60 * 10, // 10 min
+  subscription: 1000 * 60 * 5,
+  news: 1000 * 60 * 15,
+  offers: 1000 * 60 * 10,
+} as const;
+
+export const TIMEOUTS = {
+  apiRequest: 15000, // 15s
+  aiResponse: 30000, // 30s
+  aiStream: 60000, // 60s
+  fileUpload: 30000,
+  websocketReconnect: 5000,
+} as const;
+
+// ── Form Validation ──
+export const VALIDATION_RULES = {
+  email: {
+    minLength: 5,
+    maxLength: 254,
+    pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  },
+  password: {
+    minLength: 8,
+    maxLength: 128,
+    requireUppercase: true,
+    requireLowercase: true,
+    requireNumber: true,
+    requireSpecial: true,
+  },
+  name: {
+    minLength: 2,
+    maxLength: 100,
+  },
+  bio: {
+    maxLength: 500,
+  },
+  roadmapTitle: {
+    minLength: 3,
+    maxLength: 200,
+  },
+  nodeTitle: {
+    minLength: 1,
+    maxLength: 150,
+  },
+  nodeDescription: {
+    maxLength: 2000,
+  },
+} as const;
+
+// ── File Upload ──
+export const FILE_LIMITS = {
+  avatar: { maxSizeMB: 5, allowedTypes: ["image/jpeg", "image/png", "image/webp"] },
+  certificate: { maxSizeMB: 10, allowedTypes: ["application/pdf", "image/jpeg", "image/png"] },
+  document: { maxSizeMB: 20, allowedTypes: ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"] },
+} as const;
+
+// ── WebSocket ──
+export const WS_CONFIG = {
+  url: "/ws",
+  reconnectAttempts: 5,
+  reconnectDelayMs: 3000,
+  heartbeatIntervalMs: 30000,
+  pongTimeoutMs: 10000,
+} as const;
+
+// ── Date & Time ──
+export const DATE_FORMATS = {
+  short: "DD/MM/YYYY",
+  long: "D MMMM YYYY",
+  time: "HH:mm",
+  dateTime: "D MMM YYYY, HH:mm",
+  relative: "relative",
+} as const;
+
+export const LOCALE = "it-IT";
+export const TIMEZONE = "Europe/Rome";
+
+// ── Pricing ──
+export const PRICING = {
+  free: {
+    name: "Free",
+    priceMonthly: 0,
+    priceYearly: 0,
+    currency: "EUR",
+  },
+  premium: {
+    name: "Premium",
+    priceMonthly: 9.99,
+    priceYearly: 99.99,
+    currency: "EUR",
+    discountYearly: 17,
+  },
+  enterprise: {
+    name: "Enterprise",
+    priceMonthly: null,
+    currency: "EUR",
+  },
+} as const;
+
+// ── AI Models ──
+export const AI_MODELS = {
+  default: "gpt-4o-mini",
+  advanced: "gpt-4o",
+  embedding: "text-embedding-3-small",
+} as const;
+
+// ── Graph ──
+export const GRAPH_CONFIG = {
+  minZoom: 0.1,
+  maxZoom: 3,
+  defaultZoom: 1,
+  nodeWidth: 200,
+  nodeHeight: 80,
+  edgeAnimationDuration: 1000,
+  layoutPadding: 50,
+} as const;
+
+// ── Test ──
+export const TEST_CONFIG = {
+  timePerQuestionSec: 60,
+  maxRetries: 3,
+  passThreshold: 65,
+  questionTypes: ["multiple_choice", "true_false", "open_ended", "ranking"],
+} as const;
+
+// ── Animations ──
+export const ANIMATION_DURATIONS = {
+  fast: 150,
+  normal: 300,
+  slow: 500,
+  pageTransition: 400,
+} as const;
+
+export const ANIMATION_EASING = {
+  default: "cubic-bezier(0.4, 0, 0.2, 1)",
+  bounce: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+  smooth: "cubic-bezier(0.25, 0.1, 0.25, 1)",
+} as const;

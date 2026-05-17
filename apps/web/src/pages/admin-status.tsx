@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,8 @@ import {
   CheckCircle2, XCircle, AlertTriangle, Wifi, Sparkles,
   CreditCard, Globe, Search, Mail, Bell, KeyRound, ExternalLink, ChevronDown, ChevronUp,
 } from "lucide-react";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { AdminAuthGate } from "@/components/AdminAuthGate";
 
 const BASE = import.meta.env.BASE_URL || "/";
 const REFRESH_INTERVAL_MS = 15_000;
@@ -92,7 +94,7 @@ function formatUptime(seconds: number): string {
   return `${s}s`;
 }
 
-// ─── Integration setup guides ──────────────────────────────────────────────────
+// â”€â”€â”€ Integration setup guides â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface IntegrationGuide {
   vars: string[];
   icon: React.ReactNode;
@@ -109,7 +111,7 @@ const INTEGRATION_GUIDES: IntegrationGuide[] = [
     icon: <CreditCard size={16} />,
     name: "Stripe",
     what: "Abilita i pagamenti e gli abbonamenti premium (checkout, gestione piani, webhook).",
-    how: "1. Crea un account su stripe.com → Dashboard → Developers → API Keys → copia la Secret key.\n2. Per i webhook: Stripe CLI o dashboard → Webhooks → aggiungi l'endpoint `/api/stripe/webhook`.",
+    how: "1. Crea un account su stripe.com â†’ Dashboard â†’ Developers â†’ API Keys â†’ copia la Secret key.\n2. Per i webhook: Stripe CLI o dashboard â†’ Webhooks â†’ aggiungi l'endpoint `/api/stripe/webhook`.",
     docsUrl: "https://stripe.com/docs/keys",
     docsLabel: "Docs Stripe API Keys",
   },
@@ -118,7 +120,7 @@ const INTEGRATION_GUIDES: IntegrationGuide[] = [
     icon: <Globe size={16} />,
     name: "GNews",
     what: "Abilita il feed di notizie aggiornate relative al settore dell'utente.",
-    how: "1. Vai su gnews.io → crea un account gratuito → copia la tua API Key dal dashboard.",
+    how: "1. Vai su gnews.io â†’ crea un account gratuito â†’ copia la tua API Key dal dashboard.",
     docsUrl: "https://gnews.io/docs/v4",
     docsLabel: "Docs GNews API",
   },
@@ -127,7 +129,7 @@ const INTEGRATION_GUIDES: IntegrationGuide[] = [
     icon: <Search size={16} />,
     name: "Tavily",
     what: "Abilita la ricerca dinamica di articoli di crescita personale tramite AI (Growth Research Scheduler).",
-    how: "1. Vai su tavily.com → crea un account → copia la API Key dalla dashboard del tuo profilo.",
+    how: "1. Vai su tavily.com â†’ crea un account â†’ copia la API Key dalla dashboard del tuo profilo.",
     docsUrl: "https://tavily.com",
     docsLabel: "Tavily Dashboard",
   },
@@ -136,7 +138,7 @@ const INTEGRATION_GUIDES: IntegrationGuide[] = [
     icon: <Mail size={16} />,
     name: "Resend",
     what: "Abilita le email transazionali: verifica account, reset password, digest settimanale.",
-    how: "1. Vai su resend.com → crea un account → API Keys → crea una nuova chiave → aggiungila come segreto.",
+    how: "1. Vai su resend.com â†’ crea un account â†’ API Keys â†’ crea una nuova chiave â†’ aggiungila come segreto.",
     docsUrl: "https://resend.com/docs/introduction",
     docsLabel: "Docs Resend",
   },
@@ -145,7 +147,7 @@ const INTEGRATION_GUIDES: IntegrationGuide[] = [
     icon: <Bell size={16} />,
     name: "Web Push (VAPID)",
     what: "Abilita le notifiche push del browser per promemoria, scadenze obiettivi e aggiornamenti.",
-    how: "Genera le chiavi VAPID con il comando:\n`npx web-push generate-vapid-keys`\nCopia VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY. VAPID_EMAIL è la tua email di contatto (es. admin@northstar.app).",
+    how: "Genera le chiavi VAPID con il comando:\n`npx web-push generate-vapid-keys`\nCopia VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY. VAPID_EMAIL Ã¨ la tua email di contatto (es. admin@northstar.app).",
     docsUrl: "https://developer.mozilla.org/en-US/docs/Web/API/Push_API",
     docsLabel: "Web Push API MDN",
   },
@@ -154,7 +156,7 @@ const INTEGRATION_GUIDES: IntegrationGuide[] = [
     icon: <KeyRound size={16} />,
     name: "Google OAuth",
     what: "Abilita il login con Google per gli utenti (flusso OAuth2).",
-    how: "1. Vai su console.cloud.google.com → API & Services → Credentials → Create OAuth 2.0 Client ID.\n2. Tipo: Web application. Aggiungi i redirect URI autorizzati (es. https://tuodominio.repl.co/api/auth/google/callback).",
+    how: "1. Vai su console.cloud.google.com â†’ API & Services â†’ Credentials â†’ Create OAuth 2.0 Client ID.\n2. Tipo: Web application. Aggiungi i redirect URI autorizzati (es. https://tuodominio.repl.co/api/auth/google/callback).",
     docsUrl: "https://developers.google.com/identity/protocols/oauth2",
     docsLabel: "Docs Google OAuth2",
   },
@@ -208,7 +210,7 @@ function IntegrationGuideCard({ guide, isMissing }: { guide: IntegrationGuide; i
               >
                 <ExternalLink size={11} /> {guide.docsLabel}
               </a>
-              <span className="text-muted-foreground text-xs">·</span>
+              <span className="text-muted-foreground text-xs">Â·</span>
               <a
                 href="https://docs.replit.com/replit-workspace/storing-sensitive-information-environment-variables"
                 target="_blank"
@@ -226,8 +228,7 @@ function IntegrationGuideCard({ guide, isMissing }: { guide: IntegrationGuide; i
 }
 
 export default function AdminStatus() {
-  const [adminKey, setAdminKey] = useState(() => localStorage.getItem("northstar_admin_key") ?? "");
-  const [keyInput, setKeyInput] = useState("");
+  const { key } = useAdminAuth();
   const [data, setData] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
@@ -248,40 +249,17 @@ export default function AdminStatus() {
   }, []);
 
   useEffect(() => {
-    if (!adminKey) return;
+    if (!key) return;
     fetchHealth();
     const interval = setInterval(fetchHealth, REFRESH_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [adminKey, fetchHealth]);
+  }, [key, fetchHealth]);
 
   useEffect(() => {
-    if (!adminKey || !lastRefresh) return;
+    if (!key || !lastRefresh) return;
     const tick = setInterval(() => setCountdown((c) => (c > 0 ? c - 1 : 0)), 1000);
     return () => clearInterval(tick);
-  }, [adminKey, lastRefresh]);
-
-  function handleKeySubmit() {
-    const k = keyInput.trim();
-    if (!k) return;
-    localStorage.setItem("northstar_admin_key", k);
-    setAdminKey(k);
-  }
-
-  if (!adminKey) {
-    return (
-      <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm">
-          <CardHeader><CardTitle className="text-center">Admin — NorthStar</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <Input type="password" placeholder="Chiave admin" value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleKeySubmit()} />
-            <Button className="w-full" onClick={handleKeySubmit}>Accedi</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  }, [key, lastRefresh]);
 
   // Determine which integrations are missing
   const missingVars = new Set(data?.env.missingOptional ?? []);
@@ -293,16 +271,17 @@ export default function AdminStatus() {
   const configuredCount = integrationStatus.filter((i) => !i.isMissing).length;
 
   return (
-    <div className="min-h-screen bg-muted/20 p-4 md:p-8">
+    <AdminAuthGate title="Status & Setup" description="Stato servizi, env vars e guide integrazioni">
+      <div className="min-h-screen bg-muted/20 p-4 md:p-8">
       <div className="max-w-3xl mx-auto space-y-6">
 
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold">NorthStar — Status & Setup</h1>
+            <h1 className="text-2xl font-bold">NorthStar â€” Status & Setup</h1>
             {lastRefresh && (
               <p className="text-xs text-muted-foreground mt-0.5">
-                Aggiornato: {lastRefresh.toLocaleTimeString("it-IT")} · prossimo refresh in {countdown}s
+                Aggiornato: {lastRefresh.toLocaleTimeString("it-IT")} Â· prossimo refresh in {countdown}s
               </p>
             )}
           </div>
@@ -321,11 +300,11 @@ export default function AdminStatus() {
                 <StatusIcon status={data.status} size={28} />
                 <div>
                   <p className={`text-lg font-bold ${statusColor(data.status)}`}>
-                    {data.status === "ok" ? "Tutto operativo" : data.status === "degraded" ? "Funzionalità ridotte" : "Errore critico"}
+                    {data.status === "ok" ? "Tutto operativo" : data.status === "degraded" ? "FunzionalitÃ  ridotte" : "Errore critico"}
                   </p>
                   <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                     <Clock size={11} />
-                    Uptime: {formatUptime(data.uptimeSeconds)} · {new Date(data.timestamp).toLocaleString("it-IT")}
+                    Uptime: {formatUptime(data.uptimeSeconds)} Â· {new Date(data.timestamp).toLocaleString("it-IT")}
                   </p>
                 </div>
               </div>
@@ -356,11 +335,11 @@ export default function AdminStatus() {
           ) : null}
         </div>
 
-        {/* Setup wizard — integrations */}
+        {/* Setup wizard â€” integrations */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              Setup Wizard — Integrazioni Opzionali
+              Setup Wizard â€” Integrazioni Opzionali
             </h2>
             {data && (
               <div className="flex items-center gap-2">
@@ -413,16 +392,17 @@ export default function AdminStatus() {
 
         {/* Links */}
         <div className="flex gap-2 text-xs text-muted-foreground pt-2 flex-wrap">
-          <a href="/admin" className="hover:underline">← Admin Home</a>
-          <span>·</span>
+          <a href="/admin" className="hover:underline">â† Admin Home</a>
+          <span>Â·</span>
           <a href="/admin/metriche" className="hover:underline">Metriche business</a>
-          <span>·</span>
+          <span>Â·</span>
           <a href="/admin/agenti" className="hover:underline">Agent Health</a>
-          <span>·</span>
+          <span>Â·</span>
           <a href="/admin/cataloghi" className="hover:underline">Cataloghi</a>
         </div>
 
       </div>
     </div>
+    </AdminAuthGate>
   );
 }

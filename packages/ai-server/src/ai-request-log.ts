@@ -14,46 +14,56 @@ export type AiRequestStatus =
   | "error_ratelimit"
   | "error_internal";
 
+export type AiResponseCategory =
+  | "success"
+  | "insufficient_data"
+  | "refused"
+  | "error_tool"
+  | "error_model";
+
 export interface RecordAiCallInput {
-  requestId:    string;
-  userId?:      number | null;    // nullable: guest o utente cancellato
-  threadId?:    string;
-  intent:       string;           // WendyIntent
-  tier:         string;           // nano | micro | standard | reasoning
-  model:        string;
-  inputTokens:  number;
-  outputTokens: number;
-  costUsdEst:   number;
-  latencyMs:    number;
-  totalTurns:   number;
-  status:       AiRequestStatus;
-  errorCode?:   string;
-  locale?:      string;
+  requestId:        string;
+  userId?:          number | null;
+  threadId?:        string;
+  intent:           string;
+  tier:             string;
+  model:            string;
+  inputTokens:      number;
+  outputTokens:     number;
+  costUsdEst:       number;
+  latencyMs:        number;
+  totalTurns:       number;
+  status:           AiRequestStatus;
+  errorCode?:       string;
+  locale?:          string;
+  // Nuovi campi Step 5
+  toolCallsCount?:  number;
+  toolsUsed?:       string[];
+  responseCategory?: AiResponseCategory;
+  searchMode?:      "semantic" | "keyword" | "none";
 }
 
-/**
- * Registra una chiamata AI in modo fire-and-forget.
- * Cattura e logga eventuali errori senza propagarli al chiamante.
- */
 export function recordAiCall(input: RecordAiCallInput): void {
-  // Fire-and-forget: non usiamo await, non blocchiamo la risposta
   db.insert(aiRequestLogTable).values({
-    requestId:    input.requestId,
-    userId:       input.userId ?? null,
-    threadId:     input.threadId,
-    intent:       input.intent,
-    tier:         input.tier,
-    model:        input.model,
-    inputTokens:  input.inputTokens,
-    outputTokens: input.outputTokens,
-    costUsdEst:   input.costUsdEst,
-    latencyMs:    input.latencyMs,
-    totalTurns:   input.totalTurns,
-    status:       input.status,
-    errorCode:    input.errorCode,
-    locale:       input.locale ?? "it",
+    requestId:        input.requestId,
+    userId:           input.userId ?? null,
+    threadId:         input.threadId,
+    intent:           input.intent,
+    tier:             input.tier,
+    model:            input.model,
+    inputTokens:      input.inputTokens,
+    outputTokens:     input.outputTokens,
+    costUsdEst:       input.costUsdEst,
+    latencyMs:        input.latencyMs,
+    totalTurns:       input.totalTurns,
+    status:           input.status,
+    errorCode:        input.errorCode,
+    locale:           input.locale ?? "it",
+    toolCallsCount:   input.toolCallsCount ?? 0,
+    toolsUsed:        input.toolsUsed ?? [],
+    responseCategory: input.responseCategory,
+    searchMode:       input.searchMode,
   }).catch((err) => {
-    // Mai far fallire la richiesta principale per un errore di logging
     logger.warn({ err, requestId: input.requestId }, "[ai-request-log] insert failed");
   });
 }

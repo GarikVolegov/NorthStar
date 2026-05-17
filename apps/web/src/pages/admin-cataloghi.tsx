@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,8 @@ import {
   RefreshCw, Loader2, Plus, Edit3, Trash2, X, Save,
   Briefcase, Users, GraduationCap, BookOpen, ChevronDown, ChevronUp,
 } from "lucide-react";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { AdminAuthGate } from "@/components/AdminAuthGate";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -33,7 +35,7 @@ function useAdminFetch<T>(tab: Tab, adminKey: string) {
   return { data, setData, loading, refresh: fetch_ };
 }
 
-// ─── Generic JSON field editor (comma-separated for arrays) ───────────────────
+// â”€â”€â”€ Generic JSON field editor (comma-separated for arrays) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ArrayField({ label, value, onChange }: {
   label: string; value: string[]; onChange: (v: string[]) => void;
 }) {
@@ -49,7 +51,7 @@ function ArrayField({ label, value, onChange }: {
   );
 }
 
-// ─── Sectors ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Sectors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface Sector {
   id: number; name: string; description: string; icon: string; color: string;
   automationRisk: string; trend: string; growthRate: number;
@@ -103,8 +105,8 @@ function SectorForm({ initial, adminKey, onSaved, onCancel }: {
           <div><label className="text-xs font-medium text-muted-foreground">Crescita %</label><Input type="number" value={growthRate} onChange={(e) => setGrowthRate(e.target.value)} className="mt-1" /></div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className="text-xs font-medium text-muted-foreground">Stipendio min (€)</label><Input type="number" value={salaryMin} onChange={(e) => setSalaryMin(e.target.value)} className="mt-1" /></div>
-          <div><label className="text-xs font-medium text-muted-foreground">Stipendio max (€)</label><Input type="number" value={salaryMax} onChange={(e) => setSalaryMax(e.target.value)} className="mt-1" /></div>
+          <div><label className="text-xs font-medium text-muted-foreground">Stipendio min (â‚¬)</label><Input type="number" value={salaryMin} onChange={(e) => setSalaryMin(e.target.value)} className="mt-1" /></div>
+          <div><label className="text-xs font-medium text-muted-foreground">Stipendio max (â‚¬)</label><Input type="number" value={salaryMax} onChange={(e) => setSalaryMax(e.target.value)} className="mt-1" /></div>
         </div>
         <div className="flex gap-2">
           <Button size="sm" onClick={save} disabled={saving || !name.trim()}>
@@ -118,7 +120,7 @@ function SectorForm({ initial, adminKey, onSaved, onCancel }: {
   );
 }
 
-// ─── Professions ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Professions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface Profession {
   id: number; title: string; sector: string; description?: string;
   salaryRange: string; growthOutlook: string; isActive: boolean;
@@ -130,7 +132,7 @@ function ProfessionForm({ initial, adminKey, onSaved, onCancel }: {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [sector, setSector] = useState(initial?.sector ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
-  const [salaryRange, setSalaryRange] = useState(initial?.salaryRange ?? "25.000–45.000 €");
+  const [salaryRange, setSalaryRange] = useState(initial?.salaryRange ?? "25.000â€“45.000 â‚¬");
   const [growthOutlook, setGrowthOutlook] = useState(initial?.growthOutlook ?? "stable");
   const [saving, setSaving] = useState(false);
 
@@ -174,7 +176,7 @@ function ProfessionForm({ initial, adminKey, onSaved, onCancel }: {
   );
 }
 
-// ─── Education Paths ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Education Paths â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface EducationPath {
   id: number; path: string; type: string; duration: string; cost: string;
   steps: string[]; careerOutcomes: string[]; sectorFit: string[]; isActive: boolean;
@@ -233,7 +235,7 @@ function EducationForm({ initial, adminKey, onSaved, onCancel }: {
   );
 }
 
-// ─── Growth Articles ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Growth Articles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface GrowthArticle {
   id: number; title: string; category: string; description: string;
   difficulty: string; status: string; readTimeMinutes: number;
@@ -270,7 +272,7 @@ function GrowthArticleForm({ initial, adminKey, onSaved, onCancel }: {
         <div><label className="text-xs font-medium text-muted-foreground">Titolo</label><Input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1" /></div>
         <div className="grid grid-cols-3 gap-3">
           <div><label className="text-xs font-medium text-muted-foreground">Categoria</label><Input value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1" /></div>
-          <div><label className="text-xs font-medium text-muted-foreground">Difficoltà</label>
+          <div><label className="text-xs font-medium text-muted-foreground">DifficoltÃ </label>
             <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className="mt-1 w-full text-sm border rounded-md px-2 py-1.5 bg-background">
               <option value="base">Base</option><option value="intermedio">Intermedio</option><option value="avanzato">Avanzato</option>
             </select></div>
@@ -293,7 +295,7 @@ function GrowthArticleForm({ initial, adminKey, onSaved, onCancel }: {
   );
 }
 
-// ─── Generic list row ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Generic list row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ListRow({ label, sub, active, onEdit, onDelete }: {
   label: string; sub?: string; active?: boolean;
   onEdit: () => void; onDelete: () => void;
@@ -325,48 +327,28 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function AdminCataloghi() {
-  const [adminKey, setAdminKey] = useState(() => localStorage.getItem("northstar_admin_key") ?? "");
-  const [keyInput, setKeyInput] = useState("");
+  const { key } = useAdminAuth();
   const [tab, setTab] = useState<Tab>("sectors");
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  const sectors = useAdminFetch<Sector>("sectors", adminKey);
-  const professions = useAdminFetch<Profession>("professions", adminKey);
-  const educationPaths = useAdminFetch<EducationPath>("education-paths", adminKey);
-  const growthArticles = useAdminFetch<GrowthArticle>("growth-articles", adminKey);
+  const sectors = useAdminFetch<Sector>("sectors", key);
+  const professions = useAdminFetch<Profession>("professions", key);
+  const educationPaths = useAdminFetch<EducationPath>("education-paths", key);
+  const growthArticles = useAdminFetch<GrowthArticle>("growth-articles", key);
 
   const resources = { sectors, professions, "education-paths": educationPaths, "growth-articles": growthArticles };
   const current = resources[tab];
 
   async function deleteItem(url: string) {
     if (!confirm("Eliminare questo elemento?")) return;
-    await fetch(url, { method: "DELETE", headers: { "x-admin-key": adminKey } });
+    await fetch(url, { method: "DELETE", headers: { "x-admin-key": key } });
     current.refresh();
   }
 
-  if (!adminKey) {
-    return (
-      <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm">
-          <CardHeader><CardTitle className="text-center">Admin — NorthStar</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <Input type="password" placeholder="Chiave admin" value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") { localStorage.setItem("northstar_admin_key", keyInput.trim()); setAdminKey(keyInput.trim()); }
-              }} />
-            <Button className="w-full" onClick={() => {
-              localStorage.setItem("northstar_admin_key", keyInput.trim()); setAdminKey(keyInput.trim());
-            }}>Accedi</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-muted/20 p-4 md:p-8">
+    <AdminAuthGate title="Cataloghi" description="Gestisci settori, professioni, percorsi e articoli">
+      <div className="min-h-screen bg-muted/20 p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-6">
 
         <div className="flex items-center justify-between flex-wrap gap-3">
@@ -408,10 +390,10 @@ export default function AdminCataloghi() {
         {/* Create form */}
         {creating && (
           <div>
-            {tab === "sectors" && <SectorForm adminKey={adminKey} onSaved={() => { setCreating(false); current.refresh(); }} onCancel={() => setCreating(false)} />}
-            {tab === "professions" && <ProfessionForm adminKey={adminKey} onSaved={() => { setCreating(false); current.refresh(); }} onCancel={() => setCreating(false)} />}
-            {tab === "education-paths" && <EducationForm adminKey={adminKey} onSaved={() => { setCreating(false); current.refresh(); }} onCancel={() => setCreating(false)} />}
-            {tab === "growth-articles" && <GrowthArticleForm adminKey={adminKey} onSaved={() => { setCreating(false); current.refresh(); }} onCancel={() => setCreating(false)} />}
+            {tab === "sectors" && <SectorForm adminKey={key} onSaved={() => { setCreating(false); current.refresh(); }} onCancel={() => setCreating(false)} />}
+            {tab === "professions" && <ProfessionForm adminKey={key} onSaved={() => { setCreating(false); current.refresh(); }} onCancel={() => setCreating(false)} />}
+            {tab === "education-paths" && <EducationForm adminKey={key} onSaved={() => { setCreating(false); current.refresh(); }} onCancel={() => setCreating(false)} />}
+            {tab === "growth-articles" && <GrowthArticleForm adminKey={key} onSaved={() => { setCreating(false); current.refresh(); }} onCancel={() => setCreating(false)} />}
           </div>
         )}
 
@@ -427,26 +409,26 @@ export default function AdminCataloghi() {
             <div className="space-y-1">
               {tab === "sectors" && (sectors.data as Sector[]).map((s) => (
                 editingId === s.id
-                  ? <SectorForm key={s.id} initial={s} adminKey={adminKey} onSaved={() => { setEditingId(null); current.refresh(); }} onCancel={() => setEditingId(null)} />
-                  : <ListRow key={s.id} label={s.name} sub={`${s.trend} · rischio ${s.automationRisk}`}
+                  ? <SectorForm key={s.id} initial={s} adminKey={key} onSaved={() => { setEditingId(null); current.refresh(); }} onCancel={() => setEditingId(null)} />
+                  : <ListRow key={s.id} label={s.name} sub={`${s.trend} Â· rischio ${s.automationRisk}`}
                       onEdit={() => setEditingId(s.id)} onDelete={() => deleteItem(`${BASE}api/admin/catalogs/sectors/${s.id}`)} />
               ))}
               {tab === "professions" && (professions.data as Profession[]).map((p) => (
                 editingId === p.id
-                  ? <ProfessionForm key={p.id} initial={p} adminKey={adminKey} onSaved={() => { setEditingId(null); current.refresh(); }} onCancel={() => setEditingId(null)} />
-                  : <ListRow key={p.id} label={p.title} sub={`${p.sector} · ${p.salaryRange}`} active={p.isActive}
+                  ? <ProfessionForm key={p.id} initial={p} adminKey={key} onSaved={() => { setEditingId(null); current.refresh(); }} onCancel={() => setEditingId(null)} />
+                  : <ListRow key={p.id} label={p.title} sub={`${p.sector} Â· ${p.salaryRange}`} active={p.isActive}
                       onEdit={() => setEditingId(p.id)} onDelete={() => deleteItem(`${BASE}api/admin/catalogs/professions/${p.id}`)} />
               ))}
               {tab === "education-paths" && (educationPaths.data as EducationPath[]).map((e) => (
                 editingId === e.id
-                  ? <EducationForm key={e.id} initial={e} adminKey={adminKey} onSaved={() => { setEditingId(null); current.refresh(); }} onCancel={() => setEditingId(null)} />
-                  : <ListRow key={e.id} label={e.path} sub={`${e.type} · ${e.duration} · ${e.cost}`} active={e.isActive}
+                  ? <EducationForm key={e.id} initial={e} adminKey={key} onSaved={() => { setEditingId(null); current.refresh(); }} onCancel={() => setEditingId(null)} />
+                  : <ListRow key={e.id} label={e.path} sub={`${e.type} Â· ${e.duration} Â· ${e.cost}`} active={e.isActive}
                       onEdit={() => setEditingId(e.id)} onDelete={() => deleteItem(`${BASE}api/admin/catalogs/education-paths/${e.id}`)} />
               ))}
               {tab === "growth-articles" && (growthArticles.data as GrowthArticle[]).map((a) => (
                 editingId === a.id
-                  ? <GrowthArticleForm key={a.id} initial={a} adminKey={adminKey} onSaved={() => { setEditingId(null); current.refresh(); }} onCancel={() => setEditingId(null)} />
-                  : <ListRow key={a.id} label={a.title} sub={`${a.category} · ${a.difficulty} · ${a.status}`}
+                  ? <GrowthArticleForm key={a.id} initial={a} adminKey={key} onSaved={() => { setEditingId(null); current.refresh(); }} onCancel={() => setEditingId(null)} />
+                  : <ListRow key={a.id} label={a.title} sub={`${a.category} Â· ${a.difficulty} Â· ${a.status}`}
                       onEdit={() => setEditingId(a.id)} onDelete={() => deleteItem(`${BASE}api/admin/catalogs/growth-articles/${a.id}`)} />
               ))}
             </div>
@@ -454,13 +436,14 @@ export default function AdminCataloghi() {
         </Card>
 
         <div className="flex gap-2 text-xs text-muted-foreground pt-2">
-          <a href="/admin" className="hover:underline">← Admin Home</a>
-          <span>·</span>
+          <a href="/admin" className="hover:underline">â† Admin Home</a>
+          <span>Â·</span>
           <a href="/admin/crescita" className="hover:underline">Coda Crescita</a>
-          <span>·</span>
+          <span>Â·</span>
           <a href="/admin/agenti" className="hover:underline">Agent Health</a>
         </div>
       </div>
     </div>
+    </AdminAuthGate>
   );
 }

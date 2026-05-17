@@ -62,6 +62,7 @@ export * from "./chatMessages";
 // ── AI Cost tracking & request logging ──────────────────────────────
 export * from "./llmUsage";
 export * from "./aiRequestLog";
+export * from "./wendyFeedback";
 export * from "./userKeys";
 export * from "./userBadges";
 export * from "./weeklyLeaderboard";

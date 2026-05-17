@@ -46,6 +46,20 @@ export const aiRequestLogTable = pgTable(
     status:    text("status").notNull(),         // success | error_model | error_timeout | error_ratelimit | error_internal
     errorCode: text("error_code"),               // nullable, solo su errore
 
+    // ── Tool usage (non-PII, metadati routing) ────────────────────────────
+    toolCallsCount: integer("tool_calls_count").notNull().default(0),
+    toolsUsed:      text("tools_used").array().notNull().default([]),
+
+    // ── Categoria risposta ────────────────────────────────────────────────
+    responseCategory: text("response_category", {
+      enum: ["success", "insufficient_data", "refused", "error_tool", "error_model"],
+    }),
+
+    // ── Modalità ricerca semantica ────────────────────────────────────────
+    searchMode: text("search_mode", {
+      enum: ["semantic", "keyword", "none"],
+    }),
+
     // ── Localizzazione ────────────────────────────────────────────────────
     locale: text("locale").notNull().default("it"),
 

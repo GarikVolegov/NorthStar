@@ -11,12 +11,14 @@ import { Toaster } from "sonner";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { AppStateProvider } from "@/contexts/AppStateContext";
 import { WendyProvider } from "@/contexts/WendyProvider";
 
 import { WendyPanel } from "@/components/WendyPanel";
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import { useReducedMotion, easings } from "@/lib/motion";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { PageLoader } from "@/components/PageLoader";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/footer";
@@ -347,15 +349,17 @@ function App() {
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <TooltipProvider>
-            <WendyProvider>
-              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                <Router />
-              </WouterRouter>
-              <Toaster />
-              <WendyPanel />
-            </WendyProvider>
-          </TooltipProvider>
+          <AppStateProvider>
+            <TooltipProvider>
+              <WendyProvider>
+                <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                  <Router />
+                </WouterRouter>
+                <Toaster />
+                <WendyPanel />
+              </WendyProvider>
+            </TooltipProvider>
+          </AppStateProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>

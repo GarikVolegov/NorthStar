@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,8 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { AdminAuthGate } from "@/components/AdminAuthGate";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -81,7 +83,7 @@ function AgentCard({ agent }: { agent: AgentStat }) {
           </div>
           <div className="text-center p-2 rounded-lg bg-muted/40">
             <p className="text-xl font-bold">
-              {agent.avgDurationMs ? `${agent.avgDurationMs}ms` : "—"}
+              {agent.avgDurationMs ? `${agent.avgDurationMs}ms` : "â€”"}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">Latenza media</p>
           </div>
@@ -94,7 +96,7 @@ function AgentCard({ agent }: { agent: AgentStat }) {
               className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mb-2"
             >
               <AlertTriangle size={11} className="text-amber-500" />
-              {agent.lastErrors.length} errori recenti — {expanded ? "nascondi" : "mostra"}
+              {agent.lastErrors.length} errori recenti â€” {expanded ? "nascondi" : "mostra"}
             </button>
             {expanded && (
               <div className="space-y-1.5">
@@ -123,21 +125,19 @@ function AgentCard({ agent }: { agent: AgentStat }) {
 }
 
 export default function AdminAgenti() {
-  const [adminKey, setAdminKey] = useState(() => localStorage.getItem("northstar_admin_key") ?? "");
-  const [keyInput, setKeyInput] = useState("");
+  const { key } = useAdminAuth();
   const [data, setData] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
-  const fetchData = useCallback(async (key: string) => {
+  const fetchData = useCallback(async (adminKey: string) => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch(`${BASE}api/admin/agent-health`, {
-        headers: { "x-admin-key": key },
+        headers: { "x-admin-key": adminKey },
       });
-      if (res.status === 401) { setError("Chiave admin non valida."); return; }
       if (!res.ok) throw new Error("Errore server");
       setData(await res.json());
       setLastRefresh(new Date());
@@ -149,32 +149,8 @@ export default function AdminAgenti() {
   }, []);
 
   useEffect(() => {
-    if (adminKey) fetchData(adminKey);
-  }, [adminKey, fetchData]);
-
-  if (!adminKey) {
-    return (
-      <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm">
-          <CardHeader><CardTitle className="text-center">Admin — NorthStar</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <Input type="password" placeholder="Chiave admin" value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  localStorage.setItem("northstar_admin_key", keyInput.trim());
-                  setAdminKey(keyInput.trim());
-                }
-              }} />
-            <Button className="w-full" onClick={() => {
-              localStorage.setItem("northstar_admin_key", keyInput.trim());
-              setAdminKey(keyInput.trim());
-            }}>Accedi</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+    if (key) fetchData(key);
+  }, [key, fetchData]);
 
   // Build chart data from daily rows
   const agentNames = data ? [...new Set(data.daily.map((d) => d.agentName))] : [];
@@ -195,7 +171,8 @@ export default function AdminAgenti() {
   const critical = data?.agents.filter((a) => a.status === "critical").length ?? 0;
 
   return (
-    <div className="min-h-screen bg-muted/20 p-4 md:p-8">
+    <AdminAuthGate title="Agent Health" description="Success rate, latenza e ultimi errori per ogni agente AI">
+      <div className="min-h-screen bg-muted/20 p-4 md:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
 
         {/* Header */}
@@ -215,7 +192,7 @@ export default function AdminAgenti() {
             <Badge className="bg-emerald-100 text-emerald-700">{healthy} sani</Badge>
             <Badge className="bg-amber-100 text-amber-700">{degraded} degradati</Badge>
             <Badge className="bg-red-100 text-red-700">{critical} critici</Badge>
-            <Button variant="outline" size="sm" onClick={() => fetchData(adminKey)} disabled={loading}>
+            <Button variant="outline" size="sm" onClick={() => fetchData(key)} disabled={loading}>
               {loading ? <Loader2 size={14} className="animate-spin mr-1" /> : <RefreshCw size={14} className="mr-1" />}
               Aggiorna
             </Button>
@@ -255,7 +232,7 @@ export default function AdminAgenti() {
           <Card>
             <CardHeader>
               <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                Chiamate per agente — ultimi 14 giorni
+                Chiamate per agente â€” ultimi 14 giorni
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -301,13 +278,14 @@ export default function AdminAgenti() {
         )}
 
         <div className="flex gap-2 text-xs text-muted-foreground pt-2">
-          <a href="/admin" className="hover:underline">← Admin Home</a>
-          <span>·</span>
+          <a href="/admin" className="hover:underline">â† Admin Home</a>
+          <span>Â·</span>
           <a href="/admin/metriche" className="hover:underline">Metriche</a>
-          <span>·</span>
+          <span>Â·</span>
           <a href="/admin/cataloghi" className="hover:underline">Cataloghi</a>
         </div>
       </div>
     </div>
+    </AdminAuthGate>
   );
 }

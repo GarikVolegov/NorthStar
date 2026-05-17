@@ -33,10 +33,12 @@ export interface ChatMessage {
   timestamp:    number;
   isStreaming?: boolean;
   thinkingMs?:  number;
-  citations?:   RagCitation[];   // fonti KB alleggate al messaggio
-  feedback?:    'up' | 'down';   // voto utente
-  context?:     string;          // prompt contestuale usato (debug)
+  citations?:   RagCitation[];
+  feedback?:    'up' | 'down';
+  context?:     string;
   uiTool?:      { name: string; args: Record<string, unknown> };
+  requestId?:   string;   // ID server per il feedback — arriva nel done SSE event
+  toolsUsed?:   string[]; // tool chiamati durante questa risposta
 }
 
 export interface ThinkingPhase {
@@ -156,6 +158,8 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
   const thinkingStartRef        = useRef(0);
   const firstChunkReceivedRef   = useRef(false);
   const pendingCitationsRef     = useRef<RagCitation[]>([]);
+  const lastRequestIdRef        = useRef<string | undefined>(undefined);
+  const toolsUsedRef            = useRef<string[]>([]);
 
   // Mantiene la history da inviare al backend (ultime 20 coppie user/assistant)
   const historyRef = useRef<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
@@ -189,6 +193,21 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
             ),
           );
           return true;
+        }
+        // Cattura requestId e toolsUsed dal done event
+        if (data?.type === 'done') {
+          if (data.requestId) lastRequestIdRef.current = data.requestId as string;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgIdRef.current
+                ? { ...m, requestId: data.requestId as string | undefined, toolsUsed: [...toolsUsedRef.current] }
+                : m,
+            ),
+          );
+        }
+        // Cattura tool_call per mostrarlo nella UI
+        if (data?.type === 'tool_call' && typeof data.name === 'string') {
+          toolsUsedRef.current = [...toolsUsedRef.current, data.name as string];
         }
         if (data?.type === 'ui_tool' && data?.name) {
           setMessages((prev) =>
@@ -295,6 +314,8 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     thinkingStartRef.current       = Date.now();
     firstChunkReceivedRef.current  = false;
     pendingCitationsRef.current    = [];
+    lastRequestIdRef.current       = undefined;
+    toolsUsedRef.current           = [];
 
     setMessages((prev) => [
       ...prev,
@@ -384,36 +405,39 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
   const sendFeedback = useCallback(async (
     messageId: string,
     vote: 'up' | 'down',
-    note?: string,
+    reason?: 'inaccurate' | 'irrelevant' | 'too_long' | 'too_slow' | 'harmful' | 'other',
   ) => {
-    // Ottimistic update
+    // Ottimistic update locale
     setMessages((prev) =>
       prev.map((m) => m.id === messageId ? { ...m, feedback: vote } : m),
     );
 
+    // Trova il requestId del messaggio (arriva dal done SSE)
+    const msg = messages.find((m) => m.id === messageId);
+    const requestId = msg?.requestId;
+    if (!requestId) {
+      console.warn('[useWendyChat] sendFeedback: nessun requestId per', messageId);
+      return;
+    }
+
     try {
-      await fetch('/api/v1/ai/chat/feedback', {
+      const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      await fetch('/api/ai/wendy/feedback', {
         method:      'POST',
-        headers:     { 'Content-Type': 'application/json' },
+        headers,
         credentials: 'include',
         body: JSON.stringify({
-          messageId,
-          vote,
-          note: note ?? null,
-          // Contesto: messaggio utente precedente + risposta Wendy
-          context: messages
-            .filter((m) => m.id === messageId || (
-              m.role === 'user' &&
-              messages.findIndex((x) => x.id === messageId) ===
-              messages.findIndex((x) => x.id === m.id) + 1
-            ))
-            .map((m) => ({ role: m.role, content: m.content.slice(0, 500) }))
-            .slice(-2),
+          requestId,
+          rating:    vote,
+          reason:    reason ?? undefined,
+          toolsUsed: msg?.toolsUsed ?? [],
         }),
       });
     } catch (err) {
       console.warn('[useWendyChat] sendFeedback failed:', err);
-      // Non rollback: il feedback ottimistic rimane visibile, non è critico
     }
   }, [messages]);
 

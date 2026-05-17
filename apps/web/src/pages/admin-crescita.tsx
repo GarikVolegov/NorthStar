@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,8 @@ import {
   RefreshCw, Loader2, CheckCircle2, XCircle, Trash2, Edit3, X, Save,
   Sparkles, Clock, TrendingUp,
 } from "lucide-react";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { AdminAuthGate } from "@/components/AdminAuthGate";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -157,11 +159,11 @@ function ArticleCard({ article, adminKey, onRefresh }: {
               <h3 className="font-semibold text-sm leading-tight">{article.title}</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {article.category}{article.subcategory ? ` / ${article.subcategory}` : ""}
-                {" · "}
+                {" Â· "}
                 <span className="flex items-center gap-0.5 inline-flex">
                   <Clock size={10} /> {article.readTimeMinutes} min
                 </span>
-                {" · "}
+                {" Â· "}
                 {new Date(article.createdAt).toLocaleDateString("it-IT")}
               </p>
             </div>
@@ -201,47 +203,27 @@ function ArticleCard({ article, adminKey, onRefresh }: {
 }
 
 export default function AdminCrescita() {
-  const [adminKey, setAdminKey] = useState(() => localStorage.getItem("northstar_admin_key") ?? "");
-  const [keyInput, setKeyInput] = useState("");
+  const { key } = useAdminAuth();
   const [data, setData] = useState<QueueData | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const fetchData = useCallback(async (key: string) => {
+  const fetchData = useCallback(async (adminKey: string) => {
     setLoading(true);
     try {
       const res = await fetch(`${BASE}api/admin/growth-queue`, {
-        headers: { "x-admin-key": key },
+        headers: { "x-admin-key": adminKey },
       });
       if (res.ok) setData(await res.json());
     } finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
-    if (adminKey) fetchData(adminKey);
-  }, [adminKey, fetchData]);
-
-  if (!adminKey) {
-    return (
-      <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm">
-          <CardHeader><CardTitle className="text-center">Admin — NorthStar</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <Input type="password" placeholder="Chiave admin" value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") { localStorage.setItem("northstar_admin_key", keyInput.trim()); setAdminKey(keyInput.trim()); }
-              }} />
-            <Button className="w-full" onClick={() => {
-              localStorage.setItem("northstar_admin_key", keyInput.trim()); setAdminKey(keyInput.trim());
-            }}>Accedi</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+    if (key) fetchData(key);
+  }, [key, fetchData]);
 
   return (
-    <div className="min-h-screen bg-muted/20 p-4 md:p-8">
+    <AdminAuthGate title="Coda Crescita" description="Approva, modifica o scarta articoli generati dall'AI">
+      <div className="min-h-screen bg-muted/20 p-4 md:p-8">
       <div className="max-w-3xl mx-auto space-y-6">
 
         <div className="flex items-center justify-between flex-wrap gap-3">
@@ -252,7 +234,7 @@ export default function AdminCrescita() {
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">Approva, modifica o scarta articoli generati dall'AI</p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => fetchData(adminKey)} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => fetchData(key)} disabled={loading}>
             {loading ? <Loader2 size={14} className="animate-spin mr-1" /> : <RefreshCw size={14} className="mr-1" />}
             Aggiorna
           </Button>
@@ -294,18 +276,19 @@ export default function AdminCrescita() {
 
         <div className="space-y-3">
           {data?.queue.map((article) => (
-            <ArticleCard key={article.id} article={article} adminKey={adminKey} onRefresh={() => fetchData(adminKey)} />
+            <ArticleCard key={article.id} article={article} adminKey={key} onRefresh={() => fetchData(key)} />
           ))}
         </div>
 
         <div className="flex gap-2 text-xs text-muted-foreground pt-2">
-          <a href="/admin" className="hover:underline">← Admin Home</a>
-          <span>·</span>
+          <a href="/admin" className="hover:underline">â† Admin Home</a>
+          <span>Â·</span>
           <a href="/admin/cataloghi" className="hover:underline">Cataloghi</a>
-          <span>·</span>
+          <span>Â·</span>
           <a href="/admin/agenti" className="hover:underline">Agent Health</a>
         </div>
       </div>
     </div>
+    </AdminAuthGate>
   );
 }

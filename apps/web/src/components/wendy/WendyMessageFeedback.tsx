@@ -1,217 +1,100 @@
 /**
- * WendyMessageFeedback — UI 👍/👎 Human-in-the-Loop per ogni messaggio
+ * WendyMessageFeedback — 👍/👎 + categoria motivo per risposta Wendy.
  *
- * Rendering:
- *   - Appare sotto ogni messaggio dell'assistant (non durante lo streaming)
- *   - 👍 / 👎 bottoni con micro-animazione al click
- *   - Se 👎, mostra un campo note opzionale per dettagliare il problema
- *   - Stato "inviato" con checkmark per conferma visiva
- *
- * Uso:
- *   <WendyMessageFeedback
- *     messageId={msg.id}
- *     currentFeedback={msg.feedback}
- *     onFeedback={(id, vote, note) => wendy.sendFeedback(id, vote, note)}
- *   />
+ * - Upvote: manda subito
+ * - Downvote: mostra 4 chip-reason predefiniti (no testo libero per GDPR)
+ * - requestId viene passato da ChatMessage e usato da sendFeedback
  */
+import { useState } from 'react';
 
-import React, { useState } from 'react';
+type Reason = 'inaccurate' | 'irrelevant' | 'too_long' | 'too_slow' | 'harmful' | 'other';
+
+const REASONS: Array<{ value: Reason; label: string }> = [
+  { value: 'inaccurate',  label: 'Imprecisa'      },
+  { value: 'irrelevant',  label: 'Non pertinente'  },
+  { value: 'too_long',    label: 'Troppo lunga'    },
+  { value: 'too_slow',    label: 'Troppo lenta'    },
+];
 
 export interface WendyMessageFeedbackProps {
-  messageId:       string;
+  messageId:        string;
   currentFeedback?: 'up' | 'down';
-  onFeedback:      (messageId: string, vote: 'up' | 'down', note?: string) => void;
+  hasRequestId:     boolean;   // disabilita se requestId non ancora arrivato
+  onFeedback: (messageId: string, vote: 'up' | 'down', reason?: Reason) => void;
 }
 
 export function WendyMessageFeedback({
   messageId,
   currentFeedback,
+  hasRequestId,
   onFeedback,
 }: WendyMessageFeedbackProps) {
-  const [showNote, setShowNote]   = useState(false);
-  const [note,     setNote]       = useState('');
-  const [sent,     setSent]       = useState(false);
+  const [phase, setPhase] = useState<'idle' | 'choosing' | 'done'>('idle');
 
-  function handleVote(vote: 'up' | 'down') {
-    if (sent || currentFeedback) return;
-    if (vote === 'down') {
-      setShowNote(true);  // chiedi prima la nota
-      return;
-    }
-    // Upvote: manda subito
-    onFeedback(messageId, 'up');
-    setSent(true);
-  }
-
-  function handleSubmitDown() {
-    onFeedback(messageId, 'down', note.trim() || undefined);
-    setShowNote(false);
-    setSent(true);
-  }
-
-  if (sent || currentFeedback === 'up') {
+  if (!hasRequestId) return null;
+  if (phase === 'done' || currentFeedback) {
     return (
-      <div className="wendy-feedback wendy-feedback--sent" style={styles.wrap}>
-        <span style={{ fontSize: '13px', opacity: 0.5 }}>
-          {currentFeedback === 'up' || sent ? '✓ Grazie per il feedback!' : null}
-        </span>
-      </div>
+      <p className="text-[11px] opacity-40 mt-1 select-none">
+        {currentFeedback === 'up' || phase === 'done' ? 'Grazie per il feedback' : null}
+      </p>
     );
   }
 
+  function voteUp() {
+    onFeedback(messageId, 'up');
+    setPhase('done');
+  }
+
+  function voteDown(reason: Reason) {
+    onFeedback(messageId, 'down', reason);
+    setPhase('done');
+  }
+
   return (
-    <div className="wendy-feedback" style={styles.wrap}>
-      {!showNote ? (
-        <div style={styles.row}>
-          <span style={styles.label}>Risposta utile?</span>
-
-            <button
-              type="button"
-              aria-label="Risposta utile"
-              onClick={() => handleVote('up')}
-              style={{
-                ...styles.btn,
-                ...(false ? styles.btnActive : {}),
-              }}
-            >
-              👍
-            </button>
-
-            <button
-              type="button"
-              aria-label="Risposta non utile"
-              onClick={() => handleVote('down')}
-              style={{
-                ...styles.btn,
-                ...(currentFeedback === 'down' ? styles.btnActive : {}),
-              }}
-            >
-              👎
-            </button>
-
-           <button
-             type="button"
-             aria-label="Risposta non utile"
-             onClick={() => handleVote('down')}
-             style={{
-               ...styles.btn,
-               ...((currentFeedback ?? '') === 'down' ? styles.btnActive : {}),
-             }}
-           >
-             👎
-           </button>
+    <div className="mt-1.5 flex flex-col gap-1">
+      {phase === 'idle' && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] opacity-40 select-none">Utile?</span>
+          <button
+            type="button"
+            aria-label="Risposta utile"
+            onClick={voteUp}
+            className="rounded-md px-1.5 py-0.5 text-sm hover:bg-primary/10 transition-colors"
+          >
+            👍
+          </button>
+          <button
+            type="button"
+            aria-label="Risposta non utile"
+            onClick={() => setPhase('choosing')}
+            className="rounded-md px-1.5 py-0.5 text-sm hover:bg-destructive/10 transition-colors"
+          >
+            👎
+          </button>
         </div>
-      ) : (
-        <div style={styles.noteWrap}>
-          <p style={styles.noteLabel}>
-            Cosa poteva essere migliore? <span style={{ opacity: 0.5 }}>(opzionale)</span>
-          </p>
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Es. risposta troppo generica, informazioni errate…"
-            rows={2}
-            maxLength={300}
-            style={styles.textarea}
-            autoFocus
-          />
-          <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+      )}
+
+      {phase === 'choosing' && (
+        <div className="flex flex-wrap gap-1.5 mt-0.5">
+          {REASONS.map((r) => (
             <button
+              key={r.value}
               type="button"
-              onClick={handleSubmitDown}
-              style={styles.submitBtn}
+              onClick={() => voteDown(r.value)}
+              className="text-[11px] px-2 py-0.5 rounded-full border border-border/60 hover:bg-destructive/10 hover:border-destructive/40 transition-colors"
             >
-              Invia
+              {r.label}
             </button>
-            <button
-              type="button"
-              onClick={() => setShowNote(false)}
-              style={styles.cancelBtn}
-            >
-              Annulla
-            </button>
-          </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setPhase('idle')}
+            className="text-[11px] px-2 py-0.5 rounded-full border border-border/30 opacity-50 hover:opacity-100 transition-opacity"
+          >
+            Annulla
+          </button>
         </div>
       )}
     </div>
   );
 }
-
-// ─── Stili inline (nessuna dipendenza CSS esterna) ───────────────────────────────
-
-const styles: Record<string, React.CSSProperties> = {
-  wrap: {
-    marginTop:  '6px',
-    fontSize:   '13px',
-    display:    'flex',
-    flexDirection: 'column',
-    gap:        '4px',
-  },
-  row: {
-    display:    'flex',
-    alignItems: 'center',
-    gap:        '6px',
-  },
-  label: {
-    opacity:    0.45,
-    fontSize:   '12px',
-    userSelect: 'none',
-  },
-  btn: {
-    border:        'none',
-    background:    'transparent',
-    cursor:        'pointer',
-    fontSize:      '16px',
-    padding:       '2px 4px',
-    borderRadius:  '6px',
-    transition:    'background 0.12s, transform 0.1s',
-    lineHeight:    1,
-  },
-  btnActive: {
-    background: 'rgba(139,92,246,0.15)',
-    transform:  'scale(1.2)',
-  },
-  noteWrap: {
-    display:       'flex',
-    flexDirection: 'column',
-    gap:           '6px',
-    marginTop:     '4px',
-  },
-  noteLabel: {
-    margin:   0,
-    fontSize: '13px',
-    opacity:  0.7,
-  },
-  textarea: {
-    width:        '100%',
-    padding:      '8px',
-    borderRadius: '8px',
-    border:       '1px solid var(--color-border, #313244)',
-    background:   'var(--color-surface, #1e1e2e)',
-    color:        'inherit',
-    fontSize:     '13px',
-    resize:       'vertical',
-    fontFamily:   'inherit',
-    outline:      'none',
-    boxSizing:    'border-box',
-  },
-  submitBtn: {
-    padding:       '5px 14px',
-    borderRadius:  '8px',
-    border:        'none',
-    background:    'var(--color-primary, #8b5cf6)',
-    color:         '#fff',
-    cursor:        'pointer',
-    fontSize:      '13px',
-    fontWeight:    600,
-  },
-  cancelBtn: {
-    padding:       '5px 14px',
-    borderRadius:  '8px',
-    border:        '1px solid var(--color-border, #313244)',
-    background:    'transparent',
-    color:         'inherit',
-    cursor:        'pointer',
-    fontSize:      '13px',
-  },
-};
