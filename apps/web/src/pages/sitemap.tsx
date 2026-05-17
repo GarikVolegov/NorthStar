@@ -107,9 +107,9 @@ export default function Sitemap() {
       items: sectors.map((s) => ({
         label: s.name,
         iconName: s.icon,
-        href: `/wiki/${s.id}`,
+        href: "#wendy",
         desc: t("sitemap.wikiDesc"),
-        badge: "Premium",
+        badge: "Wendy AI",
       })),
     },
     {

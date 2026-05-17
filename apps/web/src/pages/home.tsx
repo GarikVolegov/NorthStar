@@ -32,6 +32,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LoginDialog } from "@/components/auth/LoginDialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWendy } from "@/contexts/WendyProvider";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { SectorIcon } from "@/lib/sector-icon";
 import { cn } from "@/lib/utils";
@@ -515,9 +516,11 @@ function TrendingSectorCard({
 function GuestPersonaHero({
   onLoginClick,
   personas,
+  wendy,
 }: {
   onLoginClick: () => void;
   personas: Persona[];
+  wendy: { open: () => void };
 }) {
   const { t } = useTranslation();
   const prefersReduced = useReducedMotion();
@@ -563,7 +566,13 @@ function GuestPersonaHero({
                   initial={prefersReduced ? {} : { opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.08 + i * 0.06, duration: 0.35 }}
-                  onClick={() => setLocation(persona.ctaHref)}
+                  onClick={() => {
+                    if (persona.ctaHref === "#wendy") {
+                      wendy.open();
+                    } else {
+                      setLocation(persona.ctaHref);
+                    }
+                  }}
                   className={cn(
                     "group cursor-pointer rounded-2xl border border-border bg-card transition-all duration-200 active:scale-[0.98]",
                     persona.borderClass,
@@ -712,7 +721,7 @@ function LoggedInHero({
     autonomo: {
       label: t("home.nextStep.autonomo.label"),
       desc: t("home.nextStep.autonomo.desc"),
-      href: "/validatore-idea",
+      href: "#wendy",
       icon: Rocket,
     },
     azienda: {
@@ -935,6 +944,7 @@ function QuickToolsSection({
   sessionId?: number;
 }) {
   const { t } = useTranslation();
+  const wendy = useWendy();
   type ToolDef = {
     href: string;
     icon: React.ElementType;
@@ -958,7 +968,7 @@ function QuickToolsSection({
         desc: t("home.tools.indeciso.1.desc"),
       },
       {
-        href: "/coach",
+        href: "#wendy",
         icon: Bot,
         title: t("home.tools.indeciso.2.title"),
         desc: t("home.tools.indeciso.2.desc"),
@@ -980,14 +990,14 @@ function QuickToolsSection({
         badge: "AI",
       },
       {
-        href: sessionId ? `/colloquio/${sessionId}` : "/dashboard",
+        href: "#wendy",
         icon: TrendingUp,
         title: t("home.tools.dipendente.1.title"),
         desc: t("home.tools.dipendente.1.desc"),
         badge: "AI",
       },
       {
-        href: "/coach",
+        href: "#wendy",
         icon: Bot,
         title: t("home.tools.dipendente.2.title"),
         desc: t("home.tools.dipendente.2.desc"),
@@ -1001,14 +1011,14 @@ function QuickToolsSection({
     ],
     autonomo: [
       {
-        href: "/validatore-idea",
+        href: "#wendy",
         icon: Rocket,
         title: t("home.tools.autonomo.0.title"),
         desc: t("home.tools.autonomo.0.desc"),
         badge: "AI",
       },
       {
-        href: "/coach",
+        href: "#wendy",
         icon: Bot,
         title: t("home.tools.autonomo.1.title"),
         desc: t("home.tools.autonomo.1.desc"),
@@ -1108,8 +1118,8 @@ function QuickToolsSection({
           </Link>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {tools.map(({ href, icon: Icon, title, desc, badge }) => (
-            <Link key={title} href={href}>
+          {tools.map(({ href, icon: Icon, title, desc, badge }) => {
+            const content = (
               <div className="group rounded-2xl border border-border bg-card p-5 flex flex-col gap-3 hover:border-primary/30 hover:shadow-md hover:shadow-black/10 transition-all duration-200 cursor-pointer h-full">
                 <div className="flex items-start justify-between">
                   <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 group-hover:bg-primary/15 transition-colors">
@@ -1131,8 +1141,12 @@ function QuickToolsSection({
                 </div>
                 <ArrowRight className="w-4 h-4 mt-auto self-end text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
               </div>
-            </Link>
-          ))}
+            );
+            if (href === "#wendy") {
+              return <button key={title} onClick={() => wendy.open()} className="block w-full text-left">{content}</button>;
+            }
+            return <Link key={title} href={href}>{content}</Link>;
+          })}
         </div>
       </div>
     </section>
@@ -1142,6 +1156,7 @@ function QuickToolsSection({
 /* ── Main Home component ──────────────────────────────── */
 export default function Home() {
   const { t } = useTranslation();
+  const wendy = useWendy();
   const personas: Persona[] = [
     {
       id: "indeciso",
@@ -1179,7 +1194,7 @@ export default function Home() {
       label: t("home.personas.autonomo.label"),
       tagline: t("home.personas.autonomo.tagline"),
       ctaLabel: t("home.personas.autonomo.ctaLabel"),
-      ctaHref: "/validatore-idea",
+      ctaHref: "#wendy",
       tools: [
         t("home.personas.autonomo.tools.0"),
         t("home.personas.autonomo.tools.1"),
@@ -1278,6 +1293,7 @@ export default function Home() {
         <GuestPersonaHero
           onLoginClick={() => setLoginOpen(true)}
           personas={personas}
+          wendy={wendy}
         />
       )}
 

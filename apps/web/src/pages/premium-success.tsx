@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, ArrowRight, Sparkles, BrainCircuit, GraduationCap, Zap } from "lucide-react";
+import { useWendy } from "@/contexts/WendyProvider";
 
 function AnimatedCounter({ end, suffix = "" }: { end: number; suffix?: string }) {
   const [count, setCount] = useState(0);
@@ -18,6 +19,7 @@ function AnimatedCounter({ end, suffix = "" }: { end: number; suffix?: string })
 
 export default function PremiumSuccess() {
   const { t } = useTranslation();
+  const wendy = useWendy();
 
   return (
     <>
@@ -82,10 +84,8 @@ export default function PremiumSuccess() {
               <GraduationCap className="w-4 h-4 mr-2" />Scopri percorsi formativi
             </Link>
           </Button>
-          <Button asChild size="lg" variant="outline" className="rounded-full px-6">
-            <Link href="/coach">
-              <Zap className="w-4 h-4 mr-2" />Inizia colloquio AI
-            </Link>
+          <Button onClick={() => wendy.open()} size="lg" variant="outline" className="rounded-full px-6">
+            <Zap className="w-4 h-4 mr-2" />Parla con Wendy
           </Button>
         </div>
       </div>

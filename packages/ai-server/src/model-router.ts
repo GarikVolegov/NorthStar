@@ -89,11 +89,11 @@ const env = (k: string, fallback: string): string => process.env[k] ?? fallback;
 // Tier presets — env-overridable. Keep names short for cost-tracking pricing table.
 const NANO_GROQ      = env("MODEL_NANO_GROQ",           "llama-3.1-8b-instant");
 const MICRO_GROQ     = env("MODEL_MICRO_GROQ",          "llama-3.3-70b-versatile");
-const NANO_OR        = env("MODEL_NANO_OPENROUTER",     "meta-llama/llama-3.3-70b-instruct:free");
-const MICRO_OR       = env("MODEL_MICRO_OPENROUTER",    "deepseek/deepseek-chat-v3-0324:free");
-const STANDARD_OR    = env("MODEL_STANDARD_OPENROUTER", "deepseek/deepseek-chat-v3-0324:free");
+const NANO_OR        = env("MODEL_NANO_OPENROUTER",     "deepseek/deepseek-v4-flash:free");
+const MICRO_OR       = env("MODEL_MICRO_OPENROUTER",    "deepseek/deepseek-v4-flash:free");
+const STANDARD_OR    = env("MODEL_STANDARD_OPENROUTER", "deepseek/deepseek-v4-flash:free");
 const STANDARD_GROQ  = env("MODEL_STANDARD_GROQ",       "llama-3.3-70b-versatile");
-const REASONING_OR   = env("MODEL_REASONING_OPENROUTER","deepseek/deepseek-r1:free");
+const REASONING_OR   = env("MODEL_REASONING_OPENROUTER","nvidia/nemotron-3-super-120b-a12b:free");
 const PREMIUM_OPENAI = env("MODEL_PREMIUM_OPENAI",      "gpt-4o");
 const CHEAP_OPENAI   = env("MODEL_CHEAP_OPENAI",        "gpt-4o-mini");
 

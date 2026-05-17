@@ -99,8 +99,6 @@ const PREFETCH_MAP: Record<string, () => Promise<unknown>> = {
   "/candidature": () => import("@/pages/applications"),
   "/calendario": () => import("@/pages/calendar"),
   "/amici": () => import("@/pages/amici"),
-  "/coach": () => import("@/pages/coach"),
-  "/validatore-idea": () => import("@/pages/validatore-idea"),
   "/affiliazione/dashboard": () => import("@/pages/affiliazione-dashboard"),
   "/chi-siamo": () => import("@/pages/chi-siamo"),
   "/come-funziona": () => import("@/pages/come-funziona"),
@@ -176,13 +174,10 @@ export function Navbar() {
     dipendente: [
       { href: "/dashboard", label: NAV_LABELS.dashboard, icon: LayoutDashboard },
       { href: "/lavori", label: NAV_LABELS.offerte, icon: MapPin },
-      { href: "/coach", label: NAV_LABELS.coach, icon: BrainCircuit },
       { href: "/crescita", label: NAV_LABELS.crescita, icon: BookOpenText },
     ],
     autonomo: [
       { href: "/dashboard", label: NAV_LABELS.dashboard, icon: LayoutDashboard },
-      { href: "/validatore-idea", label: NAV_LABELS.idea, icon: Compass },
-      { href: "/coach", label: NAV_LABELS.coach, icon: BrainCircuit },
       { href: "/settori", label: NAV_LABELS.aree, icon: Layers },
       { href: "/news", label: NAV_LABELS.news, icon: Newspaper },
     ],
@@ -502,18 +497,10 @@ export function Navbar() {
                       <Calendar className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2" /> {t("nav.calendar")}
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => setLocation("/coach")}
-                      onMouseEnter={() => prefetchRoute("/coach")}
+                      onClick={() => wendy.open()}
                       className="cursor-pointer"
                     >
-                      <BrainCircuit className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2" /> {NAV_LABELS.coach}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setLocation("/validatore-idea")}
-                      onMouseEnter={() => prefetchRoute("/validatore-idea")}
-                      className="cursor-pointer"
-                    >
-                      <Compass className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2" /> {NAV_LABELS.idea}
+                      <BrainCircuit className="h-4 w-4 mr-2 lefty:mr-0 lefty:ml-2 text-primary" /> Chiedi a Wendy
                     </DropdownMenuItem>
                     {/* Partner */}
                     {isAffiliate && (

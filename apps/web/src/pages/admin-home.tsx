@@ -218,7 +218,7 @@ export default function AdminHome() {
                 { href: "/profilo", label: "Profilo utente" },
                 { href: "/crescita", label: "Modulo crescita" },
                 { href: "/calendar", label: "Calendario" },
-                { href: "/wiki/1", label: "Wiki AI" },
+                { href: "/wiki/1", label: "Wendy AI" },
               ].map((l) => (
                 <a key={l.href} href={l.href} className="text-xs px-3 py-1.5 rounded-full bg-muted hover:bg-muted/80 transition-colors">
                   {l.label}

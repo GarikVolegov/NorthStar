@@ -19,7 +19,6 @@ import {
   Sparkles,
   TrendingUp,
   Lightbulb,
-  Bot,
   Cpu,
   ChevronDown,
   ChevronRight,
@@ -59,7 +58,7 @@ const SUGGESTIONS_DEFAULTS = [
   { title: "Esplora i settori",   description: "Scopri tutti i settori disponibili",      url: "/settori" },
   { title: "Fai il test",         description: "Scopri la tua personalità professionale", url: "/test"    },
   { title: "Trend di mercato",    description: "Le ultime tendenze del lavoro",           url: "/news"    },
-  { title: "Coach AI",            description: "Parla con il tuo coach personale",        url: "/coach"   },
+  { title: "Chiedi a Wendy",      description: "Parla con l'assistente AI di NorthStar",  url: "#wendy"   },
 ];
 
 const ORDER: Array<keyof typeof TYPE_CONFIG> = ["sector", "role", "article", "news"];
@@ -186,9 +185,16 @@ export function SearchDialog({
     {} as Record<string, typeof results>,
   );
 
-  function handleSelect(url: string) { setLocation(url); close(); }
+  function handleSelect(url: string) {
+    if (url === "#wendy") {
+      wendy.open();
+      close();
+    } else {
+      setLocation(url);
+      close();
+    }
+  }
   function handleResultSelect(item: SearchResult) { trackClick(item); setLocation(item.url); close(); }
-  function askWendy() { close(); setTimeout(() => wendy.ask(query), 200); }
 
   function handleFollowUp(e: React.FormEvent) {
     e.preventDefault();
@@ -253,7 +259,7 @@ export function SearchDialog({
               <Command shouldFilter={false}>
                 <CommandInput
                   ref={inputRef}
-                  placeholder={isAIActive ? "Fai una domanda di follow-up..." : t("search.placeholder")}
+                  placeholder={isAIActive ? "Chiedi altro a Wendy..." : t("search.placeholder")}
                   value={query}
                   onValueChange={setQuery}
                   className="border-b border-white/10"
@@ -304,20 +310,19 @@ export function SearchDialog({
                       </CommandList>
                     </div>
 
-                    {/* Colonna destra: AI response */}
+                    {/* Colonna destra: Wendy AI response */}
                     <div
                       ref={aiPanelRef}
                       className="w-3/5 p-4 overflow-y-auto flex flex-col"
                     >
-                      {/* Route info chip */}
-                      {route.confidence >= 0.6 && (
-                        <div className="flex items-center gap-1.5 mb-3">
-                          <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/60">
-                            {route.intent}
-                          </span>
-                          <div className={cn("h-1.5 w-1.5 rounded-full", route.confidence > 0.8 ? "bg-green-400" : "bg-amber-400")} />
+                      {/* Wendy header */}
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-linear-to-r from-amber-400 to-amber-600">
+                          <span className="text-[10px] font-bold text-white">✦</span>
                         </div>
-                      )}
+                        <span className="text-xs font-semibold text-foreground">Wendy</span>
+                        <span className="text-[10px] text-muted-foreground">AI Coach</span>
+                      </div>
 
                       {/* Status badge */}
                       {aiStatus && isStreaming && <AgentStatusBadge status={aiStatus} />}
@@ -340,7 +345,7 @@ export function SearchDialog({
                             type="text"
                             value={followUpInput}
                             onChange={(e) => setFollowUpInput(e.target.value)}
-                            placeholder="Domanda di follow-up..."
+                            placeholder="Chiedi altro a Wendy..."
                             className="flex-1 text-xs bg-muted/40 border border-border rounded-full px-3 py-1.5 outline-none focus:border-primary transition-colors"
                           />
                           <button
@@ -399,20 +404,6 @@ export function SearchDialog({
                       </div>
                     )}
 
-                    {query.length >= 2 && (
-                      <CommandGroup heading="Wendy AI">
-                        <CommandItem value={query} onSelect={askWendy} className="cursor-pointer">
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-linear-to-r from-primary to-purple-500 text-white">
-                            <Bot className="h-3.5 w-3.5" />
-                          </div>
-                          <div className="flex flex-col min-w-0 flex-1">
-                            <span className="text-sm font-medium truncate">{t("search.askWendy", { query })}</span>
-                            <span className="text-xs text-muted-foreground truncate">{t("search.askWendyDesc")}</span>
-                          </div>
-                        </CommandItem>
-                      </CommandGroup>
-                    )}
-
                     {showDefaultSuggestions && (
                       <CommandGroup heading={t("search.suggestions")}>
                         {activeSuggestions.map((item, i) => (
@@ -469,15 +460,18 @@ export function SearchDialog({
                   </CommandList>
                 )}
 
-                {/* AI streaming (mobile: panel singolo inline) */}
+                {/* Wendy AI streaming (mobile: panel singolo inline) */}
                 {isMobile && isAIActive && queryLong && (
                   <div ref={aiPanelRef} className="px-4 py-3 border-t border-white/10 overflow-y-auto" style={{ maxHeight: "40vh" }}>
-                    {route.confidence >= 0.6 && (
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/60">{route.intent}</span>
-                        <div className={cn("h-1.5 w-1.5 rounded-full", route.confidence > 0.8 ? "bg-green-400" : "bg-amber-400")} />
+                    {/* Wendy header */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-linear-to-r from-amber-400 to-amber-600">
+                        <span className="text-[8px] font-bold text-white">✦</span>
                       </div>
-                    )}
+                      <span className="text-xs font-semibold text-foreground">Wendy</span>
+                      <span className="text-[10px] text-muted-foreground">AI Coach</span>
+                    </div>
+
                     {aiStatus && isStreaming && <AgentStatusBadge status={aiStatus} />}
                     {(aiTokens || isStreaming) && (
                       <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
@@ -492,7 +486,7 @@ export function SearchDialog({
                           type="text"
                           value={followUpInput}
                           onChange={(e) => setFollowUpInput(e.target.value)}
-                          placeholder="Domanda di follow-up..."
+                          placeholder="Chiedi altro a Wendy..."
                           className="flex-1 text-xs bg-muted/40 border border-border rounded-full px-3 py-1.5 outline-none focus:border-primary transition-colors"
                         />
                         <button type="submit" disabled={!followUpInput.trim()} className="flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground disabled:opacity-40">

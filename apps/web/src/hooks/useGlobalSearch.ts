@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -142,7 +141,7 @@ export function useGlobalSearch() {
 
   const suggestions = suggestData?.suggestions ?? [];
 
-  // ── Orchestrator SSE streaming ─────────────────────────────────────────────
+  // ── Wendy AI streaming (integrated directly in search bar) ──────────────────
 
   function stopStream() {
     readerRef.current?.cancel().catch(() => {});
@@ -150,7 +149,7 @@ export function useGlobalSearch() {
     setIsStreaming(false);
   }
 
-  const startOrchestrate = useCallback(async (q: string, msgs: ChatMessage[]) => {
+  const startWendyAI = useCallback(async (q: string, msgs: ChatMessage[]) => {
     stopStream();
     setAiTokens("");
     setAiStatus(null);
@@ -158,10 +157,15 @@ export function useGlobalSearch() {
     setIsStreaming(true);
 
     try {
-      const res = await apiFetch(`${BASE}api/search/orchestrate`, {
+      const token = sessionStorage.getItem("northstar_token");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const res = await fetch(`${BASE}api/wendy/ask`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ q, history: msgs, sessionId }),
+        headers,
+        credentials: "include",
+        body: JSON.stringify({ message: q, history: msgs }),
       });
 
       if (!res.ok || !res.body) {
@@ -187,7 +191,6 @@ export function useGlobalSearch() {
           let event: Record<string, unknown>;
           try { event = JSON.parse(line.slice(6)); } catch { continue; }
 
-          if (event.type === "route")   setAiRoute(event.route as RouterOutput);
           if (event.type === "status")  setAiStatus(event.value as string);
           if (event.type === "sources") setAiSources(event.chunks as AiSource[]);
           if (event.type === "token") {
@@ -197,7 +200,6 @@ export function useGlobalSearch() {
           }
           if (event.type === "done") {
             setIsStreaming(false);
-            // Salva nella history per i follow-up
             if (finalText) {
               setHistory((h) => [
                 ...h,
@@ -218,10 +220,10 @@ export function useGlobalSearch() {
     }
   }, []);
 
-  // Lancia orchestratore quando la query cambia (>= 3 chars)
+  // Lancia Wendy AI quando la query cambia (>= 3 chars)
   useEffect(() => {
     if (debouncedQuery.length >= 3 && isOpen) {
-      startOrchestrate(debouncedQuery, history);
+      startWendyAI(debouncedQuery, history);
     } else if (debouncedQuery.length < 3) {
       stopStream();
       setAiTokens("");
@@ -271,11 +273,11 @@ export function useGlobalSearch() {
     [debouncedQuery, results],
   );
 
-  // Follow-up: aggiunge alla history e richiama orchestratore
+  // Follow-up: aggiunge alla history e richiama Wendy AI
   const sendFollowUp = useCallback((followUpQuery: string) => {
     setQuery(followUpQuery);
-    startOrchestrate(followUpQuery, history);
-  }, [history, startOrchestrate]);
+    startWendyAI(followUpQuery, history);
+  }, [history, startWendyAI]);
 
   return {
     query,

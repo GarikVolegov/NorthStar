@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWendy } from "@/contexts/WendyProvider";
 import { apiFetch } from "@/lib/api-fetch";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -91,7 +92,7 @@ const PERSONAS: Persona[] = [
 const JOURNEY_DESTINATION: Record<JourneyType, string> = {
   indeciso: "/test",
   dipendente: "/dashboard",
-  autonomo: "/validatore-idea",
+  autonomo: "#wendy",
   azienda: "/settori",
   investitore: "/settori",
 };
@@ -99,6 +100,7 @@ const JOURNEY_DESTINATION: Record<JourneyType, string> = {
 export default function Percorso() {
   const { user, login, token } = useAuth();
   const [, setLocation] = useLocation();
+  const wendy = useWendy();
   const [selected, setSelected] = useState<JourneyType | null>(
     (user?.journeyType as JourneyType) ?? null
   );
@@ -124,7 +126,12 @@ export default function Percorso() {
       }
     }
 
-    setLocation(JOURNEY_DESTINATION[selected]);
+    const dest = JOURNEY_DESTINATION[selected];
+    if (dest === "#wendy") {
+      wendy.open();
+    } else {
+      setLocation(dest);
+    }
   }
 
   const selectedPersona = PERSONAS.find((p) => p.id === selected);

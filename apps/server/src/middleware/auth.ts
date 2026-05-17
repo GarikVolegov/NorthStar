@@ -98,3 +98,39 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
   }
   next();
 }
+
+/**
+ * optionalAuth — tries to authenticate via Bearer token but never blocks.
+ * Sets req.user if a valid token is present, otherwise leaves it undefined.
+ */
+export async function optionalAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    next();
+    return;
+  }
+
+  const token = authHeader.slice(7);
+  try {
+    const payload = verify(token, JWT_SECRET) as unknown as JwtPayload;
+
+    req.user = {
+      id: payload.userId,
+      name: payload.name,
+      email: payload.email,
+      role: payload.role,
+      stripeSubscriptionId: payload.stripeSubscriptionId,
+      journeyType: payload.journeyType,
+      testSessionId: payload.testSessionId,
+      onboardingCompleted: payload.onboardingCompleted,
+    };
+
+    if (req.log) {
+      req.log = req.log.child({ userId: payload.userId });
+    }
+  } catch {
+    // Invalid token — silently ignore, user stays unauthenticated
+  }
+
+  next();
+}

@@ -18,6 +18,7 @@
  *   error       — last error message
  */
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { TOKEN_STORAGE_KEY } from '../lib/storage-keys';
 import { useWendyVoice } from './useWendyVoice.js';
 import { useWendyOpenAITTS } from './useWendyOpenAITTS.js';
 
@@ -48,7 +49,7 @@ export interface UseVoiceChatReturn {
 }
 
 export function useVoiceChat({
-  apiUrl = '/api/v1/ai/chat/stream',
+  apiUrl = '/api/wendy/ask',
   historyRef,
   lang = 'it-IT',
 }: UseVoiceChatOptions): UseVoiceChatReturn {
@@ -78,14 +79,18 @@ export function useVoiceChat({
     let replyBuffer = '';
 
     try {
+      const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         credentials: 'include',
         signal: abortRef.current.signal,
         body: JSON.stringify({
           message:   text,
-          history:   historyRef.current.slice(-10), // last 10 turns
+          history:   historyRef.current.slice(-10),
           voiceMode: true,
         }),
       });

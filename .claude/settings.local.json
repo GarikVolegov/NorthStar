@@ -1,7 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git pull *)"
+      "Bash(git pull *)",
+      "Bash(pnpm --filter @northstar/web build)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(findstr \"\\\\.env\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\osman\\\\Documents\\\\GitHub\\\\NorthStar\\\\apps\\\\web\\\\src\\\\pages\" -Name)",
+      "Bash(pnpm db:generate)",
+      "Bash(pnpm db:push)",
+      "Bash(pnpm --filter @workspace/db exec tsx migrate.ts)",
+      "Bash(pnpm --filter @workspace/scripts run seed:catalog)",
+      "Bash(pnpm --filter @workspace/scripts run backfill:embeddings)"
     ]
   }
 }

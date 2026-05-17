@@ -844,10 +844,10 @@ export default function Results() {
           },
           autonomo: {
             emoji: "🚀",
-            title: "Valida la tua idea di business",
-            desc: "Il validatore AI analizza il potenziale della tua idea nel settore che hai scoperto.",
-            cta: "Valida l'idea",
-            href: "/validatore-idea",
+            title: "Parla con Wendy",
+            desc: "Chiedi a Wendy di analizzare il potenziale della tua idea di business.",
+            cta: "Chiedi a Wendy",
+            href: "#wendy",
           },
           azienda: {
             emoji: "📊",

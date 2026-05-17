@@ -7,6 +7,7 @@ import { writeAuditLog } from "../middleware/audit";
 import { wendyLimiter, wendyIpLimiter, planQuotaLimiter } from "../middleware/rate-limit";
 import { costGuard } from "../middleware/cost-guard";
 import { recordLlmUsage, estimateTokens, selectModel } from "@workspace/ai-server";
+import { getLLM } from "@workspace/ai-server/llm/client";
 
 const router = Router();
 

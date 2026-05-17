@@ -17,6 +17,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { usePageMeta, buildSectorMeta } from "@/lib/seo";
 import { WorkModeBadge, useWorkPreference } from "@/components/WorkModeSelector";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWendy } from "@/contexts/WendyProvider";
 import { cn } from "@/lib/utils";
 import { getWorkModeAlignment } from "@/lib/work-mode-utils";
 import { getCareerStepGroup } from "@/lib/career-steps-utils";
@@ -120,6 +121,7 @@ export default function Sector() {
   const id = parseInt(params.id || "0", 10);
   const { user } = useAuth();
   const { workPreference } = useWorkPreference(user?.id);
+  const wendy = useWendy();
 
   const [stepsView, setStepsView] = useState<"dipendente" | "autonomo">(
     workPreference === "autonomo" ? "autonomo" : "dipendente",
@@ -348,7 +350,7 @@ export default function Sector() {
           <span className="text-sm text-muted-foreground">{t("sector.deepenWithAI")}</span>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <Link href={`/wiki/${id}`} className="block">
+          <button onClick={() => wendy.open()} className="block w-full text-left">
             <div className="h-full p-5 bg-card border rounded-2xl hover:border-primary/30 hover:shadow-md transition-all cursor-pointer group">
               <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-4 group-hover:bg-indigo-100 transition-colors">
                 <Brain className="w-5 h-5 text-indigo-600" />
@@ -359,7 +361,7 @@ export default function Sector() {
                 {t("sector.openChat")} <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
-          </Link>
+          </button>
 
           <Link href={`/roadmap/${id}`} className="block">
             <div className="h-full p-5 bg-card border rounded-2xl hover:border-primary/30 hover:shadow-md transition-all cursor-pointer group">
@@ -387,7 +389,7 @@ export default function Sector() {
             </div>
           </Link>
 
-          <Link href={`/colloquio/${id}`} className="block">
+          <button onClick={() => wendy.open()} className="block w-full text-left">
             <div className="h-full p-5 bg-card border rounded-2xl hover:border-primary/30 hover:shadow-md transition-all cursor-pointer group">
               <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center mb-4 group-hover:bg-orange-100 transition-colors">
                 <MessageSquare className="w-5 h-5 text-orange-600" />
@@ -400,7 +402,7 @@ export default function Sector() {
                 Inizia colloquio <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
-          </Link>
+          </button>
 
           <Link href={`/skills-gap/${id}`} className="block">
             <div className="h-full p-5 bg-card border rounded-2xl hover:border-primary/30 hover:shadow-md transition-all cursor-pointer group">

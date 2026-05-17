@@ -8,7 +8,6 @@ import {
   newsArticlesTable,
 } from "@workspace/db";
 import { runSearchOrchestrator, loadMemory, buildMemorySection } from "@workspace/ai-server";
-import { requireAuth } from "../middleware/auth";
 import { rootLogger } from "../middleware/logger";
 
 const router = Router();
@@ -229,9 +228,9 @@ router.get("/suggest", async (req, res) => {
     }
 
     suggestions.push({
-      title: "Chiedi al Coach AI",
+      title: "Chiedi a Wendy",
       description: `Parla con l'AI per approfondire "${q}"`,
-      url: "/coach",
+      url: "#wendy",
     });
     suggestions.push({
       title: "Cerca nel Knowledge Graph",
@@ -247,7 +246,7 @@ router.get("/suggest", async (req, res) => {
 });
 
 // ── POST /api/search/orchestrate  —  SSE orchestratore AI ───────────────────
-router.post("/orchestrate", requireAuth, async (req, res) => {
+router.post("/orchestrate", async (req, res) => {
   const { q, sessionId, history = [] } = req.body as {
     q: string;
     sessionId?: number;
@@ -259,9 +258,47 @@ router.post("/orchestrate", requireAuth, async (req, res) => {
     return;
   }
 
-  const userId     = req.user!.id;
-  const isPremium  = !!req.user!.stripeSubscriptionId;
+  const isAuthenticated = !!req.user;
+  const userId = req.user?.id ?? 0;
+  const isPremium = !!req.user?.stripeSubscriptionId;
 
+  // If not authenticated, use a simpler flow without user-specific data
+  if (!isAuthenticated) {
+    rootLogger.info({ q, sessionId }, "[search/orchestrate] unauthenticated — using public flow");
+
+    res.setHeader("Content-Type",    "text/event-stream");
+    res.setHeader("Cache-Control",   "no-cache");
+    res.setHeader("Connection",      "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
+
+    const send = (data: object) => {
+      if (!res.writableEnded) res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    try {
+      // Use public knowledge base only, no user memory
+      for await (const event of runSearchOrchestrator({
+        query:      q.trim(),
+        userId:     0, // anonymous
+        sessionId,
+        userContext: { isPremium: false, memorySection: "" },
+        history,
+        requestId:  crypto.randomUUID?.() ?? Math.random().toString(36),
+      })) {
+        send(event);
+        if (event.type === "done" || event.type === "error") break;
+      }
+    } catch (err) {
+      rootLogger.error({ err, q }, "[search/orchestrate] unhandled error (unauthenticated)");
+      send({ type: "error", message: "Errore interno" });
+    } finally {
+      res.end();
+    }
+    return;
+  }
+
+  // Authenticated flow
   res.setHeader("Content-Type",    "text/event-stream");
   res.setHeader("Cache-Control",   "no-cache");
   res.setHeader("Connection",      "keep-alive");
@@ -283,7 +320,7 @@ router.post("/orchestrate", requireAuth, async (req, res) => {
       query:      q.trim(),
       userId,
       sessionId,
-      userContext: { userId, isPremium, memorySection },
+      userContext: { isPremium, memorySection },
       history,
       requestId:  crypto.randomUUID?.() ?? Math.random().toString(36),
     })) {

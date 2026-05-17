@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod/v4";
 import OpenAI from "openai";
-import { requireAuth } from "../middleware/auth";
+import { optionalAuth } from "../middleware/auth";
 import { writeAuditLog } from "../middleware/audit";
 import { wendyLimiter, wendyIpLimiter, planQuotaLimiter } from "../middleware/rate-limit";
 import { costGuard } from "../middleware/cost-guard";
@@ -36,6 +36,12 @@ Se il contesto fornito è sufficiente, usalo come base per la risposta.
 Se non è sufficiente, dillo e chiedi più contesto. Non inventare informazioni.`;
 
 function getOpenAI(): OpenAI {
+  if (process.env.AI_PROVIDER === "openrouter") {
+    const baseURL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1";
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) throw new Error("OPENROUTER_API_KEY not set");
+    return new OpenAI({ apiKey, baseURL });
+  }
   const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
   const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
   if (!baseURL || !apiKey) {
@@ -48,11 +54,34 @@ function isPremiumUser(req: Request): boolean {
   return !!req.user?.stripeSubscriptionId;
 }
 
-router.post("/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, planQuotaLimiter, async (req: Request, res: Response) => {
-   const userId = req.user!.id;
+const UNAUTHENTICATED_RESPONSE = `Ciao! Sono Wendy, il coach di crescita personale di NorthStar.
+
+Per poterti aiutare al meglio con consigli personalizzati, orientamento professionale e analisi del tuo percorso, devi prima creare un account o effettuare il login.
+
+NorthStar ti aiuta a:
+- Scoprire il tuo percorso professionale ideale
+- Ricevere consigli personalizzati sulla crescita
+- Esplorare settori e professioni
+- Prepararti per colloqui di lavoro
+
+Crea un account gratuito per iniziare!`;
+
+async function streamUnauthenticatedResponse(res: Response): Promise<void> {
+  res.write(`data: ${JSON.stringify({ type: "sources", chunks: [] })}\n\n`);
+  for (const char of UNAUTHENTICATED_RESPONSE) {
+    res.write(`data: ${JSON.stringify({ type: "token", content: char })}\n\n`);
+    await new Promise((r) => setTimeout(r, 8));
+  }
+  res.write(`data: ${JSON.stringify({ type: "done", model: "static", reason: "unauthenticated" })}\n\n`);
+  res.end();
+}
+
+router.post("/ask", optionalAuth, costGuard, wendyLimiter, wendyIpLimiter, planQuotaLimiter, async (req: Request, res: Response) => {
    const data = askSchema.parse(req.body);
    const log = req.log;
    const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+   const isAuthenticated = !!req.user;
 
    // ── SSE headers ────────────────────────────────────────────
    res.setHeader("Content-Type", "text/event-stream");
@@ -61,14 +90,22 @@ router.post("/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, planQu
    res.setHeader("X-Accel-Buffering", "no");
 
    try {
+     // If not authenticated, return a friendly message explaining how to get started
+     if (!isAuthenticated) {
+       log.info({ message: data.message }, "[wendy] unauthenticated request — sending onboarding response");
+       await streamUnauthenticatedResponse(res);
+       return;
+     }
+
+     const userId = req.user!.id;
+
      // Mock mode for testing
      if (process.env.USE_MOCK_AI === "true") {
-       // Send initial sources event (empty for mock)
        res.write(`data: ${JSON.stringify({ type: "sources", chunks: [] })}\n\n`);
 
        const mockResponse = `Ciao! Ho analizzato la tua domanda.\n\nCome posso aiutarti ulteriormente?`;
        for (const char of mockResponse) {
-         res.write(`data: ${JSON.stringify({ type: "token", value: char })}\n\n`);
+         res.write(`data: ${JSON.stringify({ type: "token", content: char })}\n\n`);
          await new Promise((r) => setTimeout(r, 15));
        }
        res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
@@ -77,7 +114,7 @@ router.post("/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, planQu
        if (process.env.USE_MOCK_AI !== "true") {
          await recordLlmUsage({
            userId,
-           model: "gpt-3.5-turbo", // fallback for mock
+           model: "gpt-3.5-turbo",
            promptTokens: estimateTokens(data.message),
            completionTokens: estimateTokens(mockResponse),
            requestType: "wendy_chat",
@@ -89,8 +126,6 @@ router.post("/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, planQu
 
      // 1. Load conversation history for context
      const history: ChatMessage[] = [];
-     // Note: In a real implementation, you'd fetch this from session or DB
-     // For now, we start with empty history as the existing code did
 
      // 2. Route the message to determine which specialist(s) to use
      const routeDecision = await routerAgent.route(data.message, history, requestId);
@@ -132,26 +167,23 @@ router.post("/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, planQu
        log.warn({ err }, "wendy memory load failed");
      }
 
-     // 7. Build user context
-     const userContext: UserContext = {
-       userId,
-       isPremium: !!req.user?.stripeSubscriptionId,
-       stripeSubscriptionId: req.user?.stripeSubscriptionId ?? null,
-       // Note: sectionName, sectorName, and objectives are not available on the user object
-       // These would need to be fetched separately if required
-       memorySection,
-     };
+      // 7. Build user context
+      const userContext: UserContext = {
+        isPremium: !!req.user?.stripeSubscriptionId,
+        stripeSubscriptionId: req.user?.stripeSubscriptionId ?? null,
+        memorySection,
+      };
 
      // 8. Run the appropriate specialist agent(s)
      const specialist = getSpecialist(routeDecision.domain);
-     
+
      if (specialist) {
        // Run the specialist agent
        const specialistOpts: any = {
          userId,
          userContext: {
            ...userContext,
-           memorySection, // ensure memorySection is included
+           memorySection,
          },
          history,
          userMessage: data.message,
@@ -159,8 +191,8 @@ router.post("/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, planQu
          memoryFactCount,
          maxHistory: 12,
          requestId,
-         behavioralPatterns: [], // would be populated from memory in a full implementation
-         routingHistorySummary: "", // would be populated from memory in a full implementation
+         behavioralPatterns: [],
+         routingHistorySummary: "",
        };
 
        // Stream the specialist's response
@@ -173,42 +205,36 @@ router.post("/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, planQu
 
        for await (const event of specialist.run(specialistOpts)) {
          switch (event.type) {
-           case "status":
-             // Forward status events to client
+       case "status":
              res.write(`data: ${JSON.stringify({ type: "status", value: event.value })}\n\n`);
              break;
            case "token":
-             // Forward token events to client
-             res.write(`data: ${JSON.stringify({ type: "token", value: event.value })}\n\n`);
+             res.write(`data: ${JSON.stringify({ type: "token", content: event.value })}\n\n`);
              fullResponse += event.value;
              break;
-           case "done":
-             // Collect results for final processing
-             sourcesSent = true;
-             supervisorResult = event.supervisorResult;
-             evalResult = event.evalResult;
-             cotResult = event.cot ?? null;
-             allSources = [...(event.sources ?? [])];
-             break;
-           case "error":
-             log.error({ err: event.message }, "specialist agent error");
-             res.write(`data: ${JSON.stringify({ type: "error", message: event.message })}\n\n`);
-             res.end();
-             return;
+          case "done":
+            sourcesSent = true;
+            supervisorResult = event.supervisorResult;
+            evalResult = event.evalResult;
+            cotResult = event.cot ?? null;
+            allSources = [...(event.sources ?? [])];
+            break;
+          case "error":
+            log.error({ err: event.message }, "specialist agent error");
+            res.write(`data: ${JSON.stringify({ type: "error", message: event.message })}\n\n`);
+            res.end();
+            return;
          }
        }
 
-       // If no sources were sent yet (e.g., agent didn't yield done event), send empty sources
        if (!sourcesSent) {
          res.write(`data: ${JSON.stringify({ type: "sources", chunks: [] })}\n\n`);
        }
 
-       // Resolve the *actual* model used by the specialist for accurate cost-tracking & audit
        const specialistRoute = selectModelFor("specialist-chat", {
          isPremium: !!userContext.isPremium,
        });
 
-       // Send completion event with metadata
        res.write(`data: ${JSON.stringify({
          type: "done",
          model: specialistRoute.model,
@@ -218,7 +244,6 @@ router.post("/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, planQu
        })}\n\n`);
        res.end();
 
-       // Record LLM usage (approximate)
        await recordLlmUsage({
          userId,
          model: specialistRoute.model,
@@ -235,7 +260,6 @@ router.post("/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, planQu
          }),
        }).catch((err) => log.warn({ err }, "failed to record LLM usage"));
 
-       // Write audit log
        writeAuditLog(req, {
          action: "agent_message",
          category: "agent_action",
@@ -250,7 +274,6 @@ router.post("/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, planQu
          },
        });
      } else {
-       // Fallback to original Wendy logic if no specialist available
        log.warn({ domain: routeDecision.domain }, "no specialist found, falling back to general Wendy");
 
        const openai = getOpenAI();
@@ -265,7 +288,6 @@ Se non è sufficiente, dillo e chiedi più contesto. Non inventare informazioni.
 
        const systemMsg = `${WENDY_SYSTEM}${contextSection}`;
 
-       // ── Model routing ─────────────────────────────────────────
        const route = selectModel({
          isPremium: isPremiumUser(req),
          complexity: data.message.length > 500 ? "deep" : "standard",
@@ -290,7 +312,7 @@ Se non è sufficiente, dillo e chiedi più contesto. Non inventare informazioni.
          const delta = chunk.choices[0]?.delta?.content;
          if (delta) {
            fullResponse += delta;
-           res.write(`data: ${JSON.stringify({ type: "token", value: delta })}\n\n`);
+           res.write(`data: ${JSON.stringify({ type: "token", content: delta })}\n\n`);
          }
        }
 
@@ -354,7 +376,7 @@ const voiceSchema = z.object({
   instructions: z.string().max(2000).optional(),
 });
 
-router.post("/voice", requireAuth, async (req: Request, res: Response) => {
+router.post("/voice", optionalAuth, async (req: Request, res: Response) => {
   const data = voiceSchema.parse(req.body);
   const log = req.log;
 
