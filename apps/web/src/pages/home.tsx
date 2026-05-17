@@ -30,7 +30,7 @@ import {
 import { useGetStatsSummary } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LoginDialog } from "@/components/auth/LoginDialog";
+import { useClerk } from "@clerk/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWendy } from "@/contexts/WendyProvider";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
@@ -1238,7 +1238,7 @@ export default function Home() {
   const { data: trendingData } = useTrendingSectors();
   const { data: newsData, isLoading: isNewsLoading } = useHomeNews();
   const { isLoggedIn, user, updateUser } = useAuth();
-  const [loginOpen, setLoginOpen] = useState(false);
+  const { openSignIn } = useClerk();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const prefersReduced = useReducedMotion();
 
@@ -1291,7 +1291,7 @@ export default function Home() {
         />
       ) : (
         <GuestPersonaHero
-          onLoginClick={() => setLoginOpen(true)}
+          onLoginClick={() => openSignIn()}
           personas={personas}
           wendy={wendy}
         />
@@ -1618,7 +1618,7 @@ export default function Home() {
         </section>
       )}
 
-      <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
+      {/* Autenticazione gestita da Clerk — nessun dialog locale */}
 
       {/* ── Onboarding wizard (first login) ─────────────── */}
       <AnimatePresence>

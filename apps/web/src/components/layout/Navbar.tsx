@@ -35,7 +35,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Show, SignInButton, SignUpButton, UserButton, useClerk } from "@clerk/react";
+import { SignInButton, SignUpButton, UserButton, useClerk } from "@clerk/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useProactiveInsights } from "@/hooks/useProactiveInsights";
@@ -430,8 +430,7 @@ export function Navbar() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Show when="signed-in">
-              {user && (
+            {isLoggedIn && user && (
               <>
                 <NotificationBell userId={user.id} />
                 {insightsUnread > 0 && (
@@ -575,22 +574,23 @@ export function Navbar() {
                 </DropdownMenu>
                 <UserButton />
               </>
-              )}
-            </Show>
-            <Show when="signed-out">
-              <SignInButton mode="modal">
-                <button
-                  className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors px-2"
-                >
-                  {t("nav.login")}
-                </button>
-              </SignInButton>
-              <Link href="/test" onMouseEnter={() => prefetchRoute("/test")}>
-                <div className="flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full px-3 py-1 hover:bg-primary/90 transition-colors">
-                  {t("nav.startJourney")}
-                </div>
-              </Link>
-            </Show>
+            )}
+            {!isLoggedIn && (
+              <>
+                <SignInButton mode="modal">
+                  <button
+                    className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors px-2"
+                  >
+                    {t("nav.login")}
+                  </button>
+                </SignInButton>
+                <Link href="/test" onMouseEnter={() => prefetchRoute("/test")}>
+                  <div className="flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full px-3 py-1 hover:bg-primary/90 transition-colors">
+                    {t("nav.startJourney")}
+                  </div>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile search + right */}
@@ -609,9 +609,7 @@ export function Navbar() {
                 className="w-full pl-8 pr-2.5 lefty:pl-2.5 lefty:pr-8 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none transition-all pointer-events-none"
               />
             </div>
-            <Show when="signed-in">
-              {user && <NotificationBell userId={user.id} />}
-            </Show>
+            {isLoggedIn && user && <NotificationBell userId={user.id} />}
 
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger asChild>
@@ -726,8 +724,7 @@ export function Navbar() {
                 </nav>
 
                 <div className="px-5 pb-8 pt-4 border-t border-border space-y-2">
-              <Show when="signed-in">
-                {user && (
+              {isLoggedIn && user ? (
                     <>
                       <div className="flex items-center gap-3 px-1 mb-3">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
@@ -842,9 +839,7 @@ export function Navbar() {
                         <LogOut className="h-4 w-4" /> {t("nav.logout")}
                       </button>
                     </>
-                )}
-                  </Show>
-                  <Show when="signed-out">
+              ) : (
                     <>
                       <SignUpButton mode="modal">
                         <button
@@ -868,7 +863,7 @@ export function Navbar() {
                         <ThemeToggle />
                       </div>
                     </>
-                  </Show>
+              )}
                 </div>
               </SheetContent>
             </Sheet>

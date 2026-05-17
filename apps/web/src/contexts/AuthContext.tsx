@@ -1,11 +1,6 @@
 /**
- * AuthContext — gestione autenticazione globale.
- * FRONTEND_RULES.md: unico punto di verità per token + user.
- *
- * Changelog:
- *   - Fase 4: aggiunto isAffiliate?: boolean al tipo AuthUser.
- *     Viene popolato da GET /api/auth/me al mount; è poi usato
- *     in navbar.tsx per mostrare/nascondere il link dashboard affiliazione.
+ * AuthContext — bridge tra Clerk e il resto dell'app.
+ * Mantiene la stessa interfaccia per non rompere i componenti esistenti.
  */
 import {
   createContext,
@@ -16,6 +11,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useUser, useAuth as useClerkAuth, useClerk } from "@clerk/react";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { AUTH_EXPIRED_EVENT, TOKEN_STORAGE_KEY, USER_STORAGE_KEY } from "@/lib/storage-keys";
 import { useQueryClient } from "@tanstack/react-query";
@@ -35,26 +31,9 @@ export interface AuthUser {
   journeyType?: string | null;
   avatarUrl?: string | null;
   isPublic?: boolean;
-  /** Fase 4: accesso dashboard affiliazione — viene da users.is_affiliate */
   isAffiliate?: boolean;
-  /** Onboarding completato — viene da users.onboarding_completed */
   onboardingCompleted?: boolean;
-  /** Ruolo utente — 'user' | 'admin' */
   role?: "user" | "admin";
-}
-
-const JOURNEY_CACHE_KEY = "ns_journey";
-
-/** Dati minimi salvati in localStorage per UI pre-mount. */
-interface UserCache {
-  id: number;
-  name: string;
-  avatarUrl?: string | null;
-  journeyType?: string | null;
-}
-
-function cacheUser(u: AuthUser): UserCache {
-  return { id: u.id, name: u.name, avatarUrl: u.avatarUrl, journeyType: u.journeyType };
 }
 
 interface AuthContextValue {
@@ -63,6 +42,7 @@ interface AuthContextValue {
   logout: () => void;
   updateUser: (updates: Partial<AuthUser>) => void;
   isLoggedIn: boolean;
+  isAffiliate: boolean;
   token: string | null;
   authReady: boolean;
 }
@@ -71,174 +51,143 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const BASE = import.meta.env.BASE_URL || "/";
 
+function clerkUserToAuthUser(clerkUser: NonNullable<ReturnType<typeof useUser>["user"]>): AuthUser {
+  return {
+    id: parseInt(clerkUser.id.replace(/\D/g, "") || "0", 10),
+    name: clerkUser.fullName ?? clerkUser.username ?? clerkUser.emailAddresses[0]?.emailAddress ?? "",
+    email: clerkUser.primaryEmailAddress?.emailAddress ?? "",
+    testSessionId: null,
+    emailVerified: clerkUser.primaryEmailAddress?.verification?.status === "verified",
+    avatarUrl: clerkUser.imageUrl ?? null,
+    role: "user",
+    journeyType: null,
+    isAffiliate: false,
+    onboardingCompleted: false,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+  const { getToken, isSignedIn } = useClerkAuth();
+  const clerk = useClerk();
 
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    try {
-      const raw = sessionStorage.getItem(TOKEN_STORAGE_KEY);
-      if (!raw) return null;
-      const cached = localStorage.getItem(USER_STORAGE_KEY);
-      if (!cached) return null;
-      const parsed = JSON.parse(cached) as UserCache;
-      const cachedJourney = localStorage.getItem(JOURNEY_CACHE_KEY);
-      return {
-        id: parsed.id,
-        name: parsed.name,
-        avatarUrl: parsed.avatarUrl ?? null,
-        journeyType: parsed.journeyType ?? cachedJourney ?? null,
-      } as AuthUser;
-    } catch {
-      return null;
-    }
-  });
-
-  const [token, setToken] = useState<string | null>(() => {
-    try {
-      return sessionStorage.getItem(TOKEN_STORAGE_KEY);
-    } catch {
-      return null;
-    }
-  });
-
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState<boolean>(false);
 
   const logout = useCallback(() => {
     setUser(null);
     setToken(null);
     queryClient.clear();
-  }, [queryClient]);
+    clerk.signOut().catch(() => {});
+  }, [queryClient, clerk]);
 
   const updateUser = useCallback((updates: Partial<AuthUser>) => {
     setUser((prev) => {
       if (!prev) return prev;
-      const next = { ...prev, ...updates };
-      try {
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(cacheUser(next)));
-        if (next.journeyType) localStorage.setItem(JOURNEY_CACHE_KEY, next.journeyType);
-      } catch {}
-      return next;
+      return { ...prev, ...updates };
     });
   }, []);
 
+  const login = useCallback(
+    (u: AuthUser, t: string) => {
+      setUser(u);
+      setToken(t);
+      setAuthTokenGetter(() => t);
+      setAuthReady(true);
+    },
+    [],
+  );
+
   useEffect(() => {
-    if (user && token) {
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(cacheUser(user)));
-      sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+    if (!clerkLoaded) return;
+
+    if (isSignedIn && clerkUser && token) {
+      setAuthTokenGetter(() => token);
     } else {
-      localStorage.removeItem(USER_STORAGE_KEY);
-      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+      setAuthTokenGetter(null);
     }
-    setAuthTokenGetter(token ? () => token : null);
-  }, [user, token]);
+  }, [clerkLoaded, isSignedIn, clerkUser, token]);
 
   useEffect(() => {
     window.addEventListener(AUTH_EXPIRED_EVENT, logout);
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, logout);
   }, [logout]);
 
-  // Silent token refresh: decode exp claim and refresh 5 min before expiry
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didMountSync = useRef(false);
   useEffect(() => {
-    if (!token) return;
-    try {
-      const payloadB64 = token.split(".")[1];
-      if (!payloadB64) return;
-      const payload = JSON.parse(atob(payloadB64)) as { exp?: number };
-      const exp = payload.exp;
-      if (!exp) return;
-      const expiresInMs = exp * 1000 - Date.now();
-      const refreshAtMs = Math.max(0, expiresInMs - 5 * 60 * 1000);
-      refreshTimerRef.current = setTimeout(async () => {
-        try {
-          const res = await fetch(`${BASE}api/auth/refresh`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (res.ok) {
-            const body = (await res.json()) as { token?: string };
-            if (body.token) {
-              sessionStorage.setItem(TOKEN_STORAGE_KEY, body.token);
-              setToken(body.token);
-              setAuthTokenGetter(() => body.token!);
-            }
-          }
-        } catch {}
-      }, refreshAtMs);
-    } catch {}
-    return () => {
-      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-    };
-  }, [token]);
+    if (didMountSync.current) return;
+    didMountSync.current = true;
 
-  // Valida il token cached al mount e aggiorna i dati freschi (incluso isAffiliate)
-  const didMountValidate = useRef(false);
-  useEffect(() => {
-    if (didMountValidate.current) return;
-    didMountValidate.current = true;
+    if (!clerkLoaded) {
+      return;
+    }
 
-    const cachedToken = token;
-    if (!cachedToken) {
+    if (!isSignedIn || !clerkUser) {
       setAuthReady(true);
       return;
     }
 
     const ctrl = new AbortController();
-    fetch(`${BASE}api/auth/me`, {
-      headers: { Authorization: `Bearer ${cachedToken}` },
-      signal: ctrl.signal,
-    })
-      .then(async (res) => {
-        if (res.ok) {
-          const fresh = (await res.json()) as AuthUser;
-          if (fresh.journeyType) localStorage.setItem(JOURNEY_CACHE_KEY, fresh.journeyType);
-          setUser((prev) => (prev ? { ...prev, ...fresh } : fresh));
-        } else if (res.status === 401) {
-          setUser(null);
-          setToken(null);
-          queryClient.clear();
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        setAuthReady(true);
-      });
 
-    return () => ctrl.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const login = useCallback(
-    (u: AuthUser, t: string) => {
+    const syncUser = async () => {
       try {
-        sessionStorage.setItem(TOKEN_STORAGE_KEY, t);
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(cacheUser(u)));
-        if (u.journeyType) localStorage.setItem(JOURNEY_CACHE_KEY, u.journeyType);
-      } catch {}
+        // Prima prova il template "NorthStar" (con userId custom claim),
+        // poi fallback al token Clerk standard — evita che il sync fallisca
+        // se il JWT template non è ancora configurato nel Clerk Dashboard.
+        let clerkToken = await getToken({ template: "NorthStar" }).catch(() => null);
+        if (!clerkToken) {
+          clerkToken = await getToken().catch(() => null);
+        }
+        if (!clerkToken) {
+          // Nessun token disponibile — usa dati Clerk senza sync server
+          setUser(clerkUserToAuthUser(clerkUser));
+          setAuthReady(true);
+          return;
+        }
 
-      setAuthTokenGetter(() => t);
-      setUser(u);
-      setToken(t);
-      setAuthReady(true);
+        setToken(clerkToken);
 
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (tz) {
-        fetch(`${BASE}api/me`, {
-          method: "PATCH",
+        const res = await fetch(`${BASE}api/auth/clerk-sync`, {
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${t}`,
+            Authorization: `Bearer ${clerkToken}`,
           },
-          body: JSON.stringify({ timezone: tz }),
-        }).catch(() => {});
+          body: JSON.stringify({
+            clerkId: clerkUser.id,
+            email: clerkUser.primaryEmailAddress?.emailAddress,
+            name: clerkUser.fullName ?? clerkUser.username,
+          }),
+          signal: ctrl.signal,
+        });
+
+        if (res.ok) {
+          const serverUser = (await res.json()) as AuthUser;
+          const authUser = {
+            ...clerkUserToAuthUser(clerkUser),
+            ...serverUser,
+          };
+          setUser(authUser);
+        } else {
+          setUser(clerkUserToAuthUser(clerkUser));
+        }
+      } catch {
+        setUser(clerkUserToAuthUser(clerkUser));
+      } finally {
+        setAuthReady(true);
       }
-    },
-    [],
-  );
+    };
+
+    syncUser();
+
+    return () => ctrl.abort();
+  }, [clerkLoaded, isSignedIn, clerkUser, getToken]);
 
   return (
     <AuthContext.Provider
-      value={{ user, login, logout, updateUser, isLoggedIn: !!user, token, authReady }}
+      value={{ user, login, logout, updateUser, isLoggedIn: !!user, isAffiliate: !!user?.isAffiliate, token, authReady }}
     >
       {children}
     </AuthContext.Provider>
