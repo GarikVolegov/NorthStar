@@ -12,7 +12,7 @@
 
 import "dotenv/config";
 import { eq } from "drizzle-orm";
-import { db, sectorsTable, professionsTable } from "@workspace/db";
+import { db, sectorsTable, professionsTable, educationPathsTable } from "@workspace/db";
 
 // ── Dati settori ─────────────────────────────────────────────────────────────
 
@@ -201,6 +201,43 @@ async function upsertProfession(p: typeof PROFESSIONS[number], sectorId: number)
   });
 }
 
+// ── Percorsi formativi ────────────────────────────────────────────────────────
+
+const EDUCATION_PATHS = [
+  { path: "Laurea Triennale in Informatica o Ingegneria del Software", type: "universitario" as const, duration: "3 anni", cost: "Gratuita con borsa / 1k-3k€/anno", steps: ["Matematica e logica di base","Programmazione (Python, Java)","Algoritmi e strutture dati","Reti e sistemi operativi","Progetto di tesi"], careerOutcomes: ["Software Developer","DevOps Engineer","Data Engineer"], sectorFit: ["Tecnologia & Software","Dati & Intelligenza Artificiale"] },
+  { path: "Bootcamp Full-Stack Web Development (online o in-presenza)", type: "bootcamp" as const, duration: "12-20 settimane", cost: "5k-15k€ (spesso finanziabile o ISA)", steps: ["HTML, CSS e JavaScript base","React o Vue per il frontend","Node.js o Python per il backend","Database SQL e NoSQL","Progetto finale portfolio-ready"], careerOutcomes: ["Software Developer","Product Manager (Tech)"], sectorFit: ["Tecnologia & Software"] },
+  { path: "Corso online Data Science (Coursera, edX, Kaggle)", type: "online" as const, duration: "6-12 mesi", cost: "0-500€ (audit gratuito su Coursera)", steps: ["Python fondamentali","Pandas e analisi dati","Statistica applicata","Machine Learning con scikit-learn","Progetto su dataset reale"], careerOutcomes: ["Data Scientist","Business Intelligence Analyst","ML Engineer"], sectorFit: ["Dati & Intelligenza Artificiale"] },
+  { path: "MBA o Master in Business Administration", type: "universitario" as const, duration: "1-2 anni", cost: "10k-80k€ (dipende da università)", steps: ["Strategia aziendale","Finanza e contabilità","Marketing e vendite","Leadership e gestione team","Project finale / consulting project"], careerOutcomes: ["Management Consultant","Fractional C-Level","Financial Analyst"], sectorFit: ["Consulting & Management","Finanza & Investimenti"] },
+  { path: "Certificazione Google Digital Marketing & E-commerce", type: "professionale" as const, duration: "6 mesi", cost: "Gratuita su Coursera", steps: ["Fondamenti di marketing digitale","SEO e SEM","Email marketing e analytics","E-commerce e retail","Certificazione finale"], careerOutcomes: ["Digital Marketing Manager","E-commerce Manager","Growth Hacker"], sectorFit: ["Marketing & Comunicazione","E-commerce & Retail"] },
+  { path: "Percorso UX Design (Google UX Design Certificate o Interaction Design Foundation)", type: "online" as const, duration: "6-9 mesi", cost: "200-500€/anno abbonamento", steps: ["Ricerca utenti e personas","Wireframing e prototipazione","Testing con utenti","Figma avanzato","Portfolio con 3 case study"], careerOutcomes: ["UX Designer","Product Designer","Design Lead / Head of Design"], sectorFit: ["Design & UX"] },
+  { path: "Corso ESG & Sostenibilità (Politecnico o provider specializzato)", type: "professionale" as const, duration: "3-6 mesi", cost: "2k-5k€", steps: ["Framework ESG (GRI, SASB, TCFD)","Carbon accounting e Scope 1/2/3","Rendicontazione non finanziaria (CSRD)","Engagement stakeholder","Progetto di sustainability report"], careerOutcomes: ["Sustainability Manager / ESG","Renewable Energy Project Manager"], sectorFit: ["Energia & Sostenibilità"] },
+  { path: "Certificazione PMP (Project Management Professional)", type: "professionale" as const, duration: "3-6 mesi di studio + esame", cost: "500-800€ (esame + materiali)", steps: ["PMBOK Guide fondamenti","Agile e Scrum","Risk management","Budget e stakeholder management","Simulazioni esame PMP"], careerOutcomes: ["Project Manager (PMP)","Management Consultant","Supply Chain Manager"], sectorFit: ["Consulting & Management","Logistica & Supply Chain"] },
+] as const;
+
+async function upsertEducationPath(ep: typeof EDUCATION_PATHS[number]): Promise<number | null> {
+  const [existing] = await db
+    .select({ id: educationPathsTable.id })
+    .from(educationPathsTable)
+    .where(eq(educationPathsTable.path, ep.path))
+    .limit(1);
+
+  if (existing) {
+    await db.update(educationPathsTable).set({
+      type: ep.type, duration: ep.duration, cost: ep.cost,
+      steps: ep.steps as any, careerOutcomes: ep.careerOutcomes as any,
+      sectorFit: ep.sectorFit as any, isActive: true, updatedAt: new Date(),
+    }).where(eq(educationPathsTable.id, existing.id));
+    return existing.id;
+  }
+
+  const [inserted] = await db.insert(educationPathsTable).values({
+    path: ep.path, type: ep.type, duration: ep.duration, cost: ep.cost,
+    steps: ep.steps as any, careerOutcomes: ep.careerOutcomes as any,
+    sectorFit: ep.sectorFit as any, isActive: true,
+  }).returning({ id: educationPathsTable.id });
+  return inserted?.id ?? null;
+}
+
 async function main() {
   console.log("🌱  Avvio seed catalog...");
 
@@ -225,6 +262,15 @@ async function main() {
     process.stdout.write(".");
   }
   console.log(`\n✅  Professioni: ${ok} salvate, ${skip} saltate`);
+
+  // Percorsi formativi
+  console.log(`📚  Inserisco/aggiorno ${EDUCATION_PATHS.length} percorsi formativi...`);
+  let epDone = 0;
+  for (const ep of EDUCATION_PATHS) {
+    const id = await upsertEducationPath(ep);
+    if (id) { epDone++; process.stdout.write("."); }
+  }
+  console.log(`\n✅  Percorsi formativi: ${epDone} salvati`);
 
   console.log("\n🎉  Seed completato!");
   console.log("👉  Prossimo passo: POST /api/admin/agents/backfill per generare gli embedding");

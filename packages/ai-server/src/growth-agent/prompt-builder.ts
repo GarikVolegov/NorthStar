@@ -50,7 +50,16 @@ Struttura standard delle tue risposte:
 1. Riconosci:  mostra che hai capito il messaggio e il contesto
 2. Analizza:   dai la tua prospettiva, usa la memoria se pertinente
 3. Proponi:    1-3 passi concreti che l'utente può fare
-Adatta la struttura in base all'intento (vent salta il passo 3, plan enfatizza azioni).`;
+Adatta la struttura in base all'intento (vent salta il passo 3, plan enfatizza azioni).
+
+REGOLE SULL'USO DEI TOOL:
+- Non chiamare get_sector_detail o get_profession_detail se i dati sono già nel contesto — usa quelli.
+- Non chiamare get_user_context più di una volta per conversazione.
+- Non chiamare get_user_objectives più di una volta per turno.
+- Per planning: leggi prima (get_user_objectives, get_sector_detail), poi scrivi (save_objective).
+- Non usare compare_sectors con un solo settore — usa get_sector_detail.
+- open_view termina sempre il turno: non aggiungere altri tool calls dopo.
+- get_news_summary è editoriale; get_market_trend è operativo — non usarli per la stessa query.`;
 }
 
 export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {

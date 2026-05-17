@@ -67,7 +67,17 @@ export { generateEmbedding, generateEmbeddingsBatch, buildEmbeddingText } from "
 export { runSearchOrchestrator } from "./search-agent/orchestrator";
 export type { SearchOrchestratorOptions, SearchOrchestratorEvent, SearchResult as OrchestratorSearchResult } from "./search-agent/orchestrator";
 
-// Wendy Router
+// Wendy Router — tool schemas
+export type {
+  ToolError, OpenViewInput, SetFiltersInput, GetSectorDetailInput, ListSectorsInput,
+  GetProfessionDetailInput, SearchProfessionsInput, CompareSectorsInput, GetMarketTrendInput,
+  GetUserObjectivesInput, SaveObjectiveInput, UpdateObjectiveProgressInput,
+  GetGrowthArticlesInput, GetNewsSummaryInput, GetLearningPathsInput,
+  SaveBusinessIdeaInput, AddCalendarEventInput, GetUserContextInput,
+  GetUserContextOutput,
+} from "./wendy-router/tool-schemas";
+
+// Wendy Router — handlers
 export { executeToolCall }   from "./wendy-router/tool-handlers";
 export { classifyIntent }    from "./wendy-router/intent-classifier";
 export { getToolsForIntent, toolsToOpenAIFormat } from "./wendy-router/tool-registry";
