@@ -434,6 +434,20 @@ export default function Results() {
     setWorkModeConfirmed(true);
   };
 
+  // useAgentAnalysis deve stare prima di tutti i return condizionali (Rules of Hooks)
+  const { data: agentData, isLoading: agentLoading, isError: agentError } = useAgentAnalysis({
+    sessionId: Number(id),
+    riasecScores: session?.riasecScores as Record<string, number> | undefined,
+    primaryTypes: session?.primaryTypes as string[] | undefined,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    spiritScores: (session as any)?.spiritScores as Record<string, number> | undefined,
+    topSectors: ((session?.recommendations as Rec[] | undefined) ?? [])
+      .map((r: Rec) => ({ sectorName: r.sector?.name ?? "" }))
+      .filter((r: { sectorName: string }) => r.sectorName),
+    enabled: !!user,
+  });
+  const riasecScoresForAI = session?.riasecScores as Record<string, number> | undefined;
+
   if (isLoading) {
     return <ResultsSkeleton />;
   }
@@ -469,18 +483,6 @@ export default function Results() {
     s.suggestedWorkMode ?? (RIASEC_SUGGESTED_WORK_MODE[primaryTypes[0]] ?? "ibrido");
   const suggestedLabel = t(`results.workModes.${suggestedWorkMode}`);
 
-  const riasecScoresAI = session.riasecScores as Record<string, number> | undefined;
-  const topSectorsForAgent = (session.recommendations as Rec[])
-    .map((r) => ({ sectorName: r.sector?.name ?? "" }))
-    .filter((r) => r.sectorName);
-  const { data: agentData, isLoading: agentLoading, isError: agentError } = useAgentAnalysis({
-    sessionId: Number(id),
-    riasecScores: riasecScoresAI,
-    primaryTypes: session.primaryTypes as string[],
-    spiritScores: spiritScores as Record<string, number> | undefined,
-    topSectors: topSectorsForAgent,
-    enabled: !!user,
-  });
   const agentProfessions = agentData?.data?.summary?.professions ?? [];
   const agentEducation = agentData?.data?.summary?.educationPaths ?? [];
   const agentWorkMode = agentData?.data?.summary?.workMode;
@@ -516,7 +518,7 @@ export default function Results() {
       {/* AI Personality Insight Card */}
       {user && (
         <PersonalityInsightCard
-          riasecScores={riasecScoresAI ?? null}
+          riasecScores={riasecScoresForAI ?? null}
           spiritScores={spiritScores as Record<string, number> | undefined}
           primaryTypes={session.primaryTypes as string[]}
           isPremium={isPremiumAgent}
@@ -1113,7 +1115,7 @@ export default function Results() {
           </div>
           <CareerChat
             profile={{
-              riasecScores: riasecScoresAI,
+              riasecScores: riasecScoresForAI,
               primaryTypes: session.primaryTypes,
               sectors: agentData?.data?.summary ? agentData.data.summary : undefined,
               dominantSpirit: spiritScores

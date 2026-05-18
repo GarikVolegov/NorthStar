@@ -67,7 +67,7 @@ export default function AdminMessaggi() {
     setError("");
     try {
       const res = await fetch(`${BASE}api/contact/messages`, {
-        headers: { "x-admin-key": adminKey },
+        headers: { Authorization: `Bearer ${adminKey}` },
       });
       if (!res.ok) throw new Error("Errore caricamento");
       const data: Message[] = await res.json();
@@ -86,7 +86,7 @@ export default function AdminMessaggi() {
   async function markRead(id: number) {
     await fetch(`${BASE}api/contact/messages/${id}/read`, {
       method: "PATCH",
-      headers: { "x-admin-key": key },
+      headers: { Authorization: `Bearer ${key}` },
     });
     setMessages((prev) => prev.map((m) => m.id === id ? { ...m, read: true } : m));
   }

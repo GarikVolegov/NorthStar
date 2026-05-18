@@ -198,8 +198,7 @@ export default defineConfig({
       "@tanstack/react-query",
       "framer-motion",
       "lucide-react",
+      "recharts",
     ],
-    // Esclude dipendenze grandi che non servono in dev
-    exclude: ["recharts"],
   },
 });

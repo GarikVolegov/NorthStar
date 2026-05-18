@@ -35,7 +35,11 @@ function buildOptions(overrides: Partial<Options>): Partial<Options> {
 }
 
 export const globalLimiter = rateLimit(
-  buildOptions({ windowMs: 60 * 1000, max: 100 })
+  buildOptions({
+    windowMs: 60 * 1000,
+    max: 100,
+    skip: () => process.env.NODE_ENV === "development",
+  })
 );
 
 export const wendyLimiter = rateLimit(

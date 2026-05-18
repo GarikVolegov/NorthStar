@@ -96,12 +96,20 @@ export function CvSection({ userId }: { userId: number }) {
     } catch {}
   }
 
-  // ── Upload
+  // ── Upload (base64 JSON, senza multer)
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await apiFetch(`${BASE}api/cv/mine/upload`, { method: "POST", body: form });
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const res = await apiFetch(`${BASE}api/cv/mine/upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileDataUrl: dataUrl, filename: file.name, mimeType: file.type }),
+      });
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? "Errore upload"); }
       return res.json();
     },

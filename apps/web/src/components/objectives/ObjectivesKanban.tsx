@@ -9,6 +9,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -58,7 +59,7 @@ export function ObjectivesKanban({ userId }: Props) {
   const { data: objectives = [], isLoading } = useQuery<Objective[]>({
     queryKey: ["objectives", userId],
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/objectives/${userId}`, { credentials: "include" });
+      const res = await apiFetch(`${BASE}api/objectives`);
       if (!res.ok) throw new Error("Errore");
       return res.json();
     },
@@ -66,10 +67,9 @@ export function ObjectivesKanban({ userId }: Props) {
 
   const patchObjective = useMutation({
     mutationFn: async ({ id, patch }: { id: number; patch: Partial<Objective> }) => {
-      const res = await fetch(`${BASE}api/objectives/${id}`, {
+      const res = await apiFetch(`${BASE}api/objectives/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify(patch),
       });
       if (!res.ok) throw new Error("Errore");
@@ -80,17 +80,16 @@ export function ObjectivesKanban({ userId }: Props) {
 
   const deleteObjective = useMutation({
     mutationFn: async (id: number) => {
-      await fetch(`${BASE}api/objectives/${id}`, { method: "DELETE", credentials: "include" });
+      await apiFetch(`${BASE}api/objectives/${id}`, { method: "DELETE" });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["objectives", userId] }),
   });
 
   const createObjective = useMutation({
     mutationFn: async (text: string) => {
-      const res = await fetch(`${BASE}api/objectives`, {
+      const res = await apiFetch(`${BASE}api/objectives`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ text, category: "formazione" }),
       });
       if (!res.ok) throw new Error("Errore");

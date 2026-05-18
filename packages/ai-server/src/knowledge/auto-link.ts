@@ -63,13 +63,17 @@ Rispondi SOLO con un array JSON degli indici dei candidati da collegare, nel for
     if (!Array.isArray(parsed)) return [];
 
     return parsed
-      .filter((item: { index: number }) => item.index !== undefined && topCandidates[item.index])
       .map((item: { index: number; label?: string; reason?: string }) => ({
-        targetNodeId: topCandidates[item.index].node.id,
-        targetTitle: topCandidates[item.index].node.title,
+        ...item,
+        candidateIndex: item.index > 0 ? item.index - 1 : item.index,
+      }))
+      .filter((item) => Number.isInteger(item.candidateIndex) && topCandidates[item.candidateIndex])
+      .map((item) => ({
+        targetNodeId: topCandidates[item.candidateIndex].node.id,
+        targetTitle: topCandidates[item.candidateIndex].node.title,
         label: item.label ?? "collegato",
         reason: item.reason ?? "",
-        score: topCandidates[item.index].similarity,
+        score: topCandidates[item.candidateIndex].similarity,
       }));
   } catch (err) {
     logger.warn({ err }, "auto-link failed");

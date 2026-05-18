@@ -52,7 +52,7 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 app.use(requestLoggerMiddleware);
 app.use(globalLimiter);
 
@@ -109,6 +109,16 @@ import mlRouter                from "./routes/ml";
 import subscriptionRouter      from "./routes/subscription";
 import workspaceRouter         from "./routes/workspace";
 import briefingsRouter         from "./routes/briefings";
+import agentRouter             from "./routes/agent";
+import agentsRouter            from "./routes/agents";
+import journeyScoreRouter       from "./routes/journey-score";
+import cvRouter                 from "./routes/cv";
+import notificationsRouter      from "./routes/notifications";
+import favoritesRouter          from "./routes/favorites";
+import nftCertificatesRouter    from "./routes/nft-certificates";
+import certificationsRouter     from "./routes/certifications";
+import contactRouter            from "./routes/contact";
+import affiliazioneRouter       from "./routes/affiliazione";
 
 app.use("/api/auth", authRouter);
 app.use("/api/profile", profileRouter);
@@ -158,6 +168,16 @@ app.use("/api/onboarding",                  onboardingRouter);
 app.use("/api/subscription",                subscriptionRouter);
 app.use("/api/workspaces",                  workspaceRouter);
 app.use("/api/briefings",                   briefingsRouter);
+app.use("/api/agent",                       agentRouter);
+app.use("/api/agents",                      agentsRouter);
+app.use("/api/journey-score",               journeyScoreRouter);
+app.use("/api/cv",                          cvRouter);
+app.use("/api/notifications",               notificationsRouter);
+app.use("/api/favorites",                   favoritesRouter);
+app.use("/api/nft-certificates",            nftCertificatesRouter);
+app.use("/api/certifications",              certificationsRouter);
+app.use("/api/contact",                     contactRouter);
+app.use("/api/affiliazione",                affiliazioneRouter);
 
 app.get("/api/health/live", (req, res) => {
   res.json({ status: "alive" });

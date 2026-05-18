@@ -7,6 +7,110 @@ import { it } from "date-fns/locale";
 
 const router = Router();
 
+const EVENT_CATEGORIES = ["study", "training", "interview", "deadline", "task", "follow-up"] as const;
+const EVENT_PRIORITIES = ["low", "medium", "high"] as const;
+const EVENT_STATUSES = ["todo", "in-progress", "done", "postponed"] as const;
+
+type CalendarEventInput = Record<string, unknown>;
+
+function parseDateInput(value: unknown): Date | null {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value;
+  }
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function enumValue<T extends readonly string[]>(
+  value: unknown,
+  allowed: T,
+  fallback: T[number],
+): T[number] {
+  return typeof value === "string" && allowed.includes(value) ? value : fallback;
+}
+
+function arrayValue<T>(value: unknown, fallback: T[]): T[] {
+  return Array.isArray(value) ? (value as T[]) : fallback;
+}
+
+function normalizeCalendarEventCreate(body: CalendarEventInput) {
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  if (!title) {
+    return { error: "Titolo obbligatorio" };
+  }
+
+  const startAt = parseDateInput(body.startAt);
+  const endAt = parseDateInput(body.endAt);
+  if (!startAt || !endAt) {
+    return { error: "Date evento non valide" };
+  }
+
+  return {
+    data: {
+      title,
+      description: typeof body.description === "string" ? body.description : null,
+      startAt,
+      endAt,
+      allDay: typeof body.allDay === "boolean" ? body.allDay : false,
+      category: enumValue(body.category, EVENT_CATEGORIES, "task"),
+      priority: enumValue(body.priority, EVENT_PRIORITIES, "medium"),
+      status: enumValue(body.status, EVENT_STATUSES, "todo"),
+      color: typeof body.color === "string" ? body.color : null,
+      tags: arrayValue<string>(body.tags, []),
+      linkedSectorId: typeof body.linkedSectorId === "number" ? body.linkedSectorId : null,
+      linkedGoal: typeof body.linkedGoal === "string" ? body.linkedGoal : null,
+      linkedContentIds: arrayValue<number>(body.linkedContentIds, []),
+      isRecurring: typeof body.isRecurring === "boolean" ? body.isRecurring : false,
+      recurrenceRule: typeof body.recurrenceRule === "string" ? body.recurrenceRule : null,
+    },
+  };
+}
+
+function normalizeCalendarEventUpdate(body: CalendarEventInput) {
+  const data: CalendarEventInput = {};
+
+  if ("title" in body) {
+    const title = typeof body.title === "string" ? body.title.trim() : "";
+    if (!title) return { error: "Titolo obbligatorio" };
+    data.title = title;
+  }
+
+  if ("description" in body) {
+    data.description = typeof body.description === "string" ? body.description : null;
+  }
+  if ("startAt" in body) {
+    const startAt = parseDateInput(body.startAt);
+    if (!startAt) return { error: "Data inizio evento non valida" };
+    data.startAt = startAt;
+  }
+  if ("endAt" in body) {
+    const endAt = parseDateInput(body.endAt);
+    if (!endAt) return { error: "Data fine evento non valida" };
+    data.endAt = endAt;
+  }
+  if ("allDay" in body) data.allDay = typeof body.allDay === "boolean" ? body.allDay : false;
+  if ("category" in body) data.category = enumValue(body.category, EVENT_CATEGORIES, "task");
+  if ("priority" in body) data.priority = enumValue(body.priority, EVENT_PRIORITIES, "medium");
+  if ("status" in body) data.status = enumValue(body.status, EVENT_STATUSES, "todo");
+  if ("color" in body) data.color = typeof body.color === "string" ? body.color : null;
+  if ("tags" in body) data.tags = arrayValue<string>(body.tags, []);
+  if ("linkedSectorId" in body) {
+    data.linkedSectorId = typeof body.linkedSectorId === "number" ? body.linkedSectorId : null;
+  }
+  if ("linkedGoal" in body) data.linkedGoal = typeof body.linkedGoal === "string" ? body.linkedGoal : null;
+  if ("linkedContentIds" in body) data.linkedContentIds = arrayValue<number>(body.linkedContentIds, []);
+  if ("isRecurring" in body) data.isRecurring = typeof body.isRecurring === "boolean" ? body.isRecurring : false;
+  if ("recurrenceRule" in body) {
+    data.recurrenceRule = typeof body.recurrenceRule === "string" ? body.recurrenceRule : null;
+  }
+
+  return { data };
+}
+
 /* ─── GET /api/calendar/events  —  eventi filtrati per data ─── */
 router.get("/events", requireAuth, async (req, res) => {
   try {
@@ -113,43 +217,17 @@ router.get("/events/:id", requireAuth, async (req, res) => {
 router.post("/events", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
-    const {
-      title,
-      description,
-      startAt,
-      endAt,
-      allDay,
-      category,
-      priority,
-      status,
-      color,
-      tags,
-      linkedSectorId,
-      linkedGoal,
-      linkedContentIds,
-      isRecurring,
-      recurrenceRule,
-    } = req.body;
+    const normalized = normalizeCalendarEventCreate(req.body ?? {});
+    if ("error" in normalized) {
+      res.status(400).json({ error: normalized.error });
+      return;
+    }
 
     const [event] = await db
       .insert(calendarEventsTable)
       .values({
         userId,
-        title,
-        description,
-        startAt,
-        endAt,
-        allDay,
-        category,
-        priority,
-        status,
-        color,
-        tags,
-        linkedSectorId,
-        linkedGoal,
-        linkedContentIds,
-        isRecurring,
-        recurrenceRule,
+        ...normalized.data,
       })
       .returning();
     
@@ -165,11 +243,15 @@ router.patch("/events/:id", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
     const eventId = parseInt(req.params.id, 10);
-    const updateData = req.body;
+    const normalized = normalizeCalendarEventUpdate(req.body ?? {});
+    if ("error" in normalized) {
+      res.status(400).json({ error: normalized.error });
+      return;
+    }
     
     const [event] = await db
       .update(calendarEventsTable)
-      .set(updateData)
+      .set(normalized.data)
       .where(
         and(
           eq(calendarEventsTable.id, eventId),
@@ -217,6 +299,7 @@ router.get("/upcoming", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
     const now = new Date();
+    const limit = Math.max(1, Math.min(Number(req.query.limit) || 5, 20));
     
     const events = await db
       .select({
@@ -234,11 +317,11 @@ router.get("/upcoming", requireAuth, async (req, res) => {
       .where(
         and(
           eq(calendarEventsTable.userId, userId),
-          gte(calendarEventsTable.startAt, now),
+          gte(calendarEventsTable.endAt, now),
         )
       )
       .orderBy(asc(calendarEventsTable.startAt))
-      .limit(5);
+      .limit(limit);
     
     res.json(events);
   } catch (err) {

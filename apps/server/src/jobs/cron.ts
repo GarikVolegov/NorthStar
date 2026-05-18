@@ -1,4 +1,4 @@
-import { runCollector, runEnricher, runSectorDataAgent } from "@workspace/ai-server";
+import { runCollector, runEnricher, runSectorDataAgent, runNewsPublisher } from "@workspace/ai-server";
 import { rootLogger } from "../middleware/logger";
 import { runWeakSignalDetector } from "./weak-signal-detector";
 import { runProactiveInsightGenerator } from "./proactive-insight-generator";
@@ -29,6 +29,16 @@ async function safeRunEnricher(): Promise<void> {
     rootLogger.info({ processed: result.processed, enriched: result.enriched, filtered: result.filtered, durationMs: result.durationMs }, "[cron] enricher complete");
   } catch (err) {
     rootLogger.error({ err }, "[cron] enricher failed");
+  }
+}
+
+async function safeRunNewsPublisher(): Promise<void> {
+  try {
+    rootLogger.info("[cron] news-publisher starting");
+    const result = await runNewsPublisher();
+    rootLogger.info({ transferred: result.transferred, seeded: result.seeded, durationMs: result.durationMs }, "[cron] news-publisher complete");
+  } catch (err) {
+    rootLogger.error({ err }, "[cron] news-publisher failed");
   }
 }
 
@@ -79,13 +89,17 @@ export function startCronJobs(): void {
   setTimeout(() => {
     void safeRunCollector();
     void safeRunEnricher();
+    void safeRunNewsPublisher();
   }, STARTUP_DELAY_MS);
 
   // Collector ogni 6 ore
   setInterval(() => { void safeRunCollector(); }, COLLECTOR_INTERVAL_MS);
 
-  // Enricher ogni 2 ore
-  setInterval(() => { void safeRunEnricher(); }, ENRICHER_INTERVAL_MS);
+  // Enricher ogni 2 ore → poi publisher pubblica gli arricchiti
+  setInterval(async () => {
+    await safeRunEnricher();
+    void safeRunNewsPublisher();
+  }, ENRICHER_INTERVAL_MS);
 
   // Sector data agent settimanale (aggiorna skill, trend, salari)
   setInterval(() => { void safeRunSectorData(); }, SECTOR_DATA_INTERVAL_MS);

@@ -14,6 +14,7 @@ import {
 import { useUser, useAuth as useClerkAuth, useClerk } from "@clerk/react";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { AUTH_EXPIRED_EVENT, TOKEN_STORAGE_KEY } from "@/lib/storage-keys";
+import { setInMemoryToken } from "@/lib/api-fetch";
 import { useQueryClient } from "@tanstack/react-query";
 
 export interface AuthUser {
@@ -45,6 +46,7 @@ interface AuthContextValue {
   isAffiliate: boolean;
   token: string | null;
   authReady: boolean;
+  authSyncFailed: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -53,7 +55,7 @@ const BASE = import.meta.env.BASE_URL || "/";
 
 function clerkUserToAuthUser(clerkUser: NonNullable<ReturnType<typeof useUser>["user"]>): AuthUser {
   return {
-    id: parseInt(clerkUser.id.replace(/\D/g, "") || "0", 10),
+    id: 0, // placeholder: sostituito con l'ID reale del DB dopo clerk-sync
     name: clerkUser.fullName ?? clerkUser.username ?? clerkUser.emailAddresses[0]?.emailAddress ?? "",
     email: clerkUser.primaryEmailAddress?.emailAddress ?? "",
     testSessionId: null,
@@ -75,10 +77,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState<boolean>(false);
+  const [authSyncFailed, setAuthSyncFailed] = useState<boolean>(false);
 
   const logout = useCallback(() => {
     setUser(null);
     setToken(null);
+    setAuthSyncFailed(false);
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    setInMemoryToken(null);
+    setAuthTokenGetter(null);
     queryClient.clear();
     clerk.signOut().catch(() => {});
   }, [queryClient, clerk]);
@@ -94,6 +101,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (u: AuthUser, t: string) => {
       setUser(u);
       setToken(t);
+      setAuthSyncFailed(false);
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, t);
+      setInMemoryToken(t);
       setAuthTokenGetter(() => t);
       setAuthReady(true);
     },
@@ -105,8 +115,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (isSignedIn && clerkUser && token) {
       setAuthTokenGetter(() => token);
+      // setInMemoryToken NON va chiamato qui: durante il sync token = clerkToken,
+      // che il server rifiuta → 401 con sentToken=true → AUTH_EXPIRED_EVENT → logout.
+      // setInMemoryToken viene chiamato solo in syncWithServer quando nsToken è noto.
     } else {
       setAuthTokenGetter(null);
+      setInMemoryToken(null);
     }
   }, [clerkLoaded, isSignedIn, clerkUser, token]);
 
@@ -128,7 +142,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isSignedIn || !clerkUser) {
       setUser(null);
       setToken(null);
+      setAuthSyncFailed(false);
       sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+      setInMemoryToken(null);
       setAuthTokenGetter(null);
       setAuthReady(true);  // Guest: pronto immediatamente
       return;
@@ -140,22 +156,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Mostra subito i dati di Clerk — l'app diventa interattiva immediatamente
     const clerkOnlyUser = clerkUserToAuthUser(clerkUser);
-    setUser(clerkOnlyUser);
+    setUser(null);
+    setToken(null);
+    setAuthSyncFailed(false);
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    setInMemoryToken(null);
+    setAuthTokenGetter(null);
     setAuthReady(true);  // ← Sblocca l'app subito, senza aspettare il server
 
     // Sync con il server in background — aggiorna i dati senza bloccare
+    setAuthReady(false);
+
     const ctrl = new AbortController();
     const syncWithServer = async () => {
       try {
-        let clerkToken = await getToken({ template: "NorthStar" }).catch(() => null);
-        if (!clerkToken) clerkToken = await getToken().catch(() => null);
+        const clerkToken = await getToken().catch(() => null);
+        if (!clerkToken) {
+          setAuthSyncFailed(true);
+          setAuthReady(true);
+        }
         if (!clerkToken) return;  // Nessun token — mantieni dati Clerk puri
-
-        setToken(clerkToken);
-        // Scrive il token in sessionStorage — necessario per useWendyChat e altri hook
-        // che leggono il token direttamente da sessionStorage per le chiamate SSE
-        sessionStorage.setItem(TOKEN_STORAGE_KEY, clerkToken);
-        setAuthTokenGetter(() => clerkToken);
 
         const res = await fetch(`${BASE}api/auth/clerk-sync`, {
           method: "POST",
@@ -166,7 +186,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify({
             clerkId: clerkUser.id,
             email: clerkUser.primaryEmailAddress?.emailAddress,
-            name: clerkUser.fullName ?? clerkUser.username,
+            name:
+              clerkUser.fullName ??
+              clerkUser.username ??
+              clerkUser.primaryEmailAddress?.emailAddress ??
+              "Utente",
           }),
           signal: ctrl.signal,
         });
@@ -174,29 +198,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (res.ok) {
           const data = (await res.json()) as AuthUser & { northstar_token?: string };
           const { northstar_token: nsToken, ...serverUser } = data;
+          if (!nsToken) {
+            setUser(null);
+            setToken(null);
+            setAuthSyncFailed(true);
+            sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+            setInMemoryToken(null);
+            setAuthTokenGetter(null);
+            setAuthReady(true);
+            return;
+          }
 
           // Il NorthStar JWT (firmato con JWT_SECRET) funziona con requireAuth
           // senza dover verificare Clerk su ogni request — più semplice e affidabile.
           if (nsToken) {
             sessionStorage.setItem(TOKEN_STORAGE_KEY, nsToken);
+            setInMemoryToken(nsToken);
             setToken(nsToken);
+            setAuthSyncFailed(false);
             setAuthTokenGetter(() => nsToken);
+            // Invalida tutte le query in errore: ora il token è valido
+            queryClient.invalidateQueries();
           }
 
           setUser({ ...clerkOnlyUser, ...serverUser });
+        } else {
+          setUser(null);
+          setToken(null);
+          setAuthSyncFailed(true);
+          sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+          setInMemoryToken(null);
+          setAuthTokenGetter(null);
         }
       } catch {
+        if (ctrl.signal.aborted) return;
+        setUser(null);
+        setToken(null);
+        setAuthSyncFailed(true);
+        sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+        setInMemoryToken(null);
+        setAuthTokenGetter(null);
         // Sync fallita — utente rimane con dati Clerk puri, è accettabile
+      }
+      if (!ctrl.signal.aborted) {
+        setAuthReady(true);
       }
     };
 
     void syncWithServer();
     return () => ctrl.abort();
-  }, [clerkLoaded, isSignedIn, clerkUser, getToken]);
+  }, [clerkLoaded, isSignedIn, clerkUser, getToken, queryClient]);
 
   return (
     <AuthContext.Provider
-      value={{ user, login, logout, updateUser, isLoggedIn: !!user, isAffiliate: !!user?.isAffiliate, token, authReady }}
+      value={{ user, login, logout, updateUser, isLoggedIn: !!user && user.id > 0 && !!token, isAffiliate: !!user?.isAffiliate, token, authReady, authSyncFailed }}
     >
       {children}
     </AuthContext.Provider>

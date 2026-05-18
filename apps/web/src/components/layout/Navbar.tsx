@@ -37,6 +37,7 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { UserButton, useClerk } from "@clerk/react";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api-fetch";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useProactiveInsights } from "@/hooks/useProactiveInsights";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -205,9 +206,9 @@ export function Navbar() {
 
   const navLinks = PHASE_LINKS[phase];
 
-  useState(() => {
+  useEffect(() => {
     if (!user?.id) return;
-    fetch(`${BASE}api/friends/${user.id}`)
+    apiFetch(`${BASE}api/friends/${user.id}`)
       .then((res) => res.json())
       .then((data) =>
         setPendingFriends(
@@ -215,7 +216,7 @@ export function Navbar() {
         ),
       )
       .catch(() => setPendingFriends(0));
-  });
+  }, [user?.id]);
 
   const friendsBadge =
     pendingFriends && pendingFriends > 0 ? pendingFriends : null;

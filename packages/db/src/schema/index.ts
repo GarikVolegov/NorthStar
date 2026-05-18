@@ -25,6 +25,7 @@ export * from "./knowledge";
 export * from "./newsArticles";
 export * from "./growthArticles";
 export * from "./agentReview";
+export * from "./agentPrompts";
 // agentLogs.ts removed — table merged into agentReview.ts as agentRunsTable.
 // Run the following SQL to backfill and drop the old table if it still exists:
 //   INSERT INTO agent_runs SELECT * FROM agent_logs;

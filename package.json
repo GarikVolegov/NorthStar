@@ -29,6 +29,7 @@
     "// ── SECRETS ─────────────────────────────────────": "---",
     "secrets": "bash scripts/generate-secrets.sh",
     "secrets:env": "bash scripts/generate-secrets.sh --env",
+    "admin:promote": "pnpm --filter @workspace/scripts run admin:promote --",
     "// ── TEST ─────────────────────────────────────────": "---",
     "test": "pnpm run test:ai",
     "test:ai": "pnpm --filter @workspace/ai-server run test",

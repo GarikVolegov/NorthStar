@@ -1,7 +1,34 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
+import { db, testSessionsTable } from "@workspace/db";
+import { eq, desc } from "drizzle-orm";
 
 const router = Router();
+
+/* ─── GET /api/test-sessions/history  —  storico sessioni utente ─── */
+router.get("/history", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const sessions = await db
+      .select({
+        id: testSessionsTable.id,
+        primaryTypes: testSessionsTable.primaryTypes,
+        riasecScores: testSessionsTable.riasecScores,
+        recommendations: testSessionsTable.recommendations,
+        createdAt: testSessionsTable.createdAt,
+        confirmedSectorId: testSessionsTable.confirmedSectorId,
+      })
+      .from(testSessionsTable)
+      .where(eq(testSessionsTable.userId, userId))
+      .orderBy(desc(testSessionsTable.createdAt))
+      .limit(20);
+
+    res.json(sessions);
+  } catch (err) {
+    req.log?.error?.({ err }, "test-sessions history error");
+    res.status(500).json({ error: "Errore nel caricamento della cronologia" });
+  }
+});
 
 /* ─── GET /api/test-sessions/latest  —  ultima sessione utente ─── */
 router.get("/latest", requireAuth, async (req, res) => {

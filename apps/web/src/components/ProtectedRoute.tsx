@@ -16,7 +16,7 @@
 import { type ComponentType } from "react";
 import { Redirect } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { useUser } from "@clerk/react";
+import { useClerk, useUser } from "@clerk/react";
 import { PageLoader } from "@/components/PageLoader";
 
 interface ProtectedRouteProps {
@@ -27,7 +27,8 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ component: Component, ...rest }: ProtectedRouteProps) {
   const { isLoaded, isSignedIn } = useUser();
-  const { authReady } = useAuth();
+  const { signOut } = useClerk();
+  const { authReady, isLoggedIn, authSyncFailed, logout } = useAuth();
 
   // Aspetta che sia Clerk che il sync locale siano pronti
   if (!isLoaded || !authReady) {
@@ -40,6 +41,48 @@ export function ProtectedRoute({ component: Component, ...rest }: ProtectedRoute
 
   if (!isSignedIn) {
     return <Redirect to="/sign-in" />;
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background px-4 z-50">
+        <div className="w-full max-w-sm rounded-lg border bg-card p-5 text-center shadow-sm">
+          <h1 className="text-base font-semibold text-foreground">
+            Sincronizzazione account
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {authSyncFailed
+              ? "Non siamo riusciti a completare l'accesso a NorthStar. Riprova o esci e accedi di nuovo."
+              : "Stiamo completando l'accesso al tuo spazio NorthStar."}
+          </p>
+          {authSyncFailed ? (
+            <div className="mt-4 flex justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+              >
+                Riprova
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  signOut().catch(() => {});
+                }}
+                className="rounded-md border px-3 py-2 text-sm font-medium text-foreground"
+              >
+                Esci
+              </button>
+            </div>
+          ) : (
+            <div className="mt-4">
+              <PageLoader />
+            </div>
+          )}
+        </div>
+      </div>
+    );
   }
 
   return <Component {...rest} />;

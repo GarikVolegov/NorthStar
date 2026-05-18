@@ -59,7 +59,7 @@ function EditModal({ article, adminKey, onClose, onSaved }: {
     try {
       await fetch(`${BASE}api/admin/growth-queue/${article.id}/approve`, {
         method: "POST",
-        headers: { "x-admin-key": adminKey, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${adminKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({ title, description, content }),
       });
       onSaved();
@@ -112,7 +112,7 @@ function ArticleCard({ article, adminKey, onRefresh }: {
     try {
       await fetch(`${BASE}api/admin/growth-queue/${article.id}/approve`, {
         method: "POST",
-        headers: { "x-admin-key": adminKey, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${adminKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
       onRefresh();
@@ -124,7 +124,7 @@ function ArticleCard({ article, adminKey, onRefresh }: {
     try {
       await fetch(`${BASE}api/admin/growth-queue/${article.id}/reject`, {
         method: "POST",
-        headers: { "x-admin-key": adminKey },
+        headers: { Authorization: `Bearer ${adminKey}` },
       });
       onRefresh();
     } finally { setLoading(false); }
@@ -136,7 +136,7 @@ function ArticleCard({ article, adminKey, onRefresh }: {
     try {
       await fetch(`${BASE}api/admin/growth-queue/${article.id}`, {
         method: "DELETE",
-        headers: { "x-admin-key": adminKey },
+        headers: { Authorization: `Bearer ${adminKey}` },
       });
       onRefresh();
     } finally { setLoading(false); }
@@ -211,7 +211,7 @@ export default function AdminCrescita() {
     setLoading(true);
     try {
       const res = await fetch(`${BASE}api/admin/growth-queue`, {
-        headers: { "x-admin-key": adminKey },
+        headers: { Authorization: `Bearer ${adminKey}` },
       });
       if (res.ok) setData(await res.json());
     } finally { setLoading(false); }

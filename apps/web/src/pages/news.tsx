@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
+import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -207,7 +208,7 @@ export default function News() {
       const res = await fetch(`${BASE}api/profile/${user!.id}`);
       return res.json();
     },
-    enabled: !!user,
+    enabled: !!user?.id && user.id > 0,
     staleTime: 5 * 60_000,
   });
 
@@ -217,12 +218,12 @@ export default function News() {
   const { data: subsData } = useQuery<string[]>({
     queryKey: ["news-subscriptions", user?.id],
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/news/subscriptions`);
+      const res = await apiFetch(`${BASE}api/news/subscriptions`);
       if (!res.ok) return [];
       const json = await res.json();
       return json.subscriptions ?? [];
     },
-    enabled: !!user,
+    enabled: !!user?.id && user.id > 0,
     staleTime: 60_000,
   });
   const subscriptions = subsData ?? [];
@@ -230,13 +231,13 @@ export default function News() {
   const subMutation = useMutation({
     mutationFn: async ({ category, subscribe }: { category: string; subscribe: boolean }) => {
       if (subscribe) {
-        await fetch(`${BASE}api/news/subscriptions`, {
+        await apiFetch(`${BASE}api/news/subscriptions`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ category }),
         });
       } else {
-        await fetch(`${BASE}api/news/subscriptions/${category}`, { method: "DELETE" });
+        await apiFetch(`${BASE}api/news/subscriptions/${category}`, { method: "DELETE" });
       }
     },
     onSuccess: () => {

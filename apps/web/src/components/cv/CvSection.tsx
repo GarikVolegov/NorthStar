@@ -47,7 +47,7 @@ interface GraphNode {
 function useCv(userId: number) {
   return useQuery<{ cvData: CvData | null; hasCv: boolean }>({
     queryKey: ["cv", userId],
-    queryFn: () => fetch(`${BASE}api/cv/${userId}`).then((r) => r.json()),
+    queryFn: () => fetch(`${BASE}api/cv/${userId}`).then((r) => { if (!r.ok) throw new Error(`cv ${r.status}`); return r.json(); }),
     enabled: !!userId,
     staleTime: 60_000,
   });

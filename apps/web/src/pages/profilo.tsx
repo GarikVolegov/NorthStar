@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,8 @@ interface ProfileData {
   name: string;
   email: string;
   emailVerified: boolean;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
   createdAt: string;
 }
 
@@ -53,6 +55,12 @@ export default function Profilo() {
   const [bannerUrl, setBannerUrl] = useState<string | null | undefined>();
   const [linkedinWizardOpen, setLinkedinWizardOpen] = useState(false);
   const { data: profile } = useProfile(user?.id ?? 0);
+
+  useEffect(() => {
+    if (profile?.bannerUrl) {
+      setBannerUrl(profile.bannerUrl);
+    }
+  }, [profile?.bannerUrl]);
 
   const { data: completionData } = useQuery<CompletionResponse>({
     queryKey: ["completion-me"],

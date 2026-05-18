@@ -52,7 +52,7 @@ export default function AdminQualityPage() {
     setLoading(true);
     try {
       const res = await fetch(`${BASE}api/admin/quality`, {
-        headers: { "x-admin-key": key },
+        headers: { Authorization: `Bearer ${key}` },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData(await res.json() as QualityData);

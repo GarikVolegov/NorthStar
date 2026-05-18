@@ -249,11 +249,43 @@ export async function requirePremium(req: Request, res: Response, next: NextFunc
 }
 
 export async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
-  if (req.user?.role !== "admin") {
-    res.status(404).json({ error: "Not Found" });
+  if (!req.user?.id) {
+    res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  next();
+
+  try {
+    const [dbUser] = await db
+      .select({ role: usersTable.role })
+      .from(usersTable)
+      .where(eq(usersTable.id, req.user.id))
+      .limit(1);
+
+    if (dbUser?.role !== "admin") {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    req.user.role = "admin";
+    next();
+  } catch (err) {
+    rootLogger.error({ err, userId: req.user.id }, "[auth] admin role check failed");
+    res.status(500).json({ error: "Errore verifica permessi admin" });
+  }
+}
+
+export async function requireAdminAccess(req: Request, res: Response, next: NextFunction): Promise<void> {
+  await requireAuth(req, res, async () => {
+    await requireAdmin(req, res, next);
+  });
+}
+
+export async function requireAdminToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+  if (!req.user?.id) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  await requireAdmin(req, res, next);
 }
 
 /**

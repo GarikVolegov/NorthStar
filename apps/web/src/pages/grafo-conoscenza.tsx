@@ -104,6 +104,12 @@ interface AutoLinkSuggestion {
   score: number;
 }
 
+interface AutoLinkAllResponse {
+  created: number;
+  skipped: number;
+  edges: KEdge[];
+}
+
 interface ContextMenu {
   nodeId: number;
   x: number;
@@ -426,6 +432,7 @@ export default function Archivio() {
     AutoLinkSuggestion[]
   >([]);
   const [autoLinkSourceId, setAutoLinkSourceId] = useState<number | null>(null);
+  const [autoLinkingAll, setAutoLinkingAll] = useState(false);
   const onSaveRef = useRef<(() => void) | null>(null);
   const [fitAnimating, setFitAnimating] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
@@ -674,6 +681,49 @@ export default function Archivio() {
       /* silent */
     }
   }, []);
+
+  const handleAutoLinkAll = useCallback(async () => {
+    if (data.nodes.length < 2 || autoLinkingAll) return;
+    setAutoLinkingAll(true);
+    try {
+      const result = await api<AutoLinkAllResponse>("/auto-link-all", {
+        method: "POST",
+        body: JSON.stringify({ limit: 24, perNode: 3 }),
+      });
+
+      if (result.edges.length > 0) {
+        setData((d) => {
+          const existing = new Set(d.edges.map((e) => e.id));
+          return {
+            ...d,
+            edges: [
+              ...d.edges,
+              ...result.edges.filter((edge) => !existing.has(edge.id)),
+            ],
+          };
+        });
+      }
+
+      toast({
+        title:
+          result.created > 0
+            ? `${result.created} collegamenti creati`
+            : "Nessun nuovo collegamento",
+        description:
+          result.created > 0
+            ? "Wendy ha analizzato i nodi e collegato le relazioni piu rilevanti."
+            : "Il grafo e gia allineato oppure servono contenuti piu ricchi.",
+      });
+    } catch (err) {
+      toast({
+        title: "Collegamento automatico fallito",
+        description: err instanceof Error ? err.message : "Errore di rete.",
+        variant: "destructive",
+      });
+    } finally {
+      setAutoLinkingAll(false);
+    }
+  }, [autoLinkingAll, data.nodes.length, toast]);
 
   const handleFileImport = useCallback(
     async (file: File) => {
@@ -1205,6 +1255,25 @@ export default function Archivio() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>Chiedi all'Archivio</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-xl h-8 gap-1"
+                disabled={autoLinkingAll || data.nodes.length < 2}
+                onClick={handleAutoLinkAll}
+              >
+                {autoLinkingAll ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Wand2 className="w-3.5 h-3.5" />
+                )}
+                <span className="hidden lg:inline">Collega</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Collega automaticamente</TooltipContent>
           </Tooltip>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

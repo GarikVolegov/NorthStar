@@ -21,7 +21,14 @@ router.get("/summary", async (req, res) => {
     const { rows: topSectorsResult } = await pool.query<{ name: string; count: number }>(`
       SELECT r->>'sectorName' AS name, count(*)::int AS count
       FROM test_sessions,
-      jsonb_array_elements(recommendations::jsonb) AS r
+      jsonb_array_elements(
+        CASE
+          WHEN recommendations IS NULL THEN '[]'::jsonb
+          WHEN jsonb_typeof(recommendations::jsonb) = 'array' THEN recommendations::jsonb
+          ELSE '[]'::jsonb
+        END
+      ) AS r
+      WHERE r->>'sectorName' IS NOT NULL
       GROUP BY r->>'sectorName'
       ORDER BY count(*) DESC
       LIMIT 10

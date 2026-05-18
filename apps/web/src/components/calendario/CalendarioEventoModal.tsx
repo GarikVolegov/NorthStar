@@ -277,7 +277,7 @@ export function CalendarioEventoModal({
       const url = editingEvent
         ? `${BASE}api/calendar/events/${editingEvent.id}`
         : `${BASE}api/calendar/events`;
-      const method = editingEvent ? "PUT" : "POST";
+      const method = editingEvent ? "PATCH" : "POST";
 
       const res = await apiFetch(url, {
         method,

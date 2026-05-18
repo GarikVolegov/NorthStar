@@ -1,38 +1,88 @@
 import { Router } from "express";
+import { and, asc, desc, eq, gte } from "drizzle-orm";
+import {
+  calendarEventsTable,
+  db,
+  testSessionsTable,
+  userObjectivesTable,
+} from "@workspace/db";
+import { requireAuth } from "../middleware/auth";
 
 const router = Router();
 
 /* ─── GET /api/dashboard  —  dati dashboard ─── */
-router.get("/", async (req, res) => {
+router.get("/", requireAuth, async (req, res) => {
   try {
+    const user = req.user!;
+    const now = new Date();
+
+    const [latestSession, objectives, upcomingEvents] = await Promise.all([
+      db
+        .select({
+          id: testSessionsTable.id,
+          riasecScores: testSessionsTable.riasecScores,
+          primaryTypes: testSessionsTable.primaryTypes,
+          spiritScores: testSessionsTable.spiritScores,
+          recommendations: testSessionsTable.recommendations,
+          createdAt: testSessionsTable.createdAt,
+        })
+        .from(testSessionsTable)
+        .where(eq(testSessionsTable.userId, user.id))
+        .orderBy(desc(testSessionsTable.createdAt))
+        .limit(1),
+      db
+        .select({
+          id: userObjectivesTable.id,
+          text: userObjectivesTable.text,
+          category: userObjectivesTable.category,
+          progress: userObjectivesTable.progress,
+          completed: userObjectivesTable.completed,
+          completedAt: userObjectivesTable.completedAt,
+          dueDate: userObjectivesTable.dueDate,
+          createdAt: userObjectivesTable.createdAt,
+        })
+        .from(userObjectivesTable)
+        .where(eq(userObjectivesTable.userId, user.id))
+        .orderBy(desc(userObjectivesTable.createdAt))
+        .limit(8),
+      db
+        .select({
+          id: calendarEventsTable.id,
+          title: calendarEventsTable.title,
+          category: calendarEventsTable.category,
+          startAt: calendarEventsTable.startAt,
+          priority: calendarEventsTable.priority,
+        })
+        .from(calendarEventsTable)
+        .where(
+          and(
+            eq(calendarEventsTable.userId, user.id),
+            gte(calendarEventsTable.endAt, now),
+          ),
+        )
+        .orderBy(asc(calendarEventsTable.startAt))
+        .limit(5),
+    ]);
+
+    const totalObjectives = objectives.length;
+    const doneObjectives = objectives.filter((objective) => objective.completed).length;
+
     res.json({
       user: {
-        journeyType: "dipendente",
-        name: "Nome Utente",
-        email: "utente@example.com",
-        isPremium: false,
-        onboardingCompleted: true
+        journeyType: user.journeyType,
+        name: user.name,
+        email: user.email,
+        isPremium: Boolean(user.stripeSubscriptionId),
+        onboardingCompleted: user.onboardingCompleted,
       },
-      session: {
-        id: 1,
-        riasecScores: { R: 3, I: 4, A: 5, S: 2, E: 3, C: 4 },
-        primaryTypes: ["Investigativo", "Artistico"],
-        spiritScores: {
-          leadership: 3, creativity: 5, analysis: 4, people: 3, data: 4, practical: 3
-        },
-        recommendations: [
-          { sectorId: 1, sectorName: "Tecnologia", matchScore: 85 },
-          { sectorId: 2, sectorName: "Marketing", matchScore: 78 }
-        ],
-        createdAt: new Date().toISOString()
-      },
-      objectives: [],
+      session: latestSession[0] ?? null,
+      objectives,
       objectivesProgress: {
-        done: 0,
-        total: 0,
-        percent: 0
+        done: doneObjectives,
+        total: totalObjectives,
+        percent: totalObjectives > 0 ? Math.round((doneObjectives / totalObjectives) * 100) : 0,
       },
-      upcomingEvents: []
+      upcomingEvents,
     });
   } catch (err) {
     req.log?.error?.({ err }, "dashboard get error");

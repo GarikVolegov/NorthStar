@@ -7,7 +7,7 @@
  *   pnpm --filter @workspace/scripts run seed:catalog
  *
  * Dopo il seed, generare gli embedding con:
- *   POST /api/admin/agents/backfill  (x-admin-key richiesta)
+ *   POST /api/admin/agents/backfill  (richiede Bearer token admin)
  */
 
 import "dotenv/config";

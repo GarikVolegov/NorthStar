@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
 import { CheckCircle2, Circle, ChevronRight } from "lucide-react";
+import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -53,7 +54,8 @@ export function JourneyScoreWidget({ userId, compact = false }: { userId: number
   const { data, isLoading } = useQuery<JourneyScore>({
     queryKey: ["journey-score", userId],
     queryFn: async () => {
-      const r = await fetch(`${BASE}api/journey-score/${userId}`);
+      const r = await apiFetch(`${BASE}api/journey-score/${userId}`);
+      if (!r.ok) throw new Error(`journey-score ${r.status}`);
       return r.json();
     },
     enabled: !!userId,

@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { Loader2, Camera, Trash2 } from "lucide-react";
+import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -16,7 +17,7 @@ export function AvatarUpload({ userId, name, currentUrl, onUploaded }: {
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 400_000) { setError("Max 400 KB"); return; }
+    if (file.size > 2_000_000) { setError("Max 2 MB"); return; }
     if (!file.type.startsWith("image/")) { setError("Solo immagini"); return; }
 
     setError(null);
@@ -29,11 +30,10 @@ export function AvatarUpload({ userId, name, currentUrl, onUploaded }: {
         reader.readAsDataURL(file);
       });
 
-      const res = await fetch(`${BASE}api/profile/${userId}/avatar`, {
+      const res = await apiFetch(`${BASE}api/profile/${userId}/avatar`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ avatarDataUrl: dataUrl }),
-        credentials: "include",
       });
       if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? "Errore upload"); }
       const json = await res.json();
@@ -49,9 +49,8 @@ export function AvatarUpload({ userId, name, currentUrl, onUploaded }: {
   async function handleRemove() {
     setUploading(true);
     try {
-      await fetch(`${BASE}api/profile/${userId}/avatar`, {
+      await apiFetch(`${BASE}api/profile/${userId}/avatar`, {
         method: "DELETE",
-        credentials: "include",
       });
       onUploaded(null);
     } finally {
@@ -111,7 +110,7 @@ export function AvatarUpload({ userId, name, currentUrl, onUploaded }: {
       </div>
 
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <p className="text-[11px] text-muted-foreground -mt-1">JPG, PNG, WebP · max 400 KB</p>
+      <p className="text-[11px] text-muted-foreground -mt-1">JPG, PNG, WebP · max 2 MB</p>
 
       <input
         ref={fileRef}

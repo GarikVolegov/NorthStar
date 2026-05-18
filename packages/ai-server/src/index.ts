@@ -59,6 +59,8 @@ export { runCollector } from "./discovery-agent/collector-agent";
 export type { CollectorResult } from "./discovery-agent/collector-agent";
 export { runEnricher } from "./discovery-agent/enricher-agent";
 export type { EnricherResult } from "./discovery-agent/enricher-agent";
+export { runNewsPublisher } from "./discovery-agent/news-publisher";
+export type { NewsPublisherResult } from "./discovery-agent/news-publisher";
 export { getPersonalizedFeed, invalidateUserFeedCache } from "./discovery-agent/personalizer-agent";
 
 // Embeddings
@@ -104,6 +106,9 @@ export type { LLMProvider, LLMMessage, LLMConfig, ToolCall, ChatWithToolsResult,
 
 // Utilities
 export { withTimeout, gracefulDegrade } from "./utils";
+
+// Agenti AI dipendenti
+export { executeAgentTask } from "./agents/agent-executor";
 
 // Step 6/7: RAG pipeline
 export { chunkDocument, chunkReport, chunkNews } from "./rag/chunker";

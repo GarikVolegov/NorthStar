@@ -9,7 +9,14 @@ router.get("/", async (req, res) => {
     const { rows: pickCounts } = await pool.query<{ name: string; total_picks: number }>(`
       SELECT r->>'sectorName' AS name, count(*)::int AS total_picks
       FROM test_sessions,
-      jsonb_array_elements(recommendations::jsonb) AS r
+      jsonb_array_elements(
+        CASE
+          WHEN recommendations IS NULL THEN '[]'::jsonb
+          WHEN jsonb_typeof(recommendations::jsonb) = 'array' THEN recommendations::jsonb
+          ELSE '[]'::jsonb
+        END
+      ) AS r
+      WHERE r->>'sectorName' IS NOT NULL
       GROUP BY r->>'sectorName'
     `);
 

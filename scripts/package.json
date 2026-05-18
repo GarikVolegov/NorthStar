@@ -15,7 +15,8 @@
     "security:scan:all": "tsx ./src/security-agent.ts -- --all",
     "test:wendy-tools": "tsx ./src/test-wendy-tools.ts",
     "seed:rag": "tsx ./src/seed-rag.ts",
-    "rag:weak-signals": "tsx ./src/run-weak-signal-detector.ts"
+    "rag:weak-signals": "tsx ./src/run-weak-signal-detector.ts",
+    "admin:promote": "tsx ./src/admin-promote.ts"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",

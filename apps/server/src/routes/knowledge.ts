@@ -12,23 +12,32 @@ const createNodeSchema = z.object({
   type: z.string().min(1).max(32).optional(),
   title: z.string().min(1).max(200),
   content: z.string().default(""),
-  color: z.string().max(16).optional(),
-  url: z.string().optional(),
+  color: z.string().max(16).nullable().optional(),
+  url: z.string().nullable().optional(),
   sectorId: z.number().optional(),
+  x: z.number().optional(),
+  y: z.number().optional(),
 });
 
 const updateNodeSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   content: z.string().optional(),
-  color: z.string().max(16).optional(),
-  url: z.string().optional(),
+  color: z.string().max(16).nullable().optional(),
+  url: z.string().nullable().optional(),
   type: z.string().max(32).optional(),
+  x: z.number().optional(),
+  y: z.number().optional(),
 });
 
 const createEdgeSchema = z.object({
   sourceId: z.number(),
   targetId: z.number(),
   label: z.string().max(100).optional(),
+});
+
+const autoLinkAllSchema = z.object({
+  limit: z.number().int().min(2).max(30).optional(),
+  perNode: z.number().int().min(1).max(5).optional(),
 });
 
 // ── GET graph ────────────────────────────────────────────────
@@ -68,6 +77,8 @@ router.post("/nodes", requireAuth, async (req, res) => {
       color: data.color ?? null,
       url: data.url ?? null,
       sectorId: data.sectorId ?? null,
+      x: data.x ?? 0,
+      y: data.y ?? 0,
     })
     .returning();
 
@@ -78,7 +89,12 @@ router.post("/nodes", requireAuth, async (req, res) => {
 router.patch("/nodes/:id", requireAuth, async (req, res) => {
   const userId = req.user!.id;
   const id = parseInt(req.params.id);
-  const data = updateNodeSchema.parse(req.body);
+  const parsed = updateNodeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Dati nodo non validi" });
+    return;
+  }
+  const data = parsed.data;
 
   const [existing] = await db
     .select()
@@ -130,7 +146,17 @@ router.delete("/nodes/:id", requireAuth, async (req, res) => {
 // ── BATCH save positions ─────────────────────────────────────
 router.post("/nodes/positions", requireAuth, async (req, res) => {
   const userId = req.user!.id;
-  const positions = z.array(z.object({ id: z.number(), x: z.number(), y: z.number() })).parse(req.body);
+  const parsed = z.union([
+    z.array(z.object({ id: z.number(), x: z.number(), y: z.number() })),
+    z.object({ positions: z.array(z.object({ id: z.number(), x: z.number(), y: z.number() })) }),
+  ]).safeParse(req.body);
+
+  if (!parsed.success) {
+    res.status(400).json({ error: "Posizioni non valide" });
+    return;
+  }
+
+  const positions = Array.isArray(parsed.data) ? parsed.data : parsed.data.positions;
 
   for (const pos of positions) {
     await db
@@ -185,7 +211,102 @@ router.post("/nodes/:id/auto-link", requireAuth, wendyLimiter, wendyIpLimiter, p
     5,
   );
 
-  res.json({ suggestions });
+  const candidateById = new Map(filteredCandidates.map((c) => [c.id, c]));
+  res.json(
+    suggestions.map((s) => {
+      const target = candidateById.get(s.targetNodeId);
+      return {
+        id: s.targetNodeId,
+        title: s.targetTitle,
+        type: target?.type ?? "note",
+        score: s.score,
+        label: s.label,
+        reason: s.reason,
+      };
+    }),
+  );
+});
+
+// ── Auto-link all nodes (semantic agent) ─────────────────────
+router.post("/auto-link-all", requireAuth, wendyLimiter, wendyIpLimiter, planQuotaLimiter, async (req, res) => {
+  const userId = req.user!.id;
+  const parsed = autoLinkAllSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "Parametri auto-link non validi" });
+    return;
+  }
+
+  const limit = parsed.data.limit ?? 20;
+  const perNode = parsed.data.perNode ?? 3;
+
+  const nodes = await db
+    .select({ id: knowledgeNodesTable.id, title: knowledgeNodesTable.title, content: knowledgeNodesTable.content, type: knowledgeNodesTable.type })
+    .from(knowledgeNodesTable)
+    .where(eq(knowledgeNodesTable.userId, userId))
+    .limit(limit);
+
+  if (nodes.length < 2) {
+    res.json({ created: 0, skipped: 0, edges: [] });
+    return;
+  }
+
+  const existingEdges = await db
+    .select()
+    .from(knowledgeEdgesTable)
+    .where(eq(knowledgeEdgesTable.userId, userId));
+
+  const existingPairs = new Set<string>();
+  for (const edge of existingEdges) {
+    existingPairs.add(`${edge.sourceId}:${edge.targetId}`);
+    existingPairs.add(`${edge.targetId}:${edge.sourceId}`);
+  }
+
+  const createdEdges: Array<typeof knowledgeEdgesTable.$inferSelect> = [];
+  let skipped = 0;
+
+  for (const source of nodes) {
+    const candidates = nodes.filter(
+      (candidate) => candidate.id !== source.id && !existingPairs.has(`${source.id}:${candidate.id}`),
+    );
+    if (candidates.length === 0) continue;
+
+    const suggestions = await suggestAutoLinks(
+      { id: source.id, title: source.title, content: source.content ?? "", type: source.type },
+      candidates.map((c) => ({ id: c.id, title: c.title, content: c.content ?? "", type: c.type })),
+      perNode,
+    );
+
+    for (const suggestion of suggestions.slice(0, perNode)) {
+      const pairKey = `${source.id}:${suggestion.targetNodeId}`;
+      const reversePairKey = `${suggestion.targetNodeId}:${source.id}`;
+      if (existingPairs.has(pairKey) || existingPairs.has(reversePairKey)) {
+        skipped += 1;
+        continue;
+      }
+
+      try {
+        const [edge] = await db
+          .insert(knowledgeEdgesTable)
+          .values({
+            userId,
+            sourceId: source.id,
+            targetId: suggestion.targetNodeId,
+            label: suggestion.label || "collegato",
+          })
+          .returning();
+
+        if (edge) {
+          createdEdges.push(edge);
+          existingPairs.add(pairKey);
+          existingPairs.add(reversePairKey);
+        }
+      } catch {
+        skipped += 1;
+      }
+    }
+  }
+
+  res.status(201).json({ created: createdEdges.length, skipped, edges: createdEdges });
 });
 
 // ── Suggest missing nodes (ML) ──────────────────────────────
@@ -227,7 +348,7 @@ router.post("/edges", requireAuth, async (req, res) => {
 router.patch("/edges/:id", requireAuth, async (req, res) => {
   const userId = req.user!.id;
   const id = parseInt(req.params.id);
-  const data = z.object({ label: z.string().max(100).optional() }).parse(req.body);
+  const data = z.object({ label: z.string().max(100).nullable().optional() }).parse(req.body);
 
   const [existing] = await db
     .select()

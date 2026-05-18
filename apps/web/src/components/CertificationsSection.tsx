@@ -97,6 +97,7 @@ export function CertificationsSection({ userId }: { userId: number }) {
     queryKey: ["certifications"],
     queryFn: async () => {
       const r = await apiFetch(`${BASE}api/certifications`);
+      if (!r.ok) throw new Error(`certifications ${r.status}`);
       return r.json();
     },
     enabled: !!userId,

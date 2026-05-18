@@ -54,8 +54,8 @@ router.get("/", requireAuth, async (req, res) => {
       unreadCount: rows.filter((r) => !r.readAt).length,
     });
   } catch (e) {
-    log.error({ e, userId }, "[proactive-insights] list error");
-    res.status(500).json({ error: "Errore nel recupero degli insight" });
+    log.warn({ e, userId }, "[proactive-insights] list error — tabella non migrata?");
+    res.json({ insights: [], unreadCount: 0 });
   }
 });
 

@@ -88,7 +88,7 @@ export default function AdminAffiliazione() {
     setError("");
     try {
       const res = await fetch(`${BASE}api/affiliazione/leads`, {
-        headers: { "x-admin-key": adminKey },
+        headers: { Authorization: `Bearer ${adminKey}` },
       });
       if (!res.ok) throw new Error("Errore caricamento");
       const data: Lead[] = await res.json();
@@ -107,7 +107,7 @@ export default function AdminAffiliazione() {
   async function markContacted(id: number) {
     const res = await fetch(`${BASE}api/affiliazione/leads/${id}/read`, {
       method: "PATCH",
-      headers: { "x-admin-key": key },
+      headers: { Authorization: `Bearer ${key}` },
     });
     if (res.ok) {
       const updated: Lead = await res.json();
@@ -120,7 +120,7 @@ export default function AdminAffiliazione() {
     try {
       const res = await fetch(`${BASE}api/affiliazione/leads/${id}/status`, {
         method: "PATCH",
-        headers: { "x-admin-key": key, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
       if (res.ok) {

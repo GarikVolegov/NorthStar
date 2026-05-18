@@ -136,7 +136,7 @@ export default function AdminAgenti() {
     setError(null);
     try {
       const res = await fetch(`${BASE}api/admin/agent-health`, {
-        headers: { "x-admin-key": adminKey },
+        headers: { Authorization: `Bearer ${adminKey}` },
       });
       if (!res.ok) throw new Error("Errore server");
       setData(await res.json());

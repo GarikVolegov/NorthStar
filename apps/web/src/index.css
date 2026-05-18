@@ -58,3 +58,183 @@ html.lefty #root li, html.lefty #root td, html.lefty #root th {
 }
 
 /* Utility classes inherited from @workspace/design-tokens/northstar-theme.css (glass, pill-nav, hero-navy, section-growth, shimmer, gold-line, badge-gold, glow effects, touch-scroll-x, typography helpers) */
+
+/* ── Clerk Custom Theme Overrides ───────────────────────────────────────────
+   Stili aggiuntivi per i componenti Clerk che non sono coperti dall'API
+   `appearance`. Allineati al tema "Deep Navy Premium" di NorthStar.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Card container */
+.cl-card,
+.cl-signIn-start,
+.cl-signUp-start,
+.cl-verification-start,
+.cl-resetPassword-start {
+  background-color: #131621 !important;
+  border: 1px solid #1e2233 !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0px 12px 36px 0px rgba(0, 0, 0, 0.62), 0px 8px 16px -4px rgba(0, 0, 0, 0.70) !important;
+}
+
+/* Social buttons */
+.cl-socialButtonsBlockButton {
+  border: 1px solid #1e2233 !important;
+  border-radius: 0.75rem !important;
+  color: #e6e8ed !important;
+  transition: all 0.15s ease !important;
+}
+
+.cl-socialButtonsBlockButton:hover {
+  background-color: #1c2133 !important;
+  border-color: #2a3050 !important;
+}
+
+.cl-socialButtonsBlockButton__text {
+  color: #e6e8ed !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+/* Divider */
+.cl-dividerLine {
+  background-color: #1e2233 !important;
+}
+
+.cl-dividerText {
+  color: #7a7f96 !important;
+  font-size: 12px !important;
+}
+
+/* Footer links */
+.cl-footerActionLink {
+  color: #c19e4a !important;
+  font-weight: 600 !important;
+  transition: color 0.15s ease !important;
+}
+
+.cl-footerActionLink:hover {
+  color: #d4ba7c !important;
+}
+
+.cl-footerActionText {
+  color: #7a7f96 !important;
+}
+
+/* OTP inputs */
+.cl-otpCodeFieldInput {
+  background-color: #171b28 !important;
+  border: 2px solid #1e2233 !important;
+  border-radius: 0.75rem !important;
+  color: #e6e8ed !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+}
+
+.cl-otpCodeFieldInput:focus {
+  border-color: #c19e4a !important;
+}
+
+/* Alert / info text */
+.cl-alertText {
+  color: #7a7f96 !important;
+  font-size: 13px !important;
+}
+
+.cl-alertIcon {
+  color: #c19e4a !important;
+}
+
+/* Badge */
+.cl-badge {
+  background-color: rgba(193, 158, 74, 0.1) !important;
+  color: #c19e4a !important;
+  border: 1px solid rgba(193, 158, 74, 0.3) !important;
+  border-radius: 9999px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+/* User button popover */
+.cl-userButtonPopoverCard {
+  background-color: #131621 !important;
+  border: 1px solid #1e2233 !important;
+  border-radius: 0.75rem !important;
+}
+
+.cl-userButtonPopoverActionButton {
+  color: #e6e8ed !important;
+  border-radius: 0.5rem !important;
+}
+
+.cl-userButtonPopoverActionButton:hover {
+  background-color: #1c2133 !important;
+}
+
+.cl-userButtonPopoverActionButtonText {
+  color: #e6e8ed !important;
+}
+
+.cl-userButtonPopoverFooter {
+  border-top: 1px solid #1e2233 !important;
+}
+
+.cl-userButtonPopoverFooterText {
+  color: #7a7f96 !important;
+}
+
+.cl-userButtonPopoverFooterLink {
+  color: #c19e4a !important;
+}
+
+/* Form field error */
+.cl-formFieldErrorText {
+  color: #d94f45 !important;
+  font-size: 12px !important;
+}
+
+/* Form field hint */
+.cl-formFieldHintText {
+  color: #7a7f96 !important;
+  font-size: 12px !important;
+}
+
+/* Identity preview */
+.cl-identityPreviewText {
+  color: #e6e8ed !important;
+}
+
+.cl-identityPreviewEditButton {
+  color: #c19e4a !important;
+}
+
+/* Shimmer animation — gold instead of default gray */
+@keyframes clerk-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.cl-formButtonPrimary::after {
+  background: linear-gradient(90deg, transparent, rgba(193, 158, 74, 0.15), transparent) !important;
+  background-size: 200% 100% !important;
+  animation: clerk-shimmer 2s infinite linear !important;
+}
+
+/* Resend code button */
+.cl-resendCodeLink {
+  color: #c19e4a !important;
+  font-weight: 600 !important;
+}
+
+/* Header title — serif font for brand */
+.cl-headerTitle {
+  font-family: 'Playfair Display', Georgia, serif !important;
+}
+
+.cl-headerSubtitle {
+  color: #7a7f96 !important;
+}
+
+/* Footer */
+.cl-footer {
+  border-top: 1px solid #1e2233 !important;
+}

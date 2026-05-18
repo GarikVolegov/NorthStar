@@ -62,7 +62,7 @@ export const agentSuggestionsTable = pgTable("agent_suggestions", {
   payloadJson: jsonb("payload_json").$type<Record<string, unknown>>(),
   confidenceScore: real("confidence_score"),
   status: text("status", {
-    enum: ["pending_review", "approved", "rejected", "applied"],
+    enum: ["pending_review", "approved", "rejected", "applied", "archived"],
   })
     .notNull()
     .default("pending_review"),

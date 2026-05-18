@@ -54,13 +54,14 @@ export function ProssimiEventi({ userId, limit = 5, className }: Props) {
     queryKey: ["calendar-upcoming", userId, limit],
     queryFn: async () => {
       const res = await apiFetch(`${BASE}api/calendar/upcoming?limit=${limit}`);
+      if (!res.ok) throw new Error("Errore caricamento eventi");
       return res.json();
     },
     enabled: !!userId,
     refetchInterval: 5 * 60_000,
   });
 
-  const events: UpcomingEvent[] = data?.events ?? [];
+  const events: UpcomingEvent[] = Array.isArray(data) ? data : (data?.events ?? []);
 
   return (
     <div className={cn("rounded-xl border bg-card", className)}>

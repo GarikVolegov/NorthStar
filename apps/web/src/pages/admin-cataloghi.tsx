@@ -25,7 +25,7 @@ function useAdminFetch<T>(tab: Tab, adminKey: string) {
     setLoading(true);
     try {
       const res = await fetch(`${BASE}api/admin/catalogs/${tab}`, {
-        headers: { "x-admin-key": adminKey },
+        headers: { Authorization: `Bearer ${adminKey}` },
       });
       if (res.ok) setData(await res.json());
     } finally { setLoading(false); }
@@ -78,7 +78,7 @@ function SectorForm({ initial, adminKey, onSaved, onCancel }: {
       const url = initial ? `${BASE}api/admin/catalogs/sectors/${initial.id}` : `${BASE}api/admin/catalogs/sectors`;
       const method = initial ? "PUT" : "POST";
       await fetch(url, {
-        method, headers: { "x-admin-key": adminKey, "Content-Type": "application/json" },
+        method, headers: { Authorization: `Bearer ${adminKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({ name, description, icon, color, automationRisk, trend, growthRate: Number(growthRate), avgSalaryMin: Number(salaryMin), avgSalaryMax: Number(salaryMax) }),
       });
       onSaved();
@@ -142,7 +142,7 @@ function ProfessionForm({ initial, adminKey, onSaved, onCancel }: {
       const url = initial ? `${BASE}api/admin/catalogs/professions/${initial.id}` : `${BASE}api/admin/catalogs/professions`;
       const method = initial ? "PUT" : "POST";
       await fetch(url, {
-        method, headers: { "x-admin-key": adminKey, "Content-Type": "application/json" },
+        method, headers: { Authorization: `Bearer ${adminKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({ title, sector, description, salaryRange, growthOutlook }),
       });
       onSaved();
@@ -200,7 +200,7 @@ function EducationForm({ initial, adminKey, onSaved, onCancel }: {
       const url = initial ? `${BASE}api/admin/catalogs/education-paths/${initial.id}` : `${BASE}api/admin/catalogs/education-paths`;
       const method = initial ? "PUT" : "POST";
       await fetch(url, {
-        method, headers: { "x-admin-key": adminKey, "Content-Type": "application/json" },
+        method, headers: { Authorization: `Bearer ${adminKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({ path, type, duration, cost, steps, careerOutcomes, sectorFit }),
       });
       onSaved();
@@ -259,7 +259,7 @@ function GrowthArticleForm({ initial, adminKey, onSaved, onCancel }: {
       const url = initial ? `${BASE}api/admin/catalogs/growth-articles/${initial.id}` : `${BASE}api/admin/catalogs/growth-articles`;
       const method = initial ? "PUT" : "POST";
       await fetch(url, {
-        method, headers: { "x-admin-key": adminKey, "Content-Type": "application/json" },
+        method, headers: { Authorization: `Bearer ${adminKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({ title, category, description, difficulty, status, readTimeMinutes: Number(readTime), content }),
       });
       onSaved();
@@ -342,7 +342,7 @@ export default function AdminCataloghi() {
 
   async function deleteItem(url: string) {
     if (!confirm("Eliminare questo elemento?")) return;
-    await fetch(url, { method: "DELETE", headers: { "x-admin-key": key } });
+    await fetch(url, { method: "DELETE", headers: { Authorization: `Bearer ${key}` } });
     current.refresh();
   }
 

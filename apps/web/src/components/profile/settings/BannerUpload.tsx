@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { Loader2, Camera, Trash2, ImageUp } from "lucide-react";
+import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -28,11 +29,10 @@ export function BannerUpload({ userId, currentUrl, onUploaded }: {
         reader.readAsDataURL(file);
       });
 
-      const res = await fetch(`${BASE}api/profile/${userId}/banner`, {
+      const res = await apiFetch(`${BASE}api/profile/${userId}/banner`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bannerDataUrl: dataUrl }),
-        credentials: "include",
       });
       if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? "Errore upload"); }
       const json = await res.json();
@@ -48,9 +48,8 @@ export function BannerUpload({ userId, currentUrl, onUploaded }: {
   async function handleRemove() {
     setUploading(true);
     try {
-      await fetch(`${BASE}api/profile/${userId}/banner`, {
+      await apiFetch(`${BASE}api/profile/${userId}/banner`, {
         method: "DELETE",
-        credentials: "include",
       });
       onUploaded(null);
     } catch {

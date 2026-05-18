@@ -594,10 +594,14 @@ router.post("/clerk-sync", async (req, res) => {
     const authHeader = req.headers.authorization;
     const { clerkId: bodyClerkId, email, name } = req.body;
 
-    if (!bodyClerkId || !email || !name) {
-      res.status(400).json({ error: "clerkId, email e name richiesti" });
+    if (!bodyClerkId || typeof email !== "string" || !email.trim()) {
+      res.status(400).json({ error: "clerkId ed email richiesti" });
       return;
     }
+
+    const displayName = typeof name === "string" && name.trim()
+      ? name.trim()
+      : email.trim();
 
     if (authHeader?.startsWith("Bearer ")) {
       try {
@@ -619,7 +623,7 @@ router.post("/clerk-sync", async (req, res) => {
     }
 
     const clerkId = bodyClerkId;
-    const normalizedEmail = email.toLowerCase();
+    const normalizedEmail = email.trim().toLowerCase();
 
     let [user] = await protectedDbQuery(async () => {
       return await db
@@ -668,7 +672,7 @@ router.post("/clerk-sync", async (req, res) => {
         .set({
           clerkId,
           emailVerified: true,
-          name,
+          name: displayName,
           updatedAt: new Date(),
         })
         .where(eq(usersTable.id, existingByEmail.id));
@@ -710,7 +714,7 @@ router.post("/clerk-sync", async (req, res) => {
     const [created] = await db
       .insert(usersTable)
       .values({
-        name,
+        name: displayName,
         email: normalizedEmail,
         clerkId,
         emailVerified: true,
@@ -719,7 +723,7 @@ router.post("/clerk-sync", async (req, res) => {
 
     await db.insert(userProfileSettingsTable).values({
       userId: created.id,
-      username: generateUsername(name, created.id),
+      username: generateUsername(displayName, created.id),
     });
 
     const [newUser] = await db

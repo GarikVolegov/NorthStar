@@ -277,4 +277,41 @@ router.get("/search", requireAuth, async (req, res) => {
   res.json({ users });
 });
 
+/* ─── GET /api/users/me/work-preference  —  preferenza lavoro ──────── */
+router.get("/me/work-preference", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const [profile] = await db
+      .select({ workPreference: userProfileSettingsTable.workPreference })
+      .from(userProfileSettingsTable)
+      .where(eq(userProfileSettingsTable.userId, userId))
+      .limit(1);
+    res.json({ workPreference: profile?.workPreference ?? "unknown" });
+  } catch (err) {
+    req.log?.error?.({ err }, "work-preference get error");
+    res.status(500).json({ error: "Errore nel caricamento preferenza" });
+  }
+});
+
+/* ─── PATCH /api/users/me/work-preference  —  aggiorna preferenza ───── */
+router.patch("/me/work-preference", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { workPreference } = req.body;
+    if (!workPreference || typeof workPreference !== "string") {
+      res.status(400).json({ error: "workPreference richiesto" }); return;
+    }
+
+    await db
+      .update(userProfileSettingsTable)
+      .set({ workPreference, updatedAt: new Date() })
+      .where(eq(userProfileSettingsTable.userId, userId));
+
+    res.json({ workPreference });
+  } catch (err) {
+    req.log?.error?.({ err }, "work-preference update error");
+    res.status(500).json({ error: "Errore nel salvataggio preferenza" });
+  }
+});
+
 export default router;

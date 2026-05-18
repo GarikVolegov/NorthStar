@@ -6,6 +6,7 @@
  *   2. Dev.to API              — articoli formativi su skill tech (no key)
  *   3. Reddit JSON API         — r/cscareerquestions, r/learnprogramming, r/ItaliaPersonalFinance
  *   4. NewsAPI.org             — notizie lavoro, mercato, tech (free key, env: NEWS_API_KEY)
+ *   5. GNews.io                — notizie globali con focus IT (free key, env: GNEWS_API_KEY)
  *   ── D7: Fonti formazione certificata ────────────────────────────────────────
  *   5. Coursera Blog RSS       — guide carriera, annunci corsi (no key)
  *   6. Udemy Blog RSS          — skill trends, learning guides (no key)
@@ -276,7 +277,58 @@ async function collectNewsAPI(): Promise<RawItem[]> {
   return results;
 }
 
-// ── D7 Source 5: Coursera Blog RSS ─────────────────────────────────────────────
+// ── Source 5: GNews ─────────────────────────────────────────────────────────────
+
+interface GNewsArticle {
+  title: string;
+  description: string;
+  content: string;
+  url: string;
+  image: string;
+  publishedAt: string;
+  source: { name: string; url: string; icon: string };
+}
+
+async function collectGNews(): Promise<RawItem[]> {
+  const apiKey = process.env.GNEWS_API_KEY;
+  if (!apiKey) return [];
+  const queries: Array<{ q: string; type: ItemType; sector: string }> = [
+    { q: "lavoro tecnologia italia",             type: "opportunity",  sector: "Technology" },
+    { q: "formazione professionale digitale",     type: "formation",    sector: "Education" },
+    { q: "startup italia finanziamento",          type: "opportunity",  sector: "Startup" },
+    { q: "intelligenza artificiale lavoro",       type: "sector_trend", sector: "Artificial Intelligence" },
+    { q: "mercato del lavoro 2026",               type: "news",         sector: "Labor Market" },
+    { q: "economia digitale europa",              type: "sector_trend", sector: "Digital Economy" },
+  ];
+  const results: RawItem[] = [];
+  await Promise.allSettled(queries.map(async ({ q, type, sector }) => {
+    try {
+      const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(q)}&lang=it&max=5&apikey=${apiKey}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+      if (!res.ok) return;
+      const data = await res.json() as { articles?: GNewsArticle[] };
+      for (const a of (data.articles ?? [])) {
+        if (!a.url || !a.title) continue;
+        results.push({
+          type,
+          title: a.title,
+          url: a.url,
+          source: a.source?.name ?? "GNews",
+          summary: a.description ?? a.content?.slice(0, 400) ?? "",
+          imageUrl: a.image ?? undefined,
+          publishedAt: a.publishedAt ? new Date(a.publishedAt) : undefined,
+          category: type,
+          sectorNames: [sector],
+          collectorSource: "gnews",
+          searchQuery: q,
+        });
+      }
+    } catch { /* skip */ }
+  }));
+  return results;
+}
+
+// ── D7 Source 6: Coursera Blog RSS ─────────────────────────────────────────────
 
 async function collectCourseraRSS(): Promise<RawItem[]> {
   const feeds = [
@@ -295,7 +347,7 @@ async function collectCourseraRSS(): Promise<RawItem[]> {
   return results;
 }
 
-// ── D7 Source 6: Udemy Blog RSS ────────────────────────────────────────────────
+// ── D7 Source 7: Udemy Blog RSS ────────────────────────────────────────────────
 
 async function collectUdemyRSS(): Promise<RawItem[]> {
   const feeds = [
@@ -317,7 +369,7 @@ async function collectUdemyRSS(): Promise<RawItem[]> {
   return results;
 }
 
-// ── D7 Source 7: MIT OpenCourseWare RSS ───────────────────────────────────────
+// ── D7 Source 8: MIT OpenCourseWare RSS ───────────────────────────────────────
 
 async function collectMITOpenCourseWare(): Promise<RawItem[]> {
   const feeds = [
@@ -336,7 +388,7 @@ async function collectMITOpenCourseWare(): Promise<RawItem[]> {
   return results;
 }
 
-// ── D7 Source 8: YouTube EDU RSS ──────────────────────────────────────────────
+// ── D7 Source 9: YouTube EDU RSS ──────────────────────────────────────────────
 
 async function collectYouTubeEDU(): Promise<RawItem[]> {
   const channels: Array<{ id: string; name: string; type: ItemType; sector: string; category: string }> = [
@@ -360,7 +412,7 @@ async function collectYouTubeEDU(): Promise<RawItem[]> {
   return results;
 }
 
-// ── D7+IT Source 9: Il Sole 24 Ore RSS ────────────────────────────────────────
+// ── D7+IT Source 10: Il Sole 24 Ore RSS ────────────────────────────────────────
 //
 // Il Sole 24 Ore è il principale quotidiano economico-finanziario italiano.
 // Pubblica feed RSS pubblici suddivisi per sezione.
@@ -393,7 +445,7 @@ async function collectIlSole24Ore(): Promise<RawItem[]> {
   return results;
 }
 
-// ── D7+IT Source 10: Ninja Marketing RSS ──────────────────────────────────────
+// ── D7+IT Source 11: Ninja Marketing RSS ──────────────────────────────────────
 //
 // Ninja Marketing (ninjamarketing.it) è uno dei principali media italiani su:
 //   - Marketing digitale e social media
@@ -422,7 +474,7 @@ async function collectNinjaMarketing(): Promise<RawItem[]> {
   return results;
 }
 
-// ── Source 11: Dynamic sources from DB (admin-managed) ────────────────────────
+// ── Source 12: Dynamic sources from DB (admin-managed) ────────────────────────
 //
 // Legge la tabella discovery_sources (abilitata=true) e processa i feed RSS
 // configurati dall'admin via DiscoverySourcesManager.
@@ -538,6 +590,7 @@ export async function runCollector(): Promise<CollectorResult> {
     { name: "devto",               fn: collectDevTo },
     { name: "reddit",              fn: collectReddit },
     { name: "newsapi",             fn: collectNewsAPI },
+    { name: "gnews",               fn: collectGNews },
     { name: "coursera_rss",        fn: collectCourseraRSS },
     { name: "udemy_rss",           fn: collectUdemyRSS },
     { name: "mit_ocw_rss",         fn: collectMITOpenCourseWare },

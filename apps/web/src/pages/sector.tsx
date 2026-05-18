@@ -159,11 +159,11 @@ export default function Sector() {
 
   // Memoised: recomputed only when stats change or t() reference changes (lang switch).
   const chartData = useMemo<ChartEntry[]>(() => {
-    if (!stats) return [];
+    if (!stats?.growthProjection) return [];
     return [
-      { name: t("sector.shortTerm"), value: parseInt(stats.growthProjection.shortTerm), color: "hsl(var(--chart-1))" },
-      { name: t("sector.midTerm"),   value: parseInt(stats.growthProjection.midTerm),   color: "hsl(var(--chart-2))" },
-      { name: t("sector.longTerm"),  value: parseInt(stats.growthProjection.longTerm),  color: "hsl(var(--chart-3))" },
+      { name: t("sector.shortTerm"), value: parseInt(stats.growthProjection.shortTerm ?? "0"), color: "hsl(var(--chart-1))" },
+      { name: t("sector.midTerm"),   value: parseInt(stats.growthProjection.midTerm   ?? "0"), color: "hsl(var(--chart-2))" },
+      { name: t("sector.longTerm"),  value: parseInt(stats.growthProjection.longTerm  ?? "0"), color: "hsl(var(--chart-3))" },
     ];
   }, [stats, t]);
 

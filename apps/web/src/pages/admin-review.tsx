@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -43,9 +44,9 @@ import {
   MessageCircle,
   Handshake,
   Shield,
+  Menu,
 } from "lucide-react";
-import { useAdminAuth } from "@/hooks/useAdminAuth";
-import { AdminAuthGate } from "@/components/AdminAuthGate";
+import { useAuth } from "@/contexts/AuthContext";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -54,6 +55,7 @@ type SuggestionStatus =
   | "pending_review"
   | "approved"
   | "rejected"
+  | "applied"
   | "archived";
 type EntityType =
   | "sector"
@@ -76,12 +78,16 @@ type Suggestion = {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  agentName?: string | null;
+  queuePriority?: string | null;
+  queueStatus?: string | null;
 };
 
 type AgentRun = {
   id: number;
   agentName: string;
   userId: number | null;
+  taskType?: string | null;
   inputSummary: string | null;
   outputSummary: string | null;
   status: string;
@@ -106,6 +112,7 @@ type DashboardStats = {
   pending: number;
   approved: number;
   rejected: number;
+  applied?: number;
   archived: number;
   totalRuns: number;
 };
@@ -114,6 +121,14 @@ type SuggestionDetail = {
   suggestion: Suggestion;
   agentRun: AgentRun | null;
   queueItem: { id: number; queueStatus: string; priority: string } | null;
+  auditTrail?: Array<{
+    id: number;
+    actorId: number | null;
+    action: string;
+    category: string | null;
+    metadata: Record<string, unknown> | null;
+    createdAt: string;
+  }>;
 };
 
 const STATUS_CONFIG: Record<
@@ -139,6 +154,11 @@ const STATUS_CONFIG: Record<
     label: "Rifiutato",
     color: "bg-red-100 text-red-700",
     icon: XCircle,
+  },
+  applied: {
+    label: "Applicato",
+    color: "bg-blue-100 text-blue-700",
+    icon: CheckCircle2,
   },
   archived: {
     label: "Archiviato",
@@ -192,12 +212,446 @@ type AgentPrompt = {
   label: string;
   description: string;
   placeholders: string[];
+  requiredPlaceholders: string[];
   defaultValue: string;
   currentValue: string;
+  draftValue: string;
   isOverridden: boolean;
+  hasDraft: boolean;
+  activeVersionId: number | null;
+  activeVersionNumber: number | null;
+  draftVersionId: number | null;
+  draftVersionNumber: number | null;
   updatedAt: string | null;
   updatedBy: string | null;
+  validation?: PromptValidation;
 };
+
+type PromptValidation = {
+  ok: boolean;
+  errors: string[];
+  warnings: string[];
+  placeholders: string[];
+  unknownPlaceholders: string[];
+  missingPlaceholders: string[];
+  missingRequiredPlaceholders: string[];
+};
+
+type PromptVersion = {
+  id: number;
+  versionNumber: number;
+  status: "draft" | "active" | "archived" | "rolled_back";
+  value: string;
+  notes: string | null;
+  createdBy: number | null;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  validation?: PromptValidation;
+};
+
+type PromptPreview = {
+  rendered: string;
+  variables: Record<string, string>;
+  validation: PromptValidation;
+};
+
+type PromptEditorTab = "editor" | "preview" | "versions";
+
+type AgentsOverview = {
+  generatedAt: string;
+  summary: {
+    totalRuns: number;
+    totalAgents: number;
+    successRate30d: number;
+    avgDurationMs: number | null;
+    failedRuns: number;
+    runningRuns: number;
+    degradedAgents: number;
+    criticalAgents: number;
+    costUsd30d: number;
+    totalTokens30d: number;
+    aiRequests30d: number;
+    aiErrors30d: number;
+  };
+  agents: Array<{
+    agentName: string;
+    totalCalls30d: number;
+    completed30d: number;
+    running30d: number;
+    errorCount30d: number;
+    errorRate30d: number;
+    successRate30d: number;
+    avgDurationMs: number | null;
+    lastRunAt: string | null;
+    lastErrorAt: string | null;
+    status: "healthy" | "degraded" | "critical";
+  }>;
+  recentRuns: AgentRun[];
+  recentErrors: Array<{
+    id: number;
+    agentName: string;
+    taskType: string | null;
+    startedAt: string;
+    durationMs: number | null;
+    errorMessage: string | null;
+    status: string;
+  }>;
+  costs: {
+    days: number;
+    estimatedCostUsd: number;
+    totalTokens: number;
+    promptTokens: number;
+    completionTokens: number;
+    requestCount: number;
+    aiRequestCostUsd: number;
+    aiRequestTokens: number;
+    aiRequestCount: number;
+    aiErrorCount: number;
+    byProvider: Array<{
+      provider: string;
+      costUsd: number;
+      tokens: number;
+      requests: number;
+    }>;
+  };
+  runnableAgents: Array<{
+    key: string;
+    label: string;
+    description: string;
+    endpoint: string;
+    method: "POST";
+    risk: "low" | "medium" | "high";
+    requiresInput?: boolean;
+  }>;
+};
+
+type AgentsTab = "overview" | "history" | "errors" | "launch";
+
+type AdminOverview = {
+  generatedAt: string;
+  health: {
+    status: "healthy" | "attention" | "critical";
+    label: string;
+    reasons: string[];
+    criticalCount: number;
+    actionItems: number;
+  };
+  queues: {
+    reviewPending: number;
+    growthPending: number;
+    totalOpen: number;
+  };
+  errors: {
+    totalCaptured: number;
+    unique: number;
+    brokenComponents: string[];
+    recent: Array<{
+      file: string;
+      function: string;
+      message: string;
+      code: string | null;
+      capturedAt: string;
+      occurrences: number;
+    }>;
+  };
+  agents: {
+    total: number;
+    critical: number;
+    degraded: number;
+    failedRecent: Array<{
+      id: number;
+      agentName: string;
+      taskType: string | null;
+      startedAt: string;
+      durationMs: number | null;
+      errorMessage: string | null;
+      status: string;
+    }>;
+    health: Array<{
+      agentName: string;
+      totalCalls30d: number;
+      errorCount30d: number;
+      errorRate30d: number;
+      successRate30d: number;
+      avgDurationMs: number | null;
+      status: "healthy" | "degraded" | "critical";
+    }>;
+  };
+  metrics: {
+    users: { total: number; premium: number; new30d: number };
+    tests: { total: number };
+    calendar: { upcoming: number; next24h: number } | null;
+  };
+  inbox: {
+    unreadMessages: number;
+    pendingLeads: number;
+    contactedLeads: number;
+    totalMessages: number;
+    totalLeads: number;
+  };
+};
+
+type WendyQualityOverview = {
+  generatedAt: string;
+  days: number;
+  summary: {
+    total: number;
+    avgEvalScore: number | null;
+    avgSupervisorScore: number | null;
+    rewriteRate: number;
+    clarificationRate: number;
+    toolUsageRate: number;
+    rewrites: number;
+    clarifications: number;
+    uiTools: number;
+    avgResponseTimeMs: number | null;
+    supervisorRewriteCount: number;
+    avgScoreBeforeRewrite: number | null;
+    avgScoreAfterRewrite: number | null;
+    feedbackTotal: number;
+    negativeFeedback: number;
+    positiveFeedback: number;
+    negativeFeedbackRate: number;
+  };
+  trends: Array<{
+    day: string;
+    total: number;
+    avgEvalScore: number | null;
+    avgSupervisorScore: number | null;
+    rewriteRate: number;
+    clarificationRate: number;
+    toolUsageRate: number;
+    avgLatencyMs: number | null;
+    aiRequests: number;
+    aiErrors: number;
+    toolCalls: number;
+  }>;
+  domains: Array<{
+    domain: string;
+    total: number;
+    avgEvalScore: number | null;
+    avgSupervisorScore: number | null;
+    rewriteRate: number;
+    clarificationRate: number;
+    toolUsageRate: number;
+    avgResponseTimeMs: number | null;
+    status: "healthy" | "attention" | "critical";
+  }>;
+  problemConversations: Array<{
+    id: string;
+    source: "supervisor" | "feedback";
+    createdAt: string;
+    sessionId: number | null;
+    domain: string;
+    intent: string;
+    score: number | null;
+    scoreAfter: number | null;
+    reason: string;
+    snippet: string;
+  }>;
+  rewriteReasons: Array<{ reason: string; count: number }>;
+  alerts: Array<{
+    level: "attention" | "critical";
+    title: string;
+    message: string;
+    domain: string | null;
+  }>;
+};
+
+const SECTION_BY_PATH: Record<string, SidebarSection> = {
+  review: "queue",
+  queue: "queue",
+  suggestions: "suggestions",
+  suggerimenti: "suggestions",
+  runs: "agents",
+  esecuzioni: "agents",
+  logs: "logs",
+  settings: "settings",
+  impostazioni: "settings",
+  agents: "agents",
+  "lancia-agenti": "agents",
+  prompts: "prompts",
+  qualita: "qualita",
+  quality: "qualita",
+  cataloghi: "cataloghi",
+  rag: "cataloghi",
+  "agenti-salute": "agents",
+  "agent-health": "agents",
+  agenti: "agents",
+  metriche: "metriche",
+  status: "status",
+  messaggi: "messaggi",
+  crescita: "crescita",
+  affiliazione: "affiliazione",
+};
+
+const PATH_BY_SECTION: Record<SidebarSection, string> = {
+  home: "/admin",
+  queue: "/admin/review",
+  suggestions: "/admin/suggestions",
+  runs: "/admin/runs",
+  logs: "/admin/logs",
+  settings: "/admin/settings",
+  agents: "/admin/agenti",
+  prompts: "/admin/prompts",
+  qualita: "/admin/qualita",
+  cataloghi: "/admin/cataloghi",
+  "agenti-salute": "/admin/agenti",
+  metriche: "/admin/metriche",
+  status: "/admin/status",
+  messaggi: "/admin/messaggi",
+  crescita: "/admin/crescita",
+  affiliazione: "/admin/affiliazione",
+};
+
+const TITLE_BY_SECTION: Record<SidebarSection, string> = {
+  home: "Panoramica Admin",
+  queue: "Queue Revisione",
+  suggestions: "Tutti i Suggerimenti",
+  runs: "Agenti",
+  logs: "Audit Log",
+  settings: "Impostazioni",
+  agents: "Agenti",
+  prompts: "Gestione Prompt AI",
+  qualita: "Qualita Wendy",
+  cataloghi: "Cataloghi",
+  "agenti-salute": "Agenti",
+  metriche: "Metriche Business",
+  status: "Status & Setup",
+  messaggi: "Messaggi",
+  crescita: "Coda Crescita",
+  affiliazione: "Partner & Affiliazioni",
+};
+
+const ADMIN_NAV_GROUPS: Array<{
+  label: string;
+  items: Array<{
+    key: SidebarSection;
+    label: string;
+    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+    count?: (stats: DashboardStats | null) => number | undefined;
+  }>;
+}> = [
+  {
+    label: "Operativo",
+    items: [
+      { key: "home", label: "Panoramica", icon: Home },
+      { key: "queue", label: "Queue Revisione", icon: ClipboardList, count: (stats) => stats?.pending },
+      { key: "suggestions", label: "Suggerimenti", icon: Bot },
+      { key: "messaggi", label: "Messaggi", icon: MessageCircle },
+    ],
+  },
+  {
+    label: "AI / Wendy",
+    items: [
+      { key: "agents", label: "Agenti", icon: Activity },
+      { key: "prompts", label: "Prompt Agenti", icon: Code2 },
+      { key: "qualita", label: "Qualita Wendy", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Contenuti",
+    items: [
+      { key: "cataloghi", label: "Cataloghi", icon: BookOpen },
+      { key: "crescita", label: "Coda Crescita", icon: Sparkles },
+    ],
+  },
+  {
+    label: "Business",
+    items: [
+      { key: "metriche", label: "Metriche Business", icon: BarChart3 },
+      { key: "affiliazione", label: "Partner", icon: Handshake },
+    ],
+  },
+  {
+    label: "Sistema",
+    items: [
+      { key: "status", label: "Status & Setup", icon: Settings },
+      { key: "logs", label: "Audit Log", icon: FileText },
+      { key: "settings", label: "Impostazioni", icon: Settings },
+    ],
+  },
+];
+
+const HEALTH_UI = {
+  healthy: {
+    label: "Tutto stabile",
+    tone: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    dot: "bg-emerald-500",
+    icon: CheckCircle2,
+  },
+  attention: {
+    label: "Attenzione",
+    tone: "border-amber-200 bg-amber-50 text-amber-800",
+    dot: "bg-amber-500",
+    icon: Clock,
+  },
+  critical: {
+    label: "Intervento richiesto",
+    tone: "border-red-200 bg-red-50 text-red-800",
+    dot: "bg-red-500",
+    icon: ShieldAlert,
+  },
+} as const;
+
+function sectionFromLocation(pathname: string): SidebarSection {
+  const segment = pathname.split("/").filter(Boolean)[1];
+  return segment ? (SECTION_BY_PATH[segment] ?? "home") : "home";
+}
+
+function formatLastUpdated(iso: string | null) {
+  if (!iso) return "Non ancora aggiornato";
+  return `Aggiornato ${new Date(iso).toLocaleTimeString("it-IT", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
+}
+
+function formatValue(value: unknown): string {
+  if (value == null) return "-";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(formatValue).join(", ");
+  return JSON.stringify(value);
+}
+
+function humanizeKey(key: string): string {
+  return key
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function payloadEntries(payload: Record<string, unknown> | null) {
+  if (!payload) return [];
+  const hidden = new Set(["before", "after", "changes", "diff", "raw", "metadata"]);
+  return Object.entries(payload)
+    .filter(([key, value]) => !hidden.has(key) && value != null && typeof value !== "object")
+    .slice(0, 8);
+}
+
+function payloadDiffs(payload: Record<string, unknown> | null) {
+  if (!payload) return [];
+  const before = typeof payload.before === "object" && payload.before ? payload.before as Record<string, unknown> : null;
+  const after = typeof payload.after === "object" && payload.after ? payload.after as Record<string, unknown> : null;
+  if (before && after) {
+    return Array.from(new Set([...Object.keys(before), ...Object.keys(after)]))
+      .filter((key) => formatValue(before[key]) !== formatValue(after[key]))
+      .slice(0, 8)
+      .map((key) => ({ key, before: before[key], after: after[key] }));
+  }
+
+  const changes = Array.isArray(payload.changes) ? payload.changes : Array.isArray(payload.diff) ? payload.diff : [];
+  return changes
+    .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+    .slice(0, 8)
+    .map((item, index) => ({
+      key: String(item.field ?? item.key ?? `Cambio ${index + 1}`),
+      before: item.before ?? item.oldValue ?? item.from,
+      after: item.after ?? item.newValue ?? item.to ?? item.value,
+    }));
+}
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleString("it-IT", {
@@ -216,6 +670,40 @@ function fmtShortDate(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function fmtDuration(ms: number | null | undefined) {
+  if (ms == null) return "N/D";
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  return `${Math.round(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+}
+
+function fmtUsd(value: number | null | undefined) {
+  const amount = Number(value) || 0;
+  return `$${amount < 1 ? amount.toFixed(4) : amount.toFixed(2)}`;
+}
+
+function fmtPct(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return "N/D";
+  return `${Math.round(value * 100)}%`;
+}
+
+function fmtScore(value: number | null | undefined) {
+  return fmtPct(value);
+}
+
+function agentStatusLabel(status: "healthy" | "degraded" | "critical") {
+  if (status === "healthy") return "Stabile";
+  if (status === "degraded") return "Degradato";
+  return "Critico";
+}
+
+function agentStatusClass(status: "healthy" | "degraded" | "critical") {
+  if (status === "healthy") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "degraded") return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-red-200 bg-red-50 text-red-800";
 }
 
 function StatusBadge({ status }: { status: SuggestionStatus }) {
@@ -258,28 +746,38 @@ function ConfidenceBadge({ score }: { score: number | null }) {
 }
 
 export default function AdminReview() {
+  const [location, setLocation] = useLocation();
+
   useEffect(() => {
-    document.title = "Admin Review â€” NorthStar";
+    document.title = "Admin Console - NorthStar";
   }, []);
 
-  const { key, isAuthenticated, authError, login, logout, setAuthError } = useAdminAuth();
+  const { token, isLoggedIn, logout } = useAuth();
 
-  const [section, setSection] = useState<SidebarSection>("queue");
+  const [section, setSection] = useState<SidebarSection>(() =>
+    sectionFromLocation(location),
+  );
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestionsTotal, setSuggestionsTotal] = useState(0);
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [adminError, setAdminError] = useState<string | null>(null);
+  const [adminForbidden, setAdminForbidden] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [detail, setDetail] = useState<SuggestionDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterEntity, setFilterEntity] = useState<string>("all");
+  const [filterConfidence, setFilterConfidence] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [editNotes, setEditNotes] = useState("");
   const [showEditNotes, setShowEditNotes] = useState(false);
+  const [showTechnicalData, setShowTechnicalData] = useState(false);
 
   const [agentsRunning, setAgentsRunning] = useState<Set<string>>(new Set());
   const [agentsResult, setAgentsResult] = useState<
@@ -288,20 +786,31 @@ export default function AdminReview() {
   const [newsSectorInput, setNewsSectorInput] = useState("");
   const [runHistory, setRunHistory] = useState<AgentRunRecord[]>([]);
   const [runHistoryLoading, setRunHistoryLoading] = useState(false);
+  const [agentsOverviewData, setAgentsOverviewData] = useState<AgentsOverview | null>(null);
+  const [agentsOverviewLoading, setAgentsOverviewLoading] = useState(false);
+  const [agentsTab, setAgentsTab] = useState<AgentsTab>("overview");
+  const [agentFilter, setAgentFilter] = useState("all");
+  const [agentStatusFilter, setAgentStatusFilter] = useState("all");
+  const [agentDays, setAgentDays] = useState("30");
 
   const [prompts, setPrompts] = useState<AgentPrompt[]>([]);
   const [promptsLoading, setPromptsLoading] = useState(false);
   const [promptExpandedKey, setPromptExpandedKey] = useState<string | null>(
     null,
   );
+  const [promptTab, setPromptTab] = useState<PromptEditorTab>("editor");
   const [promptEditValues, setPromptEditValues] = useState<
     Record<string, string>
   >({});
+  const [promptNotes, setPromptNotes] = useState<Record<string, string>>({});
+  const [promptVersions, setPromptVersions] = useState<Record<string, PromptVersion[]>>({});
+  const [promptPreview, setPromptPreview] = useState<Record<string, PromptPreview>>({});
   const [promptSaving, setPromptSaving] = useState<Set<string>>(new Set());
 
 // Qualita section
-const [qualitaData, setQualitaData] = useState<any | null>(null);
+const [qualitaData, setQualitaData] = useState<WendyQualityOverview | null>(null);
 const [qualitaLoading, setQualitaLoading] = useState(false);
+const [qualitaDays, setQualitaDays] = useState("30");
 
 // Cataloghi section
 const [cataloghiData, setCataloghiData] = useState<any>(null);
@@ -317,7 +826,7 @@ const [wendyMetricsData, setWendyMetricsData] = useState<any | null>(null);
 const [metricheLoading, setMetricheLoading] = useState(false);
 
 // Home section
-const [homeData, setHomeData] = useState<any>(null);
+const [homeData, setHomeData] = useState<AdminOverview | null>(null);
 const [homeLoading, setHomeLoading] = useState(false);
 
 // Status section
@@ -338,23 +847,38 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
 
   const apiFetch = useCallback(
     async (path: string, options?: RequestInit) => {
+      if (!token || adminForbidden) {
+        throw new Error("auth");
+      }
+
       const res = await fetch(`${BASE}api${path}`, {
         ...options,
         headers: {
-          "x-admin-key": key,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
           ...(options?.headers || {}),
         },
       });
-      if (res.status === 403) {
-        setAuthError(true);
-        setAuthError(true);
+      if (res.status === 401) {
+        logout();
         throw new Error("auth");
       }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
+      if (res.status === 403) {
+        setAdminForbidden(true);
+        setAdminError("Accesso non autorizzato: il tuo account non ha il ruolo admin.");
+        throw new Error("forbidden");
+      }
+      if (!res.ok) {
+        const message = `Errore ${res.status} durante il caricamento della console admin.`;
+        setAdminError(message);
+        throw new Error(message);
+      }
+      const data = await res.json();
+      setAdminError(null);
+      setLastUpdatedAt(new Date().toISOString());
+      return data;
     },
-    [key],
+    [adminForbidden, logout, token],
   );
 
   const loadStats = useCallback(async () => {
@@ -371,8 +895,10 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filterStatus !== "all") params.set("status", filterStatus);
+      if (section === "queue") params.set("status", "pending_review");
+      else if (filterStatus !== "all") params.set("status", filterStatus);
       if (filterEntity !== "all") params.set("entity_type", filterEntity);
+      if (filterConfidence !== "all") params.set("confidence_min", filterConfidence);
       if (searchTerm) params.set("search", searchTerm);
       params.set("limit", "100");
       const data = await apiFetch(`/admin/suggestions?${params}`);
@@ -383,7 +909,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
       /* handled */
     }
     setLoading(false);
-  }, [apiFetch, filterStatus, filterEntity, searchTerm]);
+  }, [apiFetch, filterStatus, filterEntity, filterConfidence, searchTerm, section]);
 
   const loadRuns = useCallback(async () => {
     setLoading(true);
@@ -413,8 +939,9 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     async (id: number) => {
       setDetailLoading(true);
       try {
-        const data = await apiFetch(`/admin/suggestions/${id}`);
-        setDetail(data);
+      const data = await apiFetch(`/admin/suggestions/${id}`);
+      setDetail(data);
+      setShowTechnicalData(false);
       } catch {
         /* handled */
       }
@@ -429,14 +956,58 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
       const data = await apiFetch("/admin/prompts");
       setPrompts(data as AgentPrompt[]);
       const vals: Record<string, string> = {};
-      for (const p of data as AgentPrompt[]) vals[p.key] = p.currentValue;
+      const notes: Record<string, string> = {};
+      for (const p of data as AgentPrompt[]) {
+        vals[p.key] = p.draftValue ?? p.currentValue;
+        notes[p.key] = "";
+      }
       setPromptEditValues(vals);
+      setPromptNotes(notes);
 
     } catch {
       /* handled */
     }
     setPromptsLoading(false);
   }, [apiFetch]);
+
+  const loadPromptVersions = useCallback(
+    async (key: string) => {
+      try {
+        const data = await apiFetch(`/admin/prompts/${key}/versions`);
+        setPromptVersions((prev) => ({
+          ...prev,
+          [key]: (data.versions ?? []) as PromptVersion[],
+        }));
+      } catch {
+        /* handled */
+      }
+    },
+    [apiFetch],
+  );
+
+  const loadPromptPreview = useCallback(
+    async (key: string) => {
+      setPromptSaving((prev) => new Set(prev).add(`${key}:preview`));
+      try {
+        const data = await apiFetch(`/admin/prompts/${key}/preview`, {
+          method: "POST",
+          body: JSON.stringify({ value: promptEditValues[key] ?? "" }),
+        });
+        setPromptPreview((prev) => ({
+          ...prev,
+          [key]: data as PromptPreview,
+        }));
+      } catch {
+        /* handled */
+      }
+      setPromptSaving((prev) => {
+        const s = new Set(prev);
+        s.delete(`${key}:preview`);
+        return s;
+      });
+    },
+    [apiFetch, promptEditValues],
+  );
 
   const loadRunHistory = useCallback(async () => {
     setRunHistoryLoading(true);
@@ -450,17 +1021,29 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     setRunHistoryLoading(false);
   }, [apiFetch]);
 
+  const loadAgentsOverview = useCallback(async () => {
+    setAgentsOverviewLoading(true);
+    try {
+      const data = await apiFetch(`/admin/agents/overview?days=${agentDays}&limit=100`);
+      setAgentsOverviewData(data as AgentsOverview);
+
+    } catch {
+      /* handled */
+    }
+    setAgentsOverviewLoading(false);
+  }, [agentDays, apiFetch]);
+
   const loadQualita = useCallback(async () => {
     setQualitaLoading(true);
     try {
-      const data = await apiFetch("/admin/quality");
-      setQualitaData(data);
+      const data = await apiFetch(`/admin/quality/overview?days=${qualitaDays}&limit=50`);
+      setQualitaData(data as WendyQualityOverview);
 
     } catch {
       /* handled */
     }
     setQualitaLoading(false);
-  }, [apiFetch]);
+  }, [apiFetch, qualitaDays]);
 
   const loadCataloghi = useCallback(async () => {
     setCataloghiLoading(true);
@@ -507,8 +1090,8 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
   const loadHome = useCallback(async () => {
     setHomeLoading(true);
     try {
-      // Home page doesn't have a specific API endpoint, so we'll set a flag
-      setHomeData({ loaded: true });
+      const data = await apiFetch("/admin/overview");
+      setHomeData(data);
 
     } catch {
       /* handled */
@@ -519,7 +1102,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
   const loadStatus = useCallback(async () => {
     setStatusLoading(true);
     try {
-      // /api/health è pubblico (no admin-key) — usa fetch nativo bypassando apiFetch locale
+      // /api/health e pubblico: usa fetch nativo bypassando apiFetch locale
       const healthRes = await fetch(API_ENDPOINTS.health);
       const data = healthRes.ok ? await healthRes.json() : {};
       setStatusData(data);
@@ -572,7 +1155,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
       setAgentsRunning((prev) => new Set(prev).add(agentKey));
       setAgentsResult((prev) => ({
         ...prev,
-        [agentKey]: { ok: false, data: { status: "runningâ€¦" } },
+        [agentKey]: { ok: false, data: { status: "running..." } },
       }));
       try {
         const data = await apiFetch(path, {
@@ -594,65 +1177,111 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
         s.delete(agentKey);
         return s;
       });
-      loadRunHistory();
+      void loadAgentsOverview();
     },
-    [agentsRunning, apiFetch, loadRunHistory],
+    [agentsRunning, apiFetch, loadAgentsOverview],
   );
 
   const savePrompt = useCallback(
     async (key: string) => {
-      setPromptSaving((prev) => new Set(prev).add(key));
+      setPromptSaving((prev) => new Set(prev).add(`${key}:draft`));
       try {
-        await apiFetch(`/admin/prompts/${key}`, {
-          method: "PUT",
-          body: JSON.stringify({ value: promptEditValues[key] }),
+        await apiFetch(`/admin/prompts/${key}/draft`, {
+          method: "POST",
+          body: JSON.stringify({
+            value: promptEditValues[key],
+            notes: promptNotes[key] || undefined,
+          }),
         });
         await loadPrompts();
+        await loadPromptVersions(key);
       } catch {
         /* handled */
       }
       setPromptSaving((prev) => {
         const s = new Set(prev);
-        s.delete(key);
+        s.delete(`${key}:draft`);
         return s;
       });
     },
-    [apiFetch, promptEditValues, loadPrompts],
+    [apiFetch, promptEditValues, promptNotes, loadPrompts, loadPromptVersions],
+  );
+
+  const publishPrompt = useCallback(
+    async (key: string) => {
+      setPromptSaving((prev) => new Set(prev).add(`${key}:publish`));
+      try {
+        await apiFetch(`/admin/prompts/${key}/publish`, { method: "POST" });
+        await loadPrompts();
+        await loadPromptVersions(key);
+      } catch {
+        /* handled */
+      }
+      setPromptSaving((prev) => {
+        const s = new Set(prev);
+        s.delete(`${key}:publish`);
+        return s;
+      });
+    },
+    [apiFetch, loadPrompts, loadPromptVersions],
   );
 
   const resetPrompt = useCallback(
     async (key: string) => {
-      setPromptSaving((prev) => new Set(prev).add(key));
+      setPromptSaving((prev) => new Set(prev).add(`${key}:reset`));
       try {
-        await apiFetch(`/admin/prompts/${key}`, { method: "DELETE" });
+        await apiFetch(`/admin/prompts/${key}/reset`, { method: "POST" });
         await loadPrompts();
+        await loadPromptVersions(key);
       } catch {
         /* handled */
       }
       setPromptSaving((prev) => {
         const s = new Set(prev);
-        s.delete(key);
+        s.delete(`${key}:reset`);
         return s;
       });
     },
-    [apiFetch, loadPrompts],
+    [apiFetch, loadPrompts, loadPromptVersions],
+  );
+
+  const rollbackPrompt = useCallback(
+    async (key: string, versionId: number) => {
+      setPromptSaving((prev) => new Set(prev).add(`${key}:rollback:${versionId}`));
+      try {
+        await apiFetch(`/admin/prompts/${key}/rollback`, {
+          method: "POST",
+          body: JSON.stringify({ versionId }),
+        });
+        await loadPrompts();
+        await loadPromptVersions(key);
+      } catch {
+        /* handled */
+      }
+      setPromptSaving((prev) => {
+        const s = new Set(prev);
+        s.delete(`${key}:rollback:${versionId}`);
+        return s;
+      });
+    },
+    [apiFetch, loadPrompts, loadPromptVersions],
   );
 
   useEffect(() => {
-    if (!key) return;
+    if (!token || adminForbidden) return;
     loadStats();
-  }, [key, loadStats]);
+  }, [adminForbidden, loadStats, token]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isLoggedIn || !token || adminForbidden) return;
     if (section === "suggestions" || section === "queue") loadSuggestions();
-    else if (section === "runs") loadRuns();
+    else if (section === "runs") loadAgentsOverview();
     else if (section === "logs") loadLogs();
     else if (section === "prompts") loadPrompts();
-    else if (section === "agents") loadRunHistory();
+    else if (section === "agents") loadAgentsOverview();
     else if (section === "qualita") loadQualita();
     else if (section === "cataloghi") loadCataloghi();
-    else if (section === "agenti-salute") loadAgentiSalute();
+    else if (section === "agenti-salute") loadAgentsOverview();
     else if (section === "metriche") loadMetriche();
     else if (section === "home") loadHome();
     else if (section === "status") loadStatus();
@@ -660,10 +1289,11 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     else if (section === "crescita") loadCrescita();
     else if (section === "affiliazione") loadAffiliazione();
   }, [
-    isAuthenticated,
+    isLoggedIn,
     section,
     loadSuggestions,
     loadRuns,
+    loadAgentsOverview,
     loadLogs,
     loadPrompts,
     loadRunHistory,
@@ -676,16 +1306,35 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     loadMessaggi,
     loadCrescita,
     loadAffiliazione,
+    adminForbidden,
+    token,
   ]);
+
+  useEffect(() => {
+    if (section !== "home" || !isLoggedIn || !token || adminForbidden) return;
+
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadHome();
+      }
+    }, 60_000);
+
+    return () => window.clearInterval(id);
+  }, [adminForbidden, isLoggedIn, loadHome, section, token]);
 
   function handleLogout() {
     logout();
     setStats(null);
     setSuggestions([]);
     setDetail(null);
+    setAdminError(null);
+    setAdminForbidden(false);
+    setLastUpdatedAt(null);
+    setMobileSidebarOpen(false);
     setQualitaData(null);
     setCataloghiData(null);
     setAgentiSaluteData(null);
+    setAgentsOverviewData(null);
     setMetricheData(null);
     setWendyMetricsData(null);
     setHomeData(null);
@@ -701,9 +1350,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
         method: "POST",
         body: JSON.stringify({}),
       });
-      loadSuggestions();
-      loadStats();
-      if (detail?.suggestion.id === id) loadDetail(id);
+      await refreshAfterDecision(id);
     } catch {
       /* handled */
     }
@@ -718,9 +1365,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
       });
       setShowEditNotes(false);
       setEditNotes("");
-      loadSuggestions();
-      loadStats();
-      if (detail?.suggestion.id === id) loadDetail(id);
+      await refreshAfterDecision(id);
     } catch {
       /* handled */
     }
@@ -730,39 +1375,95 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     try {
       await apiFetch(`/admin/suggestions/${id}/archive`, {
         method: "POST",
-        body: JSON.stringify({}),
+        body: JSON.stringify({ notes: "Archiviato" }),
       });
-      loadSuggestions();
-      loadStats();
-      if (detail?.suggestion.id === id) loadDetail(id);
+      await refreshAfterDecision(id);
     } catch {
       /* handled */
     }
   }
 
-  const sidebarItems: {
-    key: SidebarSection;
-    label: string;
-    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-    count?: number;
-  }[] = [
-    { key: "queue", label: "Queue Revisione", icon: ClipboardList, count: stats?.pending },
-    { key: "suggestions", label: "Suggerimenti", icon: Bot },
-    { key: "runs", label: "Esecuzioni Agenti", icon: History },
-    { key: "logs", label: "Audit Log", icon: FileText },
-    { key: "agents", label: "Lancia Agenti", icon: Terminal },
-    { key: "prompts", label: "Prompt Agenti", icon: Code2 },
-    { key: "qualita", label: "QualitÃ  Wendy", icon: BarChart3 },
-    { key: "cataloghi", label: "Cataloghi", icon: BookOpen },
-    { key: "agenti-salute", label: "Agent Health", icon: Activity },
-    { key: "metriche", label: "Metriche Business", icon: BarChart3 },
-    { key: "home", label: "Home Admin", icon: Home },
-    { key: "status", label: "Status & Setup", icon: Settings },
-    { key: "messaggi", label: "Messaggi", icon: MessageCircle },
-    { key: "crescita", label: "Coda Crescita", icon: Sparkles },
-    { key: "affiliazione", label: "Partner", icon: Handshake },
-    { key: "settings", label: "Impostazioni", icon: Settings },
-  ];
+  async function handleApply(id: number) {
+    try {
+      await apiFetch(`/admin/suggestions/${id}/apply`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      await refreshAfterDecision(id);
+    } catch {
+      /* handled */
+    }
+  }
+
+  async function refreshAfterDecision(id: number) {
+    await Promise.all([loadSuggestions(), loadStats(), homeData ? loadHome() : Promise.resolve()]);
+    if (detail?.suggestion.id === id) await loadDetail(id);
+  }
+
+  const navigateToSection = useCallback(
+    (nextSection: SidebarSection) => {
+      setLocation(PATH_BY_SECTION[nextSection]);
+      setDetail(null);
+      setMobileSidebarOpen(false);
+    },
+    [setLocation],
+  );
+
+  const refreshCurrentSection = useCallback(() => {
+    if (!token || adminForbidden) return;
+    setAdminError(null);
+    void loadStats();
+    if (section === "suggestions" || section === "queue") void loadSuggestions();
+    else if (section === "runs") void loadAgentsOverview();
+    else if (section === "logs") void loadLogs();
+    else if (section === "prompts") void loadPrompts();
+    else if (section === "agents") void loadAgentsOverview();
+    else if (section === "qualita") void loadQualita();
+    else if (section === "cataloghi") void loadCataloghi();
+    else if (section === "agenti-salute") void loadAgentsOverview();
+    else if (section === "metriche") void loadMetriche();
+    else if (section === "home") void loadHome();
+    else if (section === "status") void loadStatus();
+    else if (section === "messaggi") void loadMessaggi();
+    else if (section === "crescita") void loadCrescita();
+    else if (section === "affiliazione") void loadAffiliazione();
+  }, [
+    adminForbidden,
+    loadAgentiSalute,
+    loadAgentsOverview,
+    loadAffiliazione,
+    loadCataloghi,
+    loadCrescita,
+    loadHome,
+    loadLogs,
+    loadMetriche,
+    loadPrompts,
+    loadQualita,
+    loadRunHistory,
+    loadRuns,
+    loadStats,
+    loadStatus,
+    loadSuggestions,
+    loadMessaggi,
+    section,
+    token,
+  ]);
+
+  const isRefreshing =
+    loading ||
+    detailLoading ||
+    runHistoryLoading ||
+    agentsOverviewLoading ||
+    promptsLoading ||
+    qualitaLoading ||
+    cataloghiLoading ||
+    agentiSaluteLoading ||
+    metricheLoading ||
+    homeLoading ||
+    statusLoading ||
+    messaggiLoading ||
+    crescitaLoading ||
+    affiliazioneLoading;
 
   const pendingCount = stats?.pending ?? 0;
   const queueSuggestions =
@@ -770,133 +1471,208 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
       ? suggestions.filter((s) => s.status === "pending_review")
       : suggestions;
 
-  return (
-    <AdminAuthGate title="Admin Review" description="Pannello di controllo per la revisione dei risultati AI">
-      <div className="min-h-screen bg-background flex">
-      {/* Sidebar */}
-      <aside className="w-64 border-r bg-card flex flex-col shrink-0">
-        <div className="p-6 border-b">
-          <div className="flex items-center gap-2 mb-1">
-            <Bot className="w-5 h-5 text-primary" />
-            <h1 className="font-serif font-bold text-lg">Admin Review</h1>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Pannello di controllo AI
-          </p>
-        </div>
+  useEffect(() => {
+    setSection(sectionFromLocation(location));
+    setDetail(null);
+  }, [location]);
 
-        {stats && (
-          <div className="p-4 border-b">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-amber-50 rounded-xl p-3 text-center">
-                <div className="text-xl font-bold text-amber-700">
-                  {stats.pending}
-                </div>
-                <div className="text-[10px] text-amber-600 uppercase tracking-wider">
-                  In Attesa
-                </div>
+  const sidebarContent = (
+    <>
+      <div className="p-5 border-b">
+        <div className="flex items-center gap-2 mb-1">
+          <Bot className="w-5 h-5 text-primary" />
+          <h1 className="font-serif font-bold text-lg">Admin Console</h1>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Controllo operativo NorthStar
+        </p>
+      </div>
+
+      {stats && (
+        <div className="p-4 border-b">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-amber-50 rounded-lg p-3 text-center">
+              <div className="text-xl font-bold text-amber-700">{stats.pending}</div>
+              <div className="text-[10px] text-amber-600 uppercase tracking-wider">In Attesa</div>
+            </div>
+            <div className="bg-emerald-50 rounded-lg p-3 text-center">
+              <div className="text-xl font-bold text-emerald-700">{stats.approved}</div>
+              <div className="text-[10px] text-emerald-600 uppercase tracking-wider">Approvati</div>
+            </div>
+            <div className="bg-red-50 rounded-lg p-3 text-center">
+              <div className="text-xl font-bold text-red-700">{stats.rejected}</div>
+              <div className="text-[10px] text-red-600 uppercase tracking-wider">Rifiutati</div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3 text-center">
+              <div className="text-xl font-bold text-slate-700">{stats.totalRuns}</div>
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider">Esecuzioni</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <nav className="flex-1 overflow-y-auto p-3 space-y-4">
+        {ADMIN_NAV_GROUPS.map((group) => (
+          <div key={group.label}>
+            <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {group.label}
+            </p>
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const count = item.count?.(stats);
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => navigateToSection(item.key)}
+                    className={cn(
+                      "min-h-11 w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+                      section === item.key
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                    aria-current={section === item.key ? "page" : undefined}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="flex-1">{item.label}</span>
+                    {count != null && count > 0 && (
+                      <span className="text-xs bg-amber-500 text-white px-1.5 py-0.5 rounded-full min-w-5 text-center">
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      <div className="p-4 border-t">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="min-h-11 w-full justify-start text-muted-foreground"
+          onClick={handleLogout}
+        >
+          <LogOut className="w-4 h-4 mr-2" /> Esci
+        </Button>
+      </div>
+    </>
+  );
+
+  if (adminForbidden) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-lg border bg-card p-6 text-center shadow-sm">
+          <ShieldAlert className="w-10 h-10 mx-auto mb-4 text-destructive" />
+          <h1 className="text-xl font-serif font-bold text-foreground">
+            Accesso non autorizzato
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Il tuo account e autenticato, ma non ha il ruolo admin necessario
+            per aprire la console NorthStar.
+          </p>
+          <Button className="mt-5 min-h-11" onClick={handleLogout}>
+            Esci
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="min-h-screen bg-background flex overflow-hidden">
+        <aside className="hidden md:flex w-72 border-r bg-card flex-col shrink-0">
+          {sidebarContent}
+        </aside>
+
+        {mobileSidebarOpen && (
+          <div className="fixed inset-0 z-50 md:hidden">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/40"
+              aria-label="Chiudi menu admin"
+              onClick={() => setMobileSidebarOpen(false)}
+            />
+            <aside className="relative h-full w-[min(22rem,88vw)] bg-card border-r shadow-xl flex flex-col">
+              {sidebarContent}
+            </aside>
+          </div>
+        )}
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Header */}
+        <header className="min-h-16 border-b bg-card flex items-center justify-between gap-3 px-4 sm:px-6 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden min-h-11 min-w-11 shrink-0"
+              onClick={() => setMobileSidebarOpen(true)}
+              aria-label="Apri menu admin"
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
+            <div className="min-w-0">
+              <h2 className="font-semibold text-foreground truncate">
+                {TITLE_BY_SECTION[section]}
+                {section === "queue" && pendingCount > 0 ? ` (${pendingCount})` : ""}
+                {section === "suggestions" ? ` (${suggestionsTotal})` : ""}
+              </h2>
+              <p className="text-xs text-muted-foreground truncate">
+                {lastUpdatedAt
+                  ? `Ultimo aggiornamento: ${formatLastUpdated(lastUpdatedAt)}`
+                  : "Pronta per il primo aggiornamento"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-11"
+              onClick={refreshCurrentSection}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={cn("w-4 h-4 sm:mr-2", isRefreshing && "animate-spin")} />
+              <span className="hidden sm:inline">Aggiorna</span>
+            </Button>
+          </div>
+        </header>
+
+        {adminError && (
+          <div className="border-b bg-destructive/10 px-4 sm:px-6 py-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex items-start gap-2 text-sm text-destructive min-w-0 flex-1">
+                <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
+                <span className="break-words">{adminError}</span>
               </div>
-              <div className="bg-emerald-50 rounded-xl p-3 text-center">
-                <div className="text-xl font-bold text-emerald-700">
-                  {stats.approved}
-                </div>
-                <div className="text-[10px] text-emerald-600 uppercase tracking-wider">
-                  Approvati
-                </div>
-              </div>
-              <div className="bg-red-50 rounded-xl p-3 text-center">
-                <div className="text-xl font-bold text-red-700">
-                  {stats.rejected}
-                </div>
-                <div className="text-[10px] text-red-600 uppercase tracking-wider">
-                  Rifiutati
-                </div>
-              </div>
-              <div className="bg-slate-50 rounded-xl p-3 text-center">
-                <div className="text-xl font-bold text-slate-700">
-                  {stats.totalRuns}
-                </div>
-                <div className="text-[10px] text-slate-500 uppercase tracking-wider">
-                  Esecuzioni
-                </div>
+              <div className="flex items-center gap-2 sm:shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="min-h-11 bg-background"
+                  onClick={refreshCurrentSection}
+                  disabled={isRefreshing}
+                >
+                  Riprova
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="min-h-11 min-w-11"
+                  aria-label="Nascondi errore"
+                  onClick={() => setAdminError(null)}
+                >
+                  <XCircle className="w-4 h-4" />
+                </Button>
               </div>
             </div>
           </div>
         )}
-
-        <nav className="flex-1 p-3 space-y-1">
-          {sidebarItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.key}
-                onClick={() => {
-                  setSection(item.key);
-                  setDetail(null);
-                }}
-                className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left",
-                  section === item.key
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span className="flex-1">{item.label}</span>
-                {item.count != null && item.count > 0 && (
-                  <span className="text-xs bg-amber-500 text-white px-1.5 py-0.5 rounded-full min-w-5 text-center">
-                    {item.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="p-4 border-t">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-muted-foreground"
-            onClick={handleLogout}
-          >
-            <LogOut className="w-4 h-4 mr-2" /> Esci
-          </Button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <header className="h-14 border-b bg-card flex items-center justify-between px-6 shrink-0">
-          <h2 className="font-semibold text-foreground">
-            {section === "queue" &&
-              `Queue Revisione${pendingCount > 0 ? ` (${pendingCount})` : ""}`}
-            {section === "suggestions" &&
-              `Tutti i Suggerimenti (${suggestionsTotal})`}
-            {section === "runs" && "Esecuzioni Agenti"}
-            {section === "logs" && "Audit Log"}
-            {section === "settings" && "Impostazioni"}
-            {section === "agents" && "Lancia Agenti di Ricerca"}
-            {section === "prompts" && "Gestione Prompt AI"}
-          </h2>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                loadStats();
-                if (section === "suggestions" || section === "queue")
-                  loadSuggestions();
-                else if (section === "runs") loadRuns();
-                else if (section === "logs") loadLogs();
-                else if (section === "prompts") loadPrompts();
-              }}
-            >
-              <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
-            </Button>
-          </div>
-        </header>
 
         <div className="flex-1 flex overflow-hidden">
           {/* List Panel */}
@@ -914,7 +1690,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
-                        placeholder="Cerca per nomeâ€¦"
+                        placeholder="Cerca per nome..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-9 h-9"
@@ -938,22 +1714,31 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                   </div>
                   {showFilters && (
                     <div className="flex flex-wrap gap-2 mt-3">
-                      <select
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value)}
-                        className="text-sm border rounded-lg px-3 py-1.5 bg-background"
-                      >
-                        <option value="all">Tutti gli stati</option>
-                        <option value="pending_review">In Revisione</option>
-                        <option value="approved">Approvati</option>
-                        <option value="rejected">Rifiutati</option>
-                        <option value="archived">Archiviati</option>
-                        <option value="draft">Bozze</option>
-                      </select>
+                      {section === "suggestions" ? (
+                        <select
+                          value={filterStatus}
+                          onChange={(e) => setFilterStatus(e.target.value)}
+                          className="min-h-11 text-sm border rounded-lg px-3 py-1.5 bg-background"
+                          aria-label="Filtra per stato"
+                        >
+                          <option value="all">Tutti gli stati</option>
+                          <option value="pending_review">In Revisione</option>
+                          <option value="approved">Approvati</option>
+                          <option value="applied">Applicati</option>
+                          <option value="rejected">Rifiutati</option>
+                          <option value="archived">Archiviati</option>
+                          <option value="draft">Bozze</option>
+                        </select>
+                      ) : (
+                        <div className="min-h-11 inline-flex items-center rounded-lg border bg-background px-3 text-sm text-muted-foreground">
+                          Solo in revisione
+                        </div>
+                      )}
                       <select
                         value={filterEntity}
                         onChange={(e) => setFilterEntity(e.target.value)}
-                        className="text-sm border rounded-lg px-3 py-1.5 bg-background"
+                        className="min-h-11 text-sm border rounded-lg px-3 py-1.5 bg-background"
+                        aria-label="Filtra per tipo"
                       >
                         <option value="all">Tutti i tipi</option>
                         <option value="sector">Settori</option>
@@ -963,13 +1748,24 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                         <option value="growth_content">Crescita</option>
                         <option value="work_mode">Work Mode</option>
                       </select>
+                      <select
+                        value={filterConfidence}
+                        onChange={(e) => setFilterConfidence(e.target.value)}
+                        className="min-h-11 text-sm border rounded-lg px-3 py-1.5 bg-background"
+                        aria-label="Filtra per confidence minima"
+                      >
+                        <option value="all">Tutte le confidence</option>
+                        <option value="0.5">Confidence 50%+</option>
+                        <option value="0.7">Confidence 70%+</option>
+                        <option value="0.85">Confidence 85%+</option>
+                      </select>
                     </div>
                   )}
                 </div>
 
                 {loading ? (
                   <div className="p-8 text-center text-muted-foreground">
-                    Caricamentoâ€¦
+                    Caricamento...
                   </div>
                 ) : queueSuggestions.length === 0 ? (
                   <div className="p-12 text-center">
@@ -1002,6 +1798,17 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                           <div className="flex items-center gap-2 flex-wrap">
                             <EntityBadge type={s.entityType} />
                             <StatusBadge status={s.status} />
+                            {s.queuePriority && (
+                              <Badge variant="outline" className="text-xs capitalize">
+                                {s.queuePriority}
+                              </Badge>
+                            )}
+                            {s.agentName && (
+                              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                <Bot className="w-3 h-3" />
+                                {s.agentName}
+                              </span>
+                            )}
                             <span className="text-xs text-muted-foreground">
                               {fmtShortDate(s.createdAt)}
                             </span>
@@ -1015,44 +1822,360 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
               </>
             )}
 
-            {section === "runs" && (
-              <div className="divide-y">
-                {runs.length === 0 ? (
+            {section === "agents" && (
+              <div className="p-4 sm:p-6 space-y-5">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      Osservabilita unificata per Wendy e agenti: salute, run, errori, costi e rilanci sicuri.
+                    </p>
+                    {agentsOverviewData?.generatedAt && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Snapshot: {fmtShortDate(agentsOverviewData.generatedAt)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <select
+                      value={agentDays}
+                      onChange={(e) => setAgentDays(e.target.value)}
+                      className="min-h-11 text-sm border rounded-lg px-3 bg-background"
+                      aria-label="Periodo agenti"
+                    >
+                      <option value="7">Ultimi 7 giorni</option>
+                      <option value="30">Ultimi 30 giorni</option>
+                    </select>
+                    <Button
+                      variant="outline"
+                      onClick={loadAgentsOverview}
+                      disabled={agentsOverviewLoading}
+                      className="min-h-11"
+                    >
+                      <RefreshCw className={cn("w-4 h-4 mr-2", agentsOverviewLoading && "animate-spin")} />
+                      Riprova
+                    </Button>
+                  </div>
+                </div>
+
+                {agentsOverviewLoading && !agentsOverviewData ? (
                   <div className="p-12 text-center text-muted-foreground">
-                    Nessuna esecuzione registrata
+                    Caricamento osservabilita agenti...
+                  </div>
+                ) : !agentsOverviewData ? (
+                  <div className="p-12 text-center border rounded-xl bg-muted/20">
+                    <Bot className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                    <p className="font-medium">Nessun dato agente disponibile</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Avvia un agente o riprova quando il server ha scritto nuove run.
+                    </p>
                   </div>
                 ) : (
-                  runs.map((run) => (
-                    <div key={run.id} className="p-4">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-foreground">
-                          {run.agentName}
-                        </span>
-                        <Badge
-                          variant={
-                            run.status === "completed"
-                              ? "secondary"
-                              : "destructive"
-                          }
-                          className="text-xs"
-                        >
-                          {run.status}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span>{fmtShortDate(run.startedAt)}</span>
-                        {run.durationMs != null && (
-                          <span>{run.durationMs}ms</span>
+                  (() => {
+                    const data = agentsOverviewData;
+                    const healthStatus =
+                      data.summary.criticalAgents > 0
+                        ? "critical"
+                        : data.summary.degradedAgents > 0 || data.summary.failedRuns > 0
+                          ? "degraded"
+                          : "healthy";
+                    const filteredRuns = data.recentRuns.filter((run) => {
+                      const agentMatches = agentFilter === "all" || run.agentName === agentFilter;
+                      const statusMatches = agentStatusFilter === "all" || run.status === agentStatusFilter;
+                      return agentMatches && statusMatches;
+                    });
+                    const tabs: Array<{ key: AgentsTab; label: string; icon: typeof Activity }> = [
+                      { key: "overview", label: "Overview", icon: Activity },
+                      { key: "history", label: "Run history", icon: History },
+                      { key: "errors", label: "Errori", icon: ShieldAlert },
+                      { key: "launch", label: "Rilancia", icon: Play },
+                    ];
+
+                    return (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                          <div className={cn("border rounded-xl p-4", agentStatusClass(healthStatus))}>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-medium">Salute agenti</span>
+                              <Activity className="w-4 h-4" />
+                            </div>
+                            <p className="text-2xl font-bold mt-2">{agentStatusLabel(healthStatus)}</p>
+                            <p className="text-xs mt-1">
+                              {data.summary.criticalAgents} critici, {data.summary.degradedAgents} degradati
+                            </p>
+                          </div>
+                          <div className="border rounded-xl p-4 bg-card">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-medium text-muted-foreground">Success rate</span>
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            </div>
+                            <p className="text-2xl font-bold mt-2">{data.summary.successRate30d}%</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {data.summary.totalRuns} run, {data.summary.failedRuns} fallite
+                            </p>
+                          </div>
+                          <div className="border rounded-xl p-4 bg-card">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-medium text-muted-foreground">Durata media</span>
+                              <Clock className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <p className="text-2xl font-bold mt-2">{fmtDuration(data.summary.avgDurationMs)}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {data.summary.runningRuns} run in corso
+                            </p>
+                          </div>
+                          <div className="border rounded-xl p-4 bg-card">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-medium text-muted-foreground">Costo AI {data.costs.days}g</span>
+                              <BarChart3 className="w-4 h-4 text-violet-600" />
+                            </div>
+                            <p className="text-2xl font-bold mt-2">{fmtUsd(data.summary.costUsd30d)}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {data.summary.totalTokens30d.toLocaleString("it-IT")} token, {data.summary.aiErrors30d} errori AI
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {tabs.map((tab) => {
+                            const Icon = tab.icon;
+                            return (
+                              <Button
+                                key={tab.key}
+                                variant={agentsTab === tab.key ? "default" : "outline"}
+                                onClick={() => setAgentsTab(tab.key)}
+                                className="min-h-11 shrink-0"
+                              >
+                                <Icon className="w-4 h-4 mr-2" />
+                                {tab.label}
+                              </Button>
+                            );
+                          })}
+                        </div>
+
+                        {agentsTab === "overview" && (
+                          <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-3">
+                            {data.agents.length === 0 ? (
+                              <div className="lg:col-span-2 p-10 text-center text-muted-foreground border rounded-xl bg-muted/20">
+                                Nessun agente ha run nel periodo selezionato.
+                              </div>
+                            ) : (
+                              data.agents.map((agent) => (
+                                <div key={agent.agentName} className="border rounded-xl p-4 bg-card">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <h4 className="font-semibold truncate">{agent.agentName}</h4>
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        Ultima run: {agent.lastRunAt ? fmtShortDate(agent.lastRunAt) : "N/D"}
+                                      </p>
+                                    </div>
+                                    <Badge variant="outline" className={cn("border", agentStatusClass(agent.status))}>
+                                      {agentStatusLabel(agent.status)}
+                                    </Badge>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
+                                    <div>
+                                      <p className="text-xs text-muted-foreground">Run</p>
+                                      <p className="font-semibold">{agent.totalCalls30d}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-muted-foreground">Success rate</p>
+                                      <p className="font-semibold">{agent.successRate30d}%</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-muted-foreground">Errori</p>
+                                      <p className={cn("font-semibold", agent.errorCount30d > 0 && "text-red-600")}>
+                                        {agent.errorCount30d}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-muted-foreground">Durata media</p>
+                                      <p className="font-semibold">{fmtDuration(agent.avgDurationMs)}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
                         )}
-                        {run.userId && <span>User #{run.userId}</span>}
-                      </div>
-                      {run.errorMessage && (
-                        <p className="text-xs text-red-600 mt-1 truncate">
-                          {run.errorMessage}
-                        </p>
-                      )}
-                    </div>
-                  ))
+
+                        {agentsTab === "history" && (
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap gap-2">
+                              <select
+                                value={agentFilter}
+                                onChange={(e) => setAgentFilter(e.target.value)}
+                                className="min-h-11 text-sm border rounded-lg px-3 bg-background"
+                                aria-label="Filtra agente"
+                              >
+                                <option value="all">Tutti gli agenti</option>
+                                {data.agents.map((agent) => (
+                                  <option key={agent.agentName} value={agent.agentName}>
+                                    {agent.agentName}
+                                  </option>
+                                ))}
+                              </select>
+                              <select
+                                value={agentStatusFilter}
+                                onChange={(e) => setAgentStatusFilter(e.target.value)}
+                                className="min-h-11 text-sm border rounded-lg px-3 bg-background"
+                                aria-label="Filtra stato run"
+                              >
+                                <option value="all">Tutti gli stati</option>
+                                <option value="completed">Completate</option>
+                                <option value="running">In corso</option>
+                                <option value="failed">Fallite</option>
+                                <option value="cancelled">Cancellate</option>
+                              </select>
+                            </div>
+                            <div className="border rounded-xl overflow-hidden">
+                              {filteredRuns.length === 0 ? (
+                                <div className="p-10 text-center text-muted-foreground">
+                                  Nessuna run corrisponde ai filtri.
+                                </div>
+                              ) : (
+                                <div className="divide-y">
+                                  {filteredRuns.map((run) => (
+                                    <div key={run.id} className="p-4">
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <p className="font-medium truncate">{run.agentName}</p>
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            {fmtShortDate(run.startedAt)} - {run.taskType ?? "task"} - {fmtDuration(run.durationMs)}
+                                          </p>
+                                        </div>
+                                        <Badge
+                                          variant={run.status === "completed" ? "secondary" : run.status === "running" ? "outline" : "destructive"}
+                                          className="text-xs capitalize"
+                                        >
+                                          {run.status}
+                                        </Badge>
+                                      </div>
+                                      {(run.outputSummary || run.errorMessage || run.inputSummary) && (
+                                        <p className={cn("text-xs mt-2 truncate", run.errorMessage ? "text-red-600" : "text-muted-foreground")}>
+                                          {run.errorMessage || run.outputSummary || run.inputSummary}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {agentsTab === "errors" && (
+                          <div className="border rounded-xl overflow-hidden">
+                            {data.recentErrors.length === 0 ? (
+                              <div className="p-10 text-center">
+                                <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
+                                <p className="font-medium">Nessun errore agente recente</p>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  Nel periodo selezionato non risultano run fallite o cancellate.
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="divide-y">
+                                {data.recentErrors.map((error) => (
+                                  <div key={error.id} className="p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <p className="font-medium truncate">{error.agentName}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          {error.taskType ?? "task"} - {fmtShortDate(error.startedAt)} - {fmtDuration(error.durationMs)}
+                                        </p>
+                                      </div>
+                                      <Badge variant="destructive" className="text-xs capitalize">
+                                        {error.status}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-sm text-red-600 mt-2 break-words">
+                                      {error.errorMessage || "Errore senza messaggio"}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {agentsTab === "launch" && (
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                            {data.runnableAgents.map((agent) => {
+                              const running = agentsRunning.has(agent.key);
+                              const result = agentsResult[agent.key];
+                              return (
+                                <div key={agent.key} className="border rounded-xl p-4 bg-card space-y-3">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <h4 className="font-semibold">{agent.label}</h4>
+                                      <p className="text-sm text-muted-foreground mt-1">{agent.description}</p>
+                                    </div>
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "capitalize",
+                                        agent.risk === "low" && "bg-emerald-50 text-emerald-700",
+                                        agent.risk === "medium" && "bg-amber-50 text-amber-700",
+                                        agent.risk === "high" && "bg-red-50 text-red-700",
+                                      )}
+                                    >
+                                      {agent.risk}
+                                    </Badge>
+                                  </div>
+                                  {agent.key === "news-research" && (
+                                    <Input
+                                      placeholder="Aree specifiche opzionali, separate da virgola"
+                                      value={newsSectorInput}
+                                      onChange={(e) => setNewsSectorInput(e.target.value)}
+                                      className="min-h-11"
+                                    />
+                                  )}
+                                  <Button
+                                    className="w-full min-h-11"
+                                    disabled={running}
+                                    onClick={() => {
+                                      const body =
+                                        agent.key === "news-research"
+                                          ? {
+                                              sectorNames: newsSectorInput
+                                                .split(",")
+                                                .map((value) => value.trim())
+                                                .filter(Boolean),
+                                            }
+                                          : {};
+                                      triggerAgent(agent.key, agent.endpoint, body);
+                                    }}
+                                  >
+                                    {running ? (
+                                      <>
+                                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                        In esecuzione...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Play className="w-4 h-4 mr-2" />
+                                        Rilancia agente
+                                      </>
+                                    )}
+                                  </Button>
+                                  {result && (
+                                    <div
+                                      className={cn(
+                                        "rounded-lg p-3 text-xs font-mono break-words",
+                                        result.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800",
+                                      )}
+                                    >
+                                      {JSON.stringify(result.data)}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()
                 )}
               </div>
             )}
@@ -1090,7 +2213,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium capitalize">
-                          {log.action} â€” {log.targetType} #{log.targetId}
+                          {log.action} - {log.targetType} #{log.targetId}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {fmtDate(log.createdAt)}
@@ -1102,10 +2225,10 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
               </div>
             )}
 
-            {section === "agents" && (
+            {false && section === "agents" && (
               <div className="p-6 space-y-6 max-w-2xl">
                 <p className="text-sm text-muted-foreground">
-                  Avvia manualmente una sessione di ricerca AI. Il processo puÃ²
+                  Avvia manualmente una sessione di ricerca AI. Il processo puo
                   richiedere 1-3 minuti.
                 </p>
 
@@ -1149,7 +2272,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                       {agentsRunning.has("news") ? (
                         <>
                           <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> In
-                          esecuzioneâ€¦
+                          esecuzione...
                         </>
                       ) : (
                         <>
@@ -1169,7 +2292,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                     >
                       {agentsResult["news"].ok ? (
                         <p>
-                          Completato â€” aggiunti:{" "}
+                          Completato - aggiunti:{" "}
                           <strong>
                             {String(agentsResult["news"].data.added ?? 0)}
                           </strong>
@@ -1209,7 +2332,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                     {agentsRunning.has("growth") ? (
                       <>
                         <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> In
-                        esecuzioneâ€¦
+                        esecuzione...
                       </>
                     ) : (
                       <>
@@ -1228,7 +2351,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                     >
                       {agentsResult["growth"].ok ? (
                         <p>
-                          Completato â€” aggiunti:{" "}
+                          Completato - aggiunti:{" "}
                           <strong>
                             {String(agentsResult["growth"].data.added ?? 0)}
                           </strong>
@@ -1338,7 +2461,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                                     ? "Completato"
                                     : run.status === "failed"
                                       ? "Fallito"
-                                      : "In esecuzioneâ€¦"}
+                                      : "In esecuzione..."}
                                 </span>
                                 {secs && (
                                   <span className="text-xs text-muted-foreground">
@@ -1350,7 +2473,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                                 {fmtDate(run.startedAt)}
                                 {sectors && (
                                   <span className="ml-2">
-                                    Â· Aree: {sectors}
+                                    - Aree: {sectors}
                                   </span>
                                 )}
                               </div>
@@ -1377,69 +2500,81 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
             )}
 
              {section === "prompts" && (
-               <div className="p-6 space-y-3 max-w-3xl">
-                 <p className="text-sm text-muted-foreground mb-4">
-                   Modifica i prompt degli agenti AI. Le modifiche sono salvate
-                   nel database e hanno effetto immediato. Usa{" "}
-                   <code className="bg-muted px-1 py-0.5 rounded text-xs">
-                     {"{{PLACEHOLDER}}"}
-                   </code>{" "}
-                   per i valori dinamici.
-                 </p>
+               <div className="p-4 sm:p-6 space-y-4 max-w-5xl">
+                 <div className="space-y-1">
+                   <p className="text-sm text-muted-foreground">
+                     Modifica i prompt in bozza, verifica placeholder e preview, poi pubblica una versione attiva con rollback tracciabile.
+                   </p>
+                   <p className="text-xs text-muted-foreground">
+                     I placeholder ammessi sono dichiarati per prompt e scritti come{" "}
+                     <code className="bg-muted px-1 py-0.5 rounded text-xs">{"{{PLACEHOLDER}}"}</code>.
+                   </p>
+                 </div>
 
                  {promptsLoading ? (
                    <div className="p-8 text-center text-muted-foreground">
-                     Caricamento promptâ€¦
+                     Caricamento prompt...
+                   </div>
+                 ) : prompts.length === 0 ? (
+                   <div className="p-10 text-center text-muted-foreground border rounded-xl bg-muted/20">
+                     Nessun prompt registrato.
                    </div>
                  ) : (
                    prompts.map((prompt) => {
                      const isExpanded = promptExpandedKey === prompt.key;
-                     const isSaving = promptSaving.has(prompt.key);
-                     const isDirty =
-                       promptEditValues[prompt.key] !== prompt.currentValue;
+                     const draftSaving = promptSaving.has(`${prompt.key}:draft`);
+                     const publishSaving = promptSaving.has(`${prompt.key}:publish`);
+                     const resetSaving = promptSaving.has(`${prompt.key}:reset`);
+                     const previewSaving = promptSaving.has(`${prompt.key}:preview`);
+                     const isBusy = draftSaving || publishSaving || resetSaving || previewSaving;
+                     const isDirty = (promptEditValues[prompt.key] ?? "") !== (prompt.draftValue ?? prompt.currentValue);
+                     const validation = prompt.validation;
+                     const preview = promptPreview[prompt.key];
+                     const versions = promptVersions[prompt.key] ?? [];
 
                      return (
-                       <div
-                         key={prompt.key}
-                         className="bg-card border rounded-2xl overflow-hidden"
-                       >
+                       <div key={prompt.key} className="bg-card border rounded-xl overflow-hidden">
                          <button
-                           className="w-full flex items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
-                           onClick={() =>
-                             setPromptExpandedKey(isExpanded ? null : prompt.key)
-                           }
+                           type="button"
+                           className="min-h-11 w-full flex items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                           onClick={() => {
+                             const next = isExpanded ? null : prompt.key;
+                             setPromptExpandedKey(next);
+                             setPromptTab("editor");
+                             if (next) void loadPromptVersions(prompt.key);
+                           }}
                          >
                            <div className="flex-1 min-w-0">
                              <div className="flex items-center gap-2 flex-wrap">
-                               <span className="font-medium text-sm">
-                                 {prompt.label}
-                               </span>
+                               <span className="font-medium text-sm">{prompt.label}</span>
+                               <Badge variant="outline" className="text-[10px]">
+                                 v{prompt.activeVersionNumber ?? 1} attiva
+                               </Badge>
+                               {prompt.hasDraft && (
+                                 <Badge className="text-[10px] bg-amber-100 text-amber-700 border-0">
+                                   Bozza
+                                 </Badge>
+                               )}
                                {prompt.isOverridden && (
-                                 <Badge
-                                   variant="secondary"
-                                   className="text-[10px] bg-amber-100 text-amber-700 border-0"
-                                 >
-                                   Modificato
+                                 <Badge variant="secondary" className="text-[10px]">
+                                   Custom
                                  </Badge>
                                )}
                              </div>
                              <p className="text-xs text-muted-foreground mt-0.5 truncate">
                                {prompt.description}
                              </p>
-                             {prompt.placeholders.length > 0 && (
-                               <div className="flex gap-1 flex-wrap mt-1">
-                                 {prompt.placeholders.map((p) => (
-                                   <code
-                                     key={p}
-                                     className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded"
-                                   >
-                                     {p}
-                                   </code>
-                                 ))}
-               </div>
-             )}
-
-           </div>
+                             <div className="flex gap-1 flex-wrap mt-2">
+                               {prompt.placeholders.map((p) => (
+                                 <code key={p} className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                                   {p}
+                                 </code>
+                               ))}
+                             </div>
+                           </div>
+                           <div className="hidden sm:block text-right text-xs text-muted-foreground">
+                             {prompt.updatedAt ? fmtShortDate(prompt.updatedAt) : "Mai pubblicato"}
+                           </div>
                            {isExpanded ? (
                              <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
                            ) : (
@@ -1448,228 +2583,472 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                          </button>
 
                          {isExpanded && (
-                           <div className="border-t p-4 space-y-3 bg-muted/10">
-                             <textarea
-                               value={promptEditValues[prompt.key] ?? ""}
-                               onChange={(e) =>
-                                 setPromptEditValues((prev) => ({
-                                   ...prev,
-                                   [prompt.key]: e.target.value,
-                                 }))
-                               }
-                               rows={Math.max(
-                                 8,
-                                 (promptEditValues[prompt.key] ?? "").split("\n")
-                                   .length + 2,
-                               )}
-                               className="w-full text-xs font-mono border rounded-xl p-3 bg-background resize-y focus:outline-none focus:ring-2 focus:ring-primary/30"
-                             />
-                             <div className="flex items-center gap-2">
-                               <Button
-                                 size="sm"
-                                 disabled={isSaving || !isDirty}
-                                 onClick={() => savePrompt(prompt.key)}
-                               >
-                                 {isSaving ? (
-                                   <RefreshCw className="w-3 h-3 mr-1.5 animate-spin" />
-                                 ) : (
-                                   <Save className="w-3 h-3 mr-1.5" />
-                                 )}
-                                 Salva
-                               </Button>
-                               {prompt.isOverridden && (
-                                 <Button
-                                   size="sm"
-                                   variant="outline"
-                                   disabled={isSaving}
-                                   onClick={() => resetPrompt(prompt.key)}
-                                 >
-                                   <RotateCcw className="w-3 h-3 mr-1.5" />
-                                   Ripristina Default
-                                 </Button>
-                               )}
-                               {isDirty && (
-                                 <span className="text-xs text-amber-600 ml-auto">
-                                   Modifiche non salvate
-                                 </span>
-                               )}
-                               {prompt.updatedAt && (
-                                 <span className="text-xs text-muted-foreground ml-auto">
-                                   Aggiornato: {fmtShortDate(prompt.updatedAt)}
-                                 </span>
-                               )}
+                           <div className="border-t p-4 space-y-4 bg-muted/10">
+                             <div className="flex gap-2 overflow-x-auto pb-1">
+                               {[
+                                 { key: "editor" as PromptEditorTab, label: "Editor", icon: Pencil },
+                                 { key: "preview" as PromptEditorTab, label: "Preview", icon: Eye },
+                                 { key: "versions" as PromptEditorTab, label: "Versioni", icon: History },
+                               ].map((tab) => {
+                                 const Icon = tab.icon;
+                                 return (
+                                   <Button
+                                     key={tab.key}
+                                     variant={promptTab === tab.key ? "default" : "outline"}
+                                     className="min-h-11 shrink-0"
+                                     onClick={() => {
+                                       setPromptTab(tab.key);
+                                       if (tab.key === "preview") void loadPromptPreview(prompt.key);
+                                       if (tab.key === "versions") void loadPromptVersions(prompt.key);
+                                     }}
+                                   >
+                                     <Icon className="w-4 h-4 mr-2" />
+                                     {tab.label}
+                                   </Button>
+                                 );
+                               })}
                              </div>
+
+                             {(validation?.errors.length || validation?.warnings.length) ? (
+                               <div className={cn(
+                                 "rounded-lg border p-3 text-sm",
+                                 validation.errors.length > 0
+                                   ? "bg-red-50 border-red-200 text-red-800"
+                                   : "bg-amber-50 border-amber-200 text-amber-800",
+                               )}>
+                                 {[...(validation.errors ?? []), ...(validation.warnings ?? [])].map((message) => (
+                                   <p key={message}>{message}</p>
+                                 ))}
+                               </div>
+                             ) : null}
+
+                             {promptTab === "editor" && (
+                               <div className="space-y-3">
+                                 <textarea
+                                   value={promptEditValues[prompt.key] ?? ""}
+                                   onChange={(e) =>
+                                     setPromptEditValues((prev) => ({
+                                       ...prev,
+                                       [prompt.key]: e.target.value,
+                                     }))
+                                   }
+                                   rows={Math.max(10, (promptEditValues[prompt.key] ?? "").split("\n").length + 2)}
+                                   className="w-full text-xs font-mono border rounded-xl p-3 bg-background resize-y focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                 />
+                                 <Input
+                                   placeholder="Note versione opzionali"
+                                   value={promptNotes[prompt.key] ?? ""}
+                                   onChange={(e) =>
+                                     setPromptNotes((prev) => ({
+                                       ...prev,
+                                       [prompt.key]: e.target.value,
+                                     }))
+                                   }
+                                   className="min-h-11"
+                                 />
+                                 <div className="flex flex-wrap items-center gap-2">
+                                   <Button
+                                     disabled={draftSaving || !isDirty}
+                                     onClick={() => savePrompt(prompt.key)}
+                                     className="min-h-11"
+                                   >
+                                     {draftSaving ? (
+                                       <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                     ) : (
+                                       <Save className="w-4 h-4 mr-2" />
+                                     )}
+                                     Salva bozza
+                                   </Button>
+                                   <Button
+                                     variant="default"
+                                     disabled={publishSaving || !prompt.hasDraft}
+                                     onClick={() => publishPrompt(prompt.key)}
+                                     className="min-h-11"
+                                   >
+                                     {publishSaving ? (
+                                       <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                     ) : (
+                                       <CheckCircle2 className="w-4 h-4 mr-2" />
+                                     )}
+                                     Pubblica
+                                   </Button>
+                                   <Button
+                                     variant="outline"
+                                     disabled={resetSaving}
+                                     onClick={() => resetPrompt(prompt.key)}
+                                     className="min-h-11"
+                                   >
+                                     {resetSaving ? (
+                                       <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                     ) : (
+                                       <RotateCcw className="w-4 h-4 mr-2" />
+                                     )}
+                                     Reset default
+                                   </Button>
+                                   {isDirty && (
+                                     <span className="text-xs text-amber-600">
+                                       Bozza modificata non salvata
+                                     </span>
+                                   )}
+                                 </div>
+                               </div>
+                             )}
+
+                             {promptTab === "preview" && (
+                               <div className="space-y-3">
+                                 <div className="flex items-center justify-between gap-3">
+                                   <p className="text-sm font-medium">Prompt finale con variabili simulate</p>
+                                   <Button
+                                     variant="outline"
+                                     disabled={previewSaving}
+                                     onClick={() => loadPromptPreview(prompt.key)}
+                                     className="min-h-11"
+                                   >
+                                     <RefreshCw className={cn("w-4 h-4 mr-2", previewSaving && "animate-spin")} />
+                                     Rigenera
+                                   </Button>
+                                 </div>
+                                 {preview ? (
+                                   <>
+                                     <pre className="bg-background border rounded-xl p-4 text-xs whitespace-pre-wrap overflow-x-auto font-mono">
+                                       {preview.rendered}
+                                     </pre>
+                                     <div className="grid gap-2 sm:grid-cols-2">
+                                       {Object.entries(preview.variables).map(([key, value]) => (
+                                         <div key={key} className="rounded-md border bg-background p-3">
+                                           <p className="text-xs font-semibold text-muted-foreground">{key}</p>
+                                           <p className="text-xs mt-1 break-words">{value}</p>
+                                         </div>
+                                       ))}
+                                     </div>
+                                   </>
+                                 ) : (
+                                   <div className="p-8 text-center text-muted-foreground border rounded-xl bg-background">
+                                     Genera una preview per vedere il prompt renderizzato.
+                                   </div>
+                                 )}
+                               </div>
+                             )}
+
+                             {promptTab === "versions" && (
+                               <div className="space-y-3">
+                                 {versions.length === 0 ? (
+                                   <div className="p-8 text-center text-muted-foreground border rounded-xl bg-background">
+                                     Nessuna versione caricata.
+                                   </div>
+                                 ) : (
+                                   versions.map((version) => {
+                                     const rollbackKey = `${prompt.key}:rollback:${version.id}`;
+                                     const rollbackSaving = promptSaving.has(rollbackKey);
+                                     const canRollback = version.status !== "active" && version.status !== "draft";
+                                     return (
+                                       <div key={version.id} className="rounded-xl border bg-background p-4 space-y-3">
+                                         <div className="flex flex-wrap items-center justify-between gap-3">
+                                           <div className="flex items-center gap-2 flex-wrap">
+                                             <span className="font-semibold text-sm">v{version.versionNumber}</span>
+                                             <Badge
+                                               variant={version.status === "active" ? "default" : "outline"}
+                                               className="capitalize"
+                                             >
+                                               {version.status}
+                                             </Badge>
+                                             {version.notes && (
+                                               <span className="text-xs text-muted-foreground">{version.notes}</span>
+                                             )}
+                                           </div>
+                                           <div className="flex items-center gap-2">
+                                             <span className="text-xs text-muted-foreground">
+                                               {fmtShortDate(version.publishedAt ?? version.updatedAt)}
+                                             </span>
+                                             {canRollback && (
+                                               <Button
+                                                 variant="outline"
+                                                 size="sm"
+                                                 disabled={rollbackSaving}
+                                                 onClick={() => rollbackPrompt(prompt.key, version.id)}
+                                                 className="min-h-11"
+                                               >
+                                                 {rollbackSaving ? (
+                                                   <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                                 ) : (
+                                                   <RotateCcw className="w-4 h-4 mr-2" />
+                                                 )}
+                                                 Rollback
+                                               </Button>
+                                             )}
+                                           </div>
+                                         </div>
+                                         <pre className="max-h-32 overflow-auto rounded-lg bg-muted/40 p-3 text-xs whitespace-pre-wrap font-mono">
+                                           {version.value}
+                                         </pre>
+                                       </div>
+                                     );
+                                   })
+                                 )}
+                               </div>
+                             )}
                            </div>
-             )}
-           </div>
+                         )}
+                       </div>
                      );
                    })
                  )}
                </div>
              )}
              {section === "qualita" && (
-               <div className="p-8">
-                 <h3 className="text-lg font-serif font-bold mb-4">
-                   QualitÃ  Wendy
-                 </h3>
-                 {qualitaLoading ? (
-                   <div className="text-center py-8 text-muted-foreground">
-                     Caricamento dati qualitÃ ...
+               <div className="p-4 sm:p-6 space-y-5">
+                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                   <div>
+                     <h3 className="text-lg font-serif font-bold flex items-center gap-2">
+                       <BarChart3 className="w-5 h-5 text-primary" />
+                       Qualita Wendy
+                     </h3>
+                     <p className="text-sm text-muted-foreground">
+                       Score, rewrite, chiarificazioni, tool e conversazioni da rivedere.
+                     </p>
+                     {qualitaData?.generatedAt && (
+                       <p className="text-xs text-muted-foreground mt-1">
+                         Snapshot: {fmtShortDate(qualitaData.generatedAt)}
+                       </p>
+                     )}
+                   </div>
+                   <div className="flex flex-wrap gap-2">
+                     <select
+                       value={qualitaDays}
+                       onChange={(e) => setQualitaDays(e.target.value)}
+                       className="min-h-11 text-sm border rounded-lg px-3 bg-background"
+                       aria-label="Periodo qualita Wendy"
+                     >
+                       <option value="7">Ultimi 7 giorni</option>
+                       <option value="30">Ultimi 30 giorni</option>
+                     </select>
+                     <Button variant="outline" onClick={loadQualita} disabled={qualitaLoading} className="min-h-11">
+                       <RefreshCw className={cn("w-4 h-4 mr-2", qualitaLoading && "animate-spin")} />
+                       Riprova
+                     </Button>
+                   </div>
+                 </div>
+
+                 {qualitaLoading && !qualitaData ? (
+                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                     {[0, 1, 2, 3, 4].map((item) => (
+                       <div key={item} className="h-28 rounded-xl border bg-card animate-pulse" />
+                     ))}
                    </div>
                  ) : !qualitaData ? (
-                   <div className="text-center py-8 text-muted-foreground">
-                     Nessun dato qualitÃ  disponibile
+                   <div className="p-10 text-center text-muted-foreground border rounded-xl bg-muted/20">
+                     Nessun dato qualita disponibile.
                    </div>
                  ) : (
                    <>
-                     {/* Totali */}
-                     {qualitaData.totals && (
-                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                         <div className="bg-card border rounded-xl p-4">
-                           <h4 className="text-sm font-semibold text-muted-foreground mb-2">
-                             Totale conversazioni
-                           </h4>
-                           <p className="text-2xl font-bold text-foreground">
-                             {qualitaData.totals.total.toLocaleString()}
-                           </p>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+                       {[
+                         {
+                           label: "Score qualita",
+                           value: fmtScore(qualitaData.summary.avgEvalScore ?? qualitaData.summary.avgSupervisorScore),
+                           detail: `${qualitaData.summary.total.toLocaleString("it-IT")} turni`,
+                           icon: CheckCircle2,
+                         },
+                         {
+                           label: "Rewrite rate",
+                           value: fmtPct(qualitaData.summary.rewriteRate),
+                           detail: `${qualitaData.summary.rewrites} rewrite`,
+                           icon: RotateCcw,
+                         },
+                         {
+                           label: "Chiarificazioni",
+                           value: fmtPct(qualitaData.summary.clarificationRate),
+                           detail: `${qualitaData.summary.clarifications} richieste`,
+                           icon: MessageCircle,
+                         },
+                         {
+                           label: "Uso tool",
+                           value: fmtPct(qualitaData.summary.toolUsageRate),
+                           detail: `${qualitaData.summary.uiTools} turni con tool`,
+                           icon: Terminal,
+                         },
+                         {
+                           label: "Feedback negativo",
+                           value: fmtPct(qualitaData.summary.negativeFeedbackRate),
+                           detail: `${qualitaData.summary.negativeFeedback}/${qualitaData.summary.feedbackTotal} feedback`,
+                           icon: ShieldAlert,
+                         },
+                       ].map((item) => {
+                         const Icon = item.icon;
+                         return (
+                           <div key={item.label} className="border rounded-xl p-4 bg-card">
+                             <div className="flex items-center justify-between gap-2">
+                               <span className="text-sm font-medium text-muted-foreground">{item.label}</span>
+                               <Icon className="w-4 h-4 text-muted-foreground" />
+                             </div>
+                             <p className="text-2xl font-bold mt-2">{item.value}</p>
+                             <p className="text-xs text-muted-foreground mt-1">{item.detail}</p>
+                           </div>
+                         );
+                       })}
+                     </div>
+
+                     <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+                       <div className="border rounded-xl bg-card p-4">
+                         <div className="flex items-center justify-between gap-3 mb-3">
+                           <div>
+                             <p className="font-semibold">Alert qualita</p>
+                             <p className="text-xs text-muted-foreground">Soglie calcolate in tempo reale</p>
+                           </div>
+                           <Badge variant={qualitaData.alerts.length > 0 ? "destructive" : "secondary"}>
+                             {qualitaData.alerts.length} alert
+                           </Badge>
                          </div>
-                         <div className="bg-card border rounded-xl p-4">
-                           <h4 className="text-sm font-semibold text-muted-foreground mb-2">
-                             Eval score medio
-                           </h4>
-                           <p className="text-2xl font-bold text-foreground">
-                             {qualitaData.totals.avgEvalScore ? (qualitaData.totals.avgEvalScore * 100).toFixed(0) + "%" : "N/D"}
-                           </p>
-                         </div>
-                         <div className="bg-card border rounded-xl p-4">
-                           <h4 className="text-sm font-semibold text-muted-foreground mb-2">
-                             Supervisor score medio
-                           </h4>
-                           <p className="text-2xl font-bold text-foreground">
-                             {qualitaData.totals.avgSupervisorScore ? (qualitaData.totals.avgSupervisorScore * 100).toFixed(0) + "%" : "N/D"}
-                           </p>
-                         </div>
-                         <div className="bg-card border rounded-xl p-4">
-                           <h4 className="text-sm font-semibold text-muted-foreground mb-2">
-                             Rewrite rate
-                           </h4>
-                           <p className="text-2xl font-bold text-foreground">
-                             {qualitaData.totals.total > 0 ? `${((qualitaData.totals.rewrites / qualitaData.totals.total) * 100).toFixed(1)}%` : "0%"}
-                           </p>
-                           <p className="text-xs text-muted-foreground mt-1">
-                             {qualitaData.totals.rewrites} riscritte
-                           </p>
-                         </div>
-                         <div className="bg-card border rounded-xl p-4">
-                           <h4 className="text-sm font-semibold text-muted-foreground mb-2">
-                             Chiarificazioni
-                           </h4>
-                           <p className="text-2xl font-bold text-foreground">
-                             {qualitaData.totals.total > 0 ? `${((qualitaData.totals.clarifications / qualitaData.totals.total) * 100).toFixed(1)}%` : "0%"}
-                           </p>
-                           <p className="text-xs text-muted-foreground mt-1">
-                             {qualitaData.totals.clarifications} richieste
-                           </p>
-                         </div>
-                         <div className="bg-card border rounded-xl p-4">
-                           <h4 className="text-sm font-semibold text-muted-foreground mb-2">
-                             UI tools usati
-                           </h4>
-                           <p className="text-2xl font-bold text-foreground">
-                             {String(qualitaData.totals.uiTools)}
-                           </p>
-                           <p className="text-xs text-muted-foreground mt-1">
-                             {qualitaData.totals.total > 0 ? ((qualitaData.totals.uiTools / qualitaData.totals.total) * 100).toFixed(1) + "%" : "0%"} dei turni
-                           </p>
-                         </div>
+                         {qualitaData.alerts.length === 0 ? (
+                           <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-4 text-sm text-emerald-800">
+                             Nessun alert: Wendy e stabile nel periodo selezionato.
+                           </div>
+                         ) : (
+                           <div className="space-y-2">
+                             {qualitaData.alerts.slice(0, 6).map((alert) => (
+                               <div
+                                 key={`${alert.title}-${alert.domain ?? "global"}`}
+                                 className={cn(
+                                   "rounded-lg border p-3",
+                                   alert.level === "critical"
+                                     ? "bg-red-50 border-red-200 text-red-900"
+                                     : "bg-amber-50 border-amber-200 text-amber-900",
+                                 )}
+                               >
+                                 <div className="flex items-start justify-between gap-3">
+                                   <p className="text-sm font-semibold">{alert.title}</p>
+                                   <Badge variant="outline" className="capitalize bg-background/70">
+                                     {alert.level}
+                                   </Badge>
+                                 </div>
+                                 <p className="text-xs mt-1">{alert.message}</p>
+                               </div>
+                             ))}
+                           </div>
+                         )}
                        </div>
-                     )}
-                     
-                     {/* Per dominio */}
-                     {qualitaData.qualityStats && qualitaData.qualityStats.length > 0 && (
-                       <div className="mb-6">
-                         <h4 className="font-semibold mb-4">Metriche per dominio</h4>
-                          <div className="overflow-x-auto">
-                           <table className="w-full text-sm">
-                             <thead>
-                               <tr className="border-b border-gray-200 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 uppercase">
-                                 <th className="px-4 py-3 text-left">Dominio</th>
-                                 <th className="px-4 py-3 text-right">Turni</th>
-                                 <th className="px-4 py-3 text-right">Eval score</th>
-                                 <th className="px-4 py-3 text-right">Supervisor</th>
-                                 <th className="px-4 py-3 text-right">Rewrite</th>
-                                 <th className="px-4 py-3 text-right">Chiarif.</th>
-                                 <th className="px-4 py-3 text-right">UI tool</th>
-                               </tr>
-                             </thead>
-                             <tbody>
-                                {qualitaData.qualityStats.map((s: any) => (
-                                 <tr key={s.domain} className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-900/50">
-                                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 capitalize">{s.domain}</td>
-                                   <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.total}</td>
-                                   <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{(s.avgEvalScore * 100).toFixed(0)}%</td>
-                                   <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.avgSupervisorScore ? `${(s.avgSupervisorScore * 100).toFixed(0)}%` : "â€”"}</td>
-                                   <td className="px-4 py-3 text-right">
-                                     <span className={s.rewrites > 0 ? "text-amber-500 font-medium" : "text-gray-400"}>
-                                       {s.rewrites} ({(s.rewrites / Math.max(s.total, 1) * 100).toFixed(0)}%)
-                                     </span>
-                                   </td>
-                                   <td className="px-4 py-3 text-right">
-                                     <span className={s.clarifications > 0 ? "text-blue-500 font-medium" : "text-gray-400"}>
-                                       {s.clarifications}
-                                     </span>
-                                   </td>
-                                   <td className="px-4 py-3 text-right">
-                                     <span className={s.uiTools > 0 ? "text-green-500 font-medium" : "text-gray-400"}>
-                                       {s.uiTools}
-                                     </span>
-                                   </td>
-                                 </tr>
-                               ))}
-                             </tbody>
-                           </table>
-                         </div>
+
+                       <div className="border rounded-xl bg-card p-4">
+                         <p className="font-semibold mb-3">Motivi rewrite</p>
+                         {qualitaData.rewriteReasons.length === 0 ? (
+                           <div className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">
+                             Nessun motivo rewrite registrato.
+                           </div>
+                         ) : (
+                           <div className="space-y-2">
+                             {qualitaData.rewriteReasons.slice(0, 6).map((reason) => (
+                               <div key={reason.reason} className="flex items-start justify-between gap-3 rounded-lg border p-3">
+                                 <p className="text-sm break-words">{reason.reason}</p>
+                                 <Badge variant="outline" className="shrink-0">{reason.count}</Badge>
+                               </div>
+                             ))}
+                           </div>
+                         )}
                        </div>
-                     )}
-                     
-                     {/* Supervisor stats */}
-                     {qualitaData.supervisorStats && qualitaData.supervisorStats.length > 0 && (
-                       <div className="mb-6">
-                         <h4 className="font-semibold mb-4">Supervisor â€” score prima/dopo rewrite</h4>
-                         <div className="overflow-x-auto">
-                           <table className="w-full text-sm">
-                             <thead>
-                               <tr className="border-b border-gray-200 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 uppercase">
-                                 <th className="px-4 py-3 text-left">Dominio</th>
-                                 <th className="px-4 py-3 text-right">Rewrite totali</th>
-                                 <th className="px-4 py-3 text-right">Score prima (media)</th>
-                                 <th className="px-4 py-3 text-right">Score dopo (media)</th>
-                                 <th className="px-4 py-3 text-right">Miglioramento</th>
-                               </tr>
-                             </thead>
-                             <tbody>
-                                {qualitaData.supervisorStats.map((s: any) => {
-                                 const improvement = s.avgScoreAfter && s.avgScoreBefore
-                                   ? ((s.avgScoreAfter - s.avgScoreBefore) * 100).toFixed(1)
-                                   : "â€”";
-                                 const isPositive = s.avgScoreAfter && s.avgScoreAfter > s.avgScoreBefore;
-                                 return (
-                                   <tr key={s.domain} className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-900/50">
-                                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 capitalize">{s.domain}</td>
-                                     <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.total}</td>
-                                     <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.avgScoreBefore ? `${(s.avgScoreBefore * 100).toFixed(0)}%` : "â€”"}</td>
-                                     <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.avgScoreAfter ? `${(s.avgScoreAfter * 100).toFixed(0)}%` : "â€”"}</td>
-                                     <td className={`px-4 py-3 text-right font-medium ${isPositive ? "text-green-500" : "text-red-400"}`}>
-                                       {improvement !== "â€”" ? `${isPositive ? "+" : ""}${improvement}%` : improvement}
-                                     </td>
-                                   </tr>
-                                 );
-                               })}
-                             </tbody>
-                           </table>
+                     </div>
+
+                     <div className="border rounded-xl bg-card p-4">
+                       <div className="flex items-center justify-between gap-3 mb-3">
+                         <div>
+                           <p className="font-semibold">Trend nel tempo</p>
+                           <p className="text-xs text-muted-foreground">Score, rewrite, chiarificazioni e latenza giornaliera</p>
                          </div>
+                         <Badge variant="outline">{qualitaData.trends.length} giorni</Badge>
                        </div>
-                     )}
+                       {qualitaData.trends.length === 0 ? (
+                         <div className="p-8 text-center text-muted-foreground bg-muted/30 rounded-lg">
+                           Nessun trend disponibile nel periodo.
+                         </div>
+                       ) : (
+                         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                           {qualitaData.trends.slice(-9).map((day) => (
+                             <div key={day.day} className="rounded-lg border p-3">
+                               <div className="flex items-center justify-between gap-2">
+                                 <p className="text-sm font-medium">{new Date(day.day).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</p>
+                                 <span className="text-xs text-muted-foreground">{day.total} turni</span>
+                               </div>
+                               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                 <span>Score <strong>{fmtScore(day.avgEvalScore ?? day.avgSupervisorScore)}</strong></span>
+                                 <span>Rewrite <strong>{fmtPct(day.rewriteRate)}</strong></span>
+                                 <span>Chiarif. <strong>{fmtPct(day.clarificationRate)}</strong></span>
+                                 <span>Latenza <strong>{day.avgLatencyMs ? fmtDuration(day.avgLatencyMs) : "N/D"}</strong></span>
+                               </div>
+                             </div>
+                           ))}
+                         </div>
+                       )}
+                     </div>
+
+                     <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+                       <div className="border rounded-xl bg-card p-4">
+                         <p className="font-semibold mb-3">Domini deboli</p>
+                         {qualitaData.domains.length === 0 ? (
+                           <div className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">
+                             Nessun dominio misurato nel periodo.
+                           </div>
+                         ) : (
+                           <div className="space-y-2">
+                             {qualitaData.domains.slice(0, 8).map((domain) => (
+                               <div key={domain.domain} className="rounded-lg border p-3">
+                                 <div className="flex items-center justify-between gap-3">
+                                   <p className="font-medium text-sm capitalize truncate">{domain.domain}</p>
+                                   <Badge
+                                     variant="outline"
+                                     className={cn(
+                                       "capitalize",
+                                       domain.status === "healthy" && "bg-emerald-50 text-emerald-700",
+                                       domain.status === "attention" && "bg-amber-50 text-amber-700",
+                                       domain.status === "critical" && "bg-red-50 text-red-700",
+                                     )}
+                                   >
+                                     {domain.status}
+                                   </Badge>
+                                 </div>
+                                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                   <span>Score {fmtScore(domain.avgEvalScore ?? domain.avgSupervisorScore)}</span>
+                                   <span>{domain.total} turni</span>
+                                   <span>Rewrite {fmtPct(domain.rewriteRate)}</span>
+                                   <span>Tool {fmtPct(domain.toolUsageRate)}</span>
+                                 </div>
+                               </div>
+                             ))}
+                           </div>
+                         )}
+                       </div>
+
+                       <div className="border rounded-xl bg-card p-4">
+                         <p className="font-semibold mb-3">Conversazioni problematiche</p>
+                         {qualitaData.problemConversations.length === 0 ? (
+                           <div className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">
+                             Nessuna conversazione problematica nel periodo.
+                           </div>
+                         ) : (
+                           <div className="space-y-2">
+                             {qualitaData.problemConversations.slice(0, 8).map((item) => (
+                               <div key={item.id} className="rounded-lg border p-3">
+                                 <div className="flex items-start justify-between gap-3">
+                                   <div className="min-w-0">
+                                     <p className="text-sm font-medium truncate">
+                                       {item.domain} / {item.intent}
+                                     </p>
+                                     <p className="text-xs text-muted-foreground">
+                                       Sessione #{item.sessionId ?? "N/D"} - {fmtShortDate(item.createdAt)}
+                                     </p>
+                                   </div>
+                                   <Badge variant={item.source === "feedback" ? "destructive" : "outline"} className="shrink-0">
+                                     {item.score != null ? fmtScore(item.score) : "feedback"}
+                                   </Badge>
+                                 </div>
+                                 <p className="text-xs mt-2 text-muted-foreground break-words">{item.snippet}</p>
+                                 {item.reason && (
+                                   <p className="text-xs mt-2 text-amber-700 break-words">Motivo: {item.reason}</p>
+                                 )}
+                               </div>
+                             ))}
+                           </div>
+                         )}
+                       </div>
+                     </div>
                    </>
                  )}
                </div>
@@ -1739,26 +3118,262 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
 
             {/* ── Home Admin ── */}
             {section === "home" && (
-              <div className="p-8">
-                <h3 className="text-lg font-serif font-bold mb-4">
-                  <Home className="w-5 h-5 inline mr-2 text-primary" />
-                  Panoramica Admin
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[
-                    { label: "In Attesa", value: stats?.pending ?? 0, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-950/30" },
-                    { label: "Approvati", value: stats?.approved ?? 0, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-950/30" },
-                    { label: "Rifiutati", value: stats?.rejected ?? 0, color: "text-red-600", bg: "bg-red-50 dark:bg-red-950/30" },
-                    { label: "Archiviati", value: stats?.archived ?? 0, color: "text-slate-600", bg: "bg-slate-50 dark:bg-slate-950/30" },
-                    { label: "Esecuzioni Agenti", value: stats?.totalRuns ?? 0, color: "text-primary", bg: "bg-primary/5" },
-                    { label: "Suggerimenti Totali", value: suggestionsTotal, color: "text-primary", bg: "bg-primary/5" },
-                  ].map((card) => (
-                    <div key={card.label} className={`rounded-xl p-4 ${card.bg} border`}>
-                      <p className={`text-2xl font-bold ${card.color}`}>{card.value}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{card.label}</p>
-                    </div>
-                  ))}
+              <div className="p-4 sm:p-6 lg:p-8 space-y-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-lg font-serif font-bold flex items-center gap-2">
+                      <Home className="w-5 h-5 text-primary" />
+                      Panoramica Admin
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Control room operativa per capire in pochi secondi cosa richiede attenzione.
+                    </p>
+                  </div>
+                  <Button size="sm" variant="outline" className="min-h-11" onClick={loadHome} disabled={homeLoading}>
+                    {homeLoading ? <RefreshCw size={14} className="animate-spin mr-2" /> : <RefreshCw size={14} className="mr-2" />}
+                    Aggiorna
+                  </Button>
                 </div>
+
+                {homeLoading && !homeData ? (
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {[0, 1, 2, 3].map((item) => (
+                      <div key={item} className="h-32 rounded-lg border bg-card animate-pulse" />
+                    ))}
+                  </div>
+                ) : !homeData ? (
+                  <div className="rounded-lg border bg-card p-8 text-center">
+                    <ShieldAlert className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
+                    <p className="font-medium">Panoramica non disponibile</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Non sono riuscito a caricare la control room.
+                    </p>
+                    <Button className="mt-4 min-h-11" variant="outline" onClick={loadHome}>
+                      Riprova
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    {(() => {
+                      const health = HEALTH_UI[homeData.health.status];
+                      const HealthIcon = health.icon;
+                      const summaryCards = [
+                        {
+                          label: "Azioni aperte",
+                          value: homeData.health.actionItems,
+                          detail: `${homeData.queues.reviewPending} review, ${homeData.inbox.unreadMessages} messaggi`,
+                          icon: ClipboardList,
+                          action: () => navigateToSection("queue"),
+                        },
+                        {
+                          label: "Errori recenti",
+                          value: homeData.errors.totalCaptured,
+                          detail: `${homeData.errors.unique} unici, ${homeData.errors.brokenComponents.length} componenti`,
+                          icon: ShieldAlert,
+                          action: () => navigateToSection("status"),
+                        },
+                        {
+                          label: "Agenti problematici",
+                          value: homeData.agents.critical + homeData.agents.degraded,
+                          detail: `${homeData.agents.critical} critici, ${homeData.agents.degraded} degradati`,
+                          icon: Bot,
+                          action: () => navigateToSection("agenti-salute"),
+                        },
+                      ];
+
+                      return (
+                        <div className="grid gap-3 xl:grid-cols-[1.4fr_repeat(3,minmax(0,1fr))]">
+                          <div className={cn("rounded-lg border p-4", health.tone)}>
+                            <div className="flex items-start gap-3">
+                              <span className={cn("mt-1 h-3 w-3 rounded-full shrink-0", health.dot)} />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <HealthIcon className="w-5 h-5" />
+                                  <p className="font-semibold">{homeData.health.label || health.label}</p>
+                                </div>
+                                <p className="text-sm mt-2 opacity-90">
+                                  {homeData.health.reasons.length > 0
+                                    ? homeData.health.reasons.slice(0, 3).join(" - ")
+                                    : "Nessuna anomalia operativa rilevata."}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {summaryCards.map((card) => {
+                            const Icon = card.icon;
+                            return (
+                              <button
+                                key={card.label}
+                                type="button"
+                                onClick={card.action}
+                                className="min-h-32 rounded-lg border bg-card p-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <Icon className="w-5 h-5 text-muted-foreground" />
+                                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                </div>
+                                <p className="mt-4 text-3xl font-bold">{card.value}</p>
+                                <p className="text-sm font-medium">{card.label}</p>
+                                <p className="text-xs text-muted-foreground mt-1">{card.detail}</p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+
+                    <div className="grid gap-4 xl:grid-cols-3">
+                      <div className="rounded-lg border bg-card p-4">
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                          <div>
+                            <p className="font-semibold">Azioni richieste</p>
+                            <p className="text-xs text-muted-foreground">Code operative da svuotare</p>
+                          </div>
+                          <Badge variant={homeData.queues.totalOpen > 0 ? "default" : "secondary"}>
+                            {homeData.queues.totalOpen} aperte
+                          </Badge>
+                        </div>
+                        <div className="space-y-2">
+                          {[
+                            { label: "Richieste in revisione", value: homeData.queues.reviewPending, section: "queue" as SidebarSection },
+                            { label: "Articoli crescita pending", value: homeData.queues.growthPending, section: "crescita" as SidebarSection },
+                            { label: "Messaggi non letti", value: homeData.inbox.unreadMessages, section: "messaggi" as SidebarSection },
+                            { label: "Lead da contattare", value: homeData.inbox.pendingLeads, section: "affiliazione" as SidebarSection },
+                          ].map((item) => (
+                            <button
+                              key={item.label}
+                              type="button"
+                              onClick={() => navigateToSection(item.section)}
+                              className="min-h-11 w-full flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                            >
+                              <span className="text-sm">{item.label}</span>
+                              <span className={cn("text-sm font-semibold", item.value > 0 ? "text-amber-700" : "text-muted-foreground")}>
+                                {item.value}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border bg-card p-4">
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                          <div>
+                            <p className="font-semibold">Errori API recenti</p>
+                            <p className="text-xs text-muted-foreground">Execution monitor in memoria</p>
+                          </div>
+                          <Button size="sm" variant="ghost" className="min-h-11" onClick={() => navigateToSection("status")}>
+                            Dettagli
+                          </Button>
+                        </div>
+                        {homeData.errors.recent.length === 0 ? (
+                          <div className="rounded-md bg-muted/40 p-4 text-sm text-muted-foreground">
+                            Nessun errore recente catturato.
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {homeData.errors.recent.slice(0, 3).map((error) => (
+                              <div key={`${error.file}-${error.function}-${error.code ?? "error"}`} className="rounded-md border p-3">
+                                <p className="text-sm font-medium truncate">{error.file}</p>
+                                <p className="text-xs text-muted-foreground truncate">{error.message}</p>
+                                <p className="text-xs text-red-600 mt-1">{error.occurrences} occorrenze</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="rounded-lg border bg-card p-4">
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                          <div>
+                            <p className="font-semibold">Agenti</p>
+                            <p className="text-xs text-muted-foreground">Salute e fallimenti recenti</p>
+                          </div>
+                          <Button size="sm" variant="ghost" className="min-h-11" onClick={() => navigateToSection("agenti-salute")}>
+                            Apri
+                          </Button>
+                        </div>
+                        {homeData.agents.failedRecent.length === 0 && homeData.agents.critical + homeData.agents.degraded === 0 ? (
+                          <div className="rounded-md bg-muted/40 p-4 text-sm text-muted-foreground">
+                            Nessun agente problematico negli ultimi 30 giorni.
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {homeData.agents.health
+                              .filter((agent) => agent.status !== "healthy")
+                              .slice(0, 3)
+                              .map((agent) => (
+                                <div key={agent.agentName} className="rounded-md border p-3">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-sm font-medium truncate">{agent.agentName}</p>
+                                    <Badge variant="outline">{agent.errorRate30d}% errori</Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {agent.errorCount30d} errori su {agent.totalCalls30d} chiamate
+                                  </p>
+                                </div>
+                              ))}
+                            {homeData.agents.failedRecent.slice(0, 2).map((run) => (
+                              <div key={run.id} className="rounded-md border p-3">
+                                <p className="text-sm font-medium truncate">{run.agentName}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {run.errorMessage || "Run fallito senza messaggio"}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <div className="rounded-lg border bg-card p-4">
+                        <p className="font-semibold mb-3">Metriche chiave</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          {[
+                            { label: "Utenti", value: homeData.metrics.users.total },
+                            { label: "Nuovi 30g", value: homeData.metrics.users.new30d },
+                            { label: "Premium", value: homeData.metrics.users.premium },
+                            { label: "Test", value: homeData.metrics.tests.total },
+                            { label: "Eventi futuri", value: homeData.metrics.calendar?.upcoming ?? 0 },
+                            { label: "Prossime 24h", value: homeData.metrics.calendar?.next24h ?? 0 },
+                          ].map((item) => (
+                            <div key={item.label} className="rounded-md bg-muted/40 p-3">
+                              <p className="text-xl font-bold">{item.value}</p>
+                              <p className="text-xs text-muted-foreground">{item.label}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border bg-card p-4">
+                        <p className="font-semibold mb-3">Inbox business</p>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => navigateToSection("messaggi")}
+                            className="min-h-24 rounded-md border p-3 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                          >
+                            <MessageCircle className="w-5 h-5 text-muted-foreground" />
+                            <p className="mt-3 text-2xl font-bold">{homeData.inbox.unreadMessages}</p>
+                            <p className="text-sm font-medium">Messaggi non letti</p>
+                            <p className="text-xs text-muted-foreground">{homeData.inbox.totalMessages} totali</p>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => navigateToSection("affiliazione")}
+                            className="min-h-24 rounded-md border p-3 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                          >
+                            <Handshake className="w-5 h-5 text-muted-foreground" />
+                            <p className="mt-3 text-2xl font-bold">{homeData.inbox.pendingLeads}</p>
+                            <p className="text-sm font-medium">Lead da contattare</p>
+                            <p className="text-xs text-muted-foreground">{homeData.inbox.totalLeads} totali</p>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -2148,7 +3763,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
 
               {detailLoading ? (
                 <div className="p-8 text-center text-muted-foreground">
-                  Caricamento dettagliâ€¦
+                  Caricamento dettagli...
                 </div>
               ) : (
                 <div className="p-6 space-y-6">
@@ -2180,6 +3795,53 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
 
                   <Separator />
 
+                  <div className="rounded-lg border bg-background p-4">
+                    <h4 className="text-sm font-semibold mb-3">Proposta</h4>
+                    {payloadEntries(detail.suggestion.payloadJson).length > 0 ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {payloadEntries(detail.suggestion.payloadJson).map(([key, value]) => (
+                          <div key={key} className="rounded-md bg-muted/40 p-3 min-w-0">
+                            <p className="text-xs font-medium text-muted-foreground">
+                              {humanizeKey(key)}
+                            </p>
+                            <p className="text-sm mt-1 break-words line-clamp-3">
+                              {formatValue(value)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Nessun campo sintetico disponibile. Apri i dati tecnici per vedere il payload completo.
+                      </p>
+                    )}
+                  </div>
+
+                  {payloadDiffs(detail.suggestion.payloadJson).length > 0 && (
+                    <div className="rounded-lg border bg-background p-4">
+                      <h4 className="text-sm font-semibold mb-3">Cambiamenti proposti</h4>
+                      <div className="space-y-3">
+                        {payloadDiffs(detail.suggestion.payloadJson).map((diff) => (
+                          <div key={diff.key} className="rounded-md border p-3">
+                            <p className="text-xs font-medium text-muted-foreground mb-2">
+                              {humanizeKey(diff.key)}
+                            </p>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <div className="rounded-md bg-red-50 p-2">
+                                <p className="text-[10px] font-semibold uppercase text-red-700">Prima</p>
+                                <p className="text-xs text-red-900 break-words">{formatValue(diff.before)}</p>
+                              </div>
+                              <div className="rounded-md bg-emerald-50 p-2">
+                                <p className="text-[10px] font-semibold uppercase text-emerald-700">Dopo</p>
+                                <p className="text-xs text-emerald-900 break-words">{formatValue(diff.after)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Agent Run Info */}
                   {detail.agentRun && (
                     <div className="bg-muted/30 rounded-xl p-4">
@@ -2207,12 +3869,20 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                   {/* Payload */}
                   {detail.suggestion.payloadJson && (
                     <div>
-                      <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                        <Eye className="w-4 h-4" /> Contenuto Completo
-                      </h4>
-                      <pre className="bg-muted/50 rounded-xl p-4 text-xs overflow-x-auto max-h-80 whitespace-pre-wrap font-mono">
-                        {JSON.stringify(detail.suggestion.payloadJson, null, 2)}
-                      </pre>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="min-h-11"
+                        onClick={() => setShowTechnicalData((value) => !value)}
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        {showTechnicalData ? "Nascondi dati tecnici" : "Mostra dati tecnici"}
+                      </Button>
+                      {showTechnicalData && (
+                        <pre className="mt-3 bg-muted/50 rounded-xl p-4 text-xs overflow-x-auto max-h-80 whitespace-pre-wrap font-mono">
+                          {JSON.stringify(detail.suggestion.payloadJson, null, 2)}
+                        </pre>
+                      )}
                     </div>
                   )}
 
@@ -2267,7 +3937,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                       {showEditNotes && (
                         <div className="space-y-2">
                           <Input
-                            placeholder="Motivo del rifiuto (opzionale)â€¦"
+                            placeholder="Motivo del rifiuto (opzionale)..."
                             value={editNotes}
                             onChange={(e) => setEditNotes(e.target.value)}
                           />
@@ -2296,9 +3966,17 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                     </div>
                   )}
 
-                  {detail.suggestion.status !== "pending_review" && (
-                    <div className="flex gap-2">
-                      {detail.suggestion.status !== "archived" && (
+                  {detail.suggestion.status === "approved" && (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-semibold">Azioni</h4>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700 text-white flex-1"
+                          onClick={() => handleApply(detail.suggestion.id)}
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-1" /> Applica
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
@@ -2306,7 +3984,57 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                         >
                           <Archive className="w-4 h-4 mr-1" /> Archivia
                         </Button>
-                      )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        In questo step Applica chiude il workflow senza modificare i dati finali.
+                      </p>
+                    </div>
+                  )}
+
+                  {detail.suggestion.status === "applied" && (
+                    <div className="rounded-lg border bg-blue-50 p-4 text-blue-800">
+                      <p className="text-sm font-semibold">Suggerimento applicato</p>
+                      <p className="text-xs mt-1">
+                        Workflow completato. Nessuna modifica automatica ai cataloghi e stata eseguita in questo step.
+                      </p>
+                    </div>
+                  )}
+
+                  {(detail.suggestion.status === "rejected" || detail.suggestion.status === "archived") && (
+                    <div className="rounded-lg border bg-muted/40 p-4">
+                      <p className="text-sm font-semibold">
+                        {detail.suggestion.status === "archived" ? "Suggerimento archiviato" : "Suggerimento rifiutato"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        La decisione resta nello storico audit della proposta.
+                      </p>
+                    </div>
+                  )}
+
+                  {detail.auditTrail && detail.auditTrail.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <History className="w-4 h-4" /> Audit decisioni
+                      </h4>
+                      <div className="space-y-2">
+                        {detail.auditTrail.slice(0, 5).map((event) => (
+                          <div key={event.id} className="rounded-md border p-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-medium">
+                                {humanizeKey(event.action.replace("admin_suggestion_", ""))}
+                              </p>
+                              <p className="text-xs text-muted-foreground shrink-0">
+                                {fmtShortDate(event.createdAt)}
+                              </p>
+                            </div>
+                            {event.metadata?.notes != null && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Note: {formatValue(event.metadata.notes)}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2316,6 +4044,6 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
         </div>
       </main>
     </div>
-    </AdminAuthGate>
+    </>
   );
 }

@@ -60,8 +60,8 @@ export default function AdminMetriche() {
     setError(null);
     try {
       const [metricsRes, wendyRes] = await Promise.all([
-        fetch(`${BASE}api/admin/metrics`, { headers: { "x-admin-key": adminKey } }),
-        fetch(`${BASE}api/admin/wendy-metrics`, { headers: { "x-admin-key": adminKey } }),
+        fetch(`${BASE}api/admin/metrics`, { headers: { Authorization: `Bearer ${adminKey}` } }),
+        fetch(`${BASE}api/admin/wendy-metrics`, { headers: { Authorization: `Bearer ${adminKey}` } }),
       ]);
       if (!metricsRes.ok) throw new Error("Errore server");
       const metricsData = await metricsRes.json();

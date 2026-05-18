@@ -44,8 +44,6 @@ const Archivio = lazy(() => import("@/pages/grafo-conoscenza"));
 const Settori = lazy(() => import("@/pages/settori"));
 const Confronta = lazy(() => import("@/pages/confronta"));
 const Contatti = lazy(() => import("@/pages/contatti"));
-const AdminMessaggi = lazy(() => import("@/pages/admin-messaggi"));
-const AdminAffiliazione = lazy(() => import("@/pages/admin-affiliazione"));
 const AdminReview = lazy(() => import("@/pages/admin-review"));
 const SitemapPage = lazy(() => import("@/pages/sitemap"));
 const ChiSiamo = lazy(() => import("@/pages/chi-siamo"));
@@ -82,13 +80,6 @@ const IdeaPage = lazy(() => import("@/pages/validatore-idea"));
 const Percorso = lazy(() => import("@/pages/percorso"));
 const ScoreCard = lazy(() => import("@/pages/score-card"));
 const Lavori = lazy(() => import("@/pages/lavori"));
-const AdminMetriche = lazy(() => import("@/pages/admin-metriche"));
-const AdminStatus = lazy(() => import("@/pages/admin-status"));
-const AdminHome = lazy(() => import("@/pages/admin-home"));
-const AdminAgenti = lazy(() => import("@/pages/admin-agenti"));
-const AdminCataloghi = lazy(() => import("@/pages/admin-cataloghi"));
-const AdminCrescita = lazy(() => import("@/pages/admin-crescita"));
-const AdminRag = lazy(() => import("@/pages/admin-rag"));
 const MemoriaWendy = lazy(() => import("@/pages/memoria-wendy"));
 const WorkspacePage = lazy(() => import("@/pages/workspace"));
 const BriefingPage = lazy(() => import("@/pages/briefing"));
@@ -292,59 +283,10 @@ function AnimatedRoutes() {
 function Router() {
   return (
     <Switch>
-      <Route path="/admin/messaggi">
+      <Route path="/admin/:section">
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
-            <AdminMessaggi />
-          </Suspense>
-        </ErrorBoundary>
-      </Route>
-      <Route path="/admin/affiliazione">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminAffiliazione />
-          </Suspense>
-        </ErrorBoundary>
-      </Route>
-      <Route path="/admin/review">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminReview />
-          </Suspense>
-        </ErrorBoundary>
-      </Route>
-      <Route path="/admin/metriche">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminMetriche />
-          </Suspense>
-        </ErrorBoundary>
-      </Route>
-      <Route path="/admin/status">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminStatus />
-          </Suspense>
-        </ErrorBoundary>
-      </Route>
-      <Route path="/admin/agenti">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminAgenti />
-          </Suspense>
-        </ErrorBoundary>
-      </Route>
-      <Route path="/admin/cataloghi">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminCataloghi />
-          </Suspense>
-        </ErrorBoundary>
-      </Route>
-      <Route path="/admin/crescita">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminCrescita />
+            <ProtectedRoute component={AdminReview} />
           </Suspense>
         </ErrorBoundary>
       </Route>
@@ -369,17 +311,10 @@ function Router() {
           </Suspense>
         </ErrorBoundary>
       </Route>
-      <Route path="/admin/rag">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <AdminRag />
-          </Suspense>
-        </ErrorBoundary>
-      </Route>
       <Route path="/admin">
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
-            <AdminHome />
+            <ProtectedRoute component={AdminReview} />
           </Suspense>
         </ErrorBoundary>
       </Route>

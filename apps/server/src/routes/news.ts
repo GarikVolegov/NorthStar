@@ -182,13 +182,16 @@ router.get("/sector/:sectorName", async (req, res) => {
 });
 
 function mapNewsItem(a: typeof newsArticlesTable.$inferSelect) {
+  const publishedAt = a.publishedAt instanceof Date
+    ? a.publishedAt.toISOString()
+    : (a.publishedAt ? String(a.publishedAt) : new Date().toISOString());
   return {
     id: String(a.id),
     title: a.title,
     description: a.summary,
     source: a.source,
     url: a.url,
-    publishedAt: a.publishedAt?.toISOString() ?? new Date().toISOString(),
+    publishedAt,
     image: null,
     category: a.category,
     sector: a.sectorNames?.[0] ?? null,

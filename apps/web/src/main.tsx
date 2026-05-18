@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import "./i18n";
+import { ClerkProvider } from "@clerk/react";
 
 /**
  * Registra il Service Worker in idle time, non al caricamento iniziale.
@@ -39,4 +40,42 @@ function registerSW() {
 
 registerSW();
 
-createRoot(document.getElementById("root")!).render(<App />);
+/**
+ * Clerk appearance personalizzato — tema "Deep Navy Premium" di NorthStar.
+ */
+const clerkAppearance = {
+  variables: {
+    colorPrimary: "#c19e4a",
+    colorBackground: "#131621",
+    colorInputBackground: "#171b28",
+    colorText: "#e6e8ed",
+    colorTextSecondary: "#7a7f96",
+    colorTextOnPrimaryBackground: "#0b0d12",
+    colorInputText: "#e6e8ed",
+    colorDanger: "#d94f45",
+    colorSuccess: "#7db89a",
+    colorNeutral: "#1e2233",
+    borderRadius: "0.75rem",
+    fontFamily: "'Inter', system-ui, sans-serif",
+    fontFamilyButtons: "'Inter', system-ui, sans-serif",
+    fontSize: "14px",
+    spacingUnit: "8px",
+  },
+  layout: {
+    logoPlacement: "inside",
+    socialButtonsPlacement: "top",
+    showOptionalFields: false,
+    privacyPageUrl: "/privacy-policy",
+    termsPageUrl: "/termini-di-servizio",
+  },
+};
+
+createRoot(document.getElementById("root")!).render(
+  <ClerkProvider
+    publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}
+    afterSignOutUrl="/"
+    appearance={clerkAppearance}
+  >
+    <App />
+  </ClerkProvider>
+);
