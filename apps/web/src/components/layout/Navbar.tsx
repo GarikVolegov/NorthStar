@@ -27,7 +27,6 @@ import {
 import { useClerk } from "@clerk/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProactiveInsights } from "@/hooks/useProactiveInsights";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { SubscriptionChip } from "@/components/subscription/SubscriptionStatus";
 import { useReducedMotion } from "@/lib/motion";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
@@ -270,7 +269,7 @@ export function Navbar() {
   const profileMenuBody = user ? (
     <>
       <DropdownMenuLabel className="p-0 font-normal">
-        <div className="h-14 overflow-hidden bg-muted sm:h-20">
+        <div className="h-16 overflow-hidden bg-muted">
           {profileBannerUrl ? (
             <img
               src={profileBannerUrl}
@@ -281,9 +280,9 @@ export function Navbar() {
             <div className="h-full w-full bg-[radial-gradient(circle_at_20%_20%,hsl(var(--primary)/0.28),transparent_35%),linear-gradient(135deg,hsl(var(--muted)),hsl(var(--background)))]" />
           )}
         </div>
-        <div className="px-3 pb-2 pt-2 sm:pb-3 sm:pt-3">
-          <div className="mb-2 flex items-center gap-2 sm:mb-3 sm:gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-card bg-primary/10 text-sm font-bold text-primary shadow-sm sm:h-14 sm:w-14 sm:border-4 sm:text-lg">
+        <div className="px-3 pb-3 pt-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-card bg-primary/10 text-base font-bold text-primary shadow-sm">
               {user.avatarUrl ? (
                 <img
                   src={user.avatarUrl}
@@ -294,23 +293,25 @@ export function Navbar() {
                 initial
               )}
             </span>
-            <div className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-foreground">
+            <div className="min-w-0 flex-1">
+              <span className="block truncate text-base font-semibold leading-5 text-foreground">
                 {displayName}
               </span>
-              <span className="block truncate text-[11px] text-muted-foreground sm:text-xs">
+              <span className="block truncate text-xs text-muted-foreground">
                 {user.email}
               </span>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {user.journeyType && JOURNEY_LABELS[user.journeyType] && (
+                  <span
+                    className={`inline-flex w-fit rounded-full border px-2 py-0.5 text-xs font-semibold ${JOURNEY_LABELS[user.journeyType].color}`}
+                  >
+                    {JOURNEY_LABELS[user.journeyType].label}
+                  </span>
+                )}
+                <SubscriptionChip />
+              </div>
             </div>
           </div>
-          {user.journeyType && JOURNEY_LABELS[user.journeyType] && (
-            <span
-              className={`mt-0.5 inline-flex w-fit rounded-full border px-2 py-0.5 text-xs font-semibold ${JOURNEY_LABELS[user.journeyType].color}`}
-            >
-              {JOURNEY_LABELS[user.journeyType].label}
-            </span>
-          )}
-          <SubscriptionChip />
         </div>
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
@@ -356,7 +357,7 @@ export function Navbar() {
       <DropdownMenuItem
         onClick={() => goToProfilePath("/wendy/memoria")}
         onMouseEnter={() => prefetchRoute("/wendy/memoria")}
-        className="min-h-10 cursor-pointer text-xs text-muted-foreground"
+        className="min-h-10 cursor-pointer text-sm text-muted-foreground"
       >
         <Brain className="mr-2 h-4 w-4" />
         Memoria di Wendy
@@ -364,7 +365,7 @@ export function Navbar() {
       <DropdownMenuItem
         onClick={() => goToProfilePath("/profilo/briefing")}
         onMouseEnter={() => prefetchRoute("/profilo/briefing")}
-        className="min-h-10 cursor-pointer text-xs text-muted-foreground"
+        className="min-h-10 cursor-pointer text-sm text-muted-foreground"
       >
         <Sparkles className="mr-2 h-4 w-4" />
         Briefing Wendy
@@ -372,17 +373,37 @@ export function Navbar() {
       <DropdownMenuItem
         onClick={() => goToProfilePath("/workspace")}
         onMouseEnter={() => prefetchRoute("/workspace")}
-        className="min-h-10 cursor-pointer text-xs text-muted-foreground"
+        className="min-h-10 cursor-pointer text-sm text-muted-foreground"
       >
         <Users className="mr-2 h-4 w-4" />
         Workspace
       </DropdownMenuItem>
       <DropdownMenuSeparator />
-      <div className="flex min-h-10 items-center justify-between gap-2 px-2 py-1">
+      <div className="flex min-h-10 items-center gap-2 px-2 py-1.5">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Tema
         </p>
-        <ThemeToggle />
+        <div className="ml-auto grid grid-cols-3 gap-1">
+          {MOBILE_THEME_OPTIONS.map((option) => {
+            const Icon = option.icon;
+            const active = (theme ?? "system") === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setTheme(option.value)}
+                className={`flex min-h-8 items-center justify-center gap-1 rounded-full border px-2 text-[10px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${
+                  active
+                    ? "border-primary/40 bg-primary/10 text-primary"
+                    : "border-border bg-background text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
       <DropdownMenuSeparator />
       <div className="flex min-h-10 items-center gap-2 px-2 py-1">
@@ -412,7 +433,7 @@ export function Navbar() {
         </div>
       </div>
       <DropdownMenuSeparator />
-      {renderAffiliateInviteBlock()}
+      {renderAffiliateInviteBlock(true)}
       <DropdownMenuSeparator />
       <DropdownMenuItem
         onClick={() => {
@@ -789,170 +810,11 @@ export function Navbar() {
                 {!isMobile && (
                 <DropdownMenuContent
                   side="top"
-                  align={isMobile ? "center" : "end"}
-                  sideOffset={isMobile ? 22 : 8}
-                  style={isMobile ? {
-                    position: "fixed",
-                    left: "50%",
-                    top: "50%",
-                    transform: `translate(-50%, -50%) scale(${mobileMenuScale})`,
-                    transformOrigin: "center",
-                    width: "min(360px, calc(100vw - 24px))",
-                  } : undefined}
-                  className="w-[calc(100vw-24px)] max-w-sm overflow-hidden border-border bg-card p-0 shadow-2xl sm:w-72"
+                  align="end"
+                  sideOffset={8}
+                  className="w-80 overflow-hidden border-border bg-card p-0 shadow-2xl"
                 >
-                  <DropdownMenuLabel className="p-0 font-normal">
-                    <div className="h-14 overflow-hidden bg-muted sm:h-20">
-                      {profileBannerUrl ? (
-                        <img
-                          src={profileBannerUrl}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="h-full w-full bg-[radial-gradient(circle_at_20%_20%,hsl(var(--primary)/0.28),transparent_35%),linear-gradient(135deg,hsl(var(--muted)),hsl(var(--background)))]" />
-                      )}
-                    </div>
-                    <div className="px-3 pb-2 pt-2 sm:pb-3 sm:pt-3">
-                      <div className="mb-2 flex items-center gap-2 sm:mb-3 sm:gap-3">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-card bg-primary/10 text-sm font-bold text-primary shadow-sm sm:h-14 sm:w-14 sm:border-4 sm:text-lg">
-                          {user.avatarUrl ? (
-                            <img
-                              src={user.avatarUrl}
-                              alt=""
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            initial
-                          )}
-                        </span>
-                        <div className="min-w-0">
-                          <span className="block truncate text-sm font-semibold text-foreground">
-                            {displayName}
-                          </span>
-                          <span className="block truncate text-[11px] text-muted-foreground sm:text-xs">
-                            {user.email}
-                          </span>
-                        </div>
-                      </div>
-                      {user.journeyType && JOURNEY_LABELS[user.journeyType] && (
-                        <span
-                          className={`mt-0.5 inline-flex w-fit rounded-full border px-2 py-0.5 text-xs font-semibold ${JOURNEY_LABELS[user.journeyType].color}`}
-                        >
-                          {JOURNEY_LABELS[user.journeyType].label}
-                        </span>
-                      )}
-                      <SubscriptionChip />
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => goToProfilePath("/profilo#impostazioni")}
-                    onMouseEnter={() => prefetchRoute("/profilo")}
-                    onFocus={() => prefetchRoute("/profilo")}
-                    className="min-h-10 cursor-pointer sm:min-h-11"
-                  >
-                    <Settings className="mr-2 h-4 w-4 text-primary" />
-                    Impostazioni profilo
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  {insightsUnread > 0 && (
-                    <>
-                      <DropdownMenuItem
-                        onClick={() => goToProfilePath("/dashboard")}
-                        className="min-h-10 cursor-pointer text-amber-500 focus:text-amber-600"
-                      >
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        Wendy ha {insightsUnread > 9 ? "9+" : insightsUnread} insight
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
-                  {!user.journeyType && (
-                    <DropdownMenuItem
-                      onClick={() => goToProfilePath("/percorso")}
-                      onMouseEnter={() => prefetchRoute("/percorso")}
-                      className="min-h-10 cursor-pointer"
-                    >
-                      <MapPin className="mr-2 h-4 w-4 text-primary" />
-                      Imposta percorso
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem
-                    onClick={() => goToProfilePath("/candidature")}
-                    className="min-h-10 cursor-pointer"
-                  >
-                    <Briefcase className="mr-2 h-4 w-4" />
-                    {t("nav.applications")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => goToProfilePath("/wendy/memoria")}
-                    onMouseEnter={() => prefetchRoute("/wendy/memoria")}
-                    className="min-h-10 cursor-pointer text-xs text-muted-foreground"
-                  >
-                    <Brain className="mr-2 h-4 w-4" />
-                    Memoria di Wendy
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => goToProfilePath("/profilo/briefing")}
-                    onMouseEnter={() => prefetchRoute("/profilo/briefing")}
-                    className="min-h-10 cursor-pointer text-xs text-muted-foreground"
-                  >
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Briefing Wendy
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => goToProfilePath("/workspace")}
-                    onMouseEnter={() => prefetchRoute("/workspace")}
-                    className="min-h-10 cursor-pointer text-xs text-muted-foreground"
-                  >
-                    <Users className="mr-2 h-4 w-4" />
-                    Workspace
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <div className="flex min-h-10 items-center justify-between gap-2 px-2 py-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Tema
-                    </p>
-                    <ThemeToggle />
-                  </div>
-                  <DropdownMenuSeparator />
-                  <div className="flex min-h-10 items-center gap-2 px-2 py-1">
-                    <div className="flex min-w-0 flex-1 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      <Globe2 className="h-4 w-4 shrink-0" />
-                      <span>Lingua</span>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      {SUPPORTED_LANGUAGES.map((code) => {
-                        const active = activeLanguage === code;
-                        return (
-                          <button
-                            key={code}
-                            type="button"
-                            onClick={() => void i18n.changeLanguage(code)}
-                            className={`min-h-8 rounded-full border px-2 text-[10px] font-bold uppercase transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${
-                              active
-                                ? "border-primary/40 bg-primary/10 text-primary"
-                                : "border-border bg-background text-muted-foreground hover:text-foreground"
-                            }`}
-                            aria-label={`Cambia lingua in ${LANGUAGE_LABELS[code] ?? code.toUpperCase()}`}
-                          >
-                            {code.toUpperCase()}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <DropdownMenuSeparator />
-                  {renderAffiliateInviteBlock()}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => signOut()}
-                    className="min-h-10 cursor-pointer text-destructive focus:text-destructive"
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    {t("nav.logout")}
-                  </DropdownMenuItem>
+                  {profileMenuBody}
                 </DropdownMenuContent>
                 )}
               </DropdownMenu>
