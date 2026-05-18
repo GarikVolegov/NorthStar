@@ -111,7 +111,8 @@ export function Navbar() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [affiliateLinkCopied, setAffiliateLinkCopied] = useState(false);
-  const affiliatePreview = useAffiliateInvitePreview(profileMenuOpen, isLoggedIn && !!user?.id);
+  const isAffiliate = !!user?.isAffiliate;
+  const affiliatePreview = useAffiliateInvitePreview(profileMenuOpen, isLoggedIn && !!user?.id && isAffiliate);
   const { unreadCount: insightsUnread } = useProactiveInsights();
 
   const phase: NavPhase = !isLoggedIn
@@ -149,7 +150,6 @@ export function Navbar() {
       .catch(() => {});
   }, [phase]);
 
-  const isAffiliate = user ? (user.isAffiliate ?? true) : false;
   const isWendyActive = wendy.phase === "thinking" || wendy.phase === "speaking";
   const displayName = user?.name || user?.email || NAV_LABELS.profilo;
   const initial = displayName.trim().charAt(0).toUpperCase() || "N";
