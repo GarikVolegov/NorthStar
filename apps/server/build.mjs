@@ -13,7 +13,7 @@ await esbuild.build({
   target: "node20",
   format: "esm",
   tsconfig: "tsconfig.json",
-  external: ["pg-native"],
+  external: ["dotenv", "pg-native"],
   packages: "bundle",
 });
 
