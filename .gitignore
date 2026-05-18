@@ -76,6 +76,8 @@ Thumbs.db
 # ── Replit-specific ────────────────────────────────────────────────────────
 .cache/
 .local/
+.vercel/
+apps/server/api/index.js
 
 # Go CLI binaries (build artifacts)
 .tools/printed-clis/*/bin/

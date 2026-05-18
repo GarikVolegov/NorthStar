@@ -1,7 +1,12 @@
 import * as esbuild from "esbuild";
+import { fileURLToPath } from "node:url";
+
+const serverDir = fileURLToPath(new URL(".", import.meta.url));
+const entryPoint = fileURLToPath(new URL("./api/index.ts", import.meta.url));
 
 await esbuild.build({
-  entryPoints: ["api/index.ts"],
+  absWorkingDir: serverDir,
+  entryPoints: [entryPoint],
   bundle: true,
   outfile: "api/index.js",
   platform: "node",

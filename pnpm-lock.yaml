@@ -201,6 +201,9 @@ importers:
       resend:
         specifier: ^6.12.3
         version: 6.12.3
+      stripe:
+        specifier: ^22.1.1
+        version: 22.1.1(@types/node@25.3.5)
       zod:
         specifier: 'catalog:'
         version: 3.25.76
@@ -220,6 +223,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 25.3.5
+      esbuild:
+        specifier: 0.27.3
+        version: 0.27.3
       tsx:
         specifier: 'catalog:'
         version: 4.21.0
