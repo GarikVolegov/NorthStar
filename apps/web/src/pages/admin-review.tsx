@@ -8,13 +8,14 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import {
   AgentsSection,
+  BusinessMetricsSection,
   ConfidenceBadge,
   EntityBadge,
-  HEALTH_UI,
   HomeSection,
   PersistenceWarningBanner,
   PromptsSection,
   QualitySection,
+  StatusSection,
   StatusBadge,
   agentStatusClass,
   agentStatusLabel,
@@ -36,6 +37,7 @@ import {
   type AgentsOverview,
   type AgentsTab,
   type AiModelPolicy,
+  type BusinessStatusSnapshot,
   type PersistenceMeta,
   type PromptEditorTab,
   type PromptPreview,
@@ -336,56 +338,6 @@ const LEAD_STATUS_UI: Record<AffiliationLeadItem["status"], { label: string; cla
   contacted: { label: "Contattato", className: "bg-amber-100 text-amber-800 border-amber-200" },
   converted: { label: "Convertito", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
   rejected: { label: "Rifiutato", className: "bg-red-100 text-red-800 border-red-200" },
-};
-
-type BusinessStatusSnapshot = {
-  generatedAt: string;
-  days: number;
-  business: {
-    users: { total: number; new7d: number; new30d: number; premium: number; conversionRate: number };
-    tests: { total: number; recent: number; recent7d: number; recent30d: number; confirmed: number; completionRate: number };
-    topSectors: Array<{ sectorId: number | null; count: number }>;
-  };
-  funnels: {
-    userToTestRate: number;
-    userToPremiumRate: number;
-    leadConversionRate: number;
-  };
-  technical: {
-    status: "healthy" | "attention" | "critical";
-    label: string;
-    reasons: string[];
-    uptimeSeconds: number;
-    dbReady: boolean;
-    services: Record<string, { status: string; label: string; uptimeSeconds?: number }>;
-    errors: {
-      totalCaptured: number;
-      unique: number;
-      brokenComponents: string[];
-      recent: Array<{ file: string; function: string; message: string; code: string | null; capturedAt: string; occurrences: number }>;
-    };
-    agents: {
-      totalRuns: number;
-      failedRuns: number;
-      runningRuns: number;
-      errorRate: number;
-      avgDurationMs: number | null;
-      recentFailures: Array<{ id: number; agentName: string; taskType: string | null; status: string; errorMessage: string | null; startedAt: string }>;
-    };
-    ai: { requests: number; errors: number; errorRate: number };
-  };
-  env: {
-    total: number;
-    configured: number;
-    missingCritical: string[];
-    missingOptional: string[];
-    items: Array<{ key: string; label: string; critical: boolean; configured: boolean }>;
-  };
-  inbox: {
-    messages: { total: number; unread: number; open: number };
-    leads: { total: number; pending: number; contacted: number; converted: number; unread: number };
-  };
-  actions: Array<{ label: string; section: SidebarSection; path: string; count: number | null }>;
 };
 
 const SECTION_BY_PATH: Record<string, SidebarSection> = {
@@ -2804,268 +2756,22 @@ const [memoryActionLoading, setMemoryActionLoading] = useState<string | null>(nu
 
             {/* ── Metriche Business ── */}
             {section === "metriche" && (
-              <div className="p-4 md:p-8 space-y-5">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <h3 className="text-lg font-serif font-bold">
-                      <BarChart3 className="w-5 h-5 inline mr-2 text-primary" />
-                      Metriche Business
-                    </h3>
-                    <p className="text-sm text-muted-foreground">Crescita, conversione e segnali per decidere cosa correggere.</p>
-                  </div>
-                  <Button size="sm" variant="outline" onClick={loadMetriche} disabled={metricheLoading} className="min-h-11">
-                    {metricheLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
-                    Aggiorna
-                  </Button>
-                </div>
-                {metricheLoading ? (
-                  <p className="text-sm text-muted-foreground">Caricamento...</p>
-                ) : metricheData ? (
-                  <div className="space-y-5">
-                    <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-                      {[
-                        { label: "Utenti", value: metricheData.business.users.total, detail: `+${metricheData.business.users.new30d} in 30g` },
-                        { label: "Nuovi 7g", value: metricheData.business.users.new7d, detail: "Acquisizione breve" },
-                        { label: "Test", value: metricheData.business.tests.total, detail: `+${metricheData.business.tests.recent30d} in 30g` },
-                        { label: "Premium", value: metricheData.business.users.premium, detail: `${metricheData.business.users.conversionRate}% conversione` },
-                        { label: "Test/User", value: `${metricheData.funnels.userToTestRate}%`, detail: "Attivazione" },
-                        { label: "Lead conv.", value: `${metricheData.funnels.leadConversionRate}%`, detail: "Partner" },
-                      ].map((item) => (
-                        <div key={item.label} className="rounded-lg p-4 bg-card border min-w-0">
-                          <p className="text-2xl font-bold truncate">{item.value}</p>
-                          <p className="text-xs font-medium text-muted-foreground">{item.label}</p>
-                          <p className="text-xs text-muted-foreground mt-1 truncate">{item.detail}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="grid lg:grid-cols-2 gap-4">
-                      <div className="rounded-lg border bg-card p-4">
-                        <h4 className="font-semibold text-sm mb-3">Trend sintetico</h4>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="rounded-lg bg-muted/40 p-3">
-                            <p className="text-xs text-muted-foreground">Utenti 7g / 30g</p>
-                            <p className="text-lg font-bold">{metricheData.business.users.new7d} / {metricheData.business.users.new30d}</p>
-                          </div>
-                          <div className="rounded-lg bg-muted/40 p-3">
-                            <p className="text-xs text-muted-foreground">Test 7g / 30g</p>
-                            <p className="text-lg font-bold">{metricheData.business.tests.recent7d} / {metricheData.business.tests.recent30d}</p>
-                          </div>
-                          <div className="rounded-lg bg-muted/40 p-3">
-                            <p className="text-xs text-muted-foreground">Test confermati</p>
-                            <p className="text-lg font-bold">{metricheData.business.tests.completionRate}%</p>
-                          </div>
-                          <div className="rounded-lg bg-muted/40 p-3">
-                            <p className="text-xs text-muted-foreground">AI error rate</p>
-                            <p className="text-lg font-bold">{metricheData.technical.ai.errorRate}%</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg border bg-card p-4">
-                        <div className="flex items-center justify-between gap-2 mb-3">
-                          <h4 className="font-semibold text-sm">Decisioni rapide</h4>
-                          <Badge variant={metricheData.technical.status === "healthy" ? "secondary" : "default"}>
-                            {metricheData.technical.label}
-                          </Badge>
-                        </div>
-                        <div className="space-y-2">
-                          {metricheData.actions.filter((action) => (action.count ?? 0) > 0).slice(0, 5).map((action) => (
-                            <button
-                              key={action.path}
-                              type="button"
-                              onClick={() => navigateToSection(action.section)}
-                              className="w-full min-h-11 rounded-lg border bg-background p-3 text-left hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <span className="text-sm font-medium">{action.label}</span>
-                                <Badge variant="outline">{action.count}</Badge>
-                              </div>
-                            </button>
-                          ))}
-                          {metricheData.actions.every((action) => !action.count) && (
-                            <p className="text-sm text-muted-foreground">Nessuna azione urgente: guarda i trend e continua a monitorare.</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {metricheData.business.topSectors && metricheData.business.topSectors.length > 0 && (
-                      <div className="rounded-lg border bg-card p-4">
-                        <h4 className="font-semibold mb-2 text-sm">Settori più popolari</h4>
-                        <div className="space-y-1">
-                          {metricheData.business.topSectors.slice(0, 5).map((s) => (
-                            <div key={String(s.sectorId)} className="flex items-center justify-between p-2 rounded-lg bg-muted/40">
-                              <span className="text-sm">Settore #{s.sectorId ?? "n/d"}</span>
-                              <Badge variant="outline">{s.count}</Badge>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="rounded-lg border bg-card p-8 text-center">
-                    <p className="text-sm text-muted-foreground">Nessun dato disponibile.</p>
-                    <Button variant="outline" className="mt-3 min-h-11" onClick={loadMetriche}>Riprova</Button>
-                  </div>
-                )}
-              </div>
+              <BusinessMetricsSection
+                data={metricheData}
+                loading={metricheLoading}
+                onRefresh={loadMetriche}
+                onNavigateSection={navigateToSection}
+              />
             )}
 
             {/* ── Status & Setup ── */}
             {section === "status" && (
-              <div className="p-4 md:p-8 space-y-5">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <h3 className="text-lg font-serif font-bold">
-                      <Settings className="w-5 h-5 inline mr-2 text-primary" />
-                      Status & Setup
-                    </h3>
-                    <p className="text-sm text-muted-foreground">Salute tecnica, configurazione e problemi recenti da correggere.</p>
-                  </div>
-                  <Button size="sm" variant="outline" onClick={loadStatus} disabled={statusLoading} className="min-h-11">
-                    {statusLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
-                    Aggiorna
-                  </Button>
-                </div>
-                {statusLoading ? (
-                  <p className="text-sm text-muted-foreground">Caricamento...</p>
-                ) : statusData ? (
-                  <div className="space-y-5">
-                    <div className={cn("rounded-lg p-4 border", HEALTH_UI[statusData.technical.status].tone)}>
-                      <div className="flex items-start justify-between gap-3 flex-wrap">
-                        <div>
-                          <h4 className="font-semibold mb-1">{statusData.technical.label}</h4>
-                          <p className="text-xs">
-                            Uptime: {Math.floor(statusData.technical.uptimeSeconds / 3600)}h {Math.floor((statusData.technical.uptimeSeconds % 3600) / 60)}m
-                          </p>
-                        </div>
-                        <Badge variant="outline">{statusData.technical.reasons.length} segnali</Badge>
-                      </div>
-                      {statusData.technical.reasons.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {statusData.technical.reasons.slice(0, 5).map((reason) => (
-                            <Badge key={reason} variant="outline" className="bg-background/60">{reason}</Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                      {Object.entries(statusData.technical.services ?? {}).map(([name, svc]) => (
-                        <div key={name} className={cn(
-                          "rounded-lg p-3 border bg-card",
-                          svc.status === "ok" && "border-emerald-200",
-                          svc.status === "not_configured" && "border-amber-200",
-                          svc.status === "error" && "border-red-200",
-                        )}>
-                          <p className="text-sm font-medium">{svc.label}</p>
-                          <p className={cn(
-                            "text-xs mt-1",
-                            svc.status === "ok" ? "text-emerald-600" :
-                              svc.status === "not_configured" ? "text-amber-600" :
-                                "text-red-600",
-                          )}>{svc.status.replace("_", " ")}</p>
-                          {svc.uptimeSeconds != null && <p className="text-xs text-muted-foreground">{Math.floor(svc.uptimeSeconds / 60)}m uptime</p>}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="grid lg:grid-cols-2 gap-4">
-                      <div className="rounded-lg border bg-card p-4">
-                        <div className="flex items-center justify-between gap-2 mb-3">
-                          <h4 className="font-semibold text-sm">Environment</h4>
-                          <span className="text-xs text-muted-foreground">{statusData.env.configured}/{statusData.env.total} configurate</span>
-                        </div>
-                        {statusData.env.missingCritical.length > 0 ? (
-                          <div className="mb-3">
-                            <p className="text-xs font-medium text-red-600 mb-1">Critiche mancanti</p>
-                            <div className="flex flex-wrap gap-2">
-                              {statusData.env.missingCritical.map((key) => <Badge key={key} variant="outline" className="border-red-200 text-red-700">{key}</Badge>)}
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-emerald-700 mb-3">Env critiche configurate.</p>
-                        )}
-                        {statusData.env.missingOptional.length > 0 && (
-                          <div>
-                            <p className="text-xs font-medium text-amber-700 mb-1">Opzionali mancanti</p>
-                            <div className="flex flex-wrap gap-2">
-                              {statusData.env.missingOptional.map((key) => <Badge key={key} variant="outline" className="border-amber-200 text-amber-700">{key}</Badge>)}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="rounded-lg border bg-card p-4">
-                        <h4 className="font-semibold text-sm mb-3">Link rapidi</h4>
-                        <div className="grid sm:grid-cols-2 gap-2">
-                          {statusData.actions.map((action) => (
-                            <button
-                              key={action.path}
-                              type="button"
-                              onClick={() => navigateToSection(action.section)}
-                              className="min-h-11 rounded-lg border bg-background p-3 text-left hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                            >
-                              <span className="text-sm font-medium">{action.label}</span>
-                              {action.count != null && <Badge variant="outline" className="ml-2">{action.count}</Badge>}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid lg:grid-cols-2 gap-4">
-                      <div className="rounded-lg border bg-card p-4">
-                        <h4 className="font-semibold text-sm mb-3">Errori recenti</h4>
-                        {statusData.technical.errors.recent.length > 0 ? (
-                          <div className="space-y-2">
-                            {statusData.technical.errors.recent.map((error) => (
-                              <div key={`${error.file}-${error.function}-${error.capturedAt}`} className="rounded-lg border bg-background p-3">
-                                <div className="flex items-start justify-between gap-3">
-                                  <p className="text-sm font-medium line-clamp-1">{error.message}</p>
-                                  <Badge variant="outline">{error.occurrences}x</Badge>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{error.file} · {error.function}</p>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">Nessun errore catturato di recente.</p>
-                        )}
-                      </div>
-
-                      <div className="rounded-lg border bg-card p-4">
-                        <h4 className="font-semibold text-sm mb-3">Agenti e AI</h4>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="rounded-lg bg-muted/40 p-3">
-                            <p className="text-xs text-muted-foreground">Run agenti</p>
-                            <p className="text-lg font-bold">{statusData.technical.agents.totalRuns}</p>
-                          </div>
-                          <div className="rounded-lg bg-muted/40 p-3">
-                            <p className="text-xs text-muted-foreground">Errori agenti</p>
-                            <p className="text-lg font-bold">{statusData.technical.agents.errorRate}%</p>
-                          </div>
-                          <div className="rounded-lg bg-muted/40 p-3">
-                            <p className="text-xs text-muted-foreground">AI request</p>
-                            <p className="text-lg font-bold">{statusData.technical.ai.requests}</p>
-                          </div>
-                          <div className="rounded-lg bg-muted/40 p-3">
-                            <p className="text-xs text-muted-foreground">AI error rate</p>
-                            <p className="text-lg font-bold">{statusData.technical.ai.errorRate}%</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-lg border bg-card p-8 text-center">
-                    <p className="text-sm text-muted-foreground">Nessun dato disponibile.</p>
-                    <Button variant="outline" className="mt-3 min-h-11" onClick={loadStatus}>Riprova</Button>
-                  </div>
-                )}
-              </div>
+              <StatusSection
+                data={statusData}
+                loading={statusLoading}
+                onRefresh={loadStatus}
+                onNavigateSection={navigateToSection}
+              />
             )}
 
             {/* ── Messaggi ── */}
