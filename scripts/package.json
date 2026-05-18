@@ -17,7 +17,15 @@
     "seed:rag": "tsx ./src/seed-rag.ts",
     "rag:weak-signals": "tsx ./src/run-weak-signal-detector.ts",
     "admin:promote": "tsx ./src/admin-promote.ts",
-    "cleanup:news-placeholders": "tsx ./src/cleanup-news-placeholders.ts"
+    "cleanup:news-placeholders": "tsx ./src/cleanup-news-placeholders.ts",
+    "diagnostic:db:schema": "node ./src/diagnostics/check-schema.mjs",
+    "diagnostic:db:users": "node ./src/diagnostics/check-all-cols.cjs",
+    "diagnostic:db:verify": "node ./src/diagnostics/verify-db.cjs",
+    "diagnostic:auth:direct": "node ./src/diagnostics/test-auth-direct.cjs",
+    "maintenance:db:apply-indexes": "node ./src/maintenance/apply-migration.cjs",
+    "maintenance:db:fix-roles": "node ./src/maintenance/fix-db.cjs",
+    "maintenance:db:test-connection": "node ./src/maintenance/test-connection.cjs",
+    "maintenance:db:test-schema": "node ./src/maintenance/test-schema.mjs"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",

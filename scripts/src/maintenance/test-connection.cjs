@@ -1,6 +1,6 @@
 // Test database connection using the existing db setup
-const { db } = require('./packages/db/src/index');
-const { usersTable } = require('./packages/db/src/schema/users');
+const { db } = require('../../../packages/db/src/index');
+const { usersTable } = require('../../../packages/db/src/schema/users');
 const { eq } = require('drizzle-orm');
 
 async function testConnection() {
@@ -27,7 +27,7 @@ async function testConnection() {
       console.log('❌ Role column does not exist or error accessing it:', roleError.message);
       
       // Try to add the columns using raw SQL via the pool
-      const { pool } = require('./packages/db/src/index');
+      const { pool } = require('../../../packages/db/src/index');
       
       console.log('Attempting to add missing columns...');
       await pool.query(`

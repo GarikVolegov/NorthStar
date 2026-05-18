@@ -1,32 +1,36 @@
-// Test the auth middleware directly
-const { db } = require('./packages/db/src/index.js');
-const { usersTable } = require('./packages/db/src/schema/users.js');
-const { eq } = require('drizzle-orm');
-require('dotenv').config({ path: '.env' });
+// Test auth query directly using pg
+const { Pool } = require('pg');
+const path = require('node:path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 async function testAuthQuery() {
+  const client = await pool.connect();
   try {
     console.log('Testing auth query with role columns...');
     
     // This mimics what the requireAuth middleware does
-    const [user] = await db
-      .select({
-        id: usersTable.id,
-        name: usersTable.name,
-        email: usersTable.email,
-        role: usersTable.role, // This should now work
-        stripeSubscriptionId: usersTable.stripeSubscriptionId,
-        journeyType: usersTable.journeyType,
-        testSessionId: usersTable.testSessionId,
-        onboardingCompleted: usersTable.onboardingCompleted,
-      })
-      .from(usersTable)
-      .limit(1);
+    const result = await client.query(`
+      SELECT 
+        id, 
+        name, 
+        email,
+        role,
+        stripe_subscription_id AS "stripeSubscriptionId",
+        journey_type AS "journeyType",
+        test_session_id AS "testSessionId",
+        onboarding_completed AS "onboardingCompleted"
+      FROM users 
+      LIMIT 1;
+    `);
     
-    if (!user) {
+    if (result.rows.length === 0) {
       console.log('❌ No users found in database');
       return;
     }
+    
+    const user = result.rows[0];
     
     console.log('✅ Auth query successful:');
     console.log('  ID:', user.id);
@@ -41,6 +45,9 @@ async function testAuthQuery() {
   } catch (err) {
     console.error('❌ Auth query failed:', err);
     console.error('Error details:', err.stack);
+  } finally {
+    client.release();
+    await pool.end();
   }
 }
 
