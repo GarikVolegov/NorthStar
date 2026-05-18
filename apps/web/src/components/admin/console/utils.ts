@@ -1,4 +1,4 @@
-import type { AgentHealthStatus } from "./types";
+import type { AdminAssignee, AgentHealthStatus } from "./types";
 
 export function auditActionLabel(action: string) {
   if (action === "growth_article_published") return "Pubblicato";
@@ -79,6 +79,12 @@ export function fmtShortDate(iso: string) {
   });
 }
 
+export function assigneeLabel(assignees: AdminAssignee[], id: number | null | undefined) {
+  if (!id) return "Non assegnato";
+  const assignee = assignees.find((item) => item.id === id);
+  return assignee ? assignee.name || assignee.email : `Admin #${id}`;
+}
+
 export function fmtDuration(ms: number | null | undefined) {
   if (ms == null) return "N/D";
   if (ms < 1000) return `${ms}ms`;
@@ -128,4 +134,3 @@ export function arrayRecords(value: unknown): Array<Record<string, unknown>> {
 export function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean) : [];
 }
-

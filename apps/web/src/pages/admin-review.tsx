@@ -12,6 +12,7 @@ import {
   ConfidenceBadge,
   EntityBadge,
   HomeSection,
+  MessagesSection,
   PersistenceWarningBanner,
   PromptsSection,
   QualitySection,
@@ -26,6 +27,7 @@ import {
   fmtScore,
   fmtShortDate,
   fmtUsd,
+  assigneeLabel,
   formatLastUpdated,
   formatValue,
   humanizeKey,
@@ -37,7 +39,10 @@ import {
   type AgentsOverview,
   type AgentsTab,
   type AiModelPolicy,
+  type AdminAssignee,
   type BusinessStatusSnapshot,
+  type ContactInboxResponse,
+  type ContactMessageItem,
   type PersistenceMeta,
   type PromptEditorTab,
   type PromptPreview,
@@ -256,30 +261,6 @@ type GrowthArticleDetail = {
   }>;
 };
 
-type AdminAssignee = { id: number; name: string; email: string };
-
-type ContactMessageItem = {
-  id: number;
-  name: string;
-  email: string;
-  subject: string;
-  message: string;
-  read: boolean;
-  readAt: string | null;
-  status: "new" | "in_progress" | "resolved" | "archived";
-  internalNotes: string | null;
-  assignedTo: number | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type ContactInboxResponse = {
-  items: ContactMessageItem[];
-  stats: Record<string, number>;
-  assignees: AdminAssignee[];
-  generatedAt: string;
-};
-
 type AffiliationLeadItem = {
   id: number;
   institutionName: string;
@@ -324,13 +305,6 @@ const GROWTH_STATUS_UI: Record<Exclude<GrowthQueueStatus, "all">, { label: strin
   pending: { label: "Pending", className: "bg-amber-100 text-amber-800 border-amber-200" },
   published: { label: "Pubblicato", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
   rejected: { label: "Rifiutato", className: "bg-red-100 text-red-800 border-red-200" },
-};
-
-const MESSAGE_STATUS_UI: Record<ContactMessageItem["status"], { label: string; className: string }> = {
-  new: { label: "Nuovo", className: "bg-primary/10 text-primary border-primary/30" },
-  in_progress: { label: "In lavorazione", className: "bg-amber-100 text-amber-800 border-amber-200" },
-  resolved: { label: "Risolto", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
-  archived: { label: "Archiviato", className: "bg-slate-100 text-slate-700 border-slate-200" },
 };
 
 const LEAD_STATUS_UI: Record<AffiliationLeadItem["status"], { label: string; className: string }> = {
@@ -576,20 +550,9 @@ function growthStatusBadge(status: GrowthArticle["status"]) {
   return <Badge variant="outline" className={cn("capitalize", cfg.className)}>{cfg.label}</Badge>;
 }
 
-function messageStatusBadge(status: ContactMessageItem["status"]) {
-  const cfg = MESSAGE_STATUS_UI[status] ?? MESSAGE_STATUS_UI.new;
-  return <Badge variant="outline" className={cfg.className}>{cfg.label}</Badge>;
-}
-
 function leadStatusBadge(status: AffiliationLeadItem["status"]) {
   const cfg = LEAD_STATUS_UI[status] ?? LEAD_STATUS_UI.pending;
   return <Badge variant="outline" className={cfg.className}>{cfg.label}</Badge>;
-}
-
-function assigneeLabel(assignees: AdminAssignee[], id: number | null | undefined) {
-  if (!id) return "Non assegnato";
-  const assignee = assignees.find((item) => item.id === id);
-  return assignee ? assignee.name || assignee.email : `Admin #${id}`;
 }
 
 export default function AdminReview() {
@@ -2776,133 +2739,29 @@ const [memoryActionLoading, setMemoryActionLoading] = useState<string | null>(nu
 
             {/* ── Messaggi ── */}
             {section === "messaggi" && (
-              <div className="p-4 md:p-8 space-y-5">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <h3 className="text-lg font-serif font-bold">
-                      <MessageCircle className="w-5 h-5 inline mr-2 text-primary" />
-                      Messaggi
-                    </h3>
-                    <p className="text-sm text-muted-foreground">Inbox operativa per contatti e richieste dirette.</p>
-                  </div>
-                  <Button size="sm" variant="outline" onClick={loadMessaggi} disabled={messaggiLoading} className="min-h-11">
-                    {messaggiLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
-                    Aggiorna
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                  {[
-                    ["Totali", messaggiData?.stats?.total ?? 0],
-                    ["Non letti", messaggiData?.stats?.unread ?? 0],
-                    ["Nuovi", messaggiData?.stats?.new ?? 0],
-                    ["In lavorazione", messaggiData?.stats?.inProgress ?? 0],
-                    ["Risolti", messaggiData?.stats?.resolved ?? 0],
-                  ].map(([label, value]) => (
-                    <div key={String(label)} className="rounded-lg border bg-card p-3">
-                      <p className="text-lg font-bold">{String(value)}</p>
-                      <p className="text-xs text-muted-foreground">{String(label)}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-[1fr_160px_170px_190px]">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input className="pl-9 min-h-11" placeholder="Cerca nome, email, oggetto o messaggio..." value={messaggiSearch} onChange={(e) => setMessaggiSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void loadMessaggi(); }} />
-                  </div>
-                  <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={messaggiRead} onChange={(e) => setMessaggiRead(e.target.value)}>
-                    <option value="all">Tutti</option>
-                    <option value="unread">Non letti</option>
-                    <option value="read">Letti</option>
-                  </select>
-                  <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={messaggiStatus} onChange={(e) => setMessaggiStatus(e.target.value)}>
-                    <option value="all">Tutti gli stati</option>
-                    {Object.entries(MESSAGE_STATUS_UI).map(([value, cfg]) => <option key={value} value={value}>{cfg.label}</option>)}
-                  </select>
-                  <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={messaggiAssignedTo} onChange={(e) => setMessaggiAssignedTo(e.target.value)}>
-                    <option value="all">Tutti gli admin</option>
-                    <option value="unassigned">Non assegnati</option>
-                    {messaggiData?.assignees?.map((admin) => <option key={admin.id} value={admin.id}>{admin.name || admin.email}</option>)}
-                  </select>
-                </div>
-
-                {messaggiLoading ? (
-                  <p className="text-sm text-muted-foreground">Caricamento...</p>
-                ) : messaggiData?.items ? (
-                  <div className="grid lg:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)] gap-4">
-                    <div className="space-y-2 min-w-0">
-                      {messaggiData.items.map((msg) => (
-                        <button key={msg.id} type="button" onClick={() => { setMessaggioSelected(msg); setMessaggioNotes(msg.internalNotes ?? ""); }} className={cn("w-full min-h-11 text-left p-4 rounded-lg border bg-card hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", messaggioSelected?.id === msg.id && "border-primary/50 bg-primary/5", !msg.read && "border-primary/30")}>
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="font-semibold text-sm truncate">{msg.subject}</p>
-                              <p className="text-xs text-muted-foreground truncate">{msg.name} · {msg.email}</p>
-                            </div>
-                            <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-                              {!msg.read && <Badge className="bg-primary text-primary-foreground">Nuovo</Badge>}
-                              {messageStatusBadge(msg.status)}
-                            </div>
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{msg.message}</p>
-                          <p className="text-xs text-muted-foreground mt-2">{fmtShortDate(msg.createdAt)} · {assigneeLabel(messaggiData.assignees, msg.assignedTo)}</p>
-                        </button>
-                      ))}
-                      {messaggiData.items.length === 0 && <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">Nessun messaggio trovato.</div>}
-                    </div>
-
-                    <div className="rounded-lg border bg-card min-w-0">
-                      {messaggioSelected ? (
-                        <div className="p-4 md:p-5 space-y-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <h4 className="font-semibold truncate">{messaggioSelected.subject}</h4>
-                              <p className="text-sm text-muted-foreground">{messaggioSelected.name} · {messaggioSelected.email}</p>
-                            </div>
-                            {messageStatusBadge(messaggioSelected.status)}
-                          </div>
-                          <div className="rounded-lg border bg-background p-4">
-                            <p className="text-sm whitespace-pre-wrap">{messaggioSelected.message}</p>
-                          </div>
-                          <div className="grid sm:grid-cols-2 gap-3">
-                            <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={messaggioSelected.status} onChange={(e) => void updateMessaggio(messaggioSelected.id, "status", { status: e.target.value })}>
-                              {Object.entries(MESSAGE_STATUS_UI).map(([value, cfg]) => <option key={value} value={value}>{cfg.label}</option>)}
-                            </select>
-                            <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={messaggioSelected.assignedTo ?? ""} onChange={(e) => void updateMessaggio(messaggioSelected.id, "assign", { assignedTo: e.target.value || null })}>
-                              <option value="">Non assegnato</option>
-                              {messaggiData.assignees.map((admin) => <option key={admin.id} value={admin.id}>{admin.name || admin.email}</option>)}
-                            </select>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <Button variant="outline" className="min-h-11" disabled={!!messaggioActionLoading} onClick={() => void updateMessaggio(messaggioSelected.id, "read", { read: !messaggioSelected.read })}>
-                              <Eye className="w-4 h-4 mr-2" /> {messaggioSelected.read ? "Segna non letto" : "Segna letto"}
-                            </Button>
-                            {user?.id ? (
-                              <Button variant="outline" className="min-h-11" disabled={!!messaggioActionLoading} onClick={() => void updateMessaggio(messaggioSelected.id, "assign", { assignedTo: user.id })}>
-                                <Shield className="w-4 h-4 mr-2" /> Assegna a me
-                              </Button>
-                            ) : null}
-                          </div>
-                          <div>
-                            <p className="text-xs font-medium mb-1">Note interne</p>
-                            <Textarea value={messaggioNotes} onChange={(e) => setMessaggioNotes(e.target.value)} placeholder="Note operative, follow-up, contesto..." />
-                            <Button className="mt-2 min-h-11" disabled={!!messaggioActionLoading} onClick={() => void updateMessaggio(messaggioSelected.id, "notes", { internalNotes: messaggioNotes })}>
-                              <Save className="w-4 h-4 mr-2" /> Salva note
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-8 text-center text-sm text-muted-foreground">Seleziona un messaggio per gestirlo.</div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-lg border bg-card p-8 text-center">
-                    <p className="text-sm text-muted-foreground">Nessun dato disponibile.</p>
-                    <Button variant="outline" className="mt-3 min-h-11" onClick={loadMessaggi}>Riprova</Button>
-                  </div>
-                )}
-              </div>
+              <MessagesSection
+                data={messaggiData}
+                loading={messaggiLoading}
+                search={messaggiSearch}
+                readFilter={messaggiRead}
+                statusFilter={messaggiStatus}
+                assignedToFilter={messaggiAssignedTo}
+                selectedMessage={messaggioSelected}
+                notes={messaggioNotes}
+                actionLoading={messaggioActionLoading}
+                currentUserId={user?.id}
+                onSearchChange={setMessaggiSearch}
+                onReadFilterChange={setMessaggiRead}
+                onStatusFilterChange={setMessaggiStatus}
+                onAssignedToFilterChange={setMessaggiAssignedTo}
+                onSelectMessage={(message) => {
+                  setMessaggioSelected(message);
+                  setMessaggioNotes(message.internalNotes ?? "");
+                }}
+                onNotesChange={setMessaggioNotes}
+                onRefresh={loadMessaggi}
+                onUpdateMessage={updateMessaggio}
+              />
             )}
 
             {/* ── Coda Crescita ── */}

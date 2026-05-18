@@ -3,6 +3,7 @@ export * from "./AgentsSection";
 export * from "./BusinessMetricsSection";
 export * from "./config";
 export * from "./HomeSection";
+export * from "./MessagesSection";
 export * from "./PromptsSection";
 export * from "./QualitySection";
 export * from "./shared";

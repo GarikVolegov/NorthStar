@@ -341,6 +341,34 @@ export type BusinessStatusSnapshot = {
   actions: Array<{ label: string; section: SidebarSection; path: string; count: number | null }>;
 };
 
+export type AdminAssignee = {
+  id: number;
+  name: string;
+  email: string;
+};
+
+export type ContactMessageItem = {
+  id: number;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  read: boolean;
+  readAt: string | null;
+  status: "new" | "in_progress" | "resolved" | "archived";
+  internalNotes: string | null;
+  assignedTo: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ContactInboxResponse = {
+  items: ContactMessageItem[];
+  stats: Record<string, number>;
+  assignees: AdminAssignee[];
+  generatedAt: string;
+};
+
 export type WendyQualityOverview = {
   generatedAt: string;
   days: number;
