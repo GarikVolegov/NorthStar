@@ -8,9 +8,12 @@ import {
   LogOut,
   Menu,
   MapPin,
+  Monitor,
+  Moon,
   Newspaper,
   Settings,
   Sparkles,
+  Sun,
   Users,
 } from "lucide-react";
 import {
@@ -30,6 +33,7 @@ import { useReducedMotion } from "@/lib/motion";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES } from "@/i18n";
+import { useTheme } from "next-themes";
 import { SearchDialog } from "@/components/search/SearchDialog";
 import { useWendy } from "@/contexts/WendyProvider";
 import { NAV_LABELS } from "@/lib/constants";
@@ -47,6 +51,12 @@ const LANGUAGE_LABELS: Record<string, string> = {
   fr: "Français",
   de: "Deutsch",
 };
+
+const MOBILE_THEME_OPTIONS = [
+  { value: "system", label: "Auto", icon: Monitor },
+  { value: "light", label: "Chiaro", icon: Sun },
+  { value: "dark", label: "Scuro", icon: Moon },
+] as const;
 
 const JOURNEY_LABELS: Record<string, { label: string; color: string }> = {
   indeciso: {
@@ -105,6 +115,7 @@ export function Navbar() {
   const prefersReduced = useReducedMotion();
   const search = useGlobalSearch();
   const wendy = useWendy();
+  const { theme, setTheme } = useTheme();
   const isMobile = useIsMobile();
   const [newsTitles, setNewsTitles] = useState<string[]>([]);
   const [profileBannerUrl, setProfileBannerUrl] = useState<string | null>(null);
@@ -157,9 +168,11 @@ export function Navbar() {
   const mobileMenuScale = !isMobile
     ? 1
     : viewportHeight > 0 && viewportHeight < 640
-      ? 0.88
+      ? 0.78
       : viewportHeight > 0 && viewportHeight < 740
-        ? 0.94
+        ? 0.84
+        : viewportHeight > 0 && viewportHeight < 860
+          ? 0.9
         : 1;
 
   const goToProfilePath = (path: string) => {
@@ -242,10 +255,11 @@ export function Navbar() {
     await copyAffiliateLink();
   };
 
-  const renderAffiliateInviteBlock = () => (
+  const renderAffiliateInviteBlock = (compact = false) => (
     <AffiliateInviteCard
       preview={affiliatePreview}
       copied={affiliateLinkCopied}
+      compact={compact}
       onCopy={() => void copyAffiliateLink()}
       onShare={() => void shareAffiliateLink()}
       onOpenDashboard={() => goToProfilePath("/affiliazione/dashboard")}
@@ -416,7 +430,7 @@ export function Navbar() {
   const profileMenuMobileBody = user ? (
     <>
       <div className="p-0 font-normal">
-        <div className="h-14 overflow-hidden bg-muted">
+        <div className="h-12 overflow-hidden bg-muted">
           {profileBannerUrl ? (
             <img
               src={profileBannerUrl}
@@ -428,8 +442,8 @@ export function Navbar() {
           )}
         </div>
         <div className="px-3 pb-2 pt-2">
-          <div className="mb-2 flex items-center gap-2">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-card bg-primary/10 text-sm font-bold text-primary shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-card bg-primary/10 text-sm font-bold text-primary shadow-sm">
               {user.avatarUrl ? (
                 <img
                   src={user.avatarUrl}
@@ -441,129 +455,146 @@ export function Navbar() {
               )}
             </span>
             <div className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-foreground">
+              <span className="block truncate text-[15px] font-semibold leading-5 text-foreground">
                 {displayName}
               </span>
               <span className="block truncate text-[11px] text-muted-foreground">
                 {user.email}
               </span>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                {user.journeyType && JOURNEY_LABELS[user.journeyType] && (
+                  <span
+                    className={`inline-flex w-fit rounded-full border px-2 py-0.5 text-[11px] font-semibold ${JOURNEY_LABELS[user.journeyType].color}`}
+                  >
+                    {JOURNEY_LABELS[user.journeyType].label}
+                  </span>
+                )}
+                <SubscriptionChip />
+              </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {user.journeyType && JOURNEY_LABELS[user.journeyType] && (
-              <span
-                className={`inline-flex w-fit rounded-full border px-2 py-0.5 text-xs font-semibold ${JOURNEY_LABELS[user.journeyType].color}`}
-              >
-                {JOURNEY_LABELS[user.journeyType].label}
-              </span>
-            )}
-            <SubscriptionChip />
-          </div>
         </div>
       </div>
       <div className="h-px bg-border" />
-      <button
-        type="button"
-        onClick={() => goToProfilePath("/profilo#impostazioni")}
-        onMouseEnter={() => prefetchRoute("/profilo")}
-        onFocus={() => prefetchRoute("/profilo")}
-        className="flex min-h-10 w-full items-center gap-2 px-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-      >
-        <Settings className="h-4 w-4 text-primary" />
-        Impostazioni profilo
-      </button>
-      {insightsUnread > 0 && (
+      <div className="px-2 py-1">
         <button
           type="button"
-          onClick={() => goToProfilePath("/dashboard")}
-          className="flex min-h-10 w-full items-center gap-2 px-2 text-left text-sm font-medium text-amber-500 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+          onClick={() => goToProfilePath("/profilo#impostazioni")}
+          onMouseEnter={() => prefetchRoute("/profilo")}
+          onFocus={() => prefetchRoute("/profilo")}
+          className="flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-semibold text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
         >
-          <Sparkles className="h-4 w-4" />
-          Wendy ha {insightsUnread > 9 ? "9+" : insightsUnread} insight
+          <Settings className="h-4 w-4 text-primary" />
+          Impostazioni profilo
         </button>
-      )}
-      {!user.journeyType && (
+        {insightsUnread > 0 && (
+          <button
+            type="button"
+            onClick={() => goToProfilePath("/dashboard")}
+            className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-amber-500 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+          >
+            <Sparkles className="h-4 w-4" />
+            Wendy ha {insightsUnread > 9 ? "9+" : insightsUnread} insight
+          </button>
+        )}
+        {!user.journeyType && (
+          <button
+            type="button"
+            onClick={() => goToProfilePath("/percorso")}
+            onMouseEnter={() => prefetchRoute("/percorso")}
+            className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+          >
+            <MapPin className="h-4 w-4 text-primary" />
+            Imposta percorso
+          </button>
+        )}
         <button
           type="button"
-          onClick={() => goToProfilePath("/percorso")}
-          onMouseEnter={() => prefetchRoute("/percorso")}
-          className="flex min-h-10 w-full items-center gap-2 px-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+          onClick={() => goToProfilePath("/candidature")}
+          className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
         >
-          <MapPin className="h-4 w-4 text-primary" />
-          Imposta percorso
+          <Briefcase className="h-4 w-4" />
+          {t("nav.applications")}
         </button>
-      )}
-      <button
-        type="button"
-        onClick={() => goToProfilePath("/candidature")}
-        className="flex min-h-10 w-full items-center gap-2 px-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-      >
-        <Briefcase className="h-4 w-4" />
-        {t("nav.applications")}
-      </button>
-      <button
-        type="button"
-        onClick={() => goToProfilePath("/wendy/memoria")}
-        onMouseEnter={() => prefetchRoute("/wendy/memoria")}
-        className="flex min-h-10 w-full items-center gap-2 px-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-      >
-        <Brain className="h-4 w-4" />
-        Memoria di Wendy
-      </button>
-      <button
-        type="button"
-        onClick={() => goToProfilePath("/profilo/briefing")}
-        onMouseEnter={() => prefetchRoute("/profilo/briefing")}
-        className="flex min-h-10 w-full items-center gap-2 px-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-      >
-        <Sparkles className="h-4 w-4" />
-        Briefing Wendy
-      </button>
-      <button
-        type="button"
-        onClick={() => goToProfilePath("/workspace")}
-        onMouseEnter={() => prefetchRoute("/workspace")}
-        className="flex min-h-10 w-full items-center gap-2 px-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-      >
-        <Users className="h-4 w-4" />
-        Workspace
-      </button>
-      <div className="h-px bg-border" />
-      <div className="flex min-h-10 items-center justify-between gap-2 px-2 py-1">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Tema
-        </p>
-        <ThemeToggle />
-      </div>
-      <div className="h-px bg-border" />
-      <div className="flex min-h-10 items-center gap-2 px-2 py-1">
-        <div className="flex min-w-0 flex-1 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          <Globe2 className="h-4 w-4 shrink-0" />
-          <span>Lingua</span>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {SUPPORTED_LANGUAGES.map((code) => {
-            const active = activeLanguage === code;
+        <div className="mt-1 grid grid-cols-3 gap-1.5">
+          {[
+            { label: "Memoria", icon: Brain, path: "/wendy/memoria" },
+            { label: "Briefing", icon: Sparkles, path: "/profilo/briefing" },
+            { label: "Workspace", icon: Users, path: "/workspace" },
+          ].map((item) => {
+            const Icon = item.icon;
             return (
               <button
-                key={code}
+                key={item.path}
                 type="button"
-                onClick={() => void i18n.changeLanguage(code)}
-                className={`min-h-8 rounded-full border px-2 text-[10px] font-bold uppercase transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${
-                  active
-                    ? "border-primary/40 bg-primary/10 text-primary"
-                    : "border-border bg-background text-muted-foreground hover:text-foreground"
-                }`}
-                aria-label={`Cambia lingua in ${LANGUAGE_LABELS[code] ?? code.toUpperCase()}`}
+                onClick={() => goToProfilePath(item.path)}
+                onMouseEnter={() => prefetchRoute(item.path)}
+                className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg border border-border/70 bg-background/60 px-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
               >
-                {code.toUpperCase()}
+                <Icon className="h-4 w-4" />
+                <span className="truncate">{item.label}</span>
               </button>
             );
           })}
         </div>
       </div>
       <div className="h-px bg-border" />
-      {renderAffiliateInviteBlock()}
+      <div className="space-y-1 px-2 py-1.5">
+        <div className="flex min-h-9 items-center gap-2">
+          <p className="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Tema
+          </p>
+          <div className="grid min-w-0 flex-1 grid-cols-3 gap-1">
+            {MOBILE_THEME_OPTIONS.map((option) => {
+              const Icon = option.icon;
+              const active = (theme ?? "system") === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setTheme(option.value)}
+                  className={`flex min-h-9 items-center justify-center gap-1 rounded-full border px-1.5 text-[10px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${
+                    active
+                      ? "border-primary/40 bg-primary/10 text-primary"
+                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{option.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex min-h-9 items-center gap-2">
+          <div className="flex w-16 shrink-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <Globe2 className="h-3.5 w-3.5 shrink-0" />
+            <span>Lingua</span>
+          </div>
+          <div className="grid min-w-0 flex-1 grid-cols-5 gap-1">
+            {SUPPORTED_LANGUAGES.map((code) => {
+              const active = activeLanguage === code;
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => void i18n.changeLanguage(code)}
+                  className={`min-h-9 rounded-full border px-1 text-[10px] font-bold uppercase transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${
+                    active
+                      ? "border-primary/40 bg-primary/10 text-primary"
+                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-label={`Cambia lingua in ${LANGUAGE_LABELS[code] ?? code.toUpperCase()}`}
+                >
+                  {code.toUpperCase()}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      <div className="h-px bg-border" />
+      {renderAffiliateInviteBlock(true)}
       <div className="h-px bg-border" />
       <button
         type="button"
@@ -571,7 +602,7 @@ export function Navbar() {
           setProfileMenuOpen(false);
           void signOut();
         }}
-        className="flex min-h-10 w-full items-center gap-2 px-2 text-left text-sm font-medium text-destructive transition-colors hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+        className="mx-2 my-1 flex min-h-10 w-[calc(100%-1rem)] items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-destructive transition-colors hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
       >
         <LogOut className="h-4 w-4" />
         {t("nav.logout")}
@@ -598,7 +629,7 @@ export function Navbar() {
           role="dialog"
           aria-modal="true"
           aria-label="Menu profilo"
-          className="fixed left-1/2 top-1/2 z-[60] w-[min(360px,calc(100vw-24px))] overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-2xl"
+          className="fixed left-1/2 top-1/2 z-[60] w-[min(348px,calc(100vw-24px))] overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-2xl"
           style={{
             transform: `translate(-50%, -50%) scale(${mobileMenuScale})`,
             transformOrigin: "center",

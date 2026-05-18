@@ -4,6 +4,7 @@ import type { AffiliateInvitePreview } from "@/hooks/useAffiliateInvitePreview";
 interface AffiliateInviteCardProps {
   preview: AffiliateInvitePreview;
   copied: boolean;
+  compact?: boolean;
   onCopy: () => void;
   onShare: () => void;
   onOpenDashboard: () => void;
@@ -13,6 +14,7 @@ interface AffiliateInviteCardProps {
 export function AffiliateInviteCard({
   preview,
   copied,
+  compact = false,
   onCopy,
   onShare,
   onOpenDashboard,
@@ -26,15 +28,15 @@ export function AffiliateInviteCard({
       : "Attiva affiliazione";
 
   return (
-    <div className="px-2 py-2">
-      <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+    <div className={compact ? "px-2 py-1.5" : "px-2 py-2"}>
+      <div className={`rounded-lg border border-primary/20 bg-primary/5 ${compact ? "p-2.5" : "p-3"}`}>
         <div className="flex items-start gap-2">
           <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
             <HandCoins className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-foreground">Invita amici</p>
-            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+            <p className={`mt-0.5 text-xs leading-snug text-muted-foreground ${compact ? "line-clamp-1" : ""}`}>
               Condividi il tuo link di iscrizione e segui i referral dalla dashboard.
             </p>
           </div>
@@ -42,7 +44,7 @@ export function AffiliateInviteCard({
 
         {hasLink ? (
           <div className="mt-3 space-y-2">
-            <div className="rounded-md border bg-background px-2 py-1.5">
+            <div className={`rounded-md border bg-background px-2 ${compact ? "py-1" : "py-1.5"}`}>
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Codice</p>
               <p className="truncate font-mono text-xs font-semibold text-foreground">
                 {preview.referralCode ?? preview.referralLink}
@@ -66,15 +68,17 @@ export function AffiliateInviteCard({
                 Condividi
               </button>
             </div>
-            <button
-              type="button"
-              onClick={onOpenDashboard}
-              onMouseEnter={onPrefetchDashboard}
-              onFocus={onPrefetchDashboard}
-              className="flex min-h-10 w-full items-center justify-center rounded-md bg-primary px-3 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-            >
-              Dashboard affiliazione
-            </button>
+            {!compact && (
+              <button
+                type="button"
+                onClick={onOpenDashboard}
+                onMouseEnter={onPrefetchDashboard}
+                onFocus={onPrefetchDashboard}
+                className="flex min-h-10 w-full items-center justify-center rounded-md bg-primary px-3 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+              >
+                Dashboard affiliazione
+              </button>
+            )}
           </div>
         ) : (
           <div className="mt-3">
