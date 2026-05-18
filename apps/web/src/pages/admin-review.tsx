@@ -12,6 +12,7 @@ import {
   EntityBadge,
   PersistenceWarningBanner,
   PromptsSection,
+  QualitySection,
   StatusBadge,
   agentStatusClass,
   agentStatusLabel,
@@ -38,6 +39,7 @@ import {
   type PromptValidation,
   type PromptVersion,
   type SuggestionStatus,
+  type WendyQualityOverview,
 } from "@/components/admin/console";
 import {
   ShieldAlert,
@@ -463,76 +465,6 @@ type BusinessStatusSnapshot = {
     leads: { total: number; pending: number; contacted: number; converted: number; unread: number };
   };
   actions: Array<{ label: string; section: SidebarSection; path: string; count: number | null }>;
-};
-
-type WendyQualityOverview = {
-  generatedAt: string;
-  days: number;
-  persistenceUnavailable?: boolean;
-  reason?: string | null;
-  setupAction?: string | null;
-  summary: {
-    total: number;
-    avgEvalScore: number | null;
-    avgSupervisorScore: number | null;
-    rewriteRate: number;
-    clarificationRate: number;
-    toolUsageRate: number;
-    rewrites: number;
-    clarifications: number;
-    uiTools: number;
-    avgResponseTimeMs: number | null;
-    supervisorRewriteCount: number;
-    avgScoreBeforeRewrite: number | null;
-    avgScoreAfterRewrite: number | null;
-    feedbackTotal: number;
-    negativeFeedback: number;
-    positiveFeedback: number;
-    negativeFeedbackRate: number;
-  };
-  trends: Array<{
-    day: string;
-    total: number;
-    avgEvalScore: number | null;
-    avgSupervisorScore: number | null;
-    rewriteRate: number;
-    clarificationRate: number;
-    toolUsageRate: number;
-    avgLatencyMs: number | null;
-    aiRequests: number;
-    aiErrors: number;
-    toolCalls: number;
-  }>;
-  domains: Array<{
-    domain: string;
-    total: number;
-    avgEvalScore: number | null;
-    avgSupervisorScore: number | null;
-    rewriteRate: number;
-    clarificationRate: number;
-    toolUsageRate: number;
-    avgResponseTimeMs: number | null;
-    status: "healthy" | "attention" | "critical";
-  }>;
-  problemConversations: Array<{
-    id: string;
-    source: "supervisor" | "feedback";
-    createdAt: string;
-    sessionId: number | null;
-    domain: string;
-    intent: string;
-    score: number | null;
-    scoreAfter: number | null;
-    reason: string;
-    snippet: string;
-  }>;
-  rewriteReasons: Array<{ reason: string; count: number }>;
-  alerts: Array<{
-    level: "attention" | "critical";
-    title: string;
-    message: string;
-    domain: string | null;
-  }>;
 };
 
 const SECTION_BY_PATH: Record<string, SidebarSection> = {
@@ -2517,268 +2449,14 @@ const [memoryActionLoading, setMemoryActionLoading] = useState<string | null>(nu
                />
              )}
              {section === "qualita" && (
-               <div className="p-4 sm:p-6 space-y-5">
-                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                   <div>
-                     <h3 className="text-lg font-serif font-bold flex items-center gap-2">
-                       <BarChart3 className="w-5 h-5 text-primary" />
-                       Qualita Wendy
-                     </h3>
-                     <p className="text-sm text-muted-foreground">
-                       Score, rewrite, chiarificazioni, tool e conversazioni da rivedere.
-                     </p>
-                     {qualitaData?.generatedAt && (
-                       <p className="text-xs text-muted-foreground mt-1">
-                         Snapshot: {fmtShortDate(qualitaData.generatedAt)}
-                       </p>
-                     )}
-                   </div>
-                   <div className="flex flex-wrap gap-2">
-                     <select
-                       value={qualitaDays}
-                       onChange={(e) => setQualitaDays(e.target.value)}
-                       className="min-h-11 text-sm border rounded-lg px-3 bg-background"
-                       aria-label="Periodo qualita Wendy"
-                     >
-                       <option value="7">Ultimi 7 giorni</option>
-                       <option value="30">Ultimi 30 giorni</option>
-                     </select>
-                     <Button variant="outline" onClick={loadQualita} disabled={qualitaLoading} className="min-h-11">
-                       <RefreshCw className={cn("w-4 h-4 mr-2", qualitaLoading && "animate-spin")} />
-                       Riprova
-                     </Button>
-                   </div>
-                 </div>
-
-                 {qualitaLoading && !qualitaData ? (
-                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                     {[0, 1, 2, 3, 4].map((item) => (
-                       <div key={item} className="h-28 rounded-xl border bg-card animate-pulse" />
-                     ))}
-                   </div>
-                  ) : !qualitaData ? (
-                    <div className="p-10 text-center text-muted-foreground border rounded-xl bg-muted/20">
-                      Nessun dato qualita disponibile.
-                    </div>
-                  ) : (
-                    <>
-                      <PersistenceWarningBanner
-                        meta={qualitaData}
-                        title="Metriche qualita non affidabili"
-                        onRetry={loadQualita}
-                        onOpenStatus={openStatusSetup}
-                      />
-                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
-                       {[
-                         {
-                           label: "Score qualita",
-                           value: fmtScore(qualitaData.summary.avgEvalScore ?? qualitaData.summary.avgSupervisorScore),
-                           detail: `${qualitaData.summary.total.toLocaleString("it-IT")} turni`,
-                           icon: CheckCircle2,
-                         },
-                         {
-                           label: "Rewrite rate",
-                           value: fmtPct(qualitaData.summary.rewriteRate),
-                           detail: `${qualitaData.summary.rewrites} rewrite`,
-                           icon: RotateCcw,
-                         },
-                         {
-                           label: "Chiarificazioni",
-                           value: fmtPct(qualitaData.summary.clarificationRate),
-                           detail: `${qualitaData.summary.clarifications} richieste`,
-                           icon: MessageCircle,
-                         },
-                         {
-                           label: "Uso tool",
-                           value: fmtPct(qualitaData.summary.toolUsageRate),
-                           detail: `${qualitaData.summary.uiTools} turni con tool`,
-                           icon: Terminal,
-                         },
-                         {
-                           label: "Feedback negativo",
-                           value: fmtPct(qualitaData.summary.negativeFeedbackRate),
-                           detail: `${qualitaData.summary.negativeFeedback}/${qualitaData.summary.feedbackTotal} feedback`,
-                           icon: ShieldAlert,
-                         },
-                       ].map((item) => {
-                         const Icon = item.icon;
-                         return (
-                           <div key={item.label} className="border rounded-xl p-4 bg-card">
-                             <div className="flex items-center justify-between gap-2">
-                               <span className="text-sm font-medium text-muted-foreground">{item.label}</span>
-                               <Icon className="w-4 h-4 text-muted-foreground" />
-                             </div>
-                             <p className="text-2xl font-bold mt-2">{item.value}</p>
-                             <p className="text-xs text-muted-foreground mt-1">{item.detail}</p>
-                           </div>
-                         );
-                       })}
-                     </div>
-
-                     <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-                       <div className="border rounded-xl bg-card p-4">
-                         <div className="flex items-center justify-between gap-3 mb-3">
-                           <div>
-                             <p className="font-semibold">Alert qualita</p>
-                             <p className="text-xs text-muted-foreground">Soglie calcolate in tempo reale</p>
-                           </div>
-                           <Badge variant={qualitaData.alerts.length > 0 ? "destructive" : "secondary"}>
-                             {qualitaData.alerts.length} alert
-                           </Badge>
-                         </div>
-                         {qualitaData.alerts.length === 0 ? (
-                           <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-4 text-sm text-emerald-800">
-                             Nessun alert: Wendy e stabile nel periodo selezionato.
-                           </div>
-                         ) : (
-                           <div className="space-y-2">
-                             {qualitaData.alerts.slice(0, 6).map((alert) => (
-                               <div
-                                 key={`${alert.title}-${alert.domain ?? "global"}`}
-                                 className={cn(
-                                   "rounded-lg border p-3",
-                                   alert.level === "critical"
-                                     ? "bg-red-50 border-red-200 text-red-900"
-                                     : "bg-amber-50 border-amber-200 text-amber-900",
-                                 )}
-                               >
-                                 <div className="flex items-start justify-between gap-3">
-                                   <p className="text-sm font-semibold">{alert.title}</p>
-                                   <Badge variant="outline" className="capitalize bg-background/70">
-                                     {alert.level}
-                                   </Badge>
-                                 </div>
-                                 <p className="text-xs mt-1">{alert.message}</p>
-                               </div>
-                             ))}
-                           </div>
-                         )}
-                       </div>
-
-                       <div className="border rounded-xl bg-card p-4">
-                         <p className="font-semibold mb-3">Motivi rewrite</p>
-                         {qualitaData.rewriteReasons.length === 0 ? (
-                           <div className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">
-                             Nessun motivo rewrite registrato.
-                           </div>
-                         ) : (
-                           <div className="space-y-2">
-                             {qualitaData.rewriteReasons.slice(0, 6).map((reason) => (
-                               <div key={reason.reason} className="flex items-start justify-between gap-3 rounded-lg border p-3">
-                                 <p className="text-sm break-words">{reason.reason}</p>
-                                 <Badge variant="outline" className="shrink-0">{reason.count}</Badge>
-                               </div>
-                             ))}
-                           </div>
-                         )}
-                       </div>
-                     </div>
-
-                     <div className="border rounded-xl bg-card p-4">
-                       <div className="flex items-center justify-between gap-3 mb-3">
-                         <div>
-                           <p className="font-semibold">Trend nel tempo</p>
-                           <p className="text-xs text-muted-foreground">Score, rewrite, chiarificazioni e latenza giornaliera</p>
-                         </div>
-                         <Badge variant="outline">{qualitaData.trends.length} giorni</Badge>
-                       </div>
-                       {qualitaData.trends.length === 0 ? (
-                         <div className="p-8 text-center text-muted-foreground bg-muted/30 rounded-lg">
-                           Nessun trend disponibile nel periodo.
-                         </div>
-                       ) : (
-                         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                           {qualitaData.trends.slice(-9).map((day) => (
-                             <div key={day.day} className="rounded-lg border p-3">
-                               <div className="flex items-center justify-between gap-2">
-                                 <p className="text-sm font-medium">{new Date(day.day).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</p>
-                                 <span className="text-xs text-muted-foreground">{day.total} turni</span>
-                               </div>
-                               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                                 <span>Score <strong>{fmtScore(day.avgEvalScore ?? day.avgSupervisorScore)}</strong></span>
-                                 <span>Rewrite <strong>{fmtPct(day.rewriteRate)}</strong></span>
-                                 <span>Chiarif. <strong>{fmtPct(day.clarificationRate)}</strong></span>
-                                 <span>Latenza <strong>{day.avgLatencyMs ? fmtDuration(day.avgLatencyMs) : "N/D"}</strong></span>
-                               </div>
-                             </div>
-                           ))}
-                         </div>
-                       )}
-                     </div>
-
-                     <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-                       <div className="border rounded-xl bg-card p-4">
-                         <p className="font-semibold mb-3">Domini deboli</p>
-                         {qualitaData.domains.length === 0 ? (
-                           <div className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">
-                             Nessun dominio misurato nel periodo.
-                           </div>
-                         ) : (
-                           <div className="space-y-2">
-                             {qualitaData.domains.slice(0, 8).map((domain) => (
-                               <div key={domain.domain} className="rounded-lg border p-3">
-                                 <div className="flex items-center justify-between gap-3">
-                                   <p className="font-medium text-sm capitalize truncate">{domain.domain}</p>
-                                   <Badge
-                                     variant="outline"
-                                     className={cn(
-                                       "capitalize",
-                                       domain.status === "healthy" && "bg-emerald-50 text-emerald-700",
-                                       domain.status === "attention" && "bg-amber-50 text-amber-700",
-                                       domain.status === "critical" && "bg-red-50 text-red-700",
-                                     )}
-                                   >
-                                     {domain.status}
-                                   </Badge>
-                                 </div>
-                                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                                   <span>Score {fmtScore(domain.avgEvalScore ?? domain.avgSupervisorScore)}</span>
-                                   <span>{domain.total} turni</span>
-                                   <span>Rewrite {fmtPct(domain.rewriteRate)}</span>
-                                   <span>Tool {fmtPct(domain.toolUsageRate)}</span>
-                                 </div>
-                               </div>
-                             ))}
-                           </div>
-                         )}
-                       </div>
-
-                       <div className="border rounded-xl bg-card p-4">
-                         <p className="font-semibold mb-3">Conversazioni problematiche</p>
-                         {qualitaData.problemConversations.length === 0 ? (
-                           <div className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">
-                             Nessuna conversazione problematica nel periodo.
-                           </div>
-                         ) : (
-                           <div className="space-y-2">
-                             {qualitaData.problemConversations.slice(0, 8).map((item) => (
-                               <div key={item.id} className="rounded-lg border p-3">
-                                 <div className="flex items-start justify-between gap-3">
-                                   <div className="min-w-0">
-                                     <p className="text-sm font-medium truncate">
-                                       {item.domain} / {item.intent}
-                                     </p>
-                                     <p className="text-xs text-muted-foreground">
-                                       Sessione #{item.sessionId ?? "N/D"} - {fmtShortDate(item.createdAt)}
-                                     </p>
-                                   </div>
-                                   <Badge variant={item.source === "feedback" ? "destructive" : "outline"} className="shrink-0">
-                                     {item.score != null ? fmtScore(item.score) : "feedback"}
-                                   </Badge>
-                                 </div>
-                                 <p className="text-xs mt-2 text-muted-foreground break-words">{item.snippet}</p>
-                                 {item.reason && (
-                                   <p className="text-xs mt-2 text-amber-700 break-words">Motivo: {item.reason}</p>
-                                 )}
-                               </div>
-                             ))}
-                           </div>
-                         )}
-                       </div>
-                     </div>
-                   </>
-                 )}
-               </div>
+               <QualitySection
+                 data={qualitaData}
+                 loading={qualitaLoading}
+                 days={qualitaDays}
+                 onDaysChange={setQualitaDays}
+                 onRefresh={loadQualita}
+                 onOpenStatus={openStatusSetup}
+               />
              )}
              {section === "settings" && (
               <div className="p-8">
