@@ -99,6 +99,90 @@
       "when": 1779000000000,
       "tag": "0013_create_user_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1779001000000,
+      "tag": "0014_step6_rag_weak_signals",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1779002000000,
+      "tag": "0015_add_rag_telemetry",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1779003000000,
+      "tag": "0016_step7_saas_collab",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1779004000000,
+      "tag": "0017_add_clerk_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1779005000000,
+      "tag": "0018_agent_employees_tasks",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1779006000000,
+      "tag": "0019_agent_prompt_versions",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1779007000000,
+      "tag": "0020_admin_catalog_drafts",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1779008000000,
+      "tag": "0021_step9_messages_affiliation_ops",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1779009000000,
+      "tag": "0022_news_articles_detail_content",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1779010000000,
+      "tag": "0023_social_posts_stories",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1779011000000,
+      "tag": "0024_app_search_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1779012000000,
+      "tag": "0025_cognee_like_memory_graph",
+      "breakpoints": true
     }
   ]
 }

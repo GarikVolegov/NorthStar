@@ -101,7 +101,7 @@ SELECT
   '/news/' || n."id",
   'public',
   jsonb_build_object('source', 'news_articles', 'category', n."category"),
-  COALESCE(n."updated_at", now())
+  COALESCE(n."created_at", now())
 FROM "news_articles" n
 ON CONFLICT ("entity_type", "entity_id", COALESCE("user_id", 0)) DO UPDATE
 SET "title" = EXCLUDED."title",
