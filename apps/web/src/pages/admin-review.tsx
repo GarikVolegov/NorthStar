@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import {
   AgentsSection,
+  AffiliationSection,
   BusinessMetricsSection,
   ConfidenceBadge,
   EntityBadge,
@@ -27,7 +28,6 @@ import {
   fmtScore,
   fmtShortDate,
   fmtUsd,
-  assigneeLabel,
   formatLastUpdated,
   formatValue,
   humanizeKey,
@@ -35,11 +35,12 @@ import {
   payloadEntries,
   type AgentRun,
   type AgentPrompt,
+  type AffiliationInboxResponse,
+  type AffiliationLeadItem,
   type AdminOverview,
   type AgentsOverview,
   type AgentsTab,
   type AiModelPolicy,
-  type AdminAssignee,
   type BusinessStatusSnapshot,
   type ContactInboxResponse,
   type ContactMessageItem,
@@ -261,30 +262,6 @@ type GrowthArticleDetail = {
   }>;
 };
 
-type AffiliationLeadItem = {
-  id: number;
-  institutionName: string;
-  contactName: string;
-  email: string;
-  partnerType: string;
-  message: string | null;
-  status: "pending" | "contacted" | "converted" | "rejected";
-  read: boolean;
-  readAt: string | null;
-  internalNotes: string | null;
-  assignedTo: number | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type AffiliationInboxResponse = {
-  items: AffiliationLeadItem[];
-  stats: Record<string, number>;
-  sources: Array<{ source: string; count: number }>;
-  assignees: AdminAssignee[];
-  generatedAt: string;
-};
-
 const CATALOG_TABS: Array<{ type: CatalogType; label: string; icon: typeof BookOpen }> = [
   { type: "sectors", label: "Settori", icon: BarChart3 },
   { type: "professions", label: "Professioni", icon: Briefcase },
@@ -304,13 +281,6 @@ const GROWTH_STATUS_UI: Record<Exclude<GrowthQueueStatus, "all">, { label: strin
   draft: { label: "Bozza", className: "bg-slate-100 text-slate-700 border-slate-200" },
   pending: { label: "Pending", className: "bg-amber-100 text-amber-800 border-amber-200" },
   published: { label: "Pubblicato", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
-  rejected: { label: "Rifiutato", className: "bg-red-100 text-red-800 border-red-200" },
-};
-
-const LEAD_STATUS_UI: Record<AffiliationLeadItem["status"], { label: string; className: string }> = {
-  pending: { label: "Pending", className: "bg-primary/10 text-primary border-primary/30" },
-  contacted: { label: "Contattato", className: "bg-amber-100 text-amber-800 border-amber-200" },
-  converted: { label: "Convertito", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
   rejected: { label: "Rifiutato", className: "bg-red-100 text-red-800 border-red-200" },
 };
 
@@ -548,11 +518,6 @@ function growthArticleToForm(article: GrowthArticle | null): Record<string, any>
 function growthStatusBadge(status: GrowthArticle["status"]) {
   const cfg = GROWTH_STATUS_UI[status] ?? GROWTH_STATUS_UI.draft;
   return <Badge variant="outline" className={cn("capitalize", cfg.className)}>{cfg.label}</Badge>;
-}
-
-function leadStatusBadge(status: AffiliationLeadItem["status"]) {
-  const cfg = LEAD_STATUS_UI[status] ?? LEAD_STATUS_UI.pending;
-  return <Badge variant="outline" className={cfg.className}>{cfg.label}</Badge>;
 }
 
 export default function AdminReview() {
@@ -2999,138 +2964,31 @@ const [memoryActionLoading, setMemoryActionLoading] = useState<string | null>(nu
 
             {/* ── Partner / Affiliazione ── */}
             {section === "affiliazione" && (
-              <div className="p-4 md:p-8 space-y-5">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <h3 className="text-lg font-serif font-bold">
-                      <Handshake className="w-5 h-5 inline mr-2 text-primary" />
-                      Partner & Affiliazioni
-                    </h3>
-                    <p className="text-sm text-muted-foreground">Gestione lead da scuole, aziende, partner e contatti istituzionali.</p>
-                  </div>
-                  <Button size="sm" variant="outline" onClick={loadAffiliazione} disabled={affiliazioneLoading} className="min-h-11">
-                    {affiliazioneLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
-                    Aggiorna
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                  {[
-                    ["Totali", affiliazioneData?.stats?.total ?? 0],
-                    ["Non letti", affiliazioneData?.stats?.unread ?? 0],
-                    ["Pending", affiliazioneData?.stats?.pending ?? 0],
-                    ["Contattati", affiliazioneData?.stats?.contacted ?? 0],
-                    ["Convertiti", affiliazioneData?.stats?.converted ?? 0],
-                  ].map(([label, value]) => (
-                    <div key={String(label)} className="rounded-lg border bg-card p-3">
-                      <p className="text-lg font-bold">{String(value)}</p>
-                      <p className="text-xs text-muted-foreground">{String(label)}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-[1fr_140px_150px_160px_190px]">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input className="pl-9 min-h-11" placeholder="Cerca nome, email, tipo o messaggio..." value={affiliazioneSearch} onChange={(e) => setAffiliazioneSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void loadAffiliazione(); }} />
-                  </div>
-                  <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={affiliazioneRead} onChange={(e) => setAffiliazioneRead(e.target.value)}>
-                    <option value="all">Tutti</option>
-                    <option value="unread">Non letti</option>
-                    <option value="read">Letti</option>
-                  </select>
-                  <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={affiliazioneStatus} onChange={(e) => setAffiliazioneStatus(e.target.value)}>
-                    <option value="all">Tutti gli stati</option>
-                    {Object.entries(LEAD_STATUS_UI).map(([value, cfg]) => <option key={value} value={value}>{cfg.label}</option>)}
-                  </select>
-                  <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={affiliazioneSource} onChange={(e) => setAffiliazioneSource(e.target.value)}>
-                    <option value="all">Tutti i tipi</option>
-                    {affiliazioneData?.sources?.map((row) => <option key={row.source} value={row.source}>{row.source.replace(/_/g, " ")}</option>)}
-                  </select>
-                  <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={affiliazioneAssignedTo} onChange={(e) => setAffiliazioneAssignedTo(e.target.value)}>
-                    <option value="all">Tutti gli admin</option>
-                    <option value="unassigned">Non assegnati</option>
-                    {affiliazioneData?.assignees?.map((admin) => <option key={admin.id} value={admin.id}>{admin.name || admin.email}</option>)}
-                  </select>
-                </div>
-
-                {affiliazioneLoading ? (
-                  <p className="text-sm text-muted-foreground">Caricamento...</p>
-                ) : affiliazioneData?.items ? (
-                  <div className="grid lg:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)] gap-4">
-                    <div className="space-y-2 min-w-0">
-                      {affiliazioneData.items.map((lead) => (
-                        <button key={lead.id} type="button" onClick={() => { setAffiliazioneSelected(lead); setAffiliazioneNotes(lead.internalNotes ?? ""); }} className={cn("w-full min-h-11 text-left p-4 rounded-lg border bg-card hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", affiliazioneSelected?.id === lead.id && "border-primary/50 bg-primary/5", !lead.read && "border-primary/30")}>
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="font-semibold text-sm truncate">{lead.institutionName}</p>
-                              <p className="text-xs text-muted-foreground truncate">{lead.contactName} · {lead.email}</p>
-                            </div>
-                            <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-                              {!lead.read && <Badge className="bg-primary text-primary-foreground">Nuovo</Badge>}
-                              {leadStatusBadge(lead.status)}
-                            </div>
-                          </div>
-                          {lead.message && <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{lead.message}</p>}
-                          <p className="text-xs text-muted-foreground mt-2">{fmtShortDate(lead.createdAt)} · {lead.partnerType.replace(/_/g, " ")} · {assigneeLabel(affiliazioneData.assignees, lead.assignedTo)}</p>
-                        </button>
-                      ))}
-                      {affiliazioneData.items.length === 0 && <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">Nessun lead trovato.</div>}
-                    </div>
-
-                    <div className="rounded-lg border bg-card min-w-0">
-                      {affiliazioneSelected ? (
-                        <div className="p-4 md:p-5 space-y-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <h4 className="font-semibold truncate">{affiliazioneSelected.institutionName}</h4>
-                              <p className="text-sm text-muted-foreground">{affiliazioneSelected.contactName} · {affiliazioneSelected.email}</p>
-                            </div>
-                            {leadStatusBadge(affiliazioneSelected.status)}
-                          </div>
-                          <div className="rounded-lg border bg-background p-4">
-                            <p className="text-xs text-muted-foreground mb-1">Messaggio originale</p>
-                            <p className="text-sm whitespace-pre-wrap">{affiliazioneSelected.message || "Nessun messaggio."}</p>
-                          </div>
-                          <div className="grid sm:grid-cols-2 gap-3">
-                            <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={affiliazioneSelected.status} onChange={(e) => void updateAffiliazione(affiliazioneSelected.id, "status", { status: e.target.value })}>
-                              {Object.entries(LEAD_STATUS_UI).map(([value, cfg]) => <option key={value} value={value}>{cfg.label}</option>)}
-                            </select>
-                            <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={affiliazioneSelected.assignedTo ?? ""} onChange={(e) => void updateAffiliazione(affiliazioneSelected.id, "assign", { assignedTo: e.target.value || null })}>
-                              <option value="">Non assegnato</option>
-                              {affiliazioneData.assignees.map((admin) => <option key={admin.id} value={admin.id}>{admin.name || admin.email}</option>)}
-                            </select>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <Button variant="outline" className="min-h-11" disabled={!!affiliazioneActionLoading} onClick={() => void updateAffiliazione(affiliazioneSelected.id, "read", { read: !affiliazioneSelected.read })}>
-                              <Eye className="w-4 h-4 mr-2" /> {affiliazioneSelected.read ? "Segna non letto" : "Segna letto"}
-                            </Button>
-                            {user?.id ? (
-                              <Button variant="outline" className="min-h-11" disabled={!!affiliazioneActionLoading} onClick={() => void updateAffiliazione(affiliazioneSelected.id, "assign", { assignedTo: user.id })}>
-                                <Shield className="w-4 h-4 mr-2" /> Assegna a me
-                              </Button>
-                            ) : null}
-                          </div>
-                          <div>
-                            <p className="text-xs font-medium mb-1">Note interne</p>
-                            <Textarea value={affiliazioneNotes} onChange={(e) => setAffiliazioneNotes(e.target.value)} placeholder="Prossimo contatto, contesto partner, priorità..." />
-                            <Button className="mt-2 min-h-11" disabled={!!affiliazioneActionLoading} onClick={() => void updateAffiliazione(affiliazioneSelected.id, "notes", { internalNotes: affiliazioneNotes })}>
-                              <Save className="w-4 h-4 mr-2" /> Salva note
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-8 text-center text-sm text-muted-foreground">Seleziona un lead per gestirlo.</div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-lg border bg-card p-8 text-center">
-                    <p className="text-sm text-muted-foreground">Nessun dato disponibile.</p>
-                    <Button variant="outline" className="mt-3 min-h-11" onClick={loadAffiliazione}>Riprova</Button>
-                  </div>
-                )}
-              </div>
+              <AffiliationSection
+                data={affiliazioneData}
+                loading={affiliazioneLoading}
+                search={affiliazioneSearch}
+                readFilter={affiliazioneRead}
+                statusFilter={affiliazioneStatus}
+                sourceFilter={affiliazioneSource}
+                assignedToFilter={affiliazioneAssignedTo}
+                selectedLead={affiliazioneSelected}
+                notes={affiliazioneNotes}
+                actionLoading={affiliazioneActionLoading}
+                currentUserId={user?.id}
+                onSearchChange={setAffiliazioneSearch}
+                onReadFilterChange={setAffiliazioneRead}
+                onStatusFilterChange={setAffiliazioneStatus}
+                onSourceFilterChange={setAffiliazioneSource}
+                onAssignedToFilterChange={setAffiliazioneAssignedTo}
+                onSelectLead={(lead) => {
+                  setAffiliazioneSelected(lead);
+                  setAffiliazioneNotes(lead.internalNotes ?? "");
+                }}
+                onNotesChange={setAffiliazioneNotes}
+                onRefresh={loadAffiliazione}
+                onUpdateLead={updateAffiliazione}
+              />
             )}
 
           </div>
