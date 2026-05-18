@@ -1,6 +1,7 @@
 export * from "./AgentLaunchResult";
 export * from "./AgentsSection";
 export * from "./config";
+export * from "./HomeSection";
 export * from "./PromptsSection";
 export * from "./QualitySection";
 export * from "./shared";

@@ -12,6 +12,25 @@ export type PersistenceMeta = {
   setupAction?: string | null;
 };
 
+export type SidebarSection =
+  | "queue"
+  | "suggestions"
+  | "runs"
+  | "logs"
+  | "settings"
+  | "agents"
+  | "prompts"
+  | "qualita"
+  | "cataloghi"
+  | "agenti-salute"
+  | "metriche"
+  | "home"
+  | "status"
+  | "messaggi"
+  | "crescita"
+  | "affiliazione"
+  | "memory";
+
 export type AgentHealthStatus = "healthy" | "degraded" | "critical";
 
 export type AgentRun = {
@@ -179,6 +198,70 @@ export type AiModelPolicy = {
       maxTokens: number;
     };
   }>;
+};
+
+export type AdminOverview = {
+  generatedAt: string;
+  health: {
+    status: "healthy" | "attention" | "critical";
+    label: string;
+    reasons: string[];
+    criticalCount: number;
+    actionItems: number;
+  };
+  queues: {
+    reviewPending: number;
+    growthPending: number;
+    totalOpen: number;
+  };
+  errors: {
+    totalCaptured: number;
+    unique: number;
+    brokenComponents: string[];
+    recent: Array<{
+      file: string;
+      function: string;
+      message: string;
+      code: string | null;
+      capturedAt: string;
+      occurrences: number;
+    }>;
+  };
+  agents: {
+    total: number;
+    critical: number;
+    degraded: number;
+    failedRecent: Array<{
+      id: number;
+      agentName: string;
+      taskType: string | null;
+      startedAt: string;
+      durationMs: number | null;
+      errorMessage: string | null;
+      status: string;
+    }>;
+    health: Array<{
+      agentName: string;
+      totalCalls30d: number;
+      errorCount30d: number;
+      errorRate30d: number;
+      successRate30d: number;
+      avgDurationMs: number | null;
+      status: "healthy" | "degraded" | "critical";
+    }>;
+  };
+  metrics: {
+    users: { total: number; premium: number; new30d: number };
+    tests: { total: number };
+    calendar: { upcoming: number; next24h: number } | null;
+  };
+  inbox: {
+    unreadMessages: number;
+    pendingLeads: number;
+    contactedLeads: number;
+    totalMessages: number;
+    totalLeads: number;
+  };
 };
 
 export type WendyQualityOverview = {

@@ -10,6 +10,8 @@ import {
   AgentsSection,
   ConfidenceBadge,
   EntityBadge,
+  HEALTH_UI,
+  HomeSection,
   PersistenceWarningBanner,
   PromptsSection,
   QualitySection,
@@ -30,6 +32,7 @@ import {
   payloadEntries,
   type AgentRun,
   type AgentPrompt,
+  type AdminOverview,
   type AgentsOverview,
   type AgentsTab,
   type AiModelPolicy,
@@ -38,6 +41,7 @@ import {
   type PromptPreview,
   type PromptValidation,
   type PromptVersion,
+  type SidebarSection,
   type SuggestionStatus,
   type WendyQualityOverview,
 } from "@/components/admin/console";
@@ -136,25 +140,6 @@ type SuggestionDetail = {
     createdAt: string;
   }>;
 };
-
-type SidebarSection =
-  | "queue"
-  | "suggestions"
-  | "runs"
-  | "logs"
-  | "settings"
-  | "agents"
-  | "prompts"
-  | "qualita"
-  | "cataloghi"
-  | "agenti-salute"
-  | "metriche"
-  | "home"
-  | "status"
-  | "messaggi"
-  | "crescita"
-  | "affiliazione"
-  | "memory";
 
 type MemoryGraphOverview = {
   generatedAt: string;
@@ -353,70 +338,6 @@ const LEAD_STATUS_UI: Record<AffiliationLeadItem["status"], { label: string; cla
   rejected: { label: "Rifiutato", className: "bg-red-100 text-red-800 border-red-200" },
 };
 
-type AdminOverview = {
-  generatedAt: string;
-  health: {
-    status: "healthy" | "attention" | "critical";
-    label: string;
-    reasons: string[];
-    criticalCount: number;
-    actionItems: number;
-  };
-  queues: {
-    reviewPending: number;
-    growthPending: number;
-    totalOpen: number;
-  };
-  errors: {
-    totalCaptured: number;
-    unique: number;
-    brokenComponents: string[];
-    recent: Array<{
-      file: string;
-      function: string;
-      message: string;
-      code: string | null;
-      capturedAt: string;
-      occurrences: number;
-    }>;
-  };
-  agents: {
-    total: number;
-    critical: number;
-    degraded: number;
-    failedRecent: Array<{
-      id: number;
-      agentName: string;
-      taskType: string | null;
-      startedAt: string;
-      durationMs: number | null;
-      errorMessage: string | null;
-      status: string;
-    }>;
-    health: Array<{
-      agentName: string;
-      totalCalls30d: number;
-      errorCount30d: number;
-      errorRate30d: number;
-      successRate30d: number;
-      avgDurationMs: number | null;
-      status: "healthy" | "degraded" | "critical";
-    }>;
-  };
-  metrics: {
-    users: { total: number; premium: number; new30d: number };
-    tests: { total: number };
-    calendar: { upcoming: number; next24h: number } | null;
-  };
-  inbox: {
-    unreadMessages: number;
-    pendingLeads: number;
-    contactedLeads: number;
-    totalMessages: number;
-    totalLeads: number;
-  };
-};
-
 type BusinessStatusSnapshot = {
   generatedAt: string;
   days: number;
@@ -586,27 +507,6 @@ const ADMIN_NAV_GROUPS: Array<{
     ],
   },
 ];
-
-const HEALTH_UI = {
-  healthy: {
-    label: "Tutto stabile",
-    tone: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    dot: "bg-emerald-500",
-    icon: CheckCircle2,
-  },
-  attention: {
-    label: "Attenzione",
-    tone: "border-amber-200 bg-amber-50 text-amber-800",
-    dot: "bg-amber-500",
-    icon: Clock,
-  },
-  critical: {
-    label: "Intervento richiesto",
-    tone: "border-red-200 bg-red-50 text-red-800",
-    dot: "bg-red-500",
-    icon: ShieldAlert,
-  },
-} as const;
 
 function sectionFromLocation(pathname: string): SidebarSection {
   const segment = pathname.split("/").filter(Boolean)[1];
@@ -2523,263 +2423,12 @@ const [memoryActionLoading, setMemoryActionLoading] = useState<string | null>(nu
 
             {/* ── Home Admin ── */}
             {section === "home" && (
-              <div className="p-4 sm:p-6 lg:p-8 space-y-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h3 className="text-lg font-serif font-bold flex items-center gap-2">
-                      <Home className="w-5 h-5 text-primary" />
-                      Panoramica Admin
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Control room operativa per capire in pochi secondi cosa richiede attenzione.
-                    </p>
-                  </div>
-                  <Button size="sm" variant="outline" className="min-h-11" onClick={loadHome} disabled={homeLoading}>
-                    {homeLoading ? <RefreshCw size={14} className="animate-spin mr-2" /> : <RefreshCw size={14} className="mr-2" />}
-                    Aggiorna
-                  </Button>
-                </div>
-
-                {homeLoading && !homeData ? (
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    {[0, 1, 2, 3].map((item) => (
-                      <div key={item} className="h-32 rounded-lg border bg-card animate-pulse" />
-                    ))}
-                  </div>
-                ) : !homeData ? (
-                  <div className="rounded-lg border bg-card p-8 text-center">
-                    <ShieldAlert className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
-                    <p className="font-medium">Panoramica non disponibile</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Non sono riuscito a caricare la control room.
-                    </p>
-                    <Button className="mt-4 min-h-11" variant="outline" onClick={loadHome}>
-                      Riprova
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    {(() => {
-                      const health = HEALTH_UI[homeData.health.status];
-                      const HealthIcon = health.icon;
-                      const summaryCards = [
-                        {
-                          label: "Azioni aperte",
-                          value: homeData.health.actionItems,
-                          detail: `${homeData.queues.reviewPending} review, ${homeData.inbox.unreadMessages} messaggi`,
-                          icon: ClipboardList,
-                          action: () => navigateToSection("queue"),
-                        },
-                        {
-                          label: "Errori recenti",
-                          value: homeData.errors.totalCaptured,
-                          detail: `${homeData.errors.unique} unici, ${homeData.errors.brokenComponents.length} componenti`,
-                          icon: ShieldAlert,
-                          action: () => navigateToSection("status"),
-                        },
-                        {
-                          label: "Agenti problematici",
-                          value: homeData.agents.critical + homeData.agents.degraded,
-                          detail: `${homeData.agents.critical} critici, ${homeData.agents.degraded} degradati`,
-                          icon: Bot,
-                          action: () => navigateToSection("agenti-salute"),
-                        },
-                      ];
-
-                      return (
-                        <div className="grid gap-3 xl:grid-cols-[1.4fr_repeat(3,minmax(0,1fr))]">
-                          <div className={cn("rounded-lg border p-4", health.tone)}>
-                            <div className="flex items-start gap-3">
-                              <span className={cn("mt-1 h-3 w-3 rounded-full shrink-0", health.dot)} />
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <HealthIcon className="w-5 h-5" />
-                                  <p className="font-semibold">{homeData.health.label || health.label}</p>
-                                </div>
-                                <p className="text-sm mt-2 opacity-90">
-                                  {homeData.health.reasons.length > 0
-                                    ? homeData.health.reasons.slice(0, 3).join(" - ")
-                                    : "Nessuna anomalia operativa rilevata."}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-
-                          {summaryCards.map((card) => {
-                            const Icon = card.icon;
-                            return (
-                              <button
-                                key={card.label}
-                                type="button"
-                                onClick={card.action}
-                                className="min-h-32 rounded-lg border bg-card p-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-                              >
-                                <div className="flex items-center justify-between gap-3">
-                                  <Icon className="w-5 h-5 text-muted-foreground" />
-                                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                                </div>
-                                <p className="mt-4 text-3xl font-bold">{card.value}</p>
-                                <p className="text-sm font-medium">{card.label}</p>
-                                <p className="text-xs text-muted-foreground mt-1">{card.detail}</p>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      );
-                    })()}
-
-                    <div className="grid gap-4 xl:grid-cols-3">
-                      <div className="rounded-lg border bg-card p-4">
-                        <div className="flex items-center justify-between gap-3 mb-3">
-                          <div>
-                            <p className="font-semibold">Azioni richieste</p>
-                            <p className="text-xs text-muted-foreground">Code operative da svuotare</p>
-                          </div>
-                          <Badge variant={homeData.queues.totalOpen > 0 ? "default" : "secondary"}>
-                            {homeData.queues.totalOpen} aperte
-                          </Badge>
-                        </div>
-                        <div className="space-y-2">
-                          {[
-                            { label: "Richieste in revisione", value: homeData.queues.reviewPending, section: "queue" as SidebarSection },
-                            { label: "Articoli crescita pending", value: homeData.queues.growthPending, section: "crescita" as SidebarSection },
-                            { label: "Messaggi non letti", value: homeData.inbox.unreadMessages, section: "messaggi" as SidebarSection },
-                            { label: "Lead da contattare", value: homeData.inbox.pendingLeads, section: "affiliazione" as SidebarSection },
-                          ].map((item) => (
-                            <button
-                              key={item.label}
-                              type="button"
-                              onClick={() => navigateToSection(item.section)}
-                              className="min-h-11 w-full flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-                            >
-                              <span className="text-sm">{item.label}</span>
-                              <span className={cn("text-sm font-semibold", item.value > 0 ? "text-amber-700" : "text-muted-foreground")}>
-                                {item.value}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg border bg-card p-4">
-                        <div className="flex items-center justify-between gap-3 mb-3">
-                          <div>
-                            <p className="font-semibold">Errori API recenti</p>
-                            <p className="text-xs text-muted-foreground">Execution monitor in memoria</p>
-                          </div>
-                          <Button size="sm" variant="ghost" className="min-h-11" onClick={() => navigateToSection("status")}>
-                            Dettagli
-                          </Button>
-                        </div>
-                        {homeData.errors.recent.length === 0 ? (
-                          <div className="rounded-md bg-muted/40 p-4 text-sm text-muted-foreground">
-                            Nessun errore recente catturato.
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {homeData.errors.recent.slice(0, 3).map((error) => (
-                              <div key={`${error.file}-${error.function}-${error.code ?? "error"}`} className="rounded-md border p-3">
-                                <p className="text-sm font-medium truncate">{error.file}</p>
-                                <p className="text-xs text-muted-foreground truncate">{error.message}</p>
-                                <p className="text-xs text-red-600 mt-1">{error.occurrences} occorrenze</p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="rounded-lg border bg-card p-4">
-                        <div className="flex items-center justify-between gap-3 mb-3">
-                          <div>
-                            <p className="font-semibold">Agenti</p>
-                            <p className="text-xs text-muted-foreground">Salute e fallimenti recenti</p>
-                          </div>
-                          <Button size="sm" variant="ghost" className="min-h-11" onClick={() => navigateToSection("agenti-salute")}>
-                            Apri
-                          </Button>
-                        </div>
-                        {homeData.agents.failedRecent.length === 0 && homeData.agents.critical + homeData.agents.degraded === 0 ? (
-                          <div className="rounded-md bg-muted/40 p-4 text-sm text-muted-foreground">
-                            Nessun agente problematico negli ultimi 30 giorni.
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {homeData.agents.health
-                              .filter((agent) => agent.status !== "healthy")
-                              .slice(0, 3)
-                              .map((agent) => (
-                                <div key={agent.agentName} className="rounded-md border p-3">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <p className="text-sm font-medium truncate">{agent.agentName}</p>
-                                    <Badge variant="outline">{agent.errorRate30d}% errori</Badge>
-                                  </div>
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    {agent.errorCount30d} errori su {agent.totalCalls30d} chiamate
-                                  </p>
-                                </div>
-                              ))}
-                            {homeData.agents.failedRecent.slice(0, 2).map((run) => (
-                              <div key={run.id} className="rounded-md border p-3">
-                                <p className="text-sm font-medium truncate">{run.agentName}</p>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {run.errorMessage || "Run fallito senza messaggio"}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4 lg:grid-cols-2">
-                      <div className="rounded-lg border bg-card p-4">
-                        <p className="font-semibold mb-3">Metriche chiave</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                          {[
-                            { label: "Utenti", value: homeData.metrics.users.total },
-                            { label: "Nuovi 30g", value: homeData.metrics.users.new30d },
-                            { label: "Premium", value: homeData.metrics.users.premium },
-                            { label: "Test", value: homeData.metrics.tests.total },
-                            { label: "Eventi futuri", value: homeData.metrics.calendar?.upcoming ?? 0 },
-                            { label: "Prossime 24h", value: homeData.metrics.calendar?.next24h ?? 0 },
-                          ].map((item) => (
-                            <div key={item.label} className="rounded-md bg-muted/40 p-3">
-                              <p className="text-xl font-bold">{item.value}</p>
-                              <p className="text-xs text-muted-foreground">{item.label}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg border bg-card p-4">
-                        <p className="font-semibold mb-3">Inbox business</p>
-                        <div className="grid sm:grid-cols-2 gap-3">
-                          <button
-                            type="button"
-                            onClick={() => navigateToSection("messaggi")}
-                            className="min-h-24 rounded-md border p-3 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-                          >
-                            <MessageCircle className="w-5 h-5 text-muted-foreground" />
-                            <p className="mt-3 text-2xl font-bold">{homeData.inbox.unreadMessages}</p>
-                            <p className="text-sm font-medium">Messaggi non letti</p>
-                            <p className="text-xs text-muted-foreground">{homeData.inbox.totalMessages} totali</p>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => navigateToSection("affiliazione")}
-                            className="min-h-24 rounded-md border p-3 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-                          >
-                            <Handshake className="w-5 h-5 text-muted-foreground" />
-                            <p className="mt-3 text-2xl font-bold">{homeData.inbox.pendingLeads}</p>
-                            <p className="text-sm font-medium">Lead da contattare</p>
-                            <p className="text-xs text-muted-foreground">{homeData.inbox.totalLeads} totali</p>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
+              <HomeSection
+                data={homeData}
+                loading={homeLoading}
+                onRefresh={loadHome}
+                onNavigateSection={navigateToSection}
+              />
             )}
 
             {/* ── Cataloghi ── */}

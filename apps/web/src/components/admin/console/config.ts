@@ -7,6 +7,7 @@ import {
   Clock,
   FileText,
   GraduationCap,
+  ShieldAlert,
   Sparkles,
   TrendingUp,
   XCircle,
@@ -59,3 +60,23 @@ export const ENTITY_CONFIG: Record<string, { label: string; icon: LucideIcon }> 
   work_mode: { label: "Work Mode", icon: Sparkles },
 };
 
+export const HEALTH_UI = {
+  healthy: {
+    label: "Tutto stabile",
+    tone: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    dot: "bg-emerald-500",
+    icon: CheckCircle2,
+  },
+  attention: {
+    label: "Attenzione",
+    tone: "border-amber-200 bg-amber-50 text-amber-800",
+    dot: "bg-amber-500",
+    icon: Clock,
+  },
+  critical: {
+    label: "Intervento richiesto",
+    tone: "border-red-200 bg-red-50 text-red-800",
+    dot: "bg-red-500",
+    icon: ShieldAlert,
+  },
+} as const;
