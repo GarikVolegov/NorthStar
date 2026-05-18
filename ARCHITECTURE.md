@@ -2,6 +2,9 @@
 
 Guida di riferimento per sviluppatori. Ogni nuovo file deve seguire i pattern descritti qui.
 
+Per la mappa fisica del monorepo e le regole di posizionamento dei file, vedi
+[`docs/REPOSITORY_STRUCTURE.md`](./docs/REPOSITORY_STRUCTURE.md).
+
 ---
 
 ## Stack tecnologico effettivo

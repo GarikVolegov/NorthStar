@@ -16,6 +16,9 @@ Prima di modificare qualsiasi area del progetto, apri **sempre** il file di rego
 | AI agent / OpenAI / Wendy / prompt | [`AI_RULES.md`](./AI_RULES.md) |
 | Git / branching / commit / PR | [`GIT_RULES.md`](./GIT_RULES.md) |
 
+Per capire dove posizionare file, script e documentazione, consulta anche
+[`docs/REPOSITORY_STRUCTURE.md`](./docs/REPOSITORY_STRUCTURE.md).
+
 ---
 
 ## 🏗️ Architettura di NorthStar
