@@ -172,6 +172,15 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
       { name: "topK",    type: "number", description: "Numero di chunk da recuperare (default 5, max 10)" },
     ],
   },
+  search_memory_graph: {
+    name:        "search_memory_graph",
+    description: "Cerca nella memoria personale strutturata dell'utente: idee, obiettivi, calendario, profilo e ricordi Wendy. Restituisce nodi, fonti e relazioni con confidence. Usare per domande sul percorso personale o su cosa Wendy ricorda dell'utente.",
+    parameters: [
+      { name: "query", type: "string", description: "Query semantica sulla memoria personale dell'utente", required: true },
+      { name: "limit", type: "number", description: "Max nodi da recuperare (default 6, max 12)" },
+      { name: "includeCandidates", type: "boolean", description: "Include relazioni/nodi candidati non ancora confermati" },
+    ],
+  },
   get_weak_signals: {
     name:        "get_weak_signals",
     description: "Recupera segnali deboli di professioni o skill emergenti (nuovi ruoli, skill insolite, trend nascenti). Utile per rispondere a domande su futuro del lavoro e ruoli emergenti.",
@@ -228,6 +237,7 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_news_summary",
     "get_market_trend",
     "get_user_context",
+    "search_memory_graph",
     "get_growth_articles",
     "search_rag",          // Step 6: grounding su domande di mercato
     "get_weak_signals",    // Step 6: anticipare trend nel settore utente
@@ -246,6 +256,7 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "save_business_idea",
     "add_calendar_event",
     "get_user_context",
+    "search_memory_graph",
     "search_rag",                // Step 6: grounding per piano basato su dati reali
     "get_weak_signals",          // Step 6: ruoli emergenti rilevanti per il piano
     "get_job_posting_trend",     // Step 6: trend domanda per il ruolo target
@@ -260,6 +271,7 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_market_trend",
     "get_growth_articles",
     "get_user_context",
+    "search_memory_graph",
     "get_user_objectives",
     "search_rag",                // Step 6: analisi profonda con fonti autorevoli
     "get_weak_signals",          // Step 6: segnali emergenti nel settore

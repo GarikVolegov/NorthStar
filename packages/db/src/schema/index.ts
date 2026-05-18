@@ -26,6 +26,7 @@ export * from "./newsArticles";
 export * from "./growthArticles";
 export * from "./agentReview";
 export * from "./agentPrompts";
+export * from "./adminCatalogDrafts";
 // agentLogs.ts removed — table merged into agentReview.ts as agentRunsTable.
 // Run the following SQL to backfill and drop the old table if it still exists:
 //   INSERT INTO agent_runs SELECT * FROM agent_logs;
@@ -60,6 +61,7 @@ export * from "./voiceSessions";
 export * from "./routingLogs";
 export * from "./qualityMetrics";
 export * from "./chatMessages";
+export * from "./social";
 // ── AI Cost tracking & request logging ──────────────────────────────
 export * from "./llmUsage";
 export * from "./aiRequestLog";
@@ -69,6 +71,7 @@ export * from "./userBadges";
 export * from "./weeklyLeaderboard";
 // ── Search ──────────────────────────────────────────────────────
 export * from "./search";
+export * from "./appSearchIndex";
 // ── News Subscriptions ─────────────────────────────────────────
 export * from "./newsSubscriptions";
 // ── Agenti AI dipendenti ──────────────────────────────────────────────────

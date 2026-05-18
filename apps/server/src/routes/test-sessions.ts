@@ -1,7 +1,102 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
-import { db, testSessionsTable } from "@workspace/db";
+import { db, testSessionsTable, sectorsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
+
+// ── Mapping domande RIASEC (incluse varianti per percorso) ───────────────────
+const RIASEC_MAP: Record<string, string> = {
+  q1: "R", q7: "R",
+  q2: "I", q8: "I",
+  q3: "A", q9: "A",
+  q4: "S", q10: "S",
+  q5: "E", q11: "E",
+  q6: "C", q12: "C",
+  // varianti dipendente
+  q5_dipendente: "S", q11_dipendente: "S",
+  // varianti autonomo
+  q5_autonomo: "E",   q6_autonomo: "C",
+  // varianti azienda
+  q5_azienda: "E",    q11_azienda: "S",
+  // varianti investitore
+  q2_investitore: "I", q8_investitore: "I",
+};
+
+const SPIRIT_KEYS = ["shen", "hun", "po", "yi", "zhi"];
+const RIASEC_NAMES: Record<string, string> = {
+  R: "Realistico", I: "Investigativo", A: "Artistico",
+  S: "Sociale", E: "Imprenditivo", C: "Convenzionale",
+};
+
+function computeScores(answers: Record<string, number>) {
+  // RIASEC
+  const riasecRaw: Record<string, number[]> = { R: [], I: [], A: [], S: [], E: [], C: [] };
+  for (const [qId, val] of Object.entries(answers)) {
+    const dim = RIASEC_MAP[qId];
+    if (dim) riasecRaw[dim].push(val);
+  }
+  const riasecScores: Record<string, number> = {};
+  for (const [dim, vals] of Object.entries(riasecRaw)) {
+    riasecScores[dim] = vals.length
+      ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
+      : 0;
+  }
+
+  // Tipi primari (top 2 non a pari punteggio 0)
+  const sorted = Object.entries(riasecScores)
+    .filter(([, v]) => v > 0)
+    .sort(([, a], [, b]) => b - a);
+  const primaryTypes = sorted.slice(0, 2).map(([k]) => RIASEC_NAMES[k] ?? k);
+
+  // Spirit
+  const spiritScores: Record<string, number> = {};
+  for (const spirit of SPIRIT_KEYS) {
+    const vals = [1, 2, 3].map((n) => answers[`${spirit}_${n}`]).filter((v) => v !== undefined);
+    spiritScores[spirit] = vals.length
+      ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
+      : 0;
+  }
+  const dominantSpirit = SPIRIT_KEYS.reduce((best, k) =>
+    (spiritScores[k] ?? 0) > (spiritScores[best] ?? 0) ? k : best, SPIRIT_KEYS[0]);
+
+  return { riasecScores, primaryTypes, spiritScores, dominantSpirit };
+}
+
+function normalizeAnswers(input: unknown): Record<string, number> | null {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const normalized: Record<string, number> = {};
+  for (const [key, rawValue] of Object.entries(input)) {
+    const value = typeof rawValue === "number" ? rawValue : Number(rawValue);
+    if (!Number.isFinite(value)) continue;
+    normalized[key] = Math.min(5, Math.max(1, Math.round(value)));
+  }
+  return Object.keys(normalized).length ? normalized : null;
+}
+
+async function matchSectors(riasecScores: Record<string, number>) {
+  const sectors = await db.select({
+    id:          sectorsTable.id,
+    name:        sectorsTable.name,
+    riasecTypes: sectorsTable.riasecTypes,
+  }).from(sectorsTable).limit(50);
+
+  const recs = sectors.map((s) => {
+    const types: string[] = (s.riasecTypes as string[]) ?? [];
+    let score = 0;
+    for (const t of types) {
+      const letter = t.charAt(0).toUpperCase();
+      score += riasecScores[letter] ?? 0;
+    }
+    const normalized = types.length ? Math.min(100, Math.round((score / types.length) * 20)) : 0;
+    return {
+      sectorId: s.id,
+      sectorName: s.name,
+      matchScore: normalized,
+      matchReason: `Il tuo profilo si allinea con le caratteristiche del settore ${s.name}.`,
+    };
+  });
+
+  return recs.sort((a, b) => b.matchScore - a.matchScore).slice(0, 5);
+}
 
 const router = Router();
 
@@ -30,6 +125,43 @@ router.get("/history", requireAuth, async (req, res) => {
   }
 });
 
+/* ─── POST /api/test-sessions  —  crea sessione + calcola score ─── */
+router.post("/", async (req, res) => {
+  try {
+    const answers = normalizeAnswers((req.body as { answers?: unknown })?.answers);
+    if (!answers) {
+      res.status(400).json({ error: "answers richiesto" }); return;
+    }
+
+    const { riasecScores, primaryTypes, spiritScores, dominantSpirit } = computeScores(answers);
+    let recommendations: Awaited<ReturnType<typeof matchSectors>> = [];
+    try {
+      recommendations = await matchSectors(riasecScores);
+    } catch (err) {
+      req.log?.warn?.({ err }, "test-sessions sector matching unavailable");
+    }
+
+    const [session] = await db
+      .insert(testSessionsTable)
+      .values({
+        userId: null, // verrà assegnato da assign-user se loggato
+        answers,
+        riasecScores,
+        primaryTypes,
+        profileSummary: `Profilo ${primaryTypes.join(" + ")}`,
+        spiritScores,
+        dominantSpirit,
+        recommendations,
+      })
+      .returning();
+
+    res.status(201).json(session);
+  } catch (err) {
+    req.log?.error?.({ err }, "test-sessions create error");
+    res.status(500).json({ error: "Errore nella creazione della sessione" });
+  }
+});
+
 /* ─── GET /api/test-sessions/latest  —  ultima sessione utente ─── */
 router.get("/latest", requireAuth, async (req, res) => {
   try {
@@ -48,25 +180,20 @@ router.get("/latest", requireAuth, async (req, res) => {
 });
 
 /* ─── GET /api/test-sessions/:sessionId  —  dettagli sessione ─── */
-router.get("/:sessionId", requireAuth, async (req, res) => {
+router.get("/:sessionId", async (req, res) => {
   try {
-    const userId = req.user!.id;
     const sessionId = parseInt(req.params.sessionId, 10);
-    res.json({
-      id: sessionId,
-      riasecScores: {
-        R: 3, I: 4, A: 5, S: 2, E: 3, C: 4
-      },
-      primaryTypes: ["Investigativo", "Artistico"],
-      spiritScores: {
-        leadership: 3, creativity: 5, analysis: 4, people: 3, data: 4, practical: 3
-      },
-      recommendations: [
-        { sectorId: 1, sectorName: "Tecnologia", matchScore: 85, matchReason: "Allineato con le tue competenze tecniche" },
-        { sectorId: 2, sectorName: "Marketing", matchScore: 78, matchReason: "Buona capacità di comunicazione e creatività" }
-      ],
-      createdAt: new Date().toISOString()
-    });
+    if (isNaN(sessionId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+    const [session] = await db
+      .select()
+      .from(testSessionsTable)
+      .where(eq(testSessionsTable.id, sessionId))
+      .limit(1);
+
+    if (!session) { res.status(404).json({ error: "Sessione non trovata" }); return; }
+
+    res.json(session);
   } catch (err) {
     req.log?.error?.({ err }, "test-sessions get error");
     res.status(500).json({ error: "Errore nel caricamento dei dettagli della sessione" });

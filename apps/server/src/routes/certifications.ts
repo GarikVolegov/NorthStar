@@ -3,6 +3,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, certificationsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
+import { sendOptionalReadFallback, sendPersistenceWriteError } from "../lib/persistence";
 
 const router = Router();
 
@@ -34,6 +35,7 @@ router.get("/", async (req, res) => {
     res.json(items);
   } catch (err) {
     req.log?.error?.({ err }, "certifications list error");
+    if (sendOptionalReadFallback(req, res, err, "certifications.list", [])) return;
     res.status(500).json({ error: "Errore nel caricamento delle certificazioni" });
   }
 });
@@ -65,6 +67,7 @@ router.post("/", async (req, res) => {
       return;
     }
     req.log?.error?.({ err }, "certification create error");
+    if (sendPersistenceWriteError(req, res, err, "certifications.create")) return;
     res.status(500).json({ error: "Errore nel salvataggio della certificazione" });
   }
 });
@@ -96,6 +99,7 @@ router.delete("/:id", async (req, res) => {
     res.status(204).send();
   } catch (err) {
     req.log?.error?.({ err }, "certification delete error");
+    if (sendPersistenceWriteError(req, res, err, "certifications.delete")) return;
     res.status(500).json({ error: "Errore nell'eliminazione della certificazione" });
   }
 });

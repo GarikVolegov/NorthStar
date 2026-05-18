@@ -89,13 +89,15 @@ const env = (k: string, fallback: string): string => process.env[k] ?? fallback;
 // Tier presets — env-overridable. Keep names short for cost-tracking pricing table.
 const NANO_GROQ      = env("MODEL_NANO_GROQ",           "llama-3.1-8b-instant");
 const MICRO_GROQ     = env("MODEL_MICRO_GROQ",          "llama-3.3-70b-versatile");
-const NANO_OR        = env("MODEL_NANO_OPENROUTER",     "deepseek/deepseek-v4-flash:free");
-const MICRO_OR       = env("MODEL_MICRO_OPENROUTER",    "deepseek/deepseek-v4-flash:free");
-const STANDARD_OR    = env("MODEL_STANDARD_OPENROUTER", "deepseek/deepseek-v4-flash:free");
+const OPENROUTER_FREE_ROUTER = env("MODEL_OPENROUTER_FREE_ROUTER", "openrouter/free");
+const NANO_OR        = env("MODEL_NANO_OPENROUTER",     "openrouter/free");
+const MICRO_OR       = env("MODEL_MICRO_OPENROUTER",    "openrouter/free");
+const STANDARD_OR    = env("MODEL_STANDARD_OPENROUTER", "openrouter/free");
 const STANDARD_GROQ  = env("MODEL_STANDARD_GROQ",       "llama-3.3-70b-versatile");
-const REASONING_OR   = env("MODEL_REASONING_OPENROUTER","nvidia/nemotron-3-super-120b-a12b:free");
+const REASONING_OR   = env("MODEL_REASONING_OPENROUTER","openrouter/free");
 const PREMIUM_OPENAI = env("MODEL_PREMIUM_OPENAI",      "gpt-4o");
 const CHEAP_OPENAI   = env("MODEL_CHEAP_OPENAI",        "gpt-4o-mini");
+const ALLOW_PAID_MODELS = process.env.ALLOW_PAID_AI_MODELS === "true";
 
 /**
  * Active backend. If AI_PROVIDER=openrouter we prefer OpenRouter free-tier models
@@ -105,27 +107,33 @@ const CHEAP_OPENAI   = env("MODEL_CHEAP_OPENAI",        "gpt-4o-mini");
 const ACTIVE_PROVIDER: "openai" | "groq" | "openrouter" =
   (process.env.AI_PROVIDER?.toLowerCase() as any) ?? "openai";
 
+function enforceFreeOpenRouterModel(model: string) {
+  if (ALLOW_PAID_MODELS) return model;
+  if (model === OPENROUTER_FREE_ROUTER || model.endsWith(":free")) return model;
+  return OPENROUTER_FREE_ROUTER;
+}
+
 function standardModel(): { model: string; provider: ModelRoute["provider"] } {
-  if (ACTIVE_PROVIDER === "openrouter") return { model: STANDARD_OR, provider: "openrouter" };
+  if (ACTIVE_PROVIDER === "openrouter") return { model: enforceFreeOpenRouterModel(STANDARD_OR), provider: "openrouter" };
   if (ACTIVE_PROVIDER === "groq") return { model: STANDARD_GROQ, provider: "groq" };
   return { model: CHEAP_OPENAI, provider: "openai" };
 }
 
 function reasoningModel(): { model: string; provider: ModelRoute["provider"] } {
-  if (ACTIVE_PROVIDER === "openrouter") return { model: REASONING_OR, provider: "openrouter" };
+  if (ACTIVE_PROVIDER === "openrouter") return { model: enforceFreeOpenRouterModel(REASONING_OR), provider: "openrouter" };
   if (ACTIVE_PROVIDER === "groq") return { model: MICRO_GROQ, provider: "groq" };
   return { model: PREMIUM_OPENAI, provider: "openai" }; // fallback if only OpenAI
 }
 
 function nanoModel(): { model: string; provider: ModelRoute["provider"] } {
   if (ACTIVE_PROVIDER === "groq")       return { model: NANO_GROQ, provider: "groq" };
-  if (ACTIVE_PROVIDER === "openrouter") return { model: NANO_OR,   provider: "openrouter" };
+  if (ACTIVE_PROVIDER === "openrouter") return { model: enforceFreeOpenRouterModel(NANO_OR),   provider: "openrouter" };
   return { model: CHEAP_OPENAI, provider: "openai" };
 }
 
 function microModel(): { model: string; provider: ModelRoute["provider"] } {
   if (ACTIVE_PROVIDER === "groq")       return { model: MICRO_GROQ, provider: "groq" };
-  if (ACTIVE_PROVIDER === "openrouter") return { model: MICRO_OR,   provider: "openrouter" };
+  if (ACTIVE_PROVIDER === "openrouter") return { model: enforceFreeOpenRouterModel(MICRO_OR),   provider: "openrouter" };
   return { model: CHEAP_OPENAI, provider: "openai" };
 }
 
@@ -247,6 +255,22 @@ export function selectModelFor(role: AgentRole, opts: RouterOptions = {}): Model
  */
 export function modelFor(role: AgentRole, opts: RouterOptions = {}): string {
   return selectModelFor(role, opts).model;
+}
+
+export function getModelRoutingPolicy() {
+  return {
+    activeProvider: ACTIVE_PROVIDER,
+    allowPaidModels: ALLOW_PAID_MODELS,
+    openRouterFreeRouter: OPENROUTER_FREE_ROUTER,
+    source: "env + role policy",
+    roles: Object.entries(ROLE_CONFIG).map(([role, config]) => ({
+      role: role as AgentRole,
+      tier: config.tier,
+      temperature: config.temperature,
+      maxTokens: config.maxTokens,
+      route: selectModelFor(role as AgentRole, { isPremium: false }),
+    })),
+  };
 }
 
 // ── Backward-compatible helper ────────────────────────────────────────────────

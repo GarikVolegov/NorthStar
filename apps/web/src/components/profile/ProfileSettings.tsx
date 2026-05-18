@@ -1,8 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { User, Mail, Calendar, ShieldCheck, KeyRound, Globe, Palette, Hand } from "lucide-react";
-import { AvatarUpload } from "@/components/profile/settings/AvatarUpload";
-import { BannerUpload } from "@/components/profile/settings/BannerUpload";
 import { ChangePasswordSection } from "@/components/profile/settings/ChangePasswordSection";
 import { PrivacyCard } from "@/components/profile/settings/PrivacyCard";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -17,14 +15,10 @@ function formatDate(iso: string) {
 
 interface ProfileSettingsProps {
   user: AuthUser;
-  avatarUrl: string | null | undefined;
-  onAvatarUpdate: (url: string | null) => void;
-  bannerUrl?: string | null;
-  onBannerUpdate?: (url: string | null) => void;
   createdAt?: string;
 }
 
-export function ProfileSettings({ user, avatarUrl, onAvatarUpdate, bannerUrl, onBannerUpdate, createdAt }: ProfileSettingsProps) {
+export function ProfileSettings({ user, createdAt }: ProfileSettingsProps) {
   const { isLefty, setIsLefty } = useLefty();
 
   return (
@@ -35,21 +29,6 @@ export function ProfileSettings({ user, avatarUrl, onAvatarUpdate, bannerUrl, on
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="border-b border-border pb-4 mb-2">
-          <BannerUpload
-            userId={user.id}
-            currentUrl={bannerUrl}
-            onUploaded={onBannerUpdate ?? (() => {})}
-          />
-        </div>
-
-        <AvatarUpload
-          userId={user.id}
-          name={user.name}
-          currentUrl={avatarUrl}
-          onUploaded={onAvatarUpdate}
-        />
-
         <div>
           <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Nome</p>
           <p className="font-semibold text-foreground">{user.name}</p>

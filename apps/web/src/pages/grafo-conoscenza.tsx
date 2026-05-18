@@ -77,6 +77,17 @@ interface KNode {
   color: string | null;
   url: string | null;
   sectorId: number | null;
+  metadata?: Record<string, unknown>;
+  sourceType?: string;
+  sourceEntityType?: string | null;
+  sourceEntityId?: string | null;
+  visibility?: string;
+  status?: "candidate" | "active" | "rejected" | "archived";
+  confidence?: number;
+  importance?: number;
+  provenance?: Record<string, unknown>;
+  extractedBy?: string;
+  lastReinforcedAt?: string | null;
   x: number;
   y: number;
   createdAt: string;
@@ -89,7 +100,14 @@ interface KEdge {
   sourceId: number;
   targetId: number;
   label: string | null;
+  relationType?: string;
+  confidence?: number;
+  status?: "candidate" | "active" | "rejected" | "archived";
+  reason?: string | null;
+  metadata?: Record<string, unknown>;
+  extractedBy?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 interface GraphData {
@@ -2397,6 +2415,41 @@ function NodeEditor({
             />
           </div>
         )}
+        <div className="rounded-xl border bg-muted/30 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] font-medium text-muted-foreground">
+              Provenance memoria
+            </p>
+            <span
+              className={cn(
+                "text-[10px] rounded-full border px-2 py-0.5",
+                node.status === "candidate" && "border-amber-200 text-amber-700 bg-amber-50",
+                node.status === "active" && "border-emerald-200 text-emerald-700 bg-emerald-50",
+                (!node.status || node.status === "archived" || node.status === "rejected") && "border-border text-muted-foreground bg-background",
+              )}
+            >
+              {node.status ?? "active"}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-[11px]">
+            <div>
+              <span className="text-muted-foreground">Fonte</span>
+              <p className="font-medium truncate">{node.sourceType ?? "manual"}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Confidence</span>
+              <p className="font-medium">{Math.round((node.confidence ?? 0.75) * 100)}%</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Entita</span>
+              <p className="font-medium truncate">{node.sourceEntityType ?? "nodo manuale"}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Importanza</span>
+              <p className="font-medium">{Math.round((node.importance ?? 0.5) * 100)}%</p>
+            </div>
+          </div>
+        </div>
         <div>
           <label className="text-[11px] font-medium text-muted-foreground block mb-1">
             Contenuto
@@ -2453,6 +2506,11 @@ function NodeEditor({
                   {e.label && (
                     <span className="text-muted-foreground italic">
                       \u2014 {e.label}
+                    </span>
+                  )}
+                  {e.confidence != null && (
+                    <span className="text-[10px] text-muted-foreground">
+                      {Math.round(e.confidence * 100)}%
                     </span>
                   )}
                   <button

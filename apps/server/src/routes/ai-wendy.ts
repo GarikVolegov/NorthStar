@@ -52,6 +52,7 @@ const WendyPageContextSchema = z.object({
   entityId:    z.number().int().positive().optional(),
   entityName:  z.string().max(100).optional(),
   journeyType: z.string().max(30).optional(),
+  data:        z.record(z.string(), z.unknown()).optional(),
 });
 
 const WendyRequestSchema = z.object({

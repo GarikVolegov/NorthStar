@@ -1,9 +1,9 @@
 import { Router, type Request, type Response } from "express";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, inArray } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, knowledgeNodesTable, knowledgeEdgesTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
-import { suggestAutoLinks, autoCategorize, suggestMissingNodes } from "@workspace/ai-server";
+import { suggestAutoLinks, autoCategorize, suggestMissingNodes, searchMemoryGraph } from "@workspace/ai-server";
 import { wendyLimiter, wendyIpLimiter, planQuotaLimiter } from "../middleware/rate-limit";
 
 const router = Router();
@@ -17,6 +17,14 @@ const createNodeSchema = z.object({
   sectorId: z.number().optional(),
   x: z.number().optional(),
   y: z.number().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  sourceType: z.string().max(64).optional(),
+  sourceEntityType: z.string().max(64).nullable().optional(),
+  sourceEntityId: z.string().max(128).nullable().optional(),
+  status: z.enum(["candidate", "active", "rejected", "archived"]).optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  importance: z.number().min(0).max(1).optional(),
+  provenance: z.record(z.string(), z.unknown()).optional(),
 });
 
 const updateNodeSchema = z.object({
@@ -27,12 +35,22 @@ const updateNodeSchema = z.object({
   type: z.string().max(32).optional(),
   x: z.number().optional(),
   y: z.number().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  status: z.enum(["candidate", "active", "rejected", "archived"]).optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  importance: z.number().min(0).max(1).optional(),
+  provenance: z.record(z.string(), z.unknown()).optional(),
 });
 
 const createEdgeSchema = z.object({
   sourceId: z.number(),
   targetId: z.number(),
   label: z.string().max(100).optional(),
+  relationType: z.string().max(64).optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  status: z.enum(["candidate", "active", "rejected", "archived"]).optional(),
+  reason: z.string().max(1000).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 const autoLinkAllSchema = z.object({
@@ -47,12 +65,12 @@ router.get("/graph", requireAuth, async (req, res) => {
   const nodes = await db
     .select()
     .from(knowledgeNodesTable)
-    .where(eq(knowledgeNodesTable.userId, userId));
+    .where(and(eq(knowledgeNodesTable.userId, userId), inArray(knowledgeNodesTable.status, ["active", "candidate"])));
 
   const edges = await db
     .select()
     .from(knowledgeEdgesTable)
-    .where(eq(knowledgeEdgesTable.userId, userId));
+    .where(and(eq(knowledgeEdgesTable.userId, userId), inArray(knowledgeEdgesTable.status, ["active", "candidate"])));
 
   res.json({ nodes, edges });
 });
@@ -79,6 +97,15 @@ router.post("/nodes", requireAuth, async (req, res) => {
       sectorId: data.sectorId ?? null,
       x: data.x ?? 0,
       y: data.y ?? 0,
+      metadata: data.metadata ?? {},
+      sourceType: data.sourceType ?? "manual",
+      sourceEntityType: data.sourceEntityType ?? null,
+      sourceEntityId: data.sourceEntityId ?? null,
+      status: data.status ?? "active",
+      confidence: data.confidence ?? 0.75,
+      importance: data.importance ?? 0.5,
+      extractedBy: "user",
+      provenance: data.provenance ?? {},
     })
     .returning();
 
@@ -292,6 +319,12 @@ router.post("/auto-link-all", requireAuth, wendyLimiter, wendyIpLimiter, planQuo
             sourceId: source.id,
             targetId: suggestion.targetNodeId,
             label: suggestion.label || "collegato",
+            relationType: "semantic",
+            confidence: Math.max(0, Math.min(1, suggestion.score ?? 0.7)),
+            status: (suggestion.score ?? 0.7) >= 0.78 ? "active" : "candidate",
+            reason: suggestion.reason ?? null,
+            extractedBy: "wendy_auto_link",
+            metadata: { source: "auto-link-all" },
           })
           .returning();
 
@@ -338,6 +371,12 @@ router.post("/edges", requireAuth, async (req, res) => {
       sourceId: data.sourceId,
       targetId: data.targetId,
       label: data.label ?? null,
+      relationType: data.relationType ?? "related",
+      confidence: data.confidence ?? 0.7,
+      status: data.status ?? "active",
+      reason: data.reason ?? null,
+      extractedBy: "user",
+      metadata: data.metadata ?? {},
     })
     .returning();
 
@@ -348,7 +387,14 @@ router.post("/edges", requireAuth, async (req, res) => {
 router.patch("/edges/:id", requireAuth, async (req, res) => {
   const userId = req.user!.id;
   const id = parseInt(req.params.id);
-  const data = z.object({ label: z.string().max(100).nullable().optional() }).parse(req.body);
+  const data = z.object({
+    label: z.string().max(100).nullable().optional(),
+    relationType: z.string().max(64).optional(),
+    confidence: z.number().min(0).max(1).optional(),
+    status: z.enum(["candidate", "active", "rejected", "archived"]).optional(),
+    reason: z.string().max(1000).nullable().optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  }).parse(req.body);
 
   const [existing] = await db
     .select()
@@ -363,7 +409,7 @@ router.patch("/edges/:id", requireAuth, async (req, res) => {
 
   const [updated] = await db
     .update(knowledgeEdgesTable)
-    .set(data)
+    .set({ ...data, updatedAt: new Date() })
     .where(eq(knowledgeEdgesTable.id, id))
     .returning();
 
@@ -396,18 +442,18 @@ router.post("/ask", requireAuth, async (req, res) => {
   const data = z.object({ message: z.string().min(1).max(5000) }).parse(req.body);
   const log = req.log;
 
-  const userNodes = await db
-    .select({ title: knowledgeNodesTable.title, content: knowledgeNodesTable.content, type: knowledgeNodesTable.type })
-    .from(knowledgeNodesTable)
-    .where(eq(knowledgeNodesTable.userId, userId))
-    .limit(20);
-
-  const contextStr = userNodes.length > 0
-    ? `\n\n## Il tuo grafo della conoscenza\n${userNodes.map((n) => `- [${n.type}] ${n.title}: ${(n.content ?? "").slice(0, 200)}`).join("\n")}`
-    : "";
+  const memory = await searchMemoryGraph({ userId, query: data.message, limit: 8 }).catch(() => null);
+  const contextStr = memory?.results.length
+    ? `\n\n## Memoria recuperata dal grafo\n${memory.results.map((n) => {
+      const rel = n.related.length
+        ? ` Connessioni: ${n.related.map((r) => `${r.title} (${r.label ?? r.relationType}, conf. ${Math.round(r.confidence * 100)}%)`).join("; ")}.`
+        : "";
+      return `- [${n.type}] ${n.title} (fonte: ${n.sourceType}, conf. ${Math.round(n.confidence * 100)}%, score ${n.score}): ${(n.content ?? "").slice(0, 260)}.${rel}`;
+    }).join("\n")}`
+    : "\n\n## Memoria recuperata dal grafo\nNessun nodo rilevante trovato per questa domanda.";
 
   const systemContent = `Sei un assistente che analizza il grafo della conoscenza personale dell'utente.
-Rispondi in modo chiaro e utile, basandoti sui nodi del grafo. Se non trovi informazioni rilevanti, dillo.${contextStr}`;
+Rispondi in modo chiaro e utile, basandoti sui nodi del grafo e citando le fonti interne quando le usi. Se non trovi informazioni rilevanti, dillo senza inventare memoria.${contextStr}`;
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -431,6 +477,7 @@ Rispondi in modo chiaro e utile, basandoti sui nodi del grafo. Se non trovi info
       res.write(`data: ${JSON.stringify({ type: "token", value: delta })}\n\n`);
     }
 
+    res.write(`data: ${JSON.stringify({ type: "sources", sources: memory?.sources ?? [], indexStatus: memory?.indexStatus ?? "unavailable" })}\n\n`);
     res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
     res.end();
   } catch (err) {

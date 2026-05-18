@@ -22,7 +22,6 @@ import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { PageLoader } from "@/components/PageLoader";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/footer";
-import { BackButton } from "@/components/layout/back-button";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { ProtectedRoute, PublicOnlyRoute } from "@/components/ProtectedRoute";
 
@@ -35,6 +34,7 @@ const Register = lazy(() => import("@/pages/register"));
 const Premium = lazy(() => import("@/pages/premium"));
 const PremiumSuccess = lazy(() => import("@/pages/premium-success"));
 const News = lazy(() => import("@/pages/news"));
+const NewsDetail = lazy(() => import("@/pages/news-detail"));
 const ResetPassword = lazy(() => import("@/pages/reset-password"));
 const Profilo = lazy(() => import("@/pages/profilo"));
 const Wiki = lazy(() => import("@/pages/wiki"));
@@ -55,6 +55,7 @@ const CrescitaCategoria = lazy(() => import("@/pages/crescita-categoria"));
 const CrescitaArticolo = lazy(() => import("@/pages/crescita-articolo"));
 const Candidature = lazy(() => import("@/pages/applications"));
 const Amici = lazy(() => import("@/pages/amici"));
+const Social = lazy(() => import("@/pages/social"));
 const Utente = lazy(() => import("@/pages/utente"));
 const Calendario = lazy(() => import("@/pages/calendar"));
 const Ruolo = lazy(() => import("@/pages/ruolo"));
@@ -160,6 +161,7 @@ function AnimatedRoutes() {
       <Route path="/premium/successo">
         <ProtectedRoute component={PremiumSuccess} />
       </Route>
+      <Route path="/news/:id" component={NewsDetail} />
       <Route path="/news" component={News} />
       <Route path="/profilo">
         <ProtectedRoute component={Profilo} />
@@ -172,6 +174,9 @@ function AnimatedRoutes() {
       </Route>
       <Route path="/amici">
         <ProtectedRoute component={Amici} />
+      </Route>
+      <Route path="/social">
+        <ProtectedRoute component={Social} />
       </Route>
       <Route path="/utente/:id" component={Utente} />
       <Route path="/wiki/:id">
@@ -329,7 +334,6 @@ function Router() {
         <div className="flex flex-col min-h-dvh">
           <MobileBottomNav />
           <main className="flex-1 pt-12 md:pt-14 pb-16 md:pb-16">
-            <BackButton />
             <AnimatedRoutes />
           </main>
           <div className="hidden md:block">

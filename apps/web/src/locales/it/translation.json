@@ -321,8 +321,8 @@
   "test": {
     "back": "Indietro",
     "questionOf": "Domanda {{current}} di {{total}}",
-    "innerCompass": "Bussola Interiore",
-    "innerCompassCount": "Bussola Interiore · {{current}} di {{total}}",
+    "innerCompass": "Dimensioni Motivazionali",
+    "innerCompassCount": "Dimensioni Motivazionali · {{current}} di {{total}}",
     "options": {
       "1": "Per niente",
       "2": "Poco",
@@ -331,100 +331,118 @@
       "5": "Moltissimo"
     },
     "ctxCount": "Calibrazione · {{current}} di {{total}}",
-    "ctxBadge": "Il tuo obiettivo · {{current}} di {{total}}",
+    "ctxBadge": "Contesto e Obiettivi · {{current}} di {{total}}",
     "transition": {
-      "badge": "Bussola Interiore",
-      "title": "Seconda parte: i Cinque Spiriti",
-      "intro": "Ottima analisi delle tue inclinazioni esterne. Ora esploriamo la tua energia interiore attraverso i",
-      "fiveSpirits": "Cinque Spiriti",
-      "tradition": "della tradizione cinese.",
-      "details": "Risponderai a <strong>15 domande</strong> — 3 per ciascuno spirito — per mappare con precisione il tuo equilibrio tra presenza, visione, istinto, analisi e volontà. Non ci sono risposte giuste o sbagliate: segui sempre il primo istinto.",
-      "startCompass": "Inizia la Bussola Interiore",
+      "badge": "Dimensioni Motivazionali",
+      "title": "Seconda parte: il tuo profilo motivazionale",
+      "intro": "Ottima analisi delle tue attitudini professionali. Ora esploriamo le cinque",
+      "fiveSpirits": "Dimensioni Motivazionali",
+      "tradition": "che determinano il tuo modo di lavorare, decidere e affrontare le sfide.",
+      "details": "Risponderai a <strong>15 domande</strong> — 3 per ciascuna dimensione — per mappare il tuo profilo psicologico professionale. Non ci sono risposte giuste o sbagliate: descrivi come sei realmente, non come vorresti essere.",
+      "startCompass": "Inizia l'analisi motivazionale",
       "spirits": {
         "presence": {
-          "name": "Presenza",
-          "desc": "Coscienza"
+          "name": "Intelligenza Emotiva",
+          "desc": "Autoconsapevolezza"
         },
         "vision": {
-          "name": "Visione",
-          "desc": "Direzione"
+          "name": "Orientamento Strategico",
+          "desc": "Visione a lungo termine"
         },
         "instinct": {
-          "name": "Istinto",
-          "desc": "Energia"
+          "name": "Motivazione e Impulso",
+          "desc": "Energia e iniziativa"
         },
         "focus": {
-          "name": "Concentrazione",
-          "desc": "Analisi"
+          "name": "Pensiero Analitico",
+          "desc": "Precisione e metodo"
         },
         "tenacity": {
-          "name": "Tenacia",
-          "desc": "Volontà"
+          "name": "Resilienza",
+          "desc": "Perseveranza"
         }
       }
     },
     "transition2": {
       "badge": "Calibrazione finale",
-      "title": "Quasi alla fine — due ultime domande",
-      "subtitle": "Per affinare i tuoi risultati, rispondi a queste due domande sul tuo obiettivo concreto. Le tue risposte personalizzeranno ulteriormente i settori consigliati.",
+      "title": "Quasi alla fine — ultime domande",
+      "subtitle": "Per affinare i risultati in base al tuo percorso, rispondi a queste domande finali. Le tue risposte personalizzeranno i settori e i ruoli consigliati.",
       "card1Title": "Stile lavorativo",
       "card1Desc": "Autonomo, dipendente o ibrido?",
       "card2Title": "Direzione di carriera",
-      "card2Desc": "Nuovo percorso o sviluppare quello già desiderato?",
+      "card2Desc": "Nuovo percorso o sviluppare quello già intrapreso?",
       "start": "Continua"
     },
     "complete": {
       "title": "Analisi completata!",
-      "subtitle": "Abbiamo analizzato il tuo profilo, la tua Bussola Interiore e i tuoi obiettivi. Siamo pronti a svelarti i settori più adatti a te.",
+      "subtitle": "Abbiamo elaborato il tuo profilo professionale e le tue dimensioni motivazionali. Siamo pronti a mostrarti i settori più compatibili con te.",
       "savedAccount": "I risultati verranno salvati automaticamente sul tuo account.",
       "discoverResults": "Scopri i tuoi risultati",
-      "processing": "Elaborazione…",
+      "processing": "Elaborazione in corso…",
       "submitError": "Errore nell'invio. Riprova."
     },
     "questions": {
       "ctx": {
-        "ctx_1": "Quando immagino il mio percorso lavorativo ideale, mi vedo come libero professionista o imprenditore — piuttosto che come dipendente di un'organizzazione.",
-        "ctx_2": "Sto cercando un percorso professionale nuovo e diverso da quello che avevo già in mente — più che rafforzare o scalare una direzione già chiara."
+        "ctx_1": "Quando immagino il mio percorso lavorativo ideale, mi vedo come libero professionista o imprenditore, piuttosto che come dipendente di un'organizzazione.",
+        "ctx_2": "Sto cercando un percorso professionale nuovo e diverso da quello che avevo già in mente, più che rafforzare o scalare una direzione già chiara.",
+        "ctx_dipendente_1": "Cerco un ruolo in cui la stabilità economica e un ambiente lavorativo solido e strutturato siano garantiti.",
+        "ctx_dipendente_2": "Sono disposto a costruire la mia carriera gradualmente all'interno di un'organizzazione, anche se richiede tempo e pazienza.",
+        "ctx_autonomo_1": "La libertà di scegliere i miei clienti, i miei orari e le mie modalità di lavoro vale per me più della sicurezza di un contratto fisso.",
+        "ctx_autonomo_2": "Sono pronto ad accettare l'incertezza economica tipica della libera professione pur di avere piena autonomia professionale.",
+        "ctx_azienda_1": "Ho l'ambizione concreta di costruire o scalare un'azienda, consapevole delle responsabilità e dei rischi che questo comporta.",
+        "ctx_azienda_2": "Sono disposto ad assumere rischi significativi e a rinunciare a stabilità immediata in cambio di un impatto più grande sul mercato.",
+        "ctx_investitore_1": "Il mio obiettivo principale è costruire asset e fonti di reddito che generino valore nel tempo, non solo un reddito da lavoro attivo.",
+        "ctx_investitore_2": "Preferisco analizzare e selezionare opportunità di investimento piuttosto che eseguire direttamente il lavoro operativo.",
+        "ctx_indeciso_1": "In questo momento sto esplorando attivamente diverse possibilità: non ho ancora una direzione professionale definita.",
+        "ctx_indeciso_2": "Sono aperto a scoprire settori e modalità di lavoro che non avevo ancora preso in considerazione."
       },
       "riasec": {
-        "q1": "Mi piace costruire, riparare e lavorare con strumenti concreti.",
-        "q2": "Mi piace analizzare dati, risolvere problemi logici e fare ricerca.",
-        "q3": "Mi piace esprimermi attraverso l'arte, il design, la scrittura o la musica.",
-        "q4": "Mi piace aiutare, insegnare e prendermi cura degli altri.",
-        "q5": "Mi piace guidare progetti, prendere decisioni e avviare nuove iniziative.",
-        "q6": "Mi piace organizzare, pianificare e seguire procedure ben definite.",
-        "q7": "Mi piace lavorare all'aperto o con strumenti fisici, più che in ufficio.",
-        "q8": "Mi affascina capire come funzionano le cose a livello profondo.",
-        "q9": "Mi piace avere libertà creativa e lavorare in ambienti flessibili e non rigidamente strutturati.",
-        "q10": "Mi importa che il mio lavoro abbia un impatto positivo sulle persone.",
-        "q11": "Mi viene naturale convincere gli altri, negoziare e guidare un gruppo.",
-        "q12": "Mi piace lavorare con precisione e curare ogni dettaglio."
+        "q1": "Costruire, riparare o lavorare con strumenti fisici mi viene naturale e mi dà soddisfazione concreta.",
+        "q2": "Analizzare dati, ragionare su problemi complessi e fare ricerca mi coinvolge e mi stimola profondamente.",
+        "q3": "Esprimermi attraverso forme creative — arte, design, scrittura o musica — è parte integrante di chi sono.",
+        "q4": "Aiutare le persone, insegnare e prendermi cura degli altri è qualcosa che trovo profondamente significativo.",
+        "q5": "Prendere l'iniziativa, guidare un gruppo verso un obiettivo e avviare nuovi progetti mi dà energia.",
+        "q6": "Organizzare, pianificare con metodo e seguire procedure strutturate mi fa sentire efficace e in controllo.",
+        "q7": "Preferisco ambienti di lavoro pratici e concreti — con spazio fisico e strumenti reali — rispetto a un ufficio sedentario.",
+        "q8": "Capire il perché delle cose — andare in profondità, oltre la superficie — è qualcosa che mi affascina.",
+        "q9": "Lavorare con libertà creativa, in ambienti flessibili dove posso portare la mia visione, è il mio contesto ideale.",
+        "q10": "Sapere che il mio lavoro ha un impatto concreto e positivo sulla vita delle persone è per me fondamentale.",
+        "q11": "Negoziare, persuadere e portare le persone verso una direzione condivisa mi riesce con naturalezza.",
+        "q12": "Lavorare con metodo, curare ogni dettaglio e garantire accuratezza è qualcosa che applico con piena soddisfazione.",
+        "q5_dipendente": "Contribuire efficacemente a un team, supportare chi coordina il lavoro e portare a termine i compiti assegnati mi soddisfa.",
+        "q11_dipendente": "Collaborare con i colleghi, condividere idee e trovare soluzioni insieme mi viene naturale e mi piace.",
+        "q5_autonomo": "Gestire in completa autonomia i miei progetti, senza dover rispondere a una gerarchia esterna, è ciò che cerco.",
+        "q6_autonomo": "Organizzare da solo il mio tempo, stabilire le mie priorità e lavorare senza routine imposte dall'esterno mi dà energia.",
+        "q5_azienda": "Definire la strategia, delegare le responsabilità e guidare un team verso obiettivi ambiziosi mi motiva profondamente.",
+        "q11_azienda": "Ispirare, motivare e sviluppare le competenze delle persone nel mio team è qualcosa che mi dà senso e soddisfazione.",
+        "q2_investitore": "Valutare rischi e opportunità attraverso l'analisi approfondita di dati, trend e scenari è il mio punto di forza naturale.",
+        "q8_investitore": "Comprendere i meccanismi economici, finanziari e di mercato è qualcosa che mi appassiona e che coltivo attivamente."
       },
       "spirits": {
-        "shen_1": "Mi sento spesso chiaro e centrato nelle mie emozioni, anche nei momenti difficili.",
-        "shen_2": "Mi accorgo facilmente quando il mio umore cambia e so come ritrovare l'equilibrio.",
-        "shen_3": "Mi riesce naturale essere presente e attento alle emozioni di chi mi sta vicino.",
-        "hun_1": "Mi è facile immaginare il mio futuro ideale e sentirlo concretamente possibile.",
-        "hun_2": "Mi entusiasmano spesso idee originali che mi spingono a esplorare strade nuove.",
-        "hun_3": "Mi sento guidato da un senso chiaro di direzione, anche quando il percorso non è ancora del tutto definito.",
-        "po_1": "Mi sento pieno di energia quando mi dedico a qualcosa che mi appassiona davvero.",
-        "po_2": "Mi fido delle mie sensazioni fisiche e istintive per capire se una situazione è giusta per me.",
-        "po_3": "Mi accorgo subito nel corpo — ancora prima che la mente lo elabori — se un ambiente mi piace o no.",
-        "yi_1": "Mi riesce facile mantenere la concentrazione a lungo su studio, analisi o risoluzione di problemi.",
-        "yi_2": "Mi soddisfa scomporre un problema complesso in parti più semplici e risolverlo passo dopo passo.",
-        "yi_3": "Mi riesce bene ricordare dettagli importanti e tenere in mente molte informazioni contemporaneamente.",
-        "zhi_1": "Mi impegno a portare avanti le mie decisioni anche quando diventano difficili o richiedono sacrifici.",
-        "zhi_2": "Mi viene naturale cercare una via per andare avanti, anche di fronte agli ostacoli.",
-        "zhi_3": "Mi mantengo costante verso i miei obiettivi anche nei momenti di stanchezza o scoraggiamento."
+        "shen_1": "Riconosco con chiarezza le mie emozioni e riesco a gestirle in modo costruttivo, anche nei momenti di maggiore pressione.",
+        "shen_2": "Mi accorgo facilmente quando il mio stato d'animo sta cambiando e so come ritrovare equilibrio e lucidità.",
+        "shen_3": "Essere presente e attento alle dinamiche emotive di chi mi sta vicino mi riesce in modo naturale e mi arricchisce.",
+        "hun_1": "Mi è facile costruire nella mente un'immagine chiara del mio futuro professionale e sentirla concretamente raggiungibile.",
+        "hun_2": "Le idee originali mi entusiasmano e mi spingono spesso a esplorare strade nuove, anche quando comportano incertezza.",
+        "hun_3": "Ho un senso chiaro della direzione che voglio prendere, anche quando il percorso per arrivarci non è ancora del tutto definito.",
+        "po_1": "Quando mi dedico a qualcosa che mi appassiona davvero, l'energia che sento è tangibile e difficile da ignorare.",
+        "po_2": "Mi fido delle mie sensazioni istintive per valutare se una situazione, un progetto o un ambiente sono giusti per me.",
+        "po_3": "Percepisco quasi fisicamente — prima ancora che la mente lo elabori — se un contesto di lavoro mi appartiene o meno.",
+        "yi_1": "Riesco a mantenere la concentrazione a lungo su attività complesse: studio, analisi, risoluzione di problemi tecnici.",
+        "yi_2": "Mi soddisfa scomporre un problema articolato in componenti più semplici e affrontarlo in modo metodico, passo dopo passo.",
+        "yi_3": "Tenere in mente molte informazioni contemporaneamente e ricordare i dettagli rilevanti è qualcosa che mi riesce con facilità.",
+        "zhi_1": "Porto avanti le mie decisioni e i miei impegni anche quando diventano difficili, richiedono sacrifici o incontrano resistenze.",
+        "zhi_2": "Di fronte agli ostacoli, la mia risposta naturale è cercare un modo per superarli, non fermarmi.",
+        "zhi_3": "Riesco a mantenere la rotta verso i miei obiettivi anche nei momenti di stanchezza o quando i risultati tardano ad arrivare."
       }
     }
   },
   "results": {
     "savedBanner": "Risultati salvati sul tuo account — li ritrovi sempre nel tuo profilo, {{name}}.",
-    "riasecProfile": "Il tuo profilo",
-    "innerCompass": "Bussola Interiore",
-    "fiveSpirits": "I tuoi Cinque Spiriti · 15 domande, 3 per spirito",
-    "dominantSpirit": "Spirito dominante",
+    "riasecProfile": "Il tuo profilo professionale",
+    "innerCompass": "Dimensioni Motivazionali",
+    "fiveSpirits": "Le tue Dimensioni Motivazionali · 15 domande, 3 per dimensione",
+    "dominantSpirit": "Dimensione dominante",
     "yourSectors": "I tuoi settori consigliati",
     "sectorCount": "{{count}} settori compatibili con il tuo profilo",
     "workModeTitle": "Modalità di lavoro preferita",
@@ -446,16 +464,16 @@
     "annualGrowth": "Crescita annua",
     "marketTrend": "Andamento mercato",
     "spirits": {
-      "shen": "Presenza",
-      "hun": "Visione",
-      "po": "Istinto",
-      "yi": "Concentrazione",
-      "zhi": "Tenacia",
-      "shen_desc": "Coscienza & Presenza",
-      "hun_desc": "Visione & Direzione",
-      "po_desc": "Istinto & Energia",
-      "yi_desc": "Concentrazione & Analisi",
-      "zhi_desc": "Volontà & Resilienza"
+      "shen": "Intelligenza Emotiva",
+      "hun": "Orientamento Strategico",
+      "po": "Motivazione e Impulso",
+      "yi": "Pensiero Analitico",
+      "zhi": "Resilienza",
+      "shen_desc": "Riconoscere e gestire le proprie emozioni",
+      "hun_desc": "Capacità di visione e pianificazione a lungo termine",
+      "po_desc": "Energia, iniziativa e fiducia nelle proprie scelte",
+      "yi_desc": "Analisi, focus e gestione della complessità",
+      "zhi_desc": "Perseveranza e capacità di superare gli ostacoli"
     },
     "workModes": {
       "dipendente": "Dipendente",

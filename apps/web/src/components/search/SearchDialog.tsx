@@ -23,6 +23,13 @@ import {
   ChevronDown,
   ChevronRight,
   Send,
+  Search,
+  Calendar,
+  BadgeCheck,
+  Brain,
+  Target,
+  User,
+  Users,
 } from "lucide-react";
 import { useWendy } from "@/contexts/WendyProvider";
 import { cn } from "@/lib/utils";
@@ -34,6 +41,8 @@ interface SearchDialogProps {
   suggestions: Array<{ title: string; description: string; url: string }>;
   route: RouterOutput;
   hasSemantic: boolean;
+  searchMode?: "semantic" | "hybrid" | "keyword";
+  indexStatus?: "ready" | "degraded" | "unavailable";
   isLoading: boolean;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
@@ -52,6 +61,13 @@ const TYPE_CONFIG = {
   role:    { labelKey: "search.roles",    icon: Briefcase,    className: "text-green-400 bg-green-500/10" },
   article: { labelKey: "search.articles", icon: BookOpenText, className: "text-amber-400 bg-amber-500/10" },
   news:    { labelKey: "search.news",     icon: Newspaper,    className: "text-purple-400 bg-purple-500/10"},
+  idea:    { labelKey: "Idee",             icon: Lightbulb,    className: "text-yellow-400 bg-yellow-500/10"},
+  objective: { labelKey: "Obiettivi",      icon: Target,       className: "text-emerald-400 bg-emerald-500/10"},
+  calendar: { labelKey: "Calendario",      icon: Calendar,     className: "text-cyan-400 bg-cyan-500/10"},
+  certification: { labelKey: "Certificazioni", icon: BadgeCheck, className: "text-blue-400 bg-blue-500/10"},
+  memory:  { labelKey: "Memoria Wendy",    icon: Brain,        className: "text-violet-400 bg-violet-500/10"},
+  workspace: { labelKey: "Workspace",      icon: Users,        className: "text-teal-400 bg-teal-500/10"},
+  profile: { labelKey: "Profilo",          icon: User,         className: "text-slate-400 bg-slate-500/10"},
 } as const;
 
 const SUGGESTIONS_DEFAULTS = [
@@ -61,7 +77,19 @@ const SUGGESTIONS_DEFAULTS = [
   { title: "Chiedi a Wendy",      description: "Parla con l'assistente AI di NorthStar",  url: "#wendy"   },
 ];
 
-const ORDER: Array<keyof typeof TYPE_CONFIG> = ["sector", "role", "article", "news"];
+const ORDER: Array<keyof typeof TYPE_CONFIG> = [
+  "idea",
+  "objective",
+  "calendar",
+  "memory",
+  "workspace",
+  "profile",
+  "certification",
+  "sector",
+  "role",
+  "article",
+  "news",
+];
 
 // ── Micro components ────────────────────────────────────────────────────────
 
@@ -141,6 +169,8 @@ export function SearchDialog({
   suggestions,
   route,
   hasSemantic,
+  searchMode = hasSemantic ? "semantic" : "keyword",
+  indexStatus = "ready",
   isLoading,
   isOpen,
   setIsOpen,
@@ -204,6 +234,12 @@ export function SearchDialog({
     setFollowUpInput("");
   }
 
+  function askCurrentQuery() {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) return;
+    sendFollowUp(trimmed);
+  }
+
   const showDefaultSuggestions = query.length < 2 && !isLoading;
   const showResults = !isLoading && results.length > 0;
   const hasSuggestions = suggestions.length > 0;
@@ -262,6 +298,12 @@ export function SearchDialog({
                   placeholder={isAIActive ? "Chiedi altro a Wendy..." : t("search.placeholder")}
                   value={query}
                   onValueChange={setQuery}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      askCurrentQuery();
+                    }
+                  }}
                   className="border-b border-white/10"
                 />
 
@@ -384,6 +426,13 @@ export function SearchDialog({
                         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">{route.intent}</span>
                         <span className="text-[10px] text-muted-foreground/40">·</span>
                         <span className="text-[10px] text-muted-foreground/60">{route.experience_level}</span>
+                        <span className="text-[10px] text-muted-foreground/40">/</span>
+                        <span className="text-[10px] text-muted-foreground/60">{searchMode}</span>
+                        {indexStatus !== "ready" && (
+                          <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-500">
+                            indice {indexStatus}
+                          </span>
+                        )}
                         <div className="ml-auto flex items-center gap-1">
                           <div className={cn("h-1.5 w-1.5 rounded-full", route.confidence > 0.8 ? "bg-green-400" : route.confidence > 0.6 ? "bg-amber-400" : "bg-muted-foreground/30")} />
                           <span className="text-[10px] text-muted-foreground/40">{Math.round(route.confidence * 100)}%</span>
@@ -401,6 +450,19 @@ export function SearchDialog({
                     {query.length >= 3 && isStreaming && aiStatus && (
                       <div className="px-4 py-3 border-b border-white/5">
                         <AgentStatusBadge status={aiStatus} />
+                      </div>
+                    )}
+
+                    {query.length >= 2 && !isStreaming && !isAIActive && (
+                      <div className="px-3 py-2 border-b border-white/5">
+                        <button
+                          type="button"
+                          onClick={askCurrentQuery}
+                          className="flex min-h-10 w-full items-center gap-2 rounded-xl border border-primary/25 bg-primary/10 px-3 text-left text-sm font-semibold text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                        >
+                          <Search className="h-4 w-4" />
+                          <span className="min-w-0 truncate">Chiedi a Wendy di guidarti su “{query}”</span>
+                        </button>
                       </div>
                     )}
 

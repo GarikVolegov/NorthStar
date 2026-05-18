@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import { db, usersTable, testSessionsTable } from "@workspace/db";
 import { eq, count } from "drizzle-orm";
+import { isPersistenceSchemaError } from "../lib/persistence";
 
 const router = Router();
 
@@ -35,10 +36,16 @@ router.get("/:userId", requireAuth, async (req, res) => {
       return;
     }
 
-    const [sessionRow] = await db
-      .select({ cnt: count() })
-      .from(testSessionsTable)
-      .where(eq(testSessionsTable.userId, userId));
+    let sessionRow: { cnt: number } | undefined;
+    try {
+      [sessionRow] = await db
+        .select({ cnt: count() })
+        .from(testSessionsTable)
+        .where(eq(testSessionsTable.userId, userId));
+    } catch (err) {
+      if (!isPersistenceSchemaError(err)) throw err;
+      req.log?.warn?.({ err, route: "journey-score", userId, setupAction: "run_migrations" }, "test sessions unavailable");
+    }
 
     const hasTest     = Number(sessionRow?.cnt ?? 0) > 0;
     const hasSector   = !!user.journeyType && user.journeyType !== "indeciso";

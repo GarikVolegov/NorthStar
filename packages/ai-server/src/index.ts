@@ -22,6 +22,9 @@ export { runGrowthAgent } from "./growth-agent/agent";
 export { loadMemory, buildMemorySection } from "./growth-agent/memory-manager";
 export { ingestText, ingestPersonaExample, ingestUrl } from "./growth-agent/ingest";
 export { retrieve } from "./growth-agent/retriever";
+export { ingestUserMemoryGraph, searchMemoryGraph, getMemoryGraphHealth } from "./memory-graph";
+export type { MemoryGraphSearchResponse, MemoryGraphSearchResult } from "./memory-graph";
+export { searchWeb } from "./growth-agent/web-search";
 export { buildSystemPrompt } from "./growth-agent/prompt-builder";
 export type { UserContext } from "./growth-agent/prompt-builder";
 export type { RetrievedChunk } from "./growth-agent/retriever";
@@ -47,7 +50,7 @@ export { FF } from "./feature-flags";
 // Cost tracking & model routing
 export { recordLlmUsage, estimateTokens, estimateCost, getProvider, MODEL_PRICING } from "./cost-tracking";
 export type { ModelPricing } from "./cost-tracking";
-export { selectModel, selectModelFor, modelFor } from "./model-router";
+export { selectModel, selectModelFor, modelFor, getModelRoutingPolicy } from "./model-router";
 export type { RouterOptions, ModelRoute, RequestComplexity, AgentRole } from "./model-router";
 
 // Search Router

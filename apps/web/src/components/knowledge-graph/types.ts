@@ -30,6 +30,17 @@ export interface KNode {
   color: string | null;
   url: string | null;
   sectorId: number | null;
+  metadata?: Record<string, unknown>;
+  sourceType?: string;
+  sourceEntityType?: string | null;
+  sourceEntityId?: string | null;
+  visibility?: string;
+  status?: "candidate" | "active" | "rejected" | "archived";
+  confidence?: number;
+  importance?: number;
+  provenance?: Record<string, unknown>;
+  extractedBy?: string;
+  lastReinforcedAt?: string | null;
   x: number;
   y: number;
   createdAt: string;
@@ -42,7 +53,14 @@ export interface KEdge {
   sourceId: number;
   targetId: number;
   label: string | null;
+  relationType?: string;
+  confidence?: number;
+  status?: "candidate" | "active" | "rejected" | "archived";
+  reason?: string | null;
+  metadata?: Record<string, unknown>;
+  extractedBy?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface GraphData {

@@ -16,7 +16,8 @@
     "test:wendy-tools": "tsx ./src/test-wendy-tools.ts",
     "seed:rag": "tsx ./src/seed-rag.ts",
     "rag:weak-signals": "tsx ./src/run-weak-signal-detector.ts",
-    "admin:promote": "tsx ./src/admin-promote.ts"
+    "admin:promote": "tsx ./src/admin-promote.ts",
+    "cleanup:news-placeholders": "tsx ./src/cleanup-news-placeholders.ts"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",

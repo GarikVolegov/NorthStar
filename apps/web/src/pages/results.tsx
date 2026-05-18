@@ -38,19 +38,19 @@ import { CareerChat } from "@/components/ai/CareerChat";
 const BASE = import.meta.env.BASE_URL || "/";
 
 const SPIRIT_META: Record<string, { emoji: string; label: string; color: string }> = {
-  shen: { emoji: "✨", label: "Presenza", color: "bg-violet-500/10 text-violet-400 border-violet-500/20" },
-  hun:  { emoji: "🌙", label: "Visione",  color: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" },
-  po:   { emoji: "⚡", label: "Istinto",  color: "bg-amber-500/10 text-amber-400 border-amber-500/20" },
-  yi:   { emoji: "🔮", label: "Focus",    color: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20" },
-  zhi:  { emoji: "🔥", label: "Tenacia",  color: "bg-rose-500/10 text-rose-400 border-rose-500/20" },
+  shen: { emoji: "🧠", label: "Intelligenza Emotiva",    color: "bg-violet-500/10 text-violet-400 border-violet-500/20" },
+  hun:  { emoji: "🎯", label: "Orientamento Strategico", color: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" },
+  po:   { emoji: "⚡", label: "Motivazione e Impulso",   color: "bg-amber-500/10 text-amber-400 border-amber-500/20" },
+  yi:   { emoji: "📊", label: "Pensiero Analitico",      color: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20" },
+  zhi:  { emoji: "🛡", label: "Resilienza",              color: "bg-rose-500/10 text-rose-400 border-rose-500/20" },
 };
 
 const SPIRIT_DESCRIPTIONS: Record<string, string> = {
-  shen: "Coscienza & Presenza",
-  hun:  "Visione & Direzione",
-  po:   "Istinto & Energia",
-  yi:   "Concentrazione & Analisi",
-  zhi:  "Volontà & Resilienza",
+  shen: "Riconoscere e gestire le proprie emozioni",
+  hun:  "Visione a lungo termine e pianificazione strategica",
+  po:   "Energia, iniziativa e fiducia nelle proprie scelte",
+  yi:   "Analisi, focus e gestione della complessità",
+  zhi:  "Perseveranza e capacità di superare gli ostacoli",
 };
 
 const SPIRIT_RADAR_ORDER = ["shen", "hun", "po", "yi", "zhi"] as const;

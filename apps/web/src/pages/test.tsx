@@ -20,21 +20,21 @@ const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const ADVANCE_DELAY_MS = 320;
 const MUTE_STORAGE_KEY = "northstar_audio_muted";
 
-const PHASE_LABELS = ["Attitudini", "Profilo Interiore", "Obiettivi"] as const;
+const PHASE_LABELS = ["Attitudini e Competenze", "Dimensioni Motivazionali", "Contesto e Obiettivi"] as const;
 
 const SPIRIT_DISPLAY: Record<string, { emoji: string; name: string; desc: string }> = {
-  presence:  { emoji: "✨", name: "Consapevolezza", desc: "Come percepisci te stessa" },
-  vision:    { emoji: "🌙", name: "Visione",         desc: "Come proietti il futuro" },
-  instinct:  { emoji: "⚡", name: "Energia",         desc: "Come agisci sotto pressione" },
-  focus:     { emoji: "🔮",           name: "Concentrazione",           desc: "Come gestisci le priorità" },
-  tenacity:  { emoji: "🔥", name: "Determinazione", desc: "Come perseveri negli ostacoli" },
+  presence:  { emoji: "🧠", name: "Intelligenza Emotiva",    desc: "Autoconsapevolezza" },
+  vision:    { emoji: "🎯", name: "Orientamento Strategico", desc: "Visione a lungo termine" },
+  instinct:  { emoji: "⚡", name: "Motivazione e Impulso",   desc: "Energia e iniziativa" },
+  focus:     { emoji: "📊", name: "Pensiero Analitico",      desc: "Precisione e metodo" },
+  tenacity:  { emoji: "🛡", name: "Resilienza",              desc: "Perseveranza" },
 };
 
 const JOURNEY_CTX1_DEFAULTS: Record<string, number> = {
   autonomo: 5, azienda: 4, investitore: 4, dipendente: 1, indeciso: 3,
 };
 
-const RIASEC_QUESTION_IDS = ["q1","q2","q3","q4","q5","q6","q7","q8","q9","q10","q11","q12"] as const;
+const BASE_RIASEC_IDS = ["q1","q2","q3","q4","q5","q6","q7","q8","q9","q10","q11","q12"] as const;
 const SPIRIT_QUESTION_IDS = [
   "shen_1","shen_2","shen_3",
   "hun_1","hun_2","hun_3",
@@ -42,6 +42,45 @@ const SPIRIT_QUESTION_IDS = [
   "yi_1","yi_2","yi_3",
   "zhi_1","zhi_2","zhi_3",
 ] as const;
+
+/** Sostituisce alcune domande RIASEC in base al percorso dell'utente */
+function getRiasecIds(journeyType?: string | null): string[] {
+  const ids: string[] = [...BASE_RIASEC_IDS];
+  switch (journeyType) {
+    case "dipendente":
+      ids[4]  = "q5_dipendente";  // sostituisce q5 (E) con variante collaborativa
+      ids[10] = "q11_dipendente"; // sostituisce q11 (E) con variante collaborativa
+      break;
+    case "autonomo":
+      ids[4]  = "q5_autonomo";   // sostituisce q5 con variante autonomia
+      ids[5]  = "q6_autonomo";   // sostituisce q6 con variante autonomia
+      break;
+    case "azienda":
+      ids[4]  = "q5_azienda";    // sostituisce q5 con variante leadership
+      ids[10] = "q11_azienda";   // sostituisce q11 con variante leadership
+      break;
+    case "investitore":
+      ids[1]  = "q2_investitore"; // sostituisce q2 con variante analisi finanziaria
+      ids[7]  = "q8_investitore"; // sostituisce q8 con variante economia/mercati
+      break;
+  }
+  return ids;
+}
+
+/** Restituisce le domande CTX specifiche per il percorso */
+function getCtxIds(journeyType?: string | null): string[] {
+  switch (journeyType) {
+    case "dipendente":   return ["ctx_dipendente_1", "ctx_dipendente_2"];
+    case "autonomo":     return ["ctx_autonomo_1",   "ctx_autonomo_2"];
+    case "azienda":      return ["ctx_azienda_1",    "ctx_azienda_2"];
+    case "investitore":  return ["ctx_investitore_1","ctx_investitore_2"];
+    case "indeciso":     return ["ctx_indeciso_1",   "ctx_indeciso_2"];
+    default:             return ["ctx_1", "ctx_2"];
+  }
+}
+
+// Questi vengono usati solo come fallback statici e per le costanti di lunghezza
+const RIASEC_QUESTION_IDS = BASE_RIASEC_IDS;
 const CTX_QUESTION_IDS = ["ctx_1","ctx_2"] as const;
 
 const SPIRIT_META: Record<string, { key: string; emoji: string; transKey: string }> = {
@@ -534,6 +573,14 @@ export default function Test() {
   const { user } = useAuth();
   const prefersReduced = useReducedMotion();
 
+  // ID domande dinamici in base al percorso dell'utente
+  const activeRiasecIds = useMemo(() => getRiasecIds(user?.journeyType), [user?.journeyType]);
+  const activeCtxIds    = useMemo(() => getCtxIds(user?.journeyType),    [user?.journeyType]);
+  const activeAllIds    = useMemo(
+    () => [...activeRiasecIds, ...ALL_SPIRIT_IDS, ...activeCtxIds],
+    [activeRiasecIds, activeCtxIds]
+  );
+
   const [audioMuted, setAudioMuted] = useState<boolean>(() => {
     try { return localStorage.getItem(MUTE_STORAGE_KEY) === "1"; } catch { return false; }
   });
@@ -605,7 +652,7 @@ export default function Test() {
 
   useEffect(() => {
     if (showWelcome || prefersReduced || audioMuted) return;
-    const id = ALL_IDS[currentStep];
+    const id = activeAllIds[currentStep];
     if (!id) return;
     const text = currentStep < SPIRITS_START
       ? t(`test.questions.riasec.${id}`)
@@ -637,15 +684,15 @@ export default function Test() {
     assignUserToSession(draft.sessionId, user.id);
   }, [user, draft]);
 
-  const isComplete   = currentStep >= ALL_IDS.length;
+  const isComplete   = currentStep >= activeAllIds.length;
   const isCtxQ       = currentStep >= SPIRITS_END;
   const isSpiritQ    = currentStep >= SPIRITS_START && currentStep < SPIRITS_END;
   const ctxOffset    = currentStep - SPIRITS_END + 1;
   const spiritOffset = currentStep - SPIRITS_START;
   const questionInGroup = (spiritOffset % 3) + 1;
-  const currentId    = ALL_IDS[currentStep];
+  const currentId    = activeAllIds[currentStep];
   const spiritInfo   = isSpiritQ ? SPIRIT_META[currentId] : null;
-  const progress     = (currentStep / ALL_IDS.length) * 100;
+  const progress     = (currentStep / activeAllIds.length) * 100;
   const currentPhase: 0 | 1 | 2 = isCtxQ ? 2 : isSpiritQ ? 1 : 0;
   const scenario     = SCENARIOS[currentId];
   const isIntroEntry = currentStep === 0 && !resumed && !prefersReduced;
@@ -657,7 +704,7 @@ export default function Test() {
     : `${currentStep + 1} / ${ALL_RIASEC_IDS.length}`;
 
   const questionText = isCtxQ
-    ? t(`test.questions.ctx.${currentId}`)
+    ? t(`test.questions.ctx.${currentId}`, { defaultValue: t(`test.questions.ctx.ctx_1`) })
     : isSpiritQ
     ? t(`test.questions.spirits.${currentId}`)
     : t(`test.questions.riasec.${currentId}`);
@@ -762,8 +809,8 @@ export default function Test() {
       };
 
   const DIVIDER_CONFIG = {
-    spirits: { label: "Profilo Interiore", emoji: "🧠", description: "Le prossime domande esplorano le tue dimensioni personali" },
-    ctx:     { label: "Obiettivi",         emoji: "🎯", description: "Ultime domande: allineiamo il percorso ai tuoi obiettivi" },
+    spirits: { label: "Dimensioni Motivazionali", emoji: "📊", description: "Analisi psicologica del tuo profilo motivazionale" },
+    ctx:     { label: "Contesto e Obiettivi",     emoji: "🎯", description: "Ultime domande per personalizzare i tuoi risultati" },
   } as const;
 
   const captionActive = !audioMuted && !prefersReduced && !!speechText && speechCharIndex !== -2;

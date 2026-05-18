@@ -34,6 +34,7 @@ import {
   skillCooccurrencesTable,
 } from "@workspace/db";
 import { generateEmbedding } from "../embeddings/generate";
+import { searchMemoryGraph } from "../memory-graph";
 import { recordToolCall } from "../metrics";
 import { logger } from "../logger";
 
@@ -734,6 +735,38 @@ export async function handleSearchRag(
   }
 }
 
+// ── 18b. search_memory_graph ────────────────────────────────────────────────
+
+export async function handleSearchMemoryGraph(
+  args: { query: string; limit?: number; includeCandidates?: boolean },
+  userId: number,
+): Promise<ToolResult> {
+  if (!args.query?.trim()) return err("INVALID_INPUT", "Query memoria vuota");
+
+  try {
+    const result = await searchMemoryGraph({
+      userId,
+      query: args.query,
+      limit: args.limit,
+      includeCandidates: Boolean(args.includeCandidates),
+    });
+
+    return {
+      ok: true,
+      data: {
+        ...result,
+        guidance:
+          result.results.length > 0
+            ? "Cita le fonti interne e segnala se la confidence e bassa."
+            : "Nessuna memoria personale rilevante trovata: non inventare dettagli sull'utente.",
+      },
+    };
+  } catch (e) {
+    logger.warn({ e, args, userId }, "[tool] search_memory_graph error");
+    return err("UNAVAILABLE", "Memoria semantica temporaneamente non disponibile");
+  }
+}
+
 // ── 19. get_weak_signals ─────────────────────────────────────────────────────
 
 export async function handleGetWeakSignals(
@@ -952,6 +985,7 @@ export async function executeToolCall(
 
     // Step 6: RAG + Job Market Intelligence
     case "search_rag":               result = await handleSearchRag(args as any); break;
+    case "search_memory_graph":      result = await handleSearchMemoryGraph(args as any, userId); break;
     case "get_weak_signals":         result = await handleGetWeakSignals(args as any); break;
     case "get_job_posting_trend":    result = await handleGetJobPostingTrend(args as any); break;
     case "get_skill_cooccurrences":  result = await handleGetSkillCooccurrences(args as any); break;

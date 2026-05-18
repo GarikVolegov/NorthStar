@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { or, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import {
   db,
   sectorsTable,
@@ -9,11 +9,13 @@ import {
 } from "@workspace/db";
 import { runSearchOrchestrator, loadMemory, buildMemorySection } from "@workspace/ai-server";
 import { rootLogger } from "../middleware/logger";
+import { optionalAuth } from "../middleware/auth";
+import { globalSearch, type GlobalSearchEntityType } from "../lib/global-search";
 
 const router = Router();
 
 interface SearchResult {
-  type: "sector" | "role" | "article" | "news";
+  type: GlobalSearchEntityType;
   id: number;
   title: string;
   description: string;
@@ -76,10 +78,13 @@ router.get("/", async (req, res) => {
         })
         .from(growthArticlesTable)
         .where(
-          or(
-            sql`${growthArticlesTable.title} ILIKE ${pattern}`,
-            sql`${growthArticlesTable.description} ILIKE ${pattern}`,
-            sql`${growthArticlesTable.tags}::text ILIKE ${pattern}`,
+          and(
+            eq(growthArticlesTable.status, "published"),
+            or(
+              sql`${growthArticlesTable.title} ILIKE ${pattern}`,
+              sql`${growthArticlesTable.description} ILIKE ${pattern}`,
+              sql`${growthArticlesTable.tags}::text ILIKE ${pattern}`,
+            ),
           ),
         )
         .limit(5),
@@ -141,16 +146,6 @@ router.get("/", async (req, res) => {
       })),
     ];
 
-    if (results.length === 0) {
-      results.push(
-        { type: "sector", id: 1, title: "Tecnologia", description: "Settore tecnologico e informatico", url: "/settore/1", icon: "layers", color: "#6366f1" },
-        { type: "sector", id: 2, title: "Marketing", description: "Settore del marketing e della comunicazione", url: "/settore/2", icon: "layers", color: "#6366f1" },
-        { type: "sector", id: 3, title: "Finanza", description: "Settore finanziario e bancario", url: "/settore/3", icon: "layers", color: "#6366f1" },
-        { type: "sector", id: 4, title: "Sanità", description: "Settore sanitario e farmaceutico", url: "/settore/4", icon: "layers", color: "#6366f1" },
-        { type: "sector", id: 5, title: "Istruzione", description: "Settore dell'istruzione e della formazione", url: "/settore/5", icon: "layers", color: "#6366f1" },
-      );
-    }
-
     res.json({ results });
   } catch (err) {
     req.log?.error?.({ err }, "search error");
@@ -189,7 +184,12 @@ router.get("/suggest", async (req, res) => {
       db
         .select({ id: growthArticlesTable.id, title: growthArticlesTable.title, slug: growthArticlesTable.slug })
         .from(growthArticlesTable)
-        .where(or(sql`${growthArticlesTable.title} ILIKE ${pattern}`, sql`${growthArticlesTable.tags}::text ILIKE ${pattern}`))
+        .where(
+          and(
+            eq(growthArticlesTable.status, "published"),
+            or(sql`${growthArticlesTable.title} ILIKE ${pattern}`, sql`${growthArticlesTable.tags}::text ILIKE ${pattern}`),
+          ),
+        )
         .limit(2),
       db
         .select({ id: newsArticlesTable.id, title: newsArticlesTable.title })
@@ -246,12 +246,13 @@ router.get("/suggest", async (req, res) => {
 });
 
 // ── POST /api/search/orchestrate  —  SSE orchestratore AI ───────────────────
-router.post("/orchestrate", async (req, res) => {
+router.post("/orchestrate", optionalAuth, async (req, res) => {
   const { q, sessionId, history = [] } = req.body as {
     q: string;
-    sessionId?: number;
+    sessionId?: number | string;
     history?: Array<{ role: "user" | "assistant"; content: string }>;
   };
+  const numericSessionId = typeof sessionId === "number" ? sessionId : undefined;
 
   if (!q || q.trim().length < 2) {
     res.status(400).json({ error: "Query troppo corta" });
@@ -277,14 +278,20 @@ router.post("/orchestrate", async (req, res) => {
     };
 
     try {
+      const searchSnapshot = await globalSearch({
+        query: q.trim(),
+        userId: null,
+        limit: 10,
+      });
       // Use public knowledge base only, no user memory
       for await (const event of runSearchOrchestrator({
         query:      q.trim(),
         userId:     0, // anonymous
-        sessionId,
+        sessionId: numericSessionId,
         userContext: { isPremium: false, memorySection: "" },
         history,
         requestId:  crypto.randomUUID?.() ?? Math.random().toString(36),
+        prefetchedResults: searchSnapshot.results,
       })) {
         send(event);
         if (event.type === "done" || event.type === "error") break;
@@ -315,14 +322,20 @@ router.post("/orchestrate", async (req, res) => {
     // Carica memoria utente in anticipo
     const userMemory    = await loadMemory(userId);
     const memorySection = buildMemorySection(userMemory);
+    const searchSnapshot = await globalSearch({
+      query: q.trim(),
+      userId,
+      limit: 10,
+    });
 
     for await (const event of runSearchOrchestrator({
       query:      q.trim(),
       userId,
-      sessionId,
+      sessionId: numericSessionId,
       userContext: { isPremium, memorySection },
       history,
       requestId:  crypto.randomUUID?.() ?? Math.random().toString(36),
+      prefetchedResults: searchSnapshot.results,
     })) {
       send(event);
       if (event.type === "done" || event.type === "error") break;

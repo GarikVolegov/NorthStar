@@ -1,11 +1,12 @@
 import { Router } from "express";
-import { eq, desc, or, like, and, lt, gt } from "drizzle-orm";
+import { eq, desc, or, like, and, lt, sql, type SQL } from "drizzle-orm";
 import { db, newsArticlesTable } from "@workspace/db";
 import { cacheGet, cacheSet } from "../lib/redis";
 
 const router = Router();
 
 const CACHE_TTL = 60; // 60s TTL as specified
+type NewsArticleRow = typeof newsArticlesTable.$inferSelect;
 
 /**
  * Encode a keyset cursor: "publishedAt|id"
@@ -22,6 +23,53 @@ function decodeCursor(cursor: string): [string, number] {
   const ts = raw.slice(0, pipe);
   const id = parseInt(raw.slice(pipe + 1), 10);
   return [ts, Number.isNaN(id) ? 0 : id];
+}
+
+function isMissingColumnError(err: unknown): boolean {
+  const message = String((err as { message?: unknown })?.message ?? err).toLowerCase();
+  return message.includes("column") && message.includes("does not exist");
+}
+
+function legacyNewsSelect() {
+  return {
+    id: newsArticlesTable.id,
+    embedding: newsArticlesTable.embedding,
+    title: newsArticlesTable.title,
+    url: newsArticlesTable.url,
+    urlHash: newsArticlesTable.urlHash,
+    source: newsArticlesTable.source,
+    summary: newsArticlesTable.summary,
+    imageUrl: sql<string | null>`null`,
+    content: sql<string | null>`null`,
+    publishedAt: newsArticlesTable.publishedAt,
+    sectorNames: newsArticlesTable.sectorNames,
+    category: newsArticlesTable.category,
+    relevanceScore: newsArticlesTable.relevanceScore,
+    searchQuery: newsArticlesTable.searchQuery,
+    createdAt: newsArticlesTable.createdAt,
+  };
+}
+
+async function selectNewsRows(
+  whereClause: SQL<unknown> | undefined,
+  limitNum: number,
+): Promise<NewsArticleRow[]> {
+  try {
+    return await db
+      .select()
+      .from(newsArticlesTable)
+      .where(whereClause as never)
+      .orderBy(desc(newsArticlesTable.publishedAt), desc(newsArticlesTable.id))
+      .limit(limitNum);
+  } catch (err) {
+    if (!isMissingColumnError(err)) throw err;
+    return await db
+      .select(legacyNewsSelect())
+      .from(newsArticlesTable)
+      .where(whereClause as never)
+      .orderBy(desc(newsArticlesTable.publishedAt), desc(newsArticlesTable.id))
+      .limit(limitNum) as NewsArticleRow[];
+  }
 }
 
 router.get("/", async (req, res) => {
@@ -54,12 +102,7 @@ router.get("/", async (req, res) => {
               ) ?? whereClause;
             }
 
-            const articles = await db
-              .select()
-              .from(newsArticlesTable)
-              .where(whereClause)
-              .orderBy(desc(newsArticlesTable.publishedAt), desc(newsArticlesTable.id))
-              .limit(perCat + 1);
+            const articles = await selectNewsRows(whereClause, perCat + 1);
 
             const hasMoreCat = articles.length > perCat;
             return {
@@ -103,12 +146,7 @@ router.get("/", async (req, res) => {
       whereClause = whereClause ? and(whereClause, cursorCond) : cursorCond;
     }
 
-    const articles = await db
-      .select()
-      .from(newsArticlesTable)
-      .where(whereClause)
-      .orderBy(desc(newsArticlesTable.publishedAt), desc(newsArticlesTable.id))
-      .limit(limitNum + 1);
+    const articles = await selectNewsRows(whereClause, limitNum + 1);
 
     const hasMore = articles.length > limitNum;
     const capped = hasMore ? articles.slice(0, limitNum) : articles;
@@ -128,7 +166,29 @@ router.get("/", async (req, res) => {
     res.json({ news: mapped, nextCursor });
   } catch (err) {
     req.log?.error?.({ err }, "news list error");
-    res.json({ news: [] });
+    res.status(200).json({ news: [], nextCursor: null });
+  }
+});
+
+router.get("/article/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id) || id <= 0) {
+      res.status(400).json({ error: "Invalid news id" });
+      return;
+    }
+
+    const [article] = await selectNewsRows(eq(newsArticlesTable.id, id), 1);
+
+    if (!article) {
+      res.status(404).json({ error: "News article not found" });
+      return;
+    }
+
+    res.json({ article: mapNewsDetail(article) });
+  } catch (err) {
+    req.log?.error?.({ err }, "news detail error");
+    res.status(500).json({ error: "Unable to load news article" });
   }
 });
 
@@ -158,12 +218,7 @@ router.get("/sector/:sectorName", async (req, res) => {
       ) ?? whereClause;
     }
 
-    const articles = await db
-      .select()
-      .from(newsArticlesTable)
-      .where(whereClause)
-      .orderBy(desc(newsArticlesTable.publishedAt), desc(newsArticlesTable.id))
-      .limit(limitNum + 1);
+    const articles = await selectNewsRows(whereClause, limitNum + 1);
 
     const hasMore = articles.length > limitNum;
     const capped = hasMore ? articles.slice(0, limitNum) : articles;
@@ -181,6 +236,24 @@ router.get("/sector/:sectorName", async (req, res) => {
   }
 });
 
+function fallbackContent(a: typeof newsArticlesTable.$inferSelect): string {
+  const summary = a.summary?.trim() || a.title;
+  const sectors = a.sectorNames?.length ? a.sectorNames.join(", ") : "mercato del lavoro";
+  return [
+    "### Cosa e successo",
+    summary,
+    "",
+    "### Perche conta per NorthStar",
+    `Questa notizia e rilevante per chi sta osservando ${sectors} e vuole capire come cambiano lavoro, business, formazione e competenze richieste.`,
+    "",
+    "### Impatto pratico",
+    "Usala come segnale per aggiornare il tuo percorso, confrontare nuove opportunita e capire quali skill potrebbero diventare piu importanti.",
+    "",
+    "### Cosa osservare",
+    "Controlla la fonte originale e monitora eventuali aggiornamenti, reazioni del settore e impatti su ruoli, salari o domanda di competenze.",
+  ].join("\n");
+}
+
 function mapNewsItem(a: typeof newsArticlesTable.$inferSelect) {
   const publishedAt = a.publishedAt instanceof Date
     ? a.publishedAt.toISOString()
@@ -188,16 +261,29 @@ function mapNewsItem(a: typeof newsArticlesTable.$inferSelect) {
   return {
     id: String(a.id),
     title: a.title,
+    preview: a.summary,
     description: a.summary,
     source: a.source,
+    sourceUrl: a.url,
     url: a.url,
+    detailUrl: `/news/${a.id}`,
     publishedAt,
-    image: null,
+    image: a.imageUrl ?? null,
     category: a.category,
     sector: a.sectorNames?.[0] ?? null,
     tags: a.sectorNames ?? [],
     relevance: a.relevanceScore,
     plan: "free" as const,
+  };
+}
+
+function mapNewsDetail(a: typeof newsArticlesTable.$inferSelect) {
+  const item = mapNewsItem(a);
+  return {
+    ...item,
+    content: a.content?.trim() || fallbackContent(a),
+    sourceUrl: a.url,
+    url: a.url,
   };
 }
 

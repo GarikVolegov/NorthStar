@@ -76,6 +76,7 @@ interface WendyContextValue {
   toggle: () => void;
   speak: (text: string) => void;
   ask: (message: string) => void;
+  consumePendingAsk: () => string | null;
   setIsSpeaking: (v: boolean) => void;
   pageContext: PageContext;
   setPageContext: (ctx: PageContext) => void;
@@ -146,12 +147,18 @@ export function WendyProvider({ children }: { children: ReactNode }) {
     setIsOpen(true);
   }, []);
 
+  const consumePendingAsk = useCallback(() => {
+    const message = pendingAskRef.current;
+    pendingAskRef.current = null;
+    return message;
+  }, []);
+
   const getPageHints = useCallback(() => {
     return PAGE_HINTS[pageContext.page] ?? PAGE_HINTS.default;
   }, [pageContext.page]);
 
   return (
-    <WendyContext.Provider value={{ isOpen, isSpeaking, phase, setPhase, open, close, toggle, speak, ask, setIsSpeaking, pageContext, setPageContext, getPageHints }}>
+    <WendyContext.Provider value={{ isOpen, isSpeaking, phase, setPhase, open, close, toggle, speak, ask, consumePendingAsk, setIsSpeaking, pageContext, setPageContext, getPageHints }}>
       {children}
       <WendyTTSBridge onSpeakingChange={setIsSpeaking} onPhaseChange={setPhase} />
     </WendyContext.Provider>

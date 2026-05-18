@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, count } from "drizzle-orm";
+import { and, eq, count } from "drizzle-orm";
 import { db, pool, sectorsTable, professionsTable, testSessionsTable } from "@workspace/db";
 
 const router = Router();
@@ -7,7 +7,11 @@ const router = Router();
 /* ─── GET /api/sectors  —  lista settori dal DB (public) ─── */
 router.get("/", async (req, res) => {
   try {
-    const sectors = await db.select().from(sectorsTable).orderBy(sectorsTable.name);
+    const sectors = await db
+      .select()
+      .from(sectorsTable)
+      .where(eq(sectorsTable.isActive, true))
+      .orderBy(sectorsTable.name);
     res.json(sectors);
   } catch (err) {
     req.log?.error?.({ err }, "sectors list error");
@@ -21,7 +25,11 @@ router.get("/:id/stats", async (req, res) => {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
 
-    const [sector] = await db.select().from(sectorsTable).where(eq(sectorsTable.id, id)).limit(1);
+    const [sector] = await db
+      .select()
+      .from(sectorsTable)
+      .where(and(eq(sectorsTable.id, id), eq(sectorsTable.isActive, true)))
+      .limit(1);
     if (!sector) { res.status(404).json({ error: "Settore non trovato" }); return; }
 
     const [rolesCount] = await db.select({ cnt: count() }).from(professionsTable).where(eq(professionsTable.sectorId, id));
@@ -90,7 +98,7 @@ router.get("/:id/roles", async (req, res) => {
         stabilityScore: professionsTable.stabilityScore,
       })
       .from(professionsTable)
-      .where(eq(professionsTable.sectorId, id))
+      .where(and(eq(professionsTable.sectorId, id), eq(professionsTable.isActive, true)))
       .orderBy(professionsTable.title);
 
     res.json(roles);
@@ -106,13 +114,17 @@ router.get("/:id", async (req, res) => {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
 
-    const [sector] = await db.select().from(sectorsTable).where(eq(sectorsTable.id, id)).limit(1);
+    const [sector] = await db
+      .select()
+      .from(sectorsTable)
+      .where(and(eq(sectorsTable.id, id), eq(sectorsTable.isActive, true)))
+      .limit(1);
     if (!sector) { res.status(404).json({ error: "Settore non trovato" }); return; }
 
     const professions = await db
       .select()
       .from(professionsTable)
-      .where(eq(professionsTable.sectorId, id))
+      .where(and(eq(professionsTable.sectorId, id), eq(professionsTable.isActive, true)))
       .orderBy(professionsTable.title);
 
     res.json({ ...sector, professions });

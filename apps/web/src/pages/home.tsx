@@ -65,6 +65,8 @@ type HomeNewsItem = {
   description: string;
   source: string;
   url: string;
+  sourceUrl?: string;
+  detailUrl?: string;
   publishedAt: string;
   image: string | null;
   category: string;
@@ -234,12 +236,25 @@ function HomeNewsCard({ item }: { item: HomeNewsItem }) {
   }
 
   return (
-    <a
-      href={item.url}
-      target="_blank"
-      rel="noopener noreferrer"
+    <Link
+      href={item.detailUrl ?? `/news/${item.id}`}
       className="group flex flex-col rounded-2xl border border-border bg-card hover:border-primary/30 transition-all duration-300 overflow-hidden h-full"
     >
+      {item.image ? (
+        <div className="aspect-video overflow-hidden bg-muted">
+          <img
+            src={item.image}
+            alt={item.title}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+        </div>
+      ) : (
+        <div className="aspect-video bg-muted/60 flex items-center justify-center">
+          <span className="text-3xl opacity-60">{catEmoji}</span>
+        </div>
+      )}
       <div className="p-5 flex-1 flex flex-col">
         <div className="flex items-center justify-between mb-3">
           <span
@@ -265,11 +280,11 @@ function HomeNewsCard({ item }: { item: HomeNewsItem }) {
             {item.source}
           </span>
           <span className="flex items-center gap-1 text-xs font-semibold text-primary group-hover:gap-1.5 transition-all">
-            {t("common.readMore")} <ExternalLink className="w-3 h-3" />
+            {t("common.readMore")} <ChevronRight className="w-3 h-3" />
           </span>
         </div>
       </div>
-    </a>
+    </Link>
   );
 }
 
@@ -1236,8 +1251,15 @@ export default function Home() {
   const { data: stats, isLoading: isStatsLoading } = useGetStatsSummary();
   const { data: trendingData } = useTrendingSectors();
   const { data: newsData, isLoading: isNewsLoading } = useHomeNews();
-  const { isLoggedIn, user, updateUser } = useAuth();
+  const { isLoggedIn, user, updateUser, authReady } = useAuth();
   const [, navigateTo] = useLocation();
+
+  // Utenti registrati vanno direttamente alla dashboard — la home è solo per ospiti
+  useEffect(() => {
+    if (authReady && isLoggedIn) navigateTo("/dashboard");
+  }, [authReady, isLoggedIn, navigateTo]);
+
+  if (authReady && isLoggedIn) return null;
   const [showOnboarding, setShowOnboarding] = useState(false);
   const prefersReduced = useReducedMotion();
 

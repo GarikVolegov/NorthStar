@@ -62,6 +62,7 @@ const THINKING_LABELS = [
 ];
 
 const FATAL_ERRORS = ['ML_SERVICE_UNAVAILABLE', 'UNAUTHORIZED', 'FORBIDDEN'];
+const PAGE_CONTEXT_MAX_CHARS = 12000;
 
 export interface UseWendyChatOptions {
   apiUrl?:            string;
@@ -99,6 +100,52 @@ interface CompressedHistory {
   summary?:       string;
   recentMessages: Array<{ role: 'user' | 'assistant'; content: string }>;
   totalTurns:     number;
+}
+
+function compactPageData(value: unknown, maxChars = PAGE_CONTEXT_MAX_CHARS): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  const preferredKeys = [
+    'ideaId',
+    'status',
+    'ideaName',
+    'oneLiner',
+    'canvas',
+    'scores',
+    'scoreReasons',
+    'scoreSuggestions',
+    'averageScore',
+    'assumption',
+    'experiment',
+    'experiments',
+    'activeExperimentId',
+    'activeExperiment',
+    'market',
+    'competitors',
+    'activeCompetitorId',
+    'activeCompetitor',
+    'lastWendyAdvice',
+    'timeline',
+    'decisionState',
+    'decisionReason',
+    'decisionUpdatedAt',
+    'decisionSuggested',
+    'focus',
+  ];
+  const compact = preferredKeys.reduce<Record<string, unknown>>((acc, key) => {
+    if (key in raw) acc[key] = raw[key];
+    return acc;
+  }, {});
+  const json = JSON.stringify(compact);
+  if (json.length <= maxChars) return compact;
+  return {
+    ...compact,
+    experiments: Array.isArray(raw.experiments) ? raw.experiments.slice(0, 5) : raw.experiments,
+    competitors: Array.isArray(raw.competitors) ? raw.competitors.slice(0, 8) : raw.competitors,
+    timeline: Array.isArray(raw.timeline) ? raw.timeline.slice(0, 8) : raw.timeline,
+    truncated: true,
+    note: 'Contesto pagina compattato per limite payload.',
+  };
 }
 
 function buildCompressedHistory(
@@ -344,6 +391,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       entityId:   (currentPage.data?.entityId as number)   ?? undefined,
       entityName: (currentPage.data?.entityName as string) ?? undefined,
       journeyType:(currentPage.data?.journeyType as string)?? undefined,
+      data:       compactPageData(currentPage.data),
     } : undefined;
 
     await startStream(apiUrl, {

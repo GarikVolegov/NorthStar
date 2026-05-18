@@ -41,6 +41,7 @@ export const sectorsTable = pgTable("sectors", {
   opportunities: jsonb("opportunities").$type<string[]>().notNull().default([]),
   icon: text("icon").notNull().default("briefcase"),
   color: text("color").notNull().default("#6366f1"),
+  isActive: boolean("is_active").notNull().default(true),
   workMode: jsonb("work_mode")
     .$type<Array<"dipendente" | "autonomo" | "ibrido">>()
     .default(["dipendente", "ibrido"]),

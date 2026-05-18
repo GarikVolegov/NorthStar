@@ -13,29 +13,24 @@ import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { usePageMeta } from "@/lib/seo";
 import {
-  Bot, Briefcase, GraduationCap, TrendingUp, Zap, Crown, Lock,
-  Loader2, ArrowRight, CheckCircle2, Sparkles, AlertTriangle,
-  DollarSign, Clock, MessageSquare, Map, Network, Newspaper,
-  Target, BrainCircuit, HelpCircle, Rocket, Building2, BarChart3,
-  MapPin, ChevronRight, LayoutGrid,
+  Bot, Crown, ArrowRight, AlertTriangle,
+  HelpCircle, Rocket, Building2, BarChart3, TrendingUp,
+  LayoutGrid, Sparkles, MapPin, ChevronRight,
 } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
 
 import { DashboardHero } from "@/components/dashboard/DashboardHero";
 import { DashboardObjectives } from "@/components/dashboard/DashboardObjectives";
 import { DashboardPersonality } from "@/components/dashboard/DashboardPersonality";
 import { DashboardCalendar } from "@/components/dashboard/DashboardCalendar";
-import { DashboardGrowth } from "@/components/dashboard/DashboardGrowth";
+import { DashboardKpiStrip } from "@/components/dashboard/DashboardKpiStrip";
 import { ProactiveInsightCard } from "@/components/wendy/ProactiveInsightCard";
 import { useProactiveInsights } from "@/hooks/useProactiveInsights";
 
 import { JourneyToolsSection } from "@/components/dashboard/JourneyToolsSection";
 import { ProfessionCard } from "@/components/dashboard/ProfessionCard";
-import { EducationCard } from "@/components/dashboard/EducationCard";
 import { WorkModePanel } from "@/components/dashboard/WorkModePanel";
 import { AgentLoadingSkeleton } from "@/components/dashboard/AgentLoadingSkeleton";
-import { DashboardSectionRenderer, type JourneyId } from "@/components/dashboard/dashboard-sections";
+import type { JourneyId } from "@/components/dashboard/dashboard-sections";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -126,7 +121,6 @@ export default function Dashboard() {
   const isPremium = agentData?.plan === "premium";
   const summary = agentData?.data?.summary;
   const professions = summary?.professions ?? [];
-  const educationPaths = summary?.educationPaths ?? [];
   const workMode = summary?.workMode;
 
   const { data: dashData, isLoading: dashLoading } = useDashboardData();
@@ -214,204 +208,131 @@ export default function Dashboard() {
     );
   }
 
-  const sectionProps = {
-    userId: user.id,
-    journeyType,
-    sessionDetail: sessionDetail ?? null,
-    sessionId,
-    isPremium,
-    topSectorId,
-  };
+  // Calcolo percentuale completamento profilo
+  const profilePercent = Math.min(100, Math.round(
+    (sessionId                                        ? 25 : 0) +
+    (journeyType && journeyType !== "indeciso"        ? 25 : 0) +
+    (user?.onboardingCompleted                        ? 25 : 0) +
+    (user?.avatarUrl                                  ? 25 : 0)
+  ));
+
+  const confirmedSectorName = sessionDetail?.recommendations?.[0]?.sectorName ?? null;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10 md:py-14 space-y-8">
+    <div className="max-w-5xl mx-auto px-4 py-8 md:py-12 space-y-5">
 
-      <DashboardHero journeyType={journeyType} session={sessionDetail ?? null} isPremium={isPremium} />
-
-      <DashboardObjectives
-        objectives={objectives}
-        progress={objectivesProgress}
-        onToggle={toggleObjective}
-        onDelete={deleteObjective}
-        onCreate={createObjective}
+      {/* ZONA 1 — Hero */}
+      <DashboardHero
+        journeyType={journeyType}
+        session={sessionDetail ?? null}
+        isPremium={isPremium}
+        userName={user.name}
       />
 
-      {insights.length > 0 && (
-        <section>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
-              <Sparkles className="w-4 h-4 text-amber-500" />
+      {/* ZONA 2 — KPI Strip */}
+      <DashboardKpiStrip
+        profilePercent={profilePercent}
+        objectives={objectives}
+        objectivesProgress={objectivesProgress}
+        upcomingEvents={upcomingEvents}
+        confirmedSectorName={confirmedSectorName}
+        sessionId={sessionId}
+      />
+
+      {/* ZONA 3 — Grid: sinistra 2/3, destra 1/3 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+        {/* Colonna sinistra */}
+        <div className="lg:col-span-2 space-y-5">
+          <DashboardCalendar events={upcomingEvents} />
+          <DashboardObjectives
+            objectives={objectives}
+            progress={objectivesProgress}
+            onToggle={toggleObjective}
+            onDelete={deleteObjective}
+            onCreate={createObjective}
+          />
+        </div>
+
+        {/* Colonna destra */}
+        <div className="space-y-4">
+          <DashboardPersonality
+            riasecScores={sessionDetail?.riasecScores}
+            spiritScores={sessionDetail?.spiritScores}
+            primaryTypes={sessionDetail?.primaryTypes}
+          />
+          {insights.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
+                Insight da Wendy
+              </p>
+              {insights.slice(0, 2).map((insight: import("@/hooks/useProactiveInsights").ProactiveInsight) => (
+                <ProactiveInsightCard
+                  key={insight.id}
+                  insight={insight}
+                  onRead={markRead}
+                  onDismiss={dismiss}
+                />
+              ))}
             </div>
-            <div>
-              <h2 className="font-bold text-lg text-foreground">Wendy ha notato qualcosa per te</h2>
-              <p className="text-xs text-muted-foreground">Segnali e insight dal mercato del lavoro</p>
-            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ZONA 4 — Strumenti del percorso */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+            <LayoutGrid className="w-3.5 h-3.5" />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {insights.slice(0, 3).map((insight: import("@/hooks/useProactiveInsights").ProactiveInsight) => (
-              <ProactiveInsightCard
-                key={insight.id}
-                insight={insight}
-                onRead={markRead}
-                onDismiss={dismiss}
-              />
-            ))}
+          <h2 className="font-bold text-base text-foreground">
+            Strumenti del percorso
+          </h2>
+          {journeyMeta && (
+            <span className="text-xs text-muted-foreground">— {journeyMeta.label}</span>
+          )}
+        </div>
+        <JourneyToolsSection journeyType={journeyType} sectorId={topSectorId} />
+      </section>
+
+      {/* ZONA 5 — Analisi AI (max 3 professioni + modalità lavoro) */}
+      {(agentLoading || detailLoading) && <AgentLoadingSkeleton />}
+
+      {agentError && !agentLoading && (
+        <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 flex items-center gap-3">
+          <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
+          <p className="text-sm text-muted-foreground">Analisi non disponibile. Riprova tra qualche minuto.</p>
+        </div>
+      )}
+
+      {agentData && !agentLoading && (professions.length > 0 || workMode) && (
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+                <Bot className="w-3.5 h-3.5" />
+              </div>
+              <h2 className="font-bold text-base text-foreground">Analisi personalizzata</h2>
+            </div>
+            {sessionId && (
+              <Link href={`/risultati/${sessionId}`} className="text-xs text-primary font-semibold hover:underline flex items-center gap-1">
+                Analisi completa <ArrowRight className="w-3 h-3" />
+              </Link>
+            )}
+          </div>
+
+          <div className="space-y-5">
+            {professions.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {professions.slice(0, 3).map((p, i) => (
+                  <ProfessionCard key={`${p.title}-${i}`} p={p} index={i} />
+                ))}
+              </div>
+            )}
+            {workMode && <WorkModePanel wm={workMode} isPremium={isPremium} />}
           </div>
         </section>
       )}
-
-      <section>
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
-            <LayoutGrid className="w-4 h-4" />
-          </div>
-          <div>
-            <h2 className="font-bold text-xl text-foreground">I tuoi strumenti</h2>
-            <p className="text-xs text-muted-foreground">
-              {journeyMeta ? `Selezionati per il percorso: ${journeyMeta.label}` : "Esplora e cresci nel tuo settore"}
-            </p>
-          </div>
-        </div>
-        <Tabs defaultValue="personalizzati">
-          <TabsList className="mb-5">
-            <TabsTrigger value="personalizzati">Per te</TabsTrigger>
-            <TabsTrigger value="avanzati">Approfondisci</TabsTrigger>
-          </TabsList>
-          <TabsContent value="personalizzati">
-            <JourneyToolsSection journeyType={journeyType} sectorId={topSectorId} />
-          </TabsContent>
-          <TabsContent value="avanzati">
-            {sessionId ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                  { href: `${BASE}wiki/${topSectorId ?? ""}`,    icon: MessageSquare, title: "Guida AI",          desc: "Chiedi tutto sul tuo settore" },
-                  { href: `${BASE}roadmap/${topSectorId ?? ""}`, icon: Map,           title: "Piano di crescita", desc: "Piano formativo personalizzato" },
-                  { href: "/grafo",                              icon: Network,       title: "Mappa delle conoscenze", desc: "Note, competenze e documenti collegati" },
-                  { href: "/news",                               icon: Newspaper,     title: "Notizie del settore",   desc: "Aggiornamenti live dal mondo del lavoro" },
-                ].map(({ href, icon: Icon, title, desc }) => (
-                  <Link key={title} href={href}>
-                    <div className="group rounded-2xl border border-border bg-card p-5 flex flex-col gap-3 hover:border-primary/30 transition-all duration-200 cursor-pointer h-full">
-                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 group-hover:bg-primary/15 transition-colors">
-                        <Icon className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-foreground text-sm">{title}</p>
-                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{desc}</p>
-                      </div>
-                      <ArrowRight className="w-4 h-4 mt-auto self-end text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Completa il test per sbloccare strumenti avanzati.</p>
-            )}
-          </TabsContent>
-        </Tabs>
-      </section>
-
-      <DashboardSectionRenderer {...sectionProps} />
-
-      <section>
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
-            <Bot className="w-4 h-4" />
-          </div>
-          <div>
-            <h2 className="font-bold text-xl text-foreground">Analisi personalizzata</h2>
-            <p className="text-xs text-muted-foreground">
-              {isPremium ? "Analisi completa basata sul tuo profilo" : "Piano gratuito — aggiorna per l'analisi completa"}
-            </p>
-          </div>
-          {sessionId && (
-            <Link href={`/risultati/${sessionId}`} className="ml-auto">
-              <div className="inline-flex items-center gap-1.5 text-sm text-primary font-semibold hover:gap-2 transition-all">
-                Risultati completi <ArrowRight className="w-3.5 h-3.5" />
-              </div>
-            </Link>
-          )}
-        </div>
-
-        {(agentLoading || detailLoading) && <AgentLoadingSkeleton />}
-
-        {agentError && !agentLoading && (
-          <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 flex items-start gap-4">
-            <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-destructive text-sm mb-1">Analisi non disponibile</p>
-              <p className="text-sm text-muted-foreground">Non è stato possibile eseguire l'analisi. Riprova tra qualche minuto.</p>
-            </div>
-          </div>
-        )}
-
-        {agentData && !agentLoading && (
-          <div className="space-y-8">
-            {professions.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <Zap className="w-4 h-4 text-primary" />
-                  <h3 className="font-semibold text-foreground">Professioni consigliate</h3>
-                  <span className="text-xs text-muted-foreground ml-1">{professions.length} professioni</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {professions.map((p, i) => (
-                    <ProfessionCard key={`${p.title}-${i}`} p={p} index={i} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {workMode && (
-              <WorkModePanel wm={workMode} isPremium={isPremium} />
-            )}
-
-            {!isPremium && !workMode && (
-              <div className="rounded-2xl border border-dashed border-primary/20 p-6 flex items-center gap-4">
-                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0 border border-primary/20">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-foreground text-sm">Modalità lavorativa + Percorsi formativi</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Con Pro l'intelligenza artificiale consiglia la modalità di lavoro ottimale e i percorsi di studio più adatti al tuo profilo.
-                  </p>
-                </div>
-                <Button asChild size="sm" variant="outline" className="shrink-0 rounded-full border-primary/30 text-primary hover:bg-primary/5">
-                  <Link href="/premium"><Crown className="w-3.5 h-3.5 mr-1.5" />Sblocca</Link>
-                </Button>
-              </div>
-            )}
-
-            {isPremium && educationPaths.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <GraduationCap className="w-4 h-4 text-growth" />
-                  <h3 className="font-semibold text-foreground">Percorsi formativi</h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {educationPaths.map((e, i) => (
-                    <EducationCard key={`${e.path}-${i}`} e={e} />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-
-      <DashboardCalendar events={upcomingEvents} />
-      <DashboardGrowth />
-
-      <div className="flex flex-col sm:flex-row gap-3 border-t border-border pt-6">
-        {sessionId && (
-          <Button asChild variant="outline" className="rounded-full">
-            <Link href={`/risultati/${sessionId}`}><ArrowRight className="w-4 h-4 mr-2" />Risultati completi</Link>
-          </Button>
-        )}
-        <Button asChild variant="ghost" className="rounded-full">
-          <Link href="/">Torna alla home</Link>
-        </Button>
-      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { db, nftCertificatesTable } from "@workspace/db";
+import { sendOptionalReadFallback } from "../lib/persistence";
 
 const router = Router();
 
@@ -15,6 +16,7 @@ router.get("/me", requireAuth, async (req, res) => {
     res.json(certs);
   } catch (err) {
     req.log?.error?.({ err }, "nft-certificates error");
+    if (sendOptionalReadFallback(req, res, err, "nft-certificates.mine", [])) return;
     res.json([]);
   }
 });

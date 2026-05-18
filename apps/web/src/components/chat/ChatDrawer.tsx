@@ -4,6 +4,7 @@ import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
 import { decryptMessage, encryptMessage, fetchEncryptedKey, unwrapAesKey } from "@/hooks/useChatEncryption";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -63,7 +64,7 @@ export function ChatDrawer({ friend, userId, wssSend, wssOn, onClose }: ChatDraw
   const loadMessages = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${BASE}api/friends/messages/${friend.friendshipId}`);
+      const res = await apiFetch(`${BASE}api/friends/messages/${friend.friendshipId}`);
       const data = await res.json();
       setMessages(data.messages ?? []);
     } finally {
@@ -133,7 +134,7 @@ export function ChatDrawer({ friend, userId, wssSend, wssOn, onClose }: ChatDraw
       }
 
       const { encryptedContent, iv } = await encryptMessage(key, text);
-      await fetch(`${BASE}api/friends/messages`, {
+      await apiFetch(`${BASE}api/friends/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -156,7 +157,7 @@ export function ChatDrawer({ friend, userId, wssSend, wssOn, onClose }: ChatDraw
     // Ottieni le chiavi pubbliche di entrambi gli utenti
     const receiverId = friend.id;
     const [myPubKeyRes, theirPubKey] = await Promise.all([
-      fetch(`${BASE}api/friends/keys/${userId}`).then((r) => r.json()),
+      apiFetch(`${BASE}api/friends/keys/${userId}`).then((r) => r.json()),
       fetchPublicKey(receiverId),
     ]);
 

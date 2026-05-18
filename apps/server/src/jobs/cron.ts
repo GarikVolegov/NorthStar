@@ -36,7 +36,14 @@ async function safeRunNewsPublisher(): Promise<void> {
   try {
     rootLogger.info("[cron] news-publisher starting");
     const result = await runNewsPublisher();
-    rootLogger.info({ transferred: result.transferred, seeded: result.seeded, durationMs: result.durationMs }, "[cron] news-publisher complete");
+    rootLogger.info(
+      {
+        transferred: result.transferred,
+        missingCoverage: result.missingCoverage.length,
+        durationMs: result.durationMs,
+      },
+      "[cron] news-publisher complete",
+    );
   } catch (err) {
     rootLogger.error({ err }, "[cron] news-publisher failed");
   }

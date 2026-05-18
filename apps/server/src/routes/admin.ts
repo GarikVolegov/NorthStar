@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import {
   affiliationLeadsTable,
   aiRequestLogTable,
+  adminCatalogDraftsTable,
   agentPromptVersionsTable,
   agentPromptsTable,
   agentRunsTable,
@@ -12,8 +13,14 @@ import {
   coachSessionsTable,
   contactMessagesTable,
   db,
+  checkDatabaseHealth,
+  discoveryItemsTable,
+  educationPathsTable,
   growthArticlesTable,
+  knowledgeEdgesTable,
+  knowledgeNodesTable,
   llmUsageTable,
+  professionEducationPathsTable,
   professionsTable,
   qualityMetrics,
   responseFeedbackTable,
@@ -23,9 +30,20 @@ import {
   testSessionsTable,
   usersTable,
 } from "@workspace/db";
-import { and, desc, eq, gte, ilike, isNull, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { register } from "@workspace/ai-server/metrics";
-import { runCollector, runEnricher, runSectorDataAgent, generateEmbeddingsBatch, buildEmbeddingText } from "@workspace/ai-server";
+import {
+  runCollector,
+  runEnricher,
+  runNewsPublisher,
+  runSectorDataAgent,
+  searchWeb,
+  generateEmbeddingsBatch,
+  buildEmbeddingText,
+  getModelRoutingPolicy,
+  getMemoryGraphHealth,
+  ingestUserMemoryGraph,
+} from "@workspace/ai-server";
 import { writeAuditLog } from "../middleware/audit";
 import { rootLogger } from "../middleware/logger";
 import { executionMonitor } from "../lib/execution-monitor";
@@ -50,7 +68,7 @@ const DEFAULT_PROMPTS: AgentPrompt[] = [
     placeholders: ["{{USER_CONTEXT}}", "{{TOOLS}}"],
     requiredPlaceholders: ["{{USER_CONTEXT}}", "{{TOOLS}}"],
     defaultValue:
-      "Sei Wendy, assistente operativa di NorthStar. Aiuta l'utente a orientarsi, pianificare e usare i tool dell'app in modo concreto.",
+      "Sei Wendy, assistente operativa di NorthStar. Aiuta l'utente a orientarsi, pianificare e usare i tool dell'app in modo concreto.\n\nContesto utente:\n{{USER_CONTEXT}}\n\nTool disponibili:\n{{TOOLS}}",
   },
   {
     key: "knowledge.auto_link",
@@ -59,7 +77,16 @@ const DEFAULT_PROMPTS: AgentPrompt[] = [
     placeholders: ["{{SOURCE_NODE}}", "{{CANDIDATES}}"],
     requiredPlaceholders: ["{{SOURCE_NODE}}", "{{CANDIDATES}}"],
     defaultValue:
-      "Analizza il nodo sorgente e collega solo candidati con relazione semantica chiara. Restituisci etichette brevi e motivazioni verificabili.",
+      "Analizza il nodo sorgente e collega solo candidati con relazione semantica chiara.\n\nNodo sorgente:\n{{SOURCE_NODE}}\n\nCandidati:\n{{CANDIDATES}}\n\nRestituisci etichette brevi e motivazioni verificabili.",
+  },
+  {
+    key: "memory_graph.retrieval",
+    label: "Cervello Wendy - Retrieval",
+    description: "Regole per usare memoria semantica, grafo e provenance nelle risposte Wendy.",
+    placeholders: ["{{QUERY}}", "{{MEMORY_RESULTS}}", "{{RELATIONS}}"],
+    requiredPlaceholders: ["{{QUERY}}", "{{MEMORY_RESULTS}}"],
+    defaultValue:
+      "Usa la memoria personale recuperata solo quando e rilevante per la query.\n\nQuery:\n{{QUERY}}\n\nNodi memoria:\n{{MEMORY_RESULTS}}\n\nRelazioni:\n{{RELATIONS}}\n\nCita le fonti interne, segnala confidence bassa e non inventare dettagli non presenti.",
   },
   {
     key: "growth.research",
@@ -68,7 +95,7 @@ const DEFAULT_PROMPTS: AgentPrompt[] = [
     placeholders: ["{{TOPIC}}", "{{AUDIENCE}}"],
     requiredPlaceholders: ["{{TOPIC}}", "{{AUDIENCE}}"],
     defaultValue:
-      "Crea contenuti pratici, aggiornati e orientati all'azione per professionisti e team. Evita generalita e includi passi concreti.",
+      "Crea contenuti pratici, aggiornati e orientati all'azione.\n\nTema:\n{{TOPIC}}\n\nAudience:\n{{AUDIENCE}}\n\nEvita generalita e includi passi concreti per professionisti e team.",
   },
 ];
 
@@ -76,7 +103,7 @@ const RUNNABLE_AGENTS = [
   {
     key: "news-research",
     label: "News Research",
-    description: "Registra una run manuale per la ricerca news e prepara il collector reale.",
+    description: "Esegue collector, enrichment e publisher per portare notizie reali nella piattaforma.",
     endpoint: "/admin/research/news/run",
     method: "POST",
     risk: "low",
@@ -85,7 +112,7 @@ const RUNNABLE_AGENTS = [
   {
     key: "growth-research",
     label: "Growth Research",
-    description: "Registra una run manuale per contenuti di crescita professionale.",
+    description: "Cerca fonti web/documentali e crea bozze pending nella Coda Crescita.",
     endpoint: "/admin/research/growth/run",
     method: "POST",
     risk: "low",
@@ -139,6 +166,331 @@ function adminAuth(_req: Request, _res: Response): boolean {
   return true;
 }
 
+type CatalogType = "sectors" | "professions" | "education_paths" | "growth_articles";
+type CatalogValidation = {
+  ok: boolean;
+  fields: Record<string, string>;
+  payload: Record<string, any>;
+};
+
+const CATALOG_TYPES: CatalogType[] = [
+  "sectors",
+  "professions",
+  "education_paths",
+  "growth_articles",
+];
+
+const CATALOG_LABELS: Record<CatalogType, string> = {
+  sectors: "Settori",
+  professions: "Professioni",
+  education_paths: "Percorsi",
+  growth_articles: "Articoli crescita",
+};
+
+const CATALOG_ENUMS = {
+  riasec: ["R", "I", "A", "S", "E", "C"],
+  automationRisk: ["low", "medium", "high"],
+  scalability: ["low", "medium", "high"],
+  trend: ["declining", "stable", "growing", "booming"],
+  workMode: ["dipendente", "autonomo", "ibrido"],
+  educationType: ["universitario", "professionale", "online", "bootcamp"],
+  articleStatus: ["draft", "pending", "published", "rejected", "archived"],
+  difficulty: ["base", "intermedio", "avanzato"],
+} as const;
+
+const GROWTH_QUEUE_STATUSES = ["draft", "pending", "published", "rejected"] as const;
+type GrowthQueueStatus = (typeof GROWTH_QUEUE_STATUSES)[number];
+
+function asRecord(value: unknown): Record<string, any> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? { ...(value as Record<string, any>) }
+    : {};
+}
+
+function stringValue(value: unknown, fallback = "") {
+  return typeof value === "string" ? value.trim() : fallback;
+}
+
+function numberValue(value: unknown, fallback = 0) {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function integerValue(value: unknown, fallback = 0) {
+  const n = Math.round(numberValue(value, fallback));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function booleanValue(value: unknown, fallback = true) {
+  if (typeof value === "boolean") return value;
+  if (value === "false") return false;
+  if (value === "true") return true;
+  return fallback;
+}
+
+function arrayValue(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return Array.from(
+      new Set(
+        value
+          .map((item) => String(item ?? "").trim())
+          .filter(Boolean),
+      ),
+    );
+  }
+  if (typeof value === "string") {
+    return Array.from(
+      new Set(
+        value
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      ),
+    );
+  }
+  return [];
+}
+
+function enumValue<T extends readonly string[]>(
+  value: unknown,
+  allowed: T,
+  fallback: T[number],
+) {
+  const normalized = stringValue(value, fallback);
+  return allowed.includes(normalized) ? normalized : fallback;
+}
+
+function hasInvalidEnumValues(values: string[], allowed: readonly string[]) {
+  return values.some((value) => !allowed.includes(value));
+}
+
+function normalizeSteps(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item, index) => {
+      const row = asRecord(item);
+      return {
+        step: integerValue(row.step, index + 1),
+        title: stringValue(row.title),
+        description: stringValue(row.description),
+      };
+    })
+    .filter((step) => step.title && step.description);
+}
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 96);
+}
+
+function normalizeGrowthArticlePayload(input: unknown, current?: typeof growthArticlesTable.$inferSelect) {
+  const raw = asRecord(input);
+  const title = stringValue(raw.title, current?.title ?? "");
+  const fields: Record<string, string> = {};
+  const payload = {
+    title,
+    slug: slugify(stringValue(raw.slug, current?.slug ?? "") || title),
+    category: stringValue(raw.category, current?.category ?? ""),
+    subcategory: stringValue(raw.subcategory, current?.subcategory ?? "") || null,
+    description: stringValue(raw.description, current?.description ?? ""),
+    content: stringValue(raw.content, current?.content ?? ""),
+    tags: raw.tags === undefined ? current?.tags ?? [] : arrayValue(raw.tags),
+    difficulty: enumValue(
+      raw.difficulty,
+      CATALOG_ENUMS.difficulty,
+      CATALOG_ENUMS.difficulty.includes(current?.difficulty as any)
+        ? (current?.difficulty as (typeof CATALOG_ENUMS.difficulty)[number])
+        : "base",
+    ),
+    personalityMatches:
+      raw.personalityMatches === undefined ? current?.personalityMatches ?? [] : arrayValue(raw.personalityMatches),
+    sectorLinks: raw.sectorLinks === undefined ? current?.sectorLinks ?? [] : arrayValue(raw.sectorLinks),
+    status: enumValue(raw.status, GROWTH_QUEUE_STATUSES, (current?.status as GrowthQueueStatus) ?? "draft"),
+    readTimeMinutes: Math.max(1, integerValue(raw.readTimeMinutes, current?.readTimeMinutes ?? 3)),
+  };
+  if (!payload.title) fields.title = "Titolo obbligatorio.";
+  if (!payload.slug) fields.slug = "Slug obbligatorio.";
+  if (!payload.category) fields.category = "Categoria obbligatoria.";
+  if (!payload.description) fields.description = "Descrizione obbligatoria.";
+  if (!payload.content || payload.content.length < 40) fields.content = "Contenuto obbligatorio, almeno 40 caratteri.";
+  if (!GROWTH_QUEUE_STATUSES.includes(payload.status as GrowthQueueStatus)) fields.status = "Status non valido.";
+  return { ok: Object.keys(fields).length === 0, fields, payload };
+}
+
+function previewGrowthArticle(article: Record<string, any>) {
+  return {
+    title: article.title,
+    slug: article.slug,
+    url: article.slug ? `/crescita/articolo/${article.slug}` : "",
+    category: article.category,
+    subcategory: article.subcategory ?? null,
+    description: article.description,
+    content: article.content,
+    tags: article.tags ?? [],
+    difficulty: article.difficulty,
+    readTimeMinutes: article.readTimeMinutes,
+    status: article.status,
+  };
+}
+
+async function ensureGrowthArticleSlug(slug: string, articleId: number) {
+  if (!slug) return {};
+  const [existing] = await db
+    .select({ id: growthArticlesTable.id })
+    .from(growthArticlesTable)
+    .where(and(eq(growthArticlesTable.slug, slug), ne(growthArticlesTable.id, articleId)))
+    .limit(1);
+  return existing ? { slug: "Slug gia usato da un altro articolo." } : {};
+}
+
+async function writeGrowthArticleAudit(
+  req: Request,
+  action: string,
+  articleId: number,
+  metadata: Record<string, unknown>,
+) {
+  await db.insert(auditLogTable).values({
+    actorId: req.user?.id ?? null,
+    targetId: null,
+    action,
+    category: "admin_action",
+    metadata: { articleId, workflow: "growth_queue", ...metadata },
+  });
+}
+
+function validateCatalogPayload(type: CatalogType, input: unknown): CatalogValidation {
+  const raw = asRecord(input);
+  const fields: Record<string, string> = {};
+
+  if (type === "sectors") {
+    const riasecTypes = arrayValue(raw.riasecTypes);
+    const workMode = arrayValue(raw.workMode);
+    const payload = {
+      name: stringValue(raw.name),
+      description: stringValue(raw.description),
+      riasecTypes,
+      skills: arrayValue(raw.skills),
+      avgSalaryMin: integerValue(raw.avgSalaryMin),
+      avgSalaryMax: integerValue(raw.avgSalaryMax),
+      growthRate: numberValue(raw.growthRate),
+      automationRisk: enumValue(raw.automationRisk, CATALOG_ENUMS.automationRisk, "medium"),
+      scalability: enumValue(raw.scalability, CATALOG_ENUMS.scalability, "medium"),
+      trend: enumValue(raw.trend, CATALOG_ENUMS.trend, "stable"),
+      timeToAutonomy: stringValue(raw.timeToAutonomy, "6-12 mesi"),
+      advantages: arrayValue(raw.advantages),
+      disadvantages: arrayValue(raw.disadvantages),
+      opportunities: arrayValue(raw.opportunities),
+      icon: stringValue(raw.icon, "briefcase"),
+      color: stringValue(raw.color, "#6366f1"),
+      isActive: booleanValue(raw.isActive, true),
+      workMode: workMode.length ? workMode : ["dipendente", "ibrido"],
+      autonomyScore: integerValue(raw.autonomyScore, 5),
+      stabilityScore: integerValue(raw.stabilityScore, 5),
+      clientAcquisitionRequired: booleanValue(raw.clientAcquisitionRequired, false),
+      freelanceSteps: normalizeSteps(raw.freelanceSteps),
+      dipendentiSteps: normalizeSteps(raw.dipendentiSteps),
+      remoteFriendly: booleanValue(raw.remoteFriendly, true),
+    };
+    if (!payload.name) fields.name = "Nome obbligatorio.";
+    if (!payload.description) fields.description = "Descrizione obbligatoria.";
+    if (payload.avgSalaryMin < 0) fields.avgSalaryMin = "Il salario minimo deve essere positivo.";
+    if (payload.avgSalaryMax < payload.avgSalaryMin) fields.avgSalaryMax = "Il salario massimo deve essere maggiore o uguale al minimo.";
+    if (hasInvalidEnumValues(payload.riasecTypes, CATALOG_ENUMS.riasec)) fields.riasecTypes = "RIASEC non valido.";
+    if (hasInvalidEnumValues(payload.workMode, CATALOG_ENUMS.workMode)) fields.workMode = "Modalita lavoro non valida.";
+    return { ok: Object.keys(fields).length === 0, fields, payload };
+  }
+
+  if (type === "professions") {
+    const riasecFit = arrayValue(raw.riasecFit);
+    const workModes = arrayValue(raw.workModes);
+    const payload = {
+      title: stringValue(raw.title),
+      sector: stringValue(raw.sector),
+      sectorId: raw.sectorId == null || raw.sectorId === "" ? null : integerValue(raw.sectorId),
+      description: stringValue(raw.description),
+      riasecFit,
+      skills: arrayValue(raw.skills),
+      workModes,
+      salaryRange: stringValue(raw.salaryRange),
+      growthOutlook: stringValue(raw.growthOutlook),
+      autonomyScore: integerValue(raw.autonomyScore, 5),
+      stabilityScore: integerValue(raw.stabilityScore, 5),
+      isActive: booleanValue(raw.isActive, true),
+    };
+    if (!payload.title) fields.title = "Titolo obbligatorio.";
+    if (!payload.sector && !payload.sectorId) fields.sector = "Settore o sectorId obbligatorio.";
+    if (!payload.salaryRange) fields.salaryRange = "Fascia salario obbligatoria.";
+    if (!payload.growthOutlook) fields.growthOutlook = "Prospettiva crescita obbligatoria.";
+    if (hasInvalidEnumValues(riasecFit, CATALOG_ENUMS.riasec)) fields.riasecFit = "RIASEC non valido.";
+    if (hasInvalidEnumValues(workModes, CATALOG_ENUMS.workMode)) fields.workModes = "Modalita lavoro non valida.";
+    return { ok: Object.keys(fields).length === 0, fields, payload };
+  }
+
+  if (type === "education_paths") {
+    const payload = {
+      path: stringValue(raw.path),
+      type: enumValue(raw.type, CATALOG_ENUMS.educationType, "online"),
+      duration: stringValue(raw.duration),
+      cost: stringValue(raw.cost),
+      steps: arrayValue(raw.steps),
+      careerOutcomes: arrayValue(raw.careerOutcomes),
+      sectorFit: arrayValue(raw.sectorFit),
+      professionIds: Array.isArray(raw.professionIds)
+        ? raw.professionIds.map((id) => integerValue(id)).filter((id) => id > 0)
+        : [],
+      isActive: booleanValue(raw.isActive, true),
+    };
+    if (!payload.path) fields.path = "Nome percorso obbligatorio.";
+    if (!payload.duration) fields.duration = "Durata obbligatoria.";
+    if (!payload.cost) fields.cost = "Costo obbligatorio.";
+    if (payload.steps.length === 0) fields.steps = "Almeno uno step obbligatorio.";
+    if (payload.careerOutcomes.length === 0) fields.careerOutcomes = "Almeno un outcome obbligatorio.";
+    return { ok: Object.keys(fields).length === 0, fields, payload };
+  }
+
+  const title = stringValue(raw.title);
+  const payload = {
+    title,
+    slug: slugify(stringValue(raw.slug) || title),
+    category: stringValue(raw.category),
+    subcategory: stringValue(raw.subcategory) || null,
+    description: stringValue(raw.description),
+    content: stringValue(raw.content),
+    tags: arrayValue(raw.tags),
+    difficulty: enumValue(raw.difficulty, CATALOG_ENUMS.difficulty, "base"),
+    personalityMatches: arrayValue(raw.personalityMatches),
+    sectorLinks: arrayValue(raw.sectorLinks),
+    status: enumValue(raw.status, CATALOG_ENUMS.articleStatus, "draft"),
+    readTimeMinutes: Math.max(1, integerValue(raw.readTimeMinutes, 3)),
+  };
+  if (!payload.title) fields.title = "Titolo obbligatorio.";
+  if (!payload.slug) fields.slug = "Slug obbligatorio.";
+  if (!payload.category) fields.category = "Categoria obbligatoria.";
+  if (!payload.description) fields.description = "Descrizione obbligatoria.";
+  if (!payload.content || payload.content.length < 40) fields.content = "Contenuto obbligatorio, almeno 40 caratteri.";
+  return { ok: Object.keys(fields).length === 0, fields, payload };
+}
+
+async function writeCatalogAudit(
+  req: Request,
+  action: string,
+  type: CatalogType,
+  metadata: Record<string, unknown>,
+) {
+  await db.insert(auditLogTable).values({
+    actorId: req.user?.id ?? null,
+    targetId: null,
+    action,
+    category: "admin_action",
+    metadata: { catalogType: type, ...metadata },
+  });
+}
+
 async function writeAgentRunSnapshot(params: {
   agentName: string;
   taskType: string;
@@ -166,6 +518,73 @@ async function writeAgentRunSnapshot(params: {
   return run;
 }
 
+function compactText(value: unknown, max = 700) {
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
+}
+
+function estimateReadTimeMinutes(content: string) {
+  const words = content.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(3, Math.ceil(words / 180));
+}
+
+function growthResearchTags(topic: string, extra: string[] = []) {
+  const topicTags = topic
+    .toLowerCase()
+    .split(/[^a-z0-9]+/i)
+    .filter((part) => part.length > 3)
+    .slice(0, 4);
+  return Array.from(new Set(["ricerca", "crescita", "documenti", ...topicTags, ...extra])).slice(0, 8);
+}
+
+function buildGrowthResearchArticle(input: {
+  title: string;
+  url?: string | null;
+  source: string;
+  summary: string;
+  topic: string;
+  index: number;
+}) {
+  const title = compactText(input.title, 140) || `Ricerca crescita: ${input.topic}`;
+  const summary = compactText(input.summary, 900);
+  const url = input.url ? compactText(input.url, 500) : "";
+  const content = [
+    `# ${title}`,
+    "",
+    "## Fonte",
+    url ? `${input.source}: ${url}` : input.source,
+    "",
+    "## Sintesi",
+    summary || "Fonte raccolta dall'agente di ricerca. Da completare in revisione editoriale.",
+    "",
+    "## Perche conta per NorthStar",
+    `Questo spunto e collegato al tema "${input.topic}" e puo aiutare Wendy a proporre contenuti pratici per orientamento, lavoro e crescita professionale.`,
+    "",
+    "## Spunti da validare",
+    "- Verificare accuratezza e freschezza della fonte.",
+    "- Adattare esempi e tono al pubblico NorthStar.",
+    "- Trasformare la ricerca in una guida applicabile prima della pubblicazione.",
+  ].join("\n");
+
+  return {
+    title,
+    slug: slugify(`${title}-${Date.now()}-${input.index}`),
+    category: "crescita-professionale",
+    subcategory: "ricerca",
+    description: summary.slice(0, 240) || `Bozza generata dall'agente ricerca crescita su ${input.topic}.`,
+    content,
+    tags: growthResearchTags(input.topic, [input.source.toLowerCase().replace(/\s+/g, "-")]),
+    difficulty: "base",
+    personalityMatches: [],
+    sectorLinks: [],
+    status: "pending",
+    readTimeMinutes: estimateReadTimeMinutes(content),
+    updatedAt: new Date(),
+  } satisfies typeof growthArticlesTable.$inferInsert;
+}
+
 function findDefaultPrompt(key: string) {
   return DEFAULT_PROMPTS.find((prompt) => prompt.key === key);
 }
@@ -184,11 +603,13 @@ function validatePromptValue(
   const unknownPlaceholders = placeholders.filter(
     (placeholder) => !allowedPlaceholders.includes(placeholder),
   );
-  const missingPlaceholders = allowedPlaceholders.filter(
-    (placeholder) => !placeholders.includes(placeholder),
-  );
   const missingRequiredPlaceholders = requiredPlaceholders.filter(
     (placeholder) => !placeholders.includes(placeholder),
+  );
+  const missingPlaceholders = allowedPlaceholders.filter(
+    (placeholder) =>
+      !placeholders.includes(placeholder) &&
+      !missingRequiredPlaceholders.includes(placeholder),
   );
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -240,6 +661,18 @@ function safeSnippet(value: string | null | undefined, max = 180) {
   if (!value) return "";
   const normalized = value.replace(/\s+/g, " ").trim();
   return normalized.length > max ? `${normalized.slice(0, max - 1)}…` : normalized;
+}
+
+function isMissingDbSchemaError(err: unknown) {
+  const error = err as { code?: string; message?: string };
+  const message = String(error?.message ?? "").toLowerCase();
+  return (
+    error?.code === "42P01" ||
+    error?.code === "42703" ||
+    message.includes("relation") && message.includes("does not exist") ||
+    message.includes("column") && message.includes("does not exist") ||
+    message.includes("schema") && message.includes("does not exist")
+  );
 }
 
 function qualityStatus(score: number | null, rewriteRate: number, clarificationRate = 0) {
@@ -370,6 +803,394 @@ async function getPromptPayload(prompt: AgentPrompt) {
     updatedAt: activeVersion?.publishedAt?.toISOString() ?? activeVersion?.updatedAt.toISOString() ?? null,
     updatedBy: activeVersion?.createdBy ? `User #${activeVersion.createdBy}` : null,
     validation,
+  };
+}
+
+function getDefaultPromptPayload(prompt: AgentPrompt) {
+  const requiredPlaceholders = prompt.requiredPlaceholders ?? [];
+  const validation = validatePromptValue(
+    prompt.defaultValue,
+    prompt.placeholders,
+    requiredPlaceholders,
+  );
+
+  return {
+    key: prompt.key,
+    label: prompt.label,
+    description: prompt.description,
+    placeholders: prompt.placeholders,
+    requiredPlaceholders,
+    defaultValue: prompt.defaultValue,
+    currentValue: prompt.defaultValue,
+    draftValue: prompt.defaultValue,
+    isOverridden: false,
+    hasDraft: false,
+    activeVersionId: null,
+    activeVersionNumber: null,
+    draftVersionId: null,
+    draftVersionNumber: null,
+    updatedAt: null,
+    updatedBy: null,
+    validation,
+    persistenceUnavailable: true,
+    reason: "prompts_persistence_unavailable",
+    setupAction: "run_migrations",
+  };
+}
+
+function persistenceFallback(reason: string, setupAction: "run_migrations" | "check_database" | "check_schema" = "run_migrations") {
+  return {
+    persistenceUnavailable: true,
+    reason,
+    setupAction,
+  };
+}
+
+function emptyQualityOverview(days: number, reason?: string) {
+  return {
+    generatedAt: new Date().toISOString(),
+    days,
+    persistenceUnavailable: Boolean(reason),
+    reason: reason ?? null,
+    setupAction: reason ? "run_migrations" : null,
+    summary: {
+      total: 0,
+      avgEvalScore: null,
+      avgSupervisorScore: null,
+      rewriteRate: 0,
+      clarificationRate: 0,
+      toolUsageRate: 0,
+      rewrites: 0,
+      clarifications: 0,
+      uiTools: 0,
+      avgResponseTimeMs: null,
+      supervisorRewriteCount: 0,
+      avgScoreBeforeRewrite: null,
+      avgScoreAfterRewrite: null,
+      feedbackTotal: 0,
+      negativeFeedback: 0,
+      positiveFeedback: 0,
+      negativeFeedbackRate: 0,
+    },
+    trends: [],
+    domains: [],
+    problemConversations: [],
+    rewriteReasons: [],
+    alerts: reason
+      ? [{
+          level: "attention" as const,
+          title: "Metriche qualita non disponibili",
+          message: "Applica le migration quality/feedback per popolare questa sezione.",
+          domain: null,
+        }]
+      : [],
+  };
+}
+
+function emptyAgentsOverview(days: number, reason?: string) {
+  return {
+    generatedAt: new Date().toISOString(),
+    days,
+    persistenceUnavailable: Boolean(reason),
+    reason: reason ?? null,
+    setupAction: reason ? "run_migrations" : null,
+    summary: {
+      totalRuns: 0,
+      totalAgents: 0,
+      successRate30d: 100,
+      avgDurationMs: null,
+      failedRuns: 0,
+      runningRuns: 0,
+      degradedAgents: 0,
+      criticalAgents: 0,
+      costUsd30d: 0,
+      totalTokens30d: 0,
+      aiRequests30d: 0,
+      aiErrors30d: 0,
+    },
+    agents: [],
+    recentRuns: [],
+    recentErrors: [],
+    costs: {
+      days,
+      estimatedCostUsd: 0,
+      totalTokens: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      requestCount: 0,
+      aiRequestCostUsd: 0,
+      aiRequestTokens: 0,
+      aiRequestCount: 0,
+      aiErrorCount: 0,
+      byProvider: [],
+    },
+    runnableAgents: RUNNABLE_AGENTS,
+  };
+}
+
+function emptyCatalogList(type: CatalogType, reason?: string) {
+  return {
+    type,
+    label: CATALOG_LABELS[type],
+    items: [],
+    drafts: [],
+    persistenceUnavailable: Boolean(reason),
+    reason: reason ?? null,
+    setupAction: reason ? "run_migrations" : null,
+  };
+}
+
+function emptyCatalogOverview(reason?: string) {
+  return {
+    generatedAt: new Date().toISOString(),
+    persistenceUnavailable: Boolean(reason),
+    reason: reason ?? null,
+    setupAction: reason ? "run_migrations" : null,
+    items: CATALOG_TYPES.map((type) => ({
+      type,
+      label: CATALOG_LABELS[type],
+      total: 0,
+      active: 0,
+      archived: 0,
+      drafts: 0,
+    })),
+  };
+}
+
+const ADMIN_ENV_CHECKS = [
+  { key: "DATABASE_URL", label: "Database", critical: true },
+  { key: "JWT_SECRET", label: "Auth token", critical: true },
+  { key: "CLERK_SECRET_KEY", label: "Clerk server", critical: true },
+  { key: "OPENROUTER_API_KEY", label: "OpenRouter AI", critical: true },
+  { key: "ADMIN_BREAK_GLASS_KEY", label: "Break-glass admin", critical: true },
+  { key: "STRIPE_SECRET_KEY", label: "Stripe", critical: false },
+  { key: "STRIPE_WEBHOOK_SECRET", label: "Stripe webhook", critical: false },
+  { key: "RESEND_API_KEY", label: "Email", critical: false },
+  { key: "TAVILY_API_KEY", label: "Web research", critical: false },
+  { key: "REDIS_URL", label: "Redis/rate limit", critical: false },
+] as const;
+
+function percent(part: number, total: number) {
+  if (!total) return 0;
+  return Math.round((part / total) * 1000) / 10;
+}
+
+function envStatus() {
+  const items = ADMIN_ENV_CHECKS.map((item) => ({
+    ...item,
+    configured: Boolean(process.env[item.key]),
+  }));
+  const missingCritical = items.filter((item) => item.critical && !item.configured);
+  const missingOptional = items.filter((item) => !item.critical && !item.configured);
+  return {
+    total: items.length,
+    configured: items.filter((item) => item.configured).length,
+    missingCritical: missingCritical.map((item) => item.key),
+    missingOptional: missingOptional.map((item) => item.key),
+    items,
+  };
+}
+
+async function getBusinessStatusSnapshot(daysInput: unknown) {
+  const days = [7, 30].includes(Number(daysInput)) ? Number(daysInput) : 30;
+  const now = new Date();
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const errorReport = executionMonitor.getReport();
+  const dbReady = await checkDatabaseHealth();
+
+  const [
+    userStats,
+    testStats,
+    topSectors,
+    contactStats,
+    leadStats,
+    agentStats,
+    recentFailedRuns,
+    aiStats,
+  ] = await Promise.all([
+    db
+      .select({
+        total: sql<number>`count(*)::int`,
+        premium: sql<number>`count(*) filter (where ${usersTable.isPremium} = true or ${usersTable.stripeSubscriptionId} is not null)::int`,
+        new7d: sql<number>`count(*) filter (where ${usersTable.createdAt} >= ${since7d})::int`,
+        new30d: sql<number>`count(*) filter (where ${usersTable.createdAt} >= ${since30d})::int`,
+      })
+      .from(usersTable),
+    db
+      .select({
+        total: sql<number>`count(*)::int`,
+        recent: sql<number>`count(*) filter (where ${testSessionsTable.createdAt} >= ${since})::int`,
+        recent7d: sql<number>`count(*) filter (where ${testSessionsTable.createdAt} >= ${since7d})::int`,
+        recent30d: sql<number>`count(*) filter (where ${testSessionsTable.createdAt} >= ${since30d})::int`,
+        confirmed: sql<number>`count(*) filter (where ${testSessionsTable.confirmedSectorId} is not null)::int`,
+      })
+      .from(testSessionsTable),
+    db
+      .select({
+        sectorId: testSessionsTable.confirmedSectorId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(testSessionsTable)
+      .where(sql`${testSessionsTable.confirmedSectorId} is not null`)
+      .groupBy(testSessionsTable.confirmedSectorId)
+      .orderBy(sql`count(*) desc`)
+      .limit(5),
+    db
+      .select({
+        total: sql<number>`count(*)::int`,
+        unread: sql<number>`count(*) filter (where ${contactMessagesTable.read} = false)::int`,
+        open: sql<number>`count(*) filter (where ${contactMessagesTable.status} in ('new', 'in_progress'))::int`,
+      })
+      .from(contactMessagesTable)
+      .where(isNull(contactMessagesTable.deletedAt)),
+    db
+      .select({
+        total: sql<number>`count(*)::int`,
+        pending: sql<number>`count(*) filter (where ${affiliationLeadsTable.status} = 'pending')::int`,
+        contacted: sql<number>`count(*) filter (where ${affiliationLeadsTable.status} = 'contacted')::int`,
+        converted: sql<number>`count(*) filter (where ${affiliationLeadsTable.status} = 'converted')::int`,
+        unread: sql<number>`count(*) filter (where ${affiliationLeadsTable.read} = false)::int`,
+      })
+      .from(affiliationLeadsTable),
+    db
+      .select({
+        total: sql<number>`count(*)::int`,
+        failed: sql<number>`count(*) filter (where ${agentRunsTable.status} in ('failed', 'cancelled'))::int`,
+        running: sql<number>`count(*) filter (where ${agentRunsTable.status} = 'running')::int`,
+        avgDurationMs: sql<number>`avg(${agentRunsTable.durationMs})::int`,
+      })
+      .from(agentRunsTable)
+      .where(gte(agentRunsTable.startedAt, since)),
+    db
+      .select({
+        id: agentRunsTable.id,
+        agentName: agentRunsTable.agentName,
+        taskType: agentRunsTable.taskType,
+        status: agentRunsTable.status,
+        errorMessage: agentRunsTable.errorMessage,
+        startedAt: agentRunsTable.startedAt,
+      })
+      .from(agentRunsTable)
+      .where(and(gte(agentRunsTable.startedAt, since), sql`${agentRunsTable.status} in ('failed', 'cancelled')`))
+      .orderBy(desc(agentRunsTable.startedAt))
+      .limit(5),
+    db
+      .select({
+        requests: sql<number>`count(*)::int`,
+        errors: sql<number>`count(*) filter (where ${aiRequestLogTable.status} <> 'success')::int`,
+      })
+      .from(aiRequestLogTable)
+      .where(gte(aiRequestLogTable.createdAt, since)),
+  ]);
+
+  const users = userStats[0] ?? { total: 0, premium: 0, new7d: 0, new30d: 0 };
+  const tests = testStats[0] ?? { total: 0, recent: 0, recent7d: 0, recent30d: 0, confirmed: 0 };
+  const contacts = contactStats[0] ?? { total: 0, unread: 0, open: 0 };
+  const leads = leadStats[0] ?? { total: 0, pending: 0, contacted: 0, converted: 0, unread: 0 };
+  const agents = agentStats[0] ?? { total: 0, failed: 0, running: 0, avgDurationMs: null };
+  const ai = aiStats[0] ?? { requests: 0, errors: 0 };
+  const env = envStatus();
+  const agentErrorRate = percent(Number(agents.failed) || 0, Number(agents.total) || 0);
+  const aiErrorRate = percent(Number(ai.errors) || 0, Number(ai.requests) || 0);
+  const recentErrors = errorReport.errors.slice(0, 5).map((error) => ({
+    file: error.file,
+    function: error.function,
+    message: error.message,
+    code: error.code ?? null,
+    capturedAt: error.capturedAt,
+    occurrences: error.occurrences,
+  }));
+
+  const services = {
+    api: { status: "ok", label: "API", uptimeSeconds: Math.floor(process.uptime()) },
+    database: { status: dbReady ? "ok" : "error", label: "Database" },
+    auth: { status: process.env.JWT_SECRET && process.env.CLERK_SECRET_KEY ? "ok" : "not_configured", label: "Clerk/Auth" },
+    ai: { status: process.env.OPENROUTER_API_KEY ? "ok" : "not_configured", label: "OpenRouter AI" },
+    stripe: { status: process.env.STRIPE_SECRET_KEY ? "ok" : "not_configured", label: "Stripe" },
+  };
+
+  const criticalReasons: string[] = [];
+  const attentionReasons: string[] = [];
+  if (!dbReady) criticalReasons.push("Database non pronto");
+  if (env.missingCritical.length > 0) criticalReasons.push(`${env.missingCritical.length} env critiche mancanti`);
+  if (errorReport.errors.length >= 5) criticalReasons.push(`${errorReport.errors.length} errori unici recenti`);
+  if (agentErrorRate > 20) criticalReasons.push(`Agent error rate ${agentErrorRate}%`);
+  if (errorReport.totalCaptured > 0) attentionReasons.push(`${errorReport.totalCaptured} errori catturati`);
+  if (env.missingOptional.length > 0) attentionReasons.push(`${env.missingOptional.length} env opzionali mancanti`);
+  if ((Number(contacts.unread) || 0) > 0) attentionReasons.push(`${contacts.unread} messaggi non letti`);
+  if ((Number(leads.pending) || 0) > 0) attentionReasons.push(`${leads.pending} lead pending`);
+  if (agentErrorRate > 0) attentionReasons.push(`Agenti con errori ${agentErrorRate}%`);
+
+  const status = criticalReasons.length > 0 ? "critical" : attentionReasons.length > 0 ? "attention" : "healthy";
+
+  return {
+    generatedAt: new Date().toISOString(),
+    days,
+    business: {
+      users: {
+        total: Number(users.total) || 0,
+        new7d: Number(users.new7d) || 0,
+        new30d: Number(users.new30d) || 0,
+        premium: Number(users.premium) || 0,
+        conversionRate: percent(Number(users.premium) || 0, Number(users.total) || 0),
+      },
+      tests: {
+        total: Number(tests.total) || 0,
+        recent: Number(tests.recent) || 0,
+        recent7d: Number(tests.recent7d) || 0,
+        recent30d: Number(tests.recent30d) || 0,
+        confirmed: Number(tests.confirmed) || 0,
+        completionRate: percent(Number(tests.confirmed) || 0, Number(tests.total) || 0),
+      },
+      topSectors,
+    },
+    funnels: {
+      userToTestRate: percent(Number(tests.total) || 0, Number(users.total) || 0),
+      userToPremiumRate: percent(Number(users.premium) || 0, Number(users.total) || 0),
+      leadConversionRate: percent(Number(leads.converted) || 0, Number(leads.total) || 0),
+    },
+    technical: {
+      status,
+      label: status === "healthy" ? "Tutto stabile" : status === "attention" ? "Attenzione" : "Intervento richiesto",
+      reasons: [...criticalReasons, ...attentionReasons],
+      uptimeSeconds: Math.floor(process.uptime()),
+      services,
+      dbReady,
+      errors: {
+        totalCaptured: errorReport.totalCaptured,
+        unique: errorReport.errors.length,
+        recent: recentErrors,
+        brokenComponents: errorReport.brokenComponents.slice(0, 5),
+      },
+      agents: {
+        totalRuns: Number(agents.total) || 0,
+        failedRuns: Number(agents.failed) || 0,
+        runningRuns: Number(agents.running) || 0,
+        errorRate: agentErrorRate,
+        avgDurationMs: agents.avgDurationMs ?? null,
+        recentFailures: recentFailedRuns,
+      },
+      ai: {
+        requests: Number(ai.requests) || 0,
+        errors: Number(ai.errors) || 0,
+        errorRate: aiErrorRate,
+      },
+    },
+    env,
+    inbox: {
+      messages: contacts,
+      leads,
+    },
+    actions: [
+      { label: "Review suggerimenti", section: "queue", path: "/admin/review", count: null },
+      { label: "Coda crescita", section: "crescita", path: "/admin/crescita", count: null },
+      { label: "Agenti", section: "agents", path: "/admin/agenti", count: Number(agents.failed) || 0 },
+      { label: "Status", section: "status", path: "/admin/status", count: criticalReasons.length + attentionReasons.length },
+      { label: "Messaggi", section: "messaggi", path: "/admin/messaggi", count: Number(contacts.unread) || 0 },
+      { label: "Affiliazione", section: "affiliazione", path: "/admin/affiliazione", count: Number(leads.pending) || 0 },
+    ],
   };
 }
 
@@ -930,8 +1751,8 @@ router.get("/prompts", async (req: Request, res: Response) => {
     }
     res.json(payload);
   } catch (err) {
-    rootLogger.error({ err }, "[admin/prompts] error");
-    res.status(500).json({ error: String(err) });
+    rootLogger.warn({ err }, "[admin/prompts] returning default prompts after read failure");
+    res.json(DEFAULT_PROMPTS.map(getDefaultPromptPayload));
   }
 });
 
@@ -967,8 +1788,35 @@ router.get("/prompts/:key/versions", async (req: Request, res: Response) => {
       })),
     });
   } catch (err) {
-    rootLogger.error({ err }, "[admin/prompts/:key/versions] error");
-    res.status(500).json({ error: String(err) });
+    const prompt = findDefaultPrompt(req.params.key);
+    if (!prompt) {
+      res.status(404).json({ error: "Prompt not found" });
+      return;
+    }
+    rootLogger.warn({ err, key: req.params.key }, "[admin/prompts/:key/versions] returning default virtual version after read failure");
+    res.json({
+      promptKey: prompt.key,
+      activeVersionId: null,
+      ...persistenceFallback("prompt_versions_persistence_unavailable"),
+      versions: [
+        {
+          id: 0,
+          versionNumber: 1,
+          status: "active",
+          value: prompt.defaultValue,
+          notes: "Versione default non persistita",
+          createdBy: null,
+          publishedAt: null,
+          createdAt: null,
+          updatedAt: null,
+          validation: validatePromptValue(
+            prompt.defaultValue,
+            prompt.placeholders,
+            prompt.requiredPlaceholders ?? [],
+          ),
+        },
+      ],
+    });
   }
 });
 
@@ -1320,8 +2168,51 @@ router.post("/prompts/:key/preview", async (req: Request, res: Response) => {
       validation,
     });
   } catch (err) {
-    rootLogger.error({ err }, "[admin/prompts/:key/preview] error");
-    res.status(500).json({ error: String(err) });
+    const prompt = findDefaultPrompt(req.params.key);
+    if (!prompt) {
+      res.status(404).json({ error: "Prompt not found" });
+      return;
+    }
+    rootLogger.warn({ err, key: req.params.key }, "[admin/prompts/:key/preview] returning default preview after read failure");
+    const value = typeof req.body?.value === "string" ? req.body.value : prompt.defaultValue;
+    const variables = sampleVariables(
+      prompt.placeholders,
+      typeof req.body?.variables === "object" && req.body.variables ? req.body.variables : undefined,
+    );
+    const validation = validatePromptValue(
+      value,
+      prompt.placeholders,
+      prompt.requiredPlaceholders ?? [],
+    );
+    res.json({
+      ok: true,
+      ...persistenceFallback("prompt_preview_persistence_unavailable"),
+      rendered: renderPrompt(value, variables),
+      variables,
+      validation,
+    });
+  }
+});
+
+router.get("/ai/model-policy", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+
+  try {
+    res.json({
+      generatedAt: new Date().toISOString(),
+      policy: getModelRoutingPolicy(),
+      notes: [
+        "Con AI_PROVIDER=openrouter la policy usa solo openrouter/free o model ID con suffisso :free.",
+        "Gli override env MODEL_* sono accettati solo se gratuiti, salvo ALLOW_PAID_AI_MODELS=true.",
+      ],
+    });
+  } catch (err) {
+    rootLogger.warn({ err }, "[admin/ai/model-policy] policy unavailable");
+    res.json({
+      generatedAt: new Date().toISOString(),
+      policy: null,
+      notes: ["Policy modelli temporaneamente non disponibile."],
+    });
   }
 });
 
@@ -1387,8 +2278,9 @@ router.get("/quality", async (req: Request, res: Response) => {
 router.get("/quality/overview", async (req: Request, res: Response) => {
   if (!adminAuth(req, res)) return;
 
+  const days = Math.max(1, Math.min(Number(req.query.days) || 30, 90));
+
   try {
-    const days = Math.max(1, Math.min(Number(req.query.days) || 30, 90));
     const limit = getLimit(req, 50, 100);
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
@@ -1683,8 +2575,8 @@ router.get("/quality/overview", async (req: Request, res: Response) => {
       alerts,
     });
   } catch (err) {
-    rootLogger.error({ err }, "[admin/quality/overview] error");
-    res.status(500).json({ error: String(err) });
+    rootLogger.warn({ err }, "[admin/quality/overview] returning empty overview after read failure");
+    res.json(emptyQualityOverview(days, "quality_overview_unavailable"));
   }
 });
 
@@ -1754,26 +2646,524 @@ router.get("/wendy-metrics", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/catalogs/sectors", async (req: Request, res: Response) => {
+async function ensureCatalogReferences(type: CatalogType, payload: Record<string, any>, entityId?: number | null) {
+  const fields: Record<string, string> = {};
+
+  if (type === "professions" && payload.sectorId) {
+    const [sector] = await db
+      .select({ id: sectorsTable.id })
+      .from(sectorsTable)
+      .where(eq(sectorsTable.id, Number(payload.sectorId)))
+      .limit(1);
+    if (!sector) fields.sectorId = "Settore collegato inesistente.";
+  }
+
+  if (type === "education_paths" && payload.professionIds?.length) {
+    for (const professionId of payload.professionIds as number[]) {
+      const [profession] = await db
+        .select({ id: professionsTable.id })
+        .from(professionsTable)
+        .where(eq(professionsTable.id, professionId))
+        .limit(1);
+      if (!profession) {
+        fields.professionIds = `Professione ${professionId} inesistente.`;
+        break;
+      }
+    }
+  }
+
+  if (type === "growth_articles" && payload.slug) {
+    const conditions = [eq(growthArticlesTable.slug, String(payload.slug))];
+    if (entityId) conditions.push(ne(growthArticlesTable.id, entityId));
+    const [existing] = await db
+      .select({ id: growthArticlesTable.id })
+      .from(growthArticlesTable)
+      .where(and(...conditions))
+      .limit(1);
+    if (existing) fields.slug = "Slug gia usato da un altro articolo.";
+  }
+
+  return fields;
+}
+
+async function getCatalogRows(type: CatalogType, limit: number, query: string, status: string) {
+  const search = `%${query}%`;
+
+  if (type === "sectors") {
+    const where = [
+      status === "archived" ? eq(sectorsTable.isActive, false) : status === "active" ? eq(sectorsTable.isActive, true) : undefined,
+      query ? or(ilike(sectorsTable.name, search), ilike(sectorsTable.description, search)) : undefined,
+    ].filter(Boolean) as any[];
+    return db
+      .select()
+      .from(sectorsTable)
+      .where(where.length ? and(...where) : undefined)
+      .orderBy(asc(sectorsTable.name))
+      .limit(limit);
+  }
+
+  if (type === "professions") {
+    const where = [
+      status === "archived" ? eq(professionsTable.isActive, false) : status === "active" ? eq(professionsTable.isActive, true) : undefined,
+      query ? or(ilike(professionsTable.title, search), ilike(professionsTable.description, search)) : undefined,
+    ].filter(Boolean) as any[];
+    return db
+      .select()
+      .from(professionsTable)
+      .where(where.length ? and(...where) : undefined)
+      .orderBy(asc(professionsTable.title))
+      .limit(limit);
+  }
+
+  if (type === "education_paths") {
+    const where = [
+      status === "archived" ? eq(educationPathsTable.isActive, false) : status === "active" ? eq(educationPathsTable.isActive, true) : undefined,
+      query ? ilike(educationPathsTable.path, search) : undefined,
+    ].filter(Boolean) as any[];
+    return db
+      .select()
+      .from(educationPathsTable)
+      .where(where.length ? and(...where) : undefined)
+      .orderBy(asc(educationPathsTable.path))
+      .limit(limit);
+  }
+
+  const where = [
+    status !== "all" ? eq(growthArticlesTable.status, status) : undefined,
+    query ? or(ilike(growthArticlesTable.title, search), ilike(growthArticlesTable.description, search)) : undefined,
+  ].filter(Boolean) as any[];
+  return db
+    .select()
+    .from(growthArticlesTable)
+    .where(where.length ? and(...where) : undefined)
+    .orderBy(desc(growthArticlesTable.updatedAt))
+    .limit(limit);
+}
+
+async function getCatalogEntity(type: CatalogType, id: number) {
+  if (type === "sectors") {
+    const [row] = await db.select().from(sectorsTable).where(eq(sectorsTable.id, id)).limit(1);
+    return row ?? null;
+  }
+  if (type === "professions") {
+    const [row] = await db.select().from(professionsTable).where(eq(professionsTable.id, id)).limit(1);
+    return row ?? null;
+  }
+  if (type === "education_paths") {
+    const [row] = await db.select().from(educationPathsTable).where(eq(educationPathsTable.id, id)).limit(1);
+    if (!row) return null;
+    const links = await db
+      .select({ professionId: professionEducationPathsTable.professionId })
+      .from(professionEducationPathsTable)
+      .where(eq(professionEducationPathsTable.educationPathId, id));
+    return { ...row, professionIds: links.map((link) => link.professionId) };
+  }
+  const [row] = await db.select().from(growthArticlesTable).where(eq(growthArticlesTable.id, id)).limit(1);
+  return row ?? null;
+}
+
+async function findPublishDraft(type: CatalogType, id: number) {
+  const [draftById] = await db
+    .select()
+    .from(adminCatalogDraftsTable)
+    .where(and(eq(adminCatalogDraftsTable.catalogType, type), eq(adminCatalogDraftsTable.id, id), eq(adminCatalogDraftsTable.status, "draft")))
+    .limit(1);
+  if (draftById) return draftById;
+
+  const [draftByEntity] = await db
+    .select()
+    .from(adminCatalogDraftsTable)
+    .where(and(eq(adminCatalogDraftsTable.catalogType, type), eq(adminCatalogDraftsTable.entityId, id), eq(adminCatalogDraftsTable.status, "draft")))
+    .orderBy(desc(adminCatalogDraftsTable.updatedAt))
+    .limit(1);
+  return draftByEntity ?? null;
+}
+
+function previewCatalogPayload(type: CatalogType, payload: Record<string, any>) {
+  if (type === "sectors") {
+    return {
+      title: payload.name,
+      subtitle: `${payload.trend} · +${payload.growthRate}% crescita`,
+      description: payload.description,
+      url: payload.id ? `/settore/${payload.id}` : "/settori",
+      badges: [payload.automationRisk, ...(payload.riasecTypes ?? [])].filter(Boolean),
+    };
+  }
+  if (type === "professions") {
+    return {
+      title: payload.title,
+      subtitle: payload.sector,
+      description: payload.description,
+      url: payload.id ? `/ruolo/${payload.id}` : "/ruoli",
+      badges: [payload.salaryRange, payload.growthOutlook].filter(Boolean),
+    };
+  }
+  if (type === "education_paths") {
+    return {
+      title: payload.path,
+      subtitle: `${payload.type} · ${payload.duration}`,
+      description: `${payload.cost} · ${(payload.careerOutcomes ?? []).slice(0, 2).join(", ")}`,
+      url: "/percorso",
+      badges: payload.sectorFit ?? [],
+    };
+  }
+  return {
+    title: payload.title,
+    subtitle: `${payload.category} · ${payload.readTimeMinutes} min`,
+    description: payload.description,
+    url: payload.slug ? `/crescita/articolo/${payload.slug}` : "/crescita",
+    badges: [payload.difficulty, payload.status, ...(payload.tags ?? []).slice(0, 3)].filter(Boolean),
+  };
+}
+
+async function publishCatalogDraft(type: CatalogType, draft: typeof adminCatalogDraftsTable.$inferSelect) {
+  const payload = draft.payload as Record<string, any>;
+  const now = new Date();
+
+  if (type === "sectors") {
+    const values = { ...payload, updatedAt: now } as typeof sectorsTable.$inferInsert;
+    if (draft.entityId) {
+      const [row] = await db.update(sectorsTable).set(values).where(eq(sectorsTable.id, draft.entityId)).returning();
+      return row;
+    }
+    const [row] = await db.insert(sectorsTable).values(values).returning();
+    return row;
+  }
+
+  if (type === "professions") {
+    const values = { ...payload, updatedAt: now } as typeof professionsTable.$inferInsert;
+    if (draft.entityId) {
+      const [row] = await db.update(professionsTable).set(values).where(eq(professionsTable.id, draft.entityId)).returning();
+      return row;
+    }
+    const [row] = await db.insert(professionsTable).values(values).returning();
+    return row;
+  }
+
+  if (type === "education_paths") {
+    const { professionIds, ...pathValues } = payload;
+    const values = { ...pathValues, updatedAt: now } as typeof educationPathsTable.$inferInsert;
+    const row = draft.entityId
+      ? (await db.update(educationPathsTable).set(values).where(eq(educationPathsTable.id, draft.entityId)).returning())[0]
+      : (await db.insert(educationPathsTable).values(values).returning())[0];
+    if (row) {
+      await db
+        .delete(professionEducationPathsTable)
+        .where(eq(professionEducationPathsTable.educationPathId, row.id));
+      if (Array.isArray(professionIds) && professionIds.length > 0) {
+        await db.insert(professionEducationPathsTable).values(
+          professionIds.map((professionId: number) => ({
+            professionId,
+            educationPathId: row.id,
+          })),
+        );
+      }
+    }
+    return row;
+  }
+
+  const values = { ...payload, updatedAt: now } as typeof growthArticlesTable.$inferInsert;
+  if (draft.entityId) {
+    const [row] = await db.update(growthArticlesTable).set(values).where(eq(growthArticlesTable.id, draft.entityId)).returning();
+    return row;
+  }
+  const [row] = await db.insert(growthArticlesTable).values(values).returning();
+  return row;
+}
+
+router.get("/catalogs/overview", async (req: Request, res: Response) => {
   if (!adminAuth(req, res)) return;
 
   try {
-    const sectors = await db
-      .select({
-        id: sectorsTable.id,
-        name: sectorsTable.name,
-        description: sectorsTable.description,
-        trend: sectorsTable.trend,
-        growthRate: sectorsTable.growthRate,
-        automationRisk: sectorsTable.automationRisk,
-        updatedAt: sectorsTable.updatedAt,
-      })
-      .from(sectorsTable)
-      .orderBy(sectorsTable.name)
-      .limit(getLimit(req, 100, 500));
-    res.json(sectors);
+    const [
+      sectorsTotal,
+      sectorsArchived,
+      professionsTotal,
+      professionsArchived,
+      pathsTotal,
+      pathsArchived,
+      articlesTotal,
+      articlesPublished,
+      articlesArchived,
+      draftRows,
+    ] = await Promise.all([
+      db.select({ count: count() }).from(sectorsTable),
+      db.select({ count: count() }).from(sectorsTable).where(eq(sectorsTable.isActive, false)),
+      db.select({ count: count() }).from(professionsTable),
+      db.select({ count: count() }).from(professionsTable).where(eq(professionsTable.isActive, false)),
+      db.select({ count: count() }).from(educationPathsTable),
+      db.select({ count: count() }).from(educationPathsTable).where(eq(educationPathsTable.isActive, false)),
+      db.select({ count: count() }).from(growthArticlesTable),
+      db.select({ count: count() }).from(growthArticlesTable).where(eq(growthArticlesTable.status, "published")),
+      db.select({ count: count() }).from(growthArticlesTable).where(eq(growthArticlesTable.status, "archived")),
+      db
+        .select({ catalogType: adminCatalogDraftsTable.catalogType, count: count() })
+        .from(adminCatalogDraftsTable)
+        .where(eq(adminCatalogDraftsTable.status, "draft"))
+        .groupBy(adminCatalogDraftsTable.catalogType),
+    ]);
+
+    const draftCounts = Object.fromEntries(draftRows.map((row) => [row.catalogType, Number(row.count)]));
+    res.json({
+      generatedAt: new Date().toISOString(),
+      items: [
+        { type: "sectors", label: CATALOG_LABELS.sectors, total: Number(sectorsTotal[0]?.count ?? 0), active: Number(sectorsTotal[0]?.count ?? 0) - Number(sectorsArchived[0]?.count ?? 0), archived: Number(sectorsArchived[0]?.count ?? 0), drafts: draftCounts.sectors ?? 0 },
+        { type: "professions", label: CATALOG_LABELS.professions, total: Number(professionsTotal[0]?.count ?? 0), active: Number(professionsTotal[0]?.count ?? 0) - Number(professionsArchived[0]?.count ?? 0), archived: Number(professionsArchived[0]?.count ?? 0), drafts: draftCounts.professions ?? 0 },
+        { type: "education_paths", label: CATALOG_LABELS.education_paths, total: Number(pathsTotal[0]?.count ?? 0), active: Number(pathsTotal[0]?.count ?? 0) - Number(pathsArchived[0]?.count ?? 0), archived: Number(pathsArchived[0]?.count ?? 0), drafts: draftCounts.education_paths ?? 0 },
+        { type: "growth_articles", label: CATALOG_LABELS.growth_articles, total: Number(articlesTotal[0]?.count ?? 0), active: Number(articlesPublished[0]?.count ?? 0), archived: Number(articlesArchived[0]?.count ?? 0), drafts: draftCounts.growth_articles ?? 0 },
+      ],
+    });
   } catch (err) {
-    rootLogger.error({ err }, "[admin/catalogs/sectors] error");
+    rootLogger.warn({ err }, "[admin/catalogs/overview] returning empty overview after read failure");
+    res.json(emptyCatalogOverview("catalogs_overview_unavailable"));
+  }
+});
+
+router.get("/catalogs/:type", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  const type = req.params.type as CatalogType;
+  if (!CATALOG_TYPES.includes(type)) {
+    res.status(404).json({ error: "Catalogo non supportato" });
+    return;
+  }
+
+  try {
+    const limit = getLimit(req, 100, 500);
+    const query = stringValue(req.query.search);
+    const status = stringValue(req.query.status, "all");
+    const [items, drafts] = await Promise.all([
+      getCatalogRows(type, limit, query, status),
+      db
+        .select()
+        .from(adminCatalogDraftsTable)
+        .where(and(eq(adminCatalogDraftsTable.catalogType, type), eq(adminCatalogDraftsTable.status, "draft")))
+        .orderBy(desc(adminCatalogDraftsTable.updatedAt))
+        .limit(100),
+    ]);
+    res.json({ type, label: CATALOG_LABELS[type], items, drafts });
+  } catch (err) {
+    rootLogger.warn({ err, type }, "[admin/catalogs] returning empty list after read failure");
+    res.json(emptyCatalogList(type, "catalog_list_unavailable"));
+  }
+});
+
+router.get("/catalogs/:type/:id", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  const type = req.params.type as CatalogType;
+  const id = Number(req.params.id);
+  if (!CATALOG_TYPES.includes(type) || !Number.isFinite(id)) {
+    res.status(400).json({ error: "Richiesta non valida" });
+    return;
+  }
+
+  try {
+    const [entity, drafts, auditTrail] = await Promise.all([
+      getCatalogEntity(type, id),
+      db
+        .select()
+        .from(adminCatalogDraftsTable)
+        .where(and(eq(adminCatalogDraftsTable.catalogType, type), eq(adminCatalogDraftsTable.entityId, id)))
+        .orderBy(desc(adminCatalogDraftsTable.updatedAt))
+        .limit(20),
+      db
+        .select()
+        .from(auditLogTable)
+        .where(and(eq(auditLogTable.category, "admin_action"), sql`${auditLogTable.metadata}->>'catalogType' = ${type}`, sql`${auditLogTable.metadata}->>'entityId' = ${String(id)}`))
+        .orderBy(desc(auditLogTable.createdAt))
+        .limit(20),
+    ]);
+    if (!entity) {
+      res.status(404).json({ error: "Elemento non trovato" });
+      return;
+    }
+    res.json({ type, entity, drafts, auditTrail });
+  } catch (err) {
+    rootLogger.error({ err, type, id }, "[admin/catalogs] detail error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+async function saveCatalogDraft(req: Request, res: Response, type: CatalogType, entityId: number | null) {
+  const basePayload = req.body?.payload ?? req.body;
+  const validation = validateCatalogPayload(type, basePayload);
+  const referenceFields = validation.ok
+    ? await ensureCatalogReferences(type, validation.payload, entityId)
+    : {};
+  const fields = { ...validation.fields, ...referenceFields };
+  if (Object.keys(fields).length > 0) {
+    res.status(400).json({ error: "Payload catalogo non valido", fields });
+    return;
+  }
+
+  const [draft] = await db
+    .insert(adminCatalogDraftsTable)
+    .values({
+      catalogType: type,
+      entityId,
+      payload: validation.payload,
+      validation: { ok: true, fields: {} },
+      notes: stringValue(req.body?.notes) || null,
+      createdBy: req.user?.id ?? null,
+      updatedAt: new Date(),
+    })
+    .returning();
+
+  await writeCatalogAudit(req, "catalog_draft_saved", type, {
+    draftId: draft.id,
+    entityId,
+    notes: draft.notes,
+  });
+  res.status(201).json({ ok: true, draft, preview: previewCatalogPayload(type, validation.payload) });
+}
+
+router.post("/catalogs/:type/draft", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  const type = req.params.type as CatalogType;
+  if (!CATALOG_TYPES.includes(type)) {
+    res.status(404).json({ error: "Catalogo non supportato" });
+    return;
+  }
+  try {
+    await saveCatalogDraft(req, res, type, null);
+  } catch (err) {
+    rootLogger.error({ err, type }, "[admin/catalogs] create draft error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.post("/catalogs/:type/:id/draft", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  const type = req.params.type as CatalogType;
+  const id = Number(req.params.id);
+  if (!CATALOG_TYPES.includes(type) || !Number.isFinite(id)) {
+    res.status(400).json({ error: "Richiesta non valida" });
+    return;
+  }
+  try {
+    const entity = await getCatalogEntity(type, id);
+    if (!entity) {
+      res.status(404).json({ error: "Elemento non trovato" });
+      return;
+    }
+    await saveCatalogDraft(req, res, type, id);
+  } catch (err) {
+    rootLogger.error({ err, type, id }, "[admin/catalogs] update draft error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.post("/catalogs/:type/preview", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  const type = req.params.type as CatalogType;
+  if (!CATALOG_TYPES.includes(type)) {
+    res.status(404).json({ error: "Catalogo non supportato" });
+    return;
+  }
+  const validation = validateCatalogPayload(type, req.body?.payload ?? req.body);
+  if (!validation.ok) {
+    res.status(400).json({ error: "Payload catalogo non valido", fields: validation.fields });
+    return;
+  }
+  res.json({ ok: true, payload: validation.payload, preview: previewCatalogPayload(type, validation.payload) });
+});
+
+router.post("/catalogs/:type/:id/publish", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  const type = req.params.type as CatalogType;
+  const id = Number(req.params.id);
+  if (!CATALOG_TYPES.includes(type) || !Number.isFinite(id)) {
+    res.status(400).json({ error: "Richiesta non valida" });
+    return;
+  }
+
+  try {
+    const draft = await findPublishDraft(type, id);
+    if (!draft) {
+      res.status(404).json({ error: "Bozza pubblicabile non trovata" });
+      return;
+    }
+    const validation = validateCatalogPayload(type, draft.payload);
+    const referenceFields = validation.ok
+      ? await ensureCatalogReferences(type, validation.payload, draft.entityId)
+      : {};
+    const fields = { ...validation.fields, ...referenceFields };
+    if (Object.keys(fields).length > 0) {
+      res.status(400).json({ error: "Bozza non valida", fields });
+      return;
+    }
+    const entity = await publishCatalogDraft(type, draft);
+    await db
+      .update(adminCatalogDraftsTable)
+      .set({
+        status: "published",
+        entityId: entity?.id ?? draft.entityId,
+        payload: validation.payload,
+        publishedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(adminCatalogDraftsTable.id, draft.id));
+    await writeCatalogAudit(req, "catalog_published", type, {
+      draftId: draft.id,
+      entityId: entity?.id ?? draft.entityId,
+      notes: stringValue(req.body?.notes) || draft.notes,
+    });
+    res.json({ ok: true, entity, draftId: draft.id });
+  } catch (err) {
+    rootLogger.error({ err, type, id }, "[admin/catalogs] publish error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.post("/catalogs/:type/:id/archive", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  const type = req.params.type as CatalogType;
+  const id = Number(req.params.id);
+  if (!CATALOG_TYPES.includes(type) || !Number.isFinite(id)) {
+    res.status(400).json({ error: "Richiesta non valida" });
+    return;
+  }
+
+  try {
+    let entity: unknown = null;
+    if (type === "sectors") entity = (await db.update(sectorsTable).set({ isActive: false, updatedAt: new Date() }).where(eq(sectorsTable.id, id)).returning())[0];
+    if (type === "professions") entity = (await db.update(professionsTable).set({ isActive: false, updatedAt: new Date() }).where(eq(professionsTable.id, id)).returning())[0];
+    if (type === "education_paths") entity = (await db.update(educationPathsTable).set({ isActive: false, updatedAt: new Date() }).where(eq(educationPathsTable.id, id)).returning())[0];
+    if (type === "growth_articles") entity = (await db.update(growthArticlesTable).set({ status: "archived", updatedAt: new Date() }).where(eq(growthArticlesTable.id, id)).returning())[0];
+    if (!entity) {
+      res.status(404).json({ error: "Elemento non trovato" });
+      return;
+    }
+    await writeCatalogAudit(req, "catalog_archived", type, { entityId: id, notes: stringValue(req.body?.notes) || null });
+    res.json({ ok: true, entity });
+  } catch (err) {
+    rootLogger.error({ err, type, id }, "[admin/catalogs] archive error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.post("/catalogs/:type/:id/restore", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  const type = req.params.type as CatalogType;
+  const id = Number(req.params.id);
+  if (!CATALOG_TYPES.includes(type) || !Number.isFinite(id)) {
+    res.status(400).json({ error: "Richiesta non valida" });
+    return;
+  }
+
+  try {
+    let entity: unknown = null;
+    if (type === "sectors") entity = (await db.update(sectorsTable).set({ isActive: true, updatedAt: new Date() }).where(eq(sectorsTable.id, id)).returning())[0];
+    if (type === "professions") entity = (await db.update(professionsTable).set({ isActive: true, updatedAt: new Date() }).where(eq(professionsTable.id, id)).returning())[0];
+    if (type === "education_paths") entity = (await db.update(educationPathsTable).set({ isActive: true, updatedAt: new Date() }).where(eq(educationPathsTable.id, id)).returning())[0];
+    if (type === "growth_articles") entity = (await db.update(growthArticlesTable).set({ status: "published", updatedAt: new Date() }).where(eq(growthArticlesTable.id, id)).returning())[0];
+    if (!entity) {
+      res.status(404).json({ error: "Elemento non trovato" });
+      return;
+    }
+    await writeCatalogAudit(req, "catalog_restored", type, { entityId: id, notes: stringValue(req.body?.notes) || null });
+    res.json({ ok: true, entity });
+  } catch (err) {
+    rootLogger.error({ err, type, id }, "[admin/catalogs] restore error");
     res.status(500).json({ error: String(err) });
   }
 });
@@ -1820,8 +3210,9 @@ router.get("/agent-health", async (req: Request, res: Response) => {
 router.get("/agents/overview", async (req: Request, res: Response) => {
   if (!adminAuth(req, res)) return;
 
+  const days = Math.max(1, Math.min(Number(req.query.days) || 30, 90));
+
   try {
-    const days = Math.max(1, Math.min(Number(req.query.days) || 30, 90));
     const limit = getLimit(req, 100, 200);
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
@@ -2000,8 +3391,174 @@ router.get("/agents/overview", async (req: Request, res: Response) => {
       runnableAgents: RUNNABLE_AGENTS,
     });
   } catch (err) {
-    rootLogger.error({ err }, "[admin/agents/overview] error");
-    res.status(500).json({ error: String(err) });
+    rootLogger.warn({ err }, "[admin/agents/overview] returning empty overview after read failure");
+    res.json(emptyAgentsOverview(days, "agents_overview_unavailable"));
+  }
+});
+
+router.get("/memory-graph/overview", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+
+  try {
+    const userId = typeof req.query.userId === "string" ? Number(req.query.userId) : undefined;
+    const health = await getMemoryGraphHealth(Number.isFinite(userId) ? userId : undefined);
+
+    const candidateEdges = await db
+      .select({
+        id: knowledgeEdgesTable.id,
+        userId: knowledgeEdgesTable.userId,
+        sourceId: knowledgeEdgesTable.sourceId,
+        targetId: knowledgeEdgesTable.targetId,
+        label: knowledgeEdgesTable.label,
+        relationType: knowledgeEdgesTable.relationType,
+        confidence: knowledgeEdgesTable.confidence,
+        reason: knowledgeEdgesTable.reason,
+        createdAt: knowledgeEdgesTable.createdAt,
+      })
+      .from(knowledgeEdgesTable)
+      .where(eq(knowledgeEdgesTable.status, "candidate"))
+      .orderBy(desc(knowledgeEdgesTable.createdAt))
+      .limit(50);
+
+    const nodeIds = Array.from(new Set(candidateEdges.flatMap((edge) => [edge.sourceId, edge.targetId])));
+    const nodes = nodeIds.length
+      ? await db
+          .select({
+            id: knowledgeNodesTable.id,
+            title: knowledgeNodesTable.title,
+            type: knowledgeNodesTable.type,
+            sourceType: knowledgeNodesTable.sourceType,
+            confidence: knowledgeNodesTable.confidence,
+            status: knowledgeNodesTable.status,
+          })
+          .from(knowledgeNodesTable)
+          .where(inArray(knowledgeNodesTable.id, nodeIds))
+      : [];
+    const nodesById = new Map(nodes.map((node) => [node.id, node]));
+
+    const sourceBreakdown = await db.execute<{ source_type: string; count: string }>(sql`
+      SELECT source_type, count(*)::text AS count
+      FROM knowledge_nodes
+      GROUP BY source_type
+      ORDER BY count(*) DESC
+      LIMIT 12
+    `);
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      health,
+      sourceBreakdown: sourceBreakdown.rows.map((row) => ({
+        sourceType: row.source_type,
+        count: Number(row.count),
+      })),
+      candidateRelations: candidateEdges.map((edge) => ({
+        ...edge,
+        source: nodesById.get(edge.sourceId) ?? null,
+        target: nodesById.get(edge.targetId) ?? null,
+      })),
+      controls: [
+        { key: "backfill_user", label: "Backfill utente", description: "Crea o aggiorna il grafo memoria di un utente." },
+        { key: "approve_relation", label: "Approva relazione", description: "Promuove una relazione candidate ad active." },
+        { key: "reject_relation", label: "Rifiuta relazione", description: "Marca una relazione candidate come rejected." },
+      ],
+    });
+  } catch (err) {
+    rootLogger.error({ err }, "[admin/memory-graph/overview] error");
+    res.status(500).json({ error: "Memory graph non disponibile" });
+  }
+});
+
+router.post("/memory-graph/backfill-user", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+
+  const userId = Number(req.body?.userId);
+  if (!Number.isInteger(userId) || userId <= 0) {
+    res.status(400).json({ error: "userId obbligatorio" });
+    return;
+  }
+
+  try {
+    const result = await ingestUserMemoryGraph(userId);
+    await writeAuditLog(req, {
+      action: "admin_memory_graph_backfill_user",
+      category: "admin_action",
+      targetId: userId,
+      metadata: result,
+    });
+    res.json(result);
+  } catch (err) {
+    rootLogger.error({ err, userId }, "[admin/memory-graph/backfill-user] error");
+    res.status(500).json({ error: "Backfill memoria non riuscito" });
+  }
+});
+
+router.post("/memory-graph/relations/:id/approve", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "ID relazione non valido" });
+    return;
+  }
+
+  try {
+    const [edge] = await db
+      .update(knowledgeEdgesTable)
+      .set({ status: "active", updatedAt: new Date(), metadata: sql`metadata || ${JSON.stringify({ approvedBy: req.user?.id, approvedAt: new Date().toISOString() })}::jsonb` as any })
+      .where(eq(knowledgeEdgesTable.id, id))
+      .returning();
+    if (!edge) {
+      res.status(404).json({ error: "Relazione non trovata" });
+      return;
+    }
+    await writeAuditLog(req, {
+      action: "admin_memory_relation_approved",
+      category: "admin_action",
+      targetId: edge.userId,
+      metadata: { edgeId: edge.id, sourceId: edge.sourceId, targetId: edge.targetId },
+    });
+    res.json({ ok: true, edge });
+  } catch (err) {
+    rootLogger.error({ err, id }, "[admin/memory-graph/relations/approve] error");
+    res.status(500).json({ error: "Approvazione relazione non riuscita" });
+  }
+});
+
+router.post("/memory-graph/relations/:id/reject", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+
+  const id = Number(req.params.id);
+  const reason = typeof req.body?.reason === "string" ? req.body.reason.trim().slice(0, 500) : "";
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "ID relazione non valido" });
+    return;
+  }
+
+  try {
+    const [edge] = await db
+      .update(knowledgeEdgesTable)
+      .set({
+        status: "rejected",
+        reason: reason || null,
+        updatedAt: new Date(),
+        metadata: sql`metadata || ${JSON.stringify({ rejectedBy: req.user?.id, rejectedAt: new Date().toISOString(), reason })}::jsonb` as any,
+      })
+      .where(eq(knowledgeEdgesTable.id, id))
+      .returning();
+    if (!edge) {
+      res.status(404).json({ error: "Relazione non trovata" });
+      return;
+    }
+    await writeAuditLog(req, {
+      action: "admin_memory_relation_rejected",
+      category: "admin_action",
+      targetId: edge.userId,
+      metadata: { edgeId: edge.id, sourceId: edge.sourceId, targetId: edge.targetId, reason },
+    });
+    res.json({ ok: true, edge });
+  } catch (err) {
+    rootLogger.error({ err, id }, "[admin/memory-graph/relations/reject] error");
+    res.status(500).json({ error: "Rifiuto relazione non riuscito" });
   }
 });
 
@@ -2009,36 +3566,28 @@ router.get("/metrics", async (req: Request, res: Response) => {
   if (!adminAuth(req, res)) return;
 
   try {
-    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const [users, tests, topSectors] = await Promise.all([
-      db
-        .select({
-          total: sql<number>`count(*)::int`,
-          premium: sql<number>`count(*) filter (where ${usersTable.isPremium} = true or ${usersTable.stripeSubscriptionId} is not null)::int`,
-          new30d: sql<number>`count(*) filter (where ${usersTable.createdAt} >= ${since})::int`,
-        })
-        .from(usersTable),
-      db.select({ total: sql<number>`count(*)::int` }).from(testSessionsTable),
-      db
-        .select({
-          sectorId: testSessionsTable.confirmedSectorId,
-          count: sql<number>`count(*)::int`,
-        })
-        .from(testSessionsTable)
-        .where(sql`${testSessionsTable.confirmedSectorId} is not null`)
-        .groupBy(testSessionsTable.confirmedSectorId)
-        .orderBy(sql`count(*) desc`)
-        .limit(5),
-    ]);
-
+    const snapshot = await getBusinessStatusSnapshot(30);
     res.json({
-      users: users[0] ?? { total: 0, premium: 0, new30d: 0 },
-      tests: tests[0] ?? { total: 0 },
-      topSectors,
-      generatedAt: new Date().toISOString(),
+      users: snapshot.business.users,
+      tests: snapshot.business.tests,
+      topSectors: snapshot.business.topSectors,
+      funnels: snapshot.funnels,
+      generatedAt: snapshot.generatedAt,
     });
   } catch (err) {
     rootLogger.error({ err }, "[admin/metrics] error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.get("/business-status", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+
+  try {
+    const snapshot = await getBusinessStatusSnapshot(req.query.days);
+    res.json(snapshot);
+  } catch (err) {
+    rootLogger.error({ err }, "[admin/business-status] error");
     res.status(500).json({ error: String(err) });
   }
 });
@@ -2047,12 +3596,30 @@ router.get("/growth-queue", async (req: Request, res: Response) => {
   if (!adminAuth(req, res)) return;
 
   try {
+    const limit = getLimit(req, 50, 100);
+    const status = stringValue(req.query.status, "all");
+    const query = stringValue(req.query.search);
+    const search = `%${query}%`;
+    const where = [
+      GROWTH_QUEUE_STATUSES.includes(status as GrowthQueueStatus)
+        ? eq(growthArticlesTable.status, status)
+        : undefined,
+      query
+        ? or(
+            ilike(growthArticlesTable.title, search),
+            ilike(growthArticlesTable.slug, search),
+            ilike(growthArticlesTable.category, search),
+            ilike(growthArticlesTable.description, search),
+          )
+        : undefined,
+    ].filter(Boolean) as any[];
     const [queue, stats] = await Promise.all([
       db
         .select()
         .from(growthArticlesTable)
-        .orderBy(desc(growthArticlesTable.createdAt))
-        .limit(getLimit(req, 50, 100)),
+        .where(where.length ? and(...where) : undefined)
+        .orderBy(desc(growthArticlesTable.updatedAt))
+        .limit(limit),
       db
         .select({
           status: growthArticlesTable.status,
@@ -2064,15 +3631,193 @@ router.get("/growth-queue", async (req: Request, res: Response) => {
 
     const byStatus = Object.fromEntries(stats.map((row) => [row.status, Number(row.count) || 0]));
     res.json({
+      generatedAt: new Date().toISOString(),
       queue,
       stats: {
-        pending: byStatus.pending ?? byStatus.draft ?? 0,
+        draft: byStatus.draft ?? 0,
+        pending: byStatus.pending ?? 0,
         published: byStatus.published ?? 0,
         rejected: byStatus.rejected ?? 0,
+        total: GROWTH_QUEUE_STATUSES.reduce((sum, key) => sum + (byStatus[key] ?? 0), 0),
       },
     });
   } catch (err) {
     rootLogger.error({ err }, "[admin/growth-queue] error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.get("/growth-queue/:id", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "ID articolo non valido" });
+    return;
+  }
+
+  try {
+    const [article] = await db.select().from(growthArticlesTable).where(eq(growthArticlesTable.id, id)).limit(1);
+    if (!article) {
+      res.status(404).json({ error: "Articolo non trovato" });
+      return;
+    }
+    const auditTrail = await db
+      .select()
+      .from(auditLogTable)
+      .where(
+        and(
+          eq(auditLogTable.category, "admin_action"),
+          sql`${auditLogTable.metadata}->>'workflow' = 'growth_queue'`,
+          sql`${auditLogTable.metadata}->>'articleId' = ${String(id)}`,
+        ),
+      )
+      .orderBy(desc(auditLogTable.createdAt))
+      .limit(30);
+    res.json({ article, preview: previewGrowthArticle(article), auditTrail });
+  } catch (err) {
+    rootLogger.error({ err, id }, "[admin/growth-queue] detail error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.patch("/growth-queue/:id", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "ID articolo non valido" });
+    return;
+  }
+
+  try {
+    const [current] = await db.select().from(growthArticlesTable).where(eq(growthArticlesTable.id, id)).limit(1);
+    if (!current) {
+      res.status(404).json({ error: "Articolo non trovato" });
+      return;
+    }
+    const validation = normalizeGrowthArticlePayload(req.body?.payload ?? req.body, current);
+    const fields = {
+      ...validation.fields,
+      ...(validation.ok ? await ensureGrowthArticleSlug(validation.payload.slug, id) : {}),
+    };
+    if (Object.keys(fields).length > 0) {
+      res.status(400).json({ error: "Articolo crescita non valido", fields });
+      return;
+    }
+    const [article] = await db
+      .update(growthArticlesTable)
+      .set({ ...validation.payload, updatedAt: new Date() })
+      .where(eq(growthArticlesTable.id, id))
+      .returning();
+    await writeGrowthArticleAudit(req, "growth_article_updated", id, {
+      previousStatus: current.status,
+      nextStatus: article.status,
+      notes: stringValue(req.body?.notes) || null,
+    });
+    res.json({ ok: true, article, preview: previewGrowthArticle(article) });
+  } catch (err) {
+    rootLogger.error({ err, id }, "[admin/growth-queue] update error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.post("/growth-queue/:id/preview", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "ID articolo non valido" });
+    return;
+  }
+
+  try {
+    const [current] = await db.select().from(growthArticlesTable).where(eq(growthArticlesTable.id, id)).limit(1);
+    if (!current) {
+      res.status(404).json({ error: "Articolo non trovato" });
+      return;
+    }
+    const validation = normalizeGrowthArticlePayload(req.body?.payload ?? req.body ?? {}, current);
+    if (!validation.ok) {
+      res.status(400).json({ error: "Articolo crescita non valido", fields: validation.fields });
+      return;
+    }
+    res.json({ ok: true, preview: previewGrowthArticle(validation.payload), payload: validation.payload });
+  } catch (err) {
+    rootLogger.error({ err, id }, "[admin/growth-queue] preview error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.post("/growth-queue/:id/publish", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "ID articolo non valido" });
+    return;
+  }
+
+  try {
+    const [current] = await db.select().from(growthArticlesTable).where(eq(growthArticlesTable.id, id)).limit(1);
+    if (!current) {
+      res.status(404).json({ error: "Articolo non trovato" });
+      return;
+    }
+    const validation = normalizeGrowthArticlePayload({ ...current, status: "published" }, current);
+    const fields = {
+      ...validation.fields,
+      ...(validation.ok ? await ensureGrowthArticleSlug(validation.payload.slug, id) : {}),
+    };
+    if (Object.keys(fields).length > 0) {
+      res.status(400).json({ error: "Articolo non pubblicabile", fields });
+      return;
+    }
+    const [article] = await db
+      .update(growthArticlesTable)
+      .set({ ...validation.payload, status: "published", updatedAt: new Date() })
+      .where(eq(growthArticlesTable.id, id))
+      .returning();
+    await writeGrowthArticleAudit(req, "growth_article_published", id, {
+      previousStatus: current.status,
+      nextStatus: article.status,
+      notes: stringValue(req.body?.notes) || null,
+    });
+    res.json({ ok: true, article, preview: previewGrowthArticle(article) });
+  } catch (err) {
+    rootLogger.error({ err, id }, "[admin/growth-queue] publish error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.post("/growth-queue/:id/reject", async (req: Request, res: Response) => {
+  if (!adminAuth(req, res)) return;
+  const id = Number(req.params.id);
+  const reason = stringValue(req.body?.reason);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "ID articolo non valido" });
+    return;
+  }
+  if (reason.length < 3) {
+    res.status(400).json({ error: "Motivo rifiuto obbligatorio", fields: { reason: "Inserisci un motivo di almeno 3 caratteri." } });
+    return;
+  }
+
+  try {
+    const [current] = await db.select().from(growthArticlesTable).where(eq(growthArticlesTable.id, id)).limit(1);
+    if (!current) {
+      res.status(404).json({ error: "Articolo non trovato" });
+      return;
+    }
+    const [article] = await db
+      .update(growthArticlesTable)
+      .set({ status: "rejected", updatedAt: new Date() })
+      .where(eq(growthArticlesTable.id, id))
+      .returning();
+    await writeGrowthArticleAudit(req, "growth_article_rejected", id, {
+      previousStatus: current.status,
+      nextStatus: article.status,
+      reason,
+    });
+    res.json({ ok: true, article, preview: previewGrowthArticle(article) });
+  } catch (err) {
+    rootLogger.error({ err, id }, "[admin/growth-queue] reject error");
     res.status(500).json({ error: String(err) });
   }
 });
@@ -2112,23 +3857,64 @@ router.post("/research/news/run", async (req: Request, res: Response) => {
 
   const startedAt = new Date();
   try {
-    const [run] = await db
-      .insert(agentRunsTable)
-      .values({
-        agentName: "news-research",
-        taskType: "manual_admin_run",
-        inputSummary: JSON.stringify(req.body ?? {}),
-        status: "completed",
-        startedAt,
-        finishedAt: new Date(),
-        durationMs: Date.now() - startedAt.getTime(),
-        outputSummary: "Run registrata. Collegare collector reale quando le chiavi news sono configurate.",
-      })
-      .returning();
-    res.status(201).json({ ok: true, added: 0, checked: 0, runId: run.id });
+    const warnings: string[] = [];
+    const collector = await runCollector();
+
+    let enricher: Awaited<ReturnType<typeof runEnricher>> | null = null;
+    try {
+      enricher = await runEnricher(20);
+      if (enricher.errors.length) warnings.push(...enricher.errors.slice(0, 5));
+    } catch (err) {
+      warnings.push(`enricher: ${String(err).slice(0, 200)}`);
+    }
+
+    let publisher: Awaited<ReturnType<typeof runNewsPublisher>> | null = null;
+    try {
+      publisher = await runNewsPublisher();
+      if (publisher.missingCoverage.length) {
+        warnings.push(`Mancano news reali per ${publisher.missingCoverage.length} settori.`);
+      }
+    } catch (err) {
+      warnings.push(`publisher: ${String(err).slice(0, 200)}`);
+    }
+
+    const output = {
+      collector,
+      enricher,
+      publisher,
+      warnings,
+    };
+    const run = await writeAgentRunSnapshot({
+      agentName: "news-research",
+      taskType: "manual_admin_run",
+      startedAt,
+      status: warnings.length && !collector.totalInserted && !publisher?.transferred ? "failed" : "completed",
+      inputSummary: JSON.stringify(req.body ?? {}),
+      outputSummary: JSON.stringify(output).slice(0, 1000),
+      errorMessage: warnings.length ? warnings.join(" | ").slice(0, 1000) : undefined,
+    });
+
+    res.status(201).json({
+      ok: true,
+      runId: run.id,
+      checked: collector.totalCollected,
+      added: publisher?.transferred ?? 0,
+      collector,
+      enricher,
+      publisher,
+      warnings,
+    });
   } catch (err) {
+    const run = await writeAgentRunSnapshot({
+      agentName: "news-research",
+      taskType: "manual_admin_run",
+      startedAt,
+      status: "failed",
+      inputSummary: JSON.stringify(req.body ?? {}),
+      errorMessage: String(err),
+    }).catch(() => null);
     rootLogger.error({ err }, "[admin/research/news/run] error");
-    res.status(500).json({ error: String(err) });
+    res.status(500).json({ ok: false, runId: run?.id, error: String(err) });
   }
 });
 
@@ -2137,23 +3923,114 @@ router.post("/research/growth/run", async (req: Request, res: Response) => {
 
   const startedAt = new Date();
   try {
-    const [run] = await db
-      .insert(agentRunsTable)
-      .values({
-        agentName: "growth-research",
-        taskType: "manual_admin_run",
-        inputSummary: JSON.stringify(req.body ?? {}),
-        status: "completed",
-        startedAt,
-        finishedAt: new Date(),
-        durationMs: Date.now() - startedAt.getTime(),
-        outputSummary: "Run registrata. La generazione automatica resta agganciabile al job AI dedicato.",
-      })
-      .returning();
-    res.status(201).json({ ok: true, added: 0, attempted: 0, runId: run.id });
+    const body = (req.body ?? {}) as { topics?: unknown; limit?: unknown };
+    const topics = Array.isArray(body.topics) && body.topics.length
+      ? body.topics.map((topic) => compactText(topic, 120)).filter(Boolean).slice(0, 5)
+      : [
+          "crescita personale lavoro focus produttivita abitudini",
+          "orientamento professionale competenze futuro del lavoro",
+          "benessere mentale burnout lavoro giovani professionisti",
+        ];
+    const perTopic = Math.max(1, Math.min(Number(body.limit) || 3, 5));
+
+    const webResults = (
+      await Promise.all(topics.map(async (topic) => ({
+        topic,
+        results: await searchWeb(topic, perTopic),
+      })))
+    ).flatMap(({ topic, results }) =>
+      results.map((result) => ({
+        topic,
+        title: compactText((result.metadata as any)?.title ?? result.source, 180),
+        url: result.source,
+        source: "Tavily",
+        summary: result.content,
+      })),
+    );
+
+    const discoveryRows = await db
+      .select()
+      .from(discoveryItemsTable)
+      .where(sql`${discoveryItemsTable.type} in ('growth', 'formation')`)
+      .orderBy(desc(discoveryItemsTable.createdAt))
+      .limit(20);
+
+    const discoveryResults = discoveryRows.map((item) => ({
+      topic: item.category || item.type,
+      title: item.title,
+      url: item.url,
+      source: item.source || item.collectorSource || "Discovery Collector",
+      summary: item.insightText || item.summary,
+    }));
+
+    const candidates = [...webResults, ...discoveryResults]
+      .filter((item) => item.title || item.summary)
+      .slice(0, 25);
+
+    const created: Array<{ id: number; title: string; slug: string; source: string }> = [];
+    const skipped: string[] = [];
+
+    for (const [index, candidate] of candidates.entries()) {
+      const payload = buildGrowthResearchArticle({ ...candidate, index });
+      const [existing] = await db
+        .select({ id: growthArticlesTable.id })
+        .from(growthArticlesTable)
+        .where(eq(growthArticlesTable.slug, payload.slug))
+        .limit(1);
+      if (existing) {
+        skipped.push(payload.slug);
+        continue;
+      }
+      const [article] = await db.insert(growthArticlesTable).values(payload).returning({
+        id: growthArticlesTable.id,
+        title: growthArticlesTable.title,
+        slug: growthArticlesTable.slug,
+      });
+      if (article) created.push({ ...article, source: candidate.source });
+    }
+
+    const warnings = candidates.length
+      ? []
+      : ["Nessuna fonte trovata: configura TAVILY_API_KEY o avvia il collector discovery."];
+    const output = {
+      topics,
+      attempted: candidates.length,
+      created: created.length,
+      skipped: skipped.length,
+      webSources: webResults.length,
+      discoverySources: discoveryResults.length,
+      warnings,
+    };
+    const run = await writeAgentRunSnapshot({
+      agentName: "growth-research",
+      taskType: "manual_admin_run",
+      startedAt,
+      status: "completed",
+      inputSummary: JSON.stringify({ topics, perTopic }),
+      outputSummary: JSON.stringify(output).slice(0, 1000),
+      errorMessage: warnings.length ? warnings.join(" | ") : undefined,
+    });
+
+    res.status(201).json({
+      ok: true,
+      runId: run.id,
+      added: created.length,
+      attempted: candidates.length,
+      topics,
+      created,
+      warnings,
+    });
   } catch (err) {
+    const run = await writeAgentRunSnapshot({
+      agentName: "growth-research",
+      taskType: "manual_admin_run",
+      startedAt,
+      status: "failed",
+      inputSummary: JSON.stringify(req.body ?? {}),
+      errorMessage: String(err),
+    }).catch(() => null);
     rootLogger.error({ err }, "[admin/research/growth/run] error");
-    res.status(500).json({ error: String(err) });
+    res.status(500).json({ ok: false, runId: run?.id, error: String(err) });
   }
 });
 

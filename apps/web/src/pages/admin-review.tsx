@@ -1,11 +1,11 @@
-﻿import { useEffect, useState, useCallback } from "react";
+﻿import { useEffect, useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { API_ENDPOINTS } from "@/lib/constants";
 import {
   ShieldAlert,
   RefreshCw,
@@ -45,6 +45,7 @@ import {
   Handshake,
   Shield,
   Menu,
+  Network,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -193,18 +194,34 @@ type SidebarSection =
   | "status"
   | "messaggi"
   | "crescita"
-  | "affiliazione";
+  | "affiliazione"
+  | "memory";
 
-type AgentRunRecord = {
-  id: string;
-  agent: "news" | "growth";
-  startedAt: string;
-  finishedAt: string | null;
-  durationMs: number | null;
-  status: "running" | "completed" | "failed";
-  input: Record<string, unknown>;
-  result: Record<string, unknown> | null;
-  error: string | null;
+type MemoryGraphOverview = {
+  generatedAt: string;
+  health: {
+    nodes: number;
+    edges: number;
+    candidates: number;
+    lowConfidenceEdges: number;
+    staleEmbeddings: number;
+    orphanNodes: number;
+  };
+  sourceBreakdown: Array<{ sourceType: string; count: number }>;
+  candidateRelations: Array<{
+    id: number;
+    userId: number;
+    sourceId: number;
+    targetId: number;
+    label: string | null;
+    relationType: string;
+    confidence: number;
+    reason: string | null;
+    createdAt: string;
+    source: { id: number; title: string; type: string; sourceType: string; confidence: number; status: string } | null;
+    target: { id: number; title: string; type: string; sourceType: string; confidence: number; status: string } | null;
+  }>;
+  controls: Array<{ key: string; label: string; description: string }>;
 };
 
 type AgentPrompt = {
@@ -225,6 +242,9 @@ type AgentPrompt = {
   updatedAt: string | null;
   updatedBy: string | null;
   validation?: PromptValidation;
+  persistenceUnavailable?: boolean;
+  reason?: string | null;
+  setupAction?: string | null;
 };
 
 type PromptValidation = {
@@ -248,18 +268,222 @@ type PromptVersion = {
   createdAt: string;
   updatedAt: string;
   validation?: PromptValidation;
+  persistenceUnavailable?: boolean;
+  reason?: string | null;
+  setupAction?: string | null;
 };
 
 type PromptPreview = {
   rendered: string;
   variables: Record<string, string>;
   validation: PromptValidation;
+  persistenceUnavailable?: boolean;
+  reason?: string | null;
+  setupAction?: string | null;
 };
 
 type PromptEditorTab = "editor" | "preview" | "versions";
 
+type AiModelPolicy = {
+  activeProvider: string;
+  allowPaidModels: boolean;
+  openRouterFreeRouter: string;
+  roles: Array<{
+    role: string;
+    tier: string;
+    temperature: number;
+    maxTokens: number;
+    route: {
+      model: string;
+      provider: string;
+      reason: string;
+      temperature: number;
+      maxTokens: number;
+    };
+  }>;
+};
+
+type CatalogType = "sectors" | "professions" | "education_paths" | "growth_articles";
+
+type CatalogOverviewItem = {
+  type: CatalogType;
+  label: string;
+  total: number;
+  active: number;
+  archived: number;
+  drafts: number;
+};
+
+type CatalogDraft = {
+  id: number;
+  catalogType: CatalogType;
+  entityId: number | null;
+  status: "draft" | "published" | "archived";
+  payload: Record<string, unknown>;
+  notes: string | null;
+  createdBy: number | null;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type CatalogPreview = {
+  title: string;
+  subtitle: string;
+  description: string;
+  url: string;
+  badges: string[];
+};
+
+type CatalogResponse = {
+  type: CatalogType;
+  label: string;
+  items: Array<Record<string, any>>;
+  drafts: CatalogDraft[];
+  persistenceUnavailable?: boolean;
+  reason?: string | null;
+  setupAction?: string | null;
+};
+
+type PersistenceMeta = {
+  persistenceUnavailable?: boolean;
+  reason?: string | null;
+  setupAction?: string | null;
+};
+
+type GrowthQueueStatus = "all" | "draft" | "pending" | "published" | "rejected";
+
+type GrowthArticle = {
+  id: number;
+  title: string;
+  slug: string;
+  category: string;
+  subcategory: string | null;
+  description: string;
+  content: string;
+  tags: string[];
+  difficulty: string;
+  status: Exclude<GrowthQueueStatus, "all">;
+  readTimeMinutes: number;
+  viewCount?: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type GrowthQueueResponse = {
+  generatedAt?: string;
+  queue: GrowthArticle[];
+  stats: {
+    draft: number;
+    pending: number;
+    published: number;
+    rejected: number;
+    total: number;
+  };
+};
+
+type GrowthArticleDetail = {
+  article: GrowthArticle;
+  preview: Record<string, any>;
+  auditTrail: Array<{
+    id: number;
+    actorId: number | null;
+    action: string;
+    category: string | null;
+    metadata: Record<string, any> | null;
+    createdAt: string;
+  }>;
+};
+
+type AdminAssignee = { id: number; name: string; email: string };
+
+type ContactMessageItem = {
+  id: number;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  read: boolean;
+  readAt: string | null;
+  status: "new" | "in_progress" | "resolved" | "archived";
+  internalNotes: string | null;
+  assignedTo: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type ContactInboxResponse = {
+  items: ContactMessageItem[];
+  stats: Record<string, number>;
+  assignees: AdminAssignee[];
+  generatedAt: string;
+};
+
+type AffiliationLeadItem = {
+  id: number;
+  institutionName: string;
+  contactName: string;
+  email: string;
+  partnerType: string;
+  message: string | null;
+  status: "pending" | "contacted" | "converted" | "rejected";
+  read: boolean;
+  readAt: string | null;
+  internalNotes: string | null;
+  assignedTo: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type AffiliationInboxResponse = {
+  items: AffiliationLeadItem[];
+  stats: Record<string, number>;
+  sources: Array<{ source: string; count: number }>;
+  assignees: AdminAssignee[];
+  generatedAt: string;
+};
+
+const CATALOG_TABS: Array<{ type: CatalogType; label: string; icon: typeof BookOpen }> = [
+  { type: "sectors", label: "Settori", icon: BarChart3 },
+  { type: "professions", label: "Professioni", icon: Briefcase },
+  { type: "education_paths", label: "Percorsi", icon: GraduationCap },
+  { type: "growth_articles", label: "Articoli", icon: FileText },
+];
+
+const GROWTH_STATUS_FILTERS: Array<{ value: GrowthQueueStatus; label: string }> = [
+  { value: "all", label: "Tutti" },
+  { value: "draft", label: "Bozze" },
+  { value: "pending", label: "Pending" },
+  { value: "published", label: "Pubblicati" },
+  { value: "rejected", label: "Rifiutati" },
+];
+
+const GROWTH_STATUS_UI: Record<Exclude<GrowthQueueStatus, "all">, { label: string; className: string }> = {
+  draft: { label: "Bozza", className: "bg-slate-100 text-slate-700 border-slate-200" },
+  pending: { label: "Pending", className: "bg-amber-100 text-amber-800 border-amber-200" },
+  published: { label: "Pubblicato", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+  rejected: { label: "Rifiutato", className: "bg-red-100 text-red-800 border-red-200" },
+};
+
+const MESSAGE_STATUS_UI: Record<ContactMessageItem["status"], { label: string; className: string }> = {
+  new: { label: "Nuovo", className: "bg-primary/10 text-primary border-primary/30" },
+  in_progress: { label: "In lavorazione", className: "bg-amber-100 text-amber-800 border-amber-200" },
+  resolved: { label: "Risolto", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+  archived: { label: "Archiviato", className: "bg-slate-100 text-slate-700 border-slate-200" },
+};
+
+const LEAD_STATUS_UI: Record<AffiliationLeadItem["status"], { label: string; className: string }> = {
+  pending: { label: "Pending", className: "bg-primary/10 text-primary border-primary/30" },
+  contacted: { label: "Contattato", className: "bg-amber-100 text-amber-800 border-amber-200" },
+  converted: { label: "Convertito", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+  rejected: { label: "Rifiutato", className: "bg-red-100 text-red-800 border-red-200" },
+};
+
 type AgentsOverview = {
   generatedAt: string;
+  persistenceUnavailable?: boolean;
+  reason?: string | null;
+  setupAction?: string | null;
   summary: {
     totalRuns: number;
     totalAgents: number;
@@ -392,9 +616,62 @@ type AdminOverview = {
   };
 };
 
+type BusinessStatusSnapshot = {
+  generatedAt: string;
+  days: number;
+  business: {
+    users: { total: number; new7d: number; new30d: number; premium: number; conversionRate: number };
+    tests: { total: number; recent: number; recent7d: number; recent30d: number; confirmed: number; completionRate: number };
+    topSectors: Array<{ sectorId: number | null; count: number }>;
+  };
+  funnels: {
+    userToTestRate: number;
+    userToPremiumRate: number;
+    leadConversionRate: number;
+  };
+  technical: {
+    status: "healthy" | "attention" | "critical";
+    label: string;
+    reasons: string[];
+    uptimeSeconds: number;
+    dbReady: boolean;
+    services: Record<string, { status: string; label: string; uptimeSeconds?: number }>;
+    errors: {
+      totalCaptured: number;
+      unique: number;
+      brokenComponents: string[];
+      recent: Array<{ file: string; function: string; message: string; code: string | null; capturedAt: string; occurrences: number }>;
+    };
+    agents: {
+      totalRuns: number;
+      failedRuns: number;
+      runningRuns: number;
+      errorRate: number;
+      avgDurationMs: number | null;
+      recentFailures: Array<{ id: number; agentName: string; taskType: string | null; status: string; errorMessage: string | null; startedAt: string }>;
+    };
+    ai: { requests: number; errors: number; errorRate: number };
+  };
+  env: {
+    total: number;
+    configured: number;
+    missingCritical: string[];
+    missingOptional: string[];
+    items: Array<{ key: string; label: string; critical: boolean; configured: boolean }>;
+  };
+  inbox: {
+    messages: { total: number; unread: number; open: number };
+    leads: { total: number; pending: number; contacted: number; converted: number; unread: number };
+  };
+  actions: Array<{ label: string; section: SidebarSection; path: string; count: number | null }>;
+};
+
 type WendyQualityOverview = {
   generatedAt: string;
   days: number;
+  persistenceUnavailable?: boolean;
+  reason?: string | null;
+  setupAction?: string | null;
   summary: {
     total: number;
     avgEvalScore: number | null;
@@ -484,6 +761,8 @@ const SECTION_BY_PATH: Record<string, SidebarSection> = {
   messaggi: "messaggi",
   crescita: "crescita",
   affiliazione: "affiliazione",
+  "cervello-wendy": "memory",
+  "memory-graph": "memory",
 };
 
 const PATH_BY_SECTION: Record<SidebarSection, string> = {
@@ -503,6 +782,7 @@ const PATH_BY_SECTION: Record<SidebarSection, string> = {
   messaggi: "/admin/messaggi",
   crescita: "/admin/crescita",
   affiliazione: "/admin/affiliazione",
+  memory: "/admin/cervello-wendy",
 };
 
 const TITLE_BY_SECTION: Record<SidebarSection, string> = {
@@ -522,6 +802,7 @@ const TITLE_BY_SECTION: Record<SidebarSection, string> = {
   messaggi: "Messaggi",
   crescita: "Coda Crescita",
   affiliazione: "Partner & Affiliazioni",
+  memory: "Cervello Wendy",
 };
 
 const ADMIN_NAV_GROUPS: Array<{
@@ -546,6 +827,7 @@ const ADMIN_NAV_GROUPS: Array<{
     label: "AI / Wendy",
     items: [
       { key: "agents", label: "Agenti", icon: Activity },
+      { key: "memory", label: "Cervello Wendy", icon: Network },
       { key: "prompts", label: "Prompt Agenti", icon: Code2 },
       { key: "qualita", label: "Qualita Wendy", icon: BarChart3 },
     ],
@@ -598,6 +880,140 @@ const HEALTH_UI = {
 function sectionFromLocation(pathname: string): SidebarSection {
   const segment = pathname.split("/").filter(Boolean)[1];
   return segment ? (SECTION_BY_PATH[segment] ?? "home") : "home";
+}
+
+function defaultCatalogPayload(type: CatalogType): Record<string, unknown> {
+  if (type === "sectors") {
+    return {
+      name: "",
+      description: "",
+      riasecTypes: [],
+      skills: [],
+      avgSalaryMin: 25000,
+      avgSalaryMax: 45000,
+      growthRate: 5,
+      automationRisk: "medium",
+      scalability: "medium",
+      trend: "stable",
+      timeToAutonomy: "6-12 mesi",
+      advantages: [],
+      disadvantages: [],
+      opportunities: [],
+      icon: "briefcase",
+      color: "#6366f1",
+      isActive: true,
+      workMode: ["dipendente", "ibrido"],
+      autonomyScore: 5,
+      stabilityScore: 5,
+      clientAcquisitionRequired: false,
+      freelanceSteps: [],
+      dipendentiSteps: [],
+      remoteFriendly: true,
+    };
+  }
+  if (type === "professions") {
+    return {
+      title: "",
+      sector: "",
+      sectorId: null,
+      description: "",
+      riasecFit: [],
+      skills: [],
+      workModes: [],
+      salaryRange: "",
+      growthOutlook: "",
+      autonomyScore: 5,
+      stabilityScore: 5,
+      isActive: true,
+    };
+  }
+  if (type === "education_paths") {
+    return {
+      path: "",
+      type: "online",
+      duration: "",
+      cost: "",
+      steps: [],
+      careerOutcomes: [],
+      sectorFit: [],
+      professionIds: [],
+      isActive: true,
+    };
+  }
+  return {
+    title: "",
+    slug: "",
+    category: "",
+    subcategory: "",
+    description: "",
+    content: "",
+    tags: [],
+    difficulty: "base",
+    personalityMatches: [],
+    sectorLinks: [],
+    status: "draft",
+    readTimeMinutes: 3,
+  };
+}
+
+function catalogTitle(type: CatalogType, item: Record<string, any>) {
+  if (type === "sectors") return item.name ?? `Settore #${item.id}`;
+  if (type === "professions") return item.title ?? `Professione #${item.id}`;
+  if (type === "education_paths") return item.path ?? `Percorso #${item.id}`;
+  return item.title ?? `Articolo #${item.id}`;
+}
+
+function catalogDescription(type: CatalogType, item: Record<string, any>) {
+  if (type === "education_paths") return `${item.type ?? "percorso"} · ${item.duration ?? "durata n/d"} · ${item.cost ?? "costo n/d"}`;
+  if (type === "growth_articles") return `${item.category ?? "categoria"} · ${item.status ?? "draft"} · ${item.readTimeMinutes ?? 0} min`;
+  return item.description ?? item.sector ?? "";
+}
+
+function isCatalogArchived(type: CatalogType, item: Record<string, any>) {
+  if (type === "growth_articles") return item.status === "archived";
+  return item.isActive === false;
+}
+
+function growthArticleToForm(article: GrowthArticle | null): Record<string, any> {
+  return {
+    title: article?.title ?? "",
+    slug: article?.slug ?? "",
+    category: article?.category ?? "",
+    subcategory: article?.subcategory ?? "",
+    description: article?.description ?? "",
+    content: article?.content ?? "",
+    tags: article?.tags ?? [],
+    difficulty: article?.difficulty ?? "base",
+    readTimeMinutes: article?.readTimeMinutes ?? 3,
+  };
+}
+
+function growthStatusBadge(status: GrowthArticle["status"]) {
+  const cfg = GROWTH_STATUS_UI[status] ?? GROWTH_STATUS_UI.draft;
+  return <Badge variant="outline" className={cn("capitalize", cfg.className)}>{cfg.label}</Badge>;
+}
+
+function messageStatusBadge(status: ContactMessageItem["status"]) {
+  const cfg = MESSAGE_STATUS_UI[status] ?? MESSAGE_STATUS_UI.new;
+  return <Badge variant="outline" className={cfg.className}>{cfg.label}</Badge>;
+}
+
+function leadStatusBadge(status: AffiliationLeadItem["status"]) {
+  const cfg = LEAD_STATUS_UI[status] ?? LEAD_STATUS_UI.pending;
+  return <Badge variant="outline" className={cfg.className}>{cfg.label}</Badge>;
+}
+
+function assigneeLabel(assignees: AdminAssignee[], id: number | null | undefined) {
+  if (!id) return "Non assegnato";
+  const assignee = assignees.find((item) => item.id === id);
+  return assignee ? assignee.name || assignee.email : `Admin #${id}`;
+}
+
+function auditActionLabel(action: string) {
+  if (action === "growth_article_published") return "Pubblicato";
+  if (action === "growth_article_rejected") return "Rifiutato";
+  if (action === "growth_article_updated") return "Modificato";
+  return action.replace(/_/g, " ");
 }
 
 function formatLastUpdated(iso: string | null) {
@@ -706,6 +1122,215 @@ function agentStatusClass(status: "healthy" | "degraded" | "critical") {
   return "border-red-200 bg-red-50 text-red-800";
 }
 
+function recordValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function arrayRecords(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value)
+    ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+    : [];
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean) : [];
+}
+
+function AgentLaunchResult({
+  agentKey,
+  result,
+}: {
+  agentKey: string;
+  result: { ok: boolean; data: Record<string, unknown> };
+}) {
+  const data = result.data;
+  const warnings = stringList(data.warnings);
+  const collector = recordValue(data.collector);
+  const enricher = recordValue(data.enricher);
+  const publisher = recordValue(data.publisher);
+  const created = arrayRecords(data.created);
+  const missingCoverage = arrayRecords(publisher.missingCoverage);
+  const topics = stringList(data.topics);
+  const hasWarnings = warnings.length > 0;
+  const tone = !result.ok
+    ? "border-red-200 bg-red-50 text-red-800"
+    : hasWarnings
+      ? "border-amber-200 bg-amber-50 text-amber-800"
+      : "border-emerald-200 bg-emerald-50 text-emerald-800";
+
+  const headline = !result.ok
+    ? "Run fallita"
+    : hasWarnings
+      ? "Run completata con warning"
+      : "Run completata";
+
+  const metrics =
+    agentKey === "news-research"
+      ? [
+          ["Run ID", data.runId],
+          ["Controllati", data.checked],
+          ["Aggiunti", data.added],
+          ["Collector raccolti", collector.totalCollected],
+          ["Collector inseriti", collector.totalInserted],
+          ["Enriched", enricher.enriched],
+          ["Publisher trasferiti", publisher.transferred],
+          ["Coverage mancante", missingCoverage.length],
+        ]
+      : agentKey === "growth-research"
+        ? [
+            ["Run ID", data.runId],
+            ["Fonti tentate", data.attempted],
+            ["Articoli creati", data.added],
+            ["Topic", topics.length],
+          ]
+        : [
+            ["Run ID", data.runId],
+            ["Processati", data.processed],
+            ["Creati", data.created ?? data.added ?? data.sectorsDone ?? data.professionsDone],
+            ["Durata", typeof data.durationMs === "number" ? fmtDuration(data.durationMs) : null],
+          ];
+
+  return (
+    <div className={cn("rounded-lg border p-3 text-sm", tone)}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-semibold">{headline}</p>
+        {data.runId != null && (
+          <span className="rounded bg-background/60 px-2 py-1 text-xs font-mono">
+            #{String(data.runId)}
+          </span>
+        )}
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {metrics
+          .filter(([, value]) => value != null && value !== "")
+          .map(([label, value]) => (
+            <div key={String(label)} className="rounded-md bg-background/60 p-2">
+              <p className="text-[11px] opacity-75">{String(label)}</p>
+              <p className="font-semibold">{String(value)}</p>
+            </div>
+          ))}
+      </div>
+
+      {agentKey === "growth-research" && topics.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold">Topic ricercati</p>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {topics.slice(0, 5).map((topic) => (
+              <Badge key={topic} variant="outline" className="bg-background/60">
+                {topic}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {agentKey === "growth-research" && created.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold">Articoli creati</p>
+          <div className="mt-1 space-y-1">
+            {created.slice(0, 3).map((article, index) => (
+              <p key={String(article.id ?? index)} className="text-xs">
+                {String(article.title ?? `Articolo #${article.id ?? index + 1}`)}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {agentKey === "news-research" && missingCoverage.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold">Settori senza abbastanza news reali</p>
+          <div className="mt-1 space-y-1">
+            {missingCoverage.slice(0, 5).map((item, index) => (
+              <p key={String(item.sectorId ?? index)} className="text-xs">
+                {String(item.sectorName ?? `Settore #${item.sectorId ?? index + 1}`)}:{" "}
+                {String(item.realArticles ?? 0)} reali, ne mancano {String(item.needed ?? 0)}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {warnings.length > 0 && (
+        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-800">
+          <p className="text-xs font-semibold">Warning</p>
+          <ul className="mt-1 list-disc pl-4 text-xs">
+            {warnings.slice(0, 4).map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {!result.ok && data.error != null && (
+        <p className="mt-3 break-words text-xs font-medium">{String(data.error)}</p>
+      )}
+
+      <details className="mt-3">
+        <summary className="cursor-pointer text-xs font-medium">Dati tecnici</summary>
+        <pre className="mt-2 max-h-56 overflow-auto rounded-md bg-background/70 p-2 text-[11px]">
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      </details>
+    </div>
+  );
+}
+
+function PersistenceWarningBanner({
+  title = "Setup persistenza da controllare",
+  meta,
+  onRetry,
+  onOpenStatus,
+}: {
+  title?: string;
+  meta: PersistenceMeta;
+  onRetry?: () => void;
+  onOpenStatus: () => void;
+}) {
+  if (!meta.persistenceUnavailable) return null;
+
+  const reason = meta.reason || "persistence_unavailable";
+  const setupLabel =
+    meta.setupAction === "check_database"
+      ? "Verifica database"
+      : meta.setupAction === "check_schema"
+        ? "Verifica schema"
+        : "Risolvi setup/migration";
+
+  return (
+    <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-900" role="alert">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex gap-3">
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
+          <div>
+            <p className="text-sm font-semibold">{title}</p>
+            <p className="mt-1 text-sm">
+              Dati non disponibili per problema di persistenza, non per assenza di contenuti.
+            </p>
+            <p className="mt-1 break-words text-xs text-red-800/80">
+              Motivo tecnico: <code>{reason}</code>
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Button variant="outline" className="min-h-11 border-red-300 bg-white/70 text-red-900 hover:bg-white" onClick={onOpenStatus}>
+            {setupLabel}
+          </Button>
+          {onRetry && (
+            <Button variant="outline" className="min-h-11 border-red-300 bg-white/70 text-red-900 hover:bg-white" onClick={onRetry}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Riprova
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StatusBadge({ status }: { status: SuggestionStatus }) {
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.draft;
   const Icon = cfg.icon;
@@ -752,7 +1377,7 @@ export default function AdminReview() {
     document.title = "Admin Console - NorthStar";
   }, []);
 
-  const { token, isLoggedIn, logout } = useAuth();
+  const { token, isLoggedIn, logout, user } = useAuth();
 
   const [section, setSection] = useState<SidebarSection>(() =>
     sectionFromLocation(location),
@@ -760,7 +1385,6 @@ export default function AdminReview() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestionsTotal, setSuggestionsTotal] = useState(0);
-  const [runs, setRuns] = useState<AgentRun[]>([]);
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [adminError, setAdminError] = useState<string | null>(null);
@@ -784,8 +1408,6 @@ export default function AdminReview() {
     Record<string, { ok: boolean; data: Record<string, unknown> }>
   >({});
   const [newsSectorInput, setNewsSectorInput] = useState("");
-  const [runHistory, setRunHistory] = useState<AgentRunRecord[]>([]);
-  const [runHistoryLoading, setRunHistoryLoading] = useState(false);
   const [agentsOverviewData, setAgentsOverviewData] = useState<AgentsOverview | null>(null);
   const [agentsOverviewLoading, setAgentsOverviewLoading] = useState(false);
   const [agentsTab, setAgentsTab] = useState<AgentsTab>("overview");
@@ -805,7 +1427,9 @@ export default function AdminReview() {
   const [promptNotes, setPromptNotes] = useState<Record<string, string>>({});
   const [promptVersions, setPromptVersions] = useState<Record<string, PromptVersion[]>>({});
   const [promptPreview, setPromptPreview] = useState<Record<string, PromptPreview>>({});
+  const [promptVersionPersistence, setPromptVersionPersistence] = useState<Record<string, PersistenceMeta>>({});
   const [promptSaving, setPromptSaving] = useState<Set<string>>(new Set());
+  const [aiModelPolicy, setAiModelPolicy] = useState<AiModelPolicy | null>(null);
 
 // Qualita section
 const [qualitaData, setQualitaData] = useState<WendyQualityOverview | null>(null);
@@ -813,16 +1437,30 @@ const [qualitaLoading, setQualitaLoading] = useState(false);
 const [qualitaDays, setQualitaDays] = useState("30");
 
 // Cataloghi section
-const [cataloghiData, setCataloghiData] = useState<any>(null);
+const [cataloghiOverview, setCataloghiOverview] = useState<CatalogOverviewItem[]>([]);
+const [cataloghiData, setCataloghiData] = useState<CatalogResponse | null>(null);
 const [cataloghiLoading, setCataloghiLoading] = useState(false);
+const [catalogType, setCatalogType] = useState<CatalogType>("sectors");
+const [catalogSearch, setCatalogSearch] = useState("");
+const [catalogStatus, setCatalogStatus] = useState("all");
+const [catalogSelected, setCatalogSelected] = useState<Record<string, any> | null>(null);
+const [catalogDraftId, setCatalogDraftId] = useState<number | null>(null);
+const [catalogPayloadText, setCatalogPayloadText] = useState(
+  JSON.stringify(defaultCatalogPayload("sectors"), null, 2),
+);
+const [catalogNotes, setCatalogNotes] = useState("");
+const [catalogPreview, setCatalogPreview] = useState<CatalogPreview | null>(null);
+const [catalogFields, setCatalogFields] = useState<Record<string, string>>({});
+const [catalogActionLoading, setCatalogActionLoading] = useState<string | null>(null);
+const [catalogAuditTrail, setCatalogAuditTrail] = useState<any[]>([]);
+const [catalogPersistence, setCatalogPersistence] = useState<PersistenceMeta>({});
 
 // Agenti salute section
 const [agentiSaluteData, setAgentiSaluteData] = useState<any | null>(null);
 const [agentiSaluteLoading, setAgentiSaluteLoading] = useState(false);
 
 // Metriche section
-const [metricheData, setMetricheData] = useState<any | null>(null);
-const [wendyMetricsData, setWendyMetricsData] = useState<any | null>(null);
+const [metricheData, setMetricheData] = useState<BusinessStatusSnapshot | null>(null);
 const [metricheLoading, setMetricheLoading] = useState(false);
 
 // Home section
@@ -830,20 +1468,49 @@ const [homeData, setHomeData] = useState<AdminOverview | null>(null);
 const [homeLoading, setHomeLoading] = useState(false);
 
 // Status section
-const [statusData, setStatusData] = useState<any | null>(null);
+const [statusData, setStatusData] = useState<BusinessStatusSnapshot | null>(null);
 const [statusLoading, setStatusLoading] = useState(false);
 
 // Messaggi section
-const [messaggiData, setMessaggiData] = useState<any[]>([]);
+const [messaggiData, setMessaggiData] = useState<ContactInboxResponse | null>(null);
 const [messaggiLoading, setMessaggiLoading] = useState(false);
+const [messaggiStatus, setMessaggiStatus] = useState("all");
+const [messaggiRead, setMessaggiRead] = useState("all");
+const [messaggiAssignedTo, setMessaggiAssignedTo] = useState("all");
+const [messaggiSearch, setMessaggiSearch] = useState("");
+const [messaggioSelected, setMessaggioSelected] = useState<ContactMessageItem | null>(null);
+const [messaggioNotes, setMessaggioNotes] = useState("");
+const [messaggioActionLoading, setMessaggioActionLoading] = useState<string | null>(null);
 
 // Crescita section
-const [crescitaData, setCrescitaData] = useState<any | null>(null);
+const [crescitaData, setCrescitaData] = useState<GrowthQueueResponse | null>(null);
 const [crescitaLoading, setCrescitaLoading] = useState(false);
+const [crescitaStatus, setCrescitaStatus] = useState<GrowthQueueStatus>("all");
+const [crescitaSearch, setCrescitaSearch] = useState("");
+const [crescitaSelected, setCrescitaSelected] = useState<GrowthArticleDetail | null>(null);
+const [crescitaForm, setCrescitaForm] = useState<Record<string, any>>(growthArticleToForm(null));
+const [crescitaFields, setCrescitaFields] = useState<Record<string, string>>({});
+const [crescitaActionLoading, setCrescitaActionLoading] = useState<string | null>(null);
+const [crescitaRejectReason, setCrescitaRejectReason] = useState("");
+const [crescitaPreview, setCrescitaPreview] = useState<Record<string, any> | null>(null);
 
 // Affiliazione section
-const [affiliazioneData, setAffiliazioneData] = useState<any[]>([]);
+const [affiliazioneData, setAffiliazioneData] = useState<AffiliationInboxResponse | null>(null);
 const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
+const [affiliazioneStatus, setAffiliazioneStatus] = useState("all");
+const [affiliazioneRead, setAffiliazioneRead] = useState("all");
+const [affiliazioneSource, setAffiliazioneSource] = useState("all");
+const [affiliazioneAssignedTo, setAffiliazioneAssignedTo] = useState("all");
+const [affiliazioneSearch, setAffiliazioneSearch] = useState("");
+const [affiliazioneSelected, setAffiliazioneSelected] = useState<AffiliationLeadItem | null>(null);
+const [affiliazioneNotes, setAffiliazioneNotes] = useState("");
+const [affiliazioneActionLoading, setAffiliazioneActionLoading] = useState<string | null>(null);
+
+// Cervello Wendy / memory graph
+const [memoryData, setMemoryData] = useState<MemoryGraphOverview | null>(null);
+const [memoryLoading, setMemoryLoading] = useState(false);
+const [memoryBackfillUserId, setMemoryBackfillUserId] = useState("");
+const [memoryActionLoading, setMemoryActionLoading] = useState<string | null>(null);
 
   const apiFetch = useCallback(
     async (path: string, options?: RequestInit) => {
@@ -869,9 +1536,18 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
         throw new Error("forbidden");
       }
       if (!res.ok) {
-        const message = `Errore ${res.status} durante il caricamento della console admin.`;
+        let errorBody: any = null;
+        try {
+          errorBody = await res.json();
+        } catch {
+          errorBody = null;
+        }
+        const message =
+          errorBody?.error ?? `Errore ${res.status} durante il caricamento della console admin.`;
         setAdminError(message);
-        throw new Error(message);
+        const error = new Error(message) as Error & { fields?: Record<string, string> };
+        error.fields = errorBody?.fields;
+        throw error;
       }
       const data = await res.json();
       setAdminError(null);
@@ -880,6 +1556,11 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     },
     [adminForbidden, logout, token],
   );
+
+  const openStatusSetup = useCallback(() => {
+    setSection("status");
+    setLocation("/admin/status");
+  }, [setLocation]);
 
   const loadStats = useCallback(async () => {
     try {
@@ -911,18 +1592,6 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     setLoading(false);
   }, [apiFetch, filterStatus, filterEntity, filterConfidence, searchTerm, section]);
 
-  const loadRuns = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await apiFetch("/admin/agent-runs?limit=100");
-      setRuns(data);
-
-    } catch {
-      /* handled */
-    }
-    setLoading(false);
-  }, [apiFetch]);
-
   const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
@@ -953,8 +1622,12 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
   const loadPrompts = useCallback(async () => {
     setPromptsLoading(true);
     try {
-      const data = await apiFetch("/admin/prompts");
+      const [data, policyData] = await Promise.all([
+        apiFetch("/admin/prompts"),
+        apiFetch("/admin/ai/model-policy"),
+      ]);
       setPrompts(data as AgentPrompt[]);
+      setAiModelPolicy((policyData as { policy?: AiModelPolicy | null }).policy ?? null);
       const vals: Record<string, string> = {};
       const notes: Record<string, string> = {};
       for (const p of data as AgentPrompt[]) {
@@ -973,10 +1646,20 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
   const loadPromptVersions = useCallback(
     async (key: string) => {
       try {
-        const data = await apiFetch(`/admin/prompts/${key}/versions`);
+        const data = await apiFetch(`/admin/prompts/${key}/versions`) as {
+          versions?: PromptVersion[];
+        } & PersistenceMeta;
         setPromptVersions((prev) => ({
           ...prev,
           [key]: (data.versions ?? []) as PromptVersion[],
+        }));
+        setPromptVersionPersistence((prev) => ({
+          ...prev,
+          [key]: {
+            persistenceUnavailable: data.persistenceUnavailable,
+            reason: data.reason,
+            setupAction: data.setupAction,
+          },
         }));
       } catch {
         /* handled */
@@ -1009,18 +1692,6 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     [apiFetch, promptEditValues],
   );
 
-  const loadRunHistory = useCallback(async () => {
-    setRunHistoryLoading(true);
-    try {
-      const data = await apiFetch("/admin/research/runs");
-      setRunHistory(data as AgentRunRecord[]);
-
-    } catch {
-      /* handled */
-    }
-    setRunHistoryLoading(false);
-  }, [apiFetch]);
-
   const loadAgentsOverview = useCallback(async () => {
     setAgentsOverviewLoading(true);
     try {
@@ -1032,6 +1703,17 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     }
     setAgentsOverviewLoading(false);
   }, [agentDays, apiFetch]);
+
+  const loadMemoryGraph = useCallback(async () => {
+    setMemoryLoading(true);
+    try {
+      const data = await apiFetch("/admin/memory-graph/overview");
+      setMemoryData(data as MemoryGraphOverview);
+    } catch {
+      /* handled */
+    }
+    setMemoryLoading(false);
+  }, [apiFetch]);
 
   const loadQualita = useCallback(async () => {
     setQualitaLoading(true);
@@ -1048,16 +1730,144 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
   const loadCataloghi = useCallback(async () => {
     setCataloghiLoading(true);
     try {
-      // Since cataloghi uses different endpoints, we'll fetch the main data
-      // For simplicity, we'll fetch sectors as representative data
-      const data = await apiFetch("/admin/catalogs/sectors");
-      setCataloghiData(data);
+      const params = new URLSearchParams();
+      params.set("limit", "100");
+      if (catalogSearch.trim()) params.set("search", catalogSearch.trim());
+      if (catalogStatus !== "all") params.set("status", catalogStatus);
+      const [overview, data] = await Promise.all([
+        apiFetch("/admin/catalogs/overview"),
+        apiFetch(`/admin/catalogs/${catalogType}?${params}`),
+      ]);
+      setCataloghiOverview((overview.items ?? []) as CatalogOverviewItem[]);
+      setCataloghiData(data as CatalogResponse);
+      setCatalogPersistence({
+        persistenceUnavailable: Boolean(overview.persistenceUnavailable || data.persistenceUnavailable),
+        reason: overview.reason ?? data.reason ?? null,
+        setupAction: overview.setupAction ?? data.setupAction ?? null,
+      });
 
     } catch {
       /* handled */
     }
     setCataloghiLoading(false);
-  }, [apiFetch]);
+  }, [apiFetch, catalogSearch, catalogStatus, catalogType]);
+
+  const openCatalogDraft = useCallback((type: CatalogType) => {
+    setCatalogType(type);
+    setCatalogSelected(null);
+    setCatalogDraftId(null);
+    setCatalogFields({});
+    setCatalogPreview(null);
+    setCatalogAuditTrail([]);
+    setCatalogNotes("");
+    setCatalogPayloadText(JSON.stringify(defaultCatalogPayload(type), null, 2));
+  }, []);
+
+  const openCatalogItem = useCallback(
+    async (item: Record<string, any>) => {
+      setCatalogSelected(item);
+      setCatalogDraftId(null);
+      setCatalogFields({});
+      setCatalogPreview(null);
+      setCatalogNotes("");
+      setCatalogPayloadText(JSON.stringify(item, null, 2));
+      setCatalogActionLoading(`detail:${item.id}`);
+      try {
+        const detailData = await apiFetch(`/admin/catalogs/${catalogType}/${item.id}`);
+        const entity = (detailData.entity ?? item) as Record<string, any>;
+        setCatalogSelected(entity);
+        setCatalogPayloadText(JSON.stringify(entity, null, 2));
+        setCatalogAuditTrail(detailData.auditTrail ?? []);
+      } catch {
+        /* handled */
+      }
+      setCatalogActionLoading(null);
+    },
+    [apiFetch, catalogType],
+  );
+
+  const parseCatalogPayload = useCallback(() => {
+    try {
+      const parsed = JSON.parse(catalogPayloadText);
+      setCatalogFields({});
+      return parsed as Record<string, unknown>;
+    } catch {
+      setCatalogFields({ json: "JSON non valido: correggi la sintassi prima di continuare." });
+      return null;
+    }
+  }, [catalogPayloadText]);
+
+  const runCatalogAction = useCallback(
+    async (action: "preview" | "draft" | "publish" | "archive" | "restore") => {
+      const selectedId = Number(catalogSelected?.id);
+      const payload = parseCatalogPayload();
+      if ((action === "preview" || action === "draft") && !payload) return;
+      if ((action === "archive" || action === "restore") && !selectedId) {
+        setCatalogFields({ item: "Seleziona un elemento gia pubblicato." });
+        return;
+      }
+      if (action === "publish" && !catalogDraftId && !selectedId) {
+        setCatalogFields({ draft: "Salva una bozza prima di pubblicare un nuovo elemento." });
+        return;
+      }
+
+      setCatalogActionLoading(action);
+      try {
+        let data: any;
+        if (action === "preview") {
+          data = await apiFetch(`/admin/catalogs/${catalogType}/preview`, {
+            method: "POST",
+            body: JSON.stringify({ payload }),
+          });
+          setCatalogPreview(data.preview as CatalogPreview);
+        } else if (action === "draft") {
+          const path = selectedId
+            ? `/admin/catalogs/${catalogType}/${selectedId}/draft`
+            : `/admin/catalogs/${catalogType}/draft`;
+          data = await apiFetch(path, {
+            method: "POST",
+            body: JSON.stringify({ payload, notes: catalogNotes }),
+          });
+          setCatalogDraftId(data.draft?.id ?? null);
+          setCatalogPreview(data.preview as CatalogPreview);
+          await loadCataloghi();
+        } else if (action === "publish") {
+          const publishId = catalogDraftId ?? selectedId;
+          data = await apiFetch(`/admin/catalogs/${catalogType}/${publishId}/publish`, {
+            method: "POST",
+            body: JSON.stringify({ notes: catalogNotes }),
+          });
+          setCatalogSelected(data.entity ?? null);
+          setCatalogDraftId(null);
+          setCatalogPayloadText(JSON.stringify(data.entity ?? payload, null, 2));
+          await loadCataloghi();
+        } else {
+          data = await apiFetch(`/admin/catalogs/${catalogType}/${selectedId}/${action}`, {
+            method: "POST",
+            body: JSON.stringify({ notes: catalogNotes }),
+          });
+          setCatalogSelected(data.entity ?? null);
+          setCatalogPayloadText(JSON.stringify(data.entity ?? payload, null, 2));
+          await loadCataloghi();
+        }
+        setCatalogFields({});
+      } catch (err) {
+        const error = err as Error & { fields?: Record<string, string> };
+        setCatalogFields(error.fields ?? { general: error.message });
+      }
+      setCatalogActionLoading(null);
+    },
+    [
+      apiFetch,
+      catalogDraftId,
+      catalogNotes,
+      catalogPayloadText,
+      catalogSelected,
+      catalogType,
+      loadCataloghi,
+      parseCatalogPayload,
+    ],
+  );
 
   const loadAgentiSalute = useCallback(async () => {
     setAgentiSaluteLoading(true);
@@ -1074,12 +1884,8 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
   const loadMetriche = useCallback(async () => {
     setMetricheLoading(true);
     try {
-      const [metricsRes, wendyRes] = await Promise.all([
-        apiFetch("/admin/metrics"),
-        apiFetch("/admin/wendy-metrics")
-      ]);
-      setMetricheData(metricsRes);
-      setWendyMetricsData(wendyRes);
+      const data = await apiFetch("/admin/business-status?days=30");
+      setMetricheData(data);
 
     } catch {
       /* handled */
@@ -1102,9 +1908,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
   const loadStatus = useCallback(async () => {
     setStatusLoading(true);
     try {
-      // /api/health e pubblico: usa fetch nativo bypassando apiFetch locale
-      const healthRes = await fetch(API_ENDPOINTS.health);
-      const data = healthRes.ok ? await healthRes.json() : {};
+      const data = await apiFetch("/admin/business-status?days=30");
       setStatusData(data);
 
     } catch {
@@ -1116,38 +1920,158 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
   const loadMessaggi = useCallback(async () => {
     setMessaggiLoading(true);
     try {
-      const data = await apiFetch("/contact/messages");
+      const params = new URLSearchParams();
+      if (messaggiStatus !== "all") params.set("status", messaggiStatus);
+      if (messaggiRead !== "all") params.set("read", messaggiRead);
+      if (messaggiAssignedTo !== "all") params.set("assignedTo", messaggiAssignedTo);
+      if (messaggiSearch.trim()) params.set("search", messaggiSearch.trim());
+      const data = await apiFetch(`/contact/messages?${params.toString()}`);
       setMessaggiData(data);
 
     } catch {
       /* handled */
     }
     setMessaggiLoading(false);
-  }, [apiFetch]);
+  }, [apiFetch, messaggiAssignedTo, messaggiRead, messaggiSearch, messaggiStatus]);
 
   const loadCrescita = useCallback(async () => {
     setCrescitaLoading(true);
     try {
-      const data = await apiFetch("/admin/growth-queue");
+      const params = new URLSearchParams();
+      if (crescitaStatus !== "all") params.set("status", crescitaStatus);
+      if (crescitaSearch.trim()) params.set("search", crescitaSearch.trim());
+      const query = params.toString();
+      const data = await apiFetch(`/admin/growth-queue${query ? `?${query}` : ""}`);
       setCrescitaData(data);
 
     } catch {
       /* handled */
     }
     setCrescitaLoading(false);
-  }, [apiFetch]);
+  }, [apiFetch, crescitaSearch, crescitaStatus]);
+
+  const loadCrescitaDetail = useCallback(
+    async (id: number) => {
+      setCrescitaActionLoading("detail");
+      setCrescitaFields({});
+      try {
+        const data = await apiFetch(`/admin/growth-queue/${id}`);
+        setCrescitaSelected(data);
+        setCrescitaForm(growthArticleToForm(data.article));
+        setCrescitaPreview(data.preview ?? null);
+        setCrescitaRejectReason("");
+      } catch {
+        /* handled */
+      }
+      setCrescitaActionLoading(null);
+    },
+    [apiFetch],
+  );
+
+  const handleCrescitaAction = useCallback(
+    async (action: "save" | "preview" | "publish" | "reject") => {
+      if (!crescitaSelected?.article?.id) return;
+      const id = crescitaSelected.article.id;
+      setCrescitaActionLoading(action);
+      setCrescitaFields({});
+      try {
+        const payload = {
+          ...crescitaForm,
+          tags: Array.isArray(crescitaForm.tags)
+            ? crescitaForm.tags
+            : String(crescitaForm.tags ?? "")
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean),
+          readTimeMinutes: Number(crescitaForm.readTimeMinutes) || 1,
+        };
+        let data: any;
+        if (action === "save") {
+          data = await apiFetch(`/admin/growth-queue/${id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ payload }),
+          });
+        } else if (action === "preview") {
+          data = await apiFetch(`/admin/growth-queue/${id}/preview`, {
+            method: "POST",
+            body: JSON.stringify({ payload }),
+          });
+        } else if (action === "publish") {
+          data = await apiFetch(`/admin/growth-queue/${id}/publish`, { method: "POST" });
+        } else {
+          data = await apiFetch(`/admin/growth-queue/${id}/reject`, {
+            method: "POST",
+            body: JSON.stringify({ reason: crescitaRejectReason }),
+          });
+        }
+        if (data.preview) setCrescitaPreview(data.preview);
+        if (data.article) {
+          await loadCrescita();
+          await loadCrescitaDetail(data.article.id);
+        }
+      } catch (error: any) {
+        setCrescitaFields(error?.fields ?? {});
+      }
+      setCrescitaActionLoading(null);
+    },
+    [apiFetch, crescitaForm, crescitaRejectReason, crescitaSelected, loadCrescita, loadCrescitaDetail],
+  );
 
   const loadAffiliazione = useCallback(async () => {
     setAffiliazioneLoading(true);
     try {
-      const data = await apiFetch("/affiliazione/leads");
+      const params = new URLSearchParams();
+      if (affiliazioneStatus !== "all") params.set("status", affiliazioneStatus);
+      if (affiliazioneRead !== "all") params.set("read", affiliazioneRead);
+      if (affiliazioneSource !== "all") params.set("source", affiliazioneSource);
+      if (affiliazioneAssignedTo !== "all") params.set("assignedTo", affiliazioneAssignedTo);
+      if (affiliazioneSearch.trim()) params.set("search", affiliazioneSearch.trim());
+      const data = await apiFetch(`/affiliazione/leads?${params.toString()}`);
       setAffiliazioneData(data);
 
     } catch {
       /* handled */
     }
     setAffiliazioneLoading(false);
-  }, [apiFetch]);
+  }, [affiliazioneAssignedTo, affiliazioneRead, affiliazioneSearch, affiliazioneSource, affiliazioneStatus, apiFetch]);
+
+  const updateMessaggio = useCallback(
+    async (id: number, path: "read" | "status" | "notes" | "assign", body: Record<string, unknown>) => {
+      setMessaggioActionLoading(path);
+      try {
+        const updated = await apiFetch(`/contact/messages/${id}/${path}`, {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        });
+        setMessaggioSelected(updated);
+        setMessaggioNotes(updated.internalNotes ?? "");
+        await loadMessaggi();
+      } catch {
+        /* handled */
+      }
+      setMessaggioActionLoading(null);
+    },
+    [apiFetch, loadMessaggi],
+  );
+
+  const updateAffiliazione = useCallback(
+    async (id: number, path: "read" | "status" | "notes" | "assign", body: Record<string, unknown>) => {
+      setAffiliazioneActionLoading(path);
+      try {
+        const updated = await apiFetch(`/affiliazione/leads/${id}/${path}`, {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        });
+        setAffiliazioneSelected(updated);
+        setAffiliazioneNotes(updated.internalNotes ?? "");
+        await loadAffiliazione();
+      } catch {
+        /* handled */
+      }
+      setAffiliazioneActionLoading(null);
+    },
+    [apiFetch, loadAffiliazione],
+  );
 
   const triggerAgent = useCallback(
     async (agentKey: string, path: string, body?: Record<string, unknown>) => {
@@ -1181,6 +2105,39 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     },
     [agentsRunning, apiFetch, loadAgentsOverview],
   );
+
+  const runMemoryBackfill = useCallback(async () => {
+    const userId = Number(memoryBackfillUserId);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      setAdminError("Inserisci un userId valido per il backfill memoria.");
+      return;
+    }
+    setMemoryActionLoading("backfill");
+    try {
+      await apiFetch("/admin/memory-graph/backfill-user", {
+        method: "POST",
+        body: JSON.stringify({ userId }),
+      });
+      await loadMemoryGraph();
+    } catch {
+      /* handled */
+    }
+    setMemoryActionLoading(null);
+  }, [apiFetch, loadMemoryGraph, memoryBackfillUserId]);
+
+  const updateMemoryRelation = useCallback(async (id: number, action: "approve" | "reject") => {
+    setMemoryActionLoading(`${action}:${id}`);
+    try {
+      await apiFetch(`/admin/memory-graph/relations/${id}/${action}`, {
+        method: "POST",
+        body: JSON.stringify({ reason: action === "reject" ? "Rifiutata da admin" : undefined }),
+      });
+      await loadMemoryGraph();
+    } catch {
+      /* handled */
+    }
+    setMemoryActionLoading(null);
+  }, [apiFetch, loadMemoryGraph]);
 
   const savePrompt = useCallback(
     async (key: string) => {
@@ -1279,6 +2236,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     else if (section === "logs") loadLogs();
     else if (section === "prompts") loadPrompts();
     else if (section === "agents") loadAgentsOverview();
+    else if (section === "memory") loadMemoryGraph();
     else if (section === "qualita") loadQualita();
     else if (section === "cataloghi") loadCataloghi();
     else if (section === "agenti-salute") loadAgentsOverview();
@@ -1292,11 +2250,10 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     isLoggedIn,
     section,
     loadSuggestions,
-    loadRuns,
     loadAgentsOverview,
+    loadMemoryGraph,
     loadLogs,
     loadPrompts,
-    loadRunHistory,
     loadQualita,
     loadCataloghi,
     loadAgentiSalute,
@@ -1332,16 +2289,27 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     setLastUpdatedAt(null);
     setMobileSidebarOpen(false);
     setQualitaData(null);
+    setCataloghiOverview([]);
     setCataloghiData(null);
+    setCatalogSelected(null);
+    setCatalogPreview(null);
+    setCatalogFields({});
     setAgentiSaluteData(null);
     setAgentsOverviewData(null);
+    setMemoryData(null);
     setMetricheData(null);
-    setWendyMetricsData(null);
     setHomeData(null);
     setStatusData(null);
-    setMessaggiData([]);
+    setMessaggiData(null);
+    setMessaggioSelected(null);
+    setMessaggioNotes("");
     setCrescitaData(null);
-    setAffiliazioneData([]);
+    setCrescitaSelected(null);
+    setCrescitaPreview(null);
+    setCrescitaFields({});
+    setAffiliazioneData(null);
+    setAffiliazioneSelected(null);
+    setAffiliazioneNotes("");
   }
 
   async function handleApprove(id: number) {
@@ -1418,6 +2386,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     else if (section === "logs") void loadLogs();
     else if (section === "prompts") void loadPrompts();
     else if (section === "agents") void loadAgentsOverview();
+    else if (section === "memory") void loadMemoryGraph();
     else if (section === "qualita") void loadQualita();
     else if (section === "cataloghi") void loadCataloghi();
     else if (section === "agenti-salute") void loadAgentsOverview();
@@ -1436,11 +2405,10 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     loadCrescita,
     loadHome,
     loadLogs,
+    loadMemoryGraph,
     loadMetriche,
     loadPrompts,
     loadQualita,
-    loadRunHistory,
-    loadRuns,
     loadStats,
     loadStatus,
     loadSuggestions,
@@ -1452,8 +2420,8 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
   const isRefreshing =
     loading ||
     detailLoading ||
-    runHistoryLoading ||
     agentsOverviewLoading ||
+    memoryLoading ||
     promptsLoading ||
     qualitaLoading ||
     cataloghiLoading ||
@@ -1470,11 +2438,24 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
     section === "queue"
       ? suggestions.filter((s) => s.status === "pending_review")
       : suggestions;
+  const promptsPersistence = prompts.find((prompt) => prompt.persistenceUnavailable);
+  const promptsPersistenceMeta: PersistenceMeta = promptsPersistence
+    ? {
+        persistenceUnavailable: true,
+        reason: promptsPersistence.reason,
+        setupAction: promptsPersistence.setupAction,
+      }
+    : {};
 
   useEffect(() => {
     setSection(sectionFromLocation(location));
     setDetail(null);
   }, [location]);
+
+  const catalogOverviewByType = useMemo(
+    () => new Map(cataloghiOverview.map((item) => [item.type, item])),
+    [cataloghiOverview],
+  );
 
   const sidebarContent = (
     <>
@@ -1822,6 +2803,186 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
               </>
             )}
 
+            {section === "memory" && (
+              <div className="p-4 sm:p-6 space-y-5">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h3 className="text-lg font-serif font-bold flex items-center gap-2">
+                      <Network className="w-5 h-5 text-primary" />
+                      Cervello Wendy
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Governance del memory graph: salute, relazioni candidate, backfill e provenance.
+                    </p>
+                    {memoryData?.generatedAt && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Snapshot: {fmtShortDate(memoryData.generatedAt)}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={loadMemoryGraph}
+                    disabled={memoryLoading}
+                    className="min-h-11"
+                  >
+                    <RefreshCw className={cn("w-4 h-4 mr-2", memoryLoading && "animate-spin")} />
+                    Aggiorna
+                  </Button>
+                </div>
+
+                {memoryLoading && !memoryData ? (
+                  <div className="p-12 text-center text-muted-foreground">
+                    Caricamento cervello Wendy...
+                  </div>
+                ) : !memoryData ? (
+                  <div className="p-12 text-center border rounded-xl bg-muted/20">
+                    <Network className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                    <p className="font-medium">Memory graph non disponibile</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Controlla migration, DB e stato servizi in Status & Setup.
+                    </p>
+                    <Button className="mt-4 min-h-11" variant="outline" onClick={loadMemoryGraph}>
+                      Riprova
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+                      {[
+                        ["Nodi", memoryData.health.nodes],
+                        ["Relazioni", memoryData.health.edges],
+                        ["Candidate", memoryData.health.candidates],
+                        ["Low confidence", memoryData.health.lowConfidenceEdges],
+                        ["Embedding mancanti", memoryData.health.staleEmbeddings],
+                        ["Nodi orfani", memoryData.health.orphanNodes],
+                      ].map(([label, value]) => (
+                        <div key={String(label)} className="rounded-xl border bg-card p-4">
+                          <p className="text-2xl font-bold">{String(value)}</p>
+                          <p className="text-xs text-muted-foreground">{String(label)}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-4">
+                      <div className="rounded-xl border bg-card p-4">
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                          <div>
+                            <h4 className="font-semibold">Relazioni da governare</h4>
+                            <p className="text-xs text-muted-foreground">
+                              Wendy e gli agenti propongono, l'admin approva o rifiuta.
+                            </p>
+                          </div>
+                          <Badge variant="outline">{memoryData.candidateRelations.length}</Badge>
+                        </div>
+                        {memoryData.candidateRelations.length === 0 ? (
+                          <p className="text-sm text-muted-foreground py-8 text-center">
+                            Nessuna relazione candidata. Il grafo non richiede decisioni ora.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {memoryData.candidateRelations.map((relation) => (
+                              <div key={relation.id} className="rounded-lg border bg-background p-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium">
+                                      {relation.source?.title ?? `Nodo ${relation.sourceId}`} → {relation.target?.title ?? `Nodo ${relation.targetId}`}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {relation.label ?? relation.relationType} · confidence {Math.round(relation.confidence * 100)}%
+                                    </p>
+                                    {relation.reason && (
+                                      <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+                                        {relation.reason}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <Badge variant="outline">user {relation.userId}</Badge>
+                                </div>
+                                <div className="flex flex-wrap gap-2 mt-3">
+                                  <Button
+                                    size="sm"
+                                    className="min-h-11"
+                                    disabled={memoryActionLoading === `approve:${relation.id}`}
+                                    onClick={() => void updateMemoryRelation(relation.id, "approve")}
+                                  >
+                                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                                    Approva
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="min-h-11"
+                                    disabled={memoryActionLoading === `reject:${relation.id}`}
+                                    onClick={() => void updateMemoryRelation(relation.id, "reject")}
+                                  >
+                                    <XCircle className="w-4 h-4 mr-2" />
+                                    Rifiuta
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="rounded-xl border bg-card p-4">
+                          <h4 className="font-semibold mb-2">Backfill utente</h4>
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Crea/aggiorna nodi da idee, obiettivi, calendario, profilo e memoria Wendy.
+                          </p>
+                          <div className="flex gap-2">
+                            <Input
+                              value={memoryBackfillUserId}
+                              onChange={(e) => setMemoryBackfillUserId(e.target.value)}
+                              placeholder="userId"
+                              inputMode="numeric"
+                              className="min-h-11"
+                            />
+                            <Button
+                              className="min-h-11"
+                              disabled={memoryActionLoading === "backfill"}
+                              onClick={() => void runMemoryBackfill()}
+                            >
+                              {memoryActionLoading === "backfill" ? (
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Play className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border bg-card p-4">
+                          <h4 className="font-semibold mb-3">Fonti memoria</h4>
+                          {memoryData.sourceBreakdown.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">Nessuna fonte indicizzata.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {memoryData.sourceBreakdown.map((source) => (
+                                <div key={source.sourceType} className="flex items-center justify-between gap-3 text-sm">
+                                  <span className="truncate">{source.sourceType}</span>
+                                  <Badge variant="outline">{source.count}</Badge>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rounded-xl border bg-amber-50 border-amber-200 p-4 text-amber-900">
+                          <h4 className="font-semibold mb-1">Regola di sicurezza</h4>
+                          <p className="text-xs">
+                            Wendy puo proporre memoria e relazioni, ma modifiche globali e relazioni dubbie passano dalla governance.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {section === "agents" && (
               <div className="p-4 sm:p-6 space-y-5">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -1873,7 +3034,9 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                   (() => {
                     const data = agentsOverviewData;
                     const healthStatus =
-                      data.summary.criticalAgents > 0
+                      data.persistenceUnavailable
+                        ? "critical"
+                        : data.summary.criticalAgents > 0
                         ? "critical"
                         : data.summary.degradedAgents > 0 || data.summary.failedRuns > 0
                           ? "degraded"
@@ -1892,6 +3055,12 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
 
                     return (
                       <>
+                        <PersistenceWarningBanner
+                          meta={data}
+                          title="Osservabilita agenti non affidabile"
+                          onRetry={loadAgentsOverview}
+                          onOpenStatus={openStatusSetup}
+                        />
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                           <div className={cn("border rounded-xl p-4", agentStatusClass(healthStatus))}>
                             <div className="flex items-center justify-between gap-2">
@@ -2159,14 +3328,7 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                                     )}
                                   </Button>
                                   {result && (
-                                    <div
-                                      className={cn(
-                                        "rounded-lg p-3 text-xs font-mono break-words",
-                                        result.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800",
-                                      )}
-                                    >
-                                      {JSON.stringify(result.data)}
-                                    </div>
+                                    <AgentLaunchResult agentKey={agent.key} result={result} />
                                   )}
                                 </div>
                               );
@@ -2225,280 +3387,6 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
               </div>
             )}
 
-            {false && section === "agents" && (
-              <div className="p-6 space-y-6 max-w-2xl">
-                <p className="text-sm text-muted-foreground">
-                  Avvia manualmente una sessione di ricerca AI. Il processo puo
-                  richiedere 1-3 minuti.
-                </p>
-
-                {/* News Research */}
-                <div className="bg-card border rounded-2xl p-6 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
-                      <Terminal className="w-4 h-4 text-blue-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold">News Research</h4>
-                      <p className="text-xs text-muted-foreground">
-                        Raccoglie notizie dal mercato del lavoro italiano
-                        tramite Tavily
-                      </p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Input
-                      placeholder="Aree specifiche (opzionale, separati da virgola)"
-                      value={newsSectorInput}
-                      onChange={(e) => setNewsSectorInput(e.target.value)}
-                      className="text-sm"
-                    />
-                    <Button
-                      size="sm"
-                      disabled={agentsRunning.has("news")}
-                      onClick={() => {
-                        const sectors = newsSectorInput.trim()
-                          ? newsSectorInput
-                              .split(",")
-                              .map((s) => s.trim())
-                              .filter(Boolean)
-                          : [];
-                        triggerAgent("news", "/admin/research/news/run", {
-                          sectorNames: sectors,
-                        });
-                      }}
-                      className="w-full"
-                    >
-                      {agentsRunning.has("news") ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> In
-                          esecuzione...
-                        </>
-                      ) : (
-                        <>
-                          <Play className="w-4 h-4 mr-2" /> Avvia News Research
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  {agentsResult["news"] && (
-                    <div
-                      className={cn(
-                        "rounded-xl p-4 text-sm font-mono",
-                        agentsResult["news"].ok
-                          ? "bg-emerald-50 text-emerald-800"
-                          : "bg-red-50 text-red-800",
-                      )}
-                    >
-                      {agentsResult["news"].ok ? (
-                        <p>
-                          Completato - aggiunti:{" "}
-                          <strong>
-                            {String(agentsResult["news"].data.added ?? 0)}
-                          </strong>
-                          , controllati:{" "}
-                          <strong>
-                            {String(agentsResult["news"].data.checked ?? 0)}
-                          </strong>
-                        </p>
-                      ) : (
-                        <p>{JSON.stringify(agentsResult["news"].data)}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Growth Research */}
-                <div className="bg-card border rounded-2xl p-6 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
-                      <TrendingUp className="w-4 h-4 text-emerald-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold">Growth Research</h4>
-                      <p className="text-xs text-muted-foreground">
-                        Genera articoli di crescita professionale tramite AI
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    disabled={agentsRunning.has("growth")}
-                    onClick={() =>
-                      triggerAgent("growth", "/admin/research/growth/run")
-                    }
-                    className="w-full"
-                  >
-                    {agentsRunning.has("growth") ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> In
-                        esecuzione...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="w-4 h-4 mr-2" /> Avvia Growth Research
-                      </>
-                    )}
-                  </Button>
-                  {agentsResult["growth"] && (
-                    <div
-                      className={cn(
-                        "rounded-xl p-4 text-sm font-mono",
-                        agentsResult["growth"].ok
-                          ? "bg-emerald-50 text-emerald-800"
-                          : "bg-red-50 text-red-800",
-                      )}
-                    >
-                      {agentsResult["growth"].ok ? (
-                        <p>
-                          Completato - aggiunti:{" "}
-                          <strong>
-                            {String(agentsResult["growth"].data.added ?? 0)}
-                          </strong>
-                          , tentati:{" "}
-                          <strong>
-                            {String(agentsResult["growth"].data.attempted ?? 0)}
-                          </strong>
-                        </p>
-                      ) : (
-                        <p>{JSON.stringify(agentsResult["growth"].data)}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Run History */}
-                <div className="bg-card border rounded-2xl p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <History className="w-4 h-4 text-muted-foreground" />
-                      <h4 className="font-semibold text-sm">
-                        Storico Esecuzioni
-                      </h4>
-                      <span className="text-xs text-muted-foreground">
-                        ({runHistory.length} run in memoria)
-                      </span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={loadRunHistory}
-                      disabled={runHistoryLoading}
-                      className="h-7 px-2"
-                    >
-                      <RefreshCw
-                        className={cn(
-                          "w-3.5 h-3.5",
-                          runHistoryLoading && "animate-spin",
-                        )}
-                      />
-                    </Button>
-                  </div>
-
-                  {runHistory.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      Nessuna esecuzione in questa sessione. Avvia un agente per
-                      vedere la cronologia.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {runHistory.map((run) => {
-                        const isNews = run.agent === "news";
-                        const secs =
-                          run.durationMs != null
-                            ? (run.durationMs / 1000).toFixed(1)
-                            : null;
-                        const sectors = Array.isArray(
-                          (run.input as { sectorNames?: string[] }).sectorNames,
-                        )
-                          ? (
-                              run.input as { sectorNames: string[] }
-                            ).sectorNames.join(", ")
-                          : "";
-
-                        return (
-                          <div
-                            key={run.id}
-                            className={cn(
-                              "flex items-start gap-3 rounded-xl p-3 text-sm border",
-                              run.status === "completed" &&
-                                "bg-emerald-50/60 border-emerald-100",
-                              run.status === "failed" &&
-                                "bg-red-50/60 border-red-100",
-                              run.status === "running" &&
-                                "bg-amber-50/60 border-amber-100",
-                            )}
-                          >
-                            <div
-                              className={cn(
-                                "w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5",
-                                isNews ? "bg-blue-100" : "bg-emerald-100",
-                              )}
-                            >
-                              {isNews ? (
-                                <Terminal className="w-3.5 h-3.5 text-blue-600" />
-                              ) : (
-                                <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-medium capitalize">
-                                  {isNews ? "News Research" : "Growth Research"}
-                                </span>
-                                <span
-                                  className={cn(
-                                    "text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
-                                    run.status === "completed" &&
-                                      "bg-emerald-100 text-emerald-700",
-                                    run.status === "failed" &&
-                                      "bg-red-100 text-red-700",
-                                    run.status === "running" &&
-                                      "bg-amber-100 text-amber-700",
-                                  )}
-                                >
-                                  {run.status === "completed"
-                                    ? "Completato"
-                                    : run.status === "failed"
-                                      ? "Fallito"
-                                      : "In esecuzione..."}
-                                </span>
-                                {secs && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {secs}s
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs text-muted-foreground mt-0.5">
-                                {fmtDate(run.startedAt)}
-                                {sectors && (
-                                  <span className="ml-2">
-                                    - Aree: {sectors}
-                                  </span>
-                                )}
-                              </div>
-                              {run.status === "completed" && run.result && (
-                                <p className="text-xs mt-1 font-mono text-emerald-700">
-                                  {isNews
-                                    ? `aggiunti ${String(run.result.added ?? 0)}, controllati ${String(run.result.checked ?? 0)}`
-                                    : `aggiunti ${String(run.result.added ?? 0)} su ${String(run.result.attempted ?? 0)} tentati`}
-                                </p>
-                              )}
-                              {run.status === "failed" && run.error && (
-                                <p className="text-xs mt-1 font-mono text-red-600 truncate">
-                                  {run.error}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
              {section === "prompts" && (
                <div className="p-4 sm:p-6 space-y-4 max-w-5xl">
                  <div className="space-y-1">
@@ -2511,7 +3399,49 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                    </p>
                  </div>
 
-                 {promptsLoading ? (
+                  {aiModelPolicy && (
+                    <div className="rounded-xl border bg-card p-4 space-y-3">
+                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                       <div>
+                         <p className="text-sm font-semibold flex items-center gap-2">
+                           <Bot className="w-4 h-4 text-primary" />
+                           Router modelli AI
+                         </p>
+                         <p className="text-xs text-muted-foreground">
+                           Provider attivo: {aiModelPolicy.activeProvider} · Free router: {aiModelPolicy.openRouterFreeRouter}
+                         </p>
+                       </div>
+                       <Badge variant={aiModelPolicy.allowPaidModels ? "default" : "outline"}>
+                         {aiModelPolicy.allowPaidModels ? "Paid abilitati" : "Solo modelli gratuiti"}
+                       </Badge>
+                     </div>
+                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                       {aiModelPolicy.roles.slice(0, 9).map((role) => (
+                         <div key={role.role} className="rounded-md border bg-background p-3">
+                           <p className="text-xs font-semibold">{role.role}</p>
+                           <p className="mt-1 text-[11px] text-muted-foreground">
+                             {role.tier} · {role.route.provider}
+                           </p>
+                           <code className="mt-2 block text-[11px] break-words rounded bg-muted px-2 py-1">
+                             {role.route.model}
+                           </code>
+                         </div>
+                       ))}
+                     </div>
+                     <p className="text-xs text-muted-foreground">
+                       Gli override si fanno via env `MODEL_*`; con OpenRouter vengono accettati solo `openrouter/free` o modelli con suffisso `:free`, salvo `ALLOW_PAID_AI_MODELS=true`.
+                     </p>
+                    </div>
+                  )}
+
+                  <PersistenceWarningBanner
+                    meta={promptsPersistenceMeta}
+                    title="Prompt caricati da fallback non persistito"
+                    onRetry={loadPrompts}
+                    onOpenStatus={openStatusSetup}
+                  />
+
+                  {promptsLoading ? (
                    <div className="p-8 text-center text-muted-foreground">
                      Caricamento prompt...
                    </div>
@@ -2528,11 +3458,12 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                      const previewSaving = promptSaving.has(`${prompt.key}:preview`);
                      const isBusy = draftSaving || publishSaving || resetSaving || previewSaving;
                      const isDirty = (promptEditValues[prompt.key] ?? "") !== (prompt.draftValue ?? prompt.currentValue);
-                     const validation = prompt.validation;
-                     const preview = promptPreview[prompt.key];
-                     const versions = promptVersions[prompt.key] ?? [];
+                      const validation = prompt.validation;
+                      const preview = promptPreview[prompt.key];
+                      const versions = promptVersions[prompt.key] ?? [];
+                      const versionMeta = promptVersionPersistence[prompt.key] ?? {};
 
-                     return (
+                      return (
                        <div key={prompt.key} className="bg-card border rounded-xl overflow-hidden">
                          <button
                            type="button"
@@ -2582,9 +3513,26 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                            )}
                          </button>
 
-                         {isExpanded && (
-                           <div className="border-t p-4 space-y-4 bg-muted/10">
-                             <div className="flex gap-2 overflow-x-auto pb-1">
+                          {isExpanded && (
+                            <div className="border-t p-4 space-y-4 bg-muted/10">
+                              <PersistenceWarningBanner
+                                meta={{
+                                  persistenceUnavailable: Boolean(
+                                    prompt.persistenceUnavailable ||
+                                    versionMeta.persistenceUnavailable ||
+                                    preview?.persistenceUnavailable,
+                                  ),
+                                  reason: prompt.reason ?? versionMeta.reason ?? preview?.reason ?? null,
+                                  setupAction: prompt.setupAction ?? versionMeta.setupAction ?? preview?.setupAction ?? null,
+                                }}
+                                title="Versioni prompt non persistite"
+                                onRetry={() => {
+                                  void loadPrompts();
+                                  void loadPromptVersions(prompt.key);
+                                }}
+                                onOpenStatus={openStatusSetup}
+                              />
+                              <div className="flex gap-2 overflow-x-auto pb-1">
                                {[
                                  { key: "editor" as PromptEditorTab, label: "Editor", icon: Pencil },
                                  { key: "preview" as PromptEditorTab, label: "Preview", icon: Eye },
@@ -2835,13 +3783,19 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                        <div key={item} className="h-28 rounded-xl border bg-card animate-pulse" />
                      ))}
                    </div>
-                 ) : !qualitaData ? (
-                   <div className="p-10 text-center text-muted-foreground border rounded-xl bg-muted/20">
-                     Nessun dato qualita disponibile.
-                   </div>
-                 ) : (
-                   <>
-                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+                  ) : !qualitaData ? (
+                    <div className="p-10 text-center text-muted-foreground border rounded-xl bg-muted/20">
+                      Nessun dato qualita disponibile.
+                    </div>
+                  ) : (
+                    <>
+                      <PersistenceWarningBanner
+                        meta={qualitaData}
+                        title="Metriche qualita non affidabili"
+                        onRetry={loadQualita}
+                        onOpenStatus={openStatusSetup}
+                      />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
                        {[
                          {
                            label: "Score qualita",
@@ -3379,37 +4333,316 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
 
             {/* ── Cataloghi ── */}
             {section === "cataloghi" && (
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-serif font-bold">
-                    <BookOpen className="w-5 h-5 inline mr-2 text-primary" />
-                    Cataloghi
-                  </h3>
-                  <Button size="sm" variant="outline" onClick={loadCataloghi} disabled={cataloghiLoading}>
-                    {cataloghiLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
-                    Aggiorna
+              <div className="p-4 md:p-8 space-y-5">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h3 className="text-lg font-serif font-bold flex items-center gap-2">
+                      <BookOpen className="w-5 h-5 text-primary" />
+                      Cataloghi core
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Editing controllato con bozze, preview utente, pubblicazione e audit.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="min-h-11"
+                      onClick={() => openCatalogDraft(catalogType)}
+                    >
+                      <FileText size={14} className="mr-1.5" />
+                      Nuova bozza
+                    </Button>
+                    <Button size="sm" variant="outline" className="min-h-11" onClick={loadCataloghi} disabled={cataloghiLoading}>
+                      {cataloghiLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
+                      Aggiorna
+                    </Button>
+                  </div>
+                </div>
+
+                <PersistenceWarningBanner
+                  meta={catalogPersistence}
+                  title="Cataloghi non affidabili"
+                  onRetry={loadCataloghi}
+                  onOpenStatus={openStatusSetup}
+                />
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  {CATALOG_TABS.map(({ type, label, icon: Icon }) => {
+                    const overview = catalogOverviewByType.get(type);
+                    const active = catalogType === type;
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => {
+                          setCatalogType(type);
+                          setCatalogSelected(null);
+                          setCatalogDraftId(null);
+                          setCatalogPreview(null);
+                          setCatalogFields({});
+                          setCatalogPayloadText(JSON.stringify(defaultCatalogPayload(type), null, 2));
+                        }}
+                        className={cn(
+                          "min-h-24 rounded-md border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+                          active ? "border-primary/50 bg-primary/5" : "bg-card hover:bg-muted/40",
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <Icon className={cn("w-5 h-5", active ? "text-primary" : "text-muted-foreground")} />
+                          {overview && overview.drafts > 0 && (
+                            <Badge variant="outline">{overview.drafts} bozze</Badge>
+                          )}
+                        </div>
+                        <p className="mt-3 font-semibold text-sm">{label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {overview ? `${overview.active} attivi · ${overview.archived} archiviati` : "Caricamento"}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex flex-col gap-3 lg:flex-row">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      className="min-h-11 pl-9"
+                      value={catalogSearch}
+                      onChange={(event) => setCatalogSearch(event.target.value)}
+                      placeholder="Cerca per titolo, nome o descrizione"
+                    />
+                  </div>
+                  <select
+                    className="min-h-11 rounded-md border bg-background px-3 text-sm"
+                    value={catalogStatus}
+                    onChange={(event) => setCatalogStatus(event.target.value)}
+                    aria-label="Filtra stato catalogo"
+                  >
+                    <option value="all">Tutti gli stati</option>
+                    <option value="active">Attivi</option>
+                    <option value="archived">Archiviati</option>
+                    {catalogType === "growth_articles" && <option value="draft">Draft articoli</option>}
+                    {catalogType === "growth_articles" && <option value="published">Pubblicati</option>}
+                  </select>
+                  <Button className="min-h-11" variant="outline" onClick={loadCataloghi} disabled={cataloghiLoading}>
+                    <Filter size={14} className="mr-1.5" />
+                    Filtra
                   </Button>
                 </div>
-                {cataloghiLoading ? (
-                  <p className="text-sm text-muted-foreground">Caricamento...</p>
-                ) : cataloghiData ? (
-                  <div className="space-y-2">
-                    {(Array.isArray(cataloghiData) ? cataloghiData : []).map((item: any) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
-                        <div>
-                          <p className="text-sm font-medium">{item.name}</p>
-                          <p className="text-xs text-muted-foreground truncate max-w-md">{item.description}</p>
-                        </div>
-                        <Badge variant="outline" className="capitalize">{item.trend}</Badge>
+
+                {Object.keys(catalogFields).length > 0 && (
+                  <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
+                    <p className="font-semibold">Correggi questi problemi prima di continuare:</p>
+                    <ul className="mt-1 list-disc pl-5">
+                      {Object.entries(catalogFields).map(([field, message]) => (
+                        <li key={field}>
+                          <span className="font-medium">{field}</span>: {message}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                  <div className="rounded-md border bg-card">
+                    <div className="border-b px-4 py-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold">{cataloghiData?.label ?? "Catalogo"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(cataloghiData?.items?.length ?? 0)} elementi · {(cataloghiData?.drafts?.length ?? 0)} bozze aperte
+                        </p>
                       </div>
-                    ))}
-                    {Array.isArray(cataloghiData) && cataloghiData.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-8">Nessun settore trovato.</p>
+                      {cataloghiLoading && <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />}
+                    </div>
+                    <div className="divide-y max-h-[620px] overflow-y-auto">
+                      {cataloghiLoading ? (
+                        <p className="p-6 text-sm text-muted-foreground">Caricamento catalogo...</p>
+                      ) : cataloghiData && cataloghiData.items.length > 0 ? (
+                        cataloghiData.items.map((item) => {
+                          const archived = isCatalogArchived(catalogType, item);
+                          const active = catalogSelected?.id === item.id;
+                          return (
+                            <button
+                              key={`${catalogType}:${item.id}`}
+                              type="button"
+                              onClick={() => void openCatalogItem(item)}
+                              className={cn(
+                                "w-full min-h-20 p-4 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+                                active && "bg-primary/5",
+                              )}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="font-medium text-sm truncate">{catalogTitle(catalogType, item)}</p>
+                                  <p className="text-xs text-muted-foreground line-clamp-2">
+                                    {catalogDescription(catalogType, item)}
+                                  </p>
+                                </div>
+                                <Badge variant="outline" className={archived ? "text-slate-500" : "text-emerald-700"}>
+                                  {archived ? "Archiviato" : catalogType === "growth_articles" ? item.status : "Attivo"}
+                                </Badge>
+                              </div>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="p-8 text-center text-sm text-muted-foreground">
+                          {catalogPersistence.persistenceUnavailable
+                            ? "Catalogo non leggibile: controlla setup o migration prima di interpretare questo vuoto."
+                            : "Nessun elemento trovato. Crea una bozza o cambia filtro."}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="rounded-md border bg-card">
+                      <div className="border-b px-4 py-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold">
+                            {catalogSelected ? catalogTitle(catalogType, catalogSelected) : "Nuova bozza"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {catalogDraftId ? `Bozza #${catalogDraftId} pronta per pubblicazione` : "Salva una bozza prima di pubblicare un nuovo contenuto."}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline" className="min-h-11" onClick={() => void runCatalogAction("preview")} disabled={catalogActionLoading === "preview"}>
+                            <Eye size={14} className="mr-1.5" />
+                            Preview
+                          </Button>
+                          <Button size="sm" className="min-h-11" onClick={() => void runCatalogAction("draft")} disabled={catalogActionLoading === "draft"}>
+                            <Save size={14} className="mr-1.5" />
+                            Salva bozza
+                          </Button>
+                          <Button size="sm" className="min-h-11" onClick={() => void runCatalogAction("publish")} disabled={catalogActionLoading === "publish"}>
+                            <CheckCircle2 size={14} className="mr-1.5" />
+                            Pubblica
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="p-4 space-y-3">
+                        <label className="block text-sm font-medium" htmlFor="catalog-notes">Note decisione</label>
+                        <Input
+                          id="catalog-notes"
+                          className="min-h-11"
+                          value={catalogNotes}
+                          onChange={(event) => setCatalogNotes(event.target.value)}
+                          placeholder="Motivo modifica, fonte dati o contesto editoriale"
+                        />
+                        <label className="block text-sm font-medium" htmlFor="catalog-payload">Payload validato</label>
+                        <textarea
+                          id="catalog-payload"
+                          className="min-h-[360px] w-full resize-y rounded-md border bg-background p-3 font-mono text-xs leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                          value={catalogPayloadText}
+                          onChange={(event) => setCatalogPayloadText(event.target.value)}
+                          spellCheck={false}
+                        />
+                      </div>
+                      {catalogSelected?.id && (
+                        <div className="border-t px-4 py-3 flex flex-wrap gap-2">
+                          {isCatalogArchived(catalogType, catalogSelected) ? (
+                            <Button size="sm" variant="outline" className="min-h-11" onClick={() => void runCatalogAction("restore")} disabled={catalogActionLoading === "restore"}>
+                              <RotateCcw size={14} className="mr-1.5" />
+                              Ripristina
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="outline" className="min-h-11 text-red-700" onClick={() => void runCatalogAction("archive")} disabled={catalogActionLoading === "archive"}>
+                              <Archive size={14} className="mr-1.5" />
+                              Archivia
+                            </Button>
+                          )}
+                          <a
+                            className="inline-flex min-h-11 items-center rounded-md border px-3 text-sm font-medium hover:bg-muted/40"
+                            href={
+                              catalogType === "growth_articles" && catalogSelected.slug
+                                ? `/crescita/articolo/${catalogSelected.slug}`
+                                : catalogType === "sectors"
+                                  ? `/settore/${catalogSelected.id}`
+                                  : catalogType === "professions"
+                                    ? `/ruolo/${catalogSelected.id}`
+                                    : "/percorso"
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <Eye size={14} className="mr-1.5" />
+                            Apri vista utente
+                          </a>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <div className="rounded-md border bg-card p-4">
+                        <p className="text-sm font-semibold mb-3">Preview utente</p>
+                        {catalogPreview ? (
+                          <div className="rounded-md border bg-background p-4">
+                            <p className="text-xs text-muted-foreground">{catalogPreview.subtitle}</p>
+                            <h4 className="mt-1 font-serif text-lg font-bold">{catalogPreview.title}</h4>
+                            <p className="mt-2 text-sm text-muted-foreground">{catalogPreview.description}</p>
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              {catalogPreview.badges?.slice(0, 6).map((badge) => (
+                                <Badge key={badge} variant="outline">{badge}</Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">Genera una preview per vedere come apparira agli utenti prima della pubblicazione.</p>
+                        )}
+                      </div>
+
+                      <div className="rounded-md border bg-card p-4">
+                        <p className="text-sm font-semibold mb-3">Audit recente</p>
+                        {catalogAuditTrail.length > 0 ? (
+                          <div className="space-y-2">
+                            {catalogAuditTrail.slice(0, 5).map((entry) => (
+                              <div key={entry.id} className="rounded-md border bg-background p-3">
+                                <p className="text-xs font-mono">{entry.action}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {entry.createdAt ? new Date(entry.createdAt).toLocaleString("it-IT") : "Data non disponibile"}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">Le decisioni su questo elemento appariranno qui.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {cataloghiData?.drafts && cataloghiData.drafts.length > 0 && (
+                      <div className="rounded-md border bg-card p-4">
+                        <p className="text-sm font-semibold mb-3">Bozze aperte</p>
+                        <div className="grid gap-2">
+                          {cataloghiData.drafts.slice(0, 6).map((draft) => (
+                            <button
+                              key={draft.id}
+                              type="button"
+                              onClick={() => {
+                                setCatalogDraftId(draft.id);
+                                setCatalogSelected(draft.entityId ? { id: draft.entityId, ...draft.payload } : null);
+                                setCatalogPayloadText(JSON.stringify(draft.payload, null, 2));
+                                setCatalogPreview(null);
+                                setCatalogFields({});
+                              }}
+                              className="min-h-14 rounded-md border bg-background p-3 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                            >
+                              <p className="text-sm font-medium">
+                                Bozza #{draft.id} {draft.entityId ? `· elemento #${draft.entityId}` : "· nuovo elemento"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Aggiornata {new Date(draft.updatedAt).toLocaleString("it-IT")}
+                              </p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">Nessun dato disponibile.</p>
-                )}
+                </div>
               </div>
             )}
 
@@ -3471,13 +4704,16 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
 
             {/* ── Metriche Business ── */}
             {section === "metriche" && (
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-serif font-bold">
-                    <BarChart3 className="w-5 h-5 inline mr-2 text-primary" />
-                    Metriche Business
-                  </h3>
-                  <Button size="sm" variant="outline" onClick={loadMetriche} disabled={metricheLoading}>
+              <div className="p-4 md:p-8 space-y-5">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <h3 className="text-lg font-serif font-bold">
+                      <BarChart3 className="w-5 h-5 inline mr-2 text-primary" />
+                      Metriche Business
+                    </h3>
+                    <p className="text-sm text-muted-foreground">Crescita, conversione e segnali per decidere cosa correggere.</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={loadMetriche} disabled={metricheLoading} className="min-h-11">
                     {metricheLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
                     Aggiorna
                   </Button>
@@ -3485,46 +4721,83 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                 {metricheLoading ? (
                   <p className="text-sm text-muted-foreground">Caricamento...</p>
                 ) : metricheData ? (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="rounded-xl p-4 bg-card border text-center">
-                        <p className="text-2xl font-bold">{metricheData.users?.total ?? 0}</p>
-                        <p className="text-xs text-muted-foreground">Utenti Totali</p>
-                      </div>
-                      <div className="rounded-xl p-4 bg-card border text-center">
-                        <p className="text-2xl font-bold text-primary">{metricheData.users?.premium ?? 0}</p>
-                        <p className="text-xs text-muted-foreground">Premium</p>
-                      </div>
-                      <div className="rounded-xl p-4 bg-card border text-center">
-                        <p className="text-2xl font-bold">{metricheData.tests?.total ?? 0}</p>
-                        <p className="text-xs text-muted-foreground">Test Completati</p>
-                      </div>
-                      <div className="rounded-xl p-4 bg-card border text-center">
-                        <p className="text-2xl font-bold">{metricheData.users?.new30d ?? 0}</p>
-                        <p className="text-xs text-muted-foreground">Nuovi (30gg)</p>
-                      </div>
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+                      {[
+                        { label: "Utenti", value: metricheData.business.users.total, detail: `+${metricheData.business.users.new30d} in 30g` },
+                        { label: "Nuovi 7g", value: metricheData.business.users.new7d, detail: "Acquisizione breve" },
+                        { label: "Test", value: metricheData.business.tests.total, detail: `+${metricheData.business.tests.recent30d} in 30g` },
+                        { label: "Premium", value: metricheData.business.users.premium, detail: `${metricheData.business.users.conversionRate}% conversione` },
+                        { label: "Test/User", value: `${metricheData.funnels.userToTestRate}%`, detail: "Attivazione" },
+                        { label: "Lead conv.", value: `${metricheData.funnels.leadConversionRate}%`, detail: "Partner" },
+                      ].map((item) => (
+                        <div key={item.label} className="rounded-lg p-4 bg-card border min-w-0">
+                          <p className="text-2xl font-bold truncate">{item.value}</p>
+                          <p className="text-xs font-medium text-muted-foreground">{item.label}</p>
+                          <p className="text-xs text-muted-foreground mt-1 truncate">{item.detail}</p>
+                        </div>
+                      ))}
                     </div>
-                    {metricheData.topSectors && metricheData.topSectors.length > 0 && (
-                      <div>
-                        <h4 className="font-semibold mb-2 text-sm">Settori più popolari</h4>
-                        <div className="space-y-1">
-                          {metricheData.topSectors.slice(0, 5).map((s: any) => (
-                            <div key={s.sectorId} className="flex items-center justify-between p-2 rounded-lg bg-muted/40">
-                              <span className="text-sm">{s.name}</span>
-                              <Badge variant="outline">{s.count}</Badge>
-                            </div>
-                          ))}
+
+                    <div className="grid lg:grid-cols-2 gap-4">
+                      <div className="rounded-lg border bg-card p-4">
+                        <h4 className="font-semibold text-sm mb-3">Trend sintetico</h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-lg bg-muted/40 p-3">
+                            <p className="text-xs text-muted-foreground">Utenti 7g / 30g</p>
+                            <p className="text-lg font-bold">{metricheData.business.users.new7d} / {metricheData.business.users.new30d}</p>
+                          </div>
+                          <div className="rounded-lg bg-muted/40 p-3">
+                            <p className="text-xs text-muted-foreground">Test 7g / 30g</p>
+                            <p className="text-lg font-bold">{metricheData.business.tests.recent7d} / {metricheData.business.tests.recent30d}</p>
+                          </div>
+                          <div className="rounded-lg bg-muted/40 p-3">
+                            <p className="text-xs text-muted-foreground">Test confermati</p>
+                            <p className="text-lg font-bold">{metricheData.business.tests.completionRate}%</p>
+                          </div>
+                          <div className="rounded-lg bg-muted/40 p-3">
+                            <p className="text-xs text-muted-foreground">AI error rate</p>
+                            <p className="text-lg font-bold">{metricheData.technical.ai.errorRate}%</p>
+                          </div>
                         </div>
                       </div>
-                    )}
-                    {wendyMetricsData && (
-                      <div>
-                        <h4 className="font-semibold mb-2 text-sm">Wendy AI — Richieste per Dominio</h4>
+
+                      <div className="rounded-lg border bg-card p-4">
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <h4 className="font-semibold text-sm">Decisioni rapide</h4>
+                          <Badge variant={metricheData.technical.status === "healthy" ? "secondary" : "default"}>
+                            {metricheData.technical.label}
+                          </Badge>
+                        </div>
+                        <div className="space-y-2">
+                          {metricheData.actions.filter((action) => (action.count ?? 0) > 0).slice(0, 5).map((action) => (
+                            <button
+                              key={action.path}
+                              type="button"
+                              onClick={() => navigateToSection(action.section)}
+                              className="w-full min-h-11 rounded-lg border bg-background p-3 text-left hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-sm font-medium">{action.label}</span>
+                                <Badge variant="outline">{action.count}</Badge>
+                              </div>
+                            </button>
+                          ))}
+                          {metricheData.actions.every((action) => !action.count) && (
+                            <p className="text-sm text-muted-foreground">Nessuna azione urgente: guarda i trend e continua a monitorare.</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {metricheData.business.topSectors && metricheData.business.topSectors.length > 0 && (
+                      <div className="rounded-lg border bg-card p-4">
+                        <h4 className="font-semibold mb-2 text-sm">Settori più popolari</h4>
                         <div className="space-y-1">
-                          {Object.entries(wendyMetricsData.volumeByDomain ?? {}).map(([domain, count]) => (
-                            <div key={domain} className="flex items-center justify-between p-2 rounded-lg bg-muted/40">
-                              <span className="text-sm capitalize">{domain}</span>
-                              <Badge variant="outline">{String(count)}</Badge>
+                          {metricheData.business.topSectors.slice(0, 5).map((s) => (
+                            <div key={String(s.sectorId)} className="flex items-center justify-between p-2 rounded-lg bg-muted/40">
+                              <span className="text-sm">Settore #{s.sectorId ?? "n/d"}</span>
+                              <Badge variant="outline">{s.count}</Badge>
                             </div>
                           ))}
                         </div>
@@ -3532,20 +4805,26 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">Nessun dato disponibile.</p>
+                  <div className="rounded-lg border bg-card p-8 text-center">
+                    <p className="text-sm text-muted-foreground">Nessun dato disponibile.</p>
+                    <Button variant="outline" className="mt-3 min-h-11" onClick={loadMetriche}>Riprova</Button>
+                  </div>
                 )}
               </div>
             )}
 
             {/* ── Status & Setup ── */}
             {section === "status" && (
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-serif font-bold">
-                    <Settings className="w-5 h-5 inline mr-2 text-primary" />
-                    Status & Setup
-                  </h3>
-                  <Button size="sm" variant="outline" onClick={loadStatus} disabled={statusLoading}>
+              <div className="p-4 md:p-8 space-y-5">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <h3 className="text-lg font-serif font-bold">
+                      <Settings className="w-5 h-5 inline mr-2 text-primary" />
+                      Status & Setup
+                    </h3>
+                    <p className="text-sm text-muted-foreground">Salute tecnica, configurazione e problemi recenti da correggere.</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={loadStatus} disabled={statusLoading} className="min-h-11">
                     {statusLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
                     Aggiorna
                   </Button>
@@ -3553,194 +4832,638 @@ const [affiliazioneLoading, setAffiliazioneLoading] = useState(false);
                 {statusLoading ? (
                   <p className="text-sm text-muted-foreground">Caricamento...</p>
                 ) : statusData ? (
-                  <div className="space-y-4">
-                    <div className={`rounded-xl p-4 border ${
-                      statusData.status === "ok" ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30" :
-                      statusData.status === "degraded" ? "bg-amber-50 border-amber-200 dark:bg-amber-950/30" :
-                      "bg-red-50 border-red-200 dark:bg-red-950/30"
-                    }`}>
-                      <h4 className="font-semibold mb-2">Stato Generale: <span className="capitalize">{statusData.status}</span></h4>
-                      <p className="text-xs text-muted-foreground">Uptime: {Math.floor(statusData.uptimeSeconds / 3600)}h {Math.floor((statusData.uptimeSeconds % 3600) / 60)}m</p>
+                  <div className="space-y-5">
+                    <div className={cn("rounded-lg p-4 border", HEALTH_UI[statusData.technical.status].tone)}>
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div>
+                          <h4 className="font-semibold mb-1">{statusData.technical.label}</h4>
+                          <p className="text-xs">
+                            Uptime: {Math.floor(statusData.technical.uptimeSeconds / 3600)}h {Math.floor((statusData.technical.uptimeSeconds % 3600) / 60)}m
+                          </p>
+                        </div>
+                        <Badge variant="outline">{statusData.technical.reasons.length} segnali</Badge>
+                      </div>
+                      {statusData.technical.reasons.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {statusData.technical.reasons.slice(0, 5).map((reason) => (
+                            <Badge key={reason} variant="outline" className="bg-background/60">{reason}</Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {Object.entries(statusData.services ?? {}).map(([name, svc]: [string, any]) => (
-                        <div key={name} className={`rounded-xl p-3 border ${
-                          svc.status === "ok" ? "bg-emerald-50 border-emerald-200" :
-                          svc.status === "not_configured" ? "bg-amber-50 border-amber-200" :
-                          "bg-red-50 border-red-200"
-                        }`}>
-                          <p className="text-sm font-medium capitalize">{name}</p>
-                          <p className={`text-xs ${
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                      {Object.entries(statusData.technical.services ?? {}).map(([name, svc]) => (
+                        <div key={name} className={cn(
+                          "rounded-lg p-3 border bg-card",
+                          svc.status === "ok" && "border-emerald-200",
+                          svc.status === "not_configured" && "border-amber-200",
+                          svc.status === "error" && "border-red-200",
+                        )}>
+                          <p className="text-sm font-medium">{svc.label}</p>
+                          <p className={cn(
+                            "text-xs mt-1",
                             svc.status === "ok" ? "text-emerald-600" :
-                            svc.status === "not_configured" ? "text-amber-600" :
-                            "text-red-600"
-                          }`}>{svc.status.replace("_", " ")}</p>
-                          {svc.latencyMs > 0 && <p className="text-xs text-muted-foreground">{svc.latencyMs}ms</p>}
+                              svc.status === "not_configured" ? "text-amber-600" :
+                                "text-red-600",
+                          )}>{svc.status.replace("_", " ")}</p>
+                          {svc.uptimeSeconds != null && <p className="text-xs text-muted-foreground">{Math.floor(svc.uptimeSeconds / 60)}m uptime</p>}
                         </div>
                       ))}
                     </div>
-                    {statusData.env && (
-                      <div>
-                        <h4 className="font-semibold mb-2 text-sm">Environment Variables</h4>
-                        <p className="text-xs text-muted-foreground">Configurate: {statusData.env.configured}/{statusData.env.total}</p>
-                        {statusData.env.missingRequired && statusData.env.missingRequired.length > 0 && (
-                          <div className="mt-2">
-                            <p className="text-xs text-red-600 font-medium">Mancanti (richieste):</p>
-                            <p className="text-xs text-red-500 font-mono">{statusData.env.missingRequired.join(", ")}</p>
+
+                    <div className="grid lg:grid-cols-2 gap-4">
+                      <div className="rounded-lg border bg-card p-4">
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <h4 className="font-semibold text-sm">Environment</h4>
+                          <span className="text-xs text-muted-foreground">{statusData.env.configured}/{statusData.env.total} configurate</span>
+                        </div>
+                        {statusData.env.missingCritical.length > 0 ? (
+                          <div className="mb-3">
+                            <p className="text-xs font-medium text-red-600 mb-1">Critiche mancanti</p>
+                            <div className="flex flex-wrap gap-2">
+                              {statusData.env.missingCritical.map((key) => <Badge key={key} variant="outline" className="border-red-200 text-red-700">{key}</Badge>)}
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-emerald-700 mb-3">Env critiche configurate.</p>
+                        )}
+                        {statusData.env.missingOptional.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium text-amber-700 mb-1">Opzionali mancanti</p>
+                            <div className="flex flex-wrap gap-2">
+                              {statusData.env.missingOptional.map((key) => <Badge key={key} variant="outline" className="border-amber-200 text-amber-700">{key}</Badge>)}
+                            </div>
                           </div>
                         )}
                       </div>
-                    )}
+
+                      <div className="rounded-lg border bg-card p-4">
+                        <h4 className="font-semibold text-sm mb-3">Link rapidi</h4>
+                        <div className="grid sm:grid-cols-2 gap-2">
+                          {statusData.actions.map((action) => (
+                            <button
+                              key={action.path}
+                              type="button"
+                              onClick={() => navigateToSection(action.section)}
+                              className="min-h-11 rounded-lg border bg-background p-3 text-left hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            >
+                              <span className="text-sm font-medium">{action.label}</span>
+                              {action.count != null && <Badge variant="outline" className="ml-2">{action.count}</Badge>}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid lg:grid-cols-2 gap-4">
+                      <div className="rounded-lg border bg-card p-4">
+                        <h4 className="font-semibold text-sm mb-3">Errori recenti</h4>
+                        {statusData.technical.errors.recent.length > 0 ? (
+                          <div className="space-y-2">
+                            {statusData.technical.errors.recent.map((error) => (
+                              <div key={`${error.file}-${error.function}-${error.capturedAt}`} className="rounded-lg border bg-background p-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <p className="text-sm font-medium line-clamp-1">{error.message}</p>
+                                  <Badge variant="outline">{error.occurrences}x</Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{error.file} · {error.function}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">Nessun errore catturato di recente.</p>
+                        )}
+                      </div>
+
+                      <div className="rounded-lg border bg-card p-4">
+                        <h4 className="font-semibold text-sm mb-3">Agenti e AI</h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-lg bg-muted/40 p-3">
+                            <p className="text-xs text-muted-foreground">Run agenti</p>
+                            <p className="text-lg font-bold">{statusData.technical.agents.totalRuns}</p>
+                          </div>
+                          <div className="rounded-lg bg-muted/40 p-3">
+                            <p className="text-xs text-muted-foreground">Errori agenti</p>
+                            <p className="text-lg font-bold">{statusData.technical.agents.errorRate}%</p>
+                          </div>
+                          <div className="rounded-lg bg-muted/40 p-3">
+                            <p className="text-xs text-muted-foreground">AI request</p>
+                            <p className="text-lg font-bold">{statusData.technical.ai.requests}</p>
+                          </div>
+                          <div className="rounded-lg bg-muted/40 p-3">
+                            <p className="text-xs text-muted-foreground">AI error rate</p>
+                            <p className="text-lg font-bold">{statusData.technical.ai.errorRate}%</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">Nessun dato disponibile.</p>
+                  <div className="rounded-lg border bg-card p-8 text-center">
+                    <p className="text-sm text-muted-foreground">Nessun dato disponibile.</p>
+                    <Button variant="outline" className="mt-3 min-h-11" onClick={loadStatus}>Riprova</Button>
+                  </div>
                 )}
               </div>
             )}
 
             {/* ── Messaggi ── */}
             {section === "messaggi" && (
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-serif font-bold">
-                    <MessageCircle className="w-5 h-5 inline mr-2 text-primary" />
-                    Messaggi
-                  </h3>
-                  <Button size="sm" variant="outline" onClick={loadMessaggi} disabled={messaggiLoading}>
+              <div className="p-4 md:p-8 space-y-5">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <h3 className="text-lg font-serif font-bold">
+                      <MessageCircle className="w-5 h-5 inline mr-2 text-primary" />
+                      Messaggi
+                    </h3>
+                    <p className="text-sm text-muted-foreground">Inbox operativa per contatti e richieste dirette.</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={loadMessaggi} disabled={messaggiLoading} className="min-h-11">
                     {messaggiLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
                     Aggiorna
                   </Button>
                 </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                  {[
+                    ["Totali", messaggiData?.stats?.total ?? 0],
+                    ["Non letti", messaggiData?.stats?.unread ?? 0],
+                    ["Nuovi", messaggiData?.stats?.new ?? 0],
+                    ["In lavorazione", messaggiData?.stats?.inProgress ?? 0],
+                    ["Risolti", messaggiData?.stats?.resolved ?? 0],
+                  ].map(([label, value]) => (
+                    <div key={String(label)} className="rounded-lg border bg-card p-3">
+                      <p className="text-lg font-bold">{String(value)}</p>
+                      <p className="text-xs text-muted-foreground">{String(label)}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-[1fr_160px_170px_190px]">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input className="pl-9 min-h-11" placeholder="Cerca nome, email, oggetto o messaggio..." value={messaggiSearch} onChange={(e) => setMessaggiSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void loadMessaggi(); }} />
+                  </div>
+                  <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={messaggiRead} onChange={(e) => setMessaggiRead(e.target.value)}>
+                    <option value="all">Tutti</option>
+                    <option value="unread">Non letti</option>
+                    <option value="read">Letti</option>
+                  </select>
+                  <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={messaggiStatus} onChange={(e) => setMessaggiStatus(e.target.value)}>
+                    <option value="all">Tutti gli stati</option>
+                    {Object.entries(MESSAGE_STATUS_UI).map(([value, cfg]) => <option key={value} value={value}>{cfg.label}</option>)}
+                  </select>
+                  <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={messaggiAssignedTo} onChange={(e) => setMessaggiAssignedTo(e.target.value)}>
+                    <option value="all">Tutti gli admin</option>
+                    <option value="unassigned">Non assegnati</option>
+                    {messaggiData?.assignees?.map((admin) => <option key={admin.id} value={admin.id}>{admin.name || admin.email}</option>)}
+                  </select>
+                </div>
+
                 {messaggiLoading ? (
                   <p className="text-sm text-muted-foreground">Caricamento...</p>
-                ) : messaggiData.length > 0 ? (
-                  <div className="space-y-2">
-                    {messaggiData.map((msg: any) => (
-                      <div key={msg.id} className="p-4 rounded-xl border bg-card">
-                        <div className="flex items-start justify-between gap-2 flex-wrap">
-                          <div>
-                            <p className="text-sm font-medium">{msg.name}</p>
-                            <p className="text-xs text-muted-foreground">{msg.email}</p>
+                ) : messaggiData?.items ? (
+                  <div className="grid lg:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)] gap-4">
+                    <div className="space-y-2 min-w-0">
+                      {messaggiData.items.map((msg) => (
+                        <button key={msg.id} type="button" onClick={() => { setMessaggioSelected(msg); setMessaggioNotes(msg.internalNotes ?? ""); }} className={cn("w-full min-h-11 text-left p-4 rounded-lg border bg-card hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", messaggioSelected?.id === msg.id && "border-primary/50 bg-primary/5", !msg.read && "border-primary/30")}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm truncate">{msg.subject}</p>
+                              <p className="text-xs text-muted-foreground truncate">{msg.name} · {msg.email}</p>
+                            </div>
+                            <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+                              {!msg.read && <Badge className="bg-primary text-primary-foreground">Nuovo</Badge>}
+                              {messageStatusBadge(msg.status)}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            {msg.subject && (
-                              <Badge variant="outline" className="capitalize">{msg.subject}</Badge>
-                            )}
-                            <span className="text-xs text-muted-foreground">{new Date(msg.createdAt).toLocaleDateString("it-IT")}</span>
+                          <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{msg.message}</p>
+                          <p className="text-xs text-muted-foreground mt-2">{fmtShortDate(msg.createdAt)} · {assigneeLabel(messaggiData.assignees, msg.assignedTo)}</p>
+                        </button>
+                      ))}
+                      {messaggiData.items.length === 0 && <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">Nessun messaggio trovato.</div>}
+                    </div>
+
+                    <div className="rounded-lg border bg-card min-w-0">
+                      {messaggioSelected ? (
+                        <div className="p-4 md:p-5 space-y-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h4 className="font-semibold truncate">{messaggioSelected.subject}</h4>
+                              <p className="text-sm text-muted-foreground">{messaggioSelected.name} · {messaggioSelected.email}</p>
+                            </div>
+                            {messageStatusBadge(messaggioSelected.status)}
+                          </div>
+                          <div className="rounded-lg border bg-background p-4">
+                            <p className="text-sm whitespace-pre-wrap">{messaggioSelected.message}</p>
+                          </div>
+                          <div className="grid sm:grid-cols-2 gap-3">
+                            <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={messaggioSelected.status} onChange={(e) => void updateMessaggio(messaggioSelected.id, "status", { status: e.target.value })}>
+                              {Object.entries(MESSAGE_STATUS_UI).map(([value, cfg]) => <option key={value} value={value}>{cfg.label}</option>)}
+                            </select>
+                            <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={messaggioSelected.assignedTo ?? ""} onChange={(e) => void updateMessaggio(messaggioSelected.id, "assign", { assignedTo: e.target.value || null })}>
+                              <option value="">Non assegnato</option>
+                              {messaggiData.assignees.map((admin) => <option key={admin.id} value={admin.id}>{admin.name || admin.email}</option>)}
+                            </select>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button variant="outline" className="min-h-11" disabled={!!messaggioActionLoading} onClick={() => void updateMessaggio(messaggioSelected.id, "read", { read: !messaggioSelected.read })}>
+                              <Eye className="w-4 h-4 mr-2" /> {messaggioSelected.read ? "Segna non letto" : "Segna letto"}
+                            </Button>
+                            {user?.id ? (
+                              <Button variant="outline" className="min-h-11" disabled={!!messaggioActionLoading} onClick={() => void updateMessaggio(messaggioSelected.id, "assign", { assignedTo: user.id })}>
+                                <Shield className="w-4 h-4 mr-2" /> Assegna a me
+                              </Button>
+                            ) : null}
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium mb-1">Note interne</p>
+                            <Textarea value={messaggioNotes} onChange={(e) => setMessaggioNotes(e.target.value)} placeholder="Note operative, follow-up, contesto..." />
+                            <Button className="mt-2 min-h-11" disabled={!!messaggioActionLoading} onClick={() => void updateMessaggio(messaggioSelected.id, "notes", { internalNotes: messaggioNotes })}>
+                              <Save className="w-4 h-4 mr-2" /> Salva note
+                            </Button>
                           </div>
                         </div>
-                        <p className="text-sm mt-2 text-muted-foreground line-clamp-2">{msg.message}</p>
-                      </div>
-                    ))}
+                      ) : (
+                        <div className="p-8 text-center text-sm text-muted-foreground">Seleziona un messaggio per gestirlo.</div>
+                      )}
+                    </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">Nessun messaggio.</p>
+                  <div className="rounded-lg border bg-card p-8 text-center">
+                    <p className="text-sm text-muted-foreground">Nessun dato disponibile.</p>
+                    <Button variant="outline" className="mt-3 min-h-11" onClick={loadMessaggi}>Riprova</Button>
+                  </div>
                 )}
               </div>
             )}
 
             {/* ── Coda Crescita ── */}
             {section === "crescita" && (
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-serif font-bold">
-                    <Sparkles className="w-5 h-5 inline mr-2 text-primary" />
-                    Coda Articoli Crescita
-                  </h3>
-                  <Button size="sm" variant="outline" onClick={loadCrescita} disabled={crescitaLoading}>
+              <div className="p-4 md:p-8 space-y-5">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <h3 className="text-lg font-serif font-bold">
+                      <Sparkles className="w-5 h-5 inline mr-2 text-primary" />
+                      Coda Crescita
+                    </h3>
+                    <p className="text-sm text-muted-foreground">Review editoriale per articoli generati o proposti.</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={loadCrescita} disabled={crescitaLoading} className="min-h-11">
                     {crescitaLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
                     Aggiorna
                   </Button>
                 </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                  {GROWTH_STATUS_FILTERS.map((item) => {
+                    const value = item.value === "all" ? crescitaData?.stats?.total : crescitaData?.stats?.[item.value];
+                    return (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => setCrescitaStatus(item.value)}
+                        className={cn(
+                          "min-h-11 rounded-lg border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                          crescitaStatus === item.value ? "bg-primary/10 border-primary/40" : "bg-card hover:bg-muted/50",
+                        )}
+                      >
+                        <p className="text-lg font-bold">{value ?? 0}</p>
+                        <p className="text-xs text-muted-foreground">{item.label}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    className="pl-9 min-h-11"
+                    placeholder="Cerca titolo, slug, categoria o descrizione..."
+                    value={crescitaSearch}
+                    onChange={(event) => setCrescitaSearch(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void loadCrescita();
+                    }}
+                  />
+                </div>
+
                 {crescitaLoading ? (
                   <p className="text-sm text-muted-foreground">Caricamento...</p>
                 ) : crescitaData?.queue ? (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-3 gap-3 mb-4">
-                      <div className="rounded-xl p-3 bg-amber-50 dark:bg-amber-950/30 border text-center">
-                        <p className="text-xl font-bold text-amber-600">{crescitaData.stats?.pending ?? 0}</p>
-                        <p className="text-xs text-muted-foreground">In coda</p>
-                      </div>
-                      <div className="rounded-xl p-3 bg-emerald-50 dark:bg-emerald-950/30 border text-center">
-                        <p className="text-xl font-bold text-emerald-600">{crescitaData.stats?.published ?? 0}</p>
-                        <p className="text-xs text-muted-foreground">Pubblicati</p>
-                      </div>
-                      <div className="rounded-xl p-3 bg-red-50 dark:bg-red-950/30 border text-center">
-                        <p className="text-xl font-bold text-red-600">{crescitaData.stats?.rejected ?? 0}</p>
-                        <p className="text-xs text-muted-foreground">Scartati</p>
-                      </div>
-                    </div>
-                    {crescitaData.queue.map((article: any) => (
-                      <div key={article.id} className="p-4 rounded-xl border bg-card">
-                        <div className="flex items-start justify-between gap-2 flex-wrap">
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-sm">{article.title}</h4>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {article.category}{article.subcategory ? ` / ${article.subcategory}` : ""}
-                              {" · "}
-                              {article.readTimeMinutes} min
-                              {" · "}
-                              {new Date(article.createdAt).toLocaleDateString("it-IT")}
-                            </p>
+                  <div className="grid lg:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)] gap-4">
+                    <div className="space-y-2 min-w-0">
+                      {crescitaData.queue.map((article) => (
+                        <button
+                          key={article.id}
+                          type="button"
+                          onClick={() => void loadCrescitaDetail(article.id)}
+                          className={cn(
+                            "w-full min-h-11 text-left p-4 rounded-lg border bg-card hover:bg-muted/50 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                            crescitaSelected?.article?.id === article.id && "border-primary/50 bg-primary/5",
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h4 className="font-semibold text-sm truncate">{article.title}</h4>
+                              <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                                {article.slug} · {article.category}{article.subcategory ? ` / ${article.subcategory}` : ""} · {article.readTimeMinutes} min
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {growthStatusBadge(article.status)}
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            </div>
                           </div>
-                          <Badge variant="outline" className="capitalize">{article.difficulty}</Badge>
+                          <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{article.description}</p>
+                          <p className="text-xs text-muted-foreground mt-2">Aggiornato {fmtShortDate(article.updatedAt)}</p>
+                        </button>
+                      ))}
+                      {crescitaData.queue.length === 0 && (
+                        <div className="rounded-lg border bg-card p-8 text-center">
+                          <p className="font-medium">Nessun articolo trovato.</p>
+                          <p className="text-sm text-muted-foreground mt-1">Cambia filtro o ricerca per vedere altre proposte.</p>
                         </div>
-                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{article.description}</p>
-                      </div>
-                    ))}
-                    {crescitaData.queue.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-8">Nessun articolo in coda.</p>
-                    )}
+                      )}
+                    </div>
+
+                    <div className="rounded-lg border bg-card min-w-0">
+                      {crescitaSelected ? (
+                        <div className="p-4 md:p-5 space-y-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h4 className="font-semibold truncate">{crescitaSelected.article.title}</h4>
+                              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                {growthStatusBadge(crescitaSelected.article.status)}
+                                <Badge variant="outline">{crescitaSelected.article.difficulty}</Badge>
+                                <span className="text-xs text-muted-foreground">{crescitaSelected.article.readTimeMinutes} min</span>
+                              </div>
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={() => setCrescitaSelected(null)}>
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+
+                          <div className="grid md:grid-cols-2 gap-3">
+                            <div>
+                              <p className="text-xs font-medium mb-1">Titolo</p>
+                              <Input value={crescitaForm.title ?? ""} onChange={(e) => setCrescitaForm((prev) => ({ ...prev, title: e.target.value }))} />
+                              {crescitaFields.title && <p className="text-xs text-red-600 mt-1">{crescitaFields.title}</p>}
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium mb-1">Slug</p>
+                              <Input value={crescitaForm.slug ?? ""} onChange={(e) => setCrescitaForm((prev) => ({ ...prev, slug: e.target.value }))} />
+                              {crescitaFields.slug && <p className="text-xs text-red-600 mt-1">{crescitaFields.slug}</p>}
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium mb-1">Categoria</p>
+                              <Input value={crescitaForm.category ?? ""} onChange={(e) => setCrescitaForm((prev) => ({ ...prev, category: e.target.value }))} />
+                              {crescitaFields.category && <p className="text-xs text-red-600 mt-1">{crescitaFields.category}</p>}
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium mb-1">Sottocategoria</p>
+                              <Input value={crescitaForm.subcategory ?? ""} onChange={(e) => setCrescitaForm((prev) => ({ ...prev, subcategory: e.target.value }))} />
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium mb-1">Difficoltà</p>
+                              <select
+                                className="w-full min-h-10 rounded-md border bg-background px-3 text-sm"
+                                value={crescitaForm.difficulty ?? "base"}
+                                onChange={(e) => setCrescitaForm((prev) => ({ ...prev, difficulty: e.target.value }))}
+                              >
+                                <option value="base">Base</option>
+                                <option value="intermedio">Intermedio</option>
+                                <option value="avanzato">Avanzato</option>
+                              </select>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium mb-1">Read time</p>
+                              <Input type="number" min={1} value={crescitaForm.readTimeMinutes ?? 3} onChange={(e) => setCrescitaForm((prev) => ({ ...prev, readTimeMinutes: e.target.value }))} />
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className="text-xs font-medium mb-1">Descrizione</p>
+                            <Textarea value={crescitaForm.description ?? ""} onChange={(e) => setCrescitaForm((prev) => ({ ...prev, description: e.target.value }))} />
+                            {crescitaFields.description && <p className="text-xs text-red-600 mt-1">{crescitaFields.description}</p>}
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium mb-1">Contenuto</p>
+                            <Textarea className="min-h-40" value={crescitaForm.content ?? ""} onChange={(e) => setCrescitaForm((prev) => ({ ...prev, content: e.target.value }))} />
+                            {crescitaFields.content && <p className="text-xs text-red-600 mt-1">{crescitaFields.content}</p>}
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium mb-1">Tag</p>
+                            <Input value={Array.isArray(crescitaForm.tags) ? crescitaForm.tags.join(", ") : crescitaForm.tags ?? ""} onChange={(e) => setCrescitaForm((prev) => ({ ...prev, tags: e.target.value }))} />
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <Button variant="outline" onClick={() => void handleCrescitaAction("save")} disabled={!!crescitaActionLoading} className="min-h-11">
+                              <Save className="w-4 h-4 mr-2" /> Salva modifiche
+                            </Button>
+                            <Button variant="outline" onClick={() => void handleCrescitaAction("preview")} disabled={!!crescitaActionLoading} className="min-h-11">
+                              <Eye className="w-4 h-4 mr-2" /> Preview
+                            </Button>
+                            <Button onClick={() => void handleCrescitaAction("publish")} disabled={!!crescitaActionLoading} className="min-h-11">
+                              <CheckCircle2 className="w-4 h-4 mr-2" /> Approva e pubblica
+                            </Button>
+                          </div>
+
+                          <div className="rounded-lg border p-3 bg-muted/20">
+                            <p className="text-sm font-medium mb-2">Rifiuta con motivo</p>
+                            <Textarea value={crescitaRejectReason} onChange={(e) => setCrescitaRejectReason(e.target.value)} placeholder="Motivo visibile nella timeline audit..." />
+                            {crescitaFields.reason && <p className="text-xs text-red-600 mt-1">{crescitaFields.reason}</p>}
+                            <Button variant="outline" className="mt-2 min-h-11 text-red-700 border-red-200 hover:bg-red-50" onClick={() => void handleCrescitaAction("reject")} disabled={!!crescitaActionLoading}>
+                              <XCircle className="w-4 h-4 mr-2" /> Rifiuta
+                            </Button>
+                          </div>
+
+                          {crescitaPreview && (
+                            <div className="rounded-lg border p-4 bg-background">
+                              <p className="text-xs font-medium text-muted-foreground mb-2">Preview utente</p>
+                              <h5 className="font-serif font-bold text-lg">{crescitaPreview.title}</h5>
+                              <p className="text-sm text-muted-foreground mt-1">{crescitaPreview.description}</p>
+                              <div className="flex gap-2 flex-wrap mt-3">
+                                <Badge variant="outline">{crescitaPreview.category}</Badge>
+                                <Badge variant="outline">{crescitaPreview.difficulty}</Badge>
+                                <Badge variant="outline">{crescitaPreview.readTimeMinutes} min</Badge>
+                              </div>
+                              <p className="text-sm mt-4 whitespace-pre-wrap line-clamp-6">{crescitaPreview.content}</p>
+                            </div>
+                          )}
+
+                          <div>
+                            <p className="text-sm font-medium mb-2">Timeline audit</p>
+                            {crescitaSelected.auditTrail?.length ? (
+                              <div className="space-y-2">
+                                {crescitaSelected.auditTrail.map((entry) => (
+                                  <div key={entry.id} className="rounded-lg border p-3 text-sm">
+                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                      <span className="font-medium">{auditActionLabel(entry.action)}</span>
+                                      <span className="text-xs text-muted-foreground">{fmtShortDate(entry.createdAt)}</span>
+                                    </div>
+                                    {(entry.metadata?.reason || entry.metadata?.notes) && (
+                                      <p className="text-xs text-muted-foreground mt-1">{String(entry.metadata.reason ?? entry.metadata.notes)}</p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">Nessuna decisione registrata.</p>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-8 text-center">
+                          <FileText className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                          <p className="font-medium">Seleziona un articolo</p>
+                          <p className="text-sm text-muted-foreground mt-1">Apri una proposta per modificarla, vedere la preview e decidere cosa pubblicare.</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">Nessun dato disponibile.</p>
+                  <div className="rounded-lg border bg-card p-8 text-center">
+                    <p className="text-sm text-muted-foreground">Nessun dato disponibile.</p>
+                    <Button variant="outline" className="mt-3 min-h-11" onClick={loadCrescita}>Riprova</Button>
+                  </div>
                 )}
               </div>
             )}
 
             {/* ── Partner / Affiliazione ── */}
             {section === "affiliazione" && (
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-serif font-bold">
-                    <Handshake className="w-5 h-5 inline mr-2 text-primary" />
-                    Partner & Affiliazioni
-                  </h3>
-                  <Button size="sm" variant="outline" onClick={loadAffiliazione} disabled={affiliazioneLoading}>
+              <div className="p-4 md:p-8 space-y-5">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <h3 className="text-lg font-serif font-bold">
+                      <Handshake className="w-5 h-5 inline mr-2 text-primary" />
+                      Partner & Affiliazioni
+                    </h3>
+                    <p className="text-sm text-muted-foreground">Gestione lead da scuole, aziende, partner e contatti istituzionali.</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={loadAffiliazione} disabled={affiliazioneLoading} className="min-h-11">
                     {affiliazioneLoading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
                     Aggiorna
                   </Button>
                 </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                  {[
+                    ["Totali", affiliazioneData?.stats?.total ?? 0],
+                    ["Non letti", affiliazioneData?.stats?.unread ?? 0],
+                    ["Pending", affiliazioneData?.stats?.pending ?? 0],
+                    ["Contattati", affiliazioneData?.stats?.contacted ?? 0],
+                    ["Convertiti", affiliazioneData?.stats?.converted ?? 0],
+                  ].map(([label, value]) => (
+                    <div key={String(label)} className="rounded-lg border bg-card p-3">
+                      <p className="text-lg font-bold">{String(value)}</p>
+                      <p className="text-xs text-muted-foreground">{String(label)}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-[1fr_140px_150px_160px_190px]">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input className="pl-9 min-h-11" placeholder="Cerca nome, email, tipo o messaggio..." value={affiliazioneSearch} onChange={(e) => setAffiliazioneSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void loadAffiliazione(); }} />
+                  </div>
+                  <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={affiliazioneRead} onChange={(e) => setAffiliazioneRead(e.target.value)}>
+                    <option value="all">Tutti</option>
+                    <option value="unread">Non letti</option>
+                    <option value="read">Letti</option>
+                  </select>
+                  <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={affiliazioneStatus} onChange={(e) => setAffiliazioneStatus(e.target.value)}>
+                    <option value="all">Tutti gli stati</option>
+                    {Object.entries(LEAD_STATUS_UI).map(([value, cfg]) => <option key={value} value={value}>{cfg.label}</option>)}
+                  </select>
+                  <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={affiliazioneSource} onChange={(e) => setAffiliazioneSource(e.target.value)}>
+                    <option value="all">Tutti i tipi</option>
+                    {affiliazioneData?.sources?.map((row) => <option key={row.source} value={row.source}>{row.source.replace(/_/g, " ")}</option>)}
+                  </select>
+                  <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={affiliazioneAssignedTo} onChange={(e) => setAffiliazioneAssignedTo(e.target.value)}>
+                    <option value="all">Tutti gli admin</option>
+                    <option value="unassigned">Non assegnati</option>
+                    {affiliazioneData?.assignees?.map((admin) => <option key={admin.id} value={admin.id}>{admin.name || admin.email}</option>)}
+                  </select>
+                </div>
+
                 {affiliazioneLoading ? (
                   <p className="text-sm text-muted-foreground">Caricamento...</p>
-                ) : affiliazioneData.length > 0 ? (
-                  <div className="space-y-2">
-                    {affiliazioneData.map((lead: any) => (
-                      <div key={lead.id} className="p-4 rounded-xl border bg-card">
-                        <div className="flex items-start justify-between gap-2 flex-wrap">
-                          <div>
-                            <p className="text-sm font-medium">{lead.institutionName}</p>
-                            <p className="text-xs text-muted-foreground">{lead.contactName} · {lead.email}</p>
+                ) : affiliazioneData?.items ? (
+                  <div className="grid lg:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)] gap-4">
+                    <div className="space-y-2 min-w-0">
+                      {affiliazioneData.items.map((lead) => (
+                        <button key={lead.id} type="button" onClick={() => { setAffiliazioneSelected(lead); setAffiliazioneNotes(lead.internalNotes ?? ""); }} className={cn("w-full min-h-11 text-left p-4 rounded-lg border bg-card hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", affiliazioneSelected?.id === lead.id && "border-primary/50 bg-primary/5", !lead.read && "border-primary/30")}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm truncate">{lead.institutionName}</p>
+                              <p className="text-xs text-muted-foreground truncate">{lead.contactName} · {lead.email}</p>
+                            </div>
+                            <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+                              {!lead.read && <Badge className="bg-primary text-primary-foreground">Nuovo</Badge>}
+                              {leadStatusBadge(lead.status)}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="capitalize">{lead.partnerType?.replace("_", " ")}</Badge>
-                            <Badge className={
-                              lead.status === "nuovo" ? "bg-primary/10 text-primary border-primary/30" :
-                              lead.status === "contattato" ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
-                              lead.status === "in_trattativa" ? "bg-orange-100 text-orange-700 border-orange-200" :
-                              "bg-emerald-100 text-emerald-700 border-emerald-200"
-                            }>
-                              {lead.status}
-                            </Badge>
+                          {lead.message && <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{lead.message}</p>}
+                          <p className="text-xs text-muted-foreground mt-2">{fmtShortDate(lead.createdAt)} · {lead.partnerType.replace(/_/g, " ")} · {assigneeLabel(affiliazioneData.assignees, lead.assignedTo)}</p>
+                        </button>
+                      ))}
+                      {affiliazioneData.items.length === 0 && <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">Nessun lead trovato.</div>}
+                    </div>
+
+                    <div className="rounded-lg border bg-card min-w-0">
+                      {affiliazioneSelected ? (
+                        <div className="p-4 md:p-5 space-y-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h4 className="font-semibold truncate">{affiliazioneSelected.institutionName}</h4>
+                              <p className="text-sm text-muted-foreground">{affiliazioneSelected.contactName} · {affiliazioneSelected.email}</p>
+                            </div>
+                            {leadStatusBadge(affiliazioneSelected.status)}
+                          </div>
+                          <div className="rounded-lg border bg-background p-4">
+                            <p className="text-xs text-muted-foreground mb-1">Messaggio originale</p>
+                            <p className="text-sm whitespace-pre-wrap">{affiliazioneSelected.message || "Nessun messaggio."}</p>
+                          </div>
+                          <div className="grid sm:grid-cols-2 gap-3">
+                            <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={affiliazioneSelected.status} onChange={(e) => void updateAffiliazione(affiliazioneSelected.id, "status", { status: e.target.value })}>
+                              {Object.entries(LEAD_STATUS_UI).map(([value, cfg]) => <option key={value} value={value}>{cfg.label}</option>)}
+                            </select>
+                            <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={affiliazioneSelected.assignedTo ?? ""} onChange={(e) => void updateAffiliazione(affiliazioneSelected.id, "assign", { assignedTo: e.target.value || null })}>
+                              <option value="">Non assegnato</option>
+                              {affiliazioneData.assignees.map((admin) => <option key={admin.id} value={admin.id}>{admin.name || admin.email}</option>)}
+                            </select>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button variant="outline" className="min-h-11" disabled={!!affiliazioneActionLoading} onClick={() => void updateAffiliazione(affiliazioneSelected.id, "read", { read: !affiliazioneSelected.read })}>
+                              <Eye className="w-4 h-4 mr-2" /> {affiliazioneSelected.read ? "Segna non letto" : "Segna letto"}
+                            </Button>
+                            {user?.id ? (
+                              <Button variant="outline" className="min-h-11" disabled={!!affiliazioneActionLoading} onClick={() => void updateAffiliazione(affiliazioneSelected.id, "assign", { assignedTo: user.id })}>
+                                <Shield className="w-4 h-4 mr-2" /> Assegna a me
+                              </Button>
+                            ) : null}
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium mb-1">Note interne</p>
+                            <Textarea value={affiliazioneNotes} onChange={(e) => setAffiliazioneNotes(e.target.value)} placeholder="Prossimo contatto, contesto partner, priorità..." />
+                            <Button className="mt-2 min-h-11" disabled={!!affiliazioneActionLoading} onClick={() => void updateAffiliazione(affiliazioneSelected.id, "notes", { internalNotes: affiliazioneNotes })}>
+                              <Save className="w-4 h-4 mr-2" /> Salva note
+                            </Button>
                           </div>
                         </div>
-                        {lead.message && <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{lead.message}</p>}
-                        <p className="text-xs text-muted-foreground mt-1">{new Date(lead.createdAt).toLocaleDateString("it-IT")}</p>
-                      </div>
-                    ))}
+                      ) : (
+                        <div className="p-8 text-center text-sm text-muted-foreground">Seleziona un lead per gestirlo.</div>
+                      )}
+                    </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">Nessuna richiesta di affiliazione.</p>
+                  <div className="rounded-lg border bg-card p-8 text-center">
+                    <p className="text-sm text-muted-foreground">Nessun dato disponibile.</p>
+                    <Button variant="outline" className="mt-3 min-h-11" onClick={loadAffiliazione}>Riprova</Button>
+                  </div>
                 )}
               </div>
             )}

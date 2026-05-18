@@ -5,7 +5,7 @@ import { useQuery, useQueryClient, useMutation, keepPreviousData } from "@tansta
 import { Newspaper, ExternalLink, Clock, Tag, Sparkles, RefreshCw, Bookmark, BookmarkCheck, Bell, BellOff, TrendingUp, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { cn } from "@/lib/utils";
@@ -15,8 +15,8 @@ import { apiFetch } from "@/lib/api-fetch";
 const BASE = import.meta.env.BASE_URL || "/";
 
 interface NewsItem {
-  id: string; title: string; description: string;
-  source: string; url: string; publishedAt: string;
+  id: string; title: string; preview?: string; description: string;
+  source: string; sourceUrl?: string; url: string; detailUrl?: string; publishedAt: string;
   image: string | null; category: string; sector: string | null;
   tags: string[]; relevance: number; plan: "free" | "premium";
 }
@@ -80,14 +80,19 @@ function SubscribeToggle({ category, subscribed, onToggle }: { category: string;
 
 function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boolean }) {
   const { t } = useTranslation();
+  const [, navigate] = useLocation();
   const { user } = useAuth();
   const { isNewsFavorite, getNewsFavoriteId, addFavorite, removeFavorite, isLoading } = useFavorites();
   const saved = isNewsFavorite(item.url);
   const favId = getNewsFavoriteId(item.url);
   const config = CATEGORY_CONFIG.find((c) => c.id === item.category);
+  const detailHref = item.detailUrl ?? `/news/${item.id}`;
+  const preview = item.preview ?? item.description;
+  const sourceHref = item.sourceUrl ?? item.url;
 
   function toggleSave(e: React.MouseEvent) {
     e.preventDefault();
+    e.stopPropagation();
     if (!user) return;
     if (saved && favId !== undefined) {
       removeFavorite(favId);
@@ -107,12 +112,25 @@ function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boole
   const catLabel = t(`news.categories.${item.category}`, { defaultValue: item.category });
 
   return (
-    <article className="bg-card border border-border rounded-2xl overflow-hidden hover:border-primary/30 transition-all group flex flex-col">
+    <article
+      role="link"
+      tabIndex={0}
+      onClick={() => navigate(detailHref)}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          navigate(detailHref);
+        }
+      }}
+      className="bg-card border border-border rounded-2xl overflow-hidden hover:border-primary/30 transition-all group flex flex-col cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
       {item.image ? (
         <div className="aspect-video overflow-hidden shrink-0">
           <img
             src={item.image}
             alt={item.title}
+            loading="lazy"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
           />
@@ -135,7 +153,7 @@ function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boole
               disabled={isLoading}
               title={saved ? t("news.removeFromSaved") : t("news.saveArticle")}
               className={cn(
-                "shrink-0 p-1.5 rounded-lg transition-colors",
+                "shrink-0 min-h-11 min-w-11 inline-flex items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                 saved ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary hover:bg-primary/5"
               )}
             >
@@ -147,17 +165,18 @@ function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boole
           {item.title}
         </h3>
         <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 mb-4 flex-1">
-          {item.description}
+          {preview}
         </p>
         <div className="flex items-center justify-between mt-auto">
           <span className="text-xs text-muted-foreground font-medium">{item.source}</span>
           <a
-            href={item.url}
+            href={sourceHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex min-h-11 items-center gap-1.5 text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md px-2"
           >
-            {t("common.readMore")} <ExternalLink className="h-3 w-3" />
+            Fonte <ExternalLink className="h-3 w-3" />
           </a>
         </div>
       </div>

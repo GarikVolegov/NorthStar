@@ -207,6 +207,7 @@ export const ERROR_MESSAGES = {
 // Navigation labels — vocabolario semplice e comprensibile
 export const NAV_LABELS = {
   home: "Home",
+  northStar: "NorthStar",
   test: "Test",
   aree: "Aree",
   lavori: "Offerte",
@@ -215,9 +216,10 @@ export const NAV_LABELS = {
   profilo: "Profilo",
   coach: "Coach AI",
   dashboard: "Dashboard",
-  idea: "Idea",
+  idea: "Idee",
   news: "News",
   partner: "Partner",
+  social: "Social",
   mappa: "Mappa",
   chiSiamo: "Chi siamo",
   comeFunziona: "Come funziona",

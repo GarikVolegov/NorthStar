@@ -31,6 +31,8 @@ export type HomeNewsItem = {
   description: string;
   source: string;
   url: string;
+  sourceUrl?: string;
+  detailUrl?: string;
   publishedAt: string;
   image: string | null;
   category: string;

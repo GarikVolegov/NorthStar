@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { get, set, del } from "idb-keyval";
+import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -140,14 +141,14 @@ export async function decryptMessage(
 /* ─── API helpers ──────────────────────────────────────────────────── */
 
 export async function fetchPublicKey(userId: number): Promise<string> {
-  const res = await fetch(`${BASE}api/friends/keys/${userId}`);
+  const res = await apiFetch(`${BASE}api/friends/keys/${userId}`);
   if (!res.ok) throw new Error("Chiave non trovata");
   const data = await res.json();
   return data.publicKey as string;
 }
 
 export async function uploadPublicKey(publicKey: string): Promise<void> {
-  await fetch(`${BASE}api/friends/keys`, {
+  await apiFetch(`${BASE}api/friends/keys`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ publicKey }),
@@ -159,7 +160,7 @@ export async function exchangeKeys(
   keyForRequester: string,
   keyForReceiver: string,
 ): Promise<void> {
-  await fetch(`${BASE}api/friends/keys/exchange`, {
+  await apiFetch(`${BASE}api/friends/keys/exchange`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ friendshipId, keyForRequester, keyForReceiver }),
@@ -167,7 +168,7 @@ export async function exchangeKeys(
 }
 
 export async function fetchEncryptedKey(friendshipId: number): Promise<string> {
-  const res = await fetch(`${BASE}api/friends/keys/exchange/${friendshipId}`);
+  const res = await apiFetch(`${BASE}api/friends/keys/exchange/${friendshipId}`);
   if (!res.ok) throw new Error("Chiave conversazione non trovata");
   const data = await res.json();
   return data.encryptedKey as string;

@@ -12,6 +12,8 @@ export const newsArticlesTable = pgTable(
     urlHash: text("url_hash").notNull().unique(),
     source: text("source").notNull().default(""),
     summary: text("summary").notNull().default(""),
+    imageUrl: text("image_url"),
+    content: text("content"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     sectorNames: text("sector_names").array().notNull().default(sql`'{}'::text[]`),
     category: text("category").notNull().default("general"),

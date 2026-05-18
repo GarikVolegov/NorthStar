@@ -53,6 +53,17 @@ export const knowledgeNodesTable = pgTable(
     embeddedText: text("embedded_text"),
     /** Metadata for platform_content: externalId, chunkIndex, source, contentType, tags, url */
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    sourceType: varchar("source_type", { length: 64 }).notNull().default("manual"),
+    sourceEntityType: varchar("source_entity_type", { length: 64 }),
+    sourceEntityId: varchar("source_entity_id", { length: 128 }),
+    visibility: varchar("visibility", { length: 16 }).notNull().default("private"),
+    status: varchar("status", { length: 24 }).notNull().default("active"),
+    confidence: real("confidence").notNull().default(0.75),
+    importance: real("importance").notNull().default(0.5),
+    decayScore: real("decay_score").notNull().default(0),
+    extractedBy: varchar("extracted_by", { length: 80 }).notNull().default("user"),
+    provenance: jsonb("provenance").$type<Record<string, unknown>>().notNull().default({}),
+    lastReinforcedAt: timestamp("last_reinforced_at", { withTimezone: true }),
     // pgvector column — populated by add-pgvector.sql migration + backfill
     // Used by SQL retriever when PGVECTOR=true
     embeddingVec: vector("embedding_vec"),
@@ -63,6 +74,8 @@ export const knowledgeNodesTable = pgTable(
     userIdx: index("knowledge_nodes_user_idx").on(t.userId),
     // Index for type-filtered queries (persona_example lookups)
     typeIdx: index("knowledge_nodes_type_idx").on(t.type),
+    statusIdx: index("knowledge_nodes_status_idx").on(t.status),
+    sourceIdx: index("knowledge_nodes_source_idx").on(t.sourceEntityType, t.sourceEntityId),
   }),
 );
 
@@ -80,12 +93,20 @@ export const knowledgeEdgesTable = pgTable(
       .notNull()
       .references(() => knowledgeNodesTable.id, { onDelete: "cascade" }),
     label: varchar("label", { length: 100 }),
+    relationType: varchar("relation_type", { length: 64 }).notNull().default("related"),
+    confidence: real("confidence").notNull().default(0.7),
+    status: varchar("status", { length: 24 }).notNull().default("active"),
+    reason: text("reason"),
+    extractedBy: varchar("extracted_by", { length: 80 }).notNull().default("user"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     userIdx: index("knowledge_edges_user_idx").on(t.userId),
     sourceIdx: index("knowledge_edges_source_idx").on(t.sourceId),
     targetIdx: index("knowledge_edges_target_idx").on(t.targetId),
+    statusIdx: index("knowledge_edges_status_idx").on(t.status),
     uniqueEdge: uniqueIndex("knowledge_edges_unique").on(
       t.userId,
       t.sourceId,

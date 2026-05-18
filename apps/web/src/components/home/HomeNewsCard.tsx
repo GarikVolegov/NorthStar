@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { Clock, ExternalLink } from "lucide-react";
+import { Clock, ChevronRight } from "lucide-react";
+import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { CAT_COLOR, CAT_EMOJI, HomeNewsItem } from "./types";
 
@@ -27,12 +28,25 @@ export function HomeNewsCard({ item }: HomeNewsCardProps) {
   }
 
   return (
-    <a
-      href={item.url}
-      target="_blank"
-      rel="noopener noreferrer"
+    <Link
+      href={item.detailUrl ?? `/news/${item.id}`}
       className="group flex flex-col rounded-2xl border border-border bg-card hover:border-primary/30 transition-all duration-300 overflow-hidden h-full"
     >
+      {item.image ? (
+        <div className="aspect-video overflow-hidden bg-muted">
+          <img
+            src={item.image}
+            alt={item.title}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+        </div>
+      ) : (
+        <div className="aspect-video bg-muted/60 flex items-center justify-center">
+          <span className="text-3xl opacity-60">{catEmoji}</span>
+        </div>
+      )}
       <div className="p-5 flex-1 flex flex-col">
         <div className="flex items-center justify-between mb-3">
           <span
@@ -58,10 +72,10 @@ export function HomeNewsCard({ item }: HomeNewsCardProps) {
             {item.source}
           </span>
           <span className="flex items-center gap-1 text-xs font-semibold text-primary group-hover:gap-1.5 transition-all">
-            {t("common.readMore")} <ExternalLink className="w-3 h-3" />
+            {t("common.readMore")} <ChevronRight className="w-3 h-3" />
           </span>
         </div>
       </div>
-    </a>
+    </Link>
   );
 }

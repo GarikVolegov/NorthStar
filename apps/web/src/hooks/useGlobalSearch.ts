@@ -4,7 +4,18 @@ import { useQuery } from "@tanstack/react-query";
 const BASE = import.meta.env.BASE_URL || "/";
 
 export interface SearchResult {
-  type: "sector" | "role" | "article" | "news";
+  type:
+    | "sector"
+    | "role"
+    | "article"
+    | "news"
+    | "idea"
+    | "objective"
+    | "calendar"
+    | "certification"
+    | "memory"
+    | "workspace"
+    | "profile";
   id: number;
   title: string;
   description: string;
@@ -14,6 +25,8 @@ export interface SearchResult {
   score_lexical?: number;
   score_semantic?: number | null;
   score_total?: number;
+  visibility?: "public" | "private";
+  metadata?: Record<string, unknown>;
 }
 
 export interface SearchSuggestion {
@@ -47,6 +60,8 @@ export interface ChatMessage {
 interface HybridResponse {
   results: SearchResult[];
   has_semantic: boolean;
+  searchMode?: "semantic" | "hybrid" | "keyword";
+  indexStatus?: "ready" | "degraded" | "unavailable";
 }
 
 interface SuggestResponse {
@@ -99,6 +114,7 @@ export function useGlobalSearch() {
   const [aiRoute, setAiRoute]         = useState<RouterOutput>(DEFAULT_ROUTE);
   const [isStreaming, setIsStreaming]  = useState(false);
   const [history, setHistory]         = useState<ChatMessage[]>([]);
+  const [orchestratedResults, setOrchestratedResults] = useState<SearchResult[]>([]);
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
 
   // ── Legacy React Query (fallback / risultati DB istantanei) ───────────────
@@ -119,8 +135,10 @@ export function useGlobalSearch() {
     gcTime: 60_000,
   });
 
-  const results    = data?.results  ?? [];
+  const results    = orchestratedResults.length > 0 ? orchestratedResults : (data?.results ?? []);
   const hasSemantic = data?.has_semantic ?? false;
+  const indexStatus = data?.indexStatus ?? "ready";
+  const searchMode = data?.searchMode ?? (hasSemantic ? "semantic" : "keyword");
 
   const { data: suggestData } = useQuery<SuggestResponse>({
     queryKey: ["global-search-suggest", debouncedQuery],
@@ -154,6 +172,7 @@ export function useGlobalSearch() {
     setAiTokens("");
     setAiStatus(null);
     setAiSources([]);
+    setOrchestratedResults([]);
     setIsStreaming(true);
 
     try {
@@ -161,11 +180,11 @@ export function useGlobalSearch() {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const res = await fetch(`${BASE}api/wendy/ask`, {
+      const res = await fetch(`${BASE}api/search/orchestrate`, {
         method: "POST",
         headers,
         credentials: "include",
-        body: JSON.stringify({ message: q, history: msgs }),
+        body: JSON.stringify({ q, sessionId, history: msgs }),
       });
 
       if (!res.ok || !res.body) {
@@ -192,6 +211,8 @@ export function useGlobalSearch() {
           try { event = JSON.parse(line.slice(6)); } catch { continue; }
 
           if (event.type === "status")  setAiStatus(event.value as string);
+          if (event.type === "route") setAiRoute(event.route as RouterOutput);
+          if (event.type === "results") setOrchestratedResults((event.results as SearchResult[]) ?? []);
           if (event.type === "sources") setAiSources(event.chunks as AiSource[]);
           if (event.type === "token") {
             const tok = event.value as string;
@@ -220,17 +241,17 @@ export function useGlobalSearch() {
     }
   }, []);
 
-  // Lancia Wendy AI quando la query cambia (>= 3 chars)
   useEffect(() => {
-    if (debouncedQuery.length >= 3 && isOpen) {
-      startWendyAI(debouncedQuery, history);
-    } else if (debouncedQuery.length < 3) {
+    if (debouncedQuery.length < 2) {
+      setOrchestratedResults([]);
+    }
+    if (debouncedQuery.length < 3) {
       stopStream();
       setAiTokens("");
       setAiStatus(null);
       setAiSources([]);
     }
-  }, [debouncedQuery, isOpen]);
+  }, [debouncedQuery]);
 
   // ── Keyboard shortcut ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -256,6 +277,7 @@ export function useGlobalSearch() {
       setAiTokens("");
       setAiStatus(null);
       setAiSources([]);
+      setOrchestratedResults([]);
     }
   }, [isOpen]);
 
@@ -286,6 +308,8 @@ export function useGlobalSearch() {
     suggestions,
     route: aiRoute,
     hasSemantic,
+    searchMode,
+    indexStatus,
     isLoading: isLoading && debouncedQuery.length >= 2,
     isError,
     isOpen,

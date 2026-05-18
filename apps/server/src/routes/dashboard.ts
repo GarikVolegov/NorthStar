@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Request } from "express";
 import { and, asc, desc, eq, gte } from "drizzle-orm";
 import {
   calendarEventsTable,
@@ -7,8 +8,19 @@ import {
   userObjectivesTable,
 } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
+import { isPersistenceSchemaError } from "../lib/persistence";
 
 const router = Router();
+
+async function optionalDashboardQuery<T>(req: Request, route: string, query: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await query;
+  } catch (err) {
+    if (!isPersistenceSchemaError(err)) throw err;
+    req.log?.warn?.({ err, route, userId: req.user?.id, setupAction: "run_migrations" }, "dashboard optional data unavailable");
+    return fallback;
+  }
+}
 
 /* ─── GET /api/dashboard  —  dati dashboard ─── */
 router.get("/", requireAuth, async (req, res) => {
@@ -17,7 +29,7 @@ router.get("/", requireAuth, async (req, res) => {
     const now = new Date();
 
     const [latestSession, objectives, upcomingEvents] = await Promise.all([
-      db
+      optionalDashboardQuery(req, "dashboard.latestSession", db
         .select({
           id: testSessionsTable.id,
           riasecScores: testSessionsTable.riasecScores,
@@ -29,8 +41,8 @@ router.get("/", requireAuth, async (req, res) => {
         .from(testSessionsTable)
         .where(eq(testSessionsTable.userId, user.id))
         .orderBy(desc(testSessionsTable.createdAt))
-        .limit(1),
-      db
+        .limit(1), []),
+      optionalDashboardQuery(req, "dashboard.objectives", db
         .select({
           id: userObjectivesTable.id,
           text: userObjectivesTable.text,
@@ -44,8 +56,8 @@ router.get("/", requireAuth, async (req, res) => {
         .from(userObjectivesTable)
         .where(eq(userObjectivesTable.userId, user.id))
         .orderBy(desc(userObjectivesTable.createdAt))
-        .limit(8),
-      db
+        .limit(8), []),
+      optionalDashboardQuery(req, "dashboard.upcomingEvents", db
         .select({
           id: calendarEventsTable.id,
           title: calendarEventsTable.title,
@@ -61,7 +73,7 @@ router.get("/", requireAuth, async (req, res) => {
           ),
         )
         .orderBy(asc(calendarEventsTable.startAt))
-        .limit(5),
+        .limit(5), []),
     ]);
 
     const totalObjectives = objectives.length;

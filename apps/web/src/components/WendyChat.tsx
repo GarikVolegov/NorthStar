@@ -5,6 +5,7 @@ import { WendyVoiceOverlay } from './wendy/WendyVoiceOverlay.js';
 import { UiToolRenderer } from './wendy/UiToolRenderer.js';
 import type { VoiceChatMessage } from '../hooks/useVoiceChat.js';
 import { StreamErrorBoundary } from './ErrorBoundary.js';
+import { useWendy } from '../contexts/WendyProvider';
 
 /**
  * WendyChat v2 — aggiunte:
@@ -31,6 +32,7 @@ export function WendyChat({
   const messagesEndRef                    = useRef<HTMLDivElement>(null);
   const inputRef                          = useRef<HTMLTextAreaElement>(null);
   const isComposingRef                    = useRef(false);
+  const wendy                             = useWendy();
 
   // Shared history ref — kept in sync with useWendyChat messages
   // so voice and text turns appear in the same conversation.
@@ -61,6 +63,13 @@ export function WendyChat({
       setInputValue(stt.transcript + stt.interimTranscript);
     }
   }, [stt.transcript, stt.interimTranscript, stt.isListening]);
+
+  useEffect(() => {
+    if (!wendy.isOpen || isStreaming) return;
+    const pending = wendy.consumePendingAsk();
+    if (!pending) return;
+    void sendMessage(pending);
+  }, [wendy.isOpen, isStreaming, sendMessage, wendy]);
 
   const handleSubmit = useCallback(
     async (e?: FormEvent) => {

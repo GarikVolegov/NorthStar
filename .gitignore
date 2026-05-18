@@ -27,6 +27,7 @@ node_modules
 
 # ── Database ───────────────────────────────────────────────────────────────
 *.sql
+!packages/db/drizzle/*.sql
 *.db
 *.sqlite
 *.sqlite3

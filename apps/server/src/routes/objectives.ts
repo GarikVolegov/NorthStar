@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { db } from "@workspace/db";
 import { userObjectivesTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
+import { sendOptionalReadFallback, sendPersistenceWriteError } from "../lib/persistence";
 
 const router = Router();
 
@@ -49,35 +50,51 @@ const SEED_OBJECTIVES: Record<string, Array<{ text: string; category: string }>>
 };
 
 router.get("/", requireAuth, async (req, res) => {
-  const userId = req.user!.id;
+  try {
+    const userId = req.user!.id;
+    const items = await db
+      .select()
+      .from(userObjectivesTable)
+      .where(eq(userObjectivesTable.userId, userId))
+      .orderBy(desc(userObjectivesTable.createdAt));
 
-  const items = await db
-    .select()
-    .from(userObjectivesTable)
-    .where(eq(userObjectivesTable.userId, userId))
-    .orderBy(desc(userObjectivesTable.createdAt));
-
-  res.json(items);
+    res.json(items);
+  } catch (err) {
+    req.log?.error?.({ err }, "objectives list error");
+    if (sendOptionalReadFallback(req, res, err, "objectives.list", [])) return;
+    res.status(500).json({ error: "Errore nel caricamento degli obiettivi" });
+  }
 });
 
 router.post("/", requireAuth, async (req, res) => {
-  const userId = req.user!.id;
-  const data = createObjectiveSchema.parse(req.body);
+  try {
+    const userId = req.user!.id;
+    const data = createObjectiveSchema.parse(req.body);
 
-  const [item] = await db
-    .insert(userObjectivesTable)
-    .values({
-      userId,
-      text: data.text,
-      category: data.category,
-      dueDate: data.dueDate ?? null,
-    })
-    .returning();
+    const [item] = await db
+      .insert(userObjectivesTable)
+      .values({
+        userId,
+        text: data.text,
+        category: data.category,
+        dueDate: data.dueDate ?? null,
+      })
+      .returning();
 
-  res.status(201).json(item);
+    res.status(201).json(item);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: "Dati obiettivo non validi" });
+      return;
+    }
+    req.log?.error?.({ err }, "objectives create error");
+    if (sendPersistenceWriteError(req, res, err, "objectives.create")) return;
+    res.status(500).json({ error: "Errore nella creazione dell'obiettivo" });
+  }
 });
 
 router.post("/seed", requireAuth, async (req, res) => {
+  try {
   const userId = req.user!.id;
   const journeyType = req.user!.journeyType ?? "indeciso";
 
@@ -100,9 +117,15 @@ router.post("/seed", requireAuth, async (req, res) => {
     .returning();
 
   res.status(201).json({ message: "Obiettivi creati", objectives: inserted });
+  } catch (err) {
+    req.log?.error?.({ err }, "objectives seed error");
+    if (sendPersistenceWriteError(req, res, err, "objectives.seed")) return;
+    res.status(500).json({ error: "Errore nell'inizializzazione degli obiettivi" });
+  }
 });
 
 router.patch("/:id", requireAuth, async (req, res) => {
+  try {
   const userId = req.user!.id;
   const id = parseInt(req.params.id);
   const data = updateObjectiveSchema.parse(req.body);
@@ -134,9 +157,19 @@ router.patch("/:id", requireAuth, async (req, res) => {
     .returning();
 
   res.json(updated);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      res.status(400).json({ error: "Dati obiettivo non validi" });
+      return;
+    }
+    req.log?.error?.({ err }, "objectives update error");
+    if (sendPersistenceWriteError(req, res, err, "objectives.update")) return;
+    res.status(500).json({ error: "Errore nell'aggiornamento dell'obiettivo" });
+  }
 });
 
 router.delete("/:id", requireAuth, async (req, res) => {
+  try {
   const userId = req.user!.id;
   const id = parseInt(req.params.id);
 
@@ -153,6 +186,11 @@ router.delete("/:id", requireAuth, async (req, res) => {
 
   await db.delete(userObjectivesTable).where(eq(userObjectivesTable.id, id));
   res.status(204).send();
+  } catch (err) {
+    req.log?.error?.({ err }, "objectives delete error");
+    if (sendPersistenceWriteError(req, res, err, "objectives.delete")) return;
+    res.status(500).json({ error: "Errore nell'eliminazione dell'obiettivo" });
+  }
 });
 
 export default router;

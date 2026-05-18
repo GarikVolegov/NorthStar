@@ -2,28 +2,59 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { db, usersTable, userProfileSettingsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
+import { isPersistenceSchemaError, sendPersistenceWriteError } from "../lib/persistence";
 
 const router = Router();
+
+async function upsertProfileSettings(userId: number, values: Partial<typeof userProfileSettingsTable.$inferInsert>) {
+  const now = new Date();
+  await db
+    .insert(userProfileSettingsTable)
+    .values({ userId, ...values, updatedAt: now })
+    .onConflictDoUpdate({
+      target: userProfileSettingsTable.userId,
+      set: { ...values, updatedAt: now },
+    });
+}
 
 /* ─── GET /api/profile/:userId  —  dati profilo ───────────────────── */
 router.get("/:userId", async (req, res) => {
   try {
     const userId = parseInt(req.params.userId, 10);
 
-    const [user] = await db
-      .select({
-        id: usersTable.id,
-        name: usersTable.name,
-        email: usersTable.email,
-        emailVerified: usersTable.emailVerified,
-        avatarUrl: usersTable.avatarUrl,
-        bannerUrl: userProfileSettingsTable.bannerUrl,
-        createdAt: usersTable.createdAt,
-      })
-      .from(usersTable)
-      .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
-      .where(eq(usersTable.id, userId))
-      .limit(1);
+    let user;
+    try {
+      [user] = await db
+        .select({
+          id: usersTable.id,
+          name: usersTable.name,
+          email: usersTable.email,
+          emailVerified: usersTable.emailVerified,
+          avatarUrl: usersTable.avatarUrl,
+          bannerUrl: userProfileSettingsTable.bannerUrl,
+          createdAt: usersTable.createdAt,
+        })
+        .from(usersTable)
+        .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
+        .where(eq(usersTable.id, userId))
+        .limit(1);
+    } catch (err) {
+      if (!isPersistenceSchemaError(err)) throw err;
+      req.log?.warn?.({ err, route: "profile.get", userId, setupAction: "run_migrations" }, "profile settings unavailable");
+      const [baseUser] = await db
+        .select({
+          id: usersTable.id,
+          name: usersTable.name,
+          email: usersTable.email,
+          emailVerified: usersTable.emailVerified,
+          avatarUrl: usersTable.avatarUrl,
+          createdAt: usersTable.createdAt,
+        })
+        .from(usersTable)
+        .where(eq(usersTable.id, userId))
+        .limit(1);
+      user = baseUser ? { ...baseUser, bannerUrl: null } : undefined;
+    }
 
     if (!user) {
       res.status(404).json({ error: "Utente non trovato" });
@@ -93,14 +124,12 @@ router.patch("/:userId/banner", requireAuth, async (req, res) => {
       res.status(400).json({ error: "Immagine troppo grande (max 1.5 MB)" }); return;
     }
 
-    await db
-      .update(userProfileSettingsTable)
-      .set({ bannerUrl: bannerDataUrl, updatedAt: new Date() })
-      .where(eq(userProfileSettingsTable.userId, userId));
+    await upsertProfileSettings(userId, { bannerUrl: bannerDataUrl });
 
     res.json({ bannerUrl: bannerDataUrl });
   } catch (err) {
     req.log?.error?.({ err }, "banner upload error");
+    if (sendPersistenceWriteError(req, res, err, "profile.banner.update")) return;
     res.status(500).json({ error: "Errore upload banner" });
   }
 });
@@ -111,14 +140,12 @@ router.delete("/:userId/banner", requireAuth, async (req, res) => {
     const userId = parseInt(req.params.userId, 10);
     if (userId !== req.user!.id) { res.status(403).json({ error: "Accesso negato" }); return; }
 
-    await db
-      .update(userProfileSettingsTable)
-      .set({ bannerUrl: null, updatedAt: new Date() })
-      .where(eq(userProfileSettingsTable.userId, userId));
+    await upsertProfileSettings(userId, { bannerUrl: null });
 
     res.json({ success: true });
   } catch (err) {
     req.log?.error?.({ err }, "banner delete error");
+    if (sendPersistenceWriteError(req, res, err, "profile.banner.delete")) return;
     res.status(500).json({ error: "Errore rimozione banner" });
   }
 });
@@ -134,14 +161,12 @@ router.patch("/:userId/mode", requireAuth, async (req, res) => {
       res.status(400).json({ error: "mode richiesto" }); return;
     }
 
-    await db
-      .update(userProfileSettingsTable)
-      .set({ userMode: mode, updatedAt: new Date() })
-      .where(eq(userProfileSettingsTable.userId, userId));
+    await upsertProfileSettings(userId, { userMode: mode });
 
     res.json({ userMode: mode });
   } catch (err) {
     req.log?.error?.({ err }, "user mode update error");
+    if (sendPersistenceWriteError(req, res, err, "profile.mode.update")) return;
     res.status(500).json({ error: "Errore nel salvataggio modalità" });
   }
 });

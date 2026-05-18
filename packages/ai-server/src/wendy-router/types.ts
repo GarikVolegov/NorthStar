@@ -34,6 +34,7 @@ export interface WendyPageContext {
   entityId?:   number;
   entityName?: string;   // es. "Tecnologia & Software" (evita un tool call)
   journeyType?: string;  // es. "dipendente"
+  data?: Record<string, unknown>; // contesto compatto della pagina corrente per copilot UI
 }
 
 // ── History compressa ─────────────────────────────────────────────────────────

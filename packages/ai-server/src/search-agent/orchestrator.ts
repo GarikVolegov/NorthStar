@@ -12,7 +12,18 @@ import type { RouterOutput }                       from "../search-router/router
 // ── Public types ────────────────────────────────────────────────────────────
 
 export interface SearchResult {
-  type: "sector" | "role" | "article" | "news";
+  type:
+    | "sector"
+    | "role"
+    | "article"
+    | "news"
+    | "idea"
+    | "objective"
+    | "calendar"
+    | "certification"
+    | "memory"
+    | "workspace"
+    | "profile";
   id: number;
   title: string;
   description: string;
@@ -37,6 +48,7 @@ export interface SearchOrchestratorOptions {
   userContext: UserContext & { memorySection?: string };
   history?:    ChatMessage[];
   requestId?:  string;
+  prefetchedResults?: SearchResult[];
 }
 
 // ── Internal hybrid DB search ────────────────────────────────────────────────
@@ -83,7 +95,7 @@ const AI_INTENTS = new Set(["explore", "learn", "solve", "compare", "find_job"])
 export async function* runSearchOrchestrator(
   opts: SearchOrchestratorOptions,
 ): AsyncGenerator<SearchOrchestratorEvent> {
-  const { query, userId, sessionId, userContext, history = [], requestId } = opts;
+  const { query, userId, sessionId, userContext, history = [], requestId, prefetchedResults } = opts;
   const agentsUsed: string[] = [];
 
   yield { type: "status", value: "🔍 Analizzo la tua ricerca..." };
@@ -95,7 +107,7 @@ export async function* runSearchOrchestrator(
   try {
     [route, results] = await Promise.all([
       routeQuery({ q: query, history }),
-      hybridDbSearch(query),
+      prefetchedResults ? Promise.resolve(prefetchedResults) : hybridDbSearch(query),
     ]);
     agentsUsed.push("hybrid-search", "search-router");
   } catch (err) {

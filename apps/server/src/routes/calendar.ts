@@ -4,6 +4,7 @@ import { eq, and, gte, asc, sql } from "drizzle-orm";
 import { db, calendarEventsTable } from "@workspace/db";
 import { format, parseISO, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays, subDays } from "date-fns";
 import { it } from "date-fns/locale";
+import { sendOptionalReadFallback } from "../lib/persistence";
 
 const router = Router();
 
@@ -326,6 +327,7 @@ router.get("/upcoming", requireAuth, async (req, res) => {
     res.json(events);
   } catch (err) {
     req.log?.error?.({ err }, "calendar upcoming error");
+    if (sendOptionalReadFallback(req, res, err, "calendar.upcoming", [])) return;
     res.status(500).json({ error: "Errore nel caricamento degli eventi imminenti" });
   }
 });

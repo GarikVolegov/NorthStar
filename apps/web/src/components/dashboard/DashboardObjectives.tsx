@@ -1,8 +1,29 @@
 import { useState } from "react";
-import { Plus, CheckCircle2, Circle, Trash2, Target } from "lucide-react";
+import { Plus, CheckCircle2, Circle, Trash2, Target, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { DashboardObjective } from "@/hooks/useDashboardData";
+
+function DueDateBadge({ dueDate, completed }: { dueDate: string | null; completed: boolean }) {
+  if (!dueDate || completed) return null;
+  const due = new Date(dueDate);
+  const now = new Date();
+  const daysLeft = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+  const { label, cls } =
+    daysLeft < 0
+      ? { label: "Scaduto", cls: "text-destructive bg-destructive/10" }
+      : daysLeft <= 3
+      ? { label: `${daysLeft}g`, cls: "text-amber-500 bg-amber-500/10" }
+      : { label: due.toLocaleDateString("it-IT", { day: "numeric", month: "short" }), cls: "text-muted-foreground bg-muted" };
+
+  return (
+    <span className={cn("inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0", cls)}>
+      <Clock className="w-2.5 h-2.5" />
+      {label}
+    </span>
+  );
+}
 
 export function DashboardObjectives({
   objectives,
@@ -73,11 +94,14 @@ export function DashboardObjectives({
               )}
             </button>
             <div className="flex-1 min-w-0">
-              <p className={cn("text-sm", obj.completed && "line-through text-muted-foreground")}>
-                {obj.text}
-              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className={cn("text-sm", obj.completed && "line-through text-muted-foreground")}>
+                  {obj.text}
+                </p>
+                <DueDateBadge dueDate={obj.dueDate} completed={obj.completed} />
+              </div>
               {obj.progress > 0 && !obj.completed && (
-                <div className="h-1 bg-primary/10 rounded-full mt-1.5 max-w-[120px]">
+                <div className="h-1 bg-primary/10 rounded-full mt-1.5 max-w-30">
                   <div
                     className="h-full bg-primary rounded-full"
                     style={{ width: `${obj.progress}%` }}

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { db, userFavoritesTable } from "@workspace/db";
+import { sendOptionalReadFallback, sendPersistenceWriteError } from "../lib/persistence";
 
 const router = Router();
 
@@ -21,6 +22,7 @@ router.get("/:userId", requireAuth, async (req, res) => {
     res.json(favorites);
   } catch (err) {
     req.log?.error?.({ err }, "favorites get error");
+    if (sendOptionalReadFallback(req, res, err, "favorites.list", [])) return;
     res.json([]);
   }
 });
@@ -41,6 +43,7 @@ router.post("/", requireAuth, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     req.log?.error?.({ err }, "favorites add error");
+    if (sendPersistenceWriteError(req, res, err, "favorites.add")) return;
     res.status(500).json({ error: "Errore aggiunta preferito" });
   }
 });
@@ -55,6 +58,7 @@ router.delete("/:id", requireAuth, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     req.log?.error?.({ err }, "favorites delete error");
+    if (sendPersistenceWriteError(req, res, err, "favorites.delete")) return;
     res.status(500).json({ error: "Errore rimozione preferito" });
   }
 });
