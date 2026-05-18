@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod/v4";
 import { requireAuth } from "../middleware/auth";
+import { getEffectivePlan, planMeets } from "../middleware/check-feature";
 
 const router = Router();
 
@@ -17,9 +18,11 @@ router.post("/", requireAuth, async (req, res) => {
     return;
   }
 
+  const currentPlan = await getEffectivePlan(req.user!.id);
+
   res.json({
     success: true,
-    plan: req.user?.stripeSubscriptionId ? "premium" : "free",
+    plan: planMeets(currentPlan, "pro") ? "premium" : "free",
     data: {
       summary: {
         professions: [],

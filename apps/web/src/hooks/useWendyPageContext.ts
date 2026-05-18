@@ -14,6 +14,9 @@ export interface WendyPageContextInput {
   entityId?:   number;
   entityName?: string;
   journeyType?: string;
+  capabilities?: string[];
+  fields?:       string[];
+  actions?:      string[];
 }
 
 /**
@@ -42,6 +45,9 @@ export function useWendyPageContext(ctx: WendyPageContextInput): void {
         entityId:    ctx.entityId,
         entityName:  ctx.entityName,
         journeyType: ctx.journeyType,
+        capabilities: ctx.capabilities,
+        fields:       ctx.fields,
+        actions:      ctx.actions,
       },
     };
     setPageContext(pageCtx);

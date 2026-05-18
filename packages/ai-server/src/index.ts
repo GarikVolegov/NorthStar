@@ -89,6 +89,7 @@ export { classifyIntent }    from "./wendy-router/intent-classifier";
 export { getToolsForIntent, toolsToOpenAIFormat } from "./wendy-router/tool-registry";
 export { resolveWendyRoute } from "./wendy-router/router";
 export { buildLightPrompt }  from "./wendy-router/light-prompt";
+export { getLocalWendyReply, isLocalWendyReplyMessage } from "./wendy-router/local-reply";
 export type { WendyIntent, WendyPageContext, CompressedHistory, WendyRouterDecision, ToolDefinition } from "./wendy-router/types";
 
 // AI Request Log

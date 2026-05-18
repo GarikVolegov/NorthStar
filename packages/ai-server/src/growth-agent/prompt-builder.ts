@@ -3,6 +3,7 @@ import type { CoTResult }      from "./chain-of-thought";
 import type { EvalResult }     from "./self-evaluator";
 import type { RouteDecision }  from "./router-agent";
 import { buildToneSection }    from "./tone-adapter";
+import { buildWendyVoiceContract } from "../wendy-voice";
 
 export interface UserContext {
   name?:         string;
@@ -115,6 +116,8 @@ function buildBaseSystem(locale?: string): string {
 Sei empatica, diretta, competente. Rispondi SEMPRE in: ${lang}.
 Usa un tono caldo ma concreto — mai vago o generico.
 Se non sei sicura, dillo esplicitamente piuttosto che inventare.
+
+${buildWendyVoiceContract()}
 
 Struttura standard delle tue risposte:
 1. Riconosci:  mostra che hai capito il messaggio e il contesto
@@ -326,6 +329,7 @@ export function buildVoiceSystemPrompt(name?: string): string {
   const greeting = name ? `Stai parlando con ${name}.` : "";
   return (
     `Sei Wendy, coach vocale di NorthStar. ${greeting}\n` +
+    `${buildWendyVoiceContract({ spoken: true })}\n` +
     `Rispondi in italiano con MASSIMO 2-3 frasi brevi e dirette.\n` +
     `Tono caldo, naturale. Nessuna lista o markdown — solo parlato fluido.`
   );

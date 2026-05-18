@@ -6,6 +6,7 @@ import { requireAuth } from "../middleware/auth";
 import { writeAuditLog } from "../middleware/audit";
 import { wendyLimiter, wendyIpLimiter, planQuotaLimiter } from "../middleware/rate-limit";
 import { costGuard } from "../middleware/cost-guard";
+import { getEffectivePlan, planMeets } from "../middleware/check-feature";
 import { recordLlmUsage, estimateTokens, selectModel } from "@workspace/ai-server";
 import { getLLM } from "@workspace/ai-server/llm/client";
 
@@ -159,8 +160,9 @@ router.post("/sessions/:id/ask", requireAuth, costGuard, wendyLimiter, wendyIpLi
 
   try {
     const llm = getLLM();
+    const currentPlan = await getEffectivePlan(req.user!.id);
     const route = selectModel({
-      isPremium: !!req.user?.stripeSubscriptionId,
+      isPremium: planMeets(currentPlan, "pro"),
       complexity: data.message.length > 500 ? "deep" : "standard",
     });
 

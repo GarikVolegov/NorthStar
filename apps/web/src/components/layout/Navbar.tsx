@@ -121,9 +121,10 @@ export function Navbar() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [affiliateLinkCopied, setAffiliateLinkCopied] = useState(false);
-  const isAffiliate = !!user?.isAffiliate;
-  const affiliatePreview = useAffiliateInvitePreview(profileMenuOpen, isLoggedIn && !!user?.id && isAffiliate);
+  const affiliatePreview = useAffiliateInvitePreview(profileMenuOpen, isLoggedIn && !!user?.id);
   const { unreadCount: insightsUnread } = useProactiveInsights();
+  const searchIsOpen = search.isOpen;
+  const setSearchIsOpen = search.setIsOpen;
 
   const phase: NavPhase = !isLoggedIn
     ? "guest"
@@ -217,6 +218,12 @@ export function Navbar() {
     };
   }, [isMobile]);
 
+  useEffect(() => {
+    if (wendy.isOpen && !searchIsOpen) {
+      setSearchIsOpen(true);
+    }
+  }, [searchIsOpen, setSearchIsOpen, wendy.isOpen]);
+
   const copyAffiliateLink = async () => {
     if (!affiliatePreview.referralLink) return;
     try {
@@ -269,7 +276,7 @@ export function Navbar() {
   const profileMenuBody = user ? (
     <>
       <DropdownMenuLabel className="p-0 font-normal">
-        <div className="h-16 overflow-hidden bg-muted">
+        <div className="h-12 overflow-hidden bg-muted">
           {profileBannerUrl ? (
             <img
               src={profileBannerUrl}
@@ -280,9 +287,9 @@ export function Navbar() {
             <div className="h-full w-full bg-[radial-gradient(circle_at_20%_20%,hsl(var(--primary)/0.28),transparent_35%),linear-gradient(135deg,hsl(var(--muted)),hsl(var(--background)))]" />
           )}
         </div>
-        <div className="px-3 pb-3 pt-3">
+        <div className="px-3 pb-2 pt-2">
           <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-card bg-primary/10 text-base font-bold text-primary shadow-sm">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-card bg-primary/10 text-sm font-bold text-primary shadow-sm">
               {user.avatarUrl ? (
                 <img
                   src={user.avatarUrl}
@@ -294,13 +301,13 @@ export function Navbar() {
               )}
             </span>
             <div className="min-w-0 flex-1">
-              <span className="block truncate text-base font-semibold leading-5 text-foreground">
+              <span className="block truncate text-sm font-semibold leading-5 text-foreground">
                 {displayName}
               </span>
               <span className="block truncate text-xs text-muted-foreground">
                 {user.email}
               </span>
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 {user.journeyType && JOURNEY_LABELS[user.journeyType] && (
                   <span
                     className={`inline-flex w-fit rounded-full border px-2 py-0.5 text-xs font-semibold ${JOURNEY_LABELS[user.journeyType].color}`}
@@ -319,7 +326,7 @@ export function Navbar() {
         onClick={() => goToProfilePath("/profilo#impostazioni")}
         onMouseEnter={() => prefetchRoute("/profilo")}
         onFocus={() => prefetchRoute("/profilo")}
-        className="min-h-10 cursor-pointer sm:min-h-11"
+        className="min-h-9 cursor-pointer"
       >
         <Settings className="mr-2 h-4 w-4 text-primary" />
         Impostazioni profilo
@@ -329,7 +336,7 @@ export function Navbar() {
         <>
           <DropdownMenuItem
             onClick={() => goToProfilePath("/dashboard")}
-            className="min-h-10 cursor-pointer text-amber-500 focus:text-amber-600"
+            className="min-h-9 cursor-pointer text-amber-500 focus:text-amber-600"
           >
             <Sparkles className="mr-2 h-4 w-4" />
             Wendy ha {insightsUnread > 9 ? "9+" : insightsUnread} insight
@@ -341,7 +348,7 @@ export function Navbar() {
         <DropdownMenuItem
           onClick={() => goToProfilePath("/percorso")}
           onMouseEnter={() => prefetchRoute("/percorso")}
-          className="min-h-10 cursor-pointer"
+          className="min-h-9 cursor-pointer"
         >
           <MapPin className="mr-2 h-4 w-4 text-primary" />
           Imposta percorso
@@ -349,7 +356,7 @@ export function Navbar() {
       )}
       <DropdownMenuItem
         onClick={() => goToProfilePath("/candidature")}
-        className="min-h-10 cursor-pointer"
+        className="min-h-9 cursor-pointer"
       >
         <Briefcase className="mr-2 h-4 w-4" />
         {t("nav.applications")}
@@ -357,7 +364,7 @@ export function Navbar() {
       <DropdownMenuItem
         onClick={() => goToProfilePath("/wendy/memoria")}
         onMouseEnter={() => prefetchRoute("/wendy/memoria")}
-        className="min-h-10 cursor-pointer text-sm text-muted-foreground"
+        className="min-h-9 cursor-pointer text-sm text-muted-foreground"
       >
         <Brain className="mr-2 h-4 w-4" />
         Memoria di Wendy
@@ -365,7 +372,7 @@ export function Navbar() {
       <DropdownMenuItem
         onClick={() => goToProfilePath("/profilo/briefing")}
         onMouseEnter={() => prefetchRoute("/profilo/briefing")}
-        className="min-h-10 cursor-pointer text-sm text-muted-foreground"
+        className="min-h-9 cursor-pointer text-sm text-muted-foreground"
       >
         <Sparkles className="mr-2 h-4 w-4" />
         Briefing Wendy
@@ -373,13 +380,13 @@ export function Navbar() {
       <DropdownMenuItem
         onClick={() => goToProfilePath("/workspace")}
         onMouseEnter={() => prefetchRoute("/workspace")}
-        className="min-h-10 cursor-pointer text-sm text-muted-foreground"
+        className="min-h-9 cursor-pointer text-sm text-muted-foreground"
       >
         <Users className="mr-2 h-4 w-4" />
         Workspace
       </DropdownMenuItem>
       <DropdownMenuSeparator />
-      <div className="flex min-h-10 items-center gap-2 px-2 py-1.5">
+      <div className="flex min-h-9 items-center gap-2 px-2 py-1">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Tema
         </p>
@@ -392,7 +399,7 @@ export function Navbar() {
                 key={option.value}
                 type="button"
                 onClick={() => setTheme(option.value)}
-                className={`flex min-h-8 items-center justify-center gap-1 rounded-full border px-2 text-[10px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${
+                className={`flex min-h-7 items-center justify-center gap-1 rounded-full border px-2 text-[10px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${
                   active
                     ? "border-primary/40 bg-primary/10 text-primary"
                     : "border-border bg-background text-muted-foreground hover:text-foreground"
@@ -406,7 +413,7 @@ export function Navbar() {
         </div>
       </div>
       <DropdownMenuSeparator />
-      <div className="flex min-h-10 items-center gap-2 px-2 py-1">
+      <div className="flex min-h-9 items-center gap-2 px-2 py-1">
         <div className="flex min-w-0 flex-1 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <Globe2 className="h-4 w-4 shrink-0" />
           <span>Lingua</span>
@@ -419,7 +426,7 @@ export function Navbar() {
                 key={code}
                 type="button"
                 onClick={() => void i18n.changeLanguage(code)}
-                className={`min-h-8 rounded-full border px-2 text-[10px] font-bold uppercase transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${
+                className={`min-h-7 rounded-full border px-2 text-[10px] font-bold uppercase transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${
                   active
                     ? "border-primary/40 bg-primary/10 text-primary"
                     : "border-border bg-background text-muted-foreground hover:text-foreground"
@@ -440,7 +447,7 @@ export function Navbar() {
           setProfileMenuOpen(false);
           void signOut();
         }}
-        className="min-h-10 cursor-pointer text-destructive focus:text-destructive"
+        className="min-h-9 cursor-pointer text-destructive focus:text-destructive"
       >
         <LogOut className="mr-2 h-4 w-4" />
         {t("nav.logout")}
@@ -710,7 +717,7 @@ export function Navbar() {
             type="button"
             onClick={() => search.setIsOpen(true)}
             aria-label="Apri ricerca Wendy"
-            className="group relative h-11 min-w-0 flex-1 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+            className="group relative h-12 min-w-0 flex-1 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
           >
             <div className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2">
               {isWendyActive ? (
@@ -760,11 +767,11 @@ export function Navbar() {
               </>
             ) : null}
             <span
-              className={`flex h-11 w-full items-center rounded-full border bg-white/5 pl-10 pr-3 text-left text-sm text-muted-foreground/70 transition-all group-hover:border-white/20 group-hover:bg-white/10 ${
+              className={`flex h-12 w-full items-center rounded-full border bg-card/80 pl-10 pr-3 text-left text-sm text-muted-foreground/80 shadow-sm backdrop-blur-xl transition-all group-hover:border-white/20 group-hover:bg-card/95 group-hover:text-foreground ${
                 wendy.isOpen ? "border-primary/30" : "border-white/10"
               } ${isWendyActive ? "border-transparent" : ""}`}
             >
-              <span className="min-w-0 flex-1 truncate">Parla con Wendy</span>
+              <span className="min-w-0 flex-1 truncate">Chiedi a Wendy...</span>
               <kbd className="ml-2 hidden items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground sm:inline-flex">
                 Cmd K
               </kbd>
@@ -787,7 +794,7 @@ export function Navbar() {
                     onMouseEnter={() => {
                       prefetchRoute("/candidature");
                       if (!user.journeyType) prefetchRoute("/percorso");
-                      if (isAffiliate) prefetchRoute("/affiliazione/dashboard");
+                      prefetchRoute("/affiliazione/dashboard");
                     }}
                     whileHover={prefersReduced ? {} : { scale: 1.02 }}
                     whileTap={prefersReduced ? {} : { scale: 0.98 }}
@@ -808,14 +815,15 @@ export function Navbar() {
                   </m.button>
                 </DropdownMenuTrigger>
                 {!isMobile && (
-                <DropdownMenuContent
-                  side="top"
-                  align="end"
-                  sideOffset={8}
-                  className="w-80 overflow-hidden border-border bg-card p-0 shadow-2xl"
-                >
-                  {profileMenuBody}
-                </DropdownMenuContent>
+                  <DropdownMenuContent
+                    side="top"
+                    align="end"
+                    sideOffset={16}
+                    collisionPadding={{ top: 72, bottom: 88, left: 16, right: 16 }}
+                    className="w-80 overflow-hidden border-border bg-card p-0 shadow-2xl"
+                  >
+                    {profileMenuBody}
+                  </DropdownMenuContent>
                 )}
               </DropdownMenu>
             ) : (
@@ -843,11 +851,6 @@ export function Navbar() {
         setIsOpen={search.setIsOpen}
         close={search.close}
         trackClick={search.trackClick}
-        aiTokens={search.aiTokens}
-        aiStatus={search.aiStatus}
-        aiSources={search.aiSources}
-        isStreaming={search.isStreaming}
-        sendFollowUp={search.sendFollowUp}
       />
     </LazyMotion>
   );

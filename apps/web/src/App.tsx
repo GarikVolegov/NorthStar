@@ -14,7 +14,6 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { AppStateProvider } from "@/contexts/AppStateContext";
 import { WendyProvider } from "@/contexts/WendyProvider";
 
-import { WendyPanel } from "@/components/WendyPanel";
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import { useReducedMotion, easings } from "@/lib/motion";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -123,6 +122,9 @@ function AnimatedRoutes() {
       <Route path="/settore/:id" component={Sector} />
       <Route path="/ruolo/:id" component={Ruolo} />
       <Route path="/registra">
+        <PublicOnlyRoute component={Register} />
+      </Route>
+      <Route path="/register">
         <PublicOnlyRoute component={Register} />
       </Route>
       {/* Clerk auth pages — routing="path" richiede route dedicate */}
@@ -361,7 +363,6 @@ function App() {
                   <Router />
                 </WouterRouter>
                 <Toaster />
-                <WendyPanel />
               </WendyProvider>
             </TooltipProvider>
           </AppStateProvider>

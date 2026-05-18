@@ -14,6 +14,7 @@ import { requestLoggerMiddleware, rootLogger } from "./middleware/logger";
 import { globalLimiter } from "./middleware/rate-limit";
 import { metricsProtection } from "./middleware/metrics-protection";
 import { record } from "./lib/monitor";
+import { maintenanceModeMiddleware } from "./lib/maintenance-mode";
 
 const app = express();
 
@@ -52,9 +53,11 @@ app.use(cors({
   },
   credentials: true
 }));
+app.use("/api/subscription/webhook", express.raw({ type: "application/json" }));
 app.use(express.json({ limit: "10mb" }));
 app.use(requestLoggerMiddleware);
 app.use(globalLimiter);
+app.use(maintenanceModeMiddleware);
 
 app.use((req, res, next) => {
   const start = Date.now();

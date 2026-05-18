@@ -15,7 +15,7 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
     name:        "open_view",
     description: "Naviga l'utente a una pagina specifica dell'app. Usare SOLO quando l'utente chiede esplicitamente di andare da qualche parte. Non combinare con altri tool nella stessa risposta.",
     parameters: [
-      { name: "viewId",     type: "string", description: "dashboard | settori | settore | ruoli | ruolo | news | crescita | percorso | profilo | archivio | coach", required: true },
+      { name: "viewId",     type: "string", description: "dashboard | settori | settore | ruoli | ruolo | news | crescita | percorso | profilo | archivio | coach | calendario | candidature | workspace | validatore | affiliazione", required: true },
       { name: "entityId",   type: "number", description: "ID del settore o professione se viewId = settore/ruolo" },
       { name: "entityName", type: "string", description: "Nome dell'entità (per URL SEO)" },
     ],
@@ -92,7 +92,7 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
   },
   save_objective: {
     name:        "save_objective",
-    description: "Crea UN NUOVO obiettivo professionale per l'utente. Non usare per aggiornare obiettivi esistenti (usare update_objective_progress).",
+    description: "Prepara UN NUOVO obiettivo professionale per l'utente. Il salvataggio reale richiede conferma esplicita nel client. Non usare per aggiornare obiettivi esistenti (usare update_objective_progress).",
     parameters: [
       { name: "text",          type: "string", description: "Descrizione chiara dell'obiettivo (max 300 caratteri)", required: true },
       { name: "category",      type: "string", description: "skill | career | learning | habit | altro" },
@@ -101,7 +101,7 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
   },
   update_objective_progress: {
     name:        "update_objective_progress",
-    description: "Aggiorna il progresso percentuale (0-100) di un obiettivo ESISTENTE. Richiede l'ID obiettivo noto.",
+    description: "Prepara l'aggiornamento del progresso percentuale (0-100) di un obiettivo ESISTENTE. Richiede l'ID obiettivo noto e conferma esplicita nel client.",
     parameters: [
       { name: "objectiveId", type: "number", description: "ID dell'obiettivo da aggiornare", required: true },
       { name: "progress",    type: "number", description: "Percentuale completamento 0-100", required: true },
@@ -137,7 +137,7 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
   // ── Scrittura dominio ────────────────────────────────────────────────────────
   save_business_idea: {
     name:        "save_business_idea",
-    description: "Salva una business idea generata durante la conversazione nel profilo utente.",
+    description: "Prepara il salvataggio di una business idea generata durante la conversazione. Il salvataggio reale richiede conferma esplicita nel client.",
     parameters: [
       { name: "title",       type: "string", description: "Titolo breve dell'idea (max 200 char)", required: true },
       { name: "description", type: "string", description: "Descrizione dell'idea (max 500 char)",  required: true },
@@ -146,7 +146,7 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
   },
   add_calendar_event: {
     name:        "add_calendar_event",
-    description: "Aggiunge una milestone o scadenza al calendario dell'utente. La data deve essere futura.",
+    description: "Prepara una milestone o scadenza per il calendario dell'utente. L'aggiunta reale richiede conferma esplicita nel client. La data deve essere futura.",
     parameters: [
       { name: "title", type: "string", description: "Titolo dell'evento",          required: true },
       { name: "date",  type: "string", description: "Data in formato YYYY-MM-DD",   required: true },

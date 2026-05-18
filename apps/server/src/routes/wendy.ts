@@ -5,6 +5,7 @@ import { optionalAuth } from "../middleware/auth";
 import { writeAuditLog } from "../middleware/audit";
 import { wendyLimiter, wendyIpLimiter, planQuotaLimiter } from "../middleware/rate-limit";
 import { costGuard } from "../middleware/cost-guard";
+import { getEffectivePlan, planMeets } from "../middleware/check-feature";
 import { recordLlmUsage, estimateTokens, selectModel, selectModelFor } from "@workspace/ai-server";
 import { routerAgent, type RouteDecision } from "@workspace/ai-server/growth-agent/router-agent";
 import { getSpecialist, type SpecialistEvent } from "@workspace/ai-server/growth-agent/specialist-agent";
@@ -48,10 +49,6 @@ function getOpenAI(): OpenAI {
     throw new Error("AI_INTEGRATIONS env vars not configured");
   }
   return new OpenAI({ apiKey, baseURL });
-}
-
-function isPremiumUser(req: Request): boolean {
-  return !!req.user?.stripeSubscriptionId;
 }
 
 const UNAUTHENTICATED_RESPONSE = `Ciao! Sono Wendy, il coach di crescita personale di NorthStar.
@@ -98,6 +95,8 @@ router.post("/ask", optionalAuth, costGuard, wendyLimiter, wendyIpLimiter, planQ
      }
 
      const userId = req.user!.id;
+     const currentPlan = await getEffectivePlan(userId);
+     const isPremium = planMeets(currentPlan, "pro");
 
      // Mock mode for testing
      if (process.env.USE_MOCK_AI === "true") {
@@ -169,7 +168,7 @@ router.post("/ask", optionalAuth, costGuard, wendyLimiter, wendyIpLimiter, planQ
 
       // 7. Build user context
       const userContext: UserContext = {
-        isPremium: !!req.user?.stripeSubscriptionId,
+        isPremium,
         stripeSubscriptionId: req.user?.stripeSubscriptionId ?? null,
         memorySection,
       };
@@ -289,7 +288,7 @@ Se non è sufficiente, dillo e chiedi più contesto. Non inventare informazioni.
        const systemMsg = `${WENDY_SYSTEM}${contextSection}`;
 
        const route = selectModel({
-         isPremium: isPremiumUser(req),
+         isPremium,
          complexity: data.message.length > 500 ? "deep" : "standard",
        });
 

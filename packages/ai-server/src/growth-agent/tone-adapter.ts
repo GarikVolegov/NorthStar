@@ -26,6 +26,7 @@
  *   azienda     → "Cerco il profilo giusto" (team building)
  *   investitore → "Valuto opportunità di mercato"
  */
+import { buildWendyToneInheritanceNote } from "../wendy-voice";
 
 export interface ToneProfile {
   journeyType: string;
@@ -118,6 +119,8 @@ export function buildToneSection(journeyType: string | undefined | null): string
   return `
 ## Come parlare con questo utente (tono adattivo)
 Percorso: **${profile.journeyType}**
+
+${buildWendyToneInheritanceNote()}
 
 - **Voce:** ${profile.voice}
 - **Ritmo:** ${profile.pace}

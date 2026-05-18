@@ -19,7 +19,6 @@ import {
   Sparkles,
   TrendingUp,
   Lightbulb,
-  Cpu,
   ChevronDown,
   ChevronRight,
   Send,
@@ -30,9 +29,16 @@ import {
   Target,
   User,
   Users,
+  Mic,
+  RotateCcw,
+  Square,
 } from "lucide-react";
 import { useWendy } from "@/contexts/WendyProvider";
 import { cn } from "@/lib/utils";
+import { useWendyChat, type ChatMessage as WendyMessage } from "@/hooks/useWendyChat";
+import { WendyThinkingIndicator } from "@/components/WendyThinkingIndicator";
+import { WendyActionCard } from "@/components/wendy/WendyActionCard";
+import { UiToolRenderer } from "@/components/wendy/UiToolRenderer";
 
 interface SearchDialogProps {
   query: string;
@@ -48,12 +54,6 @@ interface SearchDialogProps {
   setIsOpen: (open: boolean) => void;
   close: () => void;
   trackClick: (result: SearchResult) => void;
-  // AI orchestrator
-  aiTokens:    string;
-  aiStatus:    string | null;
-  aiSources:   AiSource[];
-  isStreaming: boolean;
-  sendFollowUp: (q: string) => void;
 }
 
 const TYPE_CONFIG = {
@@ -93,21 +93,6 @@ const ORDER: Array<keyof typeof TYPE_CONFIG> = [
 
 // ── Micro components ────────────────────────────────────────────────────────
 
-function AgentStatusBadge({ status }: { status: string }) {
-  return (
-    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 border border-primary/20 w-fit mb-3">
-      <Cpu className="h-3 w-3 text-primary animate-pulse" />
-      <span className="text-[11px] font-medium text-primary">{status}</span>
-    </div>
-  );
-}
-
-function StreamingCursor() {
-  return (
-    <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse align-middle" />
-  );
-}
-
 function SourcesAccordion({ sources }: { sources: AiSource[] }) {
   const [open, setOpen] = useState(false);
   if (sources.length === 0) return null;
@@ -146,6 +131,26 @@ function SourcesAccordion({ sources }: { sources: AiSource[] }) {
   );
 }
 
+function WendySources({ message }: { message: WendyMessage }) {
+  if (!message.citations?.length) return null;
+  return (
+    <div className="mt-3 flex flex-wrap gap-1.5">
+      {message.citations.slice(0, 4).map((source) => (
+        <a
+          key={`${message.id}-${source.nodeId}`}
+          href={source.url ?? "#"}
+          onClick={(event) => {
+            if (!source.url) event.preventDefault();
+          }}
+          className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+        >
+          {source.title}
+        </a>
+      ))}
+    </div>
+  );
+}
+
 // ── Mobile detection ────────────────────────────────────────────────────────
 
 function useIsMobile() {
@@ -176,78 +181,215 @@ export function SearchDialog({
   setIsOpen,
   close,
   trackClick,
-  aiTokens,
-  aiStatus,
-  aiSources,
-  isStreaming,
-  sendFollowUp,
 }: SearchDialogProps) {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const wendy = useWendy();
+  const closeWendy = wendy.close;
+  const consumePendingAsk = wendy.consumePendingAsk;
+  const getPageHints = wendy.getPageHints;
   const inputRef = useRef<HTMLInputElement>(null);
   const aiPanelRef = useRef<HTMLDivElement>(null);
-  const [followUpInput, setFollowUpInput] = useState("");
+  const [slowThinking, setSlowThinking] = useState(false);
   const isMobile = useIsMobile();
+  const chat = useWendyChat({ apiUrl: "/api/ai/wendy", maxRetries: 0 });
 
   useEffect(() => {
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 50);
   }, [isOpen]);
 
   useEffect(() => {
+    if (!isOpen || chat.isStreaming) return;
+    const pending = consumePendingAsk();
+    if (!pending) return;
+    setQuery(pending);
+    void chat.sendMessage(pending);
+  }, [chat, consumePendingAsk, isOpen, setQuery]);
+
+  useEffect(() => {
+    if (chat.stt.isListening) {
+      setQuery(chat.stt.transcript + chat.stt.interimTranscript);
+    }
+  }, [chat.stt.interimTranscript, chat.stt.isListening, chat.stt.transcript, setQuery]);
+
+  useEffect(() => {
+    if (!chat.thinking.active) {
+      setSlowThinking(false);
+      return;
+    }
+    const timeout = window.setTimeout(() => setSlowThinking(true), 9_000);
+    return () => window.clearTimeout(timeout);
+  }, [chat.thinking.active, chat.thinking.startedAt]);
+
+  useEffect(() => {
     if (!isOpen) return;
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape") {
+        close();
+        closeWendy();
+      }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, close]);
+  }, [isOpen, close, closeWendy]);
 
   // Scroll AI panel to bottom as tokens arrive
   useEffect(() => {
     if (aiPanelRef.current) {
       aiPanelRef.current.scrollTop = aiPanelRef.current.scrollHeight;
     }
-  }, [aiTokens]);
+  }, [chat.messages, chat.thinking.active]);
 
   const grouped = results.reduce(
     (acc, r) => { if (!acc[r.type]) acc[r.type] = []; acc[r.type].push(r); return acc; },
     {} as Record<string, typeof results>,
   );
 
+  const handleClose = useCallback(() => {
+    close();
+    closeWendy();
+  }, [close, closeWendy]);
+
   function handleSelect(url: string) {
     if (url === "#wendy") {
-      wendy.open();
-      close();
+      setQuery("");
+      window.requestAnimationFrame(() => inputRef.current?.focus());
     } else {
       setLocation(url);
-      close();
+      handleClose();
     }
   }
-  function handleResultSelect(item: SearchResult) { trackClick(item); setLocation(item.url); close(); }
-
-  function handleFollowUp(e: React.FormEvent) {
-    e.preventDefault();
-    if (!followUpInput.trim()) return;
-    sendFollowUp(followUpInput.trim());
-    setQuery(followUpInput.trim());
-    setFollowUpInput("");
-  }
+  function handleResultSelect(item: SearchResult) { trackClick(item); setLocation(item.url); handleClose(); }
 
   function askCurrentQuery() {
     const trimmed = query.trim();
     if (trimmed.length < 2) return;
-    sendFollowUp(trimmed);
+    void chat.sendMessage(trimmed);
+    setQuery("");
+  }
+
+  function askQuickAction(label: string) {
+    setQuery(label);
+    void chat.sendMessage(label);
+  }
+
+  function handleComposerSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    askCurrentQuery();
   }
 
   const showDefaultSuggestions = query.length < 2 && !isLoading;
   const showResults = !isLoading && results.length > 0;
   const hasSuggestions = suggestions.length > 0;
   const activeSuggestions = hasSuggestions ? suggestions : SUGGESTIONS_DEFAULTS;
+  const pageHints = getPageHints();
+  const quickActions = pageHints.quickActions.slice(0, 3);
 
   // AI panel visible when streaming or has response
-  const isAIActive = isStreaming || aiTokens.length > 0;
-  const queryLong  = query.length >= 3;
+  const hasConversation = chat.messages.length > 0 || chat.thinking.active || !!chat.streamError;
+  const isAIActive = hasConversation || chat.isStreaming;
+  const queryLong  = query.length >= 3 || hasConversation;
+  const showSideResults = isLoading || showResults;
+
+  function renderWendyMessage(message: WendyMessage) {
+    if (message.role === "error") {
+      return (
+        <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {message.content}
+        </div>
+      );
+    }
+
+    const hasBody = !!message.content || !!message.uiTool;
+    return (
+      <div className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}>
+        <div className={cn("max-w-[92%]", message.role === "user" ? "text-right" : "text-left")}>
+          {hasBody && (
+            <div
+              className={cn(
+                "rounded-3xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap",
+                message.role === "user"
+                  ? "rounded-tr-md bg-primary text-primary-foreground"
+                  : "rounded-tl-md bg-muted/65 text-foreground",
+              )}
+            >
+              {message.uiTool ? (
+                <UiToolRenderer name={message.uiTool.name} args={message.uiTool.args} />
+              ) : (
+                message.content
+              )}
+            </div>
+          )}
+          {message.role === "assistant" && (
+            <>
+              {message.actions?.map((action) => (
+                <WendyActionCard
+                  key={action.id}
+                  action={action}
+                  onConfirm={() => void chat.confirmAction(message.id, action.id)}
+                  onCancel={() => chat.cancelAction(message.id, action.id)}
+                />
+              ))}
+              <WendySources message={message} />
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderChatComposer(compact = false) {
+    return (
+      <form
+        onSubmit={handleComposerSubmit}
+        className={cn(
+          "flex items-center gap-2 border-t border-white/10 bg-card/80 backdrop-blur-xl",
+          compact ? "px-3 py-2" : "px-4 py-3",
+        )}
+      >
+        {chat.stt.supported && (
+          <button
+            type="button"
+            onClick={() => chat.stt.isListening ? chat.commitSTT() : chat.stt.start()}
+            className={cn(
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
+              chat.stt.isListening ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground hover:text-foreground",
+            )}
+            aria-label={chat.stt.isListening ? "Invia dettatura" : "Detta a Wendy"}
+          >
+            <Mic className="h-4 w-4" />
+          </button>
+        )}
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Chiedi a Wendy..."
+          className="min-h-10 flex-1 rounded-full border border-white/10 bg-background/70 px-4 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/60"
+        />
+        {chat.isStreaming ? (
+          <button
+            type="button"
+            onClick={chat.stopStream}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive transition-colors hover:bg-destructive/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+            aria-label="Interrompi Wendy"
+          >
+            <Square className="h-4 w-4 fill-current" />
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={query.trim().length < 2}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+            aria-label="Invia a Wendy"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        )}
+      </form>
+    );
+  }
 
   return (
     <AnimatePresence>
@@ -256,12 +398,12 @@ export function SearchDialog({
           {/* Backdrop */}
           <m.div
             key="search-backdrop"
-            className={cn("fixed inset-0 z-40", isMobile && "bg-black/70 backdrop-blur-sm")}
+            className="fixed inset-0 z-40 bg-background/65 backdrop-blur-md"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            onClick={close}
+            onClick={handleClose}
           />
 
           {/* Container: bottom sheet su mobile, dropdown su desktop */}
@@ -272,7 +414,7 @@ export function SearchDialog({
               : "fixed z-50 left-1/2 -translate-x-1/2 w-full px-4"}
             style={isMobile
               ? { maxHeight: "85dvh" }
-              : { top: "68px", maxWidth: isAIActive && queryLong ? "900px" : "640px" }}
+              : { top: "76px", maxWidth: isAIActive && queryLong ? "920px" : "720px" }}
             initial={isMobile ? { y: "100%" } : { opacity: 0, y: -8, scale: 0.98 }}
             animate={isMobile ? { y: 0 }   : { opacity: 1, y: 0,   scale: 1 }}
             exit={isMobile    ? { y: "100%" } : { opacity: 0, y: -8, scale: 0.98 }}
@@ -289,29 +431,56 @@ export function SearchDialog({
 
             <div className={cn(
               "overflow-hidden",
-              isMobile ? "flex flex-col flex-1" : "rounded-2xl border border-white/10 bg-card/95 backdrop-blur-xl shadow-2xl",
+              isMobile ? "flex flex-col flex-1" : "rounded-3xl border border-white/10 bg-card/90 backdrop-blur-2xl shadow-2xl",
             )}>
               {/* Input sempre in cima */}
               <Command shouldFilter={false}>
-                <CommandInput
-                  ref={inputRef}
-                  placeholder={isAIActive ? "Chiedi altro a Wendy..." : t("search.placeholder")}
-                  value={query}
-                  onValueChange={setQuery}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      askCurrentQuery();
-                    }
-                  }}
-                  className="border-b border-white/10"
-                />
+                {(showDefaultSuggestions || query.length < 3) && (
+                  <div className="flex gap-2 overflow-x-auto border-b border-white/10 px-3 py-3">
+                    {quickActions.map((action) => (
+                      <button
+                        key={`quick-${action.label}`}
+                        type="button"
+                        onClick={() => askQuickAction(action.label)}
+                        className="shrink-0 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                      >
+                        {action.icon} {action.label}
+                      </button>
+                    ))}
+                    {activeSuggestions.slice(0, 3).map((item, i) => (
+                      <button
+                        key={`composer-suggest-${i}`}
+                        type="button"
+                        onClick={() => handleSelect(item.url)}
+                        className="shrink-0 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                      >
+                        {item.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {!isAIActive && (
+                  <CommandInput
+                    ref={inputRef}
+                    placeholder={t("search.placeholder")}
+                    value={query}
+                    onValueChange={setQuery}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        askCurrentQuery();
+                      }
+                    }}
+                    className="border-b border-white/10"
+                  />
+                )}
 
                 {/* Layout split quando AI è attiva (solo desktop) */}
                 {isAIActive && queryLong && !isMobile ? (
                   <div className="flex" style={{ minHeight: "320px", maxHeight: "65vh" }}>
 
                     {/* Colonna sinistra: risultati DB */}
+                    {showSideResults && (
                     <div className="w-2/5 border-r border-white/10 overflow-y-auto">
                       <CommandList className="max-h-none">
                         {isLoading && (
@@ -344,18 +513,19 @@ export function SearchDialog({
                             </CommandGroup>
                           );
                         })}
-                        {!isLoading && results.length === 0 && query.length >= 2 && (
-                          <CommandEmpty>
-                            <p className="text-sm">{t("search.noResults", { query })}</p>
-                          </CommandEmpty>
+                        {!isLoading && !showResults && (
+                          <div className="px-4 py-5 text-sm text-muted-foreground">
+                            Nessun risultato nell'app. Wendy puo comunque rispondere qui accanto.
+                          </div>
                         )}
                       </CommandList>
                     </div>
+                    )}
 
                     {/* Colonna destra: Wendy AI response */}
                     <div
                       ref={aiPanelRef}
-                      className="w-3/5 p-4 overflow-y-auto flex flex-col"
+                      className={cn(showSideResults ? "w-3/5" : "w-full", "p-4 overflow-y-auto flex flex-col")}
                     >
                       {/* Wendy header */}
                       <div className="flex items-center gap-2 mb-3">
@@ -366,39 +536,40 @@ export function SearchDialog({
                         <span className="text-[10px] text-muted-foreground">AI Coach</span>
                       </div>
 
-                      {/* Status badge */}
-                      {aiStatus && isStreaming && <AgentStatusBadge status={aiStatus} />}
-
-                      {/* Streaming text */}
-                      {(aiTokens || isStreaming) && (
-                        <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap flex-1">
-                          {aiTokens}
-                          {isStreaming && <StreamingCursor />}
-                        </div>
-                      )}
-
-                      {/* Sources */}
-                      {!isStreaming && <SourcesAccordion sources={aiSources} />}
-
-                      {/* Follow-up input */}
-                      {!isStreaming && aiTokens && (
-                        <form onSubmit={handleFollowUp} className="mt-4 flex gap-2">
-                          <input
-                            type="text"
-                            value={followUpInput}
-                            onChange={(e) => setFollowUpInput(e.target.value)}
-                            placeholder="Chiedi altro a Wendy..."
-                            className="flex-1 text-xs bg-muted/40 border border-border rounded-full px-3 py-1.5 outline-none focus:border-primary transition-colors"
-                          />
+                      <div className="mb-3 flex items-center justify-end gap-1">
+                        {chat.messages.length > 0 && (
                           <button
-                            type="submit"
-                            disabled={!followUpInput.trim()}
-                            className="flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground disabled:opacity-40 transition-opacity"
+                            type="button"
+                            onClick={chat.clearHistory}
+                            className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                            aria-label="Nuova conversazione"
                           >
-                            <Send className="h-3 w-3" />
+                            <RotateCcw className="h-3.5 w-3.5" />
                           </button>
-                        </form>
-                      )}
+                        )}
+                      </div>
+
+                      <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+                        {chat.messages.map((message) => (
+                          <div key={message.id}>{renderWendyMessage(message)}</div>
+                        ))}
+                        <WendyThinkingIndicator thinking={chat.thinking} />
+                        {slowThinking && chat.thinking.active && (
+                          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
+                            Wendy sta ancora lavorando. Puoi interrompere e riprovare con una domanda piu breve.
+                          </div>
+                        )}
+                        {chat.streamError && (
+                          <div className="flex items-center justify-between gap-3 rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                            <span>Wendy non ha risposto correttamente.</span>
+                            <button type="button" onClick={() => void chat.retryLast()} className="font-semibold underline underline-offset-2">
+                              Riprova
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {renderChatComposer()}
                     </div>
                   </div>
 
@@ -446,14 +617,7 @@ export function SearchDialog({
                       </div>
                     )}
 
-                    {/* AI in elaborazione */}
-                    {query.length >= 3 && isStreaming && aiStatus && (
-                      <div className="px-4 py-3 border-b border-white/5">
-                        <AgentStatusBadge status={aiStatus} />
-                      </div>
-                    )}
-
-                    {query.length >= 2 && !isStreaming && !isAIActive && (
+                    {query.length >= 2 && !chat.isStreaming && !isAIActive && (
                       <div className="px-3 py-2 border-b border-white/5">
                         <button
                           type="button"
@@ -534,28 +698,26 @@ export function SearchDialog({
                       <span className="text-[10px] text-muted-foreground">AI Coach</span>
                     </div>
 
-                    {aiStatus && isStreaming && <AgentStatusBadge status={aiStatus} />}
-                    {(aiTokens || isStreaming) && (
-                      <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-                        {aiTokens}
-                        {isStreaming && <StreamingCursor />}
-                      </div>
-                    )}
-                    {!isStreaming && <SourcesAccordion sources={aiSources} />}
-                    {!isStreaming && aiTokens && (
-                      <form onSubmit={handleFollowUp} className="mt-3 flex gap-2">
-                        <input
-                          type="text"
-                          value={followUpInput}
-                          onChange={(e) => setFollowUpInput(e.target.value)}
-                          placeholder="Chiedi altro a Wendy..."
-                          className="flex-1 text-xs bg-muted/40 border border-border rounded-full px-3 py-1.5 outline-none focus:border-primary transition-colors"
-                        />
-                        <button type="submit" disabled={!followUpInput.trim()} className="flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground disabled:opacity-40">
-                          <Send className="h-3 w-3" />
-                        </button>
-                      </form>
-                    )}
+                    <div className="space-y-3">
+                      {chat.messages.map((message) => (
+                        <div key={message.id}>{renderWendyMessage(message)}</div>
+                      ))}
+                      <WendyThinkingIndicator thinking={chat.thinking} />
+                      {slowThinking && chat.thinking.active && (
+                        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
+                          Wendy sta ancora lavorando. Puoi interrompere e riprovare.
+                        </div>
+                      )}
+                      {chat.streamError && (
+                        <div className="flex items-center justify-between gap-3 rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                          <span>Wendy non ha risposto correttamente.</span>
+                          <button type="button" onClick={() => void chat.retryLast()} className="font-semibold underline underline-offset-2">
+                            Riprova
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {renderChatComposer(true)}
                   </div>
                 )}
               </Command>

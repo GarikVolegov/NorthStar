@@ -24,6 +24,7 @@ export type SidebarSection =
   | "cataloghi"
   | "agenti-salute"
   | "metriche"
+  | "abbonamenti"
   | "home"
   | "status"
   | "messaggi"
@@ -339,6 +340,122 @@ export type BusinessStatusSnapshot = {
     leads: { total: number; pending: number; contacted: number; converted: number; unread: number };
   };
   actions: Array<{ label: string; section: SidebarSection; path: string; count: number | null }>;
+};
+
+export type AdminOpsStatus = {
+  generatedAt: string;
+  enabled: boolean;
+  confirmationRequired: boolean;
+  compose: {
+    file: string;
+    exists: boolean;
+    dockerError: string | null;
+    allowedServices: string[];
+  };
+  capabilities: {
+    serverStart: boolean;
+    serverStop: boolean;
+    serverRestart: boolean;
+    databaseMaintenance: boolean;
+    databaseRestart: boolean;
+  };
+  server: {
+    status: "online" | "degraded" | "offline" | string;
+    uptimeSeconds: number;
+    pid: number;
+    nodeVersion: string;
+    platform: string;
+    env: string;
+    memory: { rss: number; heapUsed: number; heapTotal: number };
+    docker: { status: string; label: string };
+  };
+  database: {
+    status: "online" | "maintenance" | "offline" | string;
+    ready: boolean;
+    maintenance: {
+      enabled: boolean;
+      reason: string | null;
+      updatedAt: string;
+      updatedBy: number | null;
+    };
+    pool: { totalCount: number; idleCount: number; waitingCount: number };
+    docker: { status: string; label: string };
+  };
+  redis: {
+    docker: { status: string; label: string };
+  };
+  lastOperation: {
+    id: string;
+    action: string;
+    service: string;
+    status: "accepted" | "running" | "done" | "failed";
+    message: string;
+    requestedAt: string;
+    finishedAt: string | null;
+    requestedBy: number | null;
+  } | null;
+};
+
+export type AdminOpsAction =
+  | "server-start"
+  | "server-stop"
+  | "server-restart"
+  | "database-restart";
+
+export type AdminSubscriptionPlan = "free" | "pro" | "team";
+export type AdminSubscriptionStatus = "free" | "active" | "expired" | "cancelled";
+export type AdminSubscriptionSource = "free" | "internal" | "stripe";
+
+export type AdminSubscriptionCurrent = {
+  id: number | null;
+  plan: AdminSubscriptionPlan;
+  rawPlan: AdminSubscriptionPlan | null;
+  status: AdminSubscriptionStatus;
+  source: AdminSubscriptionSource;
+  validUntil: string | null;
+  cancelledAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  hasStripeSubscription: boolean;
+  stripeSubscriptionId: string | null;
+};
+
+export type AdminSubscriptionItem = {
+  user: {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    createdAt: string | null;
+  };
+  current: AdminSubscriptionCurrent;
+};
+
+export type AdminSubscriptionHistoryItem = {
+  id: number;
+  plan: AdminSubscriptionPlan;
+  effectivePlan: AdminSubscriptionPlan;
+  status: AdminSubscriptionStatus;
+  source: Exclude<AdminSubscriptionSource, "free">;
+  validUntil: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  hasStripeSubscription: boolean;
+  stripeSubscriptionId: string | null;
+};
+
+export type AdminSubscriptionsResponse = {
+  generatedAt: string;
+  items: AdminSubscriptionItem[];
+  total: number;
+  limit: number;
+  offset: number;
+  stats: Record<AdminSubscriptionPlan | "total", number>;
+};
+
+export type AdminSubscriptionDetail = AdminSubscriptionItem & {
+  history: AdminSubscriptionHistoryItem[];
 };
 
 export type AdminAssignee = {

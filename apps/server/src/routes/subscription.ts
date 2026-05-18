@@ -10,16 +10,150 @@
  *   - stripeCustomerId mai restituito al client
  */
 import { Router, type Request, type Response } from "express";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, desc, isNull, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { rootLogger } from "../middleware/logger";
-import { db, subscriptionsTable, usersTable } from "@workspace/db";
+import {
+  affiliateAccountsTable,
+  affiliateCommissionsTable,
+  affiliateReferralsTable,
+  db,
+  subscriptionsTable,
+  usersTable,
+} from "@workspace/db";
 import { invalidatePlanCache } from "../middleware/check-feature";
 
 const router = Router();
 const log    = rootLogger.child({ module: "subscription" });
 
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
+
+function affiliateCommissionPct(): number {
+  const value = Number(process.env.AFFILIATE_COMMISSION_PCT ?? "20");
+  return Number.isFinite(value) && value > 0 ? value : 20;
+}
+
+function affiliateReserveCents(): number {
+  const value = Number(process.env.AFFILIATE_RESERVE_CENTS ?? "900");
+  return Number.isInteger(value) && value > 0 ? value : 900;
+}
+
+function monthKey(date: Date): string {
+  return date.toISOString().slice(0, 7);
+}
+
+function readSubscriptionId(obj: Record<string, unknown>): string | null {
+  if (typeof obj.subscription === "string") return obj.subscription;
+  if (obj.subscription && typeof obj.subscription === "object" && "id" in obj.subscription) {
+    const id = (obj.subscription as { id?: unknown }).id;
+    return typeof id === "string" ? id : null;
+  }
+  return null;
+}
+
+async function findUserIdByStripeSubscription(subId: string): Promise<number | null> {
+  const [subscription] = await db
+    .select({ userId: subscriptionsTable.userId })
+    .from(subscriptionsTable)
+    .where(eq(subscriptionsTable.stripeSubscriptionId, subId))
+    .limit(1);
+
+  if (subscription?.userId) return subscription.userId;
+
+  const [user] = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(eq(usersTable.stripeSubscriptionId, subId))
+    .limit(1);
+
+  return user?.id ?? null;
+}
+
+async function applyAffiliateCommissionForInvoice(obj: Record<string, unknown>): Promise<void> {
+  const invoiceId = typeof obj.id === "string" ? obj.id : null;
+  const subId = readSubscriptionId(obj);
+  const amountPaid = Number(obj.amount_paid ?? 0);
+
+  if (!invoiceId || !subId || !Number.isInteger(amountPaid) || amountPaid <= 0) {
+    log.debug({ invoiceId, subId, amountPaid }, "[subscription] invoice.paid skipped for affiliate commission");
+    return;
+  }
+
+  const referredUserId = await findUserIdByStripeSubscription(subId);
+  if (!referredUserId) {
+    log.debug({ invoiceId, subId }, "[subscription] invoice.paid has no local subscription user");
+    return;
+  }
+
+  const rate = affiliateCommissionPct();
+  const commissionCents = Math.round((amountPaid * rate) / 100);
+  if (commissionCents <= 0) return;
+
+  const paidAt = typeof obj.created === "number" ? new Date(obj.created * 1000) : new Date();
+  const reserveCents = affiliateReserveCents();
+
+  await db.transaction(async (tx) => {
+    const [referral] = await tx
+      .select({
+        affiliateId: affiliateReferralsTable.affiliateId,
+        referredUserId: affiliateReferralsTable.referredUserId,
+        status: affiliateReferralsTable.status,
+      })
+      .from(affiliateReferralsTable)
+      .where(eq(affiliateReferralsTable.referredUserId, referredUserId))
+      .limit(1);
+
+    if (!referral || referral.status === "cancelled") return;
+
+    const [account] = await tx
+      .select({
+        id: affiliateAccountsTable.id,
+        status: affiliateAccountsTable.status,
+        lockedBalance: affiliateAccountsTable.lockedBalance,
+      })
+      .from(affiliateAccountsTable)
+      .where(eq(affiliateAccountsTable.id, referral.affiliateId))
+      .limit(1);
+
+    if (!account || account.status === "suspended") return;
+
+    const lockedRoom = Math.max(0, reserveCents - account.lockedBalance);
+    const lockedAdd = Math.min(commissionCents, lockedRoom);
+    const withdrawableAdd = commissionCents - lockedAdd;
+    const appliedTo = withdrawableAdd > 0 ? "withdrawable" : "locked";
+
+    const inserted = await tx
+      .insert(affiliateCommissionsTable)
+      .values({
+        affiliateId: account.id,
+        referredUserId: referral.referredUserId,
+        amountCents: commissionCents,
+        stripeInvoiceId: invoiceId,
+        sourceAmountCents: amountPaid,
+        commissionRatePct: Math.round(rate),
+        month: monthKey(paidAt),
+        appliedTo,
+        status: "applied",
+        appliedAt: new Date(),
+      })
+      .onConflictDoNothing({ target: affiliateCommissionsTable.stripeInvoiceId })
+      .returning({ id: affiliateCommissionsTable.id });
+
+    if (inserted.length === 0) return;
+
+    await tx
+      .update(affiliateAccountsTable)
+      .set({
+        lockedBalance: sql`${affiliateAccountsTable.lockedBalance} + ${lockedAdd}`,
+        withdrawableBalance: sql`${affiliateAccountsTable.withdrawableBalance} + ${withdrawableAdd}`,
+        totalEarned: sql`${affiliateAccountsTable.totalEarned} + ${commissionCents}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(affiliateAccountsTable.id, account.id));
+  });
+
+  log.info({ invoiceId, subId, referredUserId, commissionCents, rate }, "[subscription] affiliate commission applied");
+}
 
 // ── GET /api/subscription ─────────────────────────────────────────────────────
 
@@ -39,7 +173,7 @@ router.get("/", requireAuth, async (req, res) => {
         eq(subscriptionsTable.userId, userId),
         isNull(subscriptionsTable.cancelledAt),
       ))
-      .orderBy(subscriptionsTable.createdAt)
+      .orderBy(desc(subscriptionsTable.createdAt))
       .limit(1);
 
     const effectivePlan = (sub?.validUntil && sub.validUntil < new Date())
@@ -76,7 +210,9 @@ router.post(
         const sig = req.headers["stripe-signature"] as string;
         event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET) as any;
       } else {
-        event = JSON.parse(req.body.toString());
+        event = Buffer.isBuffer(req.body) || typeof req.body === "string"
+          ? JSON.parse(req.body.toString())
+          : req.body as any;
       }
     } catch (e) {
       log.warn({ e }, "[subscription] webhook signature invalid");
@@ -134,7 +270,22 @@ async function handleStripeEvent(event: { type: string; data: { object: Record<s
         .where(eq(usersTable.id, userId));
 
       invalidatePlanCache(userId);
+
+      if (typeof obj.invoice === "string" && typeof obj.amount_total === "number" && obj.amount_total > 0) {
+        await applyAffiliateCommissionForInvoice({
+          id: obj.invoice,
+          subscription: subId,
+          amount_paid: obj.amount_total,
+          created: obj.created,
+        });
+      }
+
       log.info({ userId, plan, subId }, "[subscription] checkout completed → plan upgraded");
+      break;
+    }
+
+    case "invoice.paid": {
+      await applyAffiliateCommissionForInvoice(obj);
       break;
     }
 

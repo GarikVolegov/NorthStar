@@ -1,5 +1,6 @@
 import { Router } from "express";
 import crypto from "node:crypto";
+import * as QRCode from "qrcode";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import {
   affiliateAccountsTable,
@@ -7,14 +8,26 @@ import {
   affiliateReferralsTable,
   affiliateWithdrawalsTable,
   db,
-  userProfileSettingsTable,
   usersTable,
 } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 
 const router = Router();
 
-const MIN_WITHDRAW_CENTS = 2900;
+function affiliateReserveCents(): number {
+  const value = Number(process.env.AFFILIATE_RESERVE_CENTS ?? "900");
+  return Number.isInteger(value) && value > 0 ? value : 900;
+}
+
+function minWithdrawCents(): number {
+  const explicitCents = Number(process.env.AFFILIATE_MIN_WITHDRAWAL_CENTS);
+  if (Number.isInteger(explicitCents) && explicitCents > 0) return explicitCents;
+
+  const explicitEur = Number(process.env.AFFILIATE_MIN_WITHDRAWAL_EUR);
+  if (Number.isFinite(explicitEur) && explicitEur > 0) return Math.round(explicitEur * 100);
+
+  return affiliateReserveCents();
+}
 
 function publicAppUrl(): string {
   const value =
@@ -27,7 +40,11 @@ function publicAppUrl(): string {
 }
 
 function buildReferralLink(code: string): string {
-  return `${publicAppUrl()}/register?ref=${encodeURIComponent(code)}`;
+  return `${publicAppUrl()}/sign-up?ref=${encodeURIComponent(code)}`;
+}
+
+function buildQrCodeUrl(): string {
+  return "/api/affiliate/qr";
 }
 
 function normalizeReferralCode(seed: string, userId: number): string {
@@ -41,16 +58,6 @@ function normalizeReferralCode(seed: string, userId: number): string {
 }
 
 async function ensureAffiliateAccount(userId: number) {
-  const [profile] = await db
-    .select({ isAffiliate: userProfileSettingsTable.isAffiliate })
-    .from(userProfileSettingsTable)
-    .where(eq(userProfileSettingsTable.userId, userId))
-    .limit(1);
-
-  if (!profile?.isAffiliate) {
-    return { error: "Programma affiliazione non attivo per questo account" as const, account: null };
-  }
-
   const [existing] = await db
     .select()
     .from(affiliateAccountsTable)
@@ -159,21 +166,62 @@ router.get("/dashboard", requireAuth, async (req, res) => {
       totalReferrals: account.totalReferrals,
       referralCode: account.referralCode,
       referralLink: buildReferralLink(account.referralCode),
+      qrCodeUrl: buildQrCodeUrl(),
       referrals,
       subscription: {
         plan: account.isPremiumActive ? "premium" : "free",
         status: account.status,
         currentPeriodEnd: account.nextRenewalAt?.toISOString() ?? null,
       },
-      minWithdrawAmount: MIN_WITHDRAW_CENTS,
+      minWithdrawAmount: minWithdrawCents(),
       rule: {
-        lockedReserveCents: MIN_WITHDRAW_CENTS,
-        description: "I primi 29 euro coprono il prossimo rinnovo; il surplus diventa ritirabile.",
+        lockedReserveCents: affiliateReserveCents(),
+        description: "Le commissioni coprono prima una soglia pari a un mese Premium; il resto diventa ritirabile.",
       },
     });
   } catch (err) {
     req.log?.error?.({ err }, "affiliate dashboard error");
     res.status(500).json({ error: "Errore caricamento dashboard affiliazione" });
+  }
+});
+
+router.get("/qr", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { error, account } = await ensureAffiliateAccount(userId);
+
+    if (error || !account) {
+      res.status(error === "Utente non trovato" ? 404 : 403).json({
+        error: error ?? "Programma affiliazione non disponibile",
+      });
+      return;
+    }
+
+    const referralLink = buildReferralLink(account.referralCode);
+    const qrSvg = await QRCode.toString(referralLink, {
+      type: "svg",
+      errorCorrectionLevel: "M",
+      margin: 2,
+      width: 320,
+      color: {
+        dark: "#111827",
+        light: "#ffffff",
+      },
+    });
+    const safeReferralLink = referralLink.replace(/--/g, "%2D%2D");
+    const svg = `<!-- referralLink: ${safeReferralLink} -->\n${qrSvg}`;
+
+    const disposition = req.query.download === "1"
+      ? `attachment; filename="northstar-referral-${account.referralCode}.svg"`
+      : `inline; filename="northstar-referral-${account.referralCode}.svg"`;
+
+    res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+    res.setHeader("Cache-Control", "private, max-age=300");
+    res.setHeader("Content-Disposition", disposition);
+    res.send(svg);
+  } catch (err) {
+    req.log?.error?.({ err }, "affiliate qr error");
+    res.status(500).json({ error: "Errore generazione QR referral" });
   }
 });
 
@@ -189,8 +237,9 @@ router.post("/withdraw", requireAuth, async (req, res) => {
       return;
     }
 
-    if (rawAmount < MIN_WITHDRAW_CENTS) {
-      res.status(400).json({ error: "Importo minimo prelievo non raggiunto", minWithdrawAmount: MIN_WITHDRAW_CENTS });
+    const minimum = minWithdrawCents();
+    if (rawAmount < minimum) {
+      res.status(400).json({ error: "Importo minimo prelievo non raggiunto", minWithdrawAmount: minimum });
       return;
     }
 

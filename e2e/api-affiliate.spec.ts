@@ -1,23 +1,52 @@
 /**
- * E2E tests for Affiliate API endpoints
+ * E2E tests for Affiliate API endpoints.
  */
 import { test, expect } from "@playwright/test";
-import { loginAsTestUser, loginAsAffiliateUser, TEST_API_URL } from "./helpers/auth";
+import { loginAsTestUser, TEST_API_URL } from "./helpers/auth";
 
 test.describe("Affiliate API", () => {
-  test("GET /api/affiliate/dashboard — returns 401 without auth", async ({ request }) => {
+  test("GET /api/affiliate/dashboard returns 401 without auth", async ({ request }) => {
     const res = await request.get(`${TEST_API_URL}/api/affiliate/dashboard`);
     expect(res.status()).toBe(401);
   });
 
-  test("GET /api/affiliate/dashboard — returns dashboard for affiliate user", async ({ request }) => {
-    const headers = await loginAsAffiliateUser(request);
+  test("GET /api/affiliate/dashboard returns dashboard for a normal user", async ({ request }) => {
+    const headers = await loginAsTestUser(request);
     const res = await request.get(`${TEST_API_URL}/api/affiliate/dashboard`, { headers });
-    // Affiliate endpoint may return 200 or 403 depending on backend implementation
-    expect([200, 403]).toContain(res.status());
+    expect(res.status()).toBe(200);
+
+    const body = await res.json();
+    expect(body.referralCode).toBeTruthy();
+    expect(body.referralLink).toMatch(/^https?:\/\/.+\/sign-up\?ref=/);
+    expect(body.referralLink).toContain(encodeURIComponent(body.referralCode));
+    expect(body.qrCodeUrl).toBe("/api/affiliate/qr");
   });
 
-  test("GET /api/dashboard — returns aggregated dashboard data", async ({ request }) => {
+  test("GET /api/affiliate/qr returns 401 without auth", async ({ request }) => {
+    const res = await request.get(`${TEST_API_URL}/api/affiliate/qr`);
+    expect(res.status()).toBe(401);
+  });
+
+  test("GET /api/affiliate/qr returns an internal SVG QR for a normal user", async ({ request }) => {
+    const headers = await loginAsTestUser(request);
+    const dashboardRes = await request.get(`${TEST_API_URL}/api/affiliate/dashboard`, { headers });
+    expect(dashboardRes.status()).toBe(200);
+    const dashboard = await dashboardRes.json();
+
+    const qrRes = await request.get(`${TEST_API_URL}/api/affiliate/qr`, { headers });
+    expect(qrRes.status()).toBe(200);
+    expect(qrRes.headers()["content-type"]).toContain("image/svg+xml");
+    expect(qrRes.headers()["cache-control"]).toContain("private");
+
+    const svg = await qrRes.text();
+    expect(svg).toContain("<svg");
+    expect(svg).not.toContain("chart.googleapis.com");
+    expect(svg).toContain(dashboard.referralLink);
+    expect(svg).toContain("path");
+    expect(dashboard.qrCodeUrl).toBe("/api/affiliate/qr");
+  });
+
+  test("GET /api/dashboard returns aggregated dashboard data", async ({ request }) => {
     const headers = await loginAsTestUser(request);
     const res = await request.get(`${TEST_API_URL}/api/dashboard`, { headers });
     expect(res.status()).toBe(200);
@@ -28,14 +57,12 @@ test.describe("Affiliate API", () => {
     expect(body).toHaveProperty("upcomingEvents");
   });
 
-  test("GET /api/objectives — CRUD flow", async ({ request }) => {
+  test("GET /api/objectives CRUD flow", async ({ request }) => {
     const headers = await loginAsTestUser(request);
 
-    // List (empty or not)
     const listRes = await request.get(`${TEST_API_URL}/api/objectives`, { headers });
     expect(listRes.status()).toBe(200);
 
-    // Create
     const createRes = await request.post(`${TEST_API_URL}/api/objectives`, {
       headers,
       data: { text: "Test E2E objective", category: "test" },
@@ -44,7 +71,6 @@ test.describe("Affiliate API", () => {
     const objective = await createRes.json();
     expect(objective.text).toBe("Test E2E objective");
 
-    // Update
     const updateRes = await request.patch(
       `${TEST_API_URL}/api/objectives/${objective.id}`,
       { headers, data: { completed: true } },
@@ -53,7 +79,6 @@ test.describe("Affiliate API", () => {
     const updated = await updateRes.json();
     expect(updated.completed).toBe(true);
 
-    // Delete
     const delRes = await request.delete(
       `${TEST_API_URL}/api/objectives/${objective.id}`,
       { headers },
@@ -61,10 +86,9 @@ test.describe("Affiliate API", () => {
     expect(delRes.status()).toBe(204);
   });
 
-  test("POST /api/objectives/seed — creates default objectives for journey", async ({ request }) => {
+  test("POST /api/objectives/seed creates default objectives for journey", async ({ request }) => {
     const headers = await loginAsTestUser(request);
     const res = await request.post(`${TEST_API_URL}/api/objectives/seed`, { headers });
-    // First call should create, subsequent calls should return existing
     expect([200, 201]).toContain(res.status());
   });
 });

@@ -16,7 +16,7 @@ import { randomUUID } from "node:crypto";
 import { requireAuth } from "../middleware/auth";
 import { wendyLimiter } from "../middleware/rate-limit";
 import { rootLogger } from "../middleware/logger";
-import { checkFeatureAccess } from "../middleware/check-feature";
+import { checkFeatureAccess, getEffectivePlan, planMeets } from "../middleware/check-feature";
 import { cacheIncr } from "../lib/redis";
 import {
   runGrowthAgent,
@@ -24,6 +24,7 @@ import {
   buildMemorySection,
   resolveWendyRoute,
   buildLightPrompt,
+  getLocalWendyReply,
   toolsToOpenAIFormat,
   executeToolCall,
   recordAiCall,
@@ -80,12 +81,57 @@ router.post("/", requireAuth, wendyLimiter, async (req: Request, res: Response) 
 
   // SECURITY: userId SEMPRE dal JWT, mai dal body
   const userId    = req.user!.id;
-  const isPremium = !!req.user!.stripeSubscriptionId;
   const requestId = randomUUID();
   const startedAt = Date.now();
 
+  const localReply = getLocalWendyReply(message);
+  if (localReply) {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
+
+    res.write(`data: ${JSON.stringify({ type: "status", value: "Ci sono." })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: "token", value: localReply.text })}\n\n`);
+    res.write(`data: ${JSON.stringify({
+      type: "done",
+      intent: "simple_qa",
+      requestId,
+      usage: { model: "local-wendy-reply", inputTokens: 0, outputTokens: 0 },
+    })}\n\n`);
+    res.end();
+
+    recordAiCall({
+      requestId,
+      userId,
+      threadId,
+      intent: "simple_qa",
+      tier: "nano",
+      model: "local-wendy-reply",
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsdEst: 0,
+      latencyMs: Date.now() - startedAt,
+      totalTurns: compressedHistory?.totalTurns ?? 0,
+      status: "success",
+      locale,
+      toolCallsCount: 0,
+      toolsUsed: [],
+      responseCategory: "success",
+      searchMode: "none",
+      ragChunksRetrieved: 0,
+      ragTopSimilarity: null,
+      ragSourcesUsed: [],
+    });
+    return;
+  }
+
+  const currentPlan = await getEffectivePlan(userId);
+  const isPremium = planMeets(currentPlan, "pro");
+
   // ── Daily message limit per piano ─────────────────────────────────────────
-  const FREE_DAILY_LIMIT = parseInt(process.env.WENDY_FREE_DAILY_LIMIT ?? "10");
+  const FREE_DAILY_LIMIT = parseInt(process.env.WENDY_FREE_DAILY_LIMIT ?? "40");
   const { allowed: isUnlimited } = await checkFeatureAccess(userId, "wendy_unlimited");
 
   if (!isUnlimited) {

@@ -13,6 +13,13 @@ declare module "stripe" {
   }
   export = Stripe;
 }
+
+declare module "qrcode" {
+  export function toString(
+    text: string,
+    options?: Record<string, unknown>,
+  ): Promise<string>;
+}
 // opossum e pg sono usati in packages/db/src/index.ts come deps runtime.
 
 declare module "opossum" {

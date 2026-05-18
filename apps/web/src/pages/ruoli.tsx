@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { usePageMeta } from "@/lib/seo";
@@ -11,6 +11,7 @@ import {
   ArrowRight, SlidersHorizontal, X, Zap,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -119,6 +120,13 @@ export default function Ruoli() {
     description: "Esplora tutti i lavori e le professioni disponibili per settore. Scopri competenze, stipendi e prospettive di crescita per ogni professione.",
     path: "/ruoli",
   });
+  useWendyPageContext({
+    page: "ruoli",
+    title: "Ruoli",
+    capabilities: ["navigate", "set_filters"],
+    fields: ["search", "sectorId", "riasecTypes"],
+    actions: ["Filtra ruoli", "Apri ruolo", "Confronta professioni"],
+  });
 
   const { data: roles = [], isLoading } = useQuery<Role[]>({
     queryKey: ["all-roles"],
@@ -146,6 +154,22 @@ export default function Ruoli() {
   const [activeSector, setActiveSector] = useState<number | null>(null);
   const [activeRiasec, setActiveRiasec] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const keyword = params.get("keyword") ?? params.get("query") ?? params.get("q") ?? "";
+    const riasec = params.get("riasecTypes") ?? params.get("riasec") ?? "";
+    const sectorId = Number(params.get("sectorId") ?? "");
+    if (keyword) setSearch(keyword);
+    if (riasec) {
+      setActiveRiasec(riasec.split(",").map((item) => item.trim().toUpperCase()).filter(Boolean));
+      setShowFilters(true);
+    }
+    if (Number.isFinite(sectorId) && sectorId > 0) {
+      setActiveSector(sectorId);
+      setShowFilters(true);
+    }
+  }, []);
 
   const hasFilters = !!search.trim() || activeSector !== null || activeRiasec.length > 0;
 

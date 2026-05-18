@@ -6,6 +6,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { apiFetch } from '@/lib/api-fetch';
+
+const BASE = import.meta.env.BASE_URL || '/';
 
 // ─── Tipi ────────────────────────────────────────────────────────────────────
 
@@ -25,11 +28,12 @@ export interface AffiliateDashboardData {
   totalEarned: number;        // totale storico, in centesimi
   referralCode: string;       // es. "MARIO42"
   referralLink: string;       // URL completo con il codice
+  qrCodeUrl: string;          // endpoint interno autenticato per il QR
   referrals: AffiliateReferral[];
   subscription: {
     plan: string;
-    status: 'active' | 'trialing' | 'canceled' | 'past_due';
-    currentPeriodEnd: string;
+    status: 'active' | 'paused' | 'suspended' | 'trialing' | 'canceled' | 'past_due';
+    currentPeriodEnd: string | null;
   } | null;
   minWithdrawAmount: number;  // soglia minima ritiro, in centesimi
 }
@@ -63,12 +67,10 @@ export function useAffiliateDashboard() {
   return useQuery<AffiliateDashboardData>({
     queryKey: affiliateKeys.dashboard,
     queryFn: async () => {
-      const res = await fetch('/api/affiliate/dashboard', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`${BASE}api/affiliate/dashboard`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message ?? `Errore ${res.status}`);
+        throw new Error(err?.message ?? err?.error ?? `Errore ${res.status}`);
       }
       return res.json();
     },
@@ -82,18 +84,13 @@ export function useAffiliateDashboard() {
 // ─── Mutation: ritiro ────────────────────────────────────────────────────────
 
 export function useAffiliateWithdraw() {
-  const { token } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation<void, Error, WithdrawRequest>({
     mutationFn: async ({ amount }) => {
-      const res = await fetch('/api/affiliate/withdraw', {
+      const res = await apiFetch(`${BASE}api/affiliate/withdraw`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ amount }),
       });
       if (!res.ok) {

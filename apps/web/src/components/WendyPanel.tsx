@@ -2,6 +2,7 @@ import { useEffect, useRef, useMemo } from "react";
 import { useWendy } from "../contexts/WendyProvider";
 import { WendyChat } from "./WendyChat";
 import { WendyAvatar } from "./wendy-avatar";
+import { X } from "lucide-react";
 
 export function WendyPanel() {
   const { isOpen, isSpeaking, close, getPageHints } = useWendy();
@@ -22,19 +23,19 @@ export function WendyPanel() {
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm md:hidden"
+        className="fixed inset-0 z-40 bg-background/60 backdrop-blur-md"
         onClick={close}
       />
       <div
         ref={panelRef}
         data-testid="wendy-panel"
-        className={`fixed z-50 flex flex-col bg-white/95 dark:bg-gray-950/95 shadow-2xl transition-all duration-300
-          md:right-4 md:top-4 md:bottom-4 md:w-105 md:max-w-[90vw] md:rounded-2xl md:border md:border-gray-200 md:dark:border-gray-800
-          inset-x-0 bottom-0 top-0 rounded-t-2xl md:rounded-t-2xl
+        className={`fixed z-50 flex flex-col overflow-hidden bg-background/80 shadow-2xl backdrop-blur-2xl transition-all duration-300
+          md:right-4 md:top-4 md:bottom-4 md:w-[440px] md:max-w-[90vw] md:rounded-3xl md:border md:border-white/10
+          inset-x-0 bottom-0 top-0 rounded-t-3xl md:rounded-t-3xl
         `}
       >
         {/* Header */}
-        <div className="flex items-center gap-3 border-b border-gray-200 dark:border-gray-800 px-4 py-3 shrink-0">
+        <div className="flex items-center gap-3 border-b border-white/10 bg-background/55 px-4 py-3 shrink-0">
           <div className="relative">
             <WendyAvatar
               state={isSpeaking ? "speaking" : "curious"}
@@ -47,65 +48,32 @@ export function WendyPanel() {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+            <div className="font-semibold text-sm text-foreground">
               Wendy
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
+            <div className="text-xs text-muted-foreground">
               {isSpeaking ? "Sta parlando..." : "Online"}
             </div>
           </div>
           <button
             onClick={close}
             data-testid="wendy-close-btn"
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+            className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             aria-label="Chiudi"
           >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Chat */}
         <div className="flex-1 overflow-hidden">
           <WendyChat
-            className="h-full border-0 rounded-none"
+            className="h-full rounded-none border-0 bg-transparent shadow-none"
             welcomeMessage={hints.welcome}
+            quickActions={hints.quickActions}
           />
         </div>
 
-        {/* Quick actions — contestuali alla pagina */}
-        <div className="flex gap-2 overflow-x-auto px-4 py-2 border-t border-gray-200 dark:border-gray-800 shrink-0">
-          {hints.quickActions.map((a) => (
-            <button
-              key={a.label}
-              className="shrink-0 text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 whitespace-nowrap transition-colors"
-              onClick={() => {
-                const chat =
-                  document.querySelector<HTMLTextAreaElement>(
-                    "[data-wendy-input]",
-                  );
-                if (chat) {
-                  chat.value = a.label;
-                  chat.dispatchEvent(new Event("input", { bubbles: true }));
-                  chat.focus();
-                }
-              }}
-            >
-              {a.icon} {a.label}
-            </button>
-          ))}
-        </div>
       </div>
     </>
   );

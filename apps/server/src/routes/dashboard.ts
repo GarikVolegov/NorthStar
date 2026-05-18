@@ -9,6 +9,7 @@ import {
 } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { isPersistenceSchemaError } from "../lib/persistence";
+import { getEffectivePlan, planMeets } from "../middleware/check-feature";
 
 const router = Router();
 
@@ -27,6 +28,7 @@ router.get("/", requireAuth, async (req, res) => {
   try {
     const user = req.user!;
     const now = new Date();
+    const currentPlan = await getEffectivePlan(user.id);
 
     const [latestSession, objectives, upcomingEvents] = await Promise.all([
       optionalDashboardQuery(req, "dashboard.latestSession", db
@@ -84,7 +86,7 @@ router.get("/", requireAuth, async (req, res) => {
         journeyType: user.journeyType,
         name: user.name,
         email: user.email,
-        isPremium: Boolean(user.stripeSubscriptionId),
+        isPremium: planMeets(currentPlan, "pro"),
         onboardingCompleted: user.onboardingCompleted,
       },
       session: latestSession[0] ?? null,

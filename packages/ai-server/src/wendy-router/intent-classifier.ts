@@ -5,6 +5,7 @@
  * Firma stabile: sostituibile con classificatore LLM senza toccare i chiamanti.
  */
 import type { WendyIntent, WendyPageContext, CompressedHistory } from "./types";
+import { isLocalWendyReplyMessage } from "./local-reply";
 
 // ── Pattern heuristici ────────────────────────────────────────────────────────
 
@@ -16,6 +17,8 @@ const PLANNING_PATTERNS = /\b(roadmap|piano|percorso|obiettivo|obiettivi|come di
 
 // Trigger di analisi profonda
 const DEEP_PATTERNS = /\b(confronta|analizza|differenza tra|vantaggi e svantaggi|pro e contro|quale scelgo|dimmi tutto su|approfondisci|analisi completa)\b/i;
+
+const QUICK_IDENTITY_PATTERNS = /^(ciao|hey|hei|ehi|salve|buongiorno|buonasera|hru|come stai\??|come va\??|tutto bene\??|grazie|ok|perfetto|va bene|chi sei\??|cosa sai fare\??|che cosa sai fare\??|come funziona wendy\??|presentati|aiutami a capire cosa puoi fare)$/i;
 
 // Contesti di pagina che suggeriscono domanda rapida
 const QA_PAGES = new Set(["settore", "ruolo", "professione", "sector", "profession"]);
@@ -51,6 +54,8 @@ export function classifyIntent(input: ClassifyIntentInput): WendyIntent {
 
   // 2. Navigazione esplicita → zero risposta testuale
   if (NAV_PATTERNS.test(msg)) return "navigation";
+
+  if (isLocalWendyReplyMessage(msg) || QUICK_IDENTITY_PATTERNS.test(msg)) return "simple_qa";
 
   // 3. Pianificazione esplicita
   if (PLANNING_PATTERNS.test(msg)) return "planning";

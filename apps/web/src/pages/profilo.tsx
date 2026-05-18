@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { usePageModule } from "@/hooks/usePageModule";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { ProfileSettings } from "@/components/profile/ProfileSettings";
 import { BadgesAchievements } from "@/components/profile/sections/BadgesAchievements";
 import { JourneySectionRenderer, type JourneyType } from "@/components/profile/profile-sections";
@@ -358,6 +359,13 @@ export default function Profilo() {
   const { t } = useTranslation();
   const { user, logout, isLoggedIn, updateUser } = useAuth();
   usePageModule({ pageId: "profilo" });
+  useWendyPageContext({
+    page: "profilo",
+    title: "Profilo",
+    capabilities: ["navigate", "fill_form"],
+    fields: ["profile.avatar", "profile.banner", "profile.settings"],
+    actions: ["Apri impostazioni", "Spiega completamento profilo"],
+  });
   const [avatarUrl, setAvatarUrl] = useState<string | null | undefined>(user?.avatarUrl);
   const [bannerUrl, setBannerUrl] = useState<string | null | undefined>();
   const [linkedinWizardOpen, setLinkedinWizardOpen] = useState(false);

@@ -106,15 +106,21 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
           if (raw === "[DONE]") return;
           try {
             const parsed = JSON.parse(raw) as Record<string, unknown>;
-            // Custom event types (ui_tool, status, rag_citations, etc.)
-            if (parsed.type && parsed.type !== "token") {
-              onRawChunk?.(raw);
+            // Custom event types (ui_tool, status, rag_citations, token, etc.)
+            // and provider-style deltas can be observed by callers. Returning
+            // false keeps the canonical streamed-content buffer active.
+            if (onRawChunk?.(raw)) {
+              return;
+            }
+            const eventType = typeof parsed.type === "string" ? parsed.type : undefined;
+            if (eventType && eventType !== "token") {
               return;
             }
             const chunk =
               (parsed as { choices?: Array<{ delta?: { content?: string } }> }).choices?.[0]?.delta?.content ??
-              (parsed.content as string) ??
-              (parsed.text as string) ??
+              (eventType === "token" ? (parsed.value as string) : undefined) ??
+              (eventType === "token" ? (parsed.content as string) : undefined) ??
+              (eventType === "token" ? (parsed.text as string) : undefined) ??
               "";
             if (chunk) {
               bufferRef.current += chunk;
@@ -163,7 +169,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
         setIsStreaming(false);
       }
     },
-    [scheduleFlush, onComplete, onError],
+    [scheduleFlush, onComplete, onError, onRawChunk],
   );
 
   return { content, isStreaming, isPending, error, start, stop, reset };

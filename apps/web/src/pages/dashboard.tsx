@@ -90,7 +90,13 @@ export default function Dashboard() {
     title: "Dashboard AI — NorthStar",
     description: "La tua analisi AI personalizzata: professioni consigliate, percorsi formativi e modalità di lavoro ottimale per il tuo profilo RIASEC.",
   });
-  useWendyPageContext({ page: 'dashboard', title: 'Dashboard' });
+  useWendyPageContext({
+    page: 'dashboard',
+    title: 'Dashboard',
+    capabilities: ['navigate', 'create_objective', 'update_objective_progress', 'set_filters'],
+    fields: ['objective.text', 'objective.category', 'objective.dueDate'],
+    actions: ['Crea obiettivo', 'Aggiorna progresso', 'Mostra prossimi passi'],
+  });
   usePageModule({ pageId: "dashboard" });
 
   const { user, authReady } = useAuth();

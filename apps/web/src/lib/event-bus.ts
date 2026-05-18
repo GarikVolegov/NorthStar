@@ -28,6 +28,7 @@ export type EventName =
   | "state:sync_response"
   | "notification:new"
   | "wendy:response"
+  | "wendy:action"
   | "cache:invalidate"
   // Step 7+: page lifecycle e comunicazione inter-pagina (foundation refactor)
   | "page:mounted"

@@ -2,6 +2,7 @@ import { type Request, type Response, type NextFunction } from "express";
 import { sql, and, gte, eq } from "drizzle-orm";
 import { db, llmUsageTable } from "@workspace/db";
 import { rootLogger } from "./logger";
+import { getEffectivePlan } from "./check-feature";
 
 // ── Config ──────────────────────────────────────────────────────────
 
@@ -17,14 +18,14 @@ const MONTHLY_LIMITS = {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-/** Determine the user's plan tier based on request context */
-function getPlan(req: Request): "free" | "pro" | "enterprise" {
+/** Determine the user's plan tier based on the effective internal entitlement. */
+async function getPlan(req: Request): Promise<"free" | "pro" | "enterprise"> {
   if (process.env.LLM_COST_GUARD_DISABLED === "true") return "enterprise";
   // Enterprise: manual flag or specific env
   if (req.user?.stripeSubscriptionId?.startsWith("enterprise_")) return "enterprise";
-  // Pro: any active Stripe subscription
-  if (req.user?.stripeSubscriptionId) return "pro";
-  return "free";
+  if (!req.user?.id) return "free";
+  const currentPlan = await getEffectivePlan(req.user.id);
+  return currentPlan === "free" ? "free" : "pro";
 }
 
 function currentMonthRange(): { start: Date; end: Date } {
@@ -53,7 +54,7 @@ export async function costGuard(req: Request, res: Response, next: NextFunction)
 
   try {
     const userId = req.user.id;
-    const plan = getPlan(req);
+    const plan = await getPlan(req);
     const monthlyLimit = MONTHLY_LIMITS[plan];
     const { start, end } = currentMonthRange();
 

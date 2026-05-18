@@ -18,6 +18,7 @@ import {
   PromptsSection,
   QualitySection,
   StatusSection,
+  SubscriptionsSection,
   StatusBadge,
   agentStatusClass,
   agentStatusLabel,
@@ -38,6 +39,12 @@ import {
   type AffiliationInboxResponse,
   type AffiliationLeadItem,
   type AdminOverview,
+  type AdminOpsAction,
+  type AdminOpsStatus,
+  type AdminSubscriptionDetail,
+  type AdminSubscriptionItem,
+  type AdminSubscriptionPlan,
+  type AdminSubscriptionsResponse,
   type AgentsOverview,
   type AgentsTab,
   type AiModelPolicy,
@@ -93,6 +100,7 @@ import {
   Shield,
   Menu,
   Network,
+  CreditCard,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -305,6 +313,8 @@ const SECTION_BY_PATH: Record<string, SidebarSection> = {
   "agent-health": "agents",
   agenti: "agents",
   metriche: "metriche",
+  abbonamenti: "abbonamenti",
+  subscriptions: "abbonamenti",
   status: "status",
   messaggi: "messaggi",
   crescita: "crescita",
@@ -326,6 +336,7 @@ const PATH_BY_SECTION: Record<SidebarSection, string> = {
   cataloghi: "/admin/cataloghi",
   "agenti-salute": "/admin/agenti",
   metriche: "/admin/metriche",
+  abbonamenti: "/admin/abbonamenti",
   status: "/admin/status",
   messaggi: "/admin/messaggi",
   crescita: "/admin/crescita",
@@ -346,6 +357,7 @@ const TITLE_BY_SECTION: Record<SidebarSection, string> = {
   cataloghi: "Cataloghi",
   "agenti-salute": "Agenti",
   metriche: "Metriche Business",
+  abbonamenti: "Abbonamenti Utenti",
   status: "Status & Setup",
   messaggi: "Messaggi",
   crescita: "Coda Crescita",
@@ -391,6 +403,7 @@ const ADMIN_NAV_GROUPS: Array<{
     label: "Business",
     items: [
       { key: "metriche", label: "Metriche Business", icon: BarChart3 },
+      { key: "abbonamenti", label: "Abbonamenti", icon: CreditCard },
       { key: "affiliazione", label: "Partner", icon: Handshake },
     ],
   },
@@ -613,6 +626,22 @@ const [agentiSaluteLoading, setAgentiSaluteLoading] = useState(false);
 const [metricheData, setMetricheData] = useState<BusinessStatusSnapshot | null>(null);
 const [metricheLoading, setMetricheLoading] = useState(false);
 
+// Abbonamenti section
+const [abbonamentiData, setAbbonamentiData] = useState<AdminSubscriptionsResponse | null>(null);
+const [abbonamentiDetail, setAbbonamentiDetail] = useState<AdminSubscriptionDetail | null>(null);
+const [abbonamentiLoading, setAbbonamentiLoading] = useState(false);
+const [abbonamentiDetailLoading, setAbbonamentiDetailLoading] = useState(false);
+const [abbonamentiActionLoading, setAbbonamentiActionLoading] = useState(false);
+const [abbonamentiSearch, setAbbonamentiSearch] = useState("");
+const [abbonamentiPlan, setAbbonamentiPlan] = useState("all");
+const [abbonamentiStatus, setAbbonamentiStatus] = useState("all");
+const [abbonamentiFields, setAbbonamentiFields] = useState<Record<string, string>>({});
+const [abbonamentiForm, setAbbonamentiForm] = useState<{
+  plan: AdminSubscriptionPlan;
+  validUntil: string;
+  reason: string;
+}>({ plan: "free", validUntil: "", reason: "" });
+
 // Home section
 const [homeData, setHomeData] = useState<AdminOverview | null>(null);
 const [homeLoading, setHomeLoading] = useState(false);
@@ -620,6 +649,10 @@ const [homeLoading, setHomeLoading] = useState(false);
 // Status section
 const [statusData, setStatusData] = useState<BusinessStatusSnapshot | null>(null);
 const [statusLoading, setStatusLoading] = useState(false);
+const [opsData, setOpsData] = useState<AdminOpsStatus | null>(null);
+const [opsLoading, setOpsLoading] = useState(false);
+const [opsActionLoading, setOpsActionLoading] = useState<string | null>(null);
+const [opsError, setOpsError] = useState<string | null>(null);
 
 // Messaggi section
 const [messaggiData, setMessaggiData] = useState<ContactInboxResponse | null>(null);
@@ -1043,6 +1076,73 @@ const [memoryActionLoading, setMemoryActionLoading] = useState<string | null>(nu
     setMetricheLoading(false);
   }, [apiFetch]);
 
+  const loadAbbonamenti = useCallback(async () => {
+    setAbbonamentiLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (abbonamentiSearch.trim()) params.set("search", abbonamentiSearch.trim());
+      if (abbonamentiPlan !== "all") params.set("plan", abbonamentiPlan);
+      if (abbonamentiStatus !== "all") params.set("status", abbonamentiStatus);
+      const query = params.toString();
+      const data = await apiFetch(`/admin/subscriptions${query ? `?${query}` : ""}`);
+      setAbbonamentiData(data as AdminSubscriptionsResponse);
+
+    } catch {
+      /* handled */
+    }
+    setAbbonamentiLoading(false);
+  }, [abbonamentiPlan, abbonamentiSearch, abbonamentiStatus, apiFetch]);
+
+  const loadAbbonamentiDetail = useCallback(
+    async (userId: number) => {
+      setAbbonamentiDetailLoading(true);
+      setAbbonamentiFields({});
+      try {
+        const data = await apiFetch(`/admin/subscriptions/${userId}`) as AdminSubscriptionDetail;
+        setAbbonamentiDetail(data);
+        setAbbonamentiForm({
+          plan: data.current.plan,
+          validUntil: data.current.validUntil ? new Date(data.current.validUntil).toISOString().slice(0, 10) : "",
+          reason: "",
+        });
+      } catch {
+        /* handled */
+      }
+      setAbbonamentiDetailLoading(false);
+    },
+    [apiFetch],
+  );
+
+  const saveAbbonamento = useCallback(async () => {
+    if (!abbonamentiDetail?.user?.id) return;
+    setAbbonamentiActionLoading(true);
+    setAbbonamentiFields({});
+    try {
+      const data = await apiFetch(`/admin/subscriptions/${abbonamentiDetail.user.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          plan: abbonamentiForm.plan,
+          validUntil: abbonamentiForm.plan === "free" || !abbonamentiForm.validUntil
+            ? null
+            : new Date(`${abbonamentiForm.validUntil}T23:59:59`).toISOString(),
+          reason: abbonamentiForm.reason,
+        }),
+      }) as { detail?: AdminSubscriptionDetail };
+      if (data.detail) {
+        setAbbonamentiDetail(data.detail);
+        setAbbonamentiForm({
+          plan: data.detail.current.plan,
+          validUntil: data.detail.current.validUntil ? new Date(data.detail.current.validUntil).toISOString().slice(0, 10) : "",
+          reason: "",
+        });
+      }
+      await loadAbbonamenti();
+    } catch (error: any) {
+      setAbbonamentiFields(error?.fields ?? { general: error?.message ?? "Salvataggio non riuscito." });
+    }
+    setAbbonamentiActionLoading(false);
+  }, [abbonamentiDetail, abbonamentiForm, apiFetch, loadAbbonamenti]);
+
   const loadHome = useCallback(async () => {
     setHomeLoading(true);
     try {
@@ -1066,6 +1166,57 @@ const [memoryActionLoading, setMemoryActionLoading] = useState<string | null>(nu
     }
     setStatusLoading(false);
   }, [apiFetch]);
+
+  const loadOpsStatus = useCallback(async () => {
+    setOpsLoading(true);
+    setOpsError(null);
+    try {
+      const data = await apiFetch("/admin/ops/status") as AdminOpsStatus;
+      setOpsData(data);
+    } catch (error: any) {
+      setOpsError(error?.message ?? "Stato operativo non disponibile.");
+    }
+    setOpsLoading(false);
+  }, [apiFetch]);
+
+  const runOpsAction = useCallback(async (action: AdminOpsAction, confirmation: string) => {
+    const endpointByAction: Record<AdminOpsAction, string> = {
+      "server-start": "/admin/ops/server/start",
+      "server-stop": "/admin/ops/server/stop",
+      "server-restart": "/admin/ops/server/restart",
+      "database-restart": "/admin/ops/database/restart",
+    };
+    setOpsActionLoading(action);
+    setOpsError(null);
+    try {
+      await apiFetch(endpointByAction[action], {
+        method: "POST",
+        body: JSON.stringify({ confirmation }),
+      });
+      await loadOpsStatus();
+    } catch (error: any) {
+      setOpsError(error?.message ?? "Operazione non riuscita.");
+    }
+    setOpsActionLoading(null);
+  }, [apiFetch, loadOpsStatus]);
+
+  const toggleMaintenanceMode = useCallback(async (enabled: boolean) => {
+    setOpsActionLoading("database-maintenance");
+    setOpsError(null);
+    try {
+      await apiFetch("/admin/ops/database/maintenance", {
+        method: "POST",
+        body: JSON.stringify({
+          enabled,
+          reason: enabled ? "Attivata dalla console Admin" : "Disattivata dalla console Admin",
+        }),
+      });
+      await loadOpsStatus();
+    } catch (error: any) {
+      setOpsError(error?.message ?? "Maintenance mode non aggiornata.");
+    }
+    setOpsActionLoading(null);
+  }, [apiFetch, loadOpsStatus]);
 
   const loadMessaggi = useCallback(async () => {
     setMessaggiLoading(true);
@@ -1391,8 +1542,12 @@ const [memoryActionLoading, setMemoryActionLoading] = useState<string | null>(nu
     else if (section === "cataloghi") loadCataloghi();
     else if (section === "agenti-salute") loadAgentsOverview();
     else if (section === "metriche") loadMetriche();
+    else if (section === "abbonamenti") loadAbbonamenti();
     else if (section === "home") loadHome();
-    else if (section === "status") loadStatus();
+    else if (section === "status") {
+      loadStatus();
+      loadOpsStatus();
+    }
     else if (section === "messaggi") loadMessaggi();
     else if (section === "crescita") loadCrescita();
     else if (section === "affiliazione") loadAffiliazione();
@@ -1408,8 +1563,10 @@ const [memoryActionLoading, setMemoryActionLoading] = useState<string | null>(nu
     loadCataloghi,
     loadAgentiSalute,
     loadMetriche,
+    loadAbbonamenti,
     loadHome,
     loadStatus,
+    loadOpsStatus,
     loadMessaggi,
     loadCrescita,
     loadAffiliazione,
@@ -1448,6 +1605,9 @@ const [memoryActionLoading, setMemoryActionLoading] = useState<string | null>(nu
     setAgentsOverviewData(null);
     setMemoryData(null);
     setMetricheData(null);
+    setAbbonamentiData(null);
+    setAbbonamentiDetail(null);
+    setAbbonamentiFields({});
     setHomeData(null);
     setStatusData(null);
     setMessaggiData(null);
@@ -1541,8 +1701,12 @@ const [memoryActionLoading, setMemoryActionLoading] = useState<string | null>(nu
     else if (section === "cataloghi") void loadCataloghi();
     else if (section === "agenti-salute") void loadAgentsOverview();
     else if (section === "metriche") void loadMetriche();
+    else if (section === "abbonamenti") void loadAbbonamenti();
     else if (section === "home") void loadHome();
-    else if (section === "status") void loadStatus();
+    else if (section === "status") {
+      void loadStatus();
+      void loadOpsStatus();
+    }
     else if (section === "messaggi") void loadMessaggi();
     else if (section === "crescita") void loadCrescita();
     else if (section === "affiliazione") void loadAffiliazione();
@@ -1555,12 +1719,14 @@ const [memoryActionLoading, setMemoryActionLoading] = useState<string | null>(nu
     loadCrescita,
     loadHome,
     loadLogs,
+    loadAbbonamenti,
     loadMemoryGraph,
     loadMetriche,
     loadPrompts,
     loadQualita,
     loadStats,
     loadStatus,
+    loadOpsStatus,
     loadSuggestions,
     loadMessaggi,
     section,
@@ -1577,8 +1743,13 @@ const [memoryActionLoading, setMemoryActionLoading] = useState<string | null>(nu
     cataloghiLoading ||
     agentiSaluteLoading ||
     metricheLoading ||
+    abbonamentiLoading ||
+    abbonamentiDetailLoading ||
+    abbonamentiActionLoading ||
     homeLoading ||
     statusLoading ||
+    opsLoading ||
+    Boolean(opsActionLoading) ||
     messaggiLoading ||
     crescitaLoading ||
     affiliazioneLoading;
@@ -2692,12 +2863,42 @@ const [memoryActionLoading, setMemoryActionLoading] = useState<string | null>(nu
               />
             )}
 
+            {/* ── Abbonamenti ── */}
+            {section === "abbonamenti" && (
+              <SubscriptionsSection
+                data={abbonamentiData}
+                detail={abbonamentiDetail}
+                loading={abbonamentiLoading}
+                detailLoading={abbonamentiDetailLoading}
+                actionLoading={abbonamentiActionLoading}
+                search={abbonamentiSearch}
+                planFilter={abbonamentiPlan}
+                statusFilter={abbonamentiStatus}
+                form={abbonamentiForm}
+                fields={abbonamentiFields}
+                onSearchChange={setAbbonamentiSearch}
+                onPlanFilterChange={setAbbonamentiPlan}
+                onStatusFilterChange={setAbbonamentiStatus}
+                onFormChange={setAbbonamentiForm}
+                onRefresh={loadAbbonamenti}
+                onSelectUser={(item: AdminSubscriptionItem) => void loadAbbonamentiDetail(item.user.id)}
+                onSave={saveAbbonamento}
+              />
+            )}
+
             {/* ── Status & Setup ── */}
             {section === "status" && (
               <StatusSection
                 data={statusData}
                 loading={statusLoading}
+                opsData={opsData}
+                opsLoading={opsLoading}
+                opsActionLoading={opsActionLoading}
+                opsError={opsError}
                 onRefresh={loadStatus}
+                onOpsRefresh={loadOpsStatus}
+                onOpsAction={runOpsAction}
+                onMaintenanceToggle={toggleMaintenanceMode}
                 onNavigateSection={navigateToSection}
               />
             )}

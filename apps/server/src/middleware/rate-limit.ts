@@ -1,5 +1,6 @@
 import rateLimit, { ipKeyGenerator, type Options } from "express-rate-limit";
 import type { Request } from "express";
+import { getEffectivePlan, planMeets } from "./check-feature";
 
 let redisStoreInitialized = false;
 let redisStore: any = null;
@@ -86,9 +87,11 @@ const PRO_AI_DAILY_LIMIT = parseInt(process.env.PRO_AI_DAILY_LIMIT ?? "200", 10)
 export const planQuotaLimiter = rateLimit(
    buildOptions({
      windowMs: 86400 * 1000,
-     max: (req: Request) => {
-       const isPremium = (req as any).user?.stripeSubscriptionId != null;
-       return isPremium ? PRO_AI_DAILY_LIMIT : FREE_AI_DAILY_LIMIT;
+     max: async (req: Request) => {
+       const userId = (req as any).user?.id;
+       if (!userId) return FREE_AI_DAILY_LIMIT;
+       const currentPlan = await getEffectivePlan(userId);
+       return planMeets(currentPlan, "pro") ? PRO_AI_DAILY_LIMIT : FREE_AI_DAILY_LIMIT;
      },
      keyGenerator: (req: Request) => {
        const userId = (req as any).user?.id;

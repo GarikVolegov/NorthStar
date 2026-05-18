@@ -7,7 +7,7 @@
  * SECURITY: userId sempre da JWT (req.user.id), mai dal body.
  */
 import { db, subscriptionsTable } from "@workspace/db";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, desc, isNull } from "drizzle-orm";
 
 // ── Feature gate definitions ──────────────────────────────────────────────────
 
@@ -46,10 +46,10 @@ const PLAN_RANK: Record<string, number> = { free: 0, pro: 1, team: 2 };
 
 const _cache = new Map<number, { plan: string; expiry: number }>();
 
-async function getEffectivePlan(userId: number): Promise<string> {
+export async function getEffectivePlan(userId: number): Promise<"free" | "pro" | "team"> {
   const now = Date.now();
   const cached = _cache.get(userId);
-  if (cached && cached.expiry > now) return cached.plan;
+  if (cached && cached.expiry > now) return cached.plan as "free" | "pro" | "team";
 
   const [sub] = await db
     .select({ plan: subscriptionsTable.plan, validUntil: subscriptionsTable.validUntil })
@@ -58,7 +58,7 @@ async function getEffectivePlan(userId: number): Promise<string> {
       eq(subscriptionsTable.userId, userId),
       isNull(subscriptionsTable.cancelledAt),
     ))
-    .orderBy(subscriptionsTable.createdAt)
+    .orderBy(desc(subscriptionsTable.createdAt))
     .limit(1);
 
   const plan     = sub?.plan ?? "free";
@@ -67,6 +67,10 @@ async function getEffectivePlan(userId: number): Promise<string> {
 
   _cache.set(userId, { plan: effective, expiry: now + 60_000 });
   return effective;
+}
+
+export function planMeets(currentPlan: string, requiredPlan: "free" | "pro" | "team"): boolean {
+  return PLAN_RANK[currentPlan] >= PLAN_RANK[requiredPlan];
 }
 
 export function invalidatePlanCache(userId: number): void {
@@ -81,7 +85,7 @@ export async function checkFeatureAccess(
 ): Promise<{ allowed: boolean; requiredPlan: string; currentPlan: string }> {
   const required    = FEATURE_GATES[feature];
   const currentPlan = await getEffectivePlan(userId);
-  const allowed     = PLAN_RANK[currentPlan] >= PLAN_RANK[required];
+  const allowed     = planMeets(currentPlan, required);
   return { allowed, requiredPlan: required, currentPlan };
 }
 

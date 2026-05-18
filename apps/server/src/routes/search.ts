@@ -11,6 +11,7 @@ import { runSearchOrchestrator, loadMemory, buildMemorySection } from "@workspac
 import { rootLogger } from "../middleware/logger";
 import { optionalAuth } from "../middleware/auth";
 import { globalSearch, type GlobalSearchEntityType } from "../lib/global-search";
+import { getEffectivePlan, planMeets } from "../middleware/check-feature";
 
 const router = Router();
 
@@ -261,7 +262,6 @@ router.post("/orchestrate", optionalAuth, async (req, res) => {
 
   const isAuthenticated = !!req.user;
   const userId = req.user?.id ?? 0;
-  const isPremium = !!req.user?.stripeSubscriptionId;
 
   // If not authenticated, use a simpler flow without user-specific data
   if (!isAuthenticated) {
@@ -319,6 +319,8 @@ router.post("/orchestrate", optionalAuth, async (req, res) => {
   rootLogger.info({ userId, q, sessionId }, "[search/orchestrate] started");
 
   try {
+    const currentPlan = await getEffectivePlan(userId);
+    const isPremium = planMeets(currentPlan, "pro");
     // Carica memoria utente in anticipo
     const userMemory    = await loadMemory(userId);
     const memorySection = buildMemorySection(userMemory);

@@ -83,7 +83,13 @@ function getEventColor(event: CalendarEvent): string {
 }
 
 export default function Calendario() {
-  useWendyPageContext({ page: 'calendario', title: 'Calendario' });
+  useWendyPageContext({
+    page: 'calendario',
+    title: 'Calendario',
+    capabilities: ['navigate', 'create_calendar_event', 'fill_form'],
+    fields: ['event.title', 'event.date', 'event.category', 'event.notes'],
+    actions: ['Aggiungi evento', 'Pianifica settimana', 'Apri giorno'],
+  });
   const { user, isLoggedIn } = useAuth();
   const queryClient = useQueryClient();
   const [, routerNavigate] = useLocation();

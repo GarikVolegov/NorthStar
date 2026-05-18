@@ -16,7 +16,9 @@
  *   TEST_AFFILIATE_EMAIL    (opzionale: utente con isAffiliate=true)
  *   TEST_AFFILIATE_PASSWORD (opzionale)
  */
-import { expect, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Page } from '@playwright/test';
+
+export const TEST_API_URL = process.env.TEST_API_URL ?? '';
 
 export interface LoginOptions {
   email?:    string;
@@ -59,6 +61,21 @@ export async function loginAsAffiliate(page: Page): Promise<void> {
     email:    process.env.TEST_AFFILIATE_EMAIL    ?? process.env.TEST_USER_EMAIL,
     password: process.env.TEST_AFFILIATE_PASSWORD ?? process.env.TEST_USER_PASSWORD,
   });
+}
+
+export async function loginAsTestUser(request: APIRequestContext): Promise<Record<string, string>> {
+  const email = process.env.TEST_USER_EMAIL ?? 'test@northstar.app';
+  const password = process.env.TEST_USER_PASSWORD ?? 'testpassword';
+
+  const res = await request.post(`${TEST_API_URL}/api/auth/login`, {
+    data: { email, password },
+  });
+  expect(res.status(), `Login API deve rispondere 200 (email: ${email})`).toBe(200);
+
+  const body = await res.json();
+  const token: string = body.token;
+  expect(token, 'Il token JWT deve essere presente nella risposta di /api/auth/login').toBeTruthy();
+  return { Authorization: `Bearer ${token}` };
 }
 
 /**

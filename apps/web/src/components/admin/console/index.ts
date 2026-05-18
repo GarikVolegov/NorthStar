@@ -9,5 +9,6 @@ export * from "./PromptsSection";
 export * from "./QualitySection";
 export * from "./shared";
 export * from "./StatusSection";
+export * from "./SubscriptionsSection";
 export * from "./types";
 export * from "./utils";

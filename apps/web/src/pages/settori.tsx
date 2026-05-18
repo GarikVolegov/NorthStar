@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { WorkModeBadge } from "@/components/WorkModeSelector";
 import type { Sector as ApiSector } from "@workspace/api-client-react";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 
 import { useTranslation } from "react-i18next";
 
@@ -56,12 +57,29 @@ export default function Settori() {
     description: t("seo.sectors.description"),
     path: "/settori",
   });
+  useWendyPageContext({
+    page: "settori",
+    title: "Settori",
+    capabilities: ["navigate", "set_filters"],
+    fields: ["search", "riasecTypes", "automationRisk"],
+    actions: ["Filtra settori", "Apri settore", "Confronta opportunita"],
+  });
 
   const { data: sectors = [], isLoading } = useAllSectors();
 
   const [search, setSearch] = useState("");
   const [activeRiasec, setActiveRiasec] = useState<string[]>([]);
   const [activeRisk, setActiveRisk]     = useState<string[]>([]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const keyword = params.get("keyword") ?? params.get("query") ?? params.get("q") ?? "";
+    const riasec = params.get("riasecTypes") ?? params.get("riasec") ?? "";
+    const risk = params.get("automationRisk") ?? params.get("risk") ?? "";
+    if (keyword) setSearch(keyword);
+    if (riasec) setActiveRiasec(riasec.split(",").map((item) => item.trim().toUpperCase()).filter(Boolean));
+    if (risk) setActiveRisk(risk.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean));
+  }, []);
 
   function toggleRiasec(r: string) {
     setActiveRiasec((prev) => prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]);

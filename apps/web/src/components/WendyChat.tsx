@@ -3,9 +3,11 @@ import { useWendyChat } from '../hooks/useWendyChat.js';
 import { WendyThinkingIndicator } from './WendyThinkingIndicator.js';
 import { WendyVoiceOverlay } from './wendy/WendyVoiceOverlay.js';
 import { UiToolRenderer } from './wendy/UiToolRenderer.js';
+import { WendyActionCard } from './wendy/WendyActionCard.js';
 import type { VoiceChatMessage } from '../hooks/useVoiceChat.js';
 import { StreamErrorBoundary } from './ErrorBoundary.js';
 import { useWendy } from '../contexts/WendyProvider';
+import { Mic, RotateCcw, Send, Sparkles, Square, Volume2, VolumeX } from 'lucide-react';
 
 /**
  * WendyChat v2 — aggiunte:
@@ -19,6 +21,7 @@ export interface WendyChatProps {
   className?: string;
   placeholder?: string;
   welcomeMessage?: string;
+  quickActions?: Array<{ label: string; icon?: string }>;
 }
 
 export function WendyChat({
@@ -26,6 +29,7 @@ export function WendyChat({
   className = '',
   placeholder = 'Scrivi a Wendy…',
   welcomeMessage = 'Ciao! Sono Wendy, la tua assistente di orientamento. Come posso aiutarti oggi?',
+  quickActions = [],
 }: WendyChatProps) {
   const [inputValue, setInputValue]       = useState('');
   const [voiceOpen, setVoiceOpen]         = useState(false);
@@ -41,6 +45,7 @@ export function WendyChat({
   const {
     messages, thinking, isStreaming, streamError,
     sendMessage, stopStream, clearHistory, retryLast,
+    confirmAction, cancelAction,
     tts, ttsEnabled, toggleTts,
     stt, commitSTT,
   } = useWendyChat({ apiUrl });
@@ -99,6 +104,11 @@ export function WendyChat({
     else stt.start();
   }, [stt, commitSTT]);
 
+  const handleQuickAction = useCallback((label: string) => {
+    setInputValue(label);
+    window.requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
+
   return (
     <>
       {/* Voice Overlay — portal-like, rendered outside the chat box */}
@@ -109,14 +119,17 @@ export function WendyChat({
         historyRef={historyRef}
       />
 
-      <div className={['flex flex-col bg-background border border-border rounded-2xl overflow-hidden shadow-md', className].join(' ')}>
+      <div className={['flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-background/90 shadow-2xl backdrop-blur-xl', className].join(' ')}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-muted/20">
           <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Sparkles className="h-4 w-4" />
+            </span>
             <span className="font-semibold text-sm">Wendy</span>
             {isStreaming && (
-              <span className="text-xs text-muted-foreground animate-pulse">sta scrivendo…</span>
+              <span className="text-xs text-muted-foreground animate-pulse">sta scrivendo...</span>
             )}
           </div>
           <div className="flex gap-1">
@@ -129,9 +142,7 @@ export function WendyChat({
               data-testid="wendy-voice-mode-toggle"
               className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4M9 11V7a3 3 0 016 0v4a3 3 0 01-6 0z" />
-              </svg>
+              <Mic className="h-4 w-4" />
             </button>
 
             {/* Mute TTS */}
@@ -143,13 +154,9 @@ export function WendyChat({
               className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
               {ttsEnabled ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M12 6v12m-4-9l-2.5-2.5M12 3L6 9H3v6h3l6 6V3z" />
-                </svg>
+                <Volume2 className="h-4 w-4" />
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                </svg>
+                <VolumeX className="h-4 w-4" />
               )}
             </button>
 
@@ -161,9 +168,7 @@ export function WendyChat({
               disabled={messages.length === 0}
               className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
+              <RotateCcw className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -174,11 +179,11 @@ export function WendyChat({
           role="log"
           aria-label="Conversazione con Wendy"
           aria-live="polite"
-          className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0"
+          className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
         >
           {messages.length === 0 && (
             <div className="flex justify-start">
-              <div className="max-w-[80%] px-3 py-2 rounded-2xl rounded-tl-sm bg-muted text-sm leading-relaxed">
+              <div className="max-w-[86%] px-4 py-3 rounded-3xl rounded-tl-md bg-muted/70 text-sm leading-relaxed">
                 {welcomeMessage}
               </div>
             </div>
@@ -205,10 +210,10 @@ export function WendyChat({
                 <div
                   data-testid={msg.role === 'assistant' ? 'wendy-message-assistant' : undefined}
                   className={[
-                    'max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap',
+                    'max-w-[86%] px-4 py-3 rounded-3xl text-sm leading-relaxed whitespace-pre-wrap',
                     msg.role === 'user'
-                      ? 'bg-primary text-primary-foreground rounded-tr-sm'
-                      : 'bg-muted rounded-tl-sm',
+                      ? 'bg-primary text-primary-foreground rounded-tr-md'
+                      : 'bg-muted/70 rounded-tl-md',
                     msg.isStreaming ? 'after:content-["|_"] after:animate-pulse' : '',
                   ].join(' ')}
                 >
@@ -217,6 +222,14 @@ export function WendyChat({
                   ) : (
                     msg.content || (msg.isStreaming ? '' : '…')
                   )}
+                  {msg.role === 'assistant' && msg.actions?.map((action) => (
+                    <WendyActionCard
+                      key={action.id}
+                      action={action}
+                      onConfirm={() => void confirmAction(msg.id, action.id)}
+                      onCancel={() => cancelAction(msg.id, action.id)}
+                    />
+                  ))}
                 </div>
               )}
             </div>
@@ -236,10 +249,27 @@ export function WendyChat({
         )}
 
         {/* Input area */}
-        <form onSubmit={handleSubmit} className="flex items-end gap-2 px-3 pb-3 pt-2 border-t border-border">
+        <div className="border-t border-white/10 bg-background/55 px-3 pb-3 pt-2 backdrop-blur">
+          {quickActions.length > 0 && messages.length === 0 && (
+            <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
+              {quickActions.map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={() => handleQuickAction(action.label)}
+                  className="shrink-0 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                >
+                  {action.icon ? `${action.icon} ` : ''}
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          )}
+        <form onSubmit={handleSubmit} className="flex items-end gap-2 rounded-3xl border border-input bg-background/90 p-2 shadow-sm">
           <textarea
             ref={inputRef}
             data-testid="wendy-chat-input"
+            data-wendy-input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -250,8 +280,8 @@ export function WendyChat({
             disabled={isStreaming && !stt.isListening}
             aria-label="Messaggio per Wendy"
             className={[
-              'flex-1 resize-none rounded-xl border border-input bg-background px-3 py-2 text-sm',
-              'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'flex-1 resize-none rounded-2xl border-0 bg-transparent px-3 py-2 text-sm',
+              'placeholder:text-muted-foreground focus-visible:outline-none',
               'max-h-32 overflow-y-auto transition-colors',
               stt.isListening ? 'border-primary ring-1 ring-primary' : '',
             ].join(' ')}
@@ -266,15 +296,13 @@ export function WendyChat({
               aria-label={stt.isListening ? 'Invia trascrizione' : 'Registra messaggio vocale'}
               aria-pressed={stt.isListening}
               className={[
-                'shrink-0 p-2 rounded-xl transition-colors',
+                'shrink-0 p-2 rounded-full transition-colors',
                 stt.isListening
                   ? 'bg-destructive text-destructive-foreground animate-pulse'
                   : 'bg-muted text-muted-foreground hover:text-foreground',
               ].join(' ')}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4M9 11V7a3 3 0 016 0v4a3 3 0 01-6 0z" />
-              </svg>
+              <Mic className="h-5 w-5" />
             </button>
           )}
 
@@ -284,11 +312,9 @@ export function WendyChat({
               onClick={stopStream}
               title="Interrompi risposta"
               aria-label="Interrompi risposta"
-              className="shrink-0 p-2 rounded-xl bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+              className="shrink-0 p-2 rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <rect x="6" y="6" width="12" height="12" rx="2" />
-              </svg>
+              <Square className="h-5 w-5 fill-current" />
             </button>
           ) : (
             <button
@@ -297,14 +323,13 @@ export function WendyChat({
               disabled={!inputValue.trim()}
               title="Invia messaggio"
               aria-label="Invia messaggio"
-              className="shrink-0 p-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="shrink-0 p-2 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
+              <Send className="h-5 w-5" />
             </button>
           )}
         </form>
+        </div>
       </div>
     </>
   );

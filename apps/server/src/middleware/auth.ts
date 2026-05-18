@@ -4,6 +4,7 @@ const { verify } = jwt;
 import { rootLogger } from "./logger";
 import { db, usersTable, userProfileSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { getEffectivePlan, planMeets } from "./check-feature";
 
 declare global {
   namespace Express {
@@ -241,7 +242,13 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 }
 
 export async function requirePremium(req: Request, res: Response, next: NextFunction): Promise<void> {
-  if (!req.user?.stripeSubscriptionId) {
+  if (!req.user?.id) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const currentPlan = await getEffectivePlan(req.user.id);
+  if (!planMeets(currentPlan, "pro")) {
     res.status(403).json({ code: "PREMIUM_REQUIRED", error: "Funzione riservata agli abbonati Pro" });
     return;
   }
