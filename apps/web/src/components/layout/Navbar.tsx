@@ -4,16 +4,12 @@ import { LazyMotion, domAnimation, m } from "framer-motion";
 import {
   Brain,
   Briefcase,
-  Check,
-  Copy,
   Globe2,
-  HandCoins,
   LogOut,
   Menu,
   MapPin,
   Newspaper,
   Settings,
-  Share2,
   Sparkles,
   Users,
 } from "lucide-react";
@@ -39,6 +35,8 @@ import { useWendy } from "@/contexts/WendyProvider";
 import { NAV_LABELS } from "@/lib/constants";
 import { apiFetch } from "@/lib/api-fetch";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAffiliateInvitePreview } from "@/hooks/useAffiliateInvitePreview";
+import { AffiliateInviteCard } from "@/components/affiliate/AffiliateInviteCard";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -71,12 +69,6 @@ const JOURNEY_LABELS: Record<string, { label: string; color: string }> = {
     label: "Investitore",
     color: "text-primary bg-primary/10 border-primary/30",
   },
-};
-
-type AffiliateMenuState = {
-  status: "idle" | "loading" | "ready" | "unavailable";
-  referralCode: string | null;
-  referralLink: string | null;
 };
 
 type NavPhase =
@@ -118,12 +110,8 @@ export function Navbar() {
   const [profileBannerUrl, setProfileBannerUrl] = useState<string | null>(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(0);
-  const [affiliateMenu, setAffiliateMenu] = useState<AffiliateMenuState>({
-    status: "idle",
-    referralCode: null,
-    referralLink: null,
-  });
   const [affiliateLinkCopied, setAffiliateLinkCopied] = useState(false);
+  const affiliatePreview = useAffiliateInvitePreview(profileMenuOpen, isLoggedIn && !!user?.id);
   const { unreadCount: insightsUnread } = useProactiveInsights();
 
   const phase: NavPhase = !isLoggedIn
@@ -201,47 +189,6 @@ export function Navbar() {
   }, [isLoggedIn, user?.id]);
 
   useEffect(() => {
-    if (!profileMenuOpen || !isLoggedIn || !user?.id) return;
-
-    let cancelled = false;
-    setAffiliateMenu((current) => ({
-      status: current.status === "ready" ? "ready" : "loading",
-      referralCode: current.referralCode,
-      referralLink: current.referralLink,
-    }));
-
-    apiFetch(`${BASE}api/affiliate/dashboard`)
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return response.json() as Promise<{
-          referralCode?: string | null;
-          code?: string | null;
-          referralLink?: string | null;
-          link?: string | null;
-        }>;
-      })
-      .then((data) => {
-        if (cancelled) return;
-        const referralCode = data?.referralCode ?? data?.code ?? null;
-        const referralLink = data?.referralLink ?? data?.link ?? null;
-        setAffiliateMenu(
-          referralLink
-            ? { status: "ready", referralCode, referralLink }
-            : { status: "unavailable", referralCode: null, referralLink: null },
-        );
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAffiliateMenu({ status: "unavailable", referralCode: null, referralLink: null });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isLoggedIn, profileMenuOpen, user?.id]);
-
-  useEffect(() => {
     if (!isMobile) {
       setViewportHeight(0);
       return;
@@ -259,12 +206,12 @@ export function Navbar() {
   }, [isMobile]);
 
   const copyAffiliateLink = async () => {
-    if (!affiliateMenu.referralLink) return;
+    if (!affiliatePreview.referralLink) return;
     try {
-      await navigator.clipboard.writeText(affiliateMenu.referralLink);
+      await navigator.clipboard.writeText(affiliatePreview.referralLink);
     } catch {
       const textarea = document.createElement("textarea");
-      textarea.value = affiliateMenu.referralLink;
+      textarea.value = affiliatePreview.referralLink;
       textarea.setAttribute("readonly", "");
       textarea.style.position = "fixed";
       textarea.style.opacity = "0";
@@ -279,13 +226,13 @@ export function Navbar() {
   };
 
   const shareAffiliateLink = async () => {
-    if (!affiliateMenu.referralLink) return;
+    if (!affiliatePreview.referralLink) return;
     if (navigator.share) {
       try {
         await navigator.share({
           title: "Invito NorthStar",
           text: "Iscriviti a NorthStar tramite il mio link.",
-          url: affiliateMenu.referralLink,
+          url: affiliatePreview.referralLink,
         });
         return;
       } catch {
@@ -296,71 +243,14 @@ export function Navbar() {
   };
 
   const renderAffiliateInviteBlock = () => (
-    <div className="px-2 py-2">
-      <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-        <div className="flex items-start gap-2">
-          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <HandCoins className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-foreground">Invita amici</p>
-            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
-              Condividi il tuo link di iscrizione e segui i referral dalla dashboard.
-            </p>
-          </div>
-        </div>
-
-        {affiliateMenu.status === "ready" && affiliateMenu.referralLink ? (
-          <div className="mt-3 space-y-2">
-            <div className="rounded-md border bg-background px-2 py-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Codice</p>
-              <p className="truncate font-mono text-xs font-semibold text-foreground">
-                {affiliateMenu.referralCode ?? affiliateMenu.referralLink}
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => void copyAffiliateLink()}
-                className="flex min-h-10 items-center justify-center gap-1.5 rounded-md border bg-background px-2 text-xs font-semibold transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-              >
-                {affiliateLinkCopied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                {affiliateLinkCopied ? "Copiato" : "Copia"}
-              </button>
-              <button
-                type="button"
-                onClick={() => void shareAffiliateLink()}
-                className="flex min-h-10 items-center justify-center gap-1.5 rounded-md border bg-background px-2 text-xs font-semibold transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-              >
-                <Share2 className="h-3.5 w-3.5" />
-                Condividi
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => goToProfilePath("/affiliazione/dashboard")}
-              onMouseEnter={() => prefetchRoute("/affiliazione/dashboard")}
-              onFocus={() => prefetchRoute("/affiliazione/dashboard")}
-              className="flex min-h-10 w-full items-center justify-center rounded-md bg-primary px-3 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-            >
-              Dashboard affiliazione
-            </button>
-          </div>
-        ) : (
-          <div className="mt-3">
-            <button
-              type="button"
-              onClick={() => goToProfilePath("/affiliazione/dashboard")}
-              onMouseEnter={() => prefetchRoute("/affiliazione/dashboard")}
-              onFocus={() => prefetchRoute("/affiliazione/dashboard")}
-              className="flex min-h-10 w-full items-center justify-center rounded-md border border-primary/30 bg-background px-3 text-xs font-bold text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-            >
-              {affiliateMenu.status === "loading" ? "Controllo link..." : "Attiva affiliazione"}
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
+    <AffiliateInviteCard
+      preview={affiliatePreview}
+      copied={affiliateLinkCopied}
+      onCopy={() => void copyAffiliateLink()}
+      onShare={() => void shareAffiliateLink()}
+      onOpenDashboard={() => goToProfilePath("/affiliazione/dashboard")}
+      onPrefetchDashboard={() => prefetchRoute("/affiliazione/dashboard")}
+    />
   );
 
   const profileMenuBody = user ? (

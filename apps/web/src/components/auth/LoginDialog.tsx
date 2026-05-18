@@ -8,6 +8,7 @@ import { Loader2, Star, ArrowLeft, Mail, CheckCircle2, KeyRound } from "lucide-r
 import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
+const REFERRAL_STORAGE_KEY = "referralCode";
 
 declare global {
   interface Window {
@@ -202,12 +203,22 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
       const res = await fetch(`${BASE}api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: regName, email: regEmail, password: regPassword }),
+        body: JSON.stringify({
+          name: regName,
+          email: regEmail,
+          password: regPassword,
+          referralCode:
+            localStorage.getItem(REFERRAL_STORAGE_KEY) ??
+            sessionStorage.getItem(REFERRAL_STORAGE_KEY) ??
+            undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || t("auth.errors.registerError"));
       } else {
+        localStorage.removeItem(REFERRAL_STORAGE_KEY);
+        sessionStorage.removeItem(REFERRAL_STORAGE_KEY);
         setVerifyEmail(regEmail);
         if (data.devCode) setDevHint(data.devCode);
         goTo("verify");

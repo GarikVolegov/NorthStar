@@ -11,8 +11,17 @@
 import { SignUp } from "@clerk/react";
 import { Link } from "wouter";
 import { Compass, Sparkles } from "lucide-react";
+import { useEffect } from "react";
 
 export default function SignUpPage() {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const referralCode = params.get("ref") ?? params.get("referralCode");
+    if (!referralCode?.trim()) return;
+    localStorage.setItem("referralCode", referralCode.trim());
+    sessionStorage.setItem("referralCode", referralCode.trim());
+  }, []);
+
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center bg-background px-4 py-10">
       {/* Brand header */}

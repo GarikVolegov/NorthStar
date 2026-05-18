@@ -232,6 +232,9 @@ function AnimatedRoutes() {
       <Route path="/affiliazione/dashboard">
         <ProtectedRoute component={AffiliazioneDashboard} />
       </Route>
+      <Route path="/affiliate">
+        <ProtectedRoute component={AffiliazioneDashboard} />
+      </Route>
       <Route path="/colloquio/:id">
         <ProtectedRoute component={Colloquio} />
       </Route>

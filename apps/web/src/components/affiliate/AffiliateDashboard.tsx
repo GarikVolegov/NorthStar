@@ -64,6 +64,7 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secon
   pending:   { label: 'In attesa',  variant: 'secondary' },
   confirmed: { label: 'Confermato', variant: 'default' },
   paid:      { label: 'Pagato',     variant: 'outline' },
+  cancelled: { label: 'Cancellato', variant: 'outline' },
 };
 
 // ─── Componente principale ────────────────────────────────────────────────────

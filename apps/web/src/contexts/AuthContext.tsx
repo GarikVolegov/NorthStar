@@ -52,6 +52,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const BASE = import.meta.env.BASE_URL || "/";
+const REFERRAL_STORAGE_KEY = "referralCode";
 
 function clerkUserToAuthUser(clerkUser: NonNullable<ReturnType<typeof useUser>["user"]>): AuthUser {
   return {
@@ -191,6 +192,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               clerkUser.username ??
               clerkUser.primaryEmailAddress?.emailAddress ??
               "Utente",
+            referralCode:
+              localStorage.getItem(REFERRAL_STORAGE_KEY) ??
+              sessionStorage.getItem(REFERRAL_STORAGE_KEY) ??
+              undefined,
           }),
           signal: ctrl.signal,
         });
@@ -222,6 +227,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
           setUser({ ...clerkOnlyUser, ...serverUser });
+          localStorage.removeItem(REFERRAL_STORAGE_KEY);
+          sessionStorage.removeItem(REFERRAL_STORAGE_KEY);
         } else {
           setUser(null);
           setToken(null);

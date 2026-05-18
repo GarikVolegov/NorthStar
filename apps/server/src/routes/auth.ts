@@ -2,9 +2,17 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 const { sign } = jwt;
-import { eq, and, or } from "drizzle-orm";
+import { eq, and, isNull, or, sql } from "drizzle-orm";
 import crypto from "node:crypto";
-import { db, protectedDbQuery, usersTable, userProfileSettingsTable, generateUsername } from "@workspace/db";
+import {
+  affiliateAccountsTable,
+  affiliateReferralsTable,
+  db,
+  protectedDbQuery,
+  usersTable,
+  userProfileSettingsTable,
+  generateUsername,
+} from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { authLimiter } from "../middleware/rate-limit";
 import { sendVerificationCode, send2faCode, sendPasswordReset, sendWelcomeEmail } from "../lib/email";
@@ -68,10 +76,59 @@ function buildJwtPayload(user: {
   };
 }
 
+type ReferralAccount = typeof affiliateAccountsTable.$inferSelect;
+
+function readReferralCode(input: unknown): string | null {
+  if (typeof input !== "string") return null;
+  const code = input.trim();
+  return code.length > 0 ? code : null;
+}
+
+async function findReferralAccount(referralCode: string | null): Promise<ReferralAccount | null> {
+  if (!referralCode) return null;
+  const [account] = await db
+    .select()
+    .from(affiliateAccountsTable)
+    .where(and(
+      eq(affiliateAccountsTable.referralCode, referralCode),
+      isNull(affiliateAccountsTable.deletedAt),
+    ))
+    .limit(1);
+  if (!account || account.status === "suspended") return null;
+  return account;
+}
+
+async function recordReferral(account: ReferralAccount | null, referredUserId: number): Promise<void> {
+  if (!account || account.userId === referredUserId) return;
+
+  const inserted = await db
+    .insert(affiliateReferralsTable)
+    .values({
+      affiliateId: account.id,
+      referrerUserId: account.userId,
+      referredUserId,
+      status: "active",
+      activatedAt: new Date(),
+    })
+    .onConflictDoNothing()
+    .returning({ id: affiliateReferralsTable.id });
+
+  if (inserted.length === 0) return;
+
+  await db
+    .update(affiliateAccountsTable)
+    .set({
+      totalReferrals: sql`${affiliateAccountsTable.totalReferrals} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(eq(affiliateAccountsTable.id, account.id));
+}
+
 /* ─── POST /api/auth/register  —  registrazione ──────────────────── */
 router.post("/register", async (req, res) => {
   try {
     const { name, email, password } = req.body;
+    const referralCode = readReferralCode(req.body?.referralCode);
     if (!name || !email || !password) {
       res.status(400).json({ error: "Nome, email e password richiesti" });
       return;
@@ -91,6 +148,12 @@ router.post("/register", async (req, res) => {
 
     if (existing) {
       res.status(409).json({ error: "Email già registrata" });
+      return;
+    }
+
+    const referralAccount = referralCode ? await findReferralAccount(referralCode) : null;
+    if (referralCode && !referralAccount) {
+      res.status(400).json({ error: "Codice referral non valido" });
       return;
     }
 
@@ -122,7 +185,11 @@ router.post("/register", async (req, res) => {
     await db.insert(userProfileSettingsTable).values({
       userId: user.id,
       username: generateUsername(user.name, user.id),
+      referredByAffiliateId: referralAccount?.id ?? null,
+      referralConvertedAt: referralAccount ? new Date() : null,
     });
+
+    await recordReferral(referralAccount, user.id);
 
     const token = generateToken(buildJwtPayload(user));
 
@@ -593,6 +660,7 @@ router.post("/clerk-sync", async (req, res) => {
     // lo stesso sub/clerkId inviato nel body — previene impersonificazione.
     const authHeader = req.headers.authorization;
     const { clerkId: bodyClerkId, email, name } = req.body;
+    const referralCode = readReferralCode(req.body?.referralCode);
 
     if (!bodyClerkId || typeof email !== "string" || !email.trim()) {
       res.status(400).json({ error: "clerkId ed email richiesti" });
@@ -624,6 +692,7 @@ router.post("/clerk-sync", async (req, res) => {
 
     const clerkId = bodyClerkId;
     const normalizedEmail = email.trim().toLowerCase();
+    const referralAccount = referralCode ? await findReferralAccount(referralCode) : null;
 
     let [user] = await protectedDbQuery(async () => {
       return await db
@@ -724,7 +793,11 @@ router.post("/clerk-sync", async (req, res) => {
     await db.insert(userProfileSettingsTable).values({
       userId: created.id,
       username: generateUsername(displayName, created.id),
+      referredByAffiliateId: referralAccount?.id ?? null,
+      referralConvertedAt: referralAccount ? new Date() : null,
     });
+
+    await recordReferral(referralAccount, created.id);
 
     const [newUser] = await db
       .select({

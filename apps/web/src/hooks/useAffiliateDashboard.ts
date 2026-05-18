@@ -13,7 +13,7 @@ export interface AffiliateReferral {
   id: string;
   referredUserName: string;
   referredUserEmail: string;
-  status: 'pending' | 'confirmed' | 'paid';
+  status: 'pending' | 'confirmed' | 'paid' | 'cancelled';
   commissionAmount: number;   // in centesimi
   createdAt: string;          // ISO 8601
   paidAt?: string;
