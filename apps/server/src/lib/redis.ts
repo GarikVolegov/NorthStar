@@ -3,15 +3,18 @@ import { rootLogger } from "../middleware/logger";
 import { resolveRedisUrl } from "./redis-url";
 
 const REDIS_URL = resolveRedisUrl() ?? "";
+const DEFAULT_TTL = 60;
 
 let client: Redis | null = null;
 let enabled = false;
+let initAttempted = false;
 
 function createClient(): Redis | null {
   if (!REDIS_URL) {
-    rootLogger.warn("[redis] REDIS_URL not set — cache disabled");
+    rootLogger.warn("[redis] REDIS_URL not set - cache disabled");
     return null;
   }
+
   try {
     const c = new Redis(REDIS_URL, {
       lazyConnect: true,
@@ -32,7 +35,7 @@ function createClient(): Redis | null {
 
     return c;
   } catch (err) {
-    rootLogger.warn({ err }, "[redis] failed to initialize — cache disabled");
+    rootLogger.warn({ err }, "[redis] failed to initialize - cache disabled");
     return null;
   }
 }
@@ -40,25 +43,32 @@ function createClient(): Redis | null {
 async function init(): Promise<void> {
   if (client) return;
   client = createClient();
-  if (client) {
-    try {
-      await client.connect();
-      enabled = true;
-    } catch (err) {
-      rootLogger.warn({ err }, "[redis] connect failed — cache disabled");
-      client = null;
-    }
+  if (!client) return;
+
+  try {
+    await client.connect();
+    enabled = true;
+  } catch (err) {
+    rootLogger.warn({ err }, "[redis] connect failed - cache disabled");
+    enabled = false;
+    client = null;
   }
 }
 
-const DEFAULT_TTL = 60; // seconds
+async function getClient(): Promise<Redis | null> {
+  if (enabled && client) return client;
+  if (initAttempted) return null;
+  initAttempted = true;
+  await init();
+  return enabled ? client : null;
+}
 
 export async function cacheGet<T>(key: string): Promise<T | null> {
-  if (!enabled) return null;
-  if (!client) await init();
-  if (!client) return null;
+  const activeClient = await getClient();
+  if (!activeClient) return null;
+
   try {
-    const raw = await client.get(key);
+    const raw = await activeClient.get(key);
     if (raw == null) return null;
     return JSON.parse(raw) as T;
   } catch {
@@ -67,38 +77,38 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
 }
 
 export async function cacheSet(key: string, value: unknown, ttl = DEFAULT_TTL): Promise<void> {
-  if (!enabled) return;
-  if (!client) await init();
-  if (!client) return;
+  const activeClient = await getClient();
+  if (!activeClient) return;
+
   try {
     const raw = JSON.stringify(value);
     if (ttl > 0) {
-      await client.setex(key, ttl, raw);
+      await activeClient.setex(key, ttl, raw);
     } else {
-      await client.set(key, raw);
+      await activeClient.set(key, raw);
     }
   } catch {
-    // silent fail — cache is best-effort
+    // Cache is best-effort.
   }
 }
 
 export async function cacheDel(key: string): Promise<void> {
-  if (!enabled) return;
-  if (!client) await init();
-  if (!client) return;
+  const activeClient = await getClient();
+  if (!activeClient) return;
+
   try {
-    await client.del(key);
+    await activeClient.del(key);
   } catch {
-    // silent fail
+    // Cache is best-effort.
   }
 }
 
 export async function cacheKeys(pattern: string): Promise<string[]> {
-  if (!enabled) return [];
-  if (!client) await init();
-  if (!client) return [];
+  const activeClient = await getClient();
+  if (!activeClient) return [];
+
   try {
-    return await client.keys(pattern);
+    return await activeClient.keys(pattern);
   } catch {
     return [];
   }
@@ -106,32 +116,27 @@ export async function cacheKeys(pattern: string): Promise<string[]> {
 
 export async function cacheClose(): Promise<void> {
   if (!client) return;
+
   try {
     await client.quit();
+  } catch {
+    // Cache is best-effort.
+  } finally {
     enabled = false;
     client = null;
-  } catch {
-    // silent
+    initAttempted = false;
   }
 }
 
-/**
- * Incrementa un counter intero e imposta TTL (in secondi) solo alla prima creazione.
- * Restituisce il nuovo valore del counter, o null se Redis non disponibile.
- */
 export async function cacheIncr(key: string, ttlSeconds: number): Promise<number | null> {
-  if (!enabled) return null;
-  if (!client) await init();
-  if (!client) return null;
+  const activeClient = await getClient();
+  if (!activeClient) return null;
+
   try {
-    const val = await client.incr(key);
-    // Imposta TTL solo alla prima creazione (val === 1)
-    if (val === 1) await client.expire(key, ttlSeconds);
+    const val = await activeClient.incr(key);
+    if (val === 1) await activeClient.expire(key, ttlSeconds);
     return val;
   } catch {
     return null;
   }
 }
-
-// Eager init on module load — won't block startup
-init();
