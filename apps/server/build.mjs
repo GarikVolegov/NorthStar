@@ -14,6 +14,9 @@ await esbuild.build({
   format: "esm",
   tsconfig: "tsconfig.json",
   external: ["dotenv", "pg-native"],
+  banner: {
+    js: "import { createRequire } from 'node:module';\nconst require = createRequire(import.meta.url);",
+  },
   packages: "bundle",
 });
 

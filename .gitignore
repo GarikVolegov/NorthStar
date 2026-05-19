@@ -78,6 +78,7 @@ Thumbs.db
 .local/
 .vercel/
 apps/server/api/index.js
+apps/server/api/index.cjs
 
 # Go CLI binaries (build artifacts)
 .tools/printed-clis/*/bin/
