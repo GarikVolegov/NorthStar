@@ -1,34 +1,46 @@
 import rateLimit, { ipKeyGenerator, type Options } from "express-rate-limit";
 import type { Request } from "express";
+import Redis from "ioredis";
+import RedisStore from "rate-limit-redis";
 import { getEffectivePlan, planMeets } from "./check-feature";
+import { resolveRedisUrl } from "../lib/redis-url";
 
-let redisStoreInitialized = false;
 let redisStore: any = null;
 
-async function initRedisStore(): Promise<void> {
-  if (redisStoreInitialized) return;
-  redisStoreInitialized = true;
+function requestIpKey(req: Request): string {
+  return ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? "unknown");
+}
+
+function createRedisStore(): any {
+  const redisUrl = resolveRedisUrl();
+  if (!redisUrl) return null;
+
   try {
-    const mod: any = await import("rate-limit-redis");
-    const RedisStore = mod.default ?? mod;
-    const Redis = (await import("ioredis")).default;
-    const redisUrl = process.env.REDIS_URL;
-    if (redisUrl) {
-      const client = new Redis(redisUrl, {
-        enableOfflineQueue: false,
-        maxRetriesPerRequest: 0,
-      });
-      redisStore = new RedisStore({ client });
-    }
+    const client = new Redis(redisUrl, {
+      enableOfflineQueue: false,
+      maxRetriesPerRequest: 0,
+      retryStrategy: () => null,
+    });
+
+    client.on("error", () => {
+      // Best effort limiter store. The app keeps working with the memory store.
+    });
+
+    return new RedisStore({
+      sendCommand: (...args: string[]) => (client as any).call(...args) as Promise<any>,
+    });
   } catch {
-    // Redis not available — falling back to memory store
+    return null;
   }
 }
+
+redisStore = createRedisStore();
 
 function buildOptions(overrides: Partial<Options>): Partial<Options> {
   const base: Partial<Options> = {
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator: requestIpKey,
     message: { error: "Troppe richieste. Riprova tra poco." },
   };
   if (redisStore) base.store = redisStore;
@@ -40,28 +52,27 @@ export const globalLimiter = rateLimit(
     windowMs: 60 * 1000,
     max: 100,
     skip: () => process.env.NODE_ENV === "development",
-  })
+  }),
 );
 
 export const wendyLimiter = rateLimit(
   buildOptions({
     windowMs: 60 * 1000,
     max: 30,
-    skip: (req: Request) =>
+    skip: (_req: Request) =>
       process.env.NODE_ENV === "test" || process.env.USE_MOCK_AI === "true",
-  })
+  }),
 );
 
-// Per-IP rate limiter for AI endpoints — stricter than user-level
 export const wendyIpLimiter = rateLimit(
   buildOptions({
     windowMs: 60 * 1000,
     max: 10,
-    keyGenerator: (req: Request) => ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? "unknown"),
-    skip: (req: Request) =>
+    keyGenerator: requestIpKey,
+    skip: (_req: Request) =>
       process.env.NODE_ENV === "test" || process.env.USE_MOCK_AI === "true",
     message: { error: "Troppe richieste da questo IP. Riprova tra poco." },
-  })
+  }),
 );
 
 export const authLimiter = rateLimit(
@@ -70,45 +81,34 @@ export const authLimiter = rateLimit(
     max: 10,
     skipSuccessfulRequests: true,
     message: { error: "Troppi tentativi di login. Riprova tra 15 minuti." },
-  })
+  }),
 );
 
 export const adminLimiter = rateLimit(
-  buildOptions({ windowMs: 60 * 1000, max: 200 })
+  buildOptions({ windowMs: 60 * 1000, max: 200 }),
 );
 
-// ── Per-plan AI quota ───────────────────────────────────────────────
-// Free users get {FREE_AI_DAILY_LIMIT} Wendy messages per day.
-// Pro / premium users get {PRO_AI_DAILY_LIMIT} per day.
-// Resets daily (86400s window).
 const FREE_AI_DAILY_LIMIT = parseInt(process.env.FREE_AI_DAILY_LIMIT ?? "10", 10);
 const PRO_AI_DAILY_LIMIT = parseInt(process.env.PRO_AI_DAILY_LIMIT ?? "200", 10);
 
 export const planQuotaLimiter = rateLimit(
-   buildOptions({
-     windowMs: 86400 * 1000,
-     max: async (req: Request) => {
-       const userId = (req as any).user?.id;
-       if (!userId) return FREE_AI_DAILY_LIMIT;
-       const currentPlan = await getEffectivePlan(userId);
-       return planMeets(currentPlan, "pro") ? PRO_AI_DAILY_LIMIT : FREE_AI_DAILY_LIMIT;
-     },
-     keyGenerator: (req: Request) => {
-       const userId = (req as any).user?.id;
-       if (userId) {
-         return `plan-${userId}`;
-       } else {
-         return `plan-${ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? "unknown")}`;
-       }
-     },
-     skip: (req: Request) =>
-       process.env.NODE_ENV === "test" || process.env.USE_MOCK_AI === "true",
-     message: {
-       error: "Hai raggiunto il limite giornaliero dei messaggi.",
-       code: "QUOTA_EXCEEDED",
-     },
-   })
- );
-
-// Kick off Redis init eagerly but don't block startup
-initRedisStore();
+  buildOptions({
+    windowMs: 86400 * 1000,
+    max: async (req: Request) => {
+      const userId = (req as any).user?.id;
+      if (!userId) return FREE_AI_DAILY_LIMIT;
+      const currentPlan = await getEffectivePlan(userId);
+      return planMeets(currentPlan, "pro") ? PRO_AI_DAILY_LIMIT : FREE_AI_DAILY_LIMIT;
+    },
+    keyGenerator: (req: Request) => {
+      const userId = (req as any).user?.id;
+      return userId ? `plan-user-${userId}` : `plan-ip-${requestIpKey(req)}`;
+    },
+    skip: (_req: Request) =>
+      process.env.NODE_ENV === "test" || process.env.USE_MOCK_AI === "true",
+    message: {
+      error: "Hai raggiunto il limite giornaliero dei messaggi.",
+      code: "QUOTA_EXCEEDED",
+    },
+  }),
+);

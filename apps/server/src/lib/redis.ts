@@ -1,7 +1,8 @@
 import Redis from "ioredis";
 import { rootLogger } from "../middleware/logger";
+import { resolveRedisUrl } from "./redis-url";
 
-const REDIS_URL = process.env.REDIS_URL ?? "";
+const REDIS_URL = resolveRedisUrl() ?? "";
 
 let client: Redis | null = null;
 let enabled = false;
@@ -14,8 +15,11 @@ function createClient(): Redis | null {
   try {
     const c = new Redis(REDIS_URL, {
       lazyConnect: true,
-      retryStrategy: (times) => Math.min(times * 100, 3000),
-      maxRetriesPerRequest: 3,
+      enableOfflineQueue: false,
+      retryStrategy: process.env.VERCEL
+        ? () => null
+        : (times) => Math.min(times * 100, 3000),
+      maxRetriesPerRequest: process.env.VERCEL ? 0 : 3,
     });
 
     c.on("error", (err) => {

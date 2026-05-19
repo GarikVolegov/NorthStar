@@ -15,7 +15,9 @@
 
 import { rootLogger } from "./middleware/logger";
 
-const isDisabled = process.env.OTEL_DISABLED === "true";
+const isVercel = Boolean(process.env.VERCEL);
+const hasExplicitEndpoint = Boolean(process.env.OTEL_EXPORTER_OTLP_ENDPOINT);
+const isDisabled = process.env.OTEL_DISABLED === "true" || (isVercel && !hasExplicitEndpoint);
 
 if (!isDisabled) {
   // Dynamic import to avoid crash when @opentelemetry packages are missing

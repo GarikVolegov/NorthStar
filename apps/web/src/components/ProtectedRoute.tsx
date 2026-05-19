@@ -28,7 +28,7 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ component: Component, ...rest }: ProtectedRouteProps) {
   const { isLoaded, isSignedIn } = useUser();
   const { signOut } = useClerk();
-  const { authReady, isLoggedIn, authSyncFailed, logout } = useAuth();
+  const { authReady, isLoggedIn, authSyncFailed, authSyncError, logout } = useAuth();
 
   // Aspetta che sia Clerk che il sync locale siano pronti
   if (!isLoaded || !authReady) {
@@ -55,6 +55,11 @@ export function ProtectedRoute({ component: Component, ...rest }: ProtectedRoute
               ? "Non siamo riusciti a completare l'accesso a NorthStar. Riprova o esci e accedi di nuovo."
               : "Stiamo completando l'accesso al tuo spazio NorthStar."}
           </p>
+          {authSyncFailed && authSyncError ? (
+            <p className="mt-2 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+              {authSyncError}
+            </p>
+          ) : null}
           {authSyncFailed ? (
             <div className="mt-4 flex justify-center gap-2">
               <button

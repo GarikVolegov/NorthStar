@@ -662,8 +662,17 @@ router.post("/clerk-sync", async (req, res) => {
     const { clerkId: bodyClerkId, email, name } = req.body;
     const referralCode = readReferralCode(req.body?.referralCode);
 
-    if (!bodyClerkId || typeof email !== "string" || !email.trim()) {
-      res.status(400).json({ error: "clerkId ed email richiesti" });
+    const missingFields = [
+      !bodyClerkId ? "clerkId" : null,
+      typeof email !== "string" || !email.trim() ? "email" : null,
+    ].filter(Boolean);
+
+    if (missingFields.length > 0) {
+      res.status(400).json({
+        error: "Dati Clerk incompleti: clerkId ed email sono richiesti.",
+        code: "CLERK_SYNC_INVALID_PAYLOAD",
+        missingFields,
+      });
       return;
     }
 
