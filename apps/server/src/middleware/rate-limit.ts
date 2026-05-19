@@ -1,40 +1,10 @@
 import rateLimit, { ipKeyGenerator, type Options } from "express-rate-limit";
 import type { Request } from "express";
-import Redis from "ioredis";
-import RedisStore from "rate-limit-redis";
 import { getEffectivePlan, planMeets } from "./check-feature";
-import { resolveRedisUrl } from "../lib/redis-url";
-
-let redisStore: any = null;
 
 function requestIpKey(req: Request): string {
   return ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? "unknown");
 }
-
-function createRedisStore(): any {
-  const redisUrl = resolveRedisUrl();
-  if (!redisUrl) return null;
-
-  try {
-    const client = new Redis(redisUrl, {
-      enableOfflineQueue: false,
-      maxRetriesPerRequest: 0,
-      retryStrategy: () => null,
-    });
-
-    client.on("error", () => {
-      // Best effort limiter store. The app keeps working with the memory store.
-    });
-
-    return new RedisStore({
-      sendCommand: (...args: string[]) => (client as any).call(...args) as Promise<any>,
-    });
-  } catch {
-    return null;
-  }
-}
-
-redisStore = createRedisStore();
 
 function buildOptions(overrides: Partial<Options>): Partial<Options> {
   const base: Partial<Options> = {
@@ -43,7 +13,6 @@ function buildOptions(overrides: Partial<Options>): Partial<Options> {
     keyGenerator: requestIpKey,
     message: { error: "Troppe richieste. Riprova tra poco." },
   };
-  if (redisStore) base.store = redisStore;
   return { ...base, ...overrides };
 }
 
