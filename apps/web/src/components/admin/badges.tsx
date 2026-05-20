@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
-import { STATUS_CONFIG, ENTITY_CONFIG, SuggestionStatus } from "./types";
 import { FileText } from "lucide-react";
+import { ENTITY_CONFIG, STATUS_CONFIG, SuggestionStatus } from "./types";
 
 export function StatusBadge({ status }: { status: SuggestionStatus }) {
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.draft;

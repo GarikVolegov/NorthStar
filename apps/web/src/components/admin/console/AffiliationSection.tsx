@@ -1,9 +1,9 @@
-import { Eye, Handshake, RefreshCw, Save, Search, Shield } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { Eye, Handshake, RefreshCw, Save, Search, Shield } from "lucide-react";
 import type { AffiliationInboxResponse, AffiliationLeadItem } from "./types";
 import { assigneeLabel, fmtShortDate } from "./utils";
 

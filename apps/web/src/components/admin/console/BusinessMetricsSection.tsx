@@ -1,11 +1,12 @@
-import { BarChart3, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AlertTriangle, BarChart3, RefreshCw } from "lucide-react";
 import type { BusinessStatusSnapshot, SidebarSection } from "./types";
 
 type BusinessMetricsSectionProps = {
   data: BusinessStatusSnapshot | null;
   loading: boolean;
+  error?: string | null;
   onRefresh: () => void;
   onNavigateSection: (section: SidebarSection) => void;
 };
@@ -13,6 +14,7 @@ type BusinessMetricsSectionProps = {
 export function BusinessMetricsSection({
   data,
   loading,
+  error,
   onRefresh,
   onNavigateSection,
 }: BusinessMetricsSectionProps) {
@@ -31,6 +33,18 @@ export function BusinessMetricsSection({
           Aggiorna
         </Button>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-500/10 p-4 text-sm text-red-700" role="alert">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="min-w-0">
+              <p className="font-medium">Metriche non raggiungibili</p>
+              <p className="mt-1 break-words">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Caricamento...</p>

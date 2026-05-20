@@ -1,3 +1,6 @@
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   Bot,
   ChevronRight,
@@ -8,9 +11,6 @@ import {
   RefreshCw,
   ShieldAlert,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { HEALTH_UI } from "./config";
 import type { AdminOverview, SidebarSection } from "./types";
 

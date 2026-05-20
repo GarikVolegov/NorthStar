@@ -1,15 +1,15 @@
 import {
-  FileText,
-  Clock,
-  CheckCircle2,
-  XCircle,
   Archive,
   BarChart3,
   Briefcase,
-  GraduationCap,
   Calendar,
-  TrendingUp,
+  CheckCircle2,
+  Clock,
+  FileText,
+  GraduationCap,
   Sparkles,
+  TrendingUp,
+  XCircle,
 } from "lucide-react";
 
 export type SuggestionStatus =

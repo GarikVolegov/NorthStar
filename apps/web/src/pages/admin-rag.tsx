@@ -4,22 +4,28 @@
  * Richiede utente loggato con role='admin'.
  * Mostra fonti RAG, chunk, segnali deboli e permette di triggerare ingestione.
  */
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api-fetch";
 import { API_ENDPOINTS, withParams } from "@/lib/constants";
-import { useAuth } from "@/contexts/AuthContext";
-import { useLocation } from "wouter";
-import { useEffect } from "react";
-import {
-  Database, RefreshCw, CheckCircle, XCircle, Clock,
-  TrendingUp, FileText, Rss, Plus, ChevronDown, ChevronUp,
-  AlertTriangle, BarChart3,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  AlertTriangle, BarChart3,
+  CheckCircle,
+  ChevronDown, ChevronUp,
+  Clock,
+  Database,
+  FileText,
+  Plus,
+  RefreshCw,
+  Rss,
+  TrendingUp,
+  XCircle,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

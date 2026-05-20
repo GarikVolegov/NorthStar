@@ -1,6 +1,6 @@
-import { FileText, RefreshCw, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { FileText, RefreshCw, ShieldAlert } from "lucide-react";
 import { ENTITY_CONFIG, STATUS_CONFIG } from "./config";
 import type { PersistenceMeta, SuggestionStatus } from "./types";
 

@@ -1,16 +1,23 @@
-﻿import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Compass, Zap, BarChart3, Bot, BookOpen, Sparkles, Settings,
-  Users, Calendar, TrendingUp, Brain, GraduationCap, FileText,
-  Target, MessageSquare, ChevronRight, Shield, FlaskConical,
-} from "lucide-react";
-import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { AdminAuthGate } from "@/components/AdminAuthGate";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { usePageModule } from "@/hooks/usePageModule";
+import {
+  BarChart3,
+  BookOpen,
+  Bot,
+  Brain,
+  ChevronRight,
+  FlaskConical,
+  MessageSquare,
+  Settings,
+  Shield,
+  Sparkles,
+  TrendingUp,
+  Users
+} from "lucide-react";
 
 function NavCard({ href, icon, title, description, badge }: {
   href: string; icon: React.ReactNode; title: string; description: string; badge?: string;
@@ -52,7 +59,7 @@ export default function AdminHome() {
   usePageModule({ pageId: "admin-home" });
 
   return (
-    <AdminAuthGate title="Admin Console" description="Panoramica completa â€” Discovery Â· Execution Â· Monitoraggio">
+    <AdminAuthGate title="Admin Console" description="Panoramica completa - Discovery · Execution · Monitoraggio">
       <div className="min-h-screen bg-muted/20 p-4 md:p-8">
       <div className="max-w-5xl mx-auto space-y-8">
 
@@ -64,7 +71,7 @@ export default function AdminHome() {
               NorthStar Admin Console
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Panoramica completa â€” Discovery Â· Execution Â· Monitoraggio
+              Panoramica completa - Discovery · Execution · Monitoraggio
             </p>
           </div>
           <Button
@@ -81,8 +88,8 @@ export default function AdminHome() {
         <div>
           <SectionHeader
             title="Discovery"
-            subtitle="Strumenti per esplorare e mappare il mondo del lavoro â€” test, settori, ruoli, percorsi"
-            color="bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900"
+            subtitle="Strumenti per esplorare e mappare il mondo del lavoro - test, settori, ruoli, percorsi"
+            color="bg-info-surface border border-info-muted text-info"
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <NavCard
@@ -118,8 +125,8 @@ export default function AdminHome() {
         <div>
           <SectionHeader
             title="Execution"
-            subtitle="Strumenti operativi â€” obiettivi, calendario, crescita personale, coaching"
-            color="bg-violet-50 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-900"
+            subtitle="Strumenti operativi - obiettivi, calendario, crescita personale, coaching"
+            color="bg-warning-surface border border-warning-muted text-warning"
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <NavCard
@@ -150,14 +157,14 @@ export default function AdminHome() {
           <SectionHeader
             title="Monitoraggio & Configurazione"
             subtitle="Salute del sistema, metriche business, integrazioni e setup wizard"
-            color="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900"
+            color="bg-success-surface border border-success-muted text-success"
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <NavCard
               href="/admin/metriche"
               icon={<BarChart3 size={16} />}
               title="Metriche Business"
-              description="Utenti, test completati, settori piÃ¹ popolari, conversioni premium"
+              description="Utenti, test completati, settori più popolari, conversioni premium"
             />
             <NavCard
               href="/admin/status"
@@ -170,7 +177,7 @@ export default function AdminHome() {
               href="/admin/affiliazione"
               icon={<Users size={16} />}
               title="Partner"
-              description="Gestisci le richieste di affiliazione di scuole, universitÃ  e agenzie"
+              description="Gestisci le richieste di affiliazione di scuole, università e agenzie"
             />
           </div>
         </div>

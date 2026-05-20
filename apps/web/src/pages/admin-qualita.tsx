@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { apiFetch } from "@/lib/api-fetch";
+import { useCallback, useEffect, useState } from "react";
 import { AdminShell } from "../components/AdminShell";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -33,29 +34,43 @@ interface QualityData {
   };
 }
 
-function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function StatCard({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+}) {
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-4">
-      <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">{label}</div>
-      <div className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">{value}</div>
+      <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        {label}
+      </div>
+      <div className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
+        {value}
+      </div>
       {sub && <div className="mt-0.5 text-xs text-gray-400">{sub}</div>}
     </div>
   );
 }
 
 export default function AdminQualityPage() {
-  const [adminKey, setAdminKey] = useState(() => localStorage.getItem("northstar_admin_key") ?? "");
+  const [adminKey, setAdminKey] = useState(
+    () => localStorage.getItem("northstar_admin_key") ?? "",
+  );
   const [data, setData] = useState<QualityData | null>(null);
   const [loading, setLoading] = useState(false);
 
   const fetchQuality = useCallback(async (key: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`${BASE}api/admin/quality`, {
+      const res = await apiFetch(`${BASE}api/admin/quality`, {
         headers: { Authorization: `Bearer ${key}` },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setData(await res.json() as QualityData);
+      setData((await res.json()) as QualityData);
     } catch (err) {
       console.error("[admin-quality] fetch error:", err);
     } finally {
@@ -72,7 +87,9 @@ export default function AdminQualityPage() {
       <AdminShell>
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center space-y-4">
-            <p className="text-gray-500">Inserisci la chiave admin per vedere la dashboard qualità.</p>
+            <p className="text-gray-500">
+              Inserisci la chiave admin per vedere la dashboard qualità.
+            </p>
             <input
               type="password"
               placeholder="Admin API Key"
@@ -112,12 +129,47 @@ export default function AdminQualityPage() {
         {/* Totali */}
         {t && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard label="Totale conversazioni" value={t.total.toLocaleString()} />
-            <StatCard label="Eval score medio" value={t.avgEvalScore ? (t.avgEvalScore * 100).toFixed(0) + "%" : "N/D"} />
-            <StatCard label="Supervisor score medio" value={t.avgSupervisorScore ? (t.avgSupervisorScore * 100).toFixed(0) + "%" : "N/D"} />
-            <StatCard label="Rewrite rate" value={t.total > 0 ? `${((t.rewrites / t.total) * 100).toFixed(1)}%` : "0%"} sub={`${t.rewrites} riscritte`} />
-            <StatCard label="Chiarificazioni" value={t.total > 0 ? `${((t.clarifications / t.total) * 100).toFixed(1)}%` : "0%"} sub={`${t.clarifications} richieste`} />
-            <StatCard label="UI tools usati" value={String(t.uiTools)} sub={`${t.total > 0 ? ((t.uiTools / t.total) * 100).toFixed(1) : 0}% dei turni`} />
+            <StatCard
+              label="Totale conversazioni"
+              value={t.total.toLocaleString()}
+            />
+            <StatCard
+              label="Eval score medio"
+              value={
+                t.avgEvalScore ? (t.avgEvalScore * 100).toFixed(0) + "%" : "N/D"
+              }
+            />
+            <StatCard
+              label="Supervisor score medio"
+              value={
+                t.avgSupervisorScore
+                  ? (t.avgSupervisorScore * 100).toFixed(0) + "%"
+                  : "N/D"
+              }
+            />
+            <StatCard
+              label="Rewrite rate"
+              value={
+                t.total > 0
+                  ? `${((t.rewrites / t.total) * 100).toFixed(1)}%`
+                  : "0%"
+              }
+              sub={`${t.rewrites} riscritte`}
+            />
+            <StatCard
+              label="Chiarificazioni"
+              value={
+                t.total > 0
+                  ? `${((t.clarifications / t.total) * 100).toFixed(1)}%`
+                  : "0%"
+              }
+              sub={`${t.clarifications} richieste`}
+            />
+            <StatCard
+              label="UI tools usati"
+              value={String(t.uiTools)}
+              sub={`${t.total > 0 ? ((t.uiTools / t.total) * 100).toFixed(1) : 0}% dei turni`}
+            />
           </div>
         )}
 
@@ -142,23 +194,58 @@ export default function AdminQualityPage() {
                 </thead>
                 <tbody>
                   {data.qualityStats.map((s) => (
-                    <tr key={s.domain} className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-900/50">
-                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 capitalize">{s.domain}</td>
-                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.total}</td>
-                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{(s.avgEvalScore * 100).toFixed(0)}%</td>
-                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.avgSupervisorScore ? `${(s.avgSupervisorScore * 100).toFixed(0)}%` : "—"}</td>
+                    <tr
+                      key={s.domain}
+                      className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-900/50"
+                    >
+                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 capitalize">
+                        {s.domain}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                        {s.total}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                        {(s.avgEvalScore * 100).toFixed(0)}%
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                        {s.avgSupervisorScore
+                          ? `${(s.avgSupervisorScore * 100).toFixed(0)}%`
+                          : "—"}
+                      </td>
                       <td className="px-4 py-3 text-right">
-                        <span className={s.rewrites > 0 ? "text-amber-500 font-medium" : "text-gray-400"}>
-                          {s.rewrites} ({(s.rewrites / Math.max(s.total, 1) * 100).toFixed(0)}%)
+                        <span
+                          className={
+                            s.rewrites > 0
+                              ? "text-amber-500 font-medium"
+                              : "text-gray-400"
+                          }
+                        >
+                          {s.rewrites} (
+                          {((s.rewrites / Math.max(s.total, 1)) * 100).toFixed(
+                            0,
+                          )}
+                          %)
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className={s.clarifications > 0 ? "text-blue-500 font-medium" : "text-gray-400"}>
+                        <span
+                          className={
+                            s.clarifications > 0
+                              ? "text-blue-500 font-medium"
+                              : "text-gray-400"
+                          }
+                        >
                           {s.clarifications}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className={s.uiTools > 0 ? "text-green-500 font-medium" : "text-gray-400"}>
+                        <span
+                          className={
+                            s.uiTools > 0
+                              ? "text-green-500 font-medium"
+                              : "text-gray-400"
+                          }
+                        >
                           {s.uiTools}
                         </span>
                       </td>
@@ -182,25 +269,50 @@ export default function AdminQualityPage() {
                   <tr className="border-b border-gray-200 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 uppercase">
                     <th className="px-4 py-3 text-left">Dominio</th>
                     <th className="px-4 py-3 text-right">Rewrite totali</th>
-                    <th className="px-4 py-3 text-right">Score prima (media)</th>
+                    <th className="px-4 py-3 text-right">
+                      Score prima (media)
+                    </th>
                     <th className="px-4 py-3 text-right">Score dopo (media)</th>
                     <th className="px-4 py-3 text-right">Miglioramento</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.supervisorStats.map((s) => {
-                    const improvement = s.avgScoreAfter && s.avgScoreBefore
-                      ? ((s.avgScoreAfter - s.avgScoreBefore) * 100).toFixed(1)
-                      : "—";
-                    const isPositive = s.avgScoreAfter && s.avgScoreAfter > s.avgScoreBefore;
+                    const improvement =
+                      s.avgScoreAfter && s.avgScoreBefore
+                        ? ((s.avgScoreAfter - s.avgScoreBefore) * 100).toFixed(
+                            1,
+                          )
+                        : "—";
+                    const isPositive =
+                      s.avgScoreAfter && s.avgScoreAfter > s.avgScoreBefore;
                     return (
-                      <tr key={s.domain} className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-900/50">
-                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 capitalize">{s.domain}</td>
-                        <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.total}</td>
-                        <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.avgScoreBefore ? `${(s.avgScoreBefore * 100).toFixed(0)}%` : "—"}</td>
-                        <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{s.avgScoreAfter ? `${(s.avgScoreAfter * 100).toFixed(0)}%` : "—"}</td>
-                        <td className={`px-4 py-3 text-right font-medium ${isPositive ? "text-green-500" : "text-red-400"}`}>
-                          {improvement !== "—" ? `${isPositive ? "+" : ""}${improvement}%` : improvement}
+                      <tr
+                        key={s.domain}
+                        className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-900/50"
+                      >
+                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 capitalize">
+                          {s.domain}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                          {s.total}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                          {s.avgScoreBefore
+                            ? `${(s.avgScoreBefore * 100).toFixed(0)}%`
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                          {s.avgScoreAfter
+                            ? `${(s.avgScoreAfter * 100).toFixed(0)}%`
+                            : "—"}
+                        </td>
+                        <td
+                          className={`px-4 py-3 text-right font-medium ${isPositive ? "text-green-500" : "text-red-400"}`}
+                        >
+                          {improvement !== "—"
+                            ? `${isPositive ? "+" : ""}${improvement}%`
+                            : improvement}
                         </td>
                       </tr>
                     );
@@ -212,7 +324,9 @@ export default function AdminQualityPage() {
         )}
 
         {!data && loading && (
-          <div className="text-center py-12 text-gray-400">Caricamento dati qualità...</div>
+          <div className="text-center py-12 text-gray-400">
+            Caricamento dati qualità...
+          </div>
         )}
       </div>
     </AdminShell>

@@ -1,8 +1,8 @@
-import { Bot, CheckCircle2, ChevronDown, ChevronUp, Eye, History, Pencil, RefreshCw, RotateCcw, Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { Bot, CheckCircle2, ChevronDown, ChevronUp, Eye, History, Pencil, RefreshCw, RotateCcw, Save } from "lucide-react";
 import { PersistenceWarningBanner } from "./shared";
 import type {
   AgentPrompt,

@@ -1,9 +1,9 @@
-import { CalendarClock, CreditCard, RefreshCw, Save, Search, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { CalendarClock, CreditCard, RefreshCw, Save, Search, ShieldCheck } from "lucide-react";
 import type {
   AdminSubscriptionDetail,
   AdminSubscriptionItem,
@@ -43,11 +43,6 @@ function sourceBadge(item: AdminSubscriptionItem["current"]) {
     return <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-800">Override interno</Badge>;
   }
   return null;
-}
-
-function toDateInput(iso: string | null) {
-  if (!iso) return "";
-  return new Date(iso).toISOString().slice(0, 10);
 }
 
 type SubscriptionForm = {

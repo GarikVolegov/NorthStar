@@ -1,14 +1,3 @@
-import { useState } from "react";
-import {
-  AlertTriangle,
-  Database,
-  Play,
-  Power,
-  RefreshCw,
-  RotateCcw,
-  Server,
-  Settings,
-} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -23,12 +12,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import {
+  AlertTriangle,
+  Database,
+  Play,
+  Power,
+  RefreshCw,
+  RotateCcw,
+  Server,
+  Settings,
+} from "lucide-react";
+import { useState } from "react";
 import { HEALTH_UI } from "./config";
 import type { AdminOpsAction, AdminOpsStatus, BusinessStatusSnapshot, SidebarSection } from "./types";
 
 type StatusSectionProps = {
   data: BusinessStatusSnapshot | null;
   loading: boolean;
+  error?: string | null;
   opsData: AdminOpsStatus | null;
   opsLoading: boolean;
   opsActionLoading: string | null;
@@ -83,6 +84,7 @@ function statusBadge(status: string) {
 export function StatusSection({
   data,
   loading,
+  error,
   opsData,
   opsLoading,
   opsActionLoading,
@@ -136,6 +138,18 @@ export function StatusSection({
       {opsError && (
         <div className="rounded-lg border border-red-200 bg-red-500/10 p-3 text-sm text-red-700">
           {opsError}
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-500/10 p-3 text-sm text-red-700" role="alert">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="min-w-0">
+              <p className="font-medium">Status business non raggiungibile</p>
+              <p className="mt-1 break-words">{error}</p>
+            </div>
+          </div>
         </div>
       )}
 
