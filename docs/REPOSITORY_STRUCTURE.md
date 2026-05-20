@@ -36,10 +36,10 @@ root. Devono stare in `scripts/src/diagnostics` o `scripts/src/maintenance`.
 |---|---|---|
 | `.tools` | CLI e binari generati/locali | Non trattarla come codice sorgente applicativo. |
 | `.agents`, `.opencode` | Tooling agentico locale | Modificare solo quando il task riguarda esplicitamente tooling agentico. |
-| `attached_assets` | Asset allegati/importati | Non usarla come libreria asset definitiva senza promozione esplicita. |
-| `test-results`, `.pnpm-store`, `.venv` | Output o ambiente locale | Non committare contenuti generati o cache. |
-| `cli-printing-press` | Submodule/tooling per CLI generata | Non includerlo nei commit applicativi ordinari. |
-| `main.py`, `pyproject.toml`, `uv.lock` | Microservizio Python/ML storico | Mantenerlo solo se il servizio ML resta attivo; altrimenti audit dedicato. |
+| `docs/attached_assets` | Asset allegati/importati (gitignored) | Non usarla come libreria asset definitiva senza promozione esplicita. Resta sotto `docs/` ed e' ignorata da git. |
+| `docs/eval-wendy` | Suite valutazione Wendy AI (`run-eval.ts`, samples, history) | Procedura operativa: non eseguibile come test automatici, va invocata manualmente. |
+| `test-results`, `.pnpm-store` | Output o ambiente locale | Non committare contenuti generati o cache. |
+| `cli-printing-press` | Tooling per CLI generata (non e' un git submodule) | Non includerlo nei commit applicativi ordinari. |
 
 ## Regole Di Posizionamento
 

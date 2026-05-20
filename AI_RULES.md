@@ -230,14 +230,14 @@ Documentazione dettagliata di ogni modulo in `docs/ai-modules/`:
 
 ## Eval Framework
 
-Suite di valutazione in `eval/` per testare qualità e regressioni delle risposte AI:
+Suite di valutazione in `docs/eval-wendy/` per testare qualità e regressioni delle risposte AI:
 
 ```bash
 pnpm eval    # esegue eval suite
 ```
 
 ```
-eval/
+docs/eval-wendy/
 ├── run-eval.ts       — Runner valutazione
 ├── samples.json      — Campioni di test (domande + attese)
 ├── history.json      — Storico valutazioni

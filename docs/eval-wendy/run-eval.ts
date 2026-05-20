@@ -2,9 +2,9 @@
  * Eval runner for Wendy AI — v2 with regression comparison.
  *
  * Usage:
- *   pnpm tsx eval/run-eval.ts
+ *   pnpm tsx docs/eval-wendy/run-eval.ts
  *
- * Reads eval/samples.json, calls runGrowthAgent() for each sample,
+ * Reads docs/eval-wendy/samples.json, calls runGrowthAgent() for each sample,
  * collects response + metrics, compares with last run, writes results.
  * Fails (exit code 1) if significant regression detected.
  */
