@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "fs";
 import { getLLM } from "../llm/client";
 import { selectModelFor } from "../model-router";
-import { estimateTokens, estimateCost, recordLlmUsage } from "../cost-tracking";
+import { estimateTokens, recordLlmUsage } from "../cost-tracking";
 import { logger } from "../logger";
 import type { SecurityFinding } from "./types";
 

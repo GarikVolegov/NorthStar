@@ -45,12 +45,12 @@ interface RawItem {
   url:             string;
   source:          string;
   summary:         string;
-  imageUrl?:       string;
-  publishedAt?:    Date;
+  imageUrl?:       string | undefined;
+  publishedAt?:    Date | undefined;
   category:        string;
   sectorNames:     string[];
   collectorSource: string;
-  searchQuery?:    string;
+  searchQuery?:    string | undefined;
 }
 
 // ── URL hash ─────────────────────────────────────────────────────────────────────
@@ -172,8 +172,8 @@ interface RSSEntry {
   title:        string;
   url:          string;
   summary:      string;
-  imageUrl?:    string;
-  publishedAt?: Date;
+  imageUrl?:    string | undefined;
+  publishedAt?: Date | undefined;
 }
 
 function extractTag(xml: string, tag: string): string {

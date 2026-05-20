@@ -10,7 +10,7 @@
  */
 import { db, agentTasksTable, agentEmployeesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { getLLM, getLLMForRoute } from "../llm/client";
+import { getLLMForRoute } from "../llm/client";
 import { selectModelFor } from "../model-router";
 import { logger } from "../logger";
 

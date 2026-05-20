@@ -99,6 +99,10 @@ router.post(
         .values({ ...parsed.data, ownerId: userId })
         .returning({ id: workspacesTable.id, name: workspacesTable.name });
 
+      if (!workspace) {
+        throw new Error("Workspace non creato");
+      }
+
       // Owner diventa automaticamente membro con ruolo owner
       await db.insert(workspaceMembersTable).values({
         workspaceId: workspace.id,
@@ -119,7 +123,7 @@ router.post(
 
 router.get("/:id", requireAuth, async (req, res) => {
   const userId      = req.user!.id;
-  const workspaceId = parseInt(req.params.id);
+  const workspaceId = parseInt(req.params.id ?? "", 10);
   if (isNaN(workspaceId)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const membership = await getMembership(workspaceId, userId);
@@ -157,7 +161,7 @@ const InviteMemberSchema = z.object({
 
 router.post("/:id/members", requireAuth, async (req, res) => {
   const actorId     = req.user!.id;
-  const workspaceId = parseInt(req.params.id);
+  const workspaceId = parseInt(req.params.id ?? "", 10);
   if (isNaN(workspaceId)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const actorMembership = await getMembership(workspaceId, actorId);
@@ -188,8 +192,8 @@ router.post("/:id/members", requireAuth, async (req, res) => {
 
 router.delete("/:id/members/:memberId", requireAuth, async (req, res) => {
   const actorId     = req.user!.id;
-  const workspaceId = parseInt(req.params.id);
-  const memberId    = parseInt(req.params.memberId);
+  const workspaceId = parseInt(req.params.id ?? "", 10);
+  const memberId    = parseInt(req.params.memberId ?? "", 10);
   if (isNaN(workspaceId) || isNaN(memberId)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const actorMembership = await getMembership(workspaceId, actorId);
@@ -214,7 +218,7 @@ router.delete("/:id/members/:memberId", requireAuth, async (req, res) => {
 
 router.get("/:id/plans", requireAuth, async (req, res) => {
   const userId      = req.user!.id;
-  const workspaceId = parseInt(req.params.id);
+  const workspaceId = parseInt(req.params.id ?? "", 10);
   if (isNaN(workspaceId)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const membership = await getMembership(workspaceId, userId);
@@ -262,7 +266,7 @@ const SharePlanSchema = z.object({
 
 router.post("/:id/plans", requireAuth, async (req, res) => {
   const userId      = req.user!.id;
-  const workspaceId = parseInt(req.params.id);
+  const workspaceId = parseInt(req.params.id ?? "", 10);
   if (isNaN(workspaceId)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   const membership = await getMembership(workspaceId, userId);
@@ -274,10 +278,14 @@ router.post("/:id/plans", requireAuth, async (req, res) => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
   try {
-    const [plan] = await db
-      .insert(sharedPlansTable)
-      .values({ ...parsed.data, workspaceId, ownerId: userId })
-      .returning({ id: sharedPlansTable.id, title: sharedPlansTable.title });
+      const [plan] = await db
+        .insert(sharedPlansTable)
+        .values({ ...parsed.data, workspaceId, ownerId: userId })
+        .returning({ id: sharedPlansTable.id, title: sharedPlansTable.title });
+
+    if (!plan) {
+      throw new Error("Piano non condiviso");
+    }
 
     log.info({ userId, workspaceId, planId: plan.id }, "[workspace] plan shared");
     res.status(201).json({ ok: true, plan });

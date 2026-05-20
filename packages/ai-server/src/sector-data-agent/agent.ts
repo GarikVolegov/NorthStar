@@ -10,11 +10,11 @@
  * Eseguito: settimanale via cron (apps/server/src/jobs/cron.ts) o
  * manualmente via POST /api/admin/agents/sector-data.
  */
-import { eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, sectorsTable, professionsTable } from "@workspace/db";
 import { getLLM } from "../llm/client";
 import { selectModelFor } from "../model-router";
-import { estimateTokens, estimateCost, recordLlmUsage } from "../cost-tracking";
+import { estimateTokens, recordLlmUsage } from "../cost-tracking";
 import { logger } from "../logger";
 
 export interface SectorDataResult {

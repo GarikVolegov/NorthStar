@@ -1,62 +1,50 @@
-// Type shims per moduli senza @types nel pacchetto server.
-
-declare module "stripe" {
-  class Stripe {
-    constructor(apiKey: string, options?: Record<string, unknown>);
-    webhooks: {
-      constructEvent(payload: string | Buffer, sig: string, secret: string): {
-        type: string;
-        data: { object: Record<string, unknown> };
-        [key: string]: unknown;
-      };
-    };
-  }
-  export = Stripe;
-}
+/// <reference path="../../../packages/db/src/vendor.d.ts" />
 
 declare module "qrcode" {
+  export interface QRCodeToDataURLOptions {
+    errorCorrectionLevel?: string;
+    margin?: number;
+    width?: number;
+    color?: Record<string, string>;
+  }
+
+  export function toDataURL(
+    text: string,
+    options?: QRCodeToDataURLOptions,
+  ): Promise<string>;
+
   export function toString(
     text: string,
-    options?: Record<string, unknown>,
+    options?: QRCodeToDataURLOptions & { type?: "svg" | "terminal" | "utf8" },
   ): Promise<string>;
 }
-// opossum e pg sono usati in packages/db/src/index.ts come deps runtime.
 
-declare module "opossum" {
-  type AnyFn = (...args: unknown[]) => Promise<unknown>;
-  class CircuitBreaker {
-    constructor(action: AnyFn, options?: Record<string, unknown>);
-    fire<T>(...args: unknown[]): Promise<T>;
-    on(event: string, fn: (...args: unknown[]) => void): this;
-    fallback(fn: AnyFn): this;
+declare module "@opentelemetry/sdk-node" {
+  export class NodeSDK {
+    constructor(options?: {
+      serviceName?: string;
+      traceExporter?: unknown;
+      instrumentations?: unknown[];
+    });
+    start(): Promise<void> | void;
+    shutdown(): Promise<void>;
   }
-  export = CircuitBreaker;
 }
 
-declare module "pg" {
-  export interface PoolConfig {
-    connectionString?: string;
-    max?: number;
-    idleTimeoutMillis?: number;
-    connectionTimeoutMillis?: number;
-    [k: string]: unknown;
+declare module "@opentelemetry/exporter-trace-otlp-http" {
+  export class OTLPTraceExporter {
+    constructor(options?: { url?: string });
   }
-  export interface QueryResult<R = Record<string, unknown>> {
-    rows: R[];
-    rowCount: number | null;
-    command: string;
-  }
-  export interface PoolClient {
-    query<R = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<QueryResult<R>>;
-    release(): void;
-  }
-  export class Pool {
-    constructor(config?: PoolConfig);
-    connect(): Promise<PoolClient>;
-    query<R = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<QueryResult<R>>;
-    end(): Promise<void>;
-    readonly totalCount: number;
-    readonly idleCount: number;
-    readonly waitingCount: number;
+}
+
+declare module "@opentelemetry/auto-instrumentations-node" {
+  export function getNodeAutoInstrumentations(
+    options?: Record<string, unknown>,
+  ): unknown[];
+}
+
+declare module "@opentelemetry/instrumentation-express" {
+  export class ExpressInstrumentation {
+    constructor(options?: Record<string, unknown>);
   }
 }

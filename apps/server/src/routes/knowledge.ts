@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from "express";
+import { Router } from "express";
 import { eq, and, ne, inArray } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, knowledgeNodesTable, knowledgeEdgesTable } from "@workspace/db";
@@ -115,7 +115,7 @@ router.post("/nodes", requireAuth, async (req, res) => {
 // ── UPDATE node ──────────────────────────────────────────────
 router.patch("/nodes/:id", requireAuth, async (req, res) => {
   const userId = req.user!.id;
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id ?? "", 10);
   const parsed = updateNodeSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Dati nodo non validi" });
@@ -146,7 +146,7 @@ router.patch("/nodes/:id", requireAuth, async (req, res) => {
 // ── DELETE node ──────────────────────────────────────────────
 router.delete("/nodes/:id", requireAuth, async (req, res) => {
   const userId = req.user!.id;
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id ?? "", 10);
 
   const [existing] = await db
     .select()
@@ -198,7 +198,7 @@ router.post("/nodes/positions", requireAuth, async (req, res) => {
 // ── Auto-link suggestions (ML) ──────────────────────────────
 router.post("/nodes/:id/auto-link", requireAuth, wendyLimiter, wendyIpLimiter, planQuotaLimiter, async (req, res) => {
   const userId = req.user!.id;
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id ?? "", 10);
 
   const [source] = await db
     .select()
@@ -386,7 +386,7 @@ router.post("/edges", requireAuth, async (req, res) => {
 // ── UPDATE edge ──────────────────────────────────────────────
 router.patch("/edges/:id", requireAuth, async (req, res) => {
   const userId = req.user!.id;
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id ?? "", 10);
   const data = z.object({
     label: z.string().max(100).nullable().optional(),
     relationType: z.string().max(64).optional(),
@@ -419,7 +419,7 @@ router.patch("/edges/:id", requireAuth, async (req, res) => {
 // ── DELETE edge ──────────────────────────────────────────────
 router.delete("/edges/:id", requireAuth, async (req, res) => {
   const userId = req.user!.id;
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id ?? "", 10);
 
   const [existing] = await db
     .select()

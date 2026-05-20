@@ -63,7 +63,7 @@ router.get("/", requireAuth, async (req, res) => {
 
 router.post("/:id/read", requireAuth, async (req, res) => {
   const userId = req.user!.id;
-  const id     = parseInt(req.params.id);
+  const id     = parseInt(req.params.id ?? "", 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   try {
@@ -91,7 +91,7 @@ router.post("/:id/read", requireAuth, async (req, res) => {
 
 router.post("/:id/dismiss", requireAuth, async (req, res) => {
   const userId = req.user!.id;
-  const id     = parseInt(req.params.id);
+  const id     = parseInt(req.params.id ?? "", 10);
   if (isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   try {

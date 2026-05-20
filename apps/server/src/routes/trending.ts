@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { desc, sql } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import { db, pool, sectorsTable } from "@workspace/db";
 
 const router = Router();

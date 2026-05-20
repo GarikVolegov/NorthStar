@@ -19,7 +19,11 @@ router.post("/", async (req, res) => {
     }
 
     const { q, page, history } = parsed.data;
-    const result: RouterOutput = await routeQuery({ q, page, history });
+    const result: RouterOutput = await routeQuery({
+      q,
+      ...(page ? { page } : {}),
+      ...(history ? { history } : {}),
+    });
 
     res.json(result);
   } catch (err) {

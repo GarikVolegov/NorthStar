@@ -10,7 +10,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { rootLogger } from "../middleware/logger";
 import { db, wendyBriefingsTable } from "@workspace/db";
-import { runBriefingGenerator } from "../jobs/briefing-generator";
+import { generateBriefingForUser } from "../jobs/briefing-generator";
 
 const router = Router();
 const log    = rootLogger.child({ module: "briefings" });
@@ -78,10 +78,6 @@ router.post("/generate", requireAuth, async (req, res) => {
   }
 
   try {
-    const { runBriefingGenerator: gen } = await import("../jobs/briefing-generator");
-    // Genera solo per l'utente corrente — usa il generator che farà upsert
-    // Trigger parziale: generiamo solo per questo userId
-    const { proactiveInsightsTable } = await import("@workspace/db");
     const { usersTable } = await import("@workspace/db");
 
     const [user] = await db
@@ -91,14 +87,7 @@ router.post("/generate", requireAuth, async (req, res) => {
       .limit(1);
 
     if (!user) { res.status(404).json({ error: "Utente non trovato" }); return; }
-
-    // Import interno della funzione di generazione
-    const { generateBriefingForUser } = await import("../jobs/briefing-generator") as any;
-
-    let content: string | null = null;
-    if (typeof generateBriefingForUser === "function") {
-      content = await generateBriefingForUser(userId, user.name, "weekly");
-    }
+    const content = await generateBriefingForUser(userId, user.name, "weekly");
 
     if (!content) {
       res.status(500).json({ error: "Generazione briefing fallita — riprova tra poco" });
@@ -110,6 +99,10 @@ router.post("/generate", requireAuth, async (req, res) => {
       .insert(wendyBriefingsTable)
       .values({ userId, type: "manual", period, content })
       .returning({ id: wendyBriefingsTable.id });
+
+    if (!row) {
+      throw new Error("Briefing non salvato");
+    }
 
     log.info({ userId, briefingId: row.id }, "[briefings] manual generated");
     res.status(201).json({ ok: true, briefingId: row.id, content });
@@ -123,7 +116,7 @@ router.post("/generate", requireAuth, async (req, res) => {
 
 router.patch("/:id/read", requireAuth, async (req, res) => {
   const userId     = req.user!.id;
-  const briefingId = parseInt(req.params.id);
+  const briefingId = parseInt(req.params.id ?? "", 10);
   if (isNaN(briefingId)) { res.status(400).json({ error: "ID non valido" }); return; }
 
   try {

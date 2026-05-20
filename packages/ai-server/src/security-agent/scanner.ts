@@ -84,6 +84,7 @@ export async function scanFiles(
 
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
+    if (!batch) continue;
     const fileBlock = batch.map((f) => `=== ${f.path} ===\n${f.content}`).join("\n\n");
     const userMsg = `Scan these files for security vulnerabilities:\n\n${fileBlock}`;
 

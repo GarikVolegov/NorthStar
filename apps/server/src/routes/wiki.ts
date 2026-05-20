@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from "express";
+import { Router } from "express";
 import { z } from "zod/v4";
 import { requireAuth } from "../middleware/auth";
 import { wendyLimiter, wendyIpLimiter, planQuotaLimiter } from "../middleware/rate-limit";
@@ -16,7 +16,7 @@ const askSchema = z.object({
 // ── ASK (SSE streaming with ML personalization) ────────────
 router.post("/:id/ask", requireAuth, wendyLimiter, wendyIpLimiter, planQuotaLimiter, async (req, res) => {
   const userId = req.user!.id;
-  const sectorId = parseInt(req.params.id);
+  const sectorId = parseInt(req.params.id ?? "", 10);
   const data = askSchema.parse(req.body);
   const log = req.log;
 
@@ -43,11 +43,11 @@ router.post("/:id/ask", requireAuth, wendyLimiter, wendyIpLimiter, planQuotaLimi
       userId,
       sectorId,
       sectorName,
-      journeyType: userRow?.journeyType ?? undefined,
-      workPreference: userRow?.workPreference ?? undefined,
-      cvText: userRow?.cvText ?? undefined,
+      ...(userRow?.journeyType ? { journeyType: userRow.journeyType } : {}),
+      ...(userRow?.workPreference ? { workPreference: userRow.workPreference } : {}),
+      ...(userRow?.cvText ? { cvText: userRow.cvText } : {}),
       message: data.message,
-      history: data.history,
+      ...(data.history ? { history: data.history } : {}),
     });
 
     let fullResponse = "";

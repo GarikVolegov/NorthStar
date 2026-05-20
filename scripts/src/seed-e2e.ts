@@ -8,52 +8,50 @@
  * Env vars attese:
  *   DATABASE_URL          — connection string Postgres
  *   E2E_USER_EMAIL        — email utente base  (default: e2e@northstar.it)
- *   E2E_USER_PASSWORD     — password in chiaro (default: E2ePassword123!)
+ *   E2E_USER_PASSWORD     — password in chiaro (required)
  */
 
-import 'dotenv/config';
-import { eq, sql } from 'drizzle-orm';
-import { db } from '@workspace/db';
-import * as crypto from 'crypto';
+import "dotenv/config";
+import { sql } from "drizzle-orm";
+import { db } from "@workspace/db";
+import * as crypto from "crypto";
 
 // ─── Tipi minimi — evita dipendere dall'intero schema per non dover compilare ─
-type NewUser = {
-  email: string;
-  passwordHash: string;
-  name: string;
-  isPremium: boolean;
-  isAffiliate: boolean;
-  isAdmin: boolean;
-  isEmailVerified: boolean;
-  sectorId: number | null;
-};
-
 // ─── Config ───────────────────────────────────────────────────────────────────
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
-  console.error('❌  DATABASE_URL non impostata');
+  console.error("❌  DATABASE_URL non impostata");
   process.exit(1);
 }
 
-const EMAIL    = process.env.E2E_USER_EMAIL    ?? 'e2e@northstar.it';
-const PASSWORD = process.env.E2E_USER_PASSWORD ?? 'E2ePassword123!';
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} is required; refusing to use a default test password.`);
+  }
+  return value;
+}
+
+const EMAIL = process.env.E2E_USER_EMAIL ?? "e2e@northstar.it";
+const PASSWORD = requireEnv("E2E_USER_PASSWORD");
 
 // ─── Hash password (stesso algoritmo del server) ──────────────────────────────
 function hashPassword(plain: string): string {
-  return crypto.createHash('sha256').update(plain).digest('hex');
+  return crypto.createHash("sha256").update(plain).digest("hex");
 }
 
 // ─── Main ────────────────……………………………………………………………………
 async function main() {
   // Since we're using drizzle with neon/http, we need to execute raw queries differently
   // For seed scripts, we'll use the db.execute method with raw SQL
-  
-   // Prende il primo settore disponibile (qualsiasi)
-   try {
-     const sectorRes: any = await db.execute(
-       sql`SELECT id FROM sectors ORDER BY id LIMIT 1`
-     );
-     const sectorId: number | null = sectorRes.rows.length > 0 ? sectorRes.rows[0].id : null;
+
+  // Prende il primo settore disponibile (qualsiasi)
+  try {
+    const sectorRes: any = await db.execute(
+      sql`SELECT id FROM sectors ORDER BY id LIMIT 1`,
+    );
+    const sectorId: number | null =
+      sectorRes.rows.length > 0 ? sectorRes.rows[0].id : null;
 
     const passwordHash = hashPassword(PASSWORD);
 
@@ -83,12 +81,12 @@ async function main() {
           email_verified   = true,
           sector_id        = EXCLUDED.sector_id,
           updated_at       = NOW()
-      `
+      `,
     );
 
     // Now get the user id
     const selectRes: any = await db.execute(
-      sql`SELECT id FROM users WHERE email = ${EMAIL}`
+      sql`SELECT id FROM users WHERE email = ${EMAIL}`,
     );
     console.log(`Select result for email ${EMAIL}:`, selectRes);
     if (selectRes.rows.length === 0) {
@@ -99,13 +97,25 @@ async function main() {
 
     // Cancella objectives precedenti e ricrea
     await db.execute(
-      sql`DELETE FROM user_objectives WHERE user_id = ${userId}`
+      sql`DELETE FROM user_objectives WHERE user_id = ${userId}`,
     );
 
     const objectives = [
-      { text: 'Diventare sviluppatore full-stack', category: 'skill',    progress: 30 },
-      { text: 'Trovare primo lavoro in tech',     category: 'career',   progress: 10 },
-      { text: 'Completare corso TypeScript',      category: 'learning', progress: 60 },
+      {
+        text: "Diventare sviluppatore full-stack",
+        category: "skill",
+        progress: 30,
+      },
+      {
+        text: "Trovare primo lavoro in tech",
+        category: "career",
+        progress: 10,
+      },
+      {
+        text: "Completare corso TypeScript",
+        category: "learning",
+        progress: 60,
+      },
     ];
 
     for (const obj of objectives) {
@@ -119,19 +129,21 @@ async function main() {
             ${obj.progress}, 
             NOW()
           )
-        `
+        `,
       );
     }
 
     console.log(`✅  Objectives creati: ${objectives.length}`);
-    console.log(`ℹ️   sectorId assegnato: ${sectorId ?? 'null (tabella sectors vuota)'}`);
+    console.log(
+      `ℹ️   sectorId assegnato: ${sectorId ?? "null (tabella sectors vuota)"}`,
+    );
   } catch (err) {
-    console.error('Error in seed-e2e:', err);
+    console.error("Error in seed-e2e:", err);
     throw err;
   }
 }
 
 main().catch((err) => {
-  console.error('❌  seed-e2e failed:', err);
+  console.error("❌  seed-e2e failed:", err);
   process.exit(1);
 });

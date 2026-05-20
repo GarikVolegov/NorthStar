@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import { db, growthArticlesTable } from "@workspace/db";
 
 const router = Router();
@@ -12,6 +13,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   leadership: "Leadership",
   business: "Business",
 };
+
+function isSql(condition: SQL | undefined): condition is SQL {
+  return condition !== undefined;
+}
 
 function mapArticle(article: typeof growthArticlesTable.$inferSelect) {
   return {
@@ -76,8 +81,10 @@ router.get("/per-te", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const limit = Math.max(1, Math.min(Number(req.query.limit) || 20, 100));
-    const category = typeof req.query.category === "string" ? req.query.category : "";
-    const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+    const category =
+      typeof req.query.category === "string" ? req.query.category : "";
+    const search =
+      typeof req.query.search === "string" ? req.query.search.trim() : "";
     const where = [
       eq(growthArticlesTable.status, "published"),
       category ? eq(growthArticlesTable.category, category) : undefined,
@@ -87,7 +94,7 @@ router.get("/", async (req, res) => {
             ilike(growthArticlesTable.description, `%${search}%`),
           )
         : undefined,
-    ].filter(Boolean) as any[];
+    ].filter(isSql);
 
     const articles = await db
       .select()
@@ -117,7 +124,12 @@ router.get("/:slug", async (req, res) => {
     const [article] = await db
       .select()
       .from(growthArticlesTable)
-      .where(and(eq(growthArticlesTable.slug, req.params.slug), eq(growthArticlesTable.status, "published")))
+      .where(
+        and(
+          eq(growthArticlesTable.slug, req.params.slug),
+          eq(growthArticlesTable.status, "published"),
+        ),
+      )
       .limit(1);
     if (!article) {
       res.status(404).json({ error: "Articolo non trovato" });
@@ -130,12 +142,20 @@ router.get("/:slug", async (req, res) => {
     const related = await db
       .select()
       .from(growthArticlesTable)
-      .where(and(eq(growthArticlesTable.status, "published"), eq(growthArticlesTable.category, article.category)))
+      .where(
+        and(
+          eq(growthArticlesTable.status, "published"),
+          eq(growthArticlesTable.category, article.category),
+        ),
+      )
       .orderBy(desc(growthArticlesTable.updatedAt))
       .limit(4);
     res.json({
       ...mapArticle(article),
-      related: related.filter((item) => item.id !== article.id).slice(0, 3).map(mapArticle),
+      related: related
+        .filter((item) => item.id !== article.id)
+        .slice(0, 3)
+        .map(mapArticle),
     });
   } catch (err) {
     req.log?.error?.({ err }, "growth article error");

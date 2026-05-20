@@ -37,9 +37,7 @@
     "**/build/**",
     "**/.turbo/**",
     "e2e/**",
-    "eval/**",
-    "artifacts/**"
+    "docs/eval-wendy/**"
   ],
-  "ignoreBinaries": ["docker", "concurrently"],
-  "reporters": ["compact"]
+  "ignoreBinaries": ["docker", "concurrently"]
 }

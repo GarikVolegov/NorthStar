@@ -6,7 +6,6 @@ const router = Router();
 /* ─── GET /api/jobs  —  lista lavori ─── */
 router.get("/", requireAuth, async (req, res) => {
   try {
-    const userId = req.user!.id;
     res.json([]);
   } catch (err) {
     req.log?.error?.({ err }, "jobs get error");
@@ -17,8 +16,7 @@ router.get("/", requireAuth, async (req, res) => {
 /* ─── GET /api/jobs/:id  —  dettaglio lavoro ─── */
 router.get("/:id", requireAuth, async (req, res) => {
   try {
-    const userId = req.user!.id;
-    const jobId = parseInt(req.params.id, 10);
+    const jobId = parseInt(req.params.id ?? "", 10);
     res.json({
       id: jobId,
       title: "Posizione di esempio",

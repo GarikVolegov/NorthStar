@@ -14,10 +14,10 @@ import { logger } from "../logger";
 export interface IndexOptions {
   sourceId:    number;
   docType:     "report" | "news" | "job_agg" | "generic";
-  geography?:  string[];
-  sectors?:    string[];
-  roles?:      string[];
-  publishedAt?: Date;
+  geography?:  string[] | undefined;
+  sectors?:    string[] | undefined;
+  roles?:      string[] | undefined;
+  publishedAt?: Date | undefined;
 }
 
 export interface IndexResult {

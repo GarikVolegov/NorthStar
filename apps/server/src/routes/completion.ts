@@ -6,8 +6,6 @@ const router = Router();
 /* ─── GET /api/completion/me  —  dati completamento profilo ───── */
 router.get("/me", requireAuth, async (req, res) => {
   try {
-    const userId = req.user!.id;
-    
     // Mock completion data
     res.json({
       hasTestSession: true,

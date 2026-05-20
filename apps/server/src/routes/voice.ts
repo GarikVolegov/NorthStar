@@ -3,7 +3,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { db, voiceSessionsTable, usersTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import type { VoiceSession } from "@workspace/db";
-import { XP_REWARDS, XP_PER_LEVEL, xpProgress, getUnlockedFeatures, getNextUnlock } from "./xp-constants";
+import { XP_REWARDS, xpProgress, getUnlockedFeatures, getNextUnlock } from "./xp-constants";
 import { DAILY_LIMITS } from "./xp-constants";
 
 const router = Router();
@@ -43,6 +43,10 @@ router.post("/start", async (req, res) => {
         agentType: agentType ?? null,
       })
       .returning();
+
+    if (!session) {
+      throw new Error("Sessione vocale non creata");
+    }
 
     res.status(201).json({ sessionId: session.id, startedAt: session.startedAt });
   } catch (err) {
@@ -91,7 +95,7 @@ router.post("/complete", async (req, res) => {
     const isNewDay = !lastSession || lastSession.toDateString() !== now.toDateString();
     const countedForStreak = isNewDay;
 
-    const [updated] = await db
+    await db
       .update(voiceSessionsTable)
       .set({
         status: "completed",

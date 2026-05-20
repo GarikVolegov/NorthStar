@@ -2,8 +2,8 @@ import { Router } from "express";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { db, userBadgesTable, usersTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
-import { BADGE_DEFINITIONS, type BadgeKey, type UserBadge } from "@workspace/db";
-import { XP_REWARDS, xpProgress } from "./xp-constants";
+import { BADGE_DEFINITIONS, type BadgeKey } from "@workspace/db";
+import { xpProgress } from "./xp-constants";
 
 const router = Router();
 router.use(requireAuth);
@@ -123,7 +123,7 @@ router.post("/check", async (req, res) => {
 router.post("/:id/seen", async (req, res) => {
   try {
     const userId = req.user!.id;
-    const badgeId = parseInt(req.params.id, 10);
+    const badgeId = parseInt(req.params.id ?? "", 10);
 
     await db
       .update(userBadgesTable)

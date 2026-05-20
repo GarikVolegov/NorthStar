@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
-import { eq, and, isNull, desc } from "drizzle-orm";
-import { db, usersTable, userProfileSettingsTable, nftCertificatesTable, userObjectivesTable, objectiveCommentsTable, coachSessionsTable, voiceSessionsTable, messages, conversations, businessIdeasTable, coachMemoryFactsTable, coachMemoryPatternsTable, sessionSummariesTable, affiliateAccountsTable, affiliateCommissionsTable, affiliateWithdrawalsTable, affiliateReferralsTable, chatMessagesTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { db, usersTable, userProfileSettingsTable, nftCertificatesTable, userObjectivesTable, coachSessionsTable, voiceSessionsTable, messages, conversations, businessIdeasTable, coachMemoryFactsTable, coachMemoryPatternsTable, sessionSummariesTable, affiliateAccountsTable, affiliateCommissionsTable, affiliateWithdrawalsTable, affiliateReferralsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { writeAuditLog } from "../middleware/audit";
 
@@ -8,6 +8,9 @@ const router = Router();
 
 async function getUserRelatedData(userId: number) {
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!user) {
+    throw new Error("Utente non trovato");
+  }
   const [profile] = await db.select().from(userProfileSettingsTable).where(eq(userProfileSettingsTable.userId, userId)).limit(1);
   const userWithProfile = { ...user, ...(profile ?? {}) };
   const objectives = await db.select().from(userObjectivesTable).where(eq(userObjectivesTable.userId, userId));
@@ -15,11 +18,14 @@ async function getUserRelatedData(userId: number) {
   const voiceSessions = await db.select().from(voiceSessionsTable).where(eq(voiceSessionsTable.userId, userId));
   const convs = await db.select().from(conversations).where(eq(conversations.userId, userId));
   const convIds = convs.map((c) => c.id);
-  const allMessages = convIds.length > 0
-    ? await db.select().from(messages).where(eq(messages.conversationId, convIds[0]))
-    : [];
-  for (let i = 1; i < convIds.length; i++) {
-    allMessages.push(...await db.select().from(messages).where(eq(messages.conversationId, convIds[i])));
+  const allMessages: Array<typeof messages.$inferSelect> = [];
+  for (const conversationId of convIds) {
+    allMessages.push(
+      ...(await db
+        .select()
+        .from(messages)
+        .where(eq(messages.conversationId, conversationId))),
+    );
   }
   const businessIdeas = await db.select().from(businessIdeasTable).where(eq(businessIdeasTable.userId, userId));
   const coachFacts = await db.select().from(coachMemoryFactsTable).where(eq(coachMemoryFactsTable.userId, userId));
@@ -86,10 +92,10 @@ router.get("/status", requireAuth, async (req: Request, res: Response) => {
       .limit(1);
 
     res.json({
-      deleted: !!user.deletedAt,
-      deletedAt: user.deletedAt,
-      purged: !!user.purgedAt,
-      purgedAt: user.purgedAt,
+      deleted: !!user?.deletedAt,
+      deletedAt: user?.deletedAt ?? null,
+      purged: !!user?.purgedAt,
+      purgedAt: user?.purgedAt ?? null,
     });
   } catch (err) {
     req.log?.error?.({ err }, "account status error");
@@ -107,6 +113,11 @@ router.delete("/", requireAuth, async (req: Request, res: Response) => {
       .from(usersTable)
       .where(eq(usersTable.id, userId))
       .limit(1);
+
+    if (!user) {
+      res.status(404).json({ error: "Utente non trovato" });
+      return;
+    }
 
     if (user.deletedAt) {
       res.status(400).json({ error: "Account già in fase di eliminazione" });
@@ -152,21 +163,13 @@ router.delete("/", requireAuth, async (req: Request, res: Response) => {
         })
         .where(eq(nftCertificatesTable.userId, userId));
 
-      const tables = [
-        { table: coachSessionsTable, col: coachSessionsTable.userId },
-        { table: voiceSessionsTable, col: voiceSessionsTable.userId },
-        { table: userObjectivesTable, col: userObjectivesTable.userId },
-        { table: businessIdeasTable, col: businessIdeasTable.userId },
-        { table: coachMemoryFactsTable, col: coachMemoryFactsTable.userId },
-        { table: coachMemoryPatternsTable, col: coachMemoryPatternsTable.userId },
-        { table: sessionSummariesTable, col: sessionSummariesTable.userId },
-      ] as const;
-
-      for (const { table, col } of tables) {
-        await tx.update(table as any)
-          .set({ deletedAt: now } as any)
-          .where(eq(col as any, userId) as any);
-      }
+      await tx.update(coachSessionsTable).set({ deletedAt: now }).where(eq(coachSessionsTable.userId, userId));
+      await tx.update(voiceSessionsTable).set({ deletedAt: now }).where(eq(voiceSessionsTable.userId, userId));
+      await tx.update(userObjectivesTable).set({ deletedAt: now }).where(eq(userObjectivesTable.userId, userId));
+      await tx.update(businessIdeasTable).set({ deletedAt: now }).where(eq(businessIdeasTable.userId, userId));
+      await tx.update(coachMemoryFactsTable).set({ deletedAt: now }).where(eq(coachMemoryFactsTable.userId, userId));
+      await tx.update(coachMemoryPatternsTable).set({ deletedAt: now }).where(eq(coachMemoryPatternsTable.userId, userId));
+      await tx.update(sessionSummariesTable).set({ deletedAt: now }).where(eq(sessionSummariesTable.userId, userId));
     });
 
     writeAuditLog(req, {

@@ -27,9 +27,9 @@ const QA_PAGES = new Set(["settore", "ruolo", "professione", "sector", "professi
 
 export interface ClassifyIntentInput {
   userMessage:      string;
-  pageContext?:     WendyPageContext;
-  compressedHistory?: CompressedHistory;
-  hasFileAttached?: boolean;  // Phase 2: upload file
+  pageContext?:     WendyPageContext | undefined;
+  compressedHistory?: CompressedHistory | undefined;
+  hasFileAttached?: boolean | undefined;  // Phase 2: upload file
 }
 
 /**

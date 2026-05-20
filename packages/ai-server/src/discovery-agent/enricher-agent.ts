@@ -46,7 +46,7 @@ import { logger } from "../logger";
 import { openai } from "../client";
 import { db }     from "@workspace/db";
 import { discoveryItemsTable } from "@workspace/db";
-import { eq, and, lt, isNull, or, asc, desc, sql } from "drizzle-orm";
+import { eq, and, lt, desc } from "drizzle-orm";
 import type { DiscoveryItem } from "@workspace/db";
 import { selectModelFor } from "../model-router";
 

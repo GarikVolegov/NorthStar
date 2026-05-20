@@ -54,7 +54,7 @@ function thisWeekEnd(): Date {
 
 // ── Generate briefing for one user ─────────────────────────────────────────────
 
-async function generateBriefingForUser(
+export async function generateBriefingForUser(
   userId: number,
   userName: string,
   type: "weekly" | "daily",
@@ -162,7 +162,6 @@ export async function runBriefingGenerator(type: "weekly" | "daily" = "weekly"):
 
   try {
     // Utenti Pro+ attivi negli ultimi 30 giorni
-    const requiredPlan = type === "daily" ? "team" : "pro";
     const cutoff       = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     const users = await db

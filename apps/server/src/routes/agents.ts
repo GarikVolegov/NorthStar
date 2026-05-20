@@ -13,9 +13,17 @@ import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { rootLogger } from "../middleware/logger";
 import { db, agentEmployeesTable, agentTasksTable } from "@workspace/db";
+import { isOneOf } from "../lib/type-guards";
 
 const router = Router();
 const log = rootLogger.child({ module: "agents" });
+const AGENT_TASK_STATUSES = [
+  "queued",
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+] as const;
 
 // ── GET /api/agents ────────────────────────────────────────────────────────────
 
@@ -23,15 +31,15 @@ router.get("/", async (_req, res) => {
   try {
     const agents = await db
       .select({
-        slug:         agentEmployeesTable.slug,
-        name:         agentEmployeesTable.name,
-        role:         agentEmployeesTable.role,
-        domain:       agentEmployeesTable.domain,
-        avatar:       agentEmployeesTable.avatar,
-        color:        agentEmployeesTable.color,
-        description:  agentEmployeesTable.description,
+        slug: agentEmployeesTable.slug,
+        name: agentEmployeesTable.name,
+        role: agentEmployeesTable.role,
+        domain: agentEmployeesTable.domain,
+        avatar: agentEmployeesTable.avatar,
+        color: agentEmployeesTable.color,
+        description: agentEmployeesTable.description,
         capabilities: agentEmployeesTable.capabilities,
-        sortOrder:    agentEmployeesTable.sortOrder,
+        sortOrder: agentEmployeesTable.sortOrder,
       })
       .from(agentEmployeesTable)
       .where(eq(agentEmployeesTable.isActive, true))
@@ -48,25 +56,28 @@ router.get("/", async (_req, res) => {
 
 router.get("/tasks", requireAuth, async (req, res) => {
   const userId = req.user!.id;
-  const limit  = Math.min(parseInt(req.query.limit as string || "20"), 50);
+  const limit = Math.min(parseInt((req.query.limit as string) || "20"), 50);
   const status = req.query.status as string | undefined;
 
   try {
     let query = db
       .select({
-        id:          agentTasksTable.id,
-        agentSlug:   agentTasksTable.agentSlug,
-        title:       agentTasksTable.title,
-        status:      agentTasksTable.status,
-        queuedAt:    agentTasksTable.queuedAt,
+        id: agentTasksTable.id,
+        agentSlug: agentTasksTable.agentSlug,
+        title: agentTasksTable.title,
+        status: agentTasksTable.status,
+        queuedAt: agentTasksTable.queuedAt,
         completedAt: agentTasksTable.completedAt,
-        durationMs:  agentTasksTable.durationMs,
-        errorMessage:agentTasksTable.errorMessage,
+        durationMs: agentTasksTable.durationMs,
+        errorMessage: agentTasksTable.errorMessage,
       })
       .from(agentTasksTable)
       .where(
-        status
-          ? and(eq(agentTasksTable.userId, userId), eq(agentTasksTable.status, status as any))
+        status && isOneOf(status, AGENT_TASK_STATUSES)
+          ? and(
+              eq(agentTasksTable.userId, userId),
+              eq(agentTasksTable.status, status),
+            )
           : eq(agentTasksTable.userId, userId),
       )
       .orderBy(desc(agentTasksTable.queuedAt))
@@ -83,11 +94,11 @@ router.get("/tasks", requireAuth, async (req, res) => {
 // ── POST /api/agents/tasks ────────────────────────────────────────────────────
 
 const CreateTaskSchema = z.object({
-  agentSlug:   z.string().min(1),
-  title:       z.string().min(2).max(200),
-  prompt:      z.string().min(10).max(4000),
+  agentSlug: z.string().min(1),
+  title: z.string().min(2).max(200),
+  prompt: z.string().min(10).max(4000),
   contextType: z.string().optional(),
-  contextId:   z.number().int().positive().optional(),
+  contextId: z.number().int().positive().optional(),
   contextData: z.record(z.unknown()).optional(),
 });
 
@@ -103,14 +114,18 @@ router.post("/tasks", requireAuth, async (req, res) => {
   const [agent] = await db
     .select({ slug: agentEmployeesTable.slug })
     .from(agentEmployeesTable)
-    .where(and(
-      eq(agentEmployeesTable.slug, parsed.data.agentSlug),
-      eq(agentEmployeesTable.isActive, true),
-    ))
+    .where(
+      and(
+        eq(agentEmployeesTable.slug, parsed.data.agentSlug),
+        eq(agentEmployeesTable.isActive, true),
+      ),
+    )
     .limit(1);
 
   if (!agent) {
-    res.status(404).json({ error: `Agente ${parsed.data.agentSlug} non trovato` });
+    res
+      .status(404)
+      .json({ error: `Agente ${parsed.data.agentSlug} non trovato` });
     return;
   }
 
@@ -118,13 +133,20 @@ router.post("/tasks", requireAuth, async (req, res) => {
   const runningCount = await db
     .select({ count: agentTasksTable.id })
     .from(agentTasksTable)
-    .where(and(
-      eq(agentTasksTable.userId, userId),
-      eq(agentTasksTable.status, "queued"),
-    ));
+    .where(
+      and(
+        eq(agentTasksTable.userId, userId),
+        eq(agentTasksTable.status, "queued"),
+      ),
+    );
 
   if (runningCount.length >= 5) {
-    res.status(429).json({ error: "Hai raggiunto il limite di task in coda (max 5). Attendi il completamento di alcuni." });
+    res
+      .status(429)
+      .json({
+        error:
+          "Hai raggiunto il limite di task in coda (max 5). Attendi il completamento di alcuni.",
+      });
     return;
   }
 
@@ -133,22 +155,31 @@ router.post("/tasks", requireAuth, async (req, res) => {
       .insert(agentTasksTable)
       .values({
         userId,
-        agentSlug:   parsed.data.agentSlug,
-        title:       parsed.data.title,
-        prompt:      parsed.data.prompt,
+        agentSlug: parsed.data.agentSlug,
+        title: parsed.data.title,
+        prompt: parsed.data.prompt,
         contextType: parsed.data.contextType,
-        contextId:   parsed.data.contextId,
+        contextId: parsed.data.contextId,
         contextData: parsed.data.contextData,
-        status:      "queued",
+        status: "queued",
       })
       .returning({ id: agentTasksTable.id });
 
-    log.info({ userId, taskId: task.id, agentSlug: parsed.data.agentSlug }, "[agents] task created");
+    if (!task) {
+      throw new Error("Task non creato");
+    }
+
+    log.info(
+      { userId, taskId: task.id, agentSlug: parsed.data.agentSlug },
+      "[agents] task created",
+    );
 
     // Esegui il task in background (fire-and-forget)
     import("@workspace/ai-server")
       .then(({ executeAgentTask }) => executeAgentTask(task.id))
-      .catch((err) => log.error({ err, taskId: task.id }, "[agents] executor error"));
+      .catch((err) =>
+        log.error({ err, taskId: task.id }, "[agents] executor error"),
+      );
 
     res.status(201).json({ ok: true, taskId: task.id });
   } catch (e) {
@@ -161,20 +192,25 @@ router.post("/tasks", requireAuth, async (req, res) => {
 
 router.get("/tasks/:id", requireAuth, async (req, res) => {
   const userId = req.user!.id;
-  const taskId = parseInt(req.params.id);
-  if (isNaN(taskId)) { res.status(400).json({ error: "ID non valido" }); return; }
+  const taskId = parseInt(req.params.id ?? "", 10);
+  if (isNaN(taskId)) {
+    res.status(400).json({ error: "ID non valido" });
+    return;
+  }
 
   try {
     const [task] = await db
       .select()
       .from(agentTasksTable)
-      .where(and(
-        eq(agentTasksTable.id, taskId),
-        eq(agentTasksTable.userId, userId),
-      ))
+      .where(
+        and(eq(agentTasksTable.id, taskId), eq(agentTasksTable.userId, userId)),
+      )
       .limit(1);
 
-    if (!task) { res.status(404).json({ error: "Task non trovato" }); return; }
+    if (!task) {
+      res.status(404).json({ error: "Task non trovato" });
+      return;
+    }
     res.json(task);
   } catch (e) {
     log.error({ e, taskId }, "[agents] get task error");
@@ -186,18 +222,23 @@ router.get("/tasks/:id", requireAuth, async (req, res) => {
 
 router.post("/tasks/:id/cancel", requireAuth, async (req, res) => {
   const userId = req.user!.id;
-  const taskId = parseInt(req.params.id);
-  if (isNaN(taskId)) { res.status(400).json({ error: "ID non valido" }); return; }
+  const taskId = parseInt(req.params.id ?? "", 10);
+  if (isNaN(taskId)) {
+    res.status(400).json({ error: "ID non valido" });
+    return;
+  }
 
   try {
     const [updated] = await db
       .update(agentTasksTable)
       .set({ status: "cancelled", updatedAt: new Date() })
-      .where(and(
-        eq(agentTasksTable.id, taskId),
-        eq(agentTasksTable.userId, userId),
-        eq(agentTasksTable.status, "queued"),
-      ))
+      .where(
+        and(
+          eq(agentTasksTable.id, taskId),
+          eq(agentTasksTable.userId, userId),
+          eq(agentTasksTable.status, "queued"),
+        ),
+      )
       .returning({ id: agentTasksTable.id });
 
     if (!updated) {

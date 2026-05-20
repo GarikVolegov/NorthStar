@@ -28,7 +28,6 @@ function toTokens(chars: number): number { return Math.ceil(chars / CHAR_PER_TOK
 // ── Chunking per report PDF (paragrafo con overlap) ────────────────────────
 
 export function chunkReport(text: string, targetTokens = 500, overlapTokens = 80): TextChunk[] {
-  const targetChars  = targetTokens * CHAR_PER_TOKEN;
   const overlapChars = overlapTokens * CHAR_PER_TOKEN;
 
   // Prima split per paragrafo (doppio newline)

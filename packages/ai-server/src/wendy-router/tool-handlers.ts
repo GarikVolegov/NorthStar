@@ -10,7 +10,7 @@
  *   - get_user_context: max 5 fatti biografici, nessun dato finanziario
  *   - Tutti i dati restituiti al LLM sono già in DB, non generati ex-novo
  */
-import { eq, and, ilike, or, isNull, desc, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, ilike, or, isNull, desc, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import {
   db,
@@ -27,8 +27,6 @@ import {
   educationPathsTable,
   professionEducationPathsTable,
   usersTable,
-  ragChunksTable,
-  ragSourcesTable,
   weakSignalsTable,
   jobPostingSnapshotsTable,
   skillCooccurrencesTable,
@@ -550,6 +548,7 @@ export async function handleSaveObjective(
       .insert(userObjectivesTable)
       .values({ userId, text: args.text.trim(), category: args.category ?? "altro", dueDate })
       .returning({ id: userObjectivesTable.id, text: userObjectivesTable.text });
+    if (!row) return err("UNAVAILABLE", "Errore nel salvataggio dell'obiettivo");
     return { ok: true, data: { ok: true, id: row.id, text: row.text, dueDate: dueDate ?? null } };
   } catch (e) {
     logger.warn({ e, userId }, "[tool] save_objective error");
@@ -664,7 +663,6 @@ export async function handleGetLearningPaths(
 
     // Fallback: cerca per sectorFit o restituisce i più generici
     if (rows.length === 0) {
-      const pattern = args.sectorName ? `%${args.sectorName}%` : "%";
       rows = await db
         .select({ id: educationPathsTable.id, path: educationPathsTable.path, type: educationPathsTable.type, duration: educationPathsTable.duration, cost: educationPathsTable.cost, steps: educationPathsTable.steps })
         .from(educationPathsTable)
@@ -701,6 +699,7 @@ export async function handleSaveBusinessIdea(
         status:   "draft",
       })
       .returning({ id: businessIdeasTable.id });
+    if (!row) return err("UNAVAILABLE", "Errore nel salvataggio dell'idea");
     return { ok: true, data: { ok: true, id: row.id } };
   } catch (e) {
     logger.warn({ e, userId }, "[tool] save_business_idea error");
@@ -739,6 +738,7 @@ export async function handleAddCalendarEvent(
         category:    (args.type ?? "task") as any,
       })
       .returning({ id: calendarEventsTable.id });
+    if (!row) return err("UNAVAILABLE", "Errore nell'aggiunta dell'evento");
     return { ok: true, data: { ok: true, id: row.id, date: args.date } };
   } catch (e) {
     logger.warn({ e, userId }, "[tool] add_calendar_event error");
@@ -899,7 +899,7 @@ export async function handleSearchMemoryGraph(
     const result = await searchMemoryGraph({
       userId,
       query: args.query,
-      limit: args.limit,
+      ...(args.limit === undefined ? {} : { limit: args.limit }),
       includeCandidates: Boolean(args.includeCandidates),
     });
 
@@ -1030,15 +1030,20 @@ export async function handleGetJobPostingTrend(
       return { ok: true, data: { roleTitle: args.roleTitle ?? "", trend: [], growthRate: 0, direction: "stable" } };
     }
 
-    const first = rows[0].count;
-    const last  = rows[rows.length - 1].count;
+    const firstRow = rows[0];
+    const lastRow  = rows[rows.length - 1];
+    if (!firstRow || !lastRow) {
+      return { ok: true, data: { roleTitle: args.roleTitle ?? "", trend: [], growthRate: 0, direction: "stable" } };
+    }
+    const first = firstRow.count;
+    const last  = lastRow.count;
     const growthRate = first > 0 ? Math.round(((last - first) / first) * 100) : 0;
     const direction  = growthRate > 5 ? "up" : growthRate < -5 ? "down" : "stable";
 
     return {
       ok: true,
       data: {
-        roleTitle:  rows[0].roleTitle,
+        roleTitle:  firstRow.roleTitle,
         trend:      rows.map((r) => ({
           period:       r.period,
           count:        r.count,

@@ -1,4 +1,4 @@
-import { asc, desc, gt, lt, eq, and, sql, type SQL } from "drizzle-orm";
+import { asc, desc, gt, lt, sql, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 
 export interface CursorPaginationParams {
@@ -51,7 +51,12 @@ export function buildCursorWhere(
  * );
  * ```
  */
-export function applyCursorOrder<T extends { orderBy: Function; limit: Function }>(
+interface CursorOrderBuilder {
+  orderBy: (...columns: SQL[]) => CursorOrderBuilder;
+  limit: (limit: number) => CursorOrderBuilder;
+}
+
+export function applyCursorOrder<T extends CursorOrderBuilder>(
   qb: T,
   sortCol: PgColumn,
   tiebreakerCol: PgColumn,
@@ -87,13 +92,16 @@ export function decodeCursor(cursor: string): [string, string] {
  * Returns items (capped at limit), nextCursor, prevCursor, hasMore.
  */
 export async function paginate<T extends Record<string, unknown>>(
-  queryFn: (qb: { where: Function; orderBy: Function; limit: Function }) => Promise<T[]>,
+  queryFn: (controls: {
+    where: (condition: SQL | undefined) => SQL | undefined;
+    orderBy: () => void;
+    limit: () => void;
+  }) => Promise<T[]>,
   sortCol: PgColumn,
   tiebreakerCol: PgColumn,
   params: CursorPaginationParams,
   order: "asc" | "desc" = "desc",
 ): Promise<CursorPaginationResult<T>> {
-  const limit = Math.max(1, Math.min(params.limit, 100));
   const dir = params.direction === "prev" ? "prev" : "next";
 
   let cursorValue: unknown;
@@ -107,21 +115,12 @@ export async function paginate<T extends Record<string, unknown>>(
 
   const whereClause = buildCursorWhere(sortCol, cursorValue, tiebreakerCol, tiebreakerValue, dir, order);
 
-  const qb: any = { where: (w: any) => {}, orderBy: () => {}, limit: () => {} };
-
-  // We need to simulate the Drizzle query builder pattern.
-  // Build the actual query now.
-  const orderFn = order === "asc" ? asc : desc;
-
-  let query = (whereClause ? undefined : undefined); // placeholder
-
-  // Since Drizzle doesn't support dynamic query building via builder objects,
-  // we execute directly and let the caller use the raw conditions.
   const items = await queryFn({
-    where: (w: any) => w,
+    where: (condition) => condition,
     orderBy: () => {},
     limit: () => {},
   });
+  void whereClause;
 
   // This is more of a reference implementation - for actual Drizzle usage
   // the caller should use the lower-level helpers directly.

@@ -199,31 +199,35 @@ router.get("/suggest", async (req, res) => {
         .limit(2),
     ]);
 
-    if (sectors.length > 0) {
+    const sector = sectors[0];
+    if (sector) {
       suggestions.push({
-        title: `Esplora il settore: ${sectors[0].title}`,
-        description: sectors[0].description,
-        url: `/settore/${sectors[0].id}`,
+        title: `Esplora il settore: ${sector.title}`,
+        description: sector.description,
+        url: `/settore/${sector.id}`,
       });
     }
-    if (roles.length > 0) {
+    const role = roles[0];
+    if (role) {
       suggestions.push({
-        title: `Ruolo: ${roles[0].title}`,
-        description: roles[0].description ?? "",
-        url: `/ruolo/${roles[0].id}`,
+        title: `Ruolo: ${role.title}`,
+        description: role.description ?? "",
+        url: `/ruolo/${role.id}`,
       });
     }
-    if (articles.length > 0) {
+    const article = articles[0];
+    if (article) {
       suggestions.push({
-        title: `Leggi: ${articles[0].title}`,
+        title: `Leggi: ${article.title}`,
         description: "Articolo di crescita personale",
-        url: `/crescita/articolo/${articles[0].slug}`,
+        url: `/crescita/articolo/${article.slug}`,
       });
     }
-    if (newsItems.length > 0) {
+    const newsItem = newsItems[0];
+    if (newsItem) {
       suggestions.push({
-        title: `Notizie: ${newsItems[0].title}`,
-        description: "Novità dal settore",
+        title: `Notizie: ${newsItem.title}`,
+        description: "Novita dal settore",
         url: "/news",
       });
     }
@@ -287,11 +291,11 @@ router.post("/orchestrate", optionalAuth, async (req, res) => {
       for await (const event of runSearchOrchestrator({
         query:      q.trim(),
         userId:     0, // anonymous
-        sessionId: numericSessionId,
         userContext: { isPremium: false, memorySection: "" },
         history,
         requestId:  crypto.randomUUID?.() ?? Math.random().toString(36),
         prefetchedResults: searchSnapshot.results,
+        ...(numericSessionId !== undefined ? { sessionId: numericSessionId } : {}),
       })) {
         send(event);
         if (event.type === "done" || event.type === "error") break;
@@ -333,12 +337,12 @@ router.post("/orchestrate", optionalAuth, async (req, res) => {
     for await (const event of runSearchOrchestrator({
       query:      q.trim(),
       userId,
-      sessionId: numericSessionId,
       userContext: { isPremium, memorySection },
       history,
       requestId:  crypto.randomUUID?.() ?? Math.random().toString(36),
       prefetchedResults: searchSnapshot.results,
-    })) {
+        ...(numericSessionId !== undefined ? { sessionId: numericSessionId } : {}),
+      })) {
       send(event);
       if (event.type === "done" || event.type === "error") break;
     }

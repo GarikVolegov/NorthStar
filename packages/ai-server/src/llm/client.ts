@@ -57,25 +57,6 @@ export interface LLMProvider {
 
 // ── Retry + timeout helpers ───────────────────────────────────────
 
-function isTransientError(err: unknown): boolean {
-  if (err instanceof Error) {
-    const msg = err.message.toLowerCase();
-    return (
-      msg.includes("rate limit") ||
-      msg.includes("timeout") ||
-      msg.includes("5") ||
-      msg.includes("network") ||
-      msg.includes("econnrefused") ||
-      msg.includes("econnreset") ||
-      msg.includes("etimedout") ||
-      msg.includes("internal server error") ||
-      msg.includes("service unavailable") ||
-      msg.includes("bad gateway")
-    );
-  }
-  return false;
-}
-
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
     promise,

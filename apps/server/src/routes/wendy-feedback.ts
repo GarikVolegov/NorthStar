@@ -13,7 +13,7 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
-import { requireAuth, optionalAuth } from "../middleware/auth";
+import { optionalAuth } from "../middleware/auth";
 import { db, wendyFeedbackTable } from "@workspace/db";
 import { rootLogger } from "../middleware/logger";
 

@@ -9,7 +9,7 @@ const records: RequestRecord[] = [];
 
 function prune(): void {
   const cutoff = Date.now() - WINDOW_MS;
-  while (records.length > 0 && records[0].timestamp < cutoff) {
+  while (records.length > 0 && (records[0]?.timestamp ?? Number.POSITIVE_INFINITY) < cutoff) {
     records.shift();
   }
 }

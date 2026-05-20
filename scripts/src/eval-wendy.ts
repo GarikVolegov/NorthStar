@@ -63,15 +63,15 @@ interface EvalResult {
     automaticChecks: {
       name: string;
       passed: boolean;
-      reason?: string;
+      reason: string | undefined;
     }[];
     responseTime: number;
     responseLength: number;
     toolsUsed: string[];
     responseCategory: string;
   };
-  manualJudgeRequired?: boolean;
-  judgePrompt?: string;
+  manualJudgeRequired: boolean;
+  judgePrompt: string | undefined;
   fullResponse?: string;
 }
 
@@ -209,7 +209,7 @@ function evaluateResponse(
   testCase: TestCase,
   response: Awaited<ReturnType<typeof callWendyAPI>>
 ): EvalResult {
-  const checks: Array<{ name: string; passed: boolean; reason?: string }> = [];
+  const checks: Array<{ name: string; passed: boolean; reason: string | undefined }> = [];
   const exp = testCase.expectations;
   const text = response.fullText.toLowerCase();
 
@@ -309,7 +309,14 @@ function evaluateResponse(
 
 function generateReport(results: EvalResult[]): {
   summary: KPISummary[];
-  overallKPIs: Record<string, number>;
+  overallKPIs: {
+    total_tests: number;
+    passed: number;
+    failed: number;
+    pass_rate: number;
+    avg_latency_ms: number;
+    avg_accuracy_score: number;
+  };
   results: EvalResult[];
 } {
   const byCategory = new Map<string, EvalResult[]>();
@@ -380,6 +387,7 @@ async function main() {
 
   for (let i = 0; i < tests.length; i++) {
     const test = tests[i];
+    if (!test) continue;
     process.stdout.write(`[${i + 1}/${tests.length}] ${test.id}: ${test.description}... `);
 
     try {

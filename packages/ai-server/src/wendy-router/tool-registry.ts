@@ -285,7 +285,7 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
 export function getToolsForIntent(intent: WendyIntent): ToolDefinition[] {
   return (INTENT_TOOLS[intent] ?? [])
     .map((n) => ALL_TOOLS[n])
-    .filter(Boolean);
+    .filter((tool): tool is ToolDefinition => Boolean(tool));
 }
 
 export function toolsToOpenAIFormat(tools: ToolDefinition[]): Array<{

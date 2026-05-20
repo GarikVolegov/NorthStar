@@ -43,6 +43,7 @@ function parseXmlItems(xml: string): RssItem[] {
   const itemMatches = xml.matchAll(/<item>([\s\S]*?)<\/item>/gi);
   for (const match of itemMatches) {
     const block = match[1];
+    if (!block) continue;
     const title = block.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i)?.[1]?.trim() ?? "";
     const desc  = block.match(/<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/i)?.[1]?.trim() ?? "";
     const link  = block.match(/<link>([\s\S]*?)<\/link>/i)?.[1]?.trim() ?? "";

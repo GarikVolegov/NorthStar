@@ -83,7 +83,15 @@ router.post("/analyze/trend", requireAuth, async (req, res) => {
 
   try {
     const { role_title, geography, snapshots } = parsed.data;
-    const result = await mlClient.analyzeTrendInline(role_title, geography, snapshots);
+    const normalizedSnapshots = snapshots.map((snapshot) => ({
+      period: snapshot.period,
+      geography: snapshot.geography,
+      count: snapshot.count,
+      ...(snapshot.top_skills ? { top_skills: snapshot.top_skills } : {}),
+      ...(snapshot.avg_salary_min !== undefined ? { avg_salary_min: snapshot.avg_salary_min } : {}),
+      ...(snapshot.avg_salary_max !== undefined ? { avg_salary_max: snapshot.avg_salary_max } : {}),
+    }));
+    const result = await mlClient.analyzeTrendInline(role_title, geography, normalizedSnapshots);
     res.json(result);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
