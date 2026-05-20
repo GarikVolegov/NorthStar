@@ -1,11 +1,11 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { User, Mail, Calendar, ShieldCheck, KeyRound, Globe, Palette, Hand } from "lucide-react";
 import { ChangePasswordSection } from "@/components/profile/settings/ChangePasswordSection";
 import { PrivacyCard } from "@/components/profile/settings/PrivacyCard";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { useLefty } from "@/hooks/useLefty";
 import type { AuthUser } from "@/contexts/AuthContext";
+import { useLefty } from "@/hooks/useLefty";
+import { Calendar, Globe, Hand, KeyRound, Mail, Palette, ShieldCheck, User } from "lucide-react";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("it-IT", {

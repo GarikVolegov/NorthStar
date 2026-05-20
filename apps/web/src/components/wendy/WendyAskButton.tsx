@@ -30,7 +30,7 @@
  *   - disabled: disabilita il bottone
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ContextualAction } from '../../hooks/useWendyChat.js';
 
 export interface WendyAskButtonProps {
@@ -72,13 +72,15 @@ export function WendyAskButton({
 
   // Se c'è solo un'azione, bypassa il menu
   if (actions.length === 1) {
+    const onlyAction = actions[0];
+    if (!onlyAction) return null;
     return (
       <button
         type="button"
         disabled={disabled}
-        onClick={() => handleSelect(actions[0])}
+        onClick={() => handleSelect(onlyAction)}
         className={`wendy-ask-btn wendy-ask-btn--${variant} ${className}`}
-        aria-label={actions[0].label}
+        aria-label={onlyAction.label}
       >
         <span className="wendy-ask-btn__icon" aria-hidden>✨</span>
         {variant === 'button' && <span>{label}</span>}

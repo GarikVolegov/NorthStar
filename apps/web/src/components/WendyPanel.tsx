@@ -1,8 +1,8 @@
-import { useEffect, useRef, useMemo } from "react";
+import { X } from "lucide-react";
+import { useEffect, useMemo, useRef } from "react";
 import { useWendy } from "../contexts/WendyProvider";
 import { WendyChat } from "./WendyChat";
 import { WendyAvatar } from "./wendy-avatar";
-import { X } from "lucide-react";
 
 export function WendyPanel() {
   const { isOpen, isSpeaking, close, getPageHints } = useWendy();
@@ -69,7 +69,7 @@ export function WendyPanel() {
         <div className="flex-1 overflow-hidden">
           <WendyChat
             className="h-full rounded-none border-0 bg-transparent shadow-none"
-            welcomeMessage={hints.welcome}
+            {...(hints.welcome !== undefined ? { welcomeMessage: hints.welcome } : {})}
             quickActions={hints.quickActions}
           />
         </div>

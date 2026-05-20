@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { getJson } from "@/lib/apiClient";
+import { useCallback, useEffect, useState } from "react";
 
 export type LeaderboardMode = "xp" | "streak";
 
@@ -21,7 +22,10 @@ export interface LeaderboardData {
 
 const POLL_INTERVAL_MS = 60_000;
 
-export function useLeaderboard(initialMode: LeaderboardMode = "xp", limit = 20) {
+export function useLeaderboard(
+  initialMode: LeaderboardMode = "xp",
+  limit = 20,
+) {
   const [data, setData] = useState<LeaderboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,9 +34,10 @@ export function useLeaderboard(initialMode: LeaderboardMode = "xp", limit = 20) 
   const fetchLeaderboard = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/leaderboard?mode=${mode}&limit=${limit}`, { credentials: "include" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json() as LeaderboardData;
+      const json = await getJson<LeaderboardData>(
+        `/api/leaderboard?mode=${mode}&limit=${limit}`,
+        { credentials: "include" },
+      );
       setData(json);
       setError(null);
     } catch (err) {
@@ -44,7 +49,9 @@ export function useLeaderboard(initialMode: LeaderboardMode = "xp", limit = 20) 
 
   useEffect(() => {
     void fetchLeaderboard();
-    const interval = setInterval(() => { void fetchLeaderboard(); }, POLL_INTERVAL_MS);
+    const interval = setInterval(() => {
+      void fetchLeaderboard();
+    }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [fetchLeaderboard]);
 

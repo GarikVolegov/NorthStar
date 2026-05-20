@@ -1,19 +1,36 @@
-import { useState, useMemo, useEffect } from "react";
-import { useParams, Link } from "wouter";
-import { useGetSector } from "@workspace/api-client-react";
-import { Button } from "@/components/ui/button";
+import { PhaseCard } from "@/components/roadmap/PhaseCard";
 import { Badge } from "@/components/ui/badge";
-import {
-  ArrowLeft, Sparkles, Loader2, Zap, BookOpen, Award, Target,
-  TrendingUp, Lightbulb, CheckCircle2, ChevronDown, ChevronUp,
-  MapPin, Euro, Users, GraduationCap, Rocket, Briefcase, Wrench,
-  School, BookMarked, Star, Info, ThumbsUp, ThumbsDown, Plus,
-} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api-fetch";
+import { ERROR_MESSAGES, ROADMAP_TEXT } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { PhaseCard } from "@/components/roadmap/PhaseCard";
-import { ROADMAP_TEXT, ERROR_MESSAGES } from "@/lib/constants";
+import { useGetSector } from "@workspace/api-client-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  Briefcase,
+  CheckCircle2,
+  Euro,
+  GraduationCap,
+  Info,
+  Lightbulb,
+  Loader2,
+  MapPin,
+  Plus,
+  Rocket,
+  School,
+  Sparkles,
+  Star,
+  ThumbsDown,
+  ThumbsUp,
+  TrendingUp,
+  Users,
+  Wrench,
+  Zap
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 

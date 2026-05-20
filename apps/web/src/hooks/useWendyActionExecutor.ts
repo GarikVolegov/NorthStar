@@ -1,9 +1,9 @@
-import { useCallback } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api-fetch";
 import { eventBus } from "@/lib/event-bus";
-import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
+import { useLocation } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -34,15 +34,15 @@ export interface WendyAction {
   description: string;
   requiresConfirmation: boolean;
   payload: Record<string, unknown>;
-  targetRoute?: string;
-  preview?: Array<{ label: string; value: string }>;
-  sourceTool?: string;
-  error?: string;
+  targetRoute?: string | undefined;
+  preview?: Array<{ label: string; value: string }> | undefined;
+  sourceTool?: string | undefined;
+  error?: string | undefined;
 }
 
 type ToolCallEvent = {
   name?: string;
-  args?: Record<string, unknown>;
+  args?: Record<string, unknown> | undefined;
   result?: unknown;
 };
 

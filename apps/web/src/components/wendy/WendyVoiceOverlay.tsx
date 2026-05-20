@@ -22,11 +22,11 @@
  *   - Trap focus sull'overlay (close button)
  *   - aria-live per la trascrizione
  */
+import { AvatarState, WendyAvatar } from '@/components/wendy-avatar';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import type { UseVoiceChatReturn, VoiceChatPhase, VoiceChatMessage } from '../../hooks/useVoiceChat.js';
+import type { UseVoiceChatReturn, VoiceChatMessage, VoiceChatPhase } from '../../hooks/useVoiceChat.js';
 import { useVoiceChat } from '../../hooks/useVoiceChat.js';
-import { WendyAvatar, AvatarState } from '@/components/wendy-avatar';
 
 const PHASE_LABEL: Record<VoiceChatPhase, string> = {
   idle:      'Premi il microfono per parlare',
@@ -59,7 +59,10 @@ export function WendyVoiceOverlay({
 }: WendyVoiceOverlayProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
 
-  const vc: UseVoiceChatReturn = useVoiceChat({ apiUrl, historyRef });
+  const vc: UseVoiceChatReturn = useVoiceChat({
+    ...(apiUrl !== undefined ? { apiUrl } : {}),
+    historyRef,
+  });
 
   // Focus close button on open for accessibility
   useEffect(() => {
@@ -86,8 +89,6 @@ export function WendyVoiceOverlay({
    const isListening = vc.phase === 'listening';
    const isThinking  = vc.phase === 'thinking';
    const isSpeaking  = vc.phase === 'speaking';
-   const isIdle      = vc.phase === 'idle';
-
    // Map voice chat phase to WendyAvatar state and phase
    const avatarState: AvatarState = vc.phase === 'speaking' ? 'speaking' :
                                   vc.phase === 'listening' ? 'curious' : 'reflective';

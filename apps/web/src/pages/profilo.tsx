@@ -1,28 +1,27 @@
-import { useState, useEffect, useRef } from "react";
-import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/contexts/AuthContext";
+import { LinkedInImportWizard } from "@/components/LinkedInImportWizard";
+import { JourneySectionRenderer, type JourneyType } from "@/components/profile/profile-sections";
+import { ProfileSettings } from "@/components/profile/ProfileSettings";
+import { BadgesAchievements } from "@/components/profile/sections/BadgesAchievements";
 import { Button } from "@/components/ui/button";
-import { useTranslation } from "react-i18next";
+import type { AuthUser } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePageModule } from "@/hooks/usePageModule";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
+import { apiFetch } from "@/lib/api-fetch";
+import { useQuery } from "@tanstack/react-query";
 import {
   Calendar,
   Camera,
-  Loader2,
   Linkedin,
+  Loader2,
   Mail,
   ShieldCheck,
   Trash2,
-  TrendingUp,
-  User,
+  TrendingUp
 } from "lucide-react";
-import { apiFetch } from "@/lib/api-fetch";
-import { usePageModule } from "@/hooks/usePageModule";
-import { useWendyPageContext } from "@/hooks/useWendyPageContext";
-import { ProfileSettings } from "@/components/profile/ProfileSettings";
-import { BadgesAchievements } from "@/components/profile/sections/BadgesAchievements";
-import { JourneySectionRenderer, type JourneyType } from "@/components/profile/profile-sections";
-import { LinkedInImportWizard } from "@/components/LinkedInImportWizard";
-import type { AuthUser } from "@/contexts/AuthContext";
+import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -411,10 +410,10 @@ export default function Profilo() {
     <div className="pb-10">
       <ProfileHero
         user={user}
-        avatarUrl={avatarUrl}
-        bannerUrl={bannerUrl}
-        createdAt={profile?.createdAt}
-        emailVerified={profile?.emailVerified}
+        {...(avatarUrl !== undefined ? { avatarUrl } : {})}
+        {...(bannerUrl !== undefined ? { bannerUrl } : {})}
+        {...(profile?.createdAt !== undefined ? { createdAt: profile.createdAt } : {})}
+        {...(profile?.emailVerified !== undefined ? { emailVerified: profile.emailVerified } : {})}
         showLinkedInImport={showLinkedInImport}
         onAvatarUpdate={(url) => {
           setAvatarUrl(url);
@@ -428,7 +427,10 @@ export default function Profilo() {
       <div className="container mx-auto grid max-w-5xl grid-cols-1 gap-6 px-4 md:grid-cols-3">
         <div className="space-y-5 md:col-span-1">
           <div id="impostazioni" className="scroll-mt-20">
-            <ProfileSettings user={user} createdAt={profile?.createdAt} />
+            <ProfileSettings
+              user={user}
+              {...(profile?.createdAt !== undefined ? { createdAt: profile.createdAt } : {})}
+            />
           </div>
           <BadgesAchievements completionData={completionData ?? null} />
         </div>

@@ -1,20 +1,31 @@
-import { useState, useRef, useEffect } from "react";
-import { useTranslation } from "react-i18next";
-import { Link } from "wouter";
-import { useAuth } from "@/contexts/AuthContext";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useWebSocket } from "@/hooks/useWebSocket";
-import { useChatEncryption } from "@/hooks/useChatEncryption";
 import { ChatDrawer } from "@/components/chat/ChatDrawer";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Users, UserPlus, Search, Check, X, Loader2, Star,
-  UserCheck, Clock, Globe, Lock, Trash2, ExternalLink,
-  UserMinus, ChevronRight, MessageCircle, Shield,
-} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { deleteJson, getJson, patchJson, postJson } from "@/lib/apiClient";
+import { useChatEncryption } from "@/hooks/useChatEncryption";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import { cn } from "@/lib/utils";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Check,
+  Clock,
+  ExternalLink,
+  Globe,
+  Loader2,
+  Lock,
+  MessageCircle,
+  Search,
+  UserCheck,
+  UserMinus,
+  UserPlus,
+  Users,
+  X
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -120,8 +131,9 @@ export default function Amici() {
   const { data: friendsData, isLoading: friendsLoading } = useQuery({
     queryKey: ["friends", user?.id],
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/friends/${user!.id}`);
-      return res.json() as Promise<{ friends: FriendEntry[]; incoming: FriendEntry[]; outgoing: FriendEntry[] }>;
+      return getJson<{ friends: FriendEntry[]; incoming: FriendEntry[]; outgoing: FriendEntry[] }>(
+        `${BASE}api/friends/${user!.id}`,
+      );
     },
     enabled: !!user?.id,
   });
@@ -129,8 +141,9 @@ export default function Amici() {
   const { data: searchData, isLoading: searchLoading } = useQuery({
     queryKey: ["users-search", debouncedSearch, user?.id],
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/users/search?q=${encodeURIComponent(debouncedSearch)}&userId=${user!.id}`);
-      return res.json() as Promise<{ users: SearchResult[] }>;
+      return getJson<{ users: SearchResult[] }>(
+        `${BASE}api/users/search?q=${encodeURIComponent(debouncedSearch)}&userId=${user!.id}`,
+      );
     },
     enabled: !!user?.id && debouncedSearch.length >= 2,
   });
@@ -142,8 +155,9 @@ export default function Amici() {
       const friends = friendsData?.friends ?? [];
       const counts: Record<number, number> = {};
       for (const f of friends) {
-        const res = await fetch(`${BASE}api/friends/messages/${f.friendshipId}?limit=100`);
-        const data = await res.json();
+        const data = await getJson<{ messages?: ChatMessage[] }>(
+          `${BASE}api/friends/messages/${f.friendshipId}?limit=100`,
+        );
         const msgs: ChatMessage[] = data.messages ?? [];
         counts[f.friendshipId] = msgs.filter((m) => m.senderId !== user!.id && !m.readAt).length;
       }
@@ -162,37 +176,28 @@ export default function Amici() {
 
   const sendRequestMutation = useMutation({
     mutationFn: async (receiverId: number) => {
-      const res = await fetch(`${BASE}api/friends/request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: user!.id, receiverId }),
-      });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Errore"); }
-      return res.json();
+      return postJson(`${BASE}api/friends/request`, { requesterId: user!.id, receiverId });
     },
     onSuccess: () => { invalidateFriends(); invalidateSearch(); },
   });
 
   const acceptMutation = useMutation({
     mutationFn: async (friendshipId: number) => {
-      const res = await fetch(`${BASE}api/friends/${friendshipId}/accept`, { method: "PATCH" });
-      if (!res.ok) throw new Error("Errore");
+      await patchJson(`${BASE}api/friends/${friendshipId}/accept`);
     },
     onSuccess: () => { invalidateFriends(); invalidateSearch(); },
   });
 
   const rejectMutation = useMutation({
     mutationFn: async (friendshipId: number) => {
-      const res = await fetch(`${BASE}api/friends/${friendshipId}/reject`, { method: "PATCH" });
-      if (!res.ok) throw new Error("Errore");
+      await patchJson(`${BASE}api/friends/${friendshipId}/reject`);
     },
     onSuccess: () => { invalidateFriends(); invalidateSearch(); },
   });
 
   const removeMutation = useMutation({
     mutationFn: async (friendshipId: number) => {
-      const res = await fetch(`${BASE}api/friends/${friendshipId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Errore");
+      await deleteJson(`${BASE}api/friends/${friendshipId}`);
     },
     onSuccess: () => { invalidateFriends(); invalidateSearch(); },
   });

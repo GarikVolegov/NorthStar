@@ -429,7 +429,14 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
 } as const;
 
 export function getErrorDefinition(code: string): ErrorDefinition {
-  return ERROR_DEFINITIONS[code] ?? ERROR_DEFINITIONS.UNKNOWN_ERROR;
+  return ERROR_DEFINITIONS[code] ?? ERROR_DEFINITIONS.UNKNOWN_ERROR ?? {
+    code: "UNKNOWN_ERROR",
+    messageIT: "Si è verificato un errore inaspettato.",
+    messageEN: "An unexpected error occurred.",
+    severity: "critical",
+    recoveryAction: "reload_page",
+    category: "unknown",
+  };
 }
 
 export function createError(

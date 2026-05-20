@@ -1,6 +1,13 @@
-import { useState, useCallback } from "react";
+import { postJson } from "@/lib/apiClient";
+import { useCallback, useState } from "react";
 
-export type SessionPhase = "idle" | "starting" | "ongoing" | "completing" | "done" | "error";
+export type SessionPhase =
+  | "idle"
+  | "starting"
+  | "ongoing"
+  | "completing"
+  | "done"
+  | "error";
 
 export interface SessionResult {
   xpAwarded: number;
@@ -21,17 +28,11 @@ export function useVoiceSession() {
     setPhase("starting");
     setError(null);
     try {
-      const res = await fetch("/api/voice/start", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentType }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `HTTP ${res.status}`);
-      }
-      const data = await res.json() as { sessionId: number; startedAt: string };
+      const data = await postJson<{ sessionId: number; startedAt: string }>(
+        "/api/voice/start",
+        { agentType },
+        { credentials: "include" },
+      );
       setSessionId(data.sessionId);
       setPhase("ongoing");
       return data.sessionId;
@@ -42,38 +43,39 @@ export function useVoiceSession() {
     }
   }, []);
 
-  const complete = useCallback(async (opts?: { durationSeconds?: number; summary?: string }) => {
-    if (!sessionId) return null;
-    setPhase("completing");
-    try {
-      const res = await fetch("/api/voice/complete", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, ...opts }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json() as SessionResult;
-      setResult(data);
-      setPhase("done");
-      return data;
-    } catch (err) {
-      setError(String(err));
-      setPhase("error");
-      return null;
-    }
-  }, [sessionId]);
+  const complete = useCallback(
+    async (opts?: { durationSeconds?: number; summary?: string }) => {
+      if (!sessionId) return null;
+      setPhase("completing");
+      try {
+        const data = await postJson<SessionResult>(
+          "/api/voice/complete",
+          { sessionId, ...opts },
+          { credentials: "include" },
+        );
+        setResult(data);
+        setPhase("done");
+        return data;
+      } catch (err) {
+        setError(String(err));
+        setPhase("error");
+        return null;
+      }
+    },
+    [sessionId],
+  );
 
   const abandon = useCallback(async () => {
     if (!sessionId) return;
     try {
-      await fetch("/api/voice/abandon", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId }),
-      });
-    } catch { /* silent */ }
+      await postJson(
+        "/api/voice/abandon",
+        { sessionId },
+        { credentials: "include" },
+      );
+    } catch {
+      /* silent */
+    }
     setPhase("idle");
     setSessionId(null);
   }, [sessionId]);

@@ -1,9 +1,9 @@
-import { Link } from "wouter";
-import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/lib/seo";
-import { School, GraduationCap, CheckCircle2, ArrowRight, Brain, Compass, BarChart3, Users, BookOpen } from "lucide-react";
+import { ArrowRight, BarChart3, BookOpen, Brain, CheckCircle2, Compass, GraduationCap, School, Users } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 export default function AffiliazioneScuole() {
   const { t } = useTranslation();
@@ -27,6 +27,8 @@ export default function AffiliazioneScuole() {
     "Dati su stipendi, crescita e rischio AI",
     "Confronto tra percorsi universitari e ITS",
   ];
+  void mItems;
+  void sItems;
 
   const features = [
     { icon: Brain, title: "Test RIASEC validato", desc: "Un modello usato nelle scuole di tutto il mondo, adattato al contesto italiano." },

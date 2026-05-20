@@ -1,25 +1,19 @@
-import { useState, useCallback, useRef } from 'react';
-import { useSSEStream } from './useSSEStream.js';
-import { useTTS } from './useTTS.js';
-import { useSTT } from './useSTT.js';
-import { useWendyOpenAITTS } from './useWendyOpenAITTS.js';
+import { useCallback, useRef, useState } from 'react';
 import { useWendy } from '../contexts/WendyProvider';
+import { postJson } from '../lib/apiClient';
+import { clientLogger } from '../lib/clientLogger';
 import { TOKEN_STORAGE_KEY } from '../lib/storage-keys';
+import { useSSEStream } from './useSSEStream.js';
+import { useSTT } from './useSTT.js';
+import { useTTS } from './useTTS.js';
 import {
   normalizeWendyAction,
   useWendyActionExecutor,
   type WendyAction,
 } from './useWendyActionExecutor';
-
-/**
- * useWendyChat — orchestratore stato completo chat Wendy
- *
- * Novità v2:
- *   - sendContextualMessage(): messaggio con contesto iniettato + prefill
- *   - citations: lista fonti RAG ricevute via SSE prima del testo
- *   - sendFeedback(): 👍/👎 + nota opzionale per Human-in-the-Loop
- *   - history: inviato al backend per mantenere la coerenza di sessione
- */
+import { buildCompressedHistory, compactPageData } from './useWendyHistoryCompression';
+import { useWendyOpenAITTS } from './useWendyOpenAITTS.js';
+import { FATAL_ERRORS, THINKING_LABELS } from './wendy.config';
 
 export type MessageRole = 'user' | 'assistant' | 'error';
 
@@ -36,15 +30,15 @@ export interface ChatMessage {
   role:         MessageRole;
   content:      string;
   timestamp:    number;
-  isStreaming?: boolean;
-  thinkingMs?:  number;
-  citations?:   RagCitation[];
-  feedback?:    'up' | 'down';
-  context?:     string;
-  uiTool?:      { name: string; args: Record<string, unknown> };
-  actions?:     WendyAction[];
-  requestId?:   string;   // ID server per il feedback — arriva nel done SSE event
-  toolsUsed?:   string[]; // tool chiamati durante questa risposta
+  isStreaming?: boolean | undefined;
+  thinkingMs?:  number | undefined;
+  citations?:   RagCitation[] | undefined;
+  feedback?:    'up' | 'down' | undefined;
+  context?:     string | undefined;
+  uiTool?:      { name: string; args: Record<string, unknown> } | undefined;
+  actions?:     WendyAction[] | undefined;
+  requestId?:   string | undefined;   // ID server per il feedback - arriva nel done SSE event
+  toolsUsed?:   string[] | undefined; // tool chiamati durante questa risposta
 }
 
 export interface ThinkingPhase {
@@ -57,25 +51,15 @@ export interface ContextualAction {
   id:          string;
   label:       string;      // es. "Spiega il mio RIASEC"
   prompt:      string;      // prompt completo inviato a Wendy
-  prefillText?: string;     // testo pre-compilato visibile nell'input
+  prefillText?: string | undefined;     // testo pre-compilato visibile nell'input
 }
 
-const THINKING_LABELS = [
-  'Pensando...',
-  'Leggo il contesto...',
-  'Elaboro...',
-  'Compongo la risposta...',
-];
-
-const FATAL_ERRORS = ['ML_SERVICE_UNAVAILABLE', 'UNAUTHORIZED', 'FORBIDDEN'];
-const PAGE_CONTEXT_MAX_CHARS = 12000;
-
 export interface UseWendyChatOptions {
-  apiUrl?:            string;
-  ttsEnabled?:        boolean;
-  sttLang?:           string;
-  maxRetries?:        number;
-  onMessageComplete?: (message: ChatMessage) => void;
+  apiUrl?:            string | undefined;
+  ttsEnabled?:        boolean | undefined;
+  sttLang?:           string | undefined;
+  maxRetries?:        number | undefined;
+  onMessageComplete?: ((message: ChatMessage) => void) | undefined;
 }
 
 export interface UseWendyChatReturn {
@@ -85,7 +69,11 @@ export interface UseWendyChatReturn {
   streamError:             Error | null;
   sendMessage:             (text: string) => Promise<void>;
   sendContextualMessage:   (action: ContextualAction) => Promise<void>;
-  sendFeedback:            (messageId: string, vote: 'up' | 'down', note?: string) => Promise<void>;
+  sendFeedback:            (
+    messageId: string,
+    vote: 'up' | 'down',
+    note?: 'inaccurate' | 'irrelevant' | 'too_long' | 'too_slow' | 'harmful' | 'other',
+  ) => Promise<void>;
   stopStream:              () => void;
   clearHistory:            () => void;
   retryLast:               () => Promise<void>;
@@ -99,101 +87,6 @@ export interface UseWendyChatReturn {
   commitSTT:               () => void;
 }
 
-// ── Compressione history ────────────────────────────────────────────────────
-
-const KEEP_RAW_TURNS = 6; // turni raw nel prompt; i precedenti diventano summary
-const COMPRESS_AFTER = 8; // soglia: oltre N turni si attiva la compressione
-
-interface CompressedHistory {
-  summary?:       string;
-  recentMessages: Array<{ role: 'user' | 'assistant'; content: string }>;
-  totalTurns:     number;
-}
-
-function compactPageData(value: unknown, maxChars = PAGE_CONTEXT_MAX_CHARS): Record<string, unknown> | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
-  const raw = value as Record<string, unknown>;
-  const preferredKeys = [
-    'ideaId',
-    'status',
-    'ideaName',
-    'oneLiner',
-    'canvas',
-    'scores',
-    'scoreReasons',
-    'scoreSuggestions',
-    'averageScore',
-    'assumption',
-    'experiment',
-    'experiments',
-    'activeExperimentId',
-    'activeExperiment',
-    'market',
-    'competitors',
-    'activeCompetitorId',
-    'activeCompetitor',
-    'lastWendyAdvice',
-    'timeline',
-    'decisionState',
-    'decisionReason',
-    'decisionUpdatedAt',
-    'decisionSuggested',
-    'focus',
-    'capabilities',
-    'fields',
-    'actions',
-  ];
-  const compact = preferredKeys.reduce<Record<string, unknown>>((acc, key) => {
-    if (key in raw) acc[key] = raw[key];
-    return acc;
-  }, {});
-  const json = JSON.stringify(compact);
-  if (json.length <= maxChars) return compact;
-  return {
-    ...compact,
-    experiments: Array.isArray(raw.experiments) ? raw.experiments.slice(0, 5) : raw.experiments,
-    competitors: Array.isArray(raw.competitors) ? raw.competitors.slice(0, 8) : raw.competitors,
-    timeline: Array.isArray(raw.timeline) ? raw.timeline.slice(0, 8) : raw.timeline,
-    truncated: true,
-    note: 'Contesto pagina compattato per limite payload.',
-  };
-}
-
-function buildCompressedHistory(
-  rawHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
-  existingSummary?: string,
-): CompressedHistory {
-  const totalTurns = rawHistory.length;
-
-  if (totalTurns <= COMPRESS_AFTER) {
-    // Nessuna compressione necessaria: passa tutto
-    return { summary: existingSummary, recentMessages: rawHistory, totalTurns };
-  }
-
-  // Tieni solo gli ultimi KEEP_RAW_TURNS messaggi raw
-  const recentMessages = rawHistory.slice(-KEEP_RAW_TURNS);
-
-  // Il summary dei turni vecchi viene mantenuto da fuori (sessionStorage o prop)
-  // Se non c'è ancora un summary, creiamo un placeholder strutturato
-  const summary = existingSummary ?? _buildFallbackSummary(rawHistory.slice(0, -KEEP_RAW_TURNS));
-
-  return { summary, recentMessages, totalTurns };
-}
-
-/** Costruisce un summary minimale dai messaggi vecchi (nessuna LLM call). */
-function _buildFallbackSummary(
-  oldMessages: Array<{ role: 'user' | 'assistant'; content: string }>,
-): string {
-  if (oldMessages.length === 0) return '';
-  const lines = oldMessages
-    .filter((m) => m.role === 'user')
-    .slice(-4)
-    .map((m) => `• ${m.content.slice(0, 120)}`);
-  return `[Riepilogo turni precedenti]\n${lines.join('\n')}`;
-}
-
-// ── Hook principale ─────────────────────────────────────────────────────────
-
 export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatReturn {
   const {
     apiUrl    = '/api/ai/wendy',  // nuovo entrypoint unificato
@@ -203,9 +96,11 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     onMessageComplete,
   } = options;
 
+  const defaultThinkingLabel = THINKING_LABELS[0] ?? 'Pensando...';
+
   const [messages,   setMessages]   = useState<ChatMessage[]>([]);
   const [thinking,   setThinking]   = useState<ThinkingPhase>({
-    active: false, label: THINKING_LABELS[0], startedAt: 0,
+    active: false, label: defaultThinkingLabel, startedAt: 0,
   });
   const [ttsEnabled, setTtsEnabled] = useState(initTts);
   const [streamError, setStreamError] = useState<Error | null>(null);
@@ -238,7 +133,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
   let _wendyCtx: ReturnType<typeof useWendy> | null = null;
   try { _wendyCtx = useWendy(); _setPhase = _wendyCtx.setPhase; } catch {}
 
-  // ─── SSE stream ──────────────────────────────────────────────────────────────
+  // SSE stream
 
   const { start: startStream, stop: stopSSEStream, isStreaming } = useSSEStream({
     // Intercetta eventi SSE speciali (rag_citations) prima del testo
@@ -261,7 +156,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
             : 'Hai raggiunto un limite di utilizzo di Wendy.';
           hasNonTextOutputRef.current = true;
           hasTerminalErrorRef.current = true;
-          setThinking({ active: false, label: THINKING_LABELS[0], startedAt: 0 });
+          setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
           setStreamError(new Error('WENDY_GATE'));
           setMessages((prev) =>
             prev.map((m) =>
@@ -279,7 +174,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
           const message = 'Wendy si è interrotta. Riprova.';
           hasNonTextOutputRef.current = true;
           hasTerminalErrorRef.current = true;
-          setThinking({ active: false, label: THINKING_LABELS[0], startedAt: 0 });
+          setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
           setStreamError(new Error(technicalMessage));
           setMessages((prev) =>
             prev.map((m) =>
@@ -362,7 +257,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
           streamedContentRef.current += tokenChunk;
           if (!firstChunkReceivedRef.current) {
             firstChunkReceivedRef.current = true;
-            setThinking({ active: false, label: THINKING_LABELS[0], startedAt: 0 });
+            setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
           }
           setMessages((prev) =>
             prev.map((m) =>
@@ -433,7 +328,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       streamedContentRef.current = '';
       hasNonTextOutputRef.current = false;
       hasTerminalErrorRef.current = false;
-      setThinking({ active: false, label: THINKING_LABELS[0], startedAt: 0 });
+      setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
       retriesRef.current = 0;
 
       if (_setPhase) _setPhase('idle');
@@ -454,7 +349,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       }
       if (_setPhase) _setPhase('idle');
       setStreamError(err);
-      setThinking({ active: false, label: THINKING_LABELS[0], startedAt: 0 });
+      setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
       setMessages((prev) => {
         const assistantId = assistantMsgIdRef.current;
         if (assistantId && prev.some((message) => message.id === assistantId && message.isStreaming)) {
@@ -475,7 +370,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
 
   const stopStream = useCallback(() => {
     stopSSEStream();
-    setThinking({ active: false, label: THINKING_LABELS[0], startedAt: 0 });
+    setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
     setMessages((prev) =>
       prev.map((m) =>
         m.id === assistantMsgIdRef.current
@@ -486,7 +381,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     if (_setPhase) _setPhase('idle');
   }, [stopSSEStream, _setPhase]);
 
-  // ─── Helpers ─────────────────────────────────────────────────────────────────
+  // Helpers
 
   function _friendlyError(err: Error): string {
     if (err.message.includes('504') || err.message.includes('408'))
@@ -517,7 +412,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     ]);
 
     const labelIdx = Math.floor(Math.random() * THINKING_LABELS.length);
-    setThinking({ active: true, label: THINKING_LABELS[labelIdx], startedAt: Date.now() });
+    setThinking({ active: true, label: THINKING_LABELS[labelIdx] ?? defaultThinkingLabel, startedAt: Date.now() });
     setStreamError(null);
 
     if (_setPhase) _setPhase('thinking');
@@ -549,12 +444,12 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
         compressedHistory: compressed,
         pageContext,
         locale:            navigator.language?.slice(0, 2) ?? 'it',
-        // threadId opzionale — da passare se si gestiscono sessioni multiple
+        // threadId opzionale - da passare se si gestiscono sessioni multiple
       }),
     });
   }
 
-  // ─── Public API ───────────────────────────────────────────────────────────────
+  // Public API
 
   const sendMessage = useCallback(async (text: string) => {
     const trimmed = text.trim();
@@ -593,7 +488,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
   }, [isStreaming, tts, openaiTts]);
 
   /**
-   * Invia il feedback 👍/👎 per un messaggio specifico.
+   * Invia il feedback positivo/negativo per un messaggio specifico.
    * Aggiorna lo stato locale immediatamente, poi fa la chiamata API.
    */
   const sendFeedback = useCallback(async (
@@ -610,7 +505,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     const msg = messages.find((m) => m.id === messageId);
     const requestId = msg?.requestId;
     if (!requestId) {
-      console.warn('[useWendyChat] sendFeedback: nessun requestId per', messageId);
+      clientLogger.warn('[useWendyChat] sendFeedback missing requestId', { messageId });
       return;
     }
 
@@ -619,19 +514,19 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      await fetch('/api/ai/wendy/feedback', {
-        method:      'POST',
+      await postJson('/api/ai/wendy/feedback', {
+        requestId,
+        rating:    vote,
+        reason:    reason ?? undefined,
+        toolsUsed: msg?.toolsUsed ?? [],
+      }, {
         headers,
         credentials: 'include',
-        body: JSON.stringify({
-          requestId,
-          rating:    vote,
-          reason:    reason ?? undefined,
-          toolsUsed: msg?.toolsUsed ?? [],
-        }),
       });
     } catch (err) {
-      console.warn('[useWendyChat] sendFeedback failed:', err);
+      clientLogger.warn('[useWendyChat] sendFeedback failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }, [messages]);
 
@@ -686,7 +581,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     setMessages([]);
     historyRef.current = [];
     setStreamError(null);
-    setThinking({ active: false, label: THINKING_LABELS[0], startedAt: 0 });
+    setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
   }, [stopStream, tts, openaiTts]);
 
   const toggleTts = useCallback(() => {

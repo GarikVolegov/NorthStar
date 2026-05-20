@@ -1,6 +1,6 @@
-import { CheckCircle2, Circle } from "lucide-react";
-import { cn } from "@/lib/utils";
 import type { Objective } from "@/hooks/useObjectives";
+import { cn } from "@/lib/utils";
+import { CheckCircle2, Circle } from "lucide-react";
 
 export function ObjectiveRow({ obj }: { obj: Objective }) {
   return (

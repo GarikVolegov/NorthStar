@@ -1,44 +1,43 @@
-import React, { useEffect, useState } from "react";
-import { Link, useLocation } from "wouter";
-import { motion, AnimatePresence } from "framer-motion";
 import { ProssimiEventi } from "@/components/calendario/ProssimiEventi";
-import {
-  ArrowRight,
-  ExternalLink,
-  LogIn,
-  Newspaper,
-  Clock,
-  Sparkles,
-  TrendingUp,
-  Bot,
-  DollarSign,
-  GitCompare,
-  Flame,
-  Briefcase,
-  Laptop,
-  GitMerge,
-  HelpCircle,
-  Rocket,
-  Building2,
-  BarChart3,
-  CheckCircle2,
-  MapPin,
-  ChevronRight,
-  Star,
-  Zap,
-} from "lucide-react";
-import { useGetStatsSummary } from "@workspace/api-client-react";
-import { useQuery } from "@tanstack/react-query";
+import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
+import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWendy } from "@/contexts/WendyProvider";
-import { OnboardingWizard } from "@/components/OnboardingWizard";
+import { apiFetch } from "@/lib/api-fetch";
+import { useReducedMotion } from "@/lib/motion";
 import { SectorIcon } from "@/lib/sector-icon";
 import { cn } from "@/lib/utils";
-import { apiFetch } from "@/lib/api-fetch";
-import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
-import { useReducedMotion } from "@/lib/motion";
+import { useQuery } from "@tanstack/react-query";
+import { useGetStatsSummary } from "@workspace/api-client-react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  ArrowRight,
+  BarChart3,
+  Bot,
+  Briefcase,
+  Building2,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  DollarSign,
+  Flame,
+  GitCompare,
+  GitMerge,
+  HelpCircle,
+  Laptop,
+  LogIn,
+  MapPin,
+  Newspaper,
+  Rocket,
+  Sparkles,
+  Star,
+  TrendingUp,
+  Zap,
+} from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link, useLocation } from "wouter";
 
 const ONBOARDING_KEY = "northstar_onboarding_done";
 
@@ -150,7 +149,7 @@ function useHomeNews() {
   return useQuery<{ news: HomeNewsItem[] }>({
     queryKey: ["home-news"],
     queryFn: async () => {
-      const res = await fetch(
+      const res = await apiFetch(
         `${BASE}api/news?multi=true&categories=technology,business,education&perCategory=1`,
       );
       if (!res.ok) throw new Error("news error");
@@ -164,7 +163,7 @@ function useTrendingSectors() {
   return useQuery<TrendingSector[]>({
     queryKey: ["trending-sectors"],
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/trending-sectors`);
+      const res = await apiFetch(`${BASE}api/trending-sectors`);
       if (!res.ok) throw new Error("error");
       return res.json();
     },
@@ -247,7 +246,9 @@ function HomeNewsCard({ item }: { item: HomeNewsItem }) {
             alt={item.title}
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
           />
         </div>
       ) : (
@@ -558,7 +559,9 @@ function GuestPersonaHero({
             </div>
             <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-white leading-tight mb-3">
               {t("home.hero.heading")}{" "}
-              <span className="text-italic-serif text-primary">{t("home.hero.headingHighlight")}</span>
+              <span className="text-italic-serif text-primary">
+                {t("home.hero.headingHighlight")}
+              </span>
             </h1>
             <p className="text-sm sm:text-base text-white/65 max-w-xl mx-auto">
               {t("home.hero.subtitle")}
@@ -710,9 +713,7 @@ function LoggedInHero({
     },
   };
 
-  const journey = journeyType
-    ? JOURNEY_LABELS[journeyType as JourneyId]
-    : null;
+  const journey = journeyType ? JOURNEY_LABELS[journeyType as JourneyId] : null;
   const JourneyIcon = journey?.Icon;
   const hasTest = !!latestResult?.recommendations?.length;
 
@@ -1107,7 +1108,7 @@ function QuickToolsSection({
   const tools =
     journeyType && ALL_TOOLS[journeyType]
       ? ALL_TOOLS[journeyType]
-      : ALL_TOOLS.indeciso;
+      : (ALL_TOOLS.indeciso ?? []);
 
   return (
     <section className="py-10 border-b border-border">
@@ -1157,9 +1158,21 @@ function QuickToolsSection({
               </div>
             );
             if (href === "#wendy") {
-              return <button key={title} onClick={() => wendy.open()} className="block w-full text-left">{content}</button>;
+              return (
+                <button
+                  key={title}
+                  onClick={() => wendy.open()}
+                  className="block w-full text-left"
+                >
+                  {content}
+                </button>
+              );
             }
-            return <Link key={title} href={href}>{content}</Link>;
+            return (
+              <Link key={title} href={href}>
+                {content}
+              </Link>
+            );
           })}
         </div>
       </div>
@@ -1261,7 +1274,6 @@ export default function Home() {
 
   if (authReady && isLoggedIn) return null;
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const prefersReduced = useReducedMotion();
 
   const { data: latestResult, isLoading: isLatestLoading } =
     useLatestRecommendations(isLoggedIn && !!user);
@@ -1366,7 +1378,9 @@ export default function Home() {
       {isLoggedIn && user && (
         <QuickToolsSection
           journeyType={user.journeyType}
-          sessionId={latestResult?.sessionId}
+          {...(latestResult?.sessionId !== undefined
+            ? { sessionId: latestResult.sessionId }
+            : {})}
         />
       )}
 
@@ -1647,8 +1661,12 @@ export default function Home() {
           <OnboardingWizard
             userId={user.id}
             userName={user.name}
-            currentJourneyType={user.journeyType}
-            sessionId={latestResult?.sessionId}
+            {...(user.journeyType !== undefined
+              ? { currentJourneyType: user.journeyType }
+              : {})}
+            {...(latestResult?.sessionId !== undefined
+              ? { sessionId: latestResult.sessionId }
+              : {})}
             topSectorName={
               latestResult?.recommendations?.[0]?.sectorName ?? null
             }

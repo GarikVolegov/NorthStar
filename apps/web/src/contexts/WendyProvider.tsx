@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
-import { useWendyOpenAITTS } from '../hooks/useWendyOpenAITTS';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useBrowserTTS } from '../hooks/useBrowserTTS';
+import { useWendyOpenAITTS } from '../hooks/useWendyOpenAITTS';
 
 // TTS attivo: OpenAI se VITE_OPENAI_TTS_ENABLED=true, altrimenti Web Speech API gratuito
 const USE_OPENAI_TTS = import.meta.env.VITE_OPENAI_TTS_ENABLED === 'true';
@@ -9,11 +9,13 @@ export type WendyPhase = 'idle' | 'thinking' | 'speaking' | 'listening';
 
 export interface PageContext {
   page: string;
-  title?: string;
-  data?: Record<string, unknown>;
+  title?: string | undefined;
+  data?: Record<string, unknown> | undefined;
 }
 
-const PAGE_HINTS: Record<string, { welcome?: string; quickActions: { label: string; icon: string }[] }> = {
+type PageHints = { welcome?: string | undefined; quickActions: { label: string; icon: string }[] };
+
+const PAGE_HINTS: Record<string, PageHints> = {
   dashboard: {
     welcome: "Ecco la tua dashboard! Vuoi che analizzi i tuoi progressi o hai domande su qualcosa?",
     quickActions: [
@@ -80,10 +82,11 @@ interface WendyContextValue {
   setIsSpeaking: (v: boolean) => void;
   pageContext: PageContext;
   setPageContext: (ctx: PageContext) => void;
-  getPageHints: () => { welcome?: string; quickActions: { label: string; icon: string }[] };
+  getPageHints: () => PageHints;
 }
 
 const WendyContext = createContext<WendyContextValue | null>(null);
+let wendySpeakBridge: ((text: string) => void) | null = null;
 
 export function useWendy(): WendyContextValue {
   const ctx = useContext(WendyContext);
@@ -119,8 +122,10 @@ function WendyTTSBridge({ onSpeakingChange, onPhaseChange }: { onSpeakingChange:
   }, [playOpenAI, browserTts, onSpeakingChange, onPhaseChange]);
 
   useEffect(() => {
-    (window as any).__wendySpeak = (text: string) => speakRef.current(text);
-    return () => { delete (window as any).__wendySpeak; };
+    wendySpeakBridge = (text: string) => speakRef.current(text);
+    return () => {
+      if (wendySpeakBridge) wendySpeakBridge = null;
+    };
   }, []);
 
   return null;
@@ -138,8 +143,7 @@ export function WendyProvider({ children }: { children: ReactNode }) {
   const toggle = useCallback(() => setIsOpen((v) => !v), []);
 
   const speak = useCallback((text: string) => {
-    const fn = (window as any).__wendySpeak;
-    if (fn) fn(text);
+    wendySpeakBridge?.(text);
   }, []);
 
   const ask = useCallback((message: string) => {
@@ -154,13 +158,13 @@ export function WendyProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const getPageHints = useCallback(() => {
-    return PAGE_HINTS[pageContext.page] ?? PAGE_HINTS.default;
+    return PAGE_HINTS[pageContext.page] ?? PAGE_HINTS.default ?? { quickActions: [] };
   }, [pageContext.page]);
 
   return (
     <WendyContext.Provider value={{ isOpen, isSpeaking, phase, setPhase, open, close, toggle, speak, ask, consumePendingAsk, setIsSpeaking, pageContext, setPageContext, getPageHints }}>
-      {children}
       <WendyTTSBridge onSpeakingChange={setIsSpeaking} onPhaseChange={setPhase} />
+      {children}
     </WendyContext.Provider>
   );
 }

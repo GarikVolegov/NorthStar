@@ -1,21 +1,18 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api-fetch";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { CERTIFICATE_CATEGORY_COLORS, CATEGORY_LABELS } from "@/lib/constants";
+import { apiFetch } from "@/lib/api-fetch";
+import { CATEGORY_LABELS, CERTIFICATE_CATEGORY_COLORS } from "@/lib/constants";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Award,
-  ExternalLink,
-  Copy,
   Check,
-  Shield,
-  Sparkles,
-  Gem,
   Clock,
-  ChevronRight,
+  Copy,
+  ExternalLink,
+  Gem,
   Info,
+  Shield,
+  Sparkles
 } from "lucide-react";
+import { useState } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -53,9 +50,14 @@ function CopyButton({ text }: { text: string }) {
 }
 
 function NftCard({ cert }: { cert: NftCert }) {
+  const fallbackColors = {
+    bg: "hsl(var(--muted))",
+    accent: "hsl(var(--primary))",
+  };
   const colors =
     CERTIFICATE_CATEGORY_COLORS[cert.category] ??
-    CERTIFICATE_CATEGORY_COLORS.altro;
+    CERTIFICATE_CATEGORY_COLORS.altro ??
+    fallbackColors;
   const label = CATEGORY_LABELS[cert.category] ?? "Traguardo";
   const date = new Date(cert.mintedAt).toLocaleDateString("it-IT", {
     day: "2-digit",
@@ -191,7 +193,7 @@ interface Props {
 }
 
 export function NftCertificateGallery({ userId }: Props) {
-  const qc = useQueryClient();
+  useQueryClient();
 
   const { data: certs = [], isLoading } = useQuery<NftCert[]>({
     queryKey: ["nft-certificates"],

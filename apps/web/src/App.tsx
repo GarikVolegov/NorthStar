@@ -1,28 +1,28 @@
-import { lazy, Suspense } from "react";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { AppStateProvider } from "@/contexts/AppStateContext";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { AdminAgentProvider } from "@/contexts/AdminAgentContext";
+import { WendyProvider } from "@/contexts/WendyProvider";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeProvider } from "next-themes";
+import { Suspense, lazy } from "react";
+import { Toaster } from "sonner";
 import {
-  Switch,
+  Redirect,
   Route,
+  Switch,
   Router as WouterRouter,
   useLocation,
-  Redirect,
 } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "sonner";
-import { ThemeProvider } from "next-themes";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { AppStateProvider } from "@/contexts/AppStateContext";
-import { WendyProvider } from "@/contexts/WendyProvider";
 
-import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
-import { useReducedMotion, easings } from "@/lib/motion";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { PageErrorBoundary } from "@/components/PageErrorBoundary";
-import { PageLoader } from "@/components/PageLoader";
-import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/footer";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { Navbar } from "@/components/layout/Navbar";
+import { PageLoader } from "@/components/PageLoader";
 import { ProtectedRoute, PublicOnlyRoute } from "@/components/ProtectedRoute";
+import { easings, useReducedMotion } from "@/lib/motion";
+import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
 const Home = lazy(() => import("@/pages/home"));
@@ -44,6 +44,7 @@ const Settori = lazy(() => import("@/pages/settori"));
 const Confronta = lazy(() => import("@/pages/confronta"));
 const Contatti = lazy(() => import("@/pages/contatti"));
 const AdminReview = lazy(() => import("@/pages/admin-review"));
+const AdminOffice = lazy(() => import("@/pages/admin-office"));
 const SitemapPage = lazy(() => import("@/pages/sitemap"));
 const ChiSiamo = lazy(() => import("@/pages/chi-siamo"));
 const ComeFunziona = lazy(() => import("@/pages/come-funziona"));
@@ -293,6 +294,13 @@ function AnimatedRoutes() {
 function Router() {
   return (
     <Switch>
+      <Route path="/admin/office">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <ProtectedRoute component={AdminOffice} />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
       <Route path="/admin/:section">
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
@@ -359,10 +367,12 @@ function App() {
           <AppStateProvider>
             <TooltipProvider>
               <WendyProvider>
-                <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                  <Router />
-                </WouterRouter>
-                <Toaster />
+                <AdminAgentProvider>
+                  <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                    <Router />
+                  </WouterRouter>
+                  <Toaster />
+                </AdminAgentProvider>
               </WendyProvider>
             </TooltipProvider>
           </AppStateProvider>

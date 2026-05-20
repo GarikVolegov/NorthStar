@@ -9,9 +9,9 @@
  * tramite AuthContext.tsx per sincronizzare l'utente nel DB NorthStar.
  */
 import { SignUp } from "@clerk/react";
-import { Link } from "wouter";
 import { Compass, Sparkles } from "lucide-react";
 import { useEffect } from "react";
+import { Link } from "wouter";
 
 export default function SignUpPage() {
   useEffect(() => {

@@ -1,7 +1,7 @@
-import { useTranslation } from "react-i18next";
-import { Clock, ChevronRight } from "lucide-react";
-import { Link } from "wouter";
 import { cn } from "@/lib/utils";
+import { ChevronRight, Clock } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 import { CAT_COLOR, CAT_EMOJI, HomeNewsItem } from "./types";
 
 interface HomeNewsCardProps {

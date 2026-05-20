@@ -1,5 +1,5 @@
+import { useCallback, useRef, useState } from 'react';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
-import { useState, useCallback, useRef } from 'react';
 
 export interface UseWendyVoiceOptions {
   onSend: (text: string) => void;

@@ -1,7 +1,7 @@
-import { HelpCircle, TrendingUp, Rocket, Building2, BarChart3, Crown, MapPin, type LucideIcon } from "lucide-react";
-import { Link } from "wouter";
-import { cn } from "@/lib/utils";
 import type { DashboardSession } from "@/hooks/useDashboardData";
+import { cn } from "@/lib/utils";
+import { BarChart3, Building2, Crown, HelpCircle, MapPin, Rocket, TrendingUp, type LucideIcon } from "lucide-react";
+import { Link } from "wouter";
 
 type JourneyId = "indeciso" | "dipendente" | "autonomo" | "azienda" | "investitore";
 
@@ -20,39 +20,6 @@ const JOURNEY_META: Record<JourneyId, JourneyMeta> = {
   autonomo:    { icon: Rocket,      headline: "Scala la tua attività",     subline: "Idee, mercati e strategia",              color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30" },
   azienda:     { icon: Building2,   headline: "Trova i profili giusti",    subline: "Esplora, pubblica e assumi",             color: "text-growth",    bgColor: "bg-growth/10",    borderColor: "border-growth/30" },
   investitore: { icon: BarChart3,   headline: "Analizza le opportunità",  subline: "Aree, trend e dati di mercato",        color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30" },
-};
-
-interface Metrics {
-  label: string;
-  value: string | number;
-}
-
-const PERSONA_METRICS: Record<string, (session: DashboardSession | null) => Metrics[]> = {
-  indeciso: (s) => [
-    { label: "Test", value: s ? "Completato" : "Da fare" },
-    { label: "Aree esplorate", value: s?.recommendations?.length ?? 0 },
-    { label: "Piano", value: "Da scegliere" },
-  ],
-  dipendente: () => [
-    { label: "Competenze", value: "0" },
-    { label: "Colloqui simulati", value: "0" },
-    { label: "Candidature", value: "0" },
-  ],
-  autonomo: () => [
-    { label: "Idee validate", value: "0" },
-    { label: "Aree monitorate", value: "0" },
-    { label: "Strumenti usati", value: "0" },
-  ],
-  azienda: () => [
-    { label: "Profili esplorati", value: "0" },
-    { label: "Aree analizzate", value: "21" },
-    { label: "Offerte pubblicate", value: "0" },
-  ],
-  investitore: () => [
-    { label: "Aree monitorate", value: "0" },
-    { label: "Report analizzati", value: "0" },
-    { label: "Trend attivi", value: "0" },
-  ],
 };
 
 export function DashboardHero({

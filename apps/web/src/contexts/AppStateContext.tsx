@@ -3,9 +3,9 @@
  * Provides shared state accessible from any page/component without prop drilling.
  */
 
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { NODE_CATEGORY_META, SCORE_THRESHOLD } from "@/lib/constants";
 import { eventBus } from "@/lib/event-bus";
-import { SCORE_THRESHOLD, NODE_CATEGORY_META } from "@/lib/constants";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 export interface UserProfile {
   id: string | null;

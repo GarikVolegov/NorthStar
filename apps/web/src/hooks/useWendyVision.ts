@@ -15,7 +15,7 @@
  *   - Screenshot PDF (il frontend converte PDF page → canvas → PNG base64)
  */
 
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

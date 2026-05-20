@@ -1,9 +1,9 @@
-import { Link } from "wouter";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Target, ArrowRight, CheckCircle2 } from "lucide-react";
-import { ObjectiveRow } from "./ObjectiveRow";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { Objective } from "@/hooks/useObjectives";
+import { ArrowRight, CheckCircle2, Target } from "lucide-react";
+import { Link } from "wouter";
+import { ObjectiveRow } from "./ObjectiveRow";
 
 export function ObjectivesSection({
   objectives,

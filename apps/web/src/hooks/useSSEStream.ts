@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useTransition } from "react";
+import { useCallback, useRef, useState, useTransition } from "react";
 
 // §4.1 FRONTEND_RULES — hook canonico per SSE streaming.
 // Unico modo autorizzato nel progetto per consumare stream SSE.

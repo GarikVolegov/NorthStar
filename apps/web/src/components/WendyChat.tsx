@@ -1,13 +1,13 @@
-import { useRef, useEffect, useState, useCallback, FormEvent, KeyboardEvent } from 'react';
+import { Mic, RotateCcw, Send, Sparkles, Square, Volume2, VolumeX } from 'lucide-react';
+import { FormEvent, KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { useWendy } from '../contexts/WendyProvider';
+import type { VoiceChatMessage } from '../hooks/useVoiceChat.js';
 import { useWendyChat } from '../hooks/useWendyChat.js';
+import { StreamErrorBoundary } from './ErrorBoundary.js';
 import { WendyThinkingIndicator } from './WendyThinkingIndicator.js';
-import { WendyVoiceOverlay } from './wendy/WendyVoiceOverlay.js';
 import { UiToolRenderer } from './wendy/UiToolRenderer.js';
 import { WendyActionCard } from './wendy/WendyActionCard.js';
-import type { VoiceChatMessage } from '../hooks/useVoiceChat.js';
-import { StreamErrorBoundary } from './ErrorBoundary.js';
-import { useWendy } from '../contexts/WendyProvider';
-import { Mic, RotateCcw, Send, Sparkles, Square, Volume2, VolumeX } from 'lucide-react';
+import { WendyVoiceOverlay } from './wendy/WendyVoiceOverlay.js';
 
 /**
  * WendyChat v2 — aggiunte:
@@ -46,7 +46,7 @@ export function WendyChat({
     messages, thinking, isStreaming, streamError,
     sendMessage, stopStream, clearHistory, retryLast,
     confirmAction, cancelAction,
-    tts, ttsEnabled, toggleTts,
+    ttsEnabled, toggleTts,
     stt, commitSTT,
   } = useWendyChat({ apiUrl });
 

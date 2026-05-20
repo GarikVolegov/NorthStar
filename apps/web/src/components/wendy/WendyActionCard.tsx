@@ -1,3 +1,5 @@
+import type { WendyAction } from "@/hooks/useWendyActionExecutor";
+import { cn } from "@/lib/utils";
 import {
   Check,
   CheckCircle2,
@@ -8,8 +10,6 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { WendyAction } from "@/hooks/useWendyActionExecutor";
 
 interface WendyActionCardProps {
   action: WendyAction;

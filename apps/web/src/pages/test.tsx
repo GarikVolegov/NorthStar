@@ -1,18 +1,18 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useLocation } from "wouter";
-import { motion, AnimatePresence } from "framer-motion";
-import type { Variants } from "framer-motion";
-import { useSubmitTest } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, Check, Sparkles, RotateCcw, X, ArrowRight, Clock, Layers, Volume2, VolumeX } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
-import { useReducedMotion, easings } from "@/lib/motion";
-import { useTranslation } from "react-i18next";
-import { apiFetch } from "@/lib/api-fetch";
 import { WendyAvatar, type AvatarState } from "@/components/wendy-avatar";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api-fetch";
+import { easings, useReducedMotion } from "@/lib/motion";
 import { SCENARIOS } from "@/lib/test-scenarios";
-import { speak, stopSpeech, startAmbientPad, stopAmbientPad, setMuted, isMuted } from "@/lib/wendy-voice";
+import { cn } from "@/lib/utils";
+import { isMuted, setMuted, speak, startAmbientPad, stopAmbientPad, stopSpeech } from "@/lib/wendy-voice";
+import { useSubmitTest } from "@workspace/api-client-react";
+import type { Variants } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowLeft, ArrowRight, Check, Clock, Layers, Loader2, RotateCcw, Sparkles, Volume2, VolumeX, X } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useLocation } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 const DRAFT_KEY = "northstar_test_draft";
@@ -174,7 +174,7 @@ function tokenizeCaption(text: string): CaptionToken[] {
   const regex = /(\S+?)([.,!?;:]*)(?=\s|$)/g;
   let m: RegExpExecArray | null;
   while ((m = regex.exec(text)) !== null) {
-    if (m[0]) tokens.push({ word: m[1], punct: m[2] ?? "", start: m.index });
+    if (m[0] && m[1]) tokens.push({ word: m[1], punct: m[2] ?? "", start: m.index });
   }
   return tokens;
 }
@@ -690,7 +690,7 @@ export default function Test() {
   const ctxOffset    = currentStep - SPIRITS_END + 1;
   const spiritOffset = currentStep - SPIRITS_START;
   const questionInGroup = (spiritOffset % 3) + 1;
-  const currentId    = activeAllIds[currentStep];
+  const currentId    = activeAllIds[currentStep] ?? activeAllIds[activeAllIds.length - 1]!;
   const spiritInfo   = isSpiritQ ? SPIRIT_META[currentId] : null;
   const progress     = (currentStep / activeAllIds.length) * 100;
   const currentPhase: 0 | 1 | 2 = isCtxQ ? 2 : isSpiritQ ? 1 : 0;
@@ -825,7 +825,7 @@ export default function Test() {
 
   // Fix #8: badge spirit estratto da IIFE inline
   const spiritBadge = spiritInfo ? (() => {
-    const display = SPIRIT_DISPLAY[spiritInfo.transKey];
+    const display = SPIRIT_DISPLAY[spiritInfo.transKey] ?? SPIRIT_DISPLAY.shen!;
     return (
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="inline-flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-full px-4 py-1.5">
@@ -880,7 +880,7 @@ export default function Test() {
             style={{ willChange: "transform, opacity" }}
           >
             <WelcomeScreen
-              userName={user?.name ?? user?.email}
+              {...(user?.name ?? user?.email ? { userName: user?.name ?? user?.email } : {})}
               reduced={prefersReduced}
               muted={audioMuted}
               speechText={speechText}
@@ -1152,17 +1152,20 @@ export default function Test() {
                                 disabled={justSelected !== null}
                                 initial={prefersReduced ? false : { opacity: 0, y: 8 }}
                                 animate={{
-                                  opacity: 1, y: 0,
-                                  backgroundColor: isFlashing && !prefersReduced
-                                    ? ["var(--primary)", "color-mix(in srgb, var(--primary) 80%, white 20%)", "var(--primary)"]
-                                    : undefined,
+                                  opacity: 1,
+                                  y: 0,
+                                  ...(isFlashing && !prefersReduced
+                                    ? { backgroundColor: ["var(--primary)", "color-mix(in srgb, var(--primary) 80%, white 20%)", "var(--primary)"] }
+                                    : {}),
                                 }}
                                 transition={prefersReduced ? { duration: 0 } : {
                                   opacity: { delay: optIdx * 0.04, duration: 0.28, ease: easings.easeOut },
                                   backgroundColor: isFlashing ? { duration: 0.28, times: [0, 0.5, 1] } : {},
                                 }}
-                                whileHover={prefersReduced || justSelected !== null ? undefined : { scale: 1.01 }}
-                                whileTap={prefersReduced || justSelected !== null ? undefined : { scale: 0.97, transition: { duration: 0.08 } }}
+                                {...(prefersReduced || justSelected !== null ? {} : {
+                                  whileHover: { scale: 1.01 },
+                                  whileTap: { scale: 0.97, transition: { duration: 0.08 } },
+                                })}
                                 className={cn(
                                   "w-full flex items-center justify-between px-4 sm:px-5 py-4 min-h-[56px] rounded-xl border text-left text-sm sm:text-base font-medium transition-colors duration-150",
                                   selected ? "bg-primary text-primary-foreground border-primary shadow-md"

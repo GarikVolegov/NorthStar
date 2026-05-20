@@ -6,15 +6,15 @@
  *
  * GDPR: l'utente ha pieno controllo sulla propria memoria.
  */
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api-fetch";
 import { API_ENDPOINTS, withParams } from "@/lib/constants";
-import { Brain, Plus, Trash2, Shield, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { usePageMeta } from "@/lib/seo";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Brain, Loader2, Plus, Shield, Trash2 } from "lucide-react";
+import { useState } from "react";
 
 interface MemoryFact {
   id:             number;

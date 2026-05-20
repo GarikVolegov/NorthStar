@@ -1,5 +1,5 @@
-import { Sparkles, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Crown, Sparkles } from "lucide-react";
 
 export function UserHero({ userName, isPremium, hasTestSession, hasConfirmedSector }: {
   userName: string;

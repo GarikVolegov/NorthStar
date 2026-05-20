@@ -1,5 +1,5 @@
-import { Check, Copy, HandCoins, LayoutDashboard, Share2 } from "lucide-react";
 import type { AffiliateInvitePreview } from "@/hooks/useAffiliateInvitePreview";
+import { Check, Copy, HandCoins, LayoutDashboard, Share2 } from "lucide-react";
 
 interface AffiliateInviteCardProps {
   preview: AffiliateInvitePreview;

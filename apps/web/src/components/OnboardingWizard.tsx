@@ -6,20 +6,33 @@
  * Step 2 — Orizzonte       (timeline)
  * Step 3 — Sei pronto!     (recap + primo messaggio Wendy)
  */
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Link, useLocation } from "wouter";
-import {
-  X, ChevronRight, ChevronLeft, CheckCircle2, Target,
-  Loader2, Sparkles, HelpCircle, TrendingUp, Rocket,
-  Building2, BarChart3, ArrowRight, Clock, Zap,
-  Calendar, BookOpen, Briefcase,
-} from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-fetch";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  ArrowRight,
+  BarChart3,
+  BookOpen, Briefcase,
+  Building2,
+  Calendar,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  HelpCircle,
+  Loader2,
+  Rocket,
+  Sparkles,
+  Target,
+  TrendingUp,
+  X,
+  Zap,
+} from "lucide-react";
+import { useState } from "react";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -50,6 +63,7 @@ const PERSONAS: Array<{
   { id: "azienda",    icon: Building2,   label: "Cerco talenti per il mio team", tagline: "Assumo o valuto profili", color: "text-growth", bg: "bg-growth/10", border: "border-growth/40", nextHref: "/settori", nextLabel: "Esplora i profili" },
   { id: "investitore",icon: BarChart3,   label: "Valuto opportunità di mercato", tagline: "Analisi e investimenti", color: "text-primary", bg: "bg-primary/10", border: "border-primary/40", nextHref: "/settori", nextLabel: "Vedi i settori" },
 ];
+const DEFAULT_PERSONA = PERSONAS[0]!;
 
 const HORIZON_OPTIONS: Array<{ id: Horizon; icon: React.ElementType; label: string; sub: string }> = [
   { id: "short",  icon: Zap,      label: "Entro 1–3 mesi",    sub: "Ho urgenza, voglio risultati rapidi" },
@@ -81,7 +95,7 @@ const STEP_LABELS = ["Chi sei?", "Cosa esplori?", "Orizzonte", "Sei pronto!"];
 
 /* ── Main wizard ──────────────────────────────────────── */
 export function OnboardingWizard({
-  userId, userName, currentJourneyType, topSectorName,
+  userName, currentJourneyType, topSectorName,
   onClose, onComplete,
 }: OnboardingWizardProps) {
   const [step, setStep]               = useState(0);
@@ -92,9 +106,8 @@ export function OnboardingWizard({
   const [horizon, setHorizon]         = useState<Horizon>("open");
   const [openNote, setOpenNote]       = useState("");
   const [saving, setSaving]           = useState(false);
-  const [, setLocation]               = useLocation();
 
-  const persona = PERSONAS.find((p) => p.id === selectedJourney) ?? PERSONAS[0];
+  const persona = PERSONAS.find((p) => p.id === selectedJourney) ?? DEFAULT_PERSONA;
 
   // Carica settori per la selezione
   const { data: sectorsData } = useQuery<{ sectors: Sector[] }>({

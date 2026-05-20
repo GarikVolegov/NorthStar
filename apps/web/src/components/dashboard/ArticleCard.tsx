@@ -1,7 +1,7 @@
-import { Link } from "wouter";
-import { ChevronRight, Clock } from "lucide-react";
-import { cn } from "@/lib/utils";
 import type { GrowthArticle } from "@/hooks/usePersonalizedArticles";
+import { cn } from "@/lib/utils";
+import { ChevronRight, Clock } from "lucide-react";
+import { Link } from "wouter";
 
 const DIFF_LABEL: Record<string, string> = {
   base: "Base", intermedio: "Intermedio", avanzato: "Avanzato",

@@ -1,4 +1,4 @@
 export { LeaderboardPanel } from "./LeaderboardPanel";
 export { VoiceSessionPanel } from "./VoiceSessionPanel";
-export { XpStreakBadge } from "./XpStreakBadge";
 export { XpRewardToast } from "./XpRewardToast";
+export { XpStreakBadge } from "./XpStreakBadge";

@@ -1,18 +1,16 @@
-import { useTheme } from "next-themes";
-import { Sun, Moon, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Monitor, Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 
 const THEMES = ["system", "light", "dark"] as const;
 type Theme = (typeof THEMES)[number];
 
-const NEXT: Record<Theme, Theme> = { system: "light", light: "dark", dark: "system" };
 const ICON: Record<Theme, typeof Monitor> = { system: Monitor, light: Sun, dark: Moon };
 const LABEL: Record<Theme, string> = { system: "Sistema", light: "Chiaro", dark: "Scuro" };
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const current = (theme ?? "system") as Theme;
-  const Icon = ICON[current];
 
   return (
     <div className="flex items-center gap-1">

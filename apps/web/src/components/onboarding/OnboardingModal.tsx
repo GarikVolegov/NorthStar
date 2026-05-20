@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Link } from "wouter";
-import { ArrowRight, Map, BookOpen, BrainCircuit, Network, CheckCircle2, X } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
+import { ArrowRight, BookOpen, BrainCircuit, CheckCircle2, Map, Network, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -51,7 +51,7 @@ const CATEGORY_OPTIONS = [
 
 const TOTAL_STEPS = 4;
 
-export function OnboardingModal({ sessionId, recommendations, riasecTypes, dominantSpirit }: OnboardingModalProps) {
+export function OnboardingModal({ recommendations, riasecTypes }: OnboardingModalProps) {
   const [open,              setOpen]              = useState(false);
   const [step,              setStep]              = useState(1);
   const [selectedJourney,   setSelectedJourney]   = useState<string | null>(null);

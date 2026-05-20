@@ -1,10 +1,10 @@
 /**
  * /affiliazione/dashboard and /affiliate - private C2C referral dashboard.
  */
-import { Link } from "wouter";
-import { HandCoins, HeartHandshake } from "lucide-react";
 import { AffiliateDashboard } from "@/components/affiliate/AffiliateDashboard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { HandCoins, HeartHandshake } from "lucide-react";
+import { Link } from "wouter";
 
 export default function AffiliazioneDashboard() {
   return (

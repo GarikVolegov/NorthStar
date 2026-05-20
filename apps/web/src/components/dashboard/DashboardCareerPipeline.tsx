@@ -1,5 +1,5 @@
+import { ArrowRight, Briefcase, CheckCircle2, Eye, MessageSquare, Send } from "lucide-react";
 import { Link } from "wouter";
-import { Briefcase, ArrowRight, Eye, Send, MessageSquare, CheckCircle2 } from "lucide-react";
 
 const STAGES = [
   { key: "saved", label: "Salvate", icon: Eye },

@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -92,7 +93,7 @@ function useDebounce<T>(value: T, delay: number): T {
 
 async function trackSearch(data: Record<string, unknown>) {
   try {
-    await fetch(`${BASE}api/search/track`, {
+    await apiFetch(`${BASE}api/search/track`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...data, sessionId }),
@@ -122,7 +123,7 @@ export function useGlobalSearch() {
     queryKey: ["global-search-hybrid", debouncedQuery],
     queryFn: async () => {
       if (debouncedQuery.length < 2) return { results: [], has_semantic: false };
-      const res = await fetch(`${BASE}api/search/hybrid`, {
+      const res = await apiFetch(`${BASE}api/search/hybrid`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ q: debouncedQuery, limit: 10 }),
@@ -144,7 +145,7 @@ export function useGlobalSearch() {
     queryKey: ["global-search-suggest", debouncedQuery],
     queryFn: async () => {
       if (debouncedQuery.length < 2) return { suggestions: [] };
-      const res = await fetch(
+      const res = await apiFetch(
         `${BASE}api/search/suggest?q=${encodeURIComponent(debouncedQuery)}`,
         { headers: { Accept: "application/json" } },
       );
@@ -176,13 +177,8 @@ export function useGlobalSearch() {
     setIsStreaming(true);
 
     try {
-      const token = sessionStorage.getItem("northstar_token");
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const res = await fetch(`${BASE}api/search/orchestrate`, {
+      const res = await apiFetch(`${BASE}api/search/orchestrate`, {
         method: "POST",
-        headers,
         credentials: "include",
         body: JSON.stringify({ q, sessionId, history: msgs }),
       });

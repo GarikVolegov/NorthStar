@@ -4,15 +4,15 @@
  * Mostra la lista dei briefing ricevuti, con anteprima e opzione
  * di generare un briefing on-demand (1 ogni 6 ore per tutti i piani).
  */
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api-fetch";
 import { API_ENDPOINTS, withParams } from "@/lib/constants";
-import { useAuth } from "@/contexts/AuthContext";
 import { usePageMeta } from "@/lib/seo";
-import { Sparkles, Calendar, Loader2, RefreshCw, BookOpen } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { BookOpen, Calendar, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { useState } from "react";
 
 interface Briefing {
   id:        number;

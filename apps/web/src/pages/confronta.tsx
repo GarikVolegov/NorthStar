@@ -1,16 +1,28 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
-import { useTranslation } from "react-i18next";
-import { usePageMeta } from "@/lib/seo";
-import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
+import { getJson } from "@/lib/apiClient";
+import { RIASEC_LABELS, SectorIcon } from "@/lib/sector-icon";
+import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 import {
-  TrendingUp, DollarSign, Bot, Clock, ArrowRight,
-  GitCompare, ChevronDown, X, Check, Minus, Plus,
-  Sparkles, BarChart2, Link2, Copy, CheckCheck,
+  ArrowRight,
+  BarChart2,
+  Bot,
+  Check,
+  CheckCheck,
+  ChevronDown,
+  Clock,
+  DollarSign,
+  GitCompare,
+  Link2,
+  Minus, Plus,
+  Sparkles,
+  TrendingUp,
+  X
 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -34,19 +46,11 @@ const RISK_META: Record<string, { label: string; color: string; score: number }>
   medium: { label: "Medio",  color: "text-amber-700 bg-amber-50 border-amber-200",       score: 2 },
   high:   { label: "Alto",   color: "text-rose-700 bg-rose-50 border-rose-200",           score: 1 },
 };
-const SCALE_META: Record<string, { label: string }> = {
-  high:   { label: "Alta" },
-  medium: { label: "Media" },
-  low:    { label: "Bassa" },
-};
-
 function useAllSectors() {
   return useQuery<Sector[]>({
     queryKey: ["all-sectors-compare"],
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/sectors`);
-      if (!res.ok) throw new Error("Errore");
-      return res.json();
+      return getJson<Sector[]>(`${BASE}api/sectors`);
     },
     staleTime: 300_000,
   });
@@ -393,7 +397,7 @@ export default function Confronta() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {[left, right].map((s, i) => {
-                    const meta = RISK_META[s.automationRisk] ?? RISK_META["medium"];
+                    const meta = RISK_META[s.automationRisk] ?? RISK_META.medium!;
                     return (
                       <div key={i} className="text-center p-3 rounded-xl bg-muted/40">
                         <span className={cn("text-sm font-bold px-2 py-1 rounded-lg border", meta.color)}>
@@ -415,7 +419,7 @@ export default function Confronta() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {[left, right].map((s, i) => {
-                    const meta = TREND_META[s.trend] ?? TREND_META["stable"];
+                    const meta = TREND_META[s.trend] ?? TREND_META.stable!;
                     return (
                       <div key={i} className="text-center p-3 rounded-xl bg-muted/40">
                         <span className={cn("text-xs font-semibold px-2 py-1 rounded-lg border", meta.color)}>
@@ -522,7 +526,7 @@ export default function Confronta() {
               {[
                 { s: left,  accent: "emerald", icon: Plus },
                 { s: right, accent: "violet",  icon: Plus },
-              ].map(({ s, accent }, i) => (
+              ].map(({ s }, i) => (
                 <div key={i} className="rounded-2xl border bg-card p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className={cn(

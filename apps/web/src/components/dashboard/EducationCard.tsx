@@ -1,5 +1,5 @@
-import { Clock, DollarSign, CheckCircle2 } from "lucide-react";
 import type { EducationResult } from "@/hooks/useAgentAnalysis";
+import { CheckCircle2, Clock, DollarSign } from "lucide-react";
 
 export function EducationCard({ e }: { e: EducationResult }) {
   return (

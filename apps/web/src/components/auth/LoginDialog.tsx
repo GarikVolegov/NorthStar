@@ -1,14 +1,29 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Star, ArrowLeft, Mail, CheckCircle2, KeyRound } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { ApiClientError, postJson } from "@/lib/apiClient";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  KeyRound,
+  Loader2,
+  Mail,
+  Star,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 const REFERRAL_STORAGE_KEY = "referralCode";
+declare const __GOOGLE_CLIENT_ID__: string;
 
 declare global {
   interface Window {
@@ -25,7 +40,34 @@ declare global {
   }
 }
 
-type View = "login" | "register" | "verify" | "2fa" | "forgot" | "forgot-sent" | "reset-sent";
+type View =
+  | "login"
+  | "register"
+  | "verify"
+  | "2fa"
+  | "forgot"
+  | "forgot-sent"
+  | "reset-sent";
+type AuthPayload = Parameters<ReturnType<typeof useAuth>["login"]>[0] & {
+  token?: string;
+  needsVerification?: boolean;
+  needs2fa?: boolean;
+  email?: string;
+  devCode?: string;
+  devToken?: string;
+  error?: string;
+};
+
+function getAuthErrorPayload(error: unknown): Partial<AuthPayload> {
+  if (
+    error instanceof ApiClientError &&
+    error.body &&
+    typeof error.body === "object"
+  ) {
+    return error.body as Partial<AuthPayload>;
+  }
+  return {};
+}
 
 interface LoginDialogProps {
   open: boolean;
@@ -33,7 +75,11 @@ interface LoginDialogProps {
   defaultTab?: "login" | "register";
 }
 
-export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginDialogProps) {
+export function LoginDialog({
+  open,
+  onOpenChange,
+  defaultTab = "login",
+}: LoginDialogProps) {
   const { t, i18n } = useTranslation();
   const { login } = useAuth();
   const [view, setView] = useState<View>(defaultTab);
@@ -75,35 +121,34 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
     if (open) setView(defaultTab);
   }, [open, defaultTab]);
 
-  const handleGoogleCredential = useCallback(async (credential: string) => {
-    setGoogleLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`${BASE}api/auth/google-token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || t("auth.errors.googleError"));
-      } else {
+  const handleGoogleCredential = useCallback(
+    async (credential: string) => {
+      setGoogleLoading(true);
+      setError(null);
+      try {
+        const data = await postJson<AuthPayload>(
+          `${BASE}api/auth/google-token`,
+          { credential },
+        );
         login(data, data.token ?? "");
         onOpenChange(false);
         resetAll();
+      } catch (err) {
+        setError(
+          getAuthErrorPayload(err).error || t("auth.errors.googleError"),
+        );
+      } finally {
+        setGoogleLoading(false);
       }
-    } catch {
-      setError(t("auth.errors.networkError"));
-    } finally {
-      setGoogleLoading(false);
-    }
-  }, [login, onOpenChange, t]);
+    },
+    [login, onOpenChange, t],
+  );
 
   useEffect(() => {
     if (!open) return;
-    if ((view !== "login" && view !== "register")) return;
+    if (view !== "login" && view !== "register") return;
 
-    const clientId = (window as any).__GOOGLE_CLIENT_ID__;
+    const clientId = __GOOGLE_CLIENT_ID__;
     const gsiReady = !!window.google?.accounts?.id;
 
     if (!clientId || !gsiReady || !googleBtnRef.current) return;
@@ -154,38 +199,33 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${BASE}api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+      const data = await postJson<AuthPayload>(`${BASE}api/auth/login`, {
+        email: loginEmail,
+        password: loginPassword,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        if (data.needsVerification) {
-          setVerifyEmail(data.email ?? loginEmail);
-          if (data.devCode) setDevHint(data.devCode);
-          goTo("verify");
-        } else {
-          setError(data.error || t("auth.errors.loginError"));
-        }
+      if (data.needsVerification) {
+        setVerifyEmail(data.email ?? loginEmail);
+        if (data.devCode) setDevHint(data.devCode);
+        goTo("verify");
+      } else if (data.needs2fa) {
+        setVerifyEmail(data.email ?? loginEmail);
+        setVerifyCode(["", "", "", "", "", ""]);
+        if (data.devCode) setDevHint(data.devCode);
+        goTo("2fa");
       } else {
-        if (data.needsVerification) {
-          setVerifyEmail(data.email ?? loginEmail);
-          if (data.devCode) setDevHint(data.devCode);
-          goTo("verify");
-        } else if (data.needs2fa) {
-          setVerifyEmail(data.email ?? loginEmail);
-          setVerifyCode(["", "", "", "", "", ""]);
-          if (data.devCode) setDevHint(data.devCode);
-          goTo("2fa");
-        } else {
-          login(data, data.token ?? "");
-          onOpenChange(false);
-          resetAll();
-        }
+        login(data, data.token ?? "");
+        onOpenChange(false);
+        resetAll();
       }
-    } catch {
-      setError(t("auth.errors.networkError"));
+    } catch (err) {
+      const data = getAuthErrorPayload(err);
+      if (data.needsVerification) {
+        setVerifyEmail(data.email ?? loginEmail);
+        if (data.devCode) setDevHint(data.devCode);
+        goTo("verify");
+      } else {
+        setError(data.error || t("auth.errors.loginError"));
+      }
     } finally {
       setLoading(false);
     }
@@ -200,31 +240,24 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${BASE}api/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: regName,
-          email: regEmail,
-          password: regPassword,
-          referralCode:
-            localStorage.getItem(REFERRAL_STORAGE_KEY) ??
-            sessionStorage.getItem(REFERRAL_STORAGE_KEY) ??
-            undefined,
-        }),
+      const data = await postJson<AuthPayload>(`${BASE}api/auth/register`, {
+        name: regName,
+        email: regEmail,
+        password: regPassword,
+        referralCode:
+          localStorage.getItem(REFERRAL_STORAGE_KEY) ??
+          sessionStorage.getItem(REFERRAL_STORAGE_KEY) ??
+          undefined,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || t("auth.errors.registerError"));
-      } else {
-        localStorage.removeItem(REFERRAL_STORAGE_KEY);
-        sessionStorage.removeItem(REFERRAL_STORAGE_KEY);
-        setVerifyEmail(regEmail);
-        if (data.devCode) setDevHint(data.devCode);
-        goTo("verify");
-      }
-    } catch {
-      setError(t("auth.errors.networkError"));
+      localStorage.removeItem(REFERRAL_STORAGE_KEY);
+      sessionStorage.removeItem(REFERRAL_STORAGE_KEY);
+      setVerifyEmail(regEmail);
+      if (data.devCode) setDevHint(data.devCode);
+      goTo("verify");
+    } catch (err) {
+      setError(
+        getAuthErrorPayload(err).error || t("auth.errors.registerError"),
+      );
     } finally {
       setLoading(false);
     }
@@ -240,21 +273,15 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${BASE}api/auth/verify-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: verifyEmail, code }),
+      const data = await postJson<AuthPayload>(`${BASE}api/auth/verify-email`, {
+        email: verifyEmail,
+        code,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || t("auth.errors.invalidCode"));
-      } else {
-        login(data, data.token ?? "");
-        onOpenChange(false);
-        resetAll();
-      }
-    } catch {
-      setError(t("auth.errors.networkError"));
+      login(data, data.token ?? "");
+      onOpenChange(false);
+      resetAll();
+    } catch (err) {
+      setError(getAuthErrorPayload(err).error || t("auth.errors.invalidCode"));
     } finally {
       setLoading(false);
     }
@@ -270,21 +297,15 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${BASE}api/auth/verify-2fa`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: verifyEmail, code }),
+      const data = await postJson<AuthPayload>(`${BASE}api/auth/verify-2fa`, {
+        email: verifyEmail,
+        code,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || t("auth.errors.invalidCode"));
-      } else {
-        login(data, data.token ?? "");
-        onOpenChange(false);
-        resetAll();
-      }
-    } catch {
-      setError(t("auth.errors.networkError"));
+      login(data, data.token ?? "");
+      onOpenChange(false);
+      resetAll();
+    } catch (err) {
+      setError(getAuthErrorPayload(err).error || t("auth.errors.invalidCode"));
     } finally {
       setLoading(false);
     }
@@ -294,12 +315,10 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${BASE}api/auth/resend-verification`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: verifyEmail }),
-      });
-      const data = await res.json();
+      const data = await postJson<Pick<AuthPayload, "devCode">>(
+        `${BASE}api/auth/resend-verification`,
+        { email: verifyEmail },
+      );
       if (data.devCode) setDevHint(data.devCode);
       setError(null);
     } catch {
@@ -314,12 +333,10 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${BASE}api/auth/forgot-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: forgotEmail }),
-      });
-      const data = await res.json();
+      const data = await postJson<Pick<AuthPayload, "devToken">>(
+        `${BASE}api/auth/forgot-password`,
+        { email: forgotEmail },
+      );
       if (data.devToken) setDevHint(data.devToken);
       goTo("forgot-sent");
     } catch {
@@ -342,35 +359,62 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
     login: t("auth.descriptions.login"),
     register: t("auth.descriptions.register"),
     verify: t("auth.descriptions.verify", { email: verifyEmail }),
-    "2fa": t("auth.descriptions.twoFa", { email: verifyEmail, defaultValue: `Codice inviato a ${verifyEmail}. Scade in 10 minuti.` }),
+    "2fa": t("auth.descriptions.twoFa", {
+      email: verifyEmail,
+      defaultValue: `Codice inviato a ${verifyEmail}. Scade in 10 minuti.`,
+    }),
     forgot: t("auth.descriptions.forgot"),
     "forgot-sent": t("auth.descriptions.forgotSent", { email: forgotEmail }),
     "reset-sent": t("auth.descriptions.resetSent"),
   };
 
-  const showGoogleBtn = (view === "login" || view === "register") && !!(window as any).__GOOGLE_CLIENT_ID__;
+  const showGoogleBtn =
+    (view === "login" || view === "register") && !!__GOOGLE_CLIENT_ID__;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetAll(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        onOpenChange(v);
+        if (!v) resetAll();
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-2 mb-1">
             <Star className="h-5 w-5 text-primary fill-primary" />
-            <span className="font-serif font-bold text-lg text-primary">NorthStar</span>
+            <span className="font-serif font-bold text-lg text-primary">
+              NorthStar
+            </span>
           </div>
-          <DialogTitle className="text-xl font-serif">{dialogTitles[view]}</DialogTitle>
+          <DialogTitle className="text-xl font-serif">
+            {dialogTitles[view]}
+          </DialogTitle>
           <DialogDescription>{dialogDescriptions[view]}</DialogDescription>
         </DialogHeader>
 
         {(view === "login" || view === "register") && (
           <div className="flex rounded-xl bg-muted p-1 mb-2">
-            <button onClick={() => goTo("login")} className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-all ${view === "login" ? "bg-white shadow text-foreground" : "text-muted-foreground"}`}>{t("auth.login")}</button>
-            <button onClick={() => goTo("register")} className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-all ${view === "register" ? "bg-white shadow text-foreground" : "text-muted-foreground"}`}>{t("auth.register")}</button>
+            <button
+              onClick={() => goTo("login")}
+              className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-all ${view === "login" ? "bg-white shadow text-foreground" : "text-muted-foreground"}`}
+            >
+              {t("auth.login")}
+            </button>
+            <button
+              onClick={() => goTo("register")}
+              className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-all ${view === "register" ? "bg-white shadow text-foreground" : "text-muted-foreground"}`}
+            >
+              {t("auth.register")}
+            </button>
           </div>
         )}
 
         {(view === "verify" || view === "2fa" || view === "forgot") && (
-          <button onClick={() => goTo("login")} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2 transition-colors w-fit">
+          <button
+            onClick={() => goTo("login")}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2 transition-colors w-fit"
+          >
             <ArrowLeft className="w-3.5 h-3.5" /> {t("auth.backToLogin")}
           </button>
         )}
@@ -387,7 +431,9 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
             )}
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">{t("auth.or")}</span>
+              <span className="text-xs text-muted-foreground">
+                {t("auth.or")}
+              </span>
               <div className="flex-1 h-px bg-border" />
             </div>
           </div>
@@ -397,25 +443,60 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="login-email">{t("auth.email")}</Label>
-              <Input id="login-email" type="email" placeholder={t("auth.emailPlaceholder")} value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required autoComplete="email" />
+              <Input
+                id="login-email"
+                type="email"
+                placeholder={t("auth.emailPlaceholder")}
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label htmlFor="login-password">{t("auth.password")}</Label>
-                <button type="button" onClick={() => { setForgotEmail(loginEmail); goTo("forgot"); }} className="text-xs text-primary hover:underline">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotEmail(loginEmail);
+                    goTo("forgot");
+                  }}
+                  className="text-xs text-primary hover:underline"
+                >
                   {t("auth.forgotPassword")}
                 </button>
               </div>
-              <Input id="login-password" type="password" placeholder={t("auth.passwordPlaceholder")} value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required autoComplete="current-password" />
+              <Input
+                id="login-password"
+                type="password"
+                placeholder={t("auth.passwordPlaceholder")}
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+              />
             </div>
-            {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>}
-            <Button type="submit" className="w-full rounded-full font-medium" disabled={loading}>
+            {error && (
+              <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">
+                {error}
+              </p>
+            )}
+            <Button
+              type="submit"
+              className="w-full rounded-full font-medium"
+              disabled={loading}
+            >
               {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               {t("auth.loginBtn")}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
               {t("auth.noAccount")}{" "}
-              <button type="button" onClick={() => goTo("register")} className="text-primary hover:underline font-medium">
+              <button
+                type="button"
+                onClick={() => goTo("register")}
+                className="text-primary hover:underline font-medium"
+              >
                 {t("auth.register")}
               </button>
             </p>
@@ -426,31 +507,88 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="reg-name">{t("auth.name")}</Label>
-              <Input id="reg-name" placeholder={t("auth.namePlaceholder")} value={regName} onChange={(e) => setRegName(e.target.value)} required autoComplete="name" />
+              <Input
+                id="reg-name"
+                placeholder={t("auth.namePlaceholder")}
+                value={regName}
+                onChange={(e) => setRegName(e.target.value)}
+                required
+                autoComplete="name"
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="reg-email">{t("auth.email")}</Label>
-              <Input id="reg-email" type="email" placeholder={t("auth.emailPlaceholder")} value={regEmail} onChange={(e) => setRegEmail(e.target.value)} required autoComplete="email" />
+              <Input
+                id="reg-email"
+                type="email"
+                placeholder={t("auth.emailPlaceholder")}
+                value={regEmail}
+                onChange={(e) => setRegEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="reg-password">{t("auth.password")}</Label>
-              <Input id="reg-password" type="password" placeholder={t("auth.passwordMin")} value={regPassword} onChange={(e) => setRegPassword(e.target.value)} required minLength={6} autoComplete="new-password" />
+              <Input
+                id="reg-password"
+                type="password"
+                placeholder={t("auth.passwordMin")}
+                value={regPassword}
+                onChange={(e) => setRegPassword(e.target.value)}
+                required
+                minLength={6}
+                autoComplete="new-password"
+              />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="reg-password-confirm">{t("auth.confirmPassword")}</Label>
-              <Input id="reg-password-confirm" type="password" placeholder={t("auth.confirmPasswordPlaceholder")} value={regPasswordConfirm} onChange={(e) => setRegPasswordConfirm(e.target.value)} required minLength={6} autoComplete="new-password" className={regPasswordConfirm && regPassword !== regPasswordConfirm ? "border-destructive" : ""} />
+              <Label htmlFor="reg-password-confirm">
+                {t("auth.confirmPassword")}
+              </Label>
+              <Input
+                id="reg-password-confirm"
+                type="password"
+                placeholder={t("auth.confirmPasswordPlaceholder")}
+                value={regPasswordConfirm}
+                onChange={(e) => setRegPasswordConfirm(e.target.value)}
+                required
+                minLength={6}
+                autoComplete="new-password"
+                className={
+                  regPasswordConfirm && regPassword !== regPasswordConfirm
+                    ? "border-destructive"
+                    : ""
+                }
+              />
               {regPasswordConfirm && regPassword !== regPasswordConfirm && (
-                <p className="text-xs text-destructive">{t("auth.passwordMismatch")}</p>
+                <p className="text-xs text-destructive">
+                  {t("auth.passwordMismatch")}
+                </p>
               )}
             </div>
-            {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>}
-            <Button type="submit" className="w-full rounded-full font-medium" disabled={loading || (!!regPasswordConfirm && regPassword !== regPasswordConfirm)}>
+            {error && (
+              <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">
+                {error}
+              </p>
+            )}
+            <Button
+              type="submit"
+              className="w-full rounded-full font-medium"
+              disabled={
+                loading ||
+                (!!regPasswordConfirm && regPassword !== regPasswordConfirm)
+              }
+            >
               {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               {t("auth.createAccount")}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
               {t("auth.hasAccount")}{" "}
-              <button type="button" onClick={() => goTo("login")} className="text-primary hover:underline font-medium">
+              <button
+                type="button"
+                onClick={() => goTo("login")}
+                className="text-primary hover:underline font-medium"
+              >
                 {t("auth.login")}
               </button>
             </p>
@@ -467,36 +605,73 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
 
             {devHint && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
-                <p className="text-xs text-amber-700 font-medium mb-1">{t("auth.devMode")}</p>
-                <p className="text-2xl font-mono font-bold tracking-widest text-amber-800">{devHint}</p>
+                <p className="text-xs text-amber-700 font-medium mb-1">
+                  {t("auth.devMode")}
+                </p>
+                <p className="text-2xl font-mono font-bold tracking-widest text-amber-800">
+                  {devHint}
+                </p>
               </div>
             )}
 
             <div className="space-y-2">
-              <Label className="text-center block">{t("auth.verifyCode")}</Label>
-              <div className="flex gap-2 justify-center" onPaste={handleCodePaste}>
+              <Label className="text-center block">
+                {t("auth.verifyCode")}
+              </Label>
+              <div
+                className="flex gap-2 justify-center"
+                onPaste={handleCodePaste}
+              >
                 {verifyCode.map((digit, idx) => (
-                  <input key={idx} ref={(el) => { codeRefs.current[idx] = el; }} type="text" inputMode="numeric" maxLength={1} value={digit} onChange={(e) => handleCodeInput(idx, e.target.value)} onKeyDown={(e) => handleCodeKeyDown(idx, e)} className="w-11 h-13 text-center text-xl font-bold border-2 rounded-xl outline-none focus:border-primary transition-colors bg-background" />
+                  <input
+                    key={idx}
+                    ref={(el) => {
+                      codeRefs.current[idx] = el;
+                    }}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleCodeInput(idx, e.target.value)}
+                    onKeyDown={(e) => handleCodeKeyDown(idx, e)}
+                    className="w-11 h-13 text-center text-xl font-bold border-2 rounded-xl outline-none focus:border-primary transition-colors bg-background"
+                  />
                 ))}
               </div>
             </div>
 
-            {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2 text-center">{error}</p>}
+            {error && (
+              <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2 text-center">
+                {error}
+              </p>
+            )}
 
-            <Button type="submit" className="w-full rounded-full font-medium" disabled={loading || verifyCode.join("").length < 6}>
+            <Button
+              type="submit"
+              className="w-full rounded-full font-medium"
+              disabled={loading || verifyCode.join("").length < 6}
+            >
               {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               {t("auth.verifyBtn")}
             </Button>
 
             <p className="text-center text-sm text-muted-foreground">
               {t("auth.noCodeReceived")}{" "}
-              <button type="button" onClick={handleResend} disabled={loading} className="text-primary hover:underline font-medium">
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={loading}
+                className="text-primary hover:underline font-medium"
+              >
                 {t("auth.resend")}
               </button>
             </p>
             {devHint && (
               <p className="text-center text-xs text-muted-foreground break-all">
-                {t("auth.devCodeLabel")} <span className="font-mono font-semibold text-foreground">{devHint}</span>
+                {t("auth.devCodeLabel")}{" "}
+                <span className="font-mono font-semibold text-foreground">
+                  {devHint}
+                </span>
               </p>
             )}
           </form>
@@ -512,23 +687,52 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
 
             {devHint && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
-                <p className="text-xs text-amber-700 font-medium mb-1">{t("auth.devMode")}</p>
-                <p className="text-2xl font-mono font-bold tracking-widest text-amber-800">{devHint}</p>
+                <p className="text-xs text-amber-700 font-medium mb-1">
+                  {t("auth.devMode")}
+                </p>
+                <p className="text-2xl font-mono font-bold tracking-widest text-amber-800">
+                  {devHint}
+                </p>
               </div>
             )}
 
             <div className="space-y-2">
-              <Label className="text-center block">{t("auth.verifyCode", { defaultValue: "Codice di accesso" })}</Label>
-              <div className="flex gap-2 justify-center" onPaste={handleCodePaste}>
+              <Label className="text-center block">
+                {t("auth.verifyCode", { defaultValue: "Codice di accesso" })}
+              </Label>
+              <div
+                className="flex gap-2 justify-center"
+                onPaste={handleCodePaste}
+              >
                 {verifyCode.map((digit, idx) => (
-                  <input key={idx} ref={(el) => { codeRefs.current[idx] = el; }} type="text" inputMode="numeric" maxLength={1} value={digit} onChange={(e) => handleCodeInput(idx, e.target.value)} onKeyDown={(e) => handleCodeKeyDown(idx, e)} className="w-11 h-13 text-center text-xl font-bold border-2 rounded-xl outline-none focus:border-primary transition-colors bg-background" />
+                  <input
+                    key={idx}
+                    ref={(el) => {
+                      codeRefs.current[idx] = el;
+                    }}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleCodeInput(idx, e.target.value)}
+                    onKeyDown={(e) => handleCodeKeyDown(idx, e)}
+                    className="w-11 h-13 text-center text-xl font-bold border-2 rounded-xl outline-none focus:border-primary transition-colors bg-background"
+                  />
                 ))}
               </div>
             </div>
 
-            {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2 text-center">{error}</p>}
+            {error && (
+              <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2 text-center">
+                {error}
+              </p>
+            )}
 
-            <Button type="submit" className="w-full rounded-full font-medium" disabled={loading || verifyCode.join("").length < 6}>
+            <Button
+              type="submit"
+              className="w-full rounded-full font-medium"
+              disabled={loading || verifyCode.join("").length < 6}
+            >
               {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               {t("auth.verifyBtn", { defaultValue: "Conferma" })}
             </Button>
@@ -544,10 +748,26 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="forgot-email">{t("auth.forgotEmailLabel")}</Label>
-              <Input id="forgot-email" type="email" placeholder={t("auth.emailPlaceholder")} value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} required autoComplete="email" />
+              <Input
+                id="forgot-email"
+                type="email"
+                placeholder={t("auth.emailPlaceholder")}
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
             </div>
-            {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>}
-            <Button type="submit" className="w-full rounded-full font-medium" disabled={loading}>
+            {error && (
+              <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">
+                {error}
+              </p>
+            )}
+            <Button
+              type="submit"
+              className="w-full rounded-full font-medium"
+              disabled={loading}
+            >
               {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               {t("auth.sendResetLink")}
             </Button>
@@ -563,14 +783,28 @@ export function LoginDialog({ open, onOpenChange, defaultTab = "login" }: LoginD
             </div>
             {devHint && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-                <p className="text-xs text-amber-700 font-medium mb-1">{t("auth.devToken")}</p>
-                <p className="text-xs font-mono text-amber-800 break-all">{devHint}</p>
-                <a href={`${BASE}reset-password?token=${devHint}`} className="mt-2 inline-block text-xs text-primary underline" onClick={() => onOpenChange(false)}>
+                <p className="text-xs text-amber-700 font-medium mb-1">
+                  {t("auth.devToken")}
+                </p>
+                <p className="text-xs font-mono text-amber-800 break-all">
+                  {devHint}
+                </p>
+                <a
+                  href={`${BASE}reset-password?token=${devHint}`}
+                  className="mt-2 inline-block text-xs text-primary underline"
+                  onClick={() => onOpenChange(false)}
+                >
                   {t("auth.openReset")}
                 </a>
               </div>
             )}
-            <Button variant="outline" className="w-full rounded-full" onClick={() => goTo("login")}>{t("auth.backToLoginBtn")}</Button>
+            <Button
+              variant="outline"
+              className="w-full rounded-full"
+              onClick={() => goTo("login")}
+            >
+              {t("auth.backToLoginBtn")}
+            </Button>
           </div>
         )}
       </DialogContent>

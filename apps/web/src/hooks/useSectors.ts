@@ -1,32 +1,31 @@
 import { useQuery } from "@tanstack/react-query";
+import { getJson } from "@/lib/apiClient";
 
 export interface SectorPreview {
-  id:             number;
-  name:           string;
-  icon:           string;
-  color:          string;
-  description:    string;
-  trend:          "declining" | "stable" | "growing" | "booming";
-  growthRate:     number;
+  id: number;
+  name: string;
+  icon: string;
+  color: string;
+  description: string;
+  trend: "declining" | "stable" | "growing" | "booming";
+  growthRate: number;
   automationRisk: "low" | "medium" | "high";
-  avgSalaryMin:   number;
-  avgSalaryMax:   number;
-  autonomyScore:  number;
+  avgSalaryMin: number;
+  avgSalaryMax: number;
+  autonomyScore: number;
   stabilityScore: number;
 }
 
 async function fetchSectors(): Promise<SectorPreview[]> {
-  const res = await fetch("/api/sectors", { credentials: "include" });
-  if (!res.ok) throw new Error("Errore caricamento settori");
-  return res.json();
+  return getJson<SectorPreview[]>("/api/sectors", { credentials: "include" });
 }
 
 export function useSectors() {
   return useQuery<SectorPreview[]>({
     queryKey: ["sectors"],
-    queryFn:  fetchSectors,
-    staleTime: 10 * 60 * 1000,  // 10 min — dati quasi statici
-    gcTime:    30 * 60 * 1000,
+    queryFn: fetchSectors,
+    staleTime: 10 * 60 * 1000, // 10 min — dati quasi statici
+    gcTime: 30 * 60 * 1000,
   });
 }
 

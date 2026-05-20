@@ -1,16 +1,16 @@
-import { Link } from "wouter";
-import { useTranslation } from "react-i18next";
-import {
-  Flame,
-  TrendingUp,
-  DollarSign,
-  Bot,
-  ArrowRight,
-  GitCompare,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
 import { SectorIcon } from "@/lib/sector-icon";
-import { TREND_COLOR, RISK_COLOR, TrendingSector } from "./types";
+import { cn } from "@/lib/utils";
+import {
+  ArrowRight,
+  Bot,
+  DollarSign,
+  Flame,
+  GitCompare,
+  TrendingUp,
+} from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
+import { RISK_COLOR, TREND_COLOR, TrendingSector } from "./types";
 
 interface TrendingSectorCardProps {
   sector: TrendingSector;

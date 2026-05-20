@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { getJson } from "@/lib/apiClient";
+import { useCallback, useEffect, useState } from "react";
 
 export interface RecentSession {
   id: number;
@@ -29,9 +30,9 @@ export function useVoiceStats() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch("/api/voice/stats", { credentials: "include" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json() as VoiceStats;
+      const data = await getJson<VoiceStats>("/api/voice/stats", {
+        credentials: "include",
+      });
       setStats(data);
       setError(null);
     } catch (err) {
@@ -43,7 +44,9 @@ export function useVoiceStats() {
 
   useEffect(() => {
     void fetchStats();
-    const interval = setInterval(() => { void fetchStats(); }, POLL_INTERVAL_MS);
+    const interval = setInterval(() => {
+      void fetchStats();
+    }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [fetchStats]);
 

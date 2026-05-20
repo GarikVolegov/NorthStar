@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useVoiceSession, type SessionResult } from "@/hooks/useVoiceSession";
 import { useVoiceStats } from "@/hooks/useVoiceStats";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { XpRewardToast } from "./XpRewardToast";
 import { XpStreakBadge } from "./XpStreakBadge";
 
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function VoiceSessionPanel({ agentType, onComplete }: Props) {
-  const { phase, result, error, start, complete, abandon, reset } = useVoiceSession();
+  const { phase, result, start, complete, abandon, reset } = useVoiceSession();
   const { refetch: refetchStats } = useVoiceStats();
   const [elapsed, setElapsed] = useState(0);
   const [showToast, setShowToast] = useState(false);

@@ -1,25 +1,46 @@
-import { useState, useEffect, useCallback } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { useWendyPageContext } from "@/hooks/useWendyPageContext";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  ChevronLeft, ChevronRight, Plus, Calendar, Clock,
-  AlertCircle, CheckCircle2, Circle, PauseCircle, Loader2, Download,
-} from "lucide-react";
-import {
-  format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  addMonths, subMonths, addWeeks, subWeeks, addDays, subDays,
-  startOfDay, endOfDay,
-  isSameMonth, isSameDay, isToday, parseISO, isBefore,
-} from "date-fns";
-import { it } from "date-fns/locale";
-import { cn } from "@/lib/utils";
-import { Link, useLocation } from "wouter";
 import { CalendarioEventoModal } from "@/components/calendario/CalendarioEventoModal";
 import { PushOptInBanner } from "@/components/calendario/PushOptInBanner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { apiFetch } from "@/lib/api-fetch";
+import { cn } from "@/lib/utils";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  addDays,
+  addMonths,
+  addWeeks,
+  endOfDay,
+  endOfMonth,
+  endOfWeek,
+  format,
+  isBefore,
+  isSameDay,
+  isSameMonth,
+  isToday, parseISO,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  subDays,
+  subMonths,
+  subWeeks,
+} from "date-fns";
+import { it } from "date-fns/locale";
+import {
+  AlertCircle,
+  Calendar,
+  CheckCircle2,
+  ChevronLeft, ChevronRight,
+  Circle,
+  Clock,
+  Download,
+  Loader2,
+  PauseCircle,
+  Plus,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -305,7 +326,6 @@ function MonthView({ currentDate, events, onDayClick, onEventClick }: {
   onDayClick: (d: Date) => void;
   onEventClick: (e: CalendarEvent, ev: React.MouseEvent) => void;
 }) {
-  const { locale } = { locale: it };
   const start = startOfWeek(startOfMonth(currentDate), { locale: it });
   const end = endOfWeek(endOfMonth(currentDate), { locale: it });
 

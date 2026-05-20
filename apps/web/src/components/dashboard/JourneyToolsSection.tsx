@@ -1,10 +1,5 @@
+import { ArrowRight, BarChart3, BrainCircuit, Briefcase, Building2, Mic2, Network, Newspaper, Rocket, Sparkles, Target, TrendingUp, Zap, type LucideIcon } from "lucide-react";
 import { Link } from "wouter";
-import { ArrowRight } from "lucide-react";
-import {
-  Zap, Target, BrainCircuit, Newspaper, Mic2, Briefcase,
-  Rocket, TrendingUp, Network, Building2, Sparkles, BarChart3,
-  type LucideIcon,
-} from "lucide-react";
 
 type JourneyId = "indeciso" | "dipendente" | "autonomo" | "azienda" | "investitore";
 

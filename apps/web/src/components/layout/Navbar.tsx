@@ -1,21 +1,6 @@
-import { useEffect, useState } from "react";
-import { Link, useLocation } from "wouter";
-import { LazyMotion, domAnimation, m } from "framer-motion";
-import {
-  Brain,
-  Briefcase,
-  Globe2,
-  LogOut,
-  Menu,
-  MapPin,
-  Monitor,
-  Moon,
-  Newspaper,
-  Settings,
-  Sparkles,
-  Sun,
-  Users,
-} from "lucide-react";
+import { AffiliateInviteCard } from "@/components/affiliate/AffiliateInviteCard";
+import { SearchDialog } from "@/components/search/SearchDialog";
+import { SubscriptionChip } from "@/components/subscription/SubscriptionStatus";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,22 +9,37 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useClerk } from "@clerk/react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useProactiveInsights } from "@/hooks/useProactiveInsights";
-import { SubscriptionChip } from "@/components/subscription/SubscriptionStatus";
-import { useReducedMotion } from "@/lib/motion";
-import { useGlobalSearch } from "@/hooks/useGlobalSearch";
-import { useTranslation } from "react-i18next";
-import { SUPPORTED_LANGUAGES } from "@/i18n";
-import { useTheme } from "next-themes";
-import { SearchDialog } from "@/components/search/SearchDialog";
 import { useWendy } from "@/contexts/WendyProvider";
-import { NAV_LABELS } from "@/lib/constants";
-import { apiFetch } from "@/lib/api-fetch";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAffiliateInvitePreview } from "@/hooks/useAffiliateInvitePreview";
-import { AffiliateInviteCard } from "@/components/affiliate/AffiliateInviteCard";
+import { useGlobalSearch } from "@/hooks/useGlobalSearch";
+import { useProactiveInsights } from "@/hooks/useProactiveInsights";
+import { SUPPORTED_LANGUAGES } from "@/i18n";
+import { apiFetch } from "@/lib/api-fetch";
+import { NAV_LABELS } from "@/lib/constants";
+import { useReducedMotion } from "@/lib/motion";
+import { useClerk } from "@clerk/react";
+import { LazyMotion, domAnimation, m } from "framer-motion";
+import {
+  Brain,
+  Briefcase,
+  Globe2,
+  LogOut,
+  MapPin,
+  Menu,
+  Monitor,
+  Moon,
+  Newspaper,
+  Settings,
+  Sparkles,
+  Sun,
+  Users,
+} from "lucide-react";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link, useLocation } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -121,7 +121,10 @@ export function Navbar() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [affiliateLinkCopied, setAffiliateLinkCopied] = useState(false);
-  const affiliatePreview = useAffiliateInvitePreview(profileMenuOpen, isLoggedIn && !!user?.id);
+  const affiliatePreview = useAffiliateInvitePreview(
+    profileMenuOpen,
+    isLoggedIn && !!user?.id,
+  );
   const { unreadCount: insightsUnread } = useProactiveInsights();
   const searchIsOpen = search.isOpen;
   const setSearchIsOpen = search.setIsOpen;
@@ -130,9 +133,13 @@ export function Navbar() {
     ? "guest"
     : !user?.journeyType
       ? "new-user"
-      : ["indeciso", "dipendente", "autonomo", "azienda", "investitore"].includes(
-            user.journeyType,
-          )
+      : [
+            "indeciso",
+            "dipendente",
+            "autonomo",
+            "azienda",
+            "investitore",
+          ].includes(user.journeyType)
         ? (user.journeyType as NavPhase)
         : "new-user";
 
@@ -147,11 +154,13 @@ export function Navbar() {
   };
 
   useEffect(() => {
-    const cats = (JOURNEY_CATEGORIES[phase] ?? JOURNEY_CATEGORIES.guest).join(
-      ",",
-    );
+    const cats = (
+      JOURNEY_CATEGORIES[phase] ??
+      JOURNEY_CATEGORIES.guest ??
+      []
+    ).join(",");
 
-    fetch(`${BASE}api/news?multi=true&categories=${cats}&perCategory=2`)
+    apiFetch(`${BASE}api/news?multi=true&categories=${cats}&perCategory=2`)
       .then((response) => response.json())
       .then((data) => {
         if (data?.news?.length) {
@@ -161,10 +170,12 @@ export function Navbar() {
       .catch(() => {});
   }, [phase]);
 
-  const isWendyActive = wendy.phase === "thinking" || wendy.phase === "speaking";
+  const isWendyActive =
+    wendy.phase === "thinking" || wendy.phase === "speaking";
   const displayName = user?.name || user?.email || NAV_LABELS.profilo;
   const initial = displayName.trim().charAt(0).toUpperCase() || "N";
-  const activeLanguage = i18n.resolvedLanguage?.slice(0, 2) || i18n.language?.slice(0, 2) || "it";
+  const activeLanguage =
+    i18n.resolvedLanguage?.slice(0, 2) || i18n.language?.slice(0, 2) || "it";
   const mobileMenuScale = !isMobile
     ? 1
     : viewportHeight > 0 && viewportHeight < 640
@@ -173,7 +184,7 @@ export function Navbar() {
         ? 0.84
         : viewportHeight > 0 && viewportHeight < 860
           ? 0.9
-        : 1;
+          : 1;
 
   const goToProfilePath = (path: string) => {
     setProfileMenuOpen(false);
@@ -310,9 +321,9 @@ export function Navbar() {
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 {user.journeyType && JOURNEY_LABELS[user.journeyType] && (
                   <span
-                    className={`inline-flex w-fit rounded-full border px-2 py-0.5 text-xs font-semibold ${JOURNEY_LABELS[user.journeyType].color}`}
+                    className={`inline-flex w-fit rounded-full border px-2 py-0.5 text-xs font-semibold ${JOURNEY_LABELS[user.journeyType]?.color ?? ""}`}
                   >
-                    {JOURNEY_LABELS[user.journeyType].label}
+                    {JOURNEY_LABELS[user.journeyType]?.label}
                   </span>
                 )}
                 <SubscriptionChip />
@@ -492,9 +503,9 @@ export function Navbar() {
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                 {user.journeyType && JOURNEY_LABELS[user.journeyType] && (
                   <span
-                    className={`inline-flex w-fit rounded-full border px-2 py-0.5 text-[11px] font-semibold ${JOURNEY_LABELS[user.journeyType].color}`}
+                    className={`inline-flex w-fit rounded-full border px-2 py-0.5 text-[11px] font-semibold ${JOURNEY_LABELS[user.journeyType]?.color ?? ""}`}
                   >
-                    {JOURNEY_LABELS[user.journeyType].label}
+                    {JOURNEY_LABELS[user.journeyType]?.label}
                   </span>
                 )}
                 <SubscriptionChip />
@@ -703,7 +714,9 @@ export function Navbar() {
                             className="flex items-center gap-2"
                           >
                             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary/60" />
-                            <span className="max-w-[320px] truncate">{title}</span>
+                            <span className="max-w-[320px] truncate">
+                              {title}
+                            </span>
                           </span>
                         ))
                       : "Caricamento notizie..."}
@@ -780,7 +793,10 @@ export function Navbar() {
 
           <div className="flex shrink-0 items-center">
             {isLoggedIn && user ? (
-              <DropdownMenu open={profileMenuOpen} onOpenChange={setProfileMenuOpen}>
+              <DropdownMenu
+                open={profileMenuOpen}
+                onOpenChange={setProfileMenuOpen}
+              >
                 <DropdownMenuTrigger asChild>
                   <m.button
                     type="button"
@@ -811,7 +827,9 @@ export function Navbar() {
                         initial
                       )}
                     </span>
-                    <span className="hidden min-w-0 truncate sm:block">{displayName}</span>
+                    <span className="hidden min-w-0 truncate sm:block">
+                      {displayName}
+                    </span>
                   </m.button>
                 </DropdownMenuTrigger>
                 {!isMobile && (
@@ -819,7 +837,12 @@ export function Navbar() {
                     side="top"
                     align="end"
                     sideOffset={16}
-                    collisionPadding={{ top: 72, bottom: 88, left: 16, right: 16 }}
+                    collisionPadding={{
+                      top: 72,
+                      bottom: 88,
+                      left: 16,
+                      right: 16,
+                    }}
                     className="w-80 overflow-hidden border-border bg-card p-0 shadow-2xl"
                   >
                     {profileMenuBody}
@@ -827,7 +850,10 @@ export function Navbar() {
                 )}
               </DropdownMenu>
             ) : (
-              <Link href="/sign-in" onMouseEnter={() => prefetchRoute("/sign-in")}>
+              <Link
+                href="/sign-in"
+                onMouseEnter={() => prefetchRoute("/sign-in")}
+              >
                 <button className="flex h-11 items-center rounded-full border border-primary/30 bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70">
                   {t("nav.login")}
                 </button>

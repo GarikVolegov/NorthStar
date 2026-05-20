@@ -1,41 +1,42 @@
-import React, { useState } from "react";
-import { motion } from "framer-motion";
-import { usePageMeta } from "@/lib/seo";
-import { ResultsSkeleton } from "@/components/skeletons/ResultsSkeleton";
-import { useParams, Link, useLocation } from "wouter";
-import { useWendyPageContext } from "@/hooks/useWendyPageContext";
-import { useGetTestSession, useConfirmSector, useGetStatsSummary, getGetTestSessionQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
-import { ArrowRight, CheckCircle2, TrendingUp, DollarSign, Activity, Bot, BarChart3, AlertTriangle, Sparkles, Star, UserCheck, Bookmark, BookmarkCheck, Newspaper, Brain, Map, GitCompare, GraduationCap, Loader2, Zap, Crown, Lock } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
-import { useAuth } from "@/contexts/AuthContext";
-import { useFavorites } from "@/hooks/useFavorites";
-import {
-  RadarChart,
-  Radar,
-  PolarGrid,
-  PolarAngleAxis,
-  ResponsiveContainer,
-} from "recharts";
-import { WorkModeSelector, WorkModeBadge, useWorkPreference } from "@/components/WorkModeSelector";
 import { PostTestWizard } from "@/components/PostTestWizard";
 import type { WorkPreference } from "@/components/WorkModeSelector";
-import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
-import { useReducedMotion } from "@/lib/motion";
-import { useTranslation } from "react-i18next";
-import { getWorkModeAlignment } from "@/lib/work-mode-utils";
-import { useAgentAnalysis } from "@/hooks/useAgentAnalysis";
-import type { ProfessionResult, EducationResult, WorkModeResult } from "@/hooks/useAgentAnalysis";
-import { PersonalityInsightCard } from "@/components/ai/PersonalityInsightCard";
+import { WorkModeBadge, WorkModeSelector, useWorkPreference } from "@/components/WorkModeSelector";
 import { CareerChat } from "@/components/ai/CareerChat";
+import { PersonalityInsightCard } from "@/components/ai/PersonalityInsightCard";
+import { AnimateOnScroll } from "@/components/motion";
+import { ResultsSkeleton } from "@/components/skeletons/ResultsSkeleton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAgentAnalysis } from "@/hooks/useAgentAnalysis";
+import { useFavorites } from "@/hooks/useFavorites";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
+import { getJson } from "@/lib/apiClient";
+import { useReducedMotion } from "@/lib/motion";
+import { SectorIcon } from "@/lib/sector-icon";
+import { usePageMeta } from "@/lib/seo";
+import { cn } from "@/lib/utils";
+import { getWorkModeAlignment } from "@/lib/work-mode-utils";
+import { useQueryClient } from "@tanstack/react-query";
+import { getGetTestSessionQueryKey, useConfirmSector, useGetStatsSummary, useGetTestSession } from "@workspace/api-client-react";
+import { motion } from "framer-motion";
+import { Activity, AlertTriangle, ArrowRight, BarChart3, Bookmark, BookmarkCheck, Bot, Brain, CheckCircle2, Crown, DollarSign, GitCompare, GraduationCap, Loader2, Lock, Map, Newspaper, Sparkles, Star, TrendingUp, UserCheck, Zap } from "lucide-react";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  PolarAngleAxis,
+  PolarGrid,
+  Radar,
+  RadarChart,
+  ResponsiveContainer,
+} from "recharts";
+import { Link, useLocation, useParams } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
+void BASE;
 
 const SPIRIT_META: Record<string, { emoji: string; label: string; color: string }> = {
   shen: { emoji: "🧠", label: "Intelligenza Emotiva",    color: "bg-violet-500/10 text-violet-400 border-violet-500/20" },
@@ -54,6 +55,7 @@ const SPIRIT_DESCRIPTIONS: Record<string, string> = {
 };
 
 const SPIRIT_RADAR_ORDER = ["shen", "hun", "po", "yi", "zhi"] as const;
+void SPIRIT_DESCRIPTIONS;
 
 const RIASEC_SUGGESTED_WORK_MODE: Record<string, WorkPreference> = {
   E: "autonomo",
@@ -70,10 +72,11 @@ const WORK_MODE_LABELS: Record<WorkPreference, string> = {
   ibrido: "Ibrido",
   unknown: "Non definita",
 };
+void WORK_MODE_LABELS;
 
 function SpiritBar({ spirit, score }: { spirit: string; score: number }) {
   const { t } = useTranslation();
-  const meta = SPIRIT_META[spirit];
+  const meta = SPIRIT_META[spirit] ?? SPIRIT_META.shen!;
   if (!meta) return null;
   const pct = ((score - 1) / 4) * 100;
   const displayScore = Number.isInteger(score) ? score : score.toFixed(1);
@@ -196,9 +199,9 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
   const riskVals    = cols.map(r => RISK_LABEL[r.sector?.automationRisk ?? ""]?.score ?? 2);
   const trendVals   = cols.map(r => TREND_LABEL[r.sector?.trend ?? ""]?.score ?? 2);
 
-  const PAIRS = [
+  const PAIRS = ([
     [0, 1], [0, 2], [1, 2],
-  ].filter(([a, b]) => a < cols.length && b < cols.length);
+  ] as Array<readonly [number, number]>).filter(([a, b]) => a < cols.length && b < cols.length);
 
   const ACCENT = ["hsl(var(--primary))", "hsl(var(--chart-4))", "hsl(var(--chart-3))"];
   const ACCENT_CLS = [
@@ -298,7 +301,7 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
                   </div>
                 </td>
                 {cols.map((rec, i) => {
-                  const meta = RISK_LABEL[rec.sector?.automationRisk ?? ""] ?? RISK_LABEL["medium"];
+                  const meta = RISK_LABEL[rec.sector?.automationRisk ?? ""] ?? RISK_LABEL.medium!;
                   return (
                     <td key={rec.sectorId} className="px-4 py-3 text-center">
                       <span className={cn(
@@ -339,20 +342,20 @@ function QuickCompare({ recs }: { recs: Rec[] }) {
           {PAIRS.map(([a, b]) => (
             <Link
               key={`${a}-${b}`}
-              href={`/confronta?a=${cols[a].sectorId}&b=${cols[b].sectorId}`}
+              href={`/confronta?a=${cols[a]!.sectorId}&b=${cols[b]!.sectorId}`}
             >
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-card text-xs font-medium text-foreground hover:border-primary/40 hover:text-primary transition-colors">
                 <span
-                  className={cn("inline-block w-2 h-2 rounded-full border", ACCENT_CLS[a])}
-                  style={{ backgroundColor: ACCENT[a] }}
+                  className={cn("inline-block w-2 h-2 rounded-full border", ACCENT_CLS[a] ?? ACCENT_CLS[0])}
+                  style={{ backgroundColor: ACCENT[a] ?? ACCENT[0] }}
                 />
-                {cols[a].sector?.name?.split(" ")[0]}
+                {cols[a]?.sector?.name?.split(" ")[0]}
                 <span className="text-muted-foreground">{t("results.vs")}</span>
                 <span
                   className="inline-block w-2 h-2 rounded-full border"
-                  style={{ backgroundColor: ACCENT[b] }}
+                  style={{ backgroundColor: ACCENT[b] ?? ACCENT[0] }}
                 />
-                {cols[b].sector?.name?.split(" ")[0]}
+                {cols[b]?.sector?.name?.split(" ")[0]}
                 <ArrowRight className="w-3 h-3 ml-0.5 text-muted-foreground" />
               </div>
             </Link>
@@ -421,12 +424,8 @@ export default function Results() {
       // For anonymous users: re-fetch session with work_mode override to re-rank recommendations
       setAnonymousWorkMode(mode);
       try {
-        const BASE = import.meta.env.BASE_URL || "/";
-        const res = await fetch(`${BASE}api/test-sessions/${id}?work_mode=${mode}`);
-        if (res.ok) {
-          const data = await res.json();
-          setOverriddenRecs(data);
-        }
+        const data = await getJson<typeof session>(`${BASE}api/test-sessions/${id}?work_mode=${mode}`);
+        setOverriddenRecs(data);
       } catch {
         // non-critical — keep current rankings if fetch fails
       }
@@ -480,7 +479,7 @@ export default function Results() {
   const dominantMeta = dominantSpirit ? SPIRIT_META[dominantSpirit] : null;
 
   const suggestedWorkMode: WorkPreference =
-    s.suggestedWorkMode ?? (RIASEC_SUGGESTED_WORK_MODE[primaryTypes[0]] ?? "ibrido");
+    s.suggestedWorkMode ?? (RIASEC_SUGGESTED_WORK_MODE[primaryTypes[0] ?? ""] ?? "ibrido");
   const suggestedLabel = t(`results.workModes.${suggestedWorkMode}`);
 
   const agentProfessions = agentData?.data?.summary?.professions ?? [];
@@ -742,7 +741,7 @@ export default function Results() {
                           initial={prefersReduced ? {} : { opacity: 0, y: 20 }}
                           animate={prefersReduced ? {} : { opacity: 1, y: 0 }}
                           transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.15 + index * 0.1 }}
-                          whileHover={prefersReduced ? undefined : { y: -3 }}
+                          {...(prefersReduced ? {} : { whileHover: { y: -3 } })}
                         >
                           <Card className="flex flex-col border border-border hover:border-primary/30 transition-colors">
                             <CardHeader className="pb-3">

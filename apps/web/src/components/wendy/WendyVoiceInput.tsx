@@ -27,7 +27,7 @@
  *   language:           codice lingua Deepgram (default: 'it')
  */
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type VoiceState = 'idle' | 'listening' | 'thinking' | 'error';
 

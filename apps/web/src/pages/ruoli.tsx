@@ -1,17 +1,22 @@
-import { useEffect, useState, useMemo } from "react";
-import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { usePageMeta } from "@/lib/seo";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
-import { cn } from "@/lib/utils";
-import {
-  Search, Briefcase, TrendingUp, DollarSign,
-  ArrowRight, SlidersHorizontal, X, Zap,
-} from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
+import { getJson } from "@/lib/apiClient";
+import { RIASEC_LABELS, SectorIcon } from "@/lib/sector-icon";
+import { usePageMeta } from "@/lib/seo";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import {
+  ArrowRight,
+  Briefcase,
+  DollarSign,
+  Search,
+  SlidersHorizontal,
+  TrendingUp,
+  X, Zap,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -113,8 +118,6 @@ function RoleCard({ role }: { role: Role }) {
 }
 
 export default function Ruoli() {
-  const { t } = useTranslation();
-
   usePageMeta({
     title: "Lavori Professionali — NorthStar",
     description: "Esplora tutti i lavori e le professioni disponibili per settore. Scopri competenze, stipendi e prospettive di crescita per ogni professione.",
@@ -131,9 +134,7 @@ export default function Ruoli() {
   const { data: roles = [], isLoading } = useQuery<Role[]>({
     queryKey: ["all-roles"],
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/roles`);
-      if (!res.ok) throw new Error("Errore caricamento lavori");
-      const data = await res.json();
+      const data = await getJson<unknown>(`${BASE}api/roles`);
       return Array.isArray(data) ? data : [];
     },
     staleTime: 300_000,
@@ -142,9 +143,7 @@ export default function Ruoli() {
   const { data: sectors = [] } = useQuery<{ id: number; name: string }[]>({
     queryKey: ["all-sectors"],
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/sectors`);
-      if (!res.ok) return [];
-      const data = await res.json();
+      const data = await getJson<unknown>(`${BASE}api/sectors`);
       return Array.isArray(data) ? data.map((s: { id: number; name: string }) => ({ id: s.id, name: s.name })) : [];
     },
     staleTime: 300_000,

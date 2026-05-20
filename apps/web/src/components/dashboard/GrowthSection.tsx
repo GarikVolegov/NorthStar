@@ -1,9 +1,9 @@
-import { Link } from "wouter";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { BookOpen, ArrowRight, Newspaper } from "lucide-react";
-import { ArticleCard } from "./ArticleCard";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { GrowthArticle } from "@/hooks/usePersonalizedArticles";
+import { ArrowRight, BookOpen, Newspaper } from "lucide-react";
+import { Link } from "wouter";
+import { ArticleCard } from "./ArticleCard";
 
 export function GrowthSection({
   articles,

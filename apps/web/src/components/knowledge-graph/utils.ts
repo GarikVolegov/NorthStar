@@ -24,7 +24,7 @@ export function splitTitle(title: string): [string, string | null] {
     line1 += (line1 ? " " : "") + words[i];
     i++;
   }
-  if (!line1) line1 = words[0].slice(0, 11) + "\u2026";
+  if (!line1) line1 = (words[0] ?? title).slice(0, 11) + "\u2026";
   const rest = words.slice(i).join(" ");
   const line2 = rest.length > 11 ? rest.slice(0, 10) + "\u2026" : rest;
   return [line1, line2 || null];

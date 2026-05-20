@@ -4,9 +4,9 @@
  * lo stato dell'errore con definizione specifica di cosa è rotto.
  */
 
-import { useState, useCallback, useRef } from "react";
-import { createError, getErrorDefinition, type AppError } from "@/lib/error-codes";
+import { createError, type AppError } from "@/lib/error-codes";
 import { eventBus } from "@/lib/event-bus";
+import { useCallback, useRef, useState } from "react";
 
 export interface ExecutionState {
   isExecuting: boolean;

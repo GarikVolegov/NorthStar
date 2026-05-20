@@ -1,5 +1,5 @@
-import { useWendy } from "@/contexts/WendyProvider";
 import { Button } from "@/components/ui/button";
+import { useWendy } from "@/contexts/WendyProvider";
 import { Lightbulb, Sparkles } from "lucide-react";
 
 interface Suggestion {

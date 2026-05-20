@@ -1,6 +1,6 @@
-import { useCallback } from "react";
-import { get, set, del } from "idb-keyval";
 import { apiFetch } from "@/lib/api-fetch";
+import { get, set } from "idb-keyval";
+import { useCallback } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 

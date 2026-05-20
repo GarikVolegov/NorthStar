@@ -1,8 +1,8 @@
-import { Link } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Circle, ArrowRight, User } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { ArrowRight, CheckCircle2, Circle, User } from "lucide-react";
+import { Link } from "wouter";
 
 export interface CompletionData {
   hasTestSession: boolean;

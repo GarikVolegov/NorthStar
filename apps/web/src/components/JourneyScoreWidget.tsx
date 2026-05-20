@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { cn } from "@/lib/utils";
-import { Link } from "wouter";
-import { CheckCircle2, Circle, ChevronRight } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { CheckCircle2, ChevronRight, Circle } from "lucide-react";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 

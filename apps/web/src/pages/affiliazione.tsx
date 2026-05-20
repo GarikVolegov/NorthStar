@@ -1,16 +1,33 @@
-import { useState, useMemo } from "react";
-import { Link } from "wouter";
-import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ApiClientError, postJson } from "@/lib/apiClient";
 import { usePageMeta } from "@/lib/seo";
 import {
-  School, GraduationCap, Briefcase, BookOpen, Building2, Users,
-  CheckCircle2, ArrowRight, Star, BarChart3, Compass, Brain,
-  Handshake, Mail, Globe, Zap, Shield, TrendingUp, Award,
-  MessageSquare, ChevronRight,
+  ArrowRight,
+  Award,
+  BarChart3,
+  BookOpen,
+  Brain,
+  Briefcase,
+  Building2,
+  CheckCircle2,
+  ChevronRight,
+  Compass,
+  Globe,
+  GraduationCap,
+  Handshake, Mail,
+  MessageSquare,
+  School,
+  Shield,
+  Star,
+  TrendingUp,
+  Users,
+  Zap,
 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL ?? "/";
 
@@ -37,17 +54,15 @@ function LeadForm() {
     setStatus("sending");
     setErrMsg("");
     try {
-      const res = await fetch(`${BASE}api/affiliazione/lead`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (!res.ok) { setStatus("err"); setErrMsg(data.error ?? t("affiliazione.formErrorGeneric")); return; }
+      await postJson(`${BASE}api/affiliazione/lead`, form);
       setStatus("ok");
-    } catch {
+    } catch (error) {
       setStatus("err");
-      setErrMsg(t("affiliazione.formErrorNetwork"));
+      setErrMsg(
+        error instanceof ApiClientError
+          ? error.message
+          : t("affiliazione.formErrorNetwork"),
+      );
     }
   }
 
@@ -296,6 +311,7 @@ export default function Affiliazione() {
     { n: "100%", label: "GDPR" },
     { n: "Free", label: t("affiliazione.contactFree").split(",")[0] },
   ], [t]);
+  void STATS;
 
   const SOLUTION_FEATURES = [
     { icon: Brain, title: "Test di personalità", desc: "RIASEC + Bussola Interiore in meno di 3 minuti. Validato scientificamente, pensato per il contesto italiano." },

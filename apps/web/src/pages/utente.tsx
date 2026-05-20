@@ -1,15 +1,25 @@
-import { useParams } from "wouter";
-import { Link } from "wouter";
-import { useAuth } from "@/contexts/AuthContext";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import {
-  Users, UserPlus, UserCheck, Lock, Globe, Clock,
-  Loader2, ArrowLeft, Check, X, UserMinus, MapPin,
-  Briefcase, Sparkles, MessageCircle, Shield,
-} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { deleteJson, getJson, patchJson, postJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  Briefcase,
+  Check,
+  Clock,
+  Globe,
+  Loader2,
+  Lock,
+  MapPin,
+  Sparkles,
+  UserCheck,
+  UserMinus,
+  UserPlus,
+  X
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link, useParams } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -75,9 +85,7 @@ export default function Utente() {
     queryKey: ["public-profile", targetId, user?.id],
     queryFn: async () => {
       const viewerParam = user?.id ? `?viewerId=${user.id}` : "";
-      const res = await fetch(`${BASE}api/users/${targetId}/public${viewerParam}`);
-      if (!res.ok) throw new Error("Profilo non trovato");
-      return res.json();
+      return getJson<PublicProfile>(`${BASE}api/users/${targetId}/public${viewerParam}`);
     },
     enabled: !isNaN(targetId),
   });
@@ -89,41 +97,35 @@ export default function Utente() {
 
   const sendRequestMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${BASE}api/friends/request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: user!.id, receiverId: targetId }),
-      });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Errore"); }
-      return res.json();
+      return postJson(`${BASE}api/friends/request`, { requesterId: user!.id, receiverId: targetId });
     },
     onSuccess: invalidate,
   });
 
   const cancelMutation = useMutation({
     mutationFn: async (friendshipId: number) => {
-      await fetch(`${BASE}api/friends/${friendshipId}`, { method: "DELETE" });
+      await deleteJson(`${BASE}api/friends/${friendshipId}`);
     },
     onSuccess: invalidate,
   });
 
   const acceptMutation = useMutation({
     mutationFn: async (friendshipId: number) => {
-      await fetch(`${BASE}api/friends/${friendshipId}/accept`, { method: "PATCH" });
+      await patchJson(`${BASE}api/friends/${friendshipId}/accept`);
     },
     onSuccess: invalidate,
   });
 
   const rejectMutation = useMutation({
     mutationFn: async (friendshipId: number) => {
-      await fetch(`${BASE}api/friends/${friendshipId}/reject`, { method: "PATCH" });
+      await patchJson(`${BASE}api/friends/${friendshipId}/reject`);
     },
     onSuccess: invalidate,
   });
 
   const removeMutation = useMutation({
     mutationFn: async (friendshipId: number) => {
-      await fetch(`${BASE}api/friends/${friendshipId}`, { method: "DELETE" });
+      await deleteJson(`${BASE}api/friends/${friendshipId}`);
     },
     onSuccess: invalidate,
   });

@@ -1,11 +1,11 @@
-import type { ReactNode } from "react";
-import { BrainCircuit, ArrowRight, Network, MessageSquare, Map, Mic2, Briefcase } from "lucide-react";
-import { Link } from "wouter";
-import { DashboardPersonality } from "@/components/dashboard/DashboardPersonality";
+import { DashboardCandidateSearch } from "@/components/dashboard/DashboardCandidateSearch";
 import { DashboardCareerPipeline } from "@/components/dashboard/DashboardCareerPipeline";
 import { DashboardIdeaValidator } from "@/components/dashboard/DashboardIdeaValidator";
-import { DashboardCandidateSearch } from "@/components/dashboard/DashboardCandidateSearch";
 import { DashboardMarketInsights } from "@/components/dashboard/DashboardMarketInsights";
+import { DashboardPersonality } from "@/components/dashboard/DashboardPersonality";
+import { ArrowRight, BrainCircuit, Briefcase, Map, MessageSquare, Mic2, Network } from "lucide-react";
+import type { ReactNode } from "react";
+import { Link } from "wouter";
 
 export type JourneyId = "indeciso" | "dipendente" | "autonomo" | "azienda" | "investitore";
 
@@ -335,7 +335,12 @@ const SECTION_DEFS: SectionDef[] = [
   },
   {
     key: "features",
-    render: (p) => <FeatureSections journeyType={p.journeyType} topSectorId={p.topSectorId} />,
+    render: (p) => (
+      <FeatureSections
+        journeyType={p.journeyType}
+        {...(p.topSectorId !== undefined ? { topSectorId: p.topSectorId } : {})}
+      />
+    ),
   },
   {
     key: "personality",

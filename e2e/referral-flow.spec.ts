@@ -7,7 +7,7 @@
  *   3. Registrazione tramite referral (un nuovo utente si iscrive con ?ref=CODE)
  *
  * Prerequisiti ENV:
- *   TEST_USER_EMAIL / TEST_USER_PASSWORD   → utente esistente con isAffiliate=true
+ *   TEST_USER_EMAIL / TEST_USER_PASSWORD   → utente esistente
  *   TEST_AFFILIATE_EMAIL / TEST_AFFILIATE_PASSWORD → opzionale
  *
  * I test che creano utenti usa email univoche (timestamp) così possono
@@ -166,15 +166,17 @@ test.describe('Percorso Critico — Referral Flow', () => {
       expect(res.status()).toBe(401);
     });
 
-    test('utente NON affiliato → GET /api/affiliate/dashboard restituisce 403', async ({ request }) => {
+    test('utente normale → GET /api/affiliate/dashboard restituisce 200 e genera referral', async ({ request }) => {
       const user = uniqueUser('nonaff');
       const { token } = await registerUser(request, user);
 
       const res = await request.get('/api/affiliate/dashboard', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // Utente appena registrato non è affiliato → 403
-      expect([403, 200]).toContain(res.status());
+      expect(res.status()).toBe(200);
+      const body = await res.json();
+      expect(body.referralCode ?? body.code).toBeTruthy();
+      expect(body.referralLink ?? body.link).toMatch(/\/sign-up\?ref=/);
     });
 
     test('UI: input readonly mostra link che inizia con http', async ({ page }) => {
@@ -356,7 +358,7 @@ test.describe('Percorso Critico — Referral Flow', () => {
 
       // Naviga alla pagina di registrazione con il codice referral nel querystring
       await page.goto(`/register?ref=${referralCode}`);
-      await page.waitForLoadState('networkidle', { timeout: 15_000 });
+      await expect(page.locator('body')).toBeVisible({ timeout: 10_000 });
 
       // Verifica che il codice sia memorizzato (localStorage o campo nascosto)
       const stored = await page.evaluate(

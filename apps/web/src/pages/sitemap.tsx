@@ -1,16 +1,25 @@
-import { useEffect, useMemo } from "react";
-import { Link } from "wouter";
-import { useTranslation } from "react-i18next";
-import { SectorIcon } from "@/lib/sector-icon";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getJson } from "@/lib/apiClient";
 import { SITEMAP_GROUP_COLORS } from "@/lib/constants";
+import { SectorIcon } from "@/lib/sector-icon";
+import { useQuery } from "@tanstack/react-query";
 import {
-  Map, Home, FlaskConical, Newspaper, Star, User,
-  BookOpen, GitBranch, Network, Globe, Shield, FileText,
-  Info, ExternalLink, ArrowRight, ChevronRight,
+  ArrowRight,
+  BookOpen,
+  ChevronRight,
+  ExternalLink,
+  GitBranch,
+  Globe,
+  Home,
+  Info,
+  Map,
+  Network,
+  Star
 } from "lucide-react";
+import { useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -19,11 +28,7 @@ interface Sector { id: number; name: string; icon: string; }
 function useSectors() {
   return useQuery<Sector[]>({
     queryKey: ["sectors-list"],
-    queryFn: async () => {
-      const res = await fetch(`${BASE}api/sectors`);
-      if (!res.ok) return [];
-      return res.json();
-    },
+    queryFn: () => getJson<Sector[]>(`${BASE}api/sectors`),
     staleTime: 300_000,
   });
 }
@@ -35,6 +40,15 @@ interface SitemapGroup {
   bg: string;
   items: { label: string; href: string; desc?: string; badge?: string; iconName?: string }[];
 }
+
+const SITEMAP_COLORS = {
+  navigation: SITEMAP_GROUP_COLORS.navigation!,
+  sectors: SITEMAP_GROUP_COLORS.sectors!,
+  brand: SITEMAP_GROUP_COLORS.brand!,
+  wiki: SITEMAP_GROUP_COLORS.wiki!,
+  roadmap: SITEMAP_GROUP_COLORS.roadmap!,
+  graph: SITEMAP_GROUP_COLORS.graph!,
+};
 
 export default function Sitemap() {
   const { t } = useTranslation();
@@ -50,8 +64,8 @@ export default function Sitemap() {
     {
       title: t("sitemap.groups.main"),
       icon: Home,
-      color: SITEMAP_GROUP_COLORS.navigation.color,
-      bg: SITEMAP_GROUP_COLORS.navigation.bg,
+      color: SITEMAP_COLORS.navigation.color,
+      bg: SITEMAP_COLORS.navigation.bg,
       items: [
         { label: t("sitemap.items.home.label"),      href: "/",         desc: t("sitemap.items.home.desc") },
         { label: t("sitemap.items.test.label"),      href: "/test",     desc: t("sitemap.items.test.desc") },
@@ -63,8 +77,8 @@ export default function Sitemap() {
     {
       title: t("sitemap.groups.sectors"),
       icon: Globe,
-      color: SITEMAP_GROUP_COLORS.sectors.color,
-      bg: SITEMAP_GROUP_COLORS.sectors.bg,
+      color: SITEMAP_COLORS.sectors.color,
+      bg: SITEMAP_COLORS.sectors.bg,
       items: [
         { label: t("sitemap.items.settori.label"),   href: "/settori",   desc: t("sitemap.items.settori.desc") },
         { label: t("sitemap.items.confronta.label"), href: "/confronta", desc: t("sitemap.items.confronta.desc") },
@@ -73,8 +87,8 @@ export default function Sitemap() {
     {
       title: t("sitemap.groups.brand"),
       icon: Info,
-      color: SITEMAP_GROUP_COLORS.brand.color,
-      bg: SITEMAP_GROUP_COLORS.brand.bg,
+      color: SITEMAP_COLORS.brand.color,
+      bg: SITEMAP_COLORS.brand.bg,
       items: [
         { label: t("sitemap.items.chiSiamo.label"),    href: "/chi-siamo",           desc: t("sitemap.items.chiSiamo.desc") },
         { label: t("sitemap.items.comeFunziona.label"),href: "/come-funziona",       desc: t("sitemap.items.comeFunziona.desc") },
@@ -90,8 +104,8 @@ export default function Sitemap() {
     {
       title: t("sitemap.groups.sectorPages"),
       icon: Globe,
-      color: SITEMAP_GROUP_COLORS.sectors.color,
-      bg: SITEMAP_GROUP_COLORS.sectors.bg,
+      color: SITEMAP_COLORS.sectors.color,
+      bg: SITEMAP_COLORS.sectors.bg,
       items: sectors.map((s) => ({
         label: s.name,
         iconName: s.icon,
@@ -102,8 +116,8 @@ export default function Sitemap() {
     {
       title: t("sitemap.groups.wiki"),
       icon: BookOpen,
-      color: SITEMAP_GROUP_COLORS.wiki.color,
-      bg: SITEMAP_GROUP_COLORS.wiki.bg,
+      color: SITEMAP_COLORS.wiki.color,
+      bg: SITEMAP_COLORS.wiki.bg,
       items: sectors.map((s) => ({
         label: s.name,
         iconName: s.icon,
@@ -115,8 +129,8 @@ export default function Sitemap() {
     {
       title: t("sitemap.groups.roadmap"),
       icon: GitBranch,
-      color: SITEMAP_GROUP_COLORS.roadmap.color,
-      bg: SITEMAP_GROUP_COLORS.roadmap.bg,
+      color: SITEMAP_COLORS.roadmap.color,
+      bg: SITEMAP_COLORS.roadmap.bg,
       items: sectors.map((s) => ({
         label: s.name,
         iconName: s.icon,
@@ -128,8 +142,8 @@ export default function Sitemap() {
     {
       title: t("sitemap.groups.grafo"),
       icon: Network,
-      color: SITEMAP_GROUP_COLORS.graph.color,
-      bg: SITEMAP_GROUP_COLORS.graph.bg,
+      color: SITEMAP_COLORS.graph.color,
+      bg: SITEMAP_COLORS.graph.bg,
       items: sectors.map((s) => ({
         label: s.name,
         iconName: s.icon,

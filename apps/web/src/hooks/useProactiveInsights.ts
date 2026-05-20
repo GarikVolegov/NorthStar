@@ -4,10 +4,10 @@
  * Polling automatico ogni 5 minuti per mostrare nuovi insight
  * senza richiedere un refresh manuale.
  */
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api-fetch";
 import { API_ENDPOINTS, withParams } from "@/lib/constants";
-import { useAuth } from "@/contexts/AuthContext";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export interface ProactiveInsight {
   id:                 number;

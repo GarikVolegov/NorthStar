@@ -1,8 +1,8 @@
-import { Briefcase, Crown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import type { WorkModeResult } from "@/hooks/useAgentAnalysis";
+import { cn } from "@/lib/utils";
+import { Briefcase, Crown } from "lucide-react";
+import { Link } from "wouter";
 
 export function WorkModePanel({ wm, isPremium }: { wm: WorkModeResult; isPremium: boolean }) {
   const colorMap: Record<string, string> = {

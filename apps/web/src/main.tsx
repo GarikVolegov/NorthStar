@@ -1,8 +1,10 @@
+import { ClerkProvider } from "@clerk/react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import "./index.css";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./i18n";
-import { ClerkProvider } from "@clerk/react";
+import "./index.css";
+import "./lib/sentry";
 
 /**
  * Registra il Service Worker in idle time, non al caricamento iniziale.
@@ -76,6 +78,8 @@ createRoot(document.getElementById("root")!).render(
     afterSignOutUrl="/"
     appearance={clerkAppearance}
   >
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </ClerkProvider>
 );

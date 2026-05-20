@@ -1,28 +1,48 @@
-import { useState, useRef, useEffect } from "react";
-import { useTranslation } from "react-i18next";
-import { useAuth } from "@/contexts/AuthContext";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent,
+  DialogFooter,
+  DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Plus, ExternalLink, Trash2, Loader2, ChevronDown,
-  Building2, Briefcase, MapPin, DollarSign, FileText,
-  Link2, Star, Calendar, AlertCircle, Bell, X,
-  BarChart3, TrendingUp, ArrowRight, StickyNote, Send,
-  ChevronUp, Clock, Copy, Sparkles, GripVertical,
-} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api-fetch";
-import { Link } from "wouter";
 import { cn } from "@/lib/utils";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  AlertCircle,
+  ArrowRight,
+  BarChart3,
+  Bell,
+  Briefcase,
+  Building2,
+  Calendar,
+  ChevronDown,
+  ChevronUp, Clock, Copy,
+  DollarSign,
+  ExternalLink,
+  FileText,
+  Link2,
+  Loader2,
+  MapPin,
+  Plus,
+  Send,
+  Sparkles,
+  Star,
+  StickyNote,
+  Trash2,
+  TrendingUp,
+  X
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -689,7 +709,7 @@ function AppCard({
           <div className="mt-2 flex items-start gap-1.5">
             <Clock className="w-2.5 h-2.5 text-muted-foreground/60 mt-0.5 shrink-0" />
             <p className="text-[10px] text-muted-foreground/70 line-clamp-1 italic">
-              {formatNoteDate(notesLog[0].createdAt)} · {notesLog[0].text}
+              {formatNoteDate(notesLog[0]!.createdAt)} · {notesLog[0]!.text}
             </p>
           </div>
         )}
@@ -885,9 +905,9 @@ function StatsView({ applications }: { applications: Application[] }) {
         </div>
         <div className="space-y-2">
           {funnelStages.map((stage, i) => {
-            const m = STATUS_META[stage.status];
+            const m = STATUS_META[stage.status] ?? STATUS_META.saved;
             const pct = maxFunnelCount > 0 ? (stage.count / maxFunnelCount) * 100 : 0;
-            const prevCount = i > 0 ? funnelStages[i - 1].count : null;
+            const prevCount = i > 0 ? (funnelStages[i - 1]?.count ?? null) : null;
             const convPct = prevCount !== null && prevCount > 0
               ? Math.round((stage.count / prevCount) * 100) : null;
             return (
@@ -991,5 +1011,5 @@ function groupByMonth(apps: Application[]): { month: string; count: number }[] {
 
 function formatMonth(ym: string): string {
   const [y, m] = ym.split("-");
-  return new Date(parseInt(y), parseInt(m) - 1).toLocaleDateString("it-IT", { month: "short", year: "2-digit" });
+  return new Date(parseInt(y ?? "1970"), parseInt(m ?? "1") - 1).toLocaleDateString("it-IT", { month: "short", year: "2-digit" });
 }

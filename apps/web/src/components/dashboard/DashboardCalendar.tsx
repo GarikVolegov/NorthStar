@@ -1,13 +1,22 @@
-import { useState } from "react";
-import { Link } from "wouter";
-import { ChevronLeft, ChevronRight, CalendarDays, ArrowRight } from "lucide-react";
+import type { DashboardEvent } from "@/hooks/useDashboardData";
+import { cn } from "@/lib/utils";
 import {
-  startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  eachDayOfInterval, isSameMonth, isSameDay, format, addMonths, subMonths, isToday,
+  addMonths,
+  eachDayOfInterval,
+  endOfMonth,
+  endOfWeek,
+  format,
+  isSameDay,
+  isSameMonth,
+  isToday,
+  startOfMonth,
+  startOfWeek,
+  subMonths,
 } from "date-fns";
 import { it } from "date-fns/locale";
-import { cn } from "@/lib/utils";
-import type { DashboardEvent } from "@/hooks/useDashboardData";
+import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState } from "react";
+import { Link } from "wouter";
 
 const CATEGORY_DOT: Record<string, string> = {
   study:      "bg-blue-400",

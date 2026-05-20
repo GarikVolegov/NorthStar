@@ -1,4 +1,3 @@
-import React from "react";
 import { useVoiceStats } from "@/hooks/useVoiceStats";
 
 interface Props {

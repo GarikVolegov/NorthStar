@@ -1,12 +1,12 @@
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, Sparkles, Brain, Network, Zap, Clock, ArrowRight, Bell } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
+import { Bell, Brain, CheckCircle2, Clock, Network, Sparkles, Zap } from "lucide-react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 const PLAN_MONTHLY_PRICE = 9;

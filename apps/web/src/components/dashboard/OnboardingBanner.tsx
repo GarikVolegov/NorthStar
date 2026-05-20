@@ -1,5 +1,5 @@
+import { Compass, X } from "lucide-react";
 import { Link } from "wouter";
-import { X, Compass } from "lucide-react";
 
 export function OnboardingBanner({ onDismiss }: { onDismiss: () => void }) {
   return (

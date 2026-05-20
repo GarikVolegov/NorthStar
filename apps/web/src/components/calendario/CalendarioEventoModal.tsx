@@ -1,21 +1,14 @@
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { format } from "date-fns";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -23,27 +16,34 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Loader2,
-  Trash2,
-  Bell,
-  Crown,
-  AlertTriangle,
-  ExternalLink,
-  BookOpen,
-  Map,
-} from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api-fetch";
+import { cn } from "@/lib/utils";
 import type {
   CalendarEvent,
   EventCategory,
   EventPriority,
   EventStatus,
 } from "@/pages/calendar";
-import { cn } from "@/lib/utils";
-import { apiFetch } from "@/lib/api-fetch";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import {
+  AlertTriangle,
+  Bell,
+  BookOpen,
+  Crown,
+  ExternalLink,
+  Loader2,
+  Map,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { z } from "zod";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -135,7 +135,7 @@ export function CalendarioEventoModal({
   const { data: sectors = [] } = useQuery<Sector[]>({
     queryKey: ["sectors-list"],
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/sectors`);
+      const res = await apiFetch(`${BASE}api/sectors`);
       if (!res.ok) return [];
       const data = await res.json();
       return (data as Sector[]) ?? [];
@@ -160,7 +160,7 @@ export function CalendarioEventoModal({
   const timeStr = format(defaultDate, "HH:mm");
 
   const form = useForm<EventFormValues>({
-    resolver: zodResolver(eventFormSchema),
+    resolver: zodResolver(eventFormSchema as any),
     defaultValues: {
       title: "",
       description: "",

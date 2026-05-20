@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
-import { Loader2, Camera, Trash2, ImageUp } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
+import { Camera, ImageUp, Loader2, Trash2 } from "lucide-react";
+import { useRef, useState } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 

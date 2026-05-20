@@ -1,12 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/contexts/AuthContext";
-import { Link } from "wouter";
-import { Briefcase, MapPin, Clock, ExternalLink, Sparkles, TrendingUp, Filter } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api-fetch";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { Briefcase, Clock, ExternalLink, Filter, MapPin, Sparkles, TrendingUp } from "lucide-react";
+import { useState } from "react";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 

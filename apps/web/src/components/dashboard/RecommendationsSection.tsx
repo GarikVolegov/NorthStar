@@ -1,6 +1,6 @@
-import { Link } from "wouter";
-import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ArrowRight } from "lucide-react";
+import { Link } from "wouter";
 
 interface Rec {
   sectorId: number; sectorName: string; matchScore: number; matchReason: string;

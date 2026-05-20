@@ -1,6 +1,6 @@
-import { Map, ArrowRight } from "lucide-react";
-import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { ArrowRight, Map } from "lucide-react";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 

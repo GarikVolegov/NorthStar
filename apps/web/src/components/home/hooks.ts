@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-fetch";
-import { HomeNewsItem, TrendingSector, LatestResult } from "./types";
+import { getJson } from "@/lib/apiClient";
+import { useQuery } from "@tanstack/react-query";
+import { HomeNewsItem, LatestResult, TrendingSector } from "./types";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -8,11 +9,9 @@ export function useHomeNews() {
   return useQuery<{ news: HomeNewsItem[] }>({
     queryKey: ["home-news"],
     queryFn: async () => {
-      const res = await fetch(
+      return getJson<{ news: HomeNewsItem[] }>(
         `${BASE}api/news?multi=true&categories=technology,business,education&perCategory=1`,
       );
-      if (!res.ok) throw new Error("news error");
-      return res.json();
     },
     staleTime: 600_000,
   });
@@ -22,9 +21,7 @@ export function useTrendingSectors() {
   return useQuery<TrendingSector[]>({
     queryKey: ["trending-sectors"],
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/trending-sectors`);
-      if (!res.ok) throw new Error("error");
-      return res.json();
+      return getJson<TrendingSector[]>(`${BASE}api/trending-sectors`);
     },
     staleTime: 300_000,
   });

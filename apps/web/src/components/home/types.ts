@@ -1,13 +1,11 @@
 import {
   Briefcase,
-  Laptop,
+  Building2,
   GitMerge,
   HelpCircle,
+  Laptop,
   Rocket,
-  Building2,
-  TrendingUp,
-  Bot,
-  DollarSign,
+  TrendingUp
 } from "lucide-react";
 
 export type TrendingSector = {

@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Briefcase, CheckCircle2 } from "lucide-react";
-import { WorkModeSelector, useWorkPreference } from "@/components/WorkModeSelector";
 import type { WorkPreference } from "@/components/WorkModeSelector";
+import { WorkModeSelector, useWorkPreference } from "@/components/WorkModeSelector";
+import { useQueryClient } from "@tanstack/react-query";
+import { Briefcase, CheckCircle2 } from "lucide-react";
+import { useState } from "react";
 
 export function WorkModeCard({ userId }: { userId: number }) {
   const { workPreference, save, isLoading } = useWorkPreference(userId);
@@ -66,7 +66,7 @@ export function WorkModeCard({ userId }: { userId: number }) {
         ) : (
           <div>
             <WorkModeSelector
-              initialValue={workPreference !== "unknown" ? workPreference : undefined}
+              {...(workPreference !== "unknown" ? { initialValue: workPreference } : {})}
               onSelect={handleSelect}
               isPending={isLoading}
             />

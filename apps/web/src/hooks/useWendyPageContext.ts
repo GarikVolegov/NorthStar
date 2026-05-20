@@ -9,14 +9,14 @@ import { useWendy, type PageContext } from '../contexts/WendyProvider';
 
 export interface WendyPageContextInput {
   page:        string;
-  title?:      string;
-  entityType?: "sector" | "profession" | "article" | "news";
-  entityId?:   number;
-  entityName?: string;
-  journeyType?: string;
-  capabilities?: string[];
-  fields?:       string[];
-  actions?:      string[];
+  title?:      string | undefined;
+  entityType?: "sector" | "profession" | "article" | "news" | undefined;
+  entityId?:   number | undefined;
+  entityName?: string | undefined;
+  journeyType?: string | undefined;
+  capabilities?: string[] | undefined;
+  fields?:       string[] | undefined;
+  actions?:      string[] | undefined;
 }
 
 /**

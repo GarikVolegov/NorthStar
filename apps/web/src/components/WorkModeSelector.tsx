@@ -1,11 +1,16 @@
-import React, { useState } from "react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Briefcase, Laptop, GitMerge, HelpCircle, ChevronDown, ChevronUp, ArrowRight, CheckCircle2,
-} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api-fetch";
+import { cn } from "@/lib/utils";
+import {
+  ArrowRight,
+  Briefcase,
+  CheckCircle2,
+  ChevronDown, ChevronUp,
+  GitMerge, HelpCircle,
+  Laptop,
+} from "lucide-react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";

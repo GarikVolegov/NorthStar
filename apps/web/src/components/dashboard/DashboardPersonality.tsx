@@ -1,10 +1,13 @@
-import { Link } from "wouter";
+import { cn } from "@/lib/utils";
 import { BrainCircuit, Sparkles } from "lucide-react";
 import {
-  ResponsiveContainer, RadarChart, PolarGrid,
-  PolarAngleAxis, PolarRadiusAxis, Radar,
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis, Radar,
+  RadarChart,
+  ResponsiveContainer,
 } from "recharts";
-import { cn } from "@/lib/utils";
+import { Link } from "wouter";
 
 // Chiavi short (R, I, A, S, E, C) usate nel DB
 const RIASEC_LABELS: Record<string, string> = {

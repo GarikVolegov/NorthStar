@@ -1,23 +1,23 @@
-import { Link, useLocation } from "wouter";
-import {
-  Home,
-  FlaskConical,
-  Layers,
-  Briefcase,
-  MapPin,
-  BrainCircuit,
-  Compass,
-  HandCoins,
-  Users,
-  BookOpenText,
-  Newspaper,
-  MessageCircle,
-  type LucideIcon,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { NAV_LABELS } from "@/lib/constants";
+import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
+import {
+  BookOpenText,
+  BrainCircuit,
+  Briefcase,
+  Compass,
+  FlaskConical,
+  HandCoins,
+  Home,
+  Layers,
+  MapPin,
+  MessageCircle,
+  Newspaper,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+import { Link, useLocation } from "wouter";
 
 type NavPhase = 'guest' | 'new-user' | 'indeciso' | 'dipendente' | 'autonomo' | 'azienda' | 'investitore';
 type MobileNavItem = { href: string; icon?: LucideIcon; label: string; brand?: boolean };

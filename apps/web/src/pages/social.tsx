@@ -1,5 +1,13 @@
-import { useEffect, useRef, useState } from "react";
-import { Link } from "wouter";
+import { ChatDrawer } from "@/components/chat/ChatDrawer";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/contexts/AuthContext";
+import { useChatEncryption } from "@/hooks/useChatEncryption";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { apiFetch } from "@/lib/api-fetch";
+import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Briefcase,
@@ -16,16 +24,8 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
-import { useWebSocket } from "@/hooks/useWebSocket";
-import { useChatEncryption } from "@/hooks/useChatEncryption";
-import { apiFetch } from "@/lib/api-fetch";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { ChatDrawer } from "@/components/chat/ChatDrawer";
+import { useEffect, useRef, useState } from "react";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -223,8 +223,8 @@ export default function SocialPage() {
   const me = {
     id: user?.id ?? 0,
     name: user?.name ?? "Utente",
-    email: user?.email,
-    avatarUrl: user?.avatarUrl,
+    ...(user?.email !== undefined ? { email: user.email } : {}),
+    ...(user?.avatarUrl !== undefined ? { avatarUrl: user.avatarUrl } : {}),
   };
 
   return (
@@ -588,7 +588,14 @@ function FriendsPanel({
             <p className="text-sm text-muted-foreground">Nessun risultato.</p>
           ) : searchQuery.data!.users.map((result) => (
             <div key={result.id} className="flex items-center gap-2 rounded-xl border p-2">
-              <Avatar user={{ id: result.id, name: result.name, avatarUrl: result.avatarUrl }} size="sm" />
+              <Avatar
+                user={{
+                  id: result.id,
+                  name: result.name,
+                  ...(result.avatarUrl !== undefined ? { avatarUrl: result.avatarUrl } : {}),
+                }}
+                size="sm"
+              />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold">{result.name}</p>
                 <p className="truncate text-xs text-muted-foreground">{result.city || result.email}</p>
@@ -693,7 +700,14 @@ function PublicProfilePreview({ userId, posts, loading }: { userId: number; post
         </div>
         <div className="px-5 pb-5">
           <div className="-mt-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <Avatar user={{ id: userId, name: profile?.name || user?.name || "Utente", avatarUrl: profile?.avatarUrl || user?.avatarUrl }} size="lg" />
+            <Avatar
+              user={{
+                id: userId,
+                name: profile?.name || user?.name || "Utente",
+                avatarUrl: profile?.avatarUrl ?? user?.avatarUrl ?? null,
+              }}
+              size="lg"
+            />
             <Button asChild variant="outline" className="min-h-11 rounded-xl">
               <Link href={`/utente/${userId}`}>Apri vista pubblica</Link>
             </Button>

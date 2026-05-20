@@ -23,7 +23,7 @@
  *   className: stile aggiuntivo
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 // VoiceID default — override con env VITE_WENDY_VOICE_ID
 const DEFAULT_VOICE_ID = import.meta.env?.VITE_WENDY_VOICE_ID ?? 'EXAVITQu4vr4xnSDxMaL'; // Sarah

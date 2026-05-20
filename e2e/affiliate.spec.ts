@@ -20,13 +20,13 @@ test.describe('Route /affiliate', () => {
       await loginViaApi(page);
       await page.goto('/affiliate');
       await waitForAuthReady(page);
-      await page.waitForLoadState('networkidle', { timeout: 15_000 });
+      await expect(page).toHaveURL(/\/affiliate/, { timeout: 10_000 });
     });
 
     test('la pagina si carica senza errori JS critici', async ({ page }) => {
       const errors: string[] = [];
       page.on('pageerror', (err) => errors.push(err.message));
-      await page.waitForLoadState('networkidle', { timeout: 15_000 });
+      await expect(page.locator('header').or(page.locator('main'))).toBeVisible({ timeout: 10_000 });
       const critical = errors.filter(
         (e) => !e.includes('Warning:') && !e.includes('[Fast Refresh]'),
       );

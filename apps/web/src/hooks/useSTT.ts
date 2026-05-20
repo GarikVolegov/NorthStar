@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * useSTT — Speech-to-Text via Web Speech API (SpeechRecognition)
@@ -105,7 +105,9 @@ export function useSTT(options: UseSTTOptions = {}): UseSTTReturn {
       let finalChunk = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
-        const text = result[0].transcript;
+        const alternative = result?.[0];
+        if (!result || !alternative) continue;
+        const text = alternative.transcript;
         if (result.isFinal) {
           finalChunk += text;
         } else {

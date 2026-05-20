@@ -18,12 +18,6 @@ interface QuizQuestion {
   correct: number;
 }
 
-interface QuizResult {
-  title: string;
-  questions: QuizQuestion[];
-  score?: number;
-}
-
 interface ResourceItem {
   title: string;
   url?: string;

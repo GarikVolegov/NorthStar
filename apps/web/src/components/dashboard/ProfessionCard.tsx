@@ -1,5 +1,5 @@
-import { TrendingUp, DollarSign } from "lucide-react";
 import type { ProfessionResult } from "@/hooks/useAgentAnalysis";
+import { DollarSign, TrendingUp } from "lucide-react";
 
 export function ProfessionCard({ p, index }: { p: ProfessionResult; index: number }) {
   return (

@@ -6,12 +6,12 @@
  *   card     → card con dettagli e pulsante (per profilo / impostazioni)
  *   banner   → banner orizzontale leggero per reminder upgrade
  */
-import { Link } from "wouter";
-import { Crown, Zap, Check, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { useSubscription } from "@/hooks/useSubscription";
 import type { Plan } from "@/hooks/useSubscription";
+import { useSubscription } from "@/hooks/useSubscription";
+import { cn } from "@/lib/utils";
+import { Check, ChevronRight, Crown, Zap } from "lucide-react";
+import { Link } from "wouter";
 
 // ── Plan metadata ─────────────────────────────────────────────────────────────
 
@@ -97,7 +97,7 @@ interface SubscriptionStatusCardProps {
 }
 
 export function SubscriptionStatusCard({ className }: SubscriptionStatusCardProps) {
-  const { plan, isPro, isTeam, validUntil, isLoading } = useSubscription();
+  const { plan, validUntil, isLoading } = useSubscription();
   if (isLoading) return <div className="h-32 rounded-xl bg-muted/30 animate-pulse" />;
 
   const meta = PLAN_META[plan];

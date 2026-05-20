@@ -1,5 +1,4 @@
 "use client";
-import React from "react";
 import { useLeaderboard, type LeaderboardEntry } from "@/hooks/useLeaderboard";
 
 const XP_PER_LEVEL = 200;

@@ -4,18 +4,18 @@
  * Mostra i workspace dell'utente con link a dettaglio.
  * Creazione nuovo workspace (richiede piano Team).
  */
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api-fetch";
-import { API_ENDPOINTS } from "@/lib/constants";
-import { useAuth } from "@/contexts/AuthContext";
-import { usePageMeta } from "@/lib/seo";
-import { Users, Plus, Crown, ArrowRight, Loader2, Building2, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UpgradeGate } from "@/components/ui/UpgradeGate";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api-fetch";
+import { API_ENDPOINTS } from "@/lib/constants";
+import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, Building2, Heart, Loader2, Plus, Users } from "lucide-react";
+import { useState } from "react";
+import { Link } from "wouter";
 
 interface WorkspaceItem {
   workspaceId: number;

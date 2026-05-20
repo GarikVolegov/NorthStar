@@ -1,8 +1,8 @@
-import { useEffect } from "react";
-import { Link } from "wouter";
-import { useTranslation } from "react-i18next";
-import { Shield, Mail, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ArrowRight, Mail, Shield } from "lucide-react";
+import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 interface SectionProps { id: string; title: string; children: React.ReactNode; }
 function Section({ id, title, children }: SectionProps) {

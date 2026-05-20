@@ -1,9 +1,9 @@
-import { Link } from "wouter";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { SectorIcon } from "@/lib/sector-icon";
-import { CheckCircle2, TrendingUp, Map, GitBranch, Compass, ArrowRight } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { SectorDetail } from "@/hooks/useSectorDetail";
+import { SectorIcon } from "@/lib/sector-icon";
+import { ArrowRight, CheckCircle2, Compass, GitBranch, Map, TrendingUp } from "lucide-react";
+import { Link } from "wouter";
 
 export function ConfirmedSectorCard({
   hasConfirmedSector,

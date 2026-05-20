@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { springs, durations, easings, fadeIn, fadeInUp, fadeInDown, staggerContainer } from "@/lib/motion";
+import { durations, easings, fadeIn, fadeInDown, fadeInUp, springs, staggerContainer } from "@/lib/motion";
+import { describe, expect, it } from "vitest";
 
 describe("motion constants", () => {
   describe("springs", () => {

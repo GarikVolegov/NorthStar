@@ -68,6 +68,19 @@ test.describe("Wendy Coach API", () => {
     expect(delRes.status()).toBe(204);
   });
 
+  test("POST /api/ai/wendy — small talk locale risponde via SSE senza pipeline completa", async ({ request }) => {
+    const res = await request.post(`${TEST_API_URL}/api/ai/wendy`, {
+      headers,
+      data: { message: "come stai?" },
+    });
+    expect(res.status()).toBe(200);
+
+    const text = await res.text();
+    expect(text).toContain('"type":"token"');
+    expect(text).toContain("local-wendy-reply");
+    expect(text).not.toContain('"type":"error"');
+  });
+
   test("POST /api/wendy/ask — RAG streaming endpoint", async ({ request }) => {
     const res = await request.post(`${TEST_API_URL}/api/wendy/ask`, {
       headers,

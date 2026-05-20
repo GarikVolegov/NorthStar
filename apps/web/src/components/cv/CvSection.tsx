@@ -1,32 +1,60 @@
-import { useState, useRef, useCallback } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  FileText, Upload, Loader2, Trash2, Sparkles, Network,
-  Briefcase, GraduationCap, Wrench, Award, Globe, ChevronDown, ChevronUp,
-  CheckCircle2, AlertCircle, Plus, X,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { CvGeneratorModal } from "./CvGeneratorModal";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api-fetch";
+import { cn } from "@/lib/utils";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  AlertCircle,
+  Award,
+  Briefcase,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  Globe,
+  GraduationCap,
+  Loader2,
+  Network,
+  Plus,
+  Sparkles,
+  Trash2,
+  Upload,
+  Wrench,
+} from "lucide-react";
+import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { CvGeneratorModal } from "./CvGeneratorModal";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
 export interface CvData {
   personalInfo: {
-    name: string; email?: string; phone?: string;
-    location?: string; linkedin?: string; website?: string; title?: string;
+    name: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    linkedin?: string;
+    website?: string;
+    title?: string;
   };
   summary?: string;
   experience: Array<{
-    id: string; title: string; company: string; period: string;
-    location?: string; description: string; skills: string[];
+    id: string;
+    title: string;
+    company: string;
+    period: string;
+    location?: string;
+    description: string;
+    skills: string[];
   }>;
   education: Array<{
-    id: string; degree: string; institution: string; year: string; description?: string;
+    id: string;
+    degree: string;
+    institution: string;
+    year: string;
+    description?: string;
   }>;
   skills: string[];
   tools: string[];
@@ -39,22 +67,33 @@ export interface CvData {
 }
 
 interface GraphNode {
-  id: string; label: string;
+  id: string;
+  label: string;
   type: "role" | "skill" | "tool" | "certification";
-  description: string; userAdded?: boolean;
+  description: string;
+  userAdded?: boolean;
 }
 
 function useCv(userId: number) {
   return useQuery<{ cvData: CvData | null; hasCv: boolean }>({
     queryKey: ["cv", userId],
-    queryFn: () => fetch(`${BASE}api/cv/${userId}`).then((r) => { if (!r.ok) throw new Error(`cv ${r.status}`); return r.json(); }),
+    queryFn: () =>
+      apiFetch(`${BASE}api/cv/${userId}`).then((r) => {
+        if (!r.ok) throw new Error(`cv ${r.status}`);
+        return r.json();
+      }),
     enabled: !!userId,
     staleTime: 60_000,
   });
 }
 
-// ── Extracted chips ───────────────────────────────────────────────────
-function ChipList({ items, color = "primary" }: { items: string[]; color?: string }) {
+function ChipList({
+  items,
+  color = "primary",
+}: {
+  items: string[];
+  color?: string;
+}) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? items : items.slice(0, 8);
@@ -68,10 +107,10 @@ function ChipList({ items, color = "primary" }: { items: string[]; color?: strin
             color === "primary"
               ? "bg-primary/8 text-primary border-primary/20"
               : color === "amber"
-              ? "bg-amber-50 text-amber-700 border-amber-200"
-              : color === "violet"
-              ? "bg-violet-50 text-violet-700 border-violet-200"
-              : "bg-muted text-muted-foreground border-border"
+                ? "bg-amber-50 text-amber-700 border-amber-200"
+                : color === "violet"
+                  ? "bg-violet-50 text-violet-700 border-violet-200"
+                  : "bg-muted text-muted-foreground border-border",
           )}
         >
           {item}
@@ -82,21 +121,33 @@ function ChipList({ items, color = "primary" }: { items: string[]; color?: strin
           onClick={() => setExpanded((v) => !v)}
           className="text-xs text-primary hover:underline flex items-center gap-0.5"
         >
-          {expanded
-            ? <><ChevronUp className="w-3 h-3" />{t("cv.lessExp")}</>
-            : <><ChevronDown className="w-3 h-3" />+{items.length - 8} {t("common.others", { defaultValue: "altri" })}</>}
+          {expanded ? (
+            <>
+              <ChevronUp className="w-3 h-3" />
+              {t("cv.lessExp")}
+            </>
+          ) : (
+            <>
+              <ChevronDown className="w-3 h-3" />+{items.length - 8}{" "}
+              {t("common.others", { defaultValue: "altri" })}
+            </>
+          )}
         </button>
       )}
     </div>
   );
 }
 
-// ── Graph node suggestions from CV ────────────────────────────────────
 function GraphSuggestions({
-  cvData, sectorId, userId,
+  cvData,
+  sectorId,
+  userId,
   onAdded,
 }: {
-  cvData: CvData; sectorId?: number; userId: number; onAdded?: () => void;
+  cvData: CvData;
+  sectorId?: number;
+  userId: number;
+  onAdded?: () => void;
 }) {
   const { t } = useTranslation();
   const storageKey = `grafo_user_${sectorId}_${userId}`;
@@ -104,22 +155,36 @@ function GraphSuggestions({
     try {
       const raw = localStorage.getItem(storageKey);
       return raw ? JSON.parse(raw) : { nodes: [], edges: [] };
-    } catch { return { nodes: [], edges: [] }; }
+    } catch {
+      return { nodes: [], edges: [] };
+    }
   })();
 
   const existingLabels = new Set<string>(
-    (existing.nodes as GraphNode[]).map((n) => n.label.toLowerCase())
+    (existing.nodes as GraphNode[]).map((n) => n.label.toLowerCase()),
   );
 
   const suggestions: GraphNode[] = [
     ...cvData.skills.slice(0, 6).map((s, i) => ({
-      id: `cv-skill-${i}`, label: s, type: "skill" as const, description: `Competenza da CV`, userAdded: true,
+      id: `cv-skill-${i}`,
+      label: s,
+      type: "skill" as const,
+      description: `Competenza da CV`,
+      userAdded: true,
     })),
     ...cvData.tools.slice(0, 4).map((t, i) => ({
-      id: `cv-tool-${i}`, label: t, type: "tool" as const, description: `Strumento da CV`, userAdded: true,
+      id: `cv-tool-${i}`,
+      label: t,
+      type: "tool" as const,
+      description: `Strumento da CV`,
+      userAdded: true,
     })),
     ...cvData.certifications.slice(0, 3).map((c, i) => ({
-      id: `cv-cert-${i}`, label: c, type: "certification" as const, description: `Certificazione da CV`, userAdded: true,
+      id: `cv-cert-${i}`,
+      label: c,
+      type: "certification" as const,
+      description: `Certificazione da CV`,
+      userAdded: true,
     })),
   ].filter((n) => !existingLabels.has(n.label.toLowerCase()));
 
@@ -129,7 +194,10 @@ function GraphSuggestions({
 
   function addNode(node: GraphNode) {
     const updated = {
-      nodes: [...existing.nodes, { ...node, id: `cv-${Date.now()}-${node.type}` }],
+      nodes: [
+        ...existing.nodes,
+        { ...node, id: `cv-${Date.now()}-${node.type}` },
+      ],
       edges: existing.edges,
     };
     localStorage.setItem(storageKey, JSON.stringify(updated));
@@ -153,8 +221,12 @@ function GraphSuggestions({
     <div className="mt-5 p-4 rounded-2xl border border-dashed border-primary/30 bg-primary/3">
       <div className="flex items-center gap-2 mb-3">
         <Network className="w-4 h-4 text-primary" />
-        <span className="text-sm font-semibold text-foreground">{t("cv.addToGraph")}</span>
-        <span className="text-xs text-muted-foreground">({t("cv.suggestedNodes", { count: suggestions.length })})</span>
+        <span className="text-sm font-semibold text-foreground">
+          {t("cv.addToGraph")}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          ({t("cv.suggestedNodes", { count: suggestions.length })})
+        </span>
       </div>
       <div className="flex flex-wrap gap-2">
         {suggestions.map((node) => (
@@ -166,21 +238,31 @@ function GraphSuggestions({
               "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all",
               added.has(node.label)
                 ? "bg-emerald-50 text-emerald-700 border-emerald-200 cursor-default"
-                : cn("hover:scale-105 hover:shadow-sm cursor-pointer", TYPE_COLORS[node.type])
+                : cn(
+                    "hover:scale-105 hover:shadow-sm cursor-pointer",
+                    TYPE_COLORS[node.type],
+                  ),
             )}
           >
-            {added.has(node.label)
-              ? <CheckCircle2 className="w-3 h-3" />
-              : TYPE_ICONS[node.type]}
+            {added.has(node.label) ? (
+              <CheckCircle2 className="w-3 h-3" />
+            ) : (
+              TYPE_ICONS[node.type]
+            )}
             {node.label}
-            {!added.has(node.label) && <Plus className="w-3 h-3 ml-0.5 opacity-60" />}
+            {!added.has(node.label) && (
+              <Plus className="w-3 h-3 ml-0.5 opacity-60" />
+            )}
           </button>
         ))}
       </div>
       <p className="text-xs text-muted-foreground mt-2.5">
         {t("cv.clickToAdd")}{" "}
         {sectorId && (
-          <a href={`${BASE}grafo/${sectorId}`} className="text-primary hover:underline">
+          <a
+            href={`${BASE}grafo/${sectorId}`}
+            className="text-primary hover:underline"
+          >
             {t("cv.openGraph")}
           </a>
         )}
@@ -189,9 +271,9 @@ function GraphSuggestions({
   );
 }
 
-// ── Main CvSection component ──────────────────────────────────────────
 export function CvSection({
-  userId, confirmedSectorId,
+  userId,
+  confirmedSectorId,
 }: {
   userId: number;
   confirmedSectorId?: number;
@@ -219,7 +301,10 @@ export function CvSection({
       } else if (payload.text) {
         formData.append("rawText", payload.text);
       }
-      const res = await fetch(`${BASE}api/cv/upload`, { method: "POST", body: formData });
+      const res = await apiFetch(`${BASE}api/cv/upload`, {
+        method: "POST",
+        body: formData,
+      });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || t("cv.uploadError"));
       return json;
@@ -235,29 +320,38 @@ export function CvSection({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => fetch(`${BASE}api/cv/${userId}`, { method: "DELETE" }).then((r) => r.json()),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["cv", userId] }),
+    mutationFn: () =>
+      apiFetch(`${BASE}api/cv/${userId}`, { method: "DELETE" }).then((r) =>
+        r.json(),
+      ),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["cv", userId] }),
   });
 
-  const handleFile = useCallback((file: File) => {
-    if (!["application/pdf", "text/plain"].includes(file.type)) {
-      setUploadError(t("cv.invalidFormat"));
-      return;
-    }
-    setUploadError(null);
-    uploadMutation.mutate({ file });
-  }, [uploadMutation, t]);
+  const handleFile = useCallback(
+    (file: File) => {
+      if (!["application/pdf", "text/plain"].includes(file.type)) {
+        setUploadError(t("cv.invalidFormat"));
+        return;
+      }
+      setUploadError(null);
+      uploadMutation.mutate({ file });
+    },
+    [uploadMutation, t],
+  );
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
-  }, [handleFile]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    },
+    [handleFile],
+  );
 
   const uploading = uploadMutation.isPending;
 
-  // ── Render CV data ──────────────────────────────────────────────────
   if (cvData) {
     const exp = showFullExp ? cvData.experience : cvData.experience.slice(0, 2);
     return (
@@ -267,11 +361,17 @@ export function CvSection({
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-primary" /> {t("cv.myResume")}
+                  <FileText className="w-4 h-4 text-primary" />{" "}
+                  {t("cv.myResume")}
                 </CardTitle>
                 <p className="text-sm text-muted-foreground mt-0.5">
                   {cvData.extractedAt
-                    ? t("cv.uploadedAt", { date: new Date(cvData.extractedAt).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" }) })
+                    ? t("cv.uploadedAt", {
+                        date: new Date(cvData.extractedAt).toLocaleDateString(
+                          undefined,
+                          { day: "numeric", month: "long", year: "numeric" },
+                        ),
+                      })
                     : t("cv.uploadedRecently")}
                 </p>
               </div>
@@ -296,12 +396,12 @@ export function CvSection({
             </div>
           </CardHeader>
           <CardContent className="space-y-5">
-
-            {/* Personal info */}
             <div className="flex items-start gap-3 p-4 rounded-xl bg-muted/40 border">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                 <span className="text-base font-serif font-bold text-primary">
-                  {(cvData.personalInfo?.name || user?.name || "?").charAt(0).toUpperCase()}
+                  {(cvData.personalInfo?.name || user?.name || "?")
+                    .charAt(0)
+                    .toUpperCase()}
                 </span>
               </div>
               <div className="min-w-0">
@@ -309,66 +409,93 @@ export function CvSection({
                   {cvData.personalInfo?.name || user?.name}
                 </p>
                 {cvData.personalInfo?.title && (
-                  <p className="text-sm text-primary font-medium">{cvData.personalInfo.title}</p>
+                  <p className="text-sm text-primary font-medium">
+                    {cvData.personalInfo.title}
+                  </p>
                 )}
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
                   {cvData.personalInfo?.location && (
-                    <span className="text-xs text-muted-foreground">{cvData.personalInfo.location}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {cvData.personalInfo.location}
+                    </span>
                   )}
                   {cvData.personalInfo?.phone && (
-                    <span className="text-xs text-muted-foreground">{cvData.personalInfo.phone}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {cvData.personalInfo.phone}
+                    </span>
                   )}
                   {cvData.personalInfo?.linkedin && (
-                    <a href={cvData.personalInfo.linkedin} target="_blank" rel="noopener noreferrer"
-                      className="text-xs text-primary hover:underline">LinkedIn</a>
+                    <a
+                      href={cvData.personalInfo.linkedin}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary hover:underline"
+                    >
+                      LinkedIn
+                    </a>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Skills */}
             {cvData.skills.length > 0 && (
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-2 flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3" /> {t("cv.skillsDetected", { count: cvData.skills.length })}
+                  <Sparkles className="w-3 h-3" />{" "}
+                  {t("cv.skillsDetected", { count: cvData.skills.length })}
                 </p>
                 <ChipList items={cvData.skills} color="primary" />
               </div>
             )}
 
-            {/* Tools */}
             {cvData.tools.length > 0 && (
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-2 flex items-center gap-1.5">
-                  <Wrench className="w-3 h-3" /> {t("cv.toolsCount", { count: cvData.tools.length })}
+                  <Wrench className="w-3 h-3" />{" "}
+                  {t("cv.toolsCount", { count: cvData.tools.length })}
                 </p>
                 <ChipList items={cvData.tools} color="amber" />
               </div>
             )}
 
-            {/* Experience */}
             {cvData.experience.length > 0 && (
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-3 flex items-center gap-1.5">
-                  <Briefcase className="w-3 h-3" /> {t("cv.expCount", { count: cvData.experience.length })}
+                  <Briefcase className="w-3 h-3" />{" "}
+                  {t("cv.expCount", { count: cvData.experience.length })}
                 </p>
                 <div className="space-y-3">
                   {exp.map((e) => (
                     <div key={e.id} className="border rounded-xl p-3.5 bg-card">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="font-semibold text-sm text-foreground">{e.title}</p>
-                          <p className="text-xs text-muted-foreground">{e.company} · {e.period}</p>
+                          <p className="font-semibold text-sm text-foreground">
+                            {e.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {e.company} · {e.period}
+                          </p>
                         </div>
-                        {e.location && <span className="text-xs text-muted-foreground shrink-0">{e.location}</span>}
+                        {e.location && (
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {e.location}
+                          </span>
+                        )}
                       </div>
                       {e.description && (
-                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed line-clamp-3">{e.description}</p>
+                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed line-clamp-3">
+                          {e.description}
+                        </p>
                       )}
                       {e.skills.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
                           {e.skills.slice(0, 4).map((s) => (
-                            <span key={s} className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">{s}</span>
+                            <span
+                              key={s}
+                              className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground"
+                            >
+                              {s}
+                            </span>
                           ))}
                         </div>
                       )}
@@ -379,16 +506,25 @@ export function CvSection({
                       onClick={() => setShowFullExp((v) => !v)}
                       className="text-xs text-primary hover:underline flex items-center gap-1"
                     >
-                      {showFullExp
-                        ? <><ChevronUp className="w-3 h-3" />{t("cv.lessExp")}</>
-                        : <><ChevronDown className="w-3 h-3" />{t("cv.moreExp", { count: cvData.experience.length - 2 })}</>}
+                      {showFullExp ? (
+                        <>
+                          <ChevronUp className="w-3 h-3" />
+                          {t("cv.lessExp")}
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="w-3 h-3" />
+                          {t("cv.moreExp", {
+                            count: cvData.experience.length - 2,
+                          })}
+                        </>
+                      )}
                     </button>
                   )}
                 </div>
               </div>
             )}
 
-            {/* Education */}
             {cvData.education.length > 0 && (
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-3 flex items-center gap-1.5">
@@ -396,13 +532,20 @@ export function CvSection({
                 </p>
                 <div className="space-y-2">
                   {cvData.education.map((e) => (
-                    <div key={e.id} className="flex items-start gap-3 border rounded-xl p-3.5 bg-card">
+                    <div
+                      key={e.id}
+                      className="flex items-start gap-3 border rounded-xl p-3.5 bg-card"
+                    >
                       <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
                         <GraduationCap className="w-4 h-4 text-violet-600" />
                       </div>
                       <div>
-                        <p className="font-semibold text-sm text-foreground">{e.degree}</p>
-                        <p className="text-xs text-muted-foreground">{e.institution} · {e.year}</p>
+                        <p className="font-semibold text-sm text-foreground">
+                          {e.degree}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {e.institution} · {e.year}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -410,7 +553,6 @@ export function CvSection({
               </div>
             )}
 
-            {/* Certifications + Languages */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {cvData.certifications.length > 0 && (
                 <div>
@@ -427,8 +569,12 @@ export function CvSection({
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {cvData.languages.map((l) => (
-                      <span key={l.language} className="text-xs px-2.5 py-0.5 rounded-full border bg-muted text-muted-foreground">
-                        {l.language} <span className="opacity-60">· {l.level}</span>
+                      <span
+                        key={l.language}
+                        className="text-xs px-2.5 py-0.5 rounded-full border bg-muted text-muted-foreground"
+                      >
+                        {l.language}{" "}
+                        <span className="opacity-60">· {l.level}</span>
                       </span>
                     ))}
                   </div>
@@ -436,11 +582,12 @@ export function CvSection({
               )}
             </div>
 
-            {/* Graph suggestions */}
             <GraphSuggestions
               cvData={cvData}
-              sectorId={confirmedSectorId}
               userId={userId}
+              {...(confirmedSectorId !== undefined
+                ? { sectorId: confirmedSectorId }
+                : {})}
             />
           </CardContent>
         </Card>
@@ -449,15 +596,14 @@ export function CvSection({
           <CvGeneratorModal
             userId={userId}
             cvData={cvData}
-            confirmedSectorId={confirmedSectorId}
             onClose={() => setShowGenerator(false)}
+            {...(confirmedSectorId !== undefined ? { confirmedSectorId } : {})}
           />
         )}
       </>
     );
   }
 
-  // ── Upload zone ─────────────────────────────────────────────────────
   return (
     <>
       <Card className="rounded-2xl">
@@ -482,18 +628,26 @@ export function CvSection({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-
-          {/* Mode switcher */}
           <div className="flex rounded-xl bg-muted p-1 w-fit">
             <button
               onClick={() => setMode("upload")}
-              className={cn("px-4 py-1.5 rounded-lg text-sm font-medium transition-all", mode === "upload" ? "bg-white shadow text-foreground" : "text-muted-foreground")}
+              className={cn(
+                "px-4 py-1.5 rounded-lg text-sm font-medium transition-all",
+                mode === "upload"
+                  ? "bg-white shadow text-foreground"
+                  : "text-muted-foreground",
+              )}
             >
               {t("cv.uploadFile")}
             </button>
             <button
               onClick={() => setMode("paste")}
-              className={cn("px-4 py-1.5 rounded-lg text-sm font-medium transition-all", mode === "paste" ? "bg-white shadow text-foreground" : "text-muted-foreground")}
+              className={cn(
+                "px-4 py-1.5 rounded-lg text-sm font-medium transition-all",
+                mode === "paste"
+                  ? "bg-white shadow text-foreground"
+                  : "text-muted-foreground",
+              )}
             >
               {t("cv.pasteText")}
             </button>
@@ -501,14 +655,19 @@ export function CvSection({
 
           {mode === "upload" ? (
             <div
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
               onClick={() => !uploading && fileRef.current?.click()}
               className={cn(
                 "relative border-2 border-dashed rounded-2xl p-10 text-center transition-all cursor-pointer",
-                dragOver ? "border-primary bg-primary/5 scale-[1.01]" : "border-border hover:border-primary/50 hover:bg-muted/30",
-                uploading && "cursor-wait opacity-70"
+                dragOver
+                  ? "border-primary bg-primary/5 scale-[1.01]"
+                  : "border-border hover:border-primary/50 hover:bg-muted/30",
+                uploading && "cursor-wait opacity-70",
               )}
             >
               <input
@@ -516,13 +675,20 @@ export function CvSection({
                 type="file"
                 accept=".pdf,.txt"
                 className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFile(f);
+                }}
               />
               {uploading ? (
                 <div className="flex flex-col items-center gap-3">
                   <Loader2 className="w-10 h-10 text-primary animate-spin" />
-                  <p className="text-sm font-medium text-foreground">{t("cv.analyzingAI")}</p>
-                  <p className="text-xs text-muted-foreground">{t("cv.extractingSkills")}</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {t("cv.analyzingAI")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("cv.extractingSkills")}
+                  </p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-3">
@@ -530,8 +696,12 @@ export function CvSection({
                     <Upload className="w-7 h-7 text-primary" />
                   </div>
                   <div>
-                    <p className="font-semibold text-foreground">{t("cv.dragHere")}</p>
-                    <p className="text-sm text-muted-foreground mt-1">{t("cv.fileLimit")}</p>
+                    <p className="font-semibold text-foreground">
+                      {t("cv.dragHere")}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {t("cv.fileLimit")}
+                    </p>
                   </div>
                 </div>
               )}
@@ -549,13 +719,16 @@ export function CvSection({
                 disabled={pasteText.trim().length < 50 || uploading}
                 onClick={() => uploadMutation.mutate({ text: pasteText })}
               >
-                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {uploading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
                 {t("cv.analyzeWithAI")}
               </Button>
             </div>
           )}
 
-          {/* Error */}
           {uploadError && (
             <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -563,21 +736,35 @@ export function CvSection({
             </div>
           )}
 
-          {/* Feature highlights */}
           {!isLoading && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
               {[
-                { icon: Network, key: "featureGraph", descKey: "featureGraphDesc" },
+                {
+                  icon: Network,
+                  key: "featureGraph",
+                  descKey: "featureGraphDesc",
+                },
                 { icon: FileText, key: "featureCv", descKey: "featureCvDesc" },
-                { icon: Award, key: "featurePrint", descKey: "featurePrintDesc" },
+                {
+                  icon: Award,
+                  key: "featurePrint",
+                  descKey: "featurePrintDesc",
+                },
               ].map(({ icon: Icon, key, descKey }) => (
-                <div key={key} className="flex items-start gap-2.5 p-3 rounded-xl bg-muted/50 border">
+                <div
+                  key={key}
+                  className="flex items-start gap-2.5 p-3 rounded-xl bg-muted/50 border"
+                >
                   <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                     <Icon className="w-3.5 h-3.5 text-primary" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-foreground">{t(`cv.${key}`)}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">{t(`cv.${descKey}`)}</p>
+                    <p className="text-xs font-semibold text-foreground">
+                      {t(`cv.${key}`)}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {t(`cv.${descKey}`)}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -590,8 +777,8 @@ export function CvSection({
         <CvGeneratorModal
           userId={userId}
           cvData={null}
-          confirmedSectorId={confirmedSectorId}
           onClose={() => setShowGenerator(false)}
+          {...(confirmedSectorId !== undefined ? { confirmedSectorId } : {})}
         />
       )}
     </>

@@ -1,10 +1,9 @@
-import React from "react";
-import { Link } from "wouter";
-import { motion } from "framer-motion";
-import { Flame, TrendingUp, ArrowRight, ChevronRight } from "lucide-react";
-import { useTranslation } from "react-i18next";
 import { SectorIcon } from "@/lib/sector-icon";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
+import { ArrowRight, ChevronRight, Flame, TrendingUp } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 type TrendingSector = {
   id: number;

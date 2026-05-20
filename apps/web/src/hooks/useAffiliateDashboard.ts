@@ -3,10 +3,10 @@
  * FRONTEND_RULES.md: hook TanStack Query, nessun fetch diretto nei componenti.
  * API_RULES.md: token da AuthContext, endpoint /api/affiliate/*
  */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import { apiFetch } from '@/lib/api-fetch';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 const BASE = import.meta.env.BASE_URL || '/';
 

@@ -1,7 +1,7 @@
-import * as React from "react"
-import { motion } from "framer-motion"
-import { cn } from "@/lib/utils"
 import { useReducedMotion } from "@/lib/motion"
+import { cn } from "@/lib/utils"
+import { motion } from "framer-motion"
+import * as React from "react"
 
 interface MotionCardProps extends React.HTMLAttributes<HTMLDivElement> {
   animate?: boolean
@@ -12,6 +12,7 @@ const Card = React.forwardRef<HTMLDivElement, MotionCardProps>(
     const prefersReduced = useReducedMotion()
 
     if (animate && !prefersReduced) {
+      const motionProps = props as unknown as React.ComponentPropsWithoutRef<typeof motion.div>
       return (
         <motion.div
           ref={ref}
@@ -21,7 +22,7 @@ const Card = React.forwardRef<HTMLDivElement, MotionCardProps>(
           )}
           whileHover={{ y: -3, boxShadow: "0 8px 24px -4px hsl(160 20% 30% / 0.12)", transition: { type: "spring", stiffness: 400, damping: 28 } }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          {...(props as React.ComponentPropsWithoutRef<typeof motion.div>)}
+          {...motionProps}
         />
       )
     }
@@ -96,4 +97,4 @@ const CardFooter = React.forwardRef<
 ))
 CardFooter.displayName = "CardFooter"
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }

@@ -1,6 +1,6 @@
-import { Mic2, ArrowRight } from "lucide-react";
-import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { ArrowRight, Mic2 } from "lucide-react";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 

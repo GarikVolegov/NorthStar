@@ -1,11 +1,12 @@
-import { usePageMeta } from "@/lib/seo";
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
-import { ArrowRight, BookOpen, Clock, Sparkles, TrendingUp, Star, Lock } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTranslation } from "react-i18next";
+import { getJson } from "@/lib/apiClient";
+import { usePageMeta } from "@/lib/seo";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import { ArrowRight, BookOpen, Clock, Lock, Sparkles, Star, TrendingUp } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -122,7 +123,7 @@ function ArticleCard({ article, recommended }: { article: Article; recommended?:
 function PerTeSection({ userId }: { userId: number }) {
   const { data, isLoading } = useQuery<PerTeData>({
     queryKey: ["crescita-per-te", userId],
-    queryFn: () => fetch(`${BASE}api/crescita/per-te`).then(r => r.json()),
+    queryFn: () => getJson<PerTeData>(`${BASE}api/crescita/per-te`),
     staleTime: 1000 * 60 * 10,
   });
 
@@ -254,8 +255,7 @@ export default function Crescita() {
   const { data: catData = [] } = useQuery<Category[]>({
     queryKey: ["crescita-categorie"],
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/crescita/categorie`);
-      const data = await res.json();
+      const data = await getJson<unknown>(`${BASE}api/crescita/categorie`);
       return Array.isArray(data) ? data : [];
     },
     staleTime: 1000 * 60 * 10,
@@ -264,9 +264,8 @@ export default function Crescita() {
   const { data: recentData } = useQuery<{ articles: Article[] }>({
     queryKey: ["crescita-recent"],
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/crescita?limit=6`);
-      const data = await res.json();
-      return Array.isArray(data?.articles) ? data : { articles: [] };
+      const data = await getJson<{ articles?: Article[] }>(`${BASE}api/crescita?limit=6`);
+      return { articles: Array.isArray(data?.articles) ? data.articles : [] };
     },
     staleTime: 1000 * 60 * 5,
   });

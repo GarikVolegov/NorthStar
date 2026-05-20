@@ -1,16 +1,26 @@
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog, DialogContent,
+  DialogDescription,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { apiFetch } from "@/lib/api-fetch";
+import { cn } from "@/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { apiFetch } from "@/lib/api-fetch";
-import {
-  Linkedin, Sparkles, CheckCircle2, Circle, ChevronRight,
-  Briefcase, GraduationCap, Award, Wrench, FileText,
-  Loader2, AlertCircle, Copy, ArrowLeft,
+  AlertCircle,
+  ArrowLeft,
+  Award,
+  Briefcase,
+  CheckCircle2,
+  ChevronRight,
+  GraduationCap,
+  Linkedin,
+  Loader2,
+  Sparkles,
+  Wrench
 } from "lucide-react";
+import { useState } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 

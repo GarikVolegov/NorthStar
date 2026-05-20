@@ -1,5 +1,6 @@
-import { Component, type ReactNode, type ErrorInfo } from "react";
-import { AlertTriangle, RefreshCw, Home } from "lucide-react";
+import { AlertTriangle, Home, RefreshCw } from "lucide-react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
+import { captureClientException } from "@/lib/sentry";
 
 /* ── StreamErrorBoundary ──────────────────────────────────────────────────────
  * Boundary leggero per aree di streaming SSE.
@@ -22,17 +23,22 @@ interface StreamBoundaryState {
 }
 
 export class StreamErrorBoundary extends Component<StreamBoundaryProps, StreamBoundaryState> {
-  state: StreamBoundaryState = { hasError: false };
+  override state: StreamBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(): StreamBoundaryState {
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
+  override componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[StreamErrorBoundary]", error, info.componentStack);
+    captureClientException(error, {
+      boundary: "StreamErrorBoundary",
+      componentStack: info.componentStack,
+      path: window.location.pathname,
+    });
   }
 
-  render() {
+  override render() {
     if (this.state.hasError)
       return (
         <button
@@ -67,15 +73,20 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
+  override componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[ErrorBoundary]", error, info.componentStack);
+    captureClientException(error, {
+      boundary: "ErrorBoundary",
+      componentStack: info.componentStack,
+      path: window.location.pathname,
+    });
   }
 
   handleReset = () => {
     this.setState({ hasError: false, error: null });
   };
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
 

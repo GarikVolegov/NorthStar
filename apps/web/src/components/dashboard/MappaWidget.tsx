@@ -1,8 +1,8 @@
-import { Network, ArrowRight } from "lucide-react";
-import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { ArrowRight, Network } from "lucide-react";
+import { Link } from "wouter";
 
-export function MappaWidget({ userId }: { userId: number }) {
+export function MappaWidget({ userId: _userId }: { userId: number }) {
   return (
     <section>
       <div className="flex items-center gap-3 mb-4">

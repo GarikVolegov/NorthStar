@@ -1,6 +1,6 @@
-import type { ReactNode, ButtonHTMLAttributes } from 'react';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 interface CtaProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;

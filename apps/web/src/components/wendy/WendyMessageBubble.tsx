@@ -21,7 +21,7 @@
  *   onFeedback?:  (type: 'up'|'down') => void
  */
 
-import React, { useState, memo } from 'react';
+import React, { memo, useState } from 'react';
 
 export interface BubbleMetadata {
   provider?:   string;
@@ -253,7 +253,10 @@ export const WendyMessageBubble = memo(function WendyMessageBubble({
 
         {/* Metadata + feedback (solo assistant, non durante streaming) */}
         {isAssistant && !isStreaming && !isLoading && metadata && (
-          <MetaBar meta={metadata} onFeedback={onFeedback} />
+          <MetaBar
+            meta={metadata}
+            {...(onFeedback !== undefined ? { onFeedback } : {})}
+          />
         )}
       </div>
     </div>

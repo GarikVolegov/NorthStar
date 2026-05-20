@@ -6,12 +6,12 @@
  *
  * Accessibility: focus-visible, role=article, aria-label con titolo.
  */
+import { Button } from "@/components/ui/button";
+import type { ProactiveInsight } from "@/hooks/useProactiveInsights";
+import { cn } from "@/lib/utils";
+import { BookOpen, Lightbulb, Newspaper, TrendingUp, X, Zap } from "lucide-react";
 import { useRef } from "react";
 import { Link } from "wouter";
-import { X, TrendingUp, Zap, BookOpen, Newspaper, Lightbulb } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import type { ProactiveInsight } from "@/hooks/useProactiveInsights";
 
 const TYPE_META: Record<ProactiveInsight["insightType"], {
   icon:  React.ElementType;

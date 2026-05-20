@@ -1,5 +1,5 @@
+import { ExternalLink, User } from "lucide-react";
 import { Link } from "wouter";
-import { User, ExternalLink } from "lucide-react";
 
 export function ProfileLinkSection() {
   return (

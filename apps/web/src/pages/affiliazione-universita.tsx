@@ -1,9 +1,9 @@
-import { Link } from "wouter";
-import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/lib/seo";
-import { Building2, CheckCircle2, ArrowRight, Brain, Compass, BarChart3, TrendingUp, Users, Shield } from "lucide-react";
+import { ArrowRight, BarChart3, Brain, Building2, CheckCircle2, Compass, Shield, TrendingUp, Users } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 export default function AffiliazioneUniversita() {
   const { t } = useTranslation();

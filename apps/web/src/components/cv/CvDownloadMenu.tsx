@@ -2,12 +2,12 @@
  * CvDownloadMenu
  * Dropdown per scaricare il CV in 3 formati: PDF, DOCX, JSON
  */
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { Download, FileText, FileJson, File } from "lucide-react";
+import { Download, File, FileJson, FileText } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 

@@ -1,36 +1,43 @@
-import { useAuth } from "@/contexts/AuthContext";
-import { useLocation } from "wouter";
-import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api-fetch";
-import { usePageModule } from "@/hooks/usePageModule";
-import { useDashboardData } from "@/hooks/useDashboardData";
-import { useAgentAnalysis } from "@/hooks/useAgentAnalysis";
-import { useWendyPageContext } from "@/hooks/useWendyPageContext";
-import type { ProfessionResult, EducationResult, WorkModeResult } from "@/hooks/useAgentAnalysis";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAgentAnalysis } from "@/hooks/useAgentAnalysis";
+import { useDashboardData } from "@/hooks/useDashboardData";
+import { usePageModule } from "@/hooks/usePageModule";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
+import { apiFetch } from "@/lib/api-fetch";
 import { usePageMeta } from "@/lib/seo";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Bot, Crown, ArrowRight, AlertTriangle,
-  HelpCircle, Rocket, Building2, BarChart3, TrendingUp,
-  LayoutGrid, Sparkles, MapPin, ChevronRight,
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
+  Bot,
+  Building2,
+  ChevronRight,
+  HelpCircle,
+  LayoutGrid,
+  MapPin,
+  Rocket,
+  Sparkles,
+  TrendingUp
 } from "lucide-react";
+import { useEffect } from "react";
+import { Link, useLocation } from "wouter";
 
+import { DashboardCalendar } from "@/components/dashboard/DashboardCalendar";
 import { DashboardHero } from "@/components/dashboard/DashboardHero";
+import { DashboardKpiStrip } from "@/components/dashboard/DashboardKpiStrip";
 import { DashboardObjectives } from "@/components/dashboard/DashboardObjectives";
 import { DashboardPersonality } from "@/components/dashboard/DashboardPersonality";
-import { DashboardCalendar } from "@/components/dashboard/DashboardCalendar";
-import { DashboardKpiStrip } from "@/components/dashboard/DashboardKpiStrip";
 import { ProactiveInsightCard } from "@/components/wendy/ProactiveInsightCard";
 import { useProactiveInsights } from "@/hooks/useProactiveInsights";
 
+import { AgentLoadingSkeleton } from "@/components/dashboard/AgentLoadingSkeleton";
+import type { JourneyId } from "@/components/dashboard/dashboard-sections";
 import { JourneyToolsSection } from "@/components/dashboard/JourneyToolsSection";
 import { ProfessionCard } from "@/components/dashboard/ProfessionCard";
 import { WorkModePanel } from "@/components/dashboard/WorkModePanel";
-import { AgentLoadingSkeleton } from "@/components/dashboard/AgentLoadingSkeleton";
-import type { JourneyId } from "@/components/dashboard/dashboard-sections";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -263,9 +270,9 @@ export default function Dashboard() {
         {/* Colonna destra */}
         <div className="space-y-4">
           <DashboardPersonality
-            riasecScores={sessionDetail?.riasecScores}
-            spiritScores={sessionDetail?.spiritScores}
-            primaryTypes={sessionDetail?.primaryTypes}
+            {...(sessionDetail?.riasecScores ? { riasecScores: sessionDetail.riasecScores } : {})}
+            {...(sessionDetail?.spiritScores ? { spiritScores: sessionDetail.spiritScores } : {})}
+            {...(sessionDetail?.primaryTypes ? { primaryTypes: sessionDetail.primaryTypes } : {})}
           />
           {insights.length > 0 && (
             <div className="space-y-2">
@@ -298,7 +305,10 @@ export default function Dashboard() {
             <span className="text-xs text-muted-foreground">— {journeyMeta.label}</span>
           )}
         </div>
-        <JourneyToolsSection journeyType={journeyType} sectorId={topSectorId} />
+        <JourneyToolsSection
+          journeyType={journeyType}
+          {...(topSectorId !== undefined ? { sectorId: topSectorId } : {})}
+        />
       </section>
 
       {/* ZONA 5 — Analisi AI (max 3 professioni + modalità lavoro) */}

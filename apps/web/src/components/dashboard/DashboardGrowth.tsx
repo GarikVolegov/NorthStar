@@ -1,5 +1,5 @@
+import { ArrowRight, BookOpen } from "lucide-react";
 import { Link } from "wouter";
-import { BookOpen, ArrowRight } from "lucide-react";
 
 interface GrowthArticle {
   title: string;

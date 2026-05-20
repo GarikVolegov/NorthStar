@@ -1,8 +1,7 @@
-import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { Zap, Loader2, TrendingUp, DollarSign, Crown, Lock, ArrowRight } from "lucide-react";
 import type { ProfessionResult } from "@/hooks/useAgentAnalysis";
+import { ArrowRight, Crown, DollarSign, Loader2, Lock, TrendingUp, Zap } from "lucide-react";
+import { Link } from "wouter";
 
 export function AIAnalysisSection({
   agentProfessions,

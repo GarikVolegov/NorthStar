@@ -4,9 +4,9 @@
  * di cosa è rotto, con azione di recovery contestuale.
  */
 
-import { Component, type ReactNode, type ErrorInfo } from "react";
-import { createError, type AppError, getRecoveryLabel } from "@/lib/error-codes";
+import { createError, getRecoveryLabel, type AppError } from "@/lib/error-codes";
 import { eventBus } from "@/lib/event-bus";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
@@ -32,7 +32,7 @@ export class PageErrorBoundary extends Component<Props, State> {
     return { hasError: true, error: appError, errorInfo: null };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     const appError = normalizeRenderError(error);
     this.setState({ hasError: true, error: appError, errorInfo });
     eventBus.emit("error:caught", {
@@ -68,7 +68,7 @@ export class PageErrorBoundary extends Component<Props, State> {
     }
   };
 
-  render() {
+  override render() {
     if (this.state.hasError && this.state.error) {
       if (this.props.fallback) {
         return this.props.fallback;

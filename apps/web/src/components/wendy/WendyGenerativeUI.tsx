@@ -27,7 +27,7 @@
  *   3. Aggiungi la definizione tool lato backend (wendy-chat.ts)
  */
 
-import React, { memo, Suspense, lazy } from 'react';
+import React, { memo } from 'react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

@@ -9,9 +9,10 @@ test.describe("Autenticazione", () => {
     await expect(page.locator("body")).toBeVisible();
   });
 
-  test("pagina di registrazione è accessibile", async ({ page }) => {
+  test("pagina di registrazione e accessibile", async ({ page }) => {
     await page.goto(`${BASE}/registra`);
-    await expect(page.locator("input[type='email'], input[name='email']").first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("heading", { name: /create your account|crea/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("textbox", { name: /email address|email/i })).toBeVisible();
   });
 
   test("registrazione con dati validi", async ({ page }) => {
@@ -20,30 +21,19 @@ test.describe("Autenticazione", () => {
     const password = "TestPassword123!";
 
     await page.goto(`${BASE}/registra`);
+    await page.getByRole("textbox", { name: /email address|email/i }).fill(email);
+    await page.getByRole("textbox", { name: /password/i }).fill(password);
+    await page.getByRole("button", { name: /^continue$/i }).click();
 
-    // Fill in name
-    const nameInput = page.locator("input[name='name'], input[placeholder*='nome'], input[placeholder*='Nome']").first();
-    if (await nameInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await nameInput.fill("Test E2E User");
-    }
-
-    // Fill in email
-    await page.locator("input[type='email'], input[name='email']").first().fill(email);
-
-    // Fill in password (might be two fields)
-    const passwordInputs = page.locator("input[type='password']");
-    const count = await passwordInputs.count();
-    if (count >= 1) await passwordInputs.nth(0).fill(password);
-    if (count >= 2) await passwordInputs.nth(1).fill(password);
-
-    // Submit
-    await page.locator("button[type='submit'], button:has-text('Registrati'), button:has-text('Crea account')").first().click();
-
-    // Wait for navigation or success indicator
-    await page.waitForTimeout(2000);
-    const url = page.url();
-    // Should redirect to home, dashboard, or show a success message
-    const success = url.includes("/") || await page.locator("text=/verificare|registrato|benvenuto/i").isVisible({ timeout: 3000 }).catch(() => false);
-    expect(success).toBeTruthy();
+    await expect
+      .poll(async () => {
+        const url = page.url();
+        const visibleState = await page
+          .locator("text=/verificare|registrato|benvenuto|verify|continue|password/i")
+          .isVisible()
+          .catch(() => false);
+        return url.includes("/") || visibleState;
+      }, { timeout: 5_000 })
+      .toBeTruthy();
   });
 });

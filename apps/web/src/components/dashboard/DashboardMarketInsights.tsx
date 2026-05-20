@@ -1,6 +1,6 @@
-import { Link } from "wouter";
-import { TrendingUp, ArrowRight, BarChart3 } from "lucide-react";
 import { SectorFreshnessBadge } from "@/components/sector/SectorFreshnessBadge";
+import { ArrowRight, BarChart3, TrendingUp } from "lucide-react";
+import { Link } from "wouter";
 
 export function DashboardMarketInsights() {
   return (

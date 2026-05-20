@@ -1,7 +1,7 @@
-import { Target, CalendarDays, Briefcase, User } from "lucide-react";
-import { Link } from "wouter";
+import type { DashboardEvent, DashboardObjective } from "@/hooks/useDashboardData";
 import { cn } from "@/lib/utils";
-import type { DashboardObjective, DashboardEvent } from "@/hooks/useDashboardData";
+import { Briefcase, CalendarDays, Target, User } from "lucide-react";
+import { Link } from "wouter";
 
 function formatEventDate(iso: string) {
   const d = new Date(iso);
@@ -27,7 +27,7 @@ function ProfileRing({ percent }: { percent: number }) {
 
 export function DashboardKpiStrip({
   profilePercent,
-  objectives,
+  objectives: _objectives,
   objectivesProgress,
   upcomingEvents,
   confirmedSectorName,

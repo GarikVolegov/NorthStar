@@ -1,7 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useLocation } from "wouter";
-import { useTranslation } from "react-i18next";
-import { m, AnimatePresence } from "framer-motion";
+import { WendyThinkingIndicator } from "@/components/WendyThinkingIndicator";
 import {
   Command,
   CommandEmpty,
@@ -10,35 +7,38 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import type { SearchResult, RouterOutput, AiSource } from "@/hooks/useGlobalSearch";
+import { UiToolRenderer } from "@/components/wendy/UiToolRenderer";
+import { WendyActionCard } from "@/components/wendy/WendyActionCard";
+import { useWendy } from "@/contexts/WendyProvider";
+import type { AiSource, RouterOutput, SearchResult } from "@/hooks/useGlobalSearch";
+import { useWendyChat, type ChatMessage as WendyMessage } from "@/hooks/useWendyChat";
+import { cn } from "@/lib/utils";
+import { AnimatePresence, m } from "framer-motion";
 import {
-  Briefcase,
+  BadgeCheck,
   BookOpenText,
-  Newspaper,
-  Layers,
-  Sparkles,
-  TrendingUp,
-  Lightbulb,
+  Brain,
+  Briefcase,
+  Calendar,
   ChevronDown,
   ChevronRight,
-  Send,
+  Layers,
+  Lightbulb,
+  Mic,
+  Newspaper,
+  RotateCcw,
   Search,
-  Calendar,
-  BadgeCheck,
-  Brain,
+  Send,
+  Sparkles,
+  Square,
   Target,
+  TrendingUp,
   User,
   Users,
-  Mic,
-  RotateCcw,
-  Square,
 } from "lucide-react";
-import { useWendy } from "@/contexts/WendyProvider";
-import { cn } from "@/lib/utils";
-import { useWendyChat, type ChatMessage as WendyMessage } from "@/hooks/useWendyChat";
-import { WendyThinkingIndicator } from "@/components/WendyThinkingIndicator";
-import { WendyActionCard } from "@/components/wendy/WendyActionCard";
-import { UiToolRenderer } from "@/components/wendy/UiToolRenderer";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useLocation } from "wouter";
 
 interface SearchDialogProps {
   query: string;
@@ -93,7 +93,7 @@ const ORDER: Array<keyof typeof TYPE_CONFIG> = [
 
 // ── Micro components ────────────────────────────────────────────────────────
 
-function SourcesAccordion({ sources }: { sources: AiSource[] }) {
+export function SourcesAccordion({ sources }: { sources: AiSource[] }) {
   const [open, setOpen] = useState(false);
   if (sources.length === 0) return null;
   return (
@@ -178,7 +178,6 @@ export function SearchDialog({
   indexStatus = "ready",
   isLoading,
   isOpen,
-  setIsOpen,
   close,
   trackClick,
 }: SearchDialogProps) {
@@ -241,7 +240,12 @@ export function SearchDialog({
   }, [chat.messages, chat.thinking.active]);
 
   const grouped = results.reduce(
-    (acc, r) => { if (!acc[r.type]) acc[r.type] = []; acc[r.type].push(r); return acc; },
+    (acc, r) => {
+      const bucket = acc[r.type] ?? [];
+      bucket.push(r);
+      acc[r.type] = bucket;
+      return acc;
+    },
     {} as Record<string, typeof results>,
   );
 
@@ -492,9 +496,10 @@ export function SearchDialog({
                         {showResults && ORDER.filter((type) => grouped[type]?.length).map((type) => {
                           const config = TYPE_CONFIG[type];
                           const Icon   = config.icon;
+                          const typeResults = grouped[type] ?? [];
                           return (
                             <CommandGroup key={type} heading={t(config.labelKey)}>
-                              {grouped[type].slice(0, 3).map((item) => (
+                              {typeResults.slice(0, 3).map((item) => (
                                 <CommandItem
                                   key={`${type}-${item.id}`}
                                   value={`${item.title} ${item.description}`}
@@ -666,9 +671,10 @@ export function SearchDialog({
                       ORDER.filter((type) => grouped[type]?.length).map((type) => {
                         const config = TYPE_CONFIG[type];
                         const Icon   = config.icon;
+                        const typeResults = grouped[type] ?? [];
                         return (
                           <CommandGroup key={type} heading={t(config.labelKey)}>
-                            {grouped[type].map((item) => (
+                            {typeResults.map((item) => (
                               <CommandItem key={`${type}-${item.id}`} value={`${item.title} ${item.description}`} onSelect={() => handleResultSelect(item)} className="cursor-pointer">
                                 <div className={`flex h-7 w-7 items-center justify-center rounded-full ${config.className}`}>
                                   <Icon className="h-3.5 w-3.5" />
