@@ -33,6 +33,7 @@
 import { openai } from "../client";
 import { logger } from "../logger";
 import { selectModelFor } from "../model-router";
+import { ragConfig } from "../config/rag";
 
 export interface CoTResult {
   limitingPattern: string;      // e.g. "all-or-nothing thinking"
@@ -50,7 +51,6 @@ interface CachedCoT {
 }
 
 const cotCache = new Map<number, CachedCoT>();
-const CACHE_TTL_MS = 300_000; // 5 minutes
 
 function tokenizeForCoT(s: string): Set<string> {
   return new Set(s.toLowerCase().match(/[a-z\u00e0-\u00fc]{4,}/g) ?? []);
@@ -59,15 +59,15 @@ function tokenizeForCoT(s: string): Set<string> {
 function shouldReuseCached(userId: number, newTokens: Set<string>): CoTResult | null {
   const cached = cotCache.get(userId);
   if (!cached) return null;
-  if (Date.now() - cached.timestamp > CACHE_TTL_MS) {
+  if (Date.now() - cached.timestamp > ragConfig.chainOfThought.cacheTtlMs) {
     cotCache.delete(userId);
     return null;
   }
-  if (cached.result.confidence < 0.75) return null;
+  if (cached.result.confidence < ragConfig.chainOfThought.reuseMinConfidence) return null;
   if (newTokens.size === 0 || cached.userTokens.size === 0) return null;
   const intersection = [...newTokens].filter((t) => cached.userTokens.has(t)).length;
   const overlap = intersection / Math.max(newTokens.size, cached.userTokens.size);
-  if (overlap < 0.60) return null;
+  if (overlap < ragConfig.chainOfThought.reuseMinTokenOverlap) return null;
   return cached.result;
 }
 
@@ -101,12 +101,12 @@ Rispondi SOLO con JSON valido, nessun testo extra:
 
 /** Short messages / greetings don't need CoT */
 const SKIP_PATTERNS = [
-  /^(ciao|salve|hey|ok|grazie|perfetto|capito|sì|no|va bene)[\.!?]?$/i,
+  /^(ciao|salve|hey|ok|grazie|perfetto|capito|sì|no|va bene)[.!?]?$/i,
 ];
 
 function shouldSkipCoT(message: string): boolean {
   const wordCount = message.trim().split(/\s+/).length;
-  if (wordCount < 5) return true;
+  if (wordCount < ragConfig.chainOfThought.minWords) return true;
   return SKIP_PATTERNS.some((p) => p.test(message.trim()));
 }
 
@@ -143,8 +143,8 @@ export async function runChainOfThought(
         { role: "system", content: COT_SYSTEM },
         { role: "user",   content: userContent },
       ],
-      temperature: 0.3,   // low temperature for analytical tasks
-      max_tokens: 300,
+      temperature: ragConfig.chainOfThought.temperature,
+      max_tokens: ragConfig.chainOfThought.maxTokens,
       response_format: { type: "json_object" },
     });
 
@@ -172,7 +172,7 @@ export async function runChainOfThought(
  * Only included if confidence >= 0.6 (below that, the analysis is too uncertain).
  */
 export function buildCoTSection(cot: CoTResult | null): string {
-  if (!cot || cot.confidence < 0.6) return "";
+  if (!cot || cot.confidence < ragConfig.chainOfThought.outputMinConfidence) return "";
 
   const actions = cot.controllableActions
     .map((a, i) => `   ${i + 1}. ${a}`)

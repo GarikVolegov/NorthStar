@@ -1,3 +1,5 @@
+import "./tracing";
+import "./sentry";
 import app from "./app";
 import http from "node:http";
 import { rootLogger } from "./middleware/logger";
@@ -17,6 +19,12 @@ startAlertChecker();
 const { startCronJobs } = await import("./jobs/cron");
 startCronJobs();
 
+const { agentRegistry } = await import("./lib/agent-registry");
+agentRegistry.start();
+void agentRegistry.refresh().catch((err) => {
+  rootLogger.warn({ err }, "Initial agent registry refresh failed");
+});
+
 httpServer.listen(PORT, () => {
   rootLogger.info({ port: PORT, wsPath: "/ws" }, "NorthStar API Server started");
 });
@@ -35,6 +43,14 @@ async function gracefulShutdown(signal: string): Promise<void> {
     rootLogger.info("WebSocket server closed");
   } catch (err) {
     rootLogger.warn({ err }, "Error closing WebSocket server");
+  }
+
+  try {
+    const { agentRegistry } = await import("./lib/agent-registry");
+    agentRegistry.stop();
+    rootLogger.info("Agent registry stopped");
+  } catch (err) {
+    rootLogger.warn({ err }, "Error stopping agent registry");
   }
 
   try {

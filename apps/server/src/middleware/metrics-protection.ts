@@ -12,7 +12,7 @@ export function metricsProtection(req: Request, res: Response, next: NextFunctio
   // Get client IP (handling proxies)
   const clientIp = req.headers["x-forwarded-for"] 
     ? Array.isArray(req.headers["x-forwarded-for"]) 
-      ? req.headers["x-forwarded-for"][0] 
+      ? req.headers["x-forwarded-for"][0] ?? ""
       : req.headers["x-forwarded-for"]
     : req.socket.remoteAddress ?? "";
   
@@ -41,7 +41,7 @@ export function metricsProtection(req: Request, res: Response, next: NextFunctio
     const ipMatches = allowedIps.some(allowedIp => {
       // Handle CIDR notation simply - if it contains "/" treat as prefix match
       if (allowedIp.includes("/")) {
-        const prefix = allowedIp.split("/")[0];
+        const prefix = allowedIp.split("/")[0] ?? "";
         return normalizedIp.startsWith(prefix);
       }
       return normalizedIp === allowedIp;

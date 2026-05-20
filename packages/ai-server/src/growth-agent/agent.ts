@@ -44,7 +44,7 @@ export const GROWTH_AGENT_VOICE_MODEL = modelFor("growth-agent-voice");
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
-  domain?: RouteDecision["domain"];
+  domain?: RouteDecision["domain"] | undefined;
 }
 
 // Set dei nomi tool UI (generative UI) per distinguerli dai Wendy domain tools
@@ -54,15 +54,15 @@ const UI_TOOL_NAMES = new Set<string>(
 
 export interface GrowthAgentOptions {
   userId:           number;
-  sessionId?:       number;
-  userContext:      UserContext & { memorySection?: string };
+  sessionId?:       number | undefined;
+  userContext:      UserContext & { memorySection?: string | undefined };
   history:          ChatMessage[];
   userMessage:      string;
-  maxHistory?:      number;
-  memoryFactCount?: number;
-  voiceMode?:       boolean;
-  requestId?:       string;
-  wendyIntent?:     WendyIntent;   // passato da ai-wendy.ts per scegliere i tool di dominio
+  maxHistory?:      number | undefined;
+  memoryFactCount?: number | undefined;
+  voiceMode?:       boolean | undefined;
+  requestId?:       string | undefined;
+  wendyIntent?:     WendyIntent | undefined;   // passato da ai-wendy.ts per scegliere i tool di dominio
 }
 
 function buildConversationSummary(history: ChatMessage[]): string {
@@ -76,10 +76,10 @@ export async function* runGrowthAgent(
   opts: GrowthAgentOptions,
 ): AsyncGenerator<
   | { type: "token";     value: string }
-  | { type: "status";    value: string; domain?: RouteDecision["domain"] }
+  | { type: "status";    value: string; domain?: RouteDecision["domain"] | undefined }
   | { type: "ui_tool";   name: UiToolName; args: UiToolArgs }
   | { type: "tool_call"; name: string; result: unknown }
-  | { type: "done";     sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult; routeDecision?: RouteDecision; supervisorResult?: SupervisorResult }
+  | { type: "done";     sources: RetrievedChunk[]; cot?: CoTResult | null | undefined; evalResult?: EvalResult | undefined; routeDecision?: RouteDecision | undefined; supervisorResult?: SupervisorResult | undefined }
   | { type: "error";    message: string }
 > {
   const {
@@ -180,7 +180,7 @@ export async function* runGrowthAgent(
   });
 
   const memorySection   = buildMemorySection(userMemory);
-  const enrichedContext: UserContext & { memorySection?: string } = {
+  const enrichedContext: UserContext & { memorySection?: string | undefined } = {
     ...userContext,
     memorySection: memorySection || userContext.memorySection,
   };
@@ -348,16 +348,16 @@ export async function* runGrowthAgent(
     ];
     const hasTools = allTools.length > 0;
 
-    const stream = await openai.chat.completions.create({
+    const completionParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming = {
       model: route.model,
       messages,
       stream: true,
       temperature,
       max_tokens: evalResult.level === "low" ? 300 : 600,
-      tools:       hasTools ? allTools : undefined,
-      tool_choice: hasTools ? "auto"   : undefined,
       stream_options: { include_usage: false },
-    });
+      ...(hasTools ? { tools: allTools, tool_choice: "auto" } : {}),
+    };
+    const stream = await openai.chat.completions.create(completionParams);
 
     const tokenBuffer:   string[] = [];
     let   toolCallName:  string   = "";

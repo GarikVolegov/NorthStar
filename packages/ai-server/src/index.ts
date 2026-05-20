@@ -42,7 +42,7 @@ export type { SupervisorResult, SupervisorDimensions } from "./growth-agent/supe
 
 // Observability
 export { logger, type LoggerFields } from "./logger";
-export { wendyRequestsTotal, wendyLatencySeconds, wendySupervisorRewritesTotal, wendyLlmTokensTotal, wendyErrorsTotal, wendyToolCallsTotal, wendyToolCallDuration, recordRequest, recordError, recordSupervisorRewrite, recordLlmTokens, recordToolCall, getMetricsContentType, getMetrics, register } from "./metrics";
+export { wendyRequestsTotal, wendyLatencySeconds, wendySupervisorRewritesTotal, wendyLlmTokensTotal, wendyErrorsTotal, wendyToolCallsTotal, wendyToolCallDuration, recordRequest, recordError, recordSupervisorRewrite, recordLlmTokens, recordToolCall, getMetricsContentType, getMetrics, getRagMetricsSummary, register } from "./metrics";
 
 // Feature flags
 export { FF } from "./feature-flags";
@@ -68,6 +68,8 @@ export { getPersonalizedFeed, invalidateUserFeedCache } from "./discovery-agent/
 
 // Embeddings
 export { generateEmbedding, generateEmbeddingsBatch, buildEmbeddingText } from "./embeddings/generate";
+export { embedText as probeEmbedding, getEmbedderHealthSnapshot } from "./growth-agent/embedder";
+export type { EmbedderHealthSnapshot } from "./growth-agent/embedder";
 
 // Search Orchestrator
 export { runSearchOrchestrator } from "./search-agent/orchestrator";

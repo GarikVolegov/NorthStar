@@ -28,17 +28,56 @@ vi.mock("../growth-agent/embedder", () => ({
   EMBEDDING_DIMS: 1536,
 }));
 
-import { retrieve, type RetrievedChunk, type SourceType } from "../growth-agent/retriever";
+import {
+  cosine,
+  retrieve,
+  retrieverWithTimeout,
+  validateQueryEmbedding,
+} from "../growth-agent/retriever";
 import { embedText } from "../growth-agent/embedder";
-
-function makeChunk(text: string, score: number): RetrievedChunk {
-  return { id: 1, content: text, source: "test", sourceType: "document", score, metadata: {} };
-}
 
 describe("Retriever", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // pgvector is default, but pool.query returns undefined → falls through to JS retriever
+    mockPoolQuery.mockResolvedValue({ rows: [] });
+  });
+
+  describe("cosine", () => {
+    it("scores identical vectors close to 1", () => {
+      expect(cosine([1, 2, 3], [1, 2, 3])).toBeCloseTo(1);
+    });
+
+    it("does not return NaN for zero vectors", () => {
+      expect(Number.isFinite(cosine([0, 0], [0, 0]))).toBe(true);
+    });
+  });
+
+  describe("validation", () => {
+    it("rejects non-finite embedding values", () => {
+      expect(() => validateQueryEmbedding([1, Number.NaN], 2)).toThrow(/non-finite/);
+      expect(() => validateQueryEmbedding([1, Number.POSITIVE_INFINITY], 2)).toThrow(/non-finite/);
+    });
+
+    it("rejects wrong embedding dimensions", () => {
+      expect(() => validateQueryEmbedding([1, 2, 3], 2)).toThrow(/expected 2 dims/);
+    });
+
+    it("does not query pgvector when the query embedding is invalid", async () => {
+      const invalid = new Array(1536).fill(0);
+      invalid[10] = Number.NaN;
+      vi.mocked(embedText).mockResolvedValueOnce(invalid);
+
+      await expect(retrieve("bad embedding", 1)).rejects.toThrow(/non-finite/);
+      expect(mockPoolQuery).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("timeout", () => {
+    it("rejects when the operation is too slow", async () => {
+      await expect(
+        retrieverWithTimeout(new Promise((resolve) => setTimeout(resolve, 25)), 1),
+      ).rejects.toThrow(/timeout/);
+    });
   });
 
   describe("embedding", () => {

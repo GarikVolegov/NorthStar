@@ -27,7 +27,6 @@
  *   ]);
  */
 import { db } from "@workspace/db";
-import { knowledgeNodesTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { embedText, chunkText } from "./embedder";
 

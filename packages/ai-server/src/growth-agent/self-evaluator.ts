@@ -42,7 +42,6 @@
  */
 import type { RetrievedChunk } from "./retriever";
 import type { CoTResult } from "./chain-of-thought";
-import { openai } from "../client";
 
 export type ConfidenceLevel = "high" | "medium" | "low";
 

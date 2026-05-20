@@ -112,7 +112,7 @@ export function classifyIntentSync(message: string): IntentCategory {
   const best = (Object.entries(scores) as [IntentCategory, number][])
     .sort((a, b) => b[1] - a[1])[0];
 
-  return best[1] > 0 ? best[0] : "azione";
+  return best && best[1] > 0 ? best[0] : "azione";
 }
 
 /**

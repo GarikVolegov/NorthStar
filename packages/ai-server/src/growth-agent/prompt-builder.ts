@@ -6,38 +6,38 @@ import { buildToneSection }    from "./tone-adapter";
 import { buildWendyVoiceContract } from "../wendy-voice";
 
 export interface UserContext {
-  name?:         string;
-  journeyType?:  string;
-  userMode?:     string;
-  objectives?:   string[];
-  sectorName?:   string;
-  pageContext?:  Record<string, unknown>;
-  memorySection?: string;
-  locale?:       string;
-  isPremium?:    boolean;
-  stripeSubscriptionId?: string | null;
+  name?:         string | undefined;
+  journeyType?:  string | undefined;
+  userMode?:     string | undefined;
+  objectives?:   string[] | undefined;
+  sectorName?:   string | undefined;
+  pageContext?:  Record<string, unknown> | undefined;
+  memorySection?: string | undefined;
+  locale?:       string | undefined;
+  isPremium?:    boolean | undefined;
+  stripeSubscriptionId?: string | null | undefined;
 }
 
 export interface BuildSystemPromptOptions {
-  userContext:            UserContext & { memorySection?: string };
+  userContext:            UserContext & { memorySection?: string | undefined };
   personaExamples:        RetrievedChunk[];
   documentChunks:         RetrievedChunk[];
   webResults:             RetrievedChunk[];
   cot:                    CoTResult | null;
   userMessage:            string;
   evalResult:             EvalResult;
-  platformChunks?:        RetrievedChunk[];
-  routeDecision?:         RouteDecision;
-  behaviorPatterns?:      Array<{ patternType: string; description: string; confidence: number }>;
-  routingHistorySummary?: string;
-  fallbackInstruction?:   string;
-  sessionMessageCount?:   number;
-  hasSessionGoal?:        boolean;
-  pendingFollowUp?:       string;
+  platformChunks?:        RetrievedChunk[] | undefined;
+  routeDecision?:         RouteDecision | undefined;
+  behaviorPatterns?:      Array<{ patternType: string; description: string; confidence: number }> | undefined;
+  routingHistorySummary?: string | undefined;
+  fallbackInstruction?:   string | undefined;
+  sessionMessageCount?:   number | undefined;
+  hasSessionGoal?:        boolean | undefined;
+  pendingFollowUp?:       string | undefined;
   // Step 7: tono adattivo
-  localHour?:             number;          // 0-23, ora locale dell'utente
-  localDayOfWeek?:        number;          // 0=Dom, 1=Lun, …, 6=Sab
-  wendyTonePreference?:   string;          // "auto" | "concise" | "detailed" | "formal" | "casual"
+  localHour?:             number | undefined;          // 0-23, ora locale dell'utente
+  localDayOfWeek?:        number | undefined;          // 0=Dom, 1=Lun, …, 6=Sab
+  wendyTonePreference?:   string | undefined;          // "auto" | "concise" | "detailed" | "formal" | "casual"
 }
 
 const LOCALE_NAMES: Record<string, string> = {
@@ -57,13 +57,13 @@ const TONE_BY_JOURNEY: Record<string, string> = {
   indeciso:          "Tono esplorativo: aiuta a fare chiarezza senza pressione, proponi strumenti di auto-scoperta.",
 };
 
-const TONE_BY_HOUR: Record<string, string> = {
+const TONE_BY_HOUR: Record<"morning" | "evening" | "night", string> = {
   morning:  "È mattina: proponi obiettivi del giorno, energia alta.",
   evening:  "È sera: tono più riflessivo, recap di giornata, nessuna pressione.",
   night:    "È notte tarda: tono calmo e non urgente.",
 };
 
-const TONE_BY_DAY: Record<string, string> = {
+const TONE_BY_DAY: Record<"monday" | "friday" | "weekend", string> = {
   monday: "È inizio settimana: buon momento per pianificare e fissare obiettivi.",
   friday: "È venerdì: focus su recap della settimana e preparazione del weekend.",
   weekend:"È weekend: tono più leggero, esplorazione libera.",
@@ -77,33 +77,33 @@ const USER_TONE_MAP: Record<string, string> = {
 };
 
 function buildAdaptiveTone(opts: {
-  journeyType?:       string;
-  localHour?:         number;
-  localDayOfWeek?:    number;
-  tonePreference?:    string;
+  journeyType?:  string | undefined;
+  localHour?:             number | undefined;
+  localDayOfWeek?:        number | undefined;
+  tonePreference?:    string | undefined;
 }): string | null {
   const { journeyType, localHour, localDayOfWeek, tonePreference } = opts;
   const parts: string[] = [];
 
   if (journeyType && TONE_BY_JOURNEY[journeyType]) {
-    parts.push(TONE_BY_JOURNEY[journeyType]);
+    parts.push(TONE_BY_JOURNEY[journeyType] ?? "");
   }
 
   if (typeof localHour === "number") {
-    if (localHour >= 6 && localHour < 10)       parts.push(TONE_BY_HOUR.morning);
-    else if (localHour >= 20 && localHour < 23)  parts.push(TONE_BY_HOUR.evening);
-    else if (localHour >= 23 || localHour < 5)   parts.push(TONE_BY_HOUR.night);
+    if (localHour >= 6 && localHour < 10) parts.push(TONE_BY_HOUR.morning ?? "");
+    else if (localHour >= 20 && localHour < 23) parts.push(TONE_BY_HOUR.evening ?? "");
+    else if (localHour >= 23 || localHour < 5) parts.push(TONE_BY_HOUR.night ?? "");
   }
 
   if (typeof localDayOfWeek === "number") {
-    if (localDayOfWeek === 1)                         parts.push(TONE_BY_DAY.monday);
-    else if (localDayOfWeek === 5)                    parts.push(TONE_BY_DAY.friday);
-    else if (localDayOfWeek === 0 || localDayOfWeek === 6) parts.push(TONE_BY_DAY.weekend);
+    if (localDayOfWeek === 1) parts.push(TONE_BY_DAY.monday ?? "");
+    else if (localDayOfWeek === 5) parts.push(TONE_BY_DAY.friday ?? "");
+    else if (localDayOfWeek === 0 || localDayOfWeek === 6) parts.push(TONE_BY_DAY.weekend ?? "");
   }
 
   if (tonePreference && tonePreference !== "auto" && USER_TONE_MAP[tonePreference]) {
     // La preferenza utente sovrascrive le regole automatiche
-    return `## Preferenza tono\n${USER_TONE_MAP[tonePreference]}`;
+    return `## Preferenza tono\n${USER_TONE_MAP[tonePreference] ?? ""}`;
   }
 
   if (parts.length === 0) return null;
@@ -152,8 +152,8 @@ REGOLE RAG E DATI DI MERCATO (Step 6):
 export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {
   const {
     userContext, personaExamples, documentChunks, webResults,
-    cot, userMessage, evalResult, platformChunks = [],
-    routeDecision, behaviorPatterns, routingHistorySummary,
+    cot, userMessage: _userMessage, evalResult, platformChunks = [],
+    routeDecision: _routeDecision, behaviorPatterns, routingHistorySummary,
     fallbackInstruction, sessionMessageCount = 0, hasSessionGoal,
     pendingFollowUp, localHour, localDayOfWeek, wendyTonePreference,
   } = opts;

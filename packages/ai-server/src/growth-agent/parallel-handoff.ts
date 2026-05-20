@@ -24,7 +24,7 @@ import { openai } from "../client";
 import { getLLM } from "../llm/client";
 import { selectModelFor } from "../model-router";
 import { getSpecialist } from "./specialist-agent";
-import type { SpecialistRunOptions, SpecialistEvent } from "./specialist-agent";
+import type { SpecialistRunOptions } from "./specialist-agent";
 import type { RouteDecision, Domain } from "./router-agent";
 import type { RetrievedChunk } from "./retriever";
 import type { CoTResult } from "./chain-of-thought";
@@ -43,34 +43,34 @@ const CHUNK_SIZE       = 4;
 
 export interface ParallelHandoffOptions {
   userId:                number;
-  userContext:           UserContext & { memorySection?: string };
+  userContext:           UserContext & { memorySection?: string | undefined };
   history:               ChatMessage[];
   userMessage:           string;
   primaryRoute:          RouteDecision;
   secondaryRoute:        RouteDecision;
   memoryFactCount:       number;
-  maxHistory?:           number;
-  requestId?:            string;
-  behavioralPatterns?:   Array<{ patternType: string; description: string; confidence: number }>;
-  routingHistorySummary?: string;
+  maxHistory?:           number | undefined;
+  requestId?:            string | undefined;
+  behavioralPatterns?:   Array<{ patternType: string; description: string; confidence: number }> | undefined;
+  routingHistorySummary?: string | undefined;
 }
 
 export type ParallelHandoffEvent =
   | { type: "token";  value: string }
-  | { type: "status"; value: string; domain?: Domain }
-  | { type: "done";   sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult; routeDecision: RouteDecision; supervisorResult?: SupervisorResult }
+  | { type: "status"; value: string; domain?: Domain | undefined }
+  | { type: "done";   sources: RetrievedChunk[]; cot?: CoTResult | null | undefined; evalResult?: EvalResult | undefined; routeDecision: RouteDecision; supervisorResult?: SupervisorResult | undefined }
   | { type: "error";  message: string };
 
 interface SpecialistResult {
   domain:  Domain;
   text:    string;
   sources: RetrievedChunk[];
-  cot?:    CoTResult | null;
-  evalResult?: EvalResult;
-  supervisorResult?: SupervisorResult;
+  cot?:    CoTResult | null | undefined;
+  evalResult?: EvalResult | undefined;
+  supervisorResult?: SupervisorResult | undefined;
   statusEvents: Array<{ value: string; domain: Domain }>;
   finishedAt: number; // Date.now() when drain completed
-  error?:  string;
+  error?:  string | undefined;
 }
 
 // ── Drain a specialist generator ────────────────────────────────────────────────

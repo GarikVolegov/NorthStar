@@ -6,9 +6,7 @@ const isDev = process.env.NODE_ENV !== "production";
 
 const rootLogger = pino({
   level: process.env.LOG_LEVEL ?? (isDev ? "debug" : "info"),
-  transport: isDev
-    ? { target: "pino/file", options: { destination: 1 } }
-    : undefined,
+  ...(isDev ? { transport: { target: "pino/file", options: { destination: 1 } } } : {}),
   formatters: {
     level(label) { return { level: label }; },
   },

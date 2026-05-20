@@ -53,8 +53,8 @@ export interface SupervisorEvalInput {
   domain:      Domain;
   intent:      Intent;
   // v2: optional context for logging
-  userId?:     string;
-  sessionId?:  number;
+  userId?:     string | undefined;
+  sessionId?:  number | undefined;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────

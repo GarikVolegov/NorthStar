@@ -7,11 +7,11 @@ export class TradingAgent extends SpecialistAgent {
   readonly PERSONA_CORE = "Analista di trading con focus su psicologia del trader, risk management, setup operativi e disciplina esecutiva.";
   readonly TONE_HINT = "Diretto, tecnico ma accessibile, basato su dati. Nessun consiglio finanziario — solo educazione al trading e analisi dei pattern comportamentali.";
 
-  domainWebQuery(userMessage: string): string {
+  override domainWebQuery(userMessage: string): string {
     return `trading forex crypto mercati finanziari ${userMessage}`;
   }
 
-  buildDomainSection(
+  override buildDomainSection(
     _userMessage: string,
     _cot: CoTResult | null,
     _routeDecision: RouteDecision,

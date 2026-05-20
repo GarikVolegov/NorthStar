@@ -42,6 +42,7 @@ import { openai } from "../client";
 import { embedText } from "./embedder";
 import { logger } from "../logger";
 import { selectModelFor } from "../model-router";
+import { ragConfig } from "../config/rag";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -81,21 +82,20 @@ function computeConfidence(observedCount: number): number {
 
 // ── Semantic similarity ─────────────────────────────────────────────────────
 
-const SIMILARITY_THRESHOLD = 0.85;
-
 interface CacheEntry {
   embedding: number[];
   expiresAt: number;
 }
 const patternEmbeddingCache = new Map<number, CacheEntry>();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0, na = 0, nb = 0;
   for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    na += a[i] * a[i];
-    nb += b[i] * b[i];
+    const av = a[i] ?? 0;
+    const bv = b[i] ?? 0;
+    dot += av * bv;
+    na += av * av;
+    nb += bv * bv;
   }
   return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-10);
 }
@@ -107,10 +107,10 @@ async function getPatternEmbedding(
   const cached = patternEmbeddingCache.get(id);
   if (cached && cached.expiresAt > Date.now()) return cached.embedding;
   const emb = await embedText(description);
-  patternEmbeddingCache.set(id, { embedding: emb, expiresAt: Date.now() + CACHE_TTL_MS });
+  patternEmbeddingCache.set(id, { embedding: emb, expiresAt: Date.now() + ragConfig.memory.embeddingCacheTtlMs });
   // Keep cache bounded
-  if (patternEmbeddingCache.size > 500) {
-    const firstKey = patternEmbeddingCache.keys().next().value;
+  if (patternEmbeddingCache.size > ragConfig.memory.maxEmbeddingCacheEntries) {
+    const firstKey = patternEmbeddingCache.keys().next().value as number | undefined;
     if (firstKey !== undefined) patternEmbeddingCache.delete(firstKey);
   }
   return emb;
@@ -213,7 +213,7 @@ export async function mergeMemory(
   extracted: ExtractedMemory,
 ): Promise<void> {
   // ── Load existing data for this user (max 1000 rows each) ───────
-  const MAX_MEMORY_ROWS = 1000;
+  const MAX_MEMORY_ROWS = ragConfig.memory.maxMemoryRows;
   const [allExistingFacts, allExistingPatterns] = await Promise.all([
     db
       .select()
@@ -311,7 +311,7 @@ export async function mergeMemory(
       if (existing.patternType !== pattern.patternType) continue;
       const existingEmb = await getPatternEmbedding(existing.id, existing.description);
       const score = cosineSimilarity(newEmbedding, existingEmb);
-      if (score > bestScore && score >= SIMILARITY_THRESHOLD) {
+      if (score > bestScore && score >= ragConfig.memory.similarityThreshold) {
         bestMatch = existing;
         bestScore = score;
       }
@@ -373,9 +373,9 @@ export async function loadMemory(userId: number): Promise<UserMemory> {
   ]);
 
   const topPatterns = patterns
-    .filter((p) => p.confidence >= 0.50)
+    .filter((p) => p.confidence >= ragConfig.memory.minPatternConfidence)
     .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, 8); // max 8 patterns in prompt
+    .slice(0, ragConfig.memory.maxPromptPatterns);
 
   return { facts, patterns: topPatterns };
 }

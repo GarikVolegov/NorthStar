@@ -1,4 +1,4 @@
-import { getLLM, type LLMMessage } from "../llm/client";
+import { getLLM } from "../llm/client";
 import { commitRoute, loadRoutingContext, logRouteDecision } from "./router-memory";
 import { loadMemory } from "./memory-manager";
 import type { ChatMessage } from "./agent";
@@ -33,9 +33,9 @@ export interface RouteDecision {
   threshold:       number;
   reasoning:       string;
   handoffContext:  string;
-  secondaryRoute?: RouteDecision;
-  isFallback?:     boolean;
-  fallbackReason?: string;
+  secondaryRoute?: RouteDecision | undefined;
+  isFallback?:     boolean | undefined;
+  fallbackReason?: string | undefined;
 }
 
 // ── System prompt v5 ─────────────────────────────────────────────────────────────
@@ -120,8 +120,6 @@ const DOMAIN_KEYWORDS: Record<Domain, string[]> = {
 
 const BASE_WORD_COUNT       = 8;
 const DOMAIN_HISTORY_BONUS  = 0.10;
-const KEYWORD_MATCH_BONUS   = 0.10;
-
 function computeAdaptiveThreshold(
   userMessage: string,
   domain: Domain,
