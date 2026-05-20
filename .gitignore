@@ -89,7 +89,7 @@ cli-printing-press/printing-press.exe
 go-install/
 go123-install/
 
-attached_assets/
+docs/attached_assets/
 skills-lock.json
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md

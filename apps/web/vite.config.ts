@@ -13,11 +13,34 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 const basePath = process.env.BASE_PATH || "/";
+const commitSha = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA;
+const releaseEnvironment =
+  process.env.VERCEL_ENV === "production"
+    ? "production"
+    : process.env.VERCEL_ENV === "preview"
+      ? "staging"
+      : process.env.SENTRY_ENVIRONMENT;
+const sentryRelease =
+  process.env.SENTRY_RELEASE ??
+  process.env.VITE_SENTRY_RELEASE ??
+  (commitSha && releaseEnvironment
+    ? `${releaseEnvironment}@${commitSha.slice(0, 7)}`
+    : commitSha);
+const shouldUploadSourcemaps = Boolean(
+  process.env.SENTRY_AUTH_TOKEN &&
+    process.env.SENTRY_ORG &&
+    process.env.SENTRY_PROJECT &&
+    sentryRelease,
+);
 
-export default defineConfig({
+export default defineConfig(async () => ({
   base: basePath,
   define: {
     __GOOGLE_CLIENT_ID__: JSON.stringify(process.env.GOOGLE_CLIENT_ID ?? ""),
+    "import.meta.env.VITE_SENTRY_RELEASE": JSON.stringify(sentryRelease ?? ""),
+    "import.meta.env.VITE_COMMIT_SHA": JSON.stringify(
+      process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA ?? "",
+    ),
   },
   plugins: [
     react(),
@@ -77,6 +100,17 @@ export default defineConfig({
         ],
       },
     }),
+    shouldUploadSourcemaps &&
+      (await import("@sentry/vite-plugin")).sentryVitePlugin({
+        org: process.env.SENTRY_ORG!,
+        project: process.env.SENTRY_PROJECT!,
+        authToken: process.env.SENTRY_AUTH_TOKEN!,
+        release: { name: sentryRelease! },
+        sourcemaps: {
+          assets: "./dist/public/assets/**",
+          filesToDeleteAfterUpload: ["./dist/public/assets/**/*.map"],
+        },
+      }),
   ],
   resolve: {
     alias: {
@@ -85,6 +119,7 @@ export default defineConfig({
         import.meta.dirname,
         "..",
         "..",
+        "docs",
         "attached_assets",
       ),
     },
@@ -102,6 +137,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 800,
     // Minifica con esbuild (molto più veloce di terser, output quasi identico)
     minify: "esbuild",
+    sourcemap: shouldUploadSourcemaps ? "hidden" : false,
     rollupOptions: {
       output: {
         // Hash brevi per URL più corti
@@ -201,4 +237,4 @@ export default defineConfig({
       "recharts",
     ],
   },
-});
+}));

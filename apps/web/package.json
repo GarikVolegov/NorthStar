@@ -8,10 +8,11 @@
     "build": "vite build --config vite.config.ts",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "vitest run --configLoader runner",
+    "test:watch": "vitest --configLoader runner",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage --configLoader runner",
+    "lint": "eslint src --max-warnings=0"
   },
   "devDependencies": {
     "@clerk/types": "^4.101.20",
@@ -52,8 +53,10 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@sentry/vite-plugin": "^4.6.1",
     "@types/react-speech-recognition": "^3.9.6",
     "@vitejs/plugin-react": "catalog:",
+    "@vitest/coverage-v8": "4.1.5",
     "@vitest/ui": "^4.1.5",
     "@workspace/api-client-react": "workspace:*",
     "@workspace/design-tokens": "workspace:*",
@@ -88,11 +91,15 @@
   "dependencies": {
     "@clerk/react": "^6.6.4",
     "@emotion/is-prop-valid": "^1.3.1",
+    "@sentry/react": "^10.29.0",
+    "@workspace/api-zod": "workspace:*",
     "i18next": "^26.0.8",
     "i18next-browser-languagedetector": "^8.2.1",
     "idb-keyval": "^6.2.1",
     "react-i18next": "^17.0.6",
+    "react-markdown": "^10.1.0",
     "react-speech-recognition": "^4.0.1",
+    "rehype-sanitize": "^6.0.0",
     "stripe": "^22.1.0"
   }
 }
