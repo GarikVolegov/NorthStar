@@ -31,7 +31,7 @@ NorthStar è una piattaforma SaaS modulare composta da:
 | -------------------- | --------------------------------------- | ----- | ------------------------------ |
 | **PostgreSQL**       | postgres:16-alpine                      | 5432  | Database principale            |
 | **Redis**            | redis:7-alpine                          | 6379  | Cache + rate limiting          |
-| **AI Agents (ML)**   | Python FastAPI (`artifacts/ai-agents/`) | 8000  | ML training/predizione modelli |
+| **AI Agents (ML)**   | Python FastAPI (`main.py`)              | 8000  | ML training/predizione modelli |
 | **NorthStar Server** | Express + TS (`apps/server/`)           | 3001  | API REST principale            |
 | **Frontend**         | React + Vite (`apps/web/`)              | 5173  | SPA frontend                   |
 | **Jaeger**           | jaegertracing/all-in-one                | 16686 | Distributed tracing UI         |
@@ -152,14 +152,14 @@ Ogni servizio ha un health check configurato:
 
 ### Posizione
 
-Il microservizio AI vive sotto `artifacts/ai-agents/` come servizio FastAPI indipendente, montato da `docker-compose.yml`.
+Il microservizio AI vive in root come servizio FastAPI indipendente, montato da `docker-compose.yml`.
 
 ### File Correlati
 
-- `artifacts/ai-agents/main.py`: punto di ingresso del server
-- `artifacts/ai-agents/pyproject.toml`: definisce le dipendenze e i metadati
-- `artifacts/ai-agents/uv.lock`: file di blocco delle dipendenze generato da `uv`
-- `artifacts/ai-agents/.python-version`: specifica la versione di Python (3.11)
+- `main.py`: punto di ingresso del server
+- `pyproject.toml`: definisce le dipendenze e i metadati
+- `uv.lock`: file di blocco delle dipendenze generato da `uv`
+- `.python-version`: specifica la versione di Python (3.11)
 
 ### Dipendenze Principali
 
@@ -359,7 +359,7 @@ Retry con backoff esponenziale (max 3 tentativi, 1s/2s/4s) su errori transitori 
 | `wendy_llm_tokens_total`            | Counter   | model          |
 | `wendy_router_confidence_histogram` | Histogram | domain, intent |
 
-### Python ML Service (`artifacts/ai-agents/`)
+### Python ML Service (`main.py`)
 
 Microservizio FastAPI per training e predizione di modelli ML (scikit-learn):
 
