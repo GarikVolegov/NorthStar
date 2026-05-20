@@ -2,9 +2,10 @@ import { type Request, type Response, type NextFunction } from "express";
 import jwt from "jsonwebtoken";
 const { verify } = jwt;
 import { rootLogger } from "./logger";
-import { db, usersTable, userProfileSettingsTable } from "@workspace/db";
+import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { getEffectivePlan, planMeets } from "./check-feature";
+import { JWT_SECRET } from "../lib/jwt-secret";
 
 declare global {
   namespace Express {
@@ -23,14 +24,9 @@ declare global {
   }
 }
 
-const JWT_SECRET: string = process.env.JWT_SECRET ?? "";
-if (!JWT_SECRET) {
-  rootLogger.fatal("[auth] JWT_SECRET not configured — cannot authenticate");
-  process.exit(1);
-}
-
 const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY ?? "";
-const CLERK_JWKS_URL = process.env.CLERK_JWKS_URL ?? "https://api.clerk.com/v1/jwks";
+const CLERK_JWKS_URL =
+  process.env.CLERK_JWKS_URL ?? "https://api.clerk.com/v1/jwks";
 
 interface ClerkJwtPayload {
   sub: string;
@@ -51,7 +47,8 @@ interface JwtPayload {
   testSessionId: number | null;
 }
 
-let jwksCache: { keys: Array<{ kid: string; n: string; e: string }> } | null = null;
+let jwksCache: { keys: Array<{ kid: string; n: string; e: string }> } | null =
+  null;
 let jwksCacheTime = 0;
 
 async function getClerkJwks() {
@@ -60,19 +57,23 @@ async function getClerkJwks() {
     return jwksCache;
   }
   const res = await fetch(CLERK_JWKS_URL);
-  jwksCache = await res.json();
+  jwksCache = (await res.json()) as { keys: Array<{ kid: string; n: string; e: string }> };
   jwksCacheTime = now;
   return jwksCache;
 }
 
-async function verifyClerkToken(token: string): Promise<ClerkJwtPayload | null> {
+async function verifyClerkToken(
+  token: string,
+): Promise<ClerkJwtPayload | null> {
   try {
     if (!CLERK_SECRET_KEY) return null;
 
     const jwks = await getClerkJwks();
     if (!jwks) return null;
 
-    const header = JSON.parse(Buffer.from(token.split(".")[0], "base64").toString());
+    const tokenHeader = token.split(".")[0];
+    if (!tokenHeader) return null;
+    const header = JSON.parse(Buffer.from(tokenHeader, "base64").toString()) as { kid?: string };
     const key = jwks.keys.find((k) => k.kid === header.kid);
     if (!key) return null;
 
@@ -81,12 +82,21 @@ async function verifyClerkToken(token: string): Promise<ClerkJwtPayload | null> 
 
     const pem = `-----BEGIN PUBLIC KEY-----\n${Buffer.concat([
       Buffer.from([0x30]),
-      Buffer.from([0x82, (n.length + e.length + 4) >> 8, (n.length + e.length + 4) & 0xff]),
+      Buffer.from([
+        0x82,
+        (n.length + e.length + 4) >> 8,
+        (n.length + e.length + 4) & 0xff,
+      ]),
       Buffer.from([0x02, n.length + 1, 0x00, ...n]),
       Buffer.from([0x02, e.length, ...e]),
-    ]).toString("base64").match(/.{1,64}/g)!.join("\n")}\n-----END PUBLIC KEY-----`;
+    ])
+      .toString("base64")
+      .match(/.{1,64}/g)!
+      .join("\n")}\n-----END PUBLIC KEY-----`;
 
-    const payload = verify(token, pem, { algorithms: ["RS256"] }) as ClerkJwtPayload;
+    const payload = verify(token, pem, {
+      algorithms: ["RS256"],
+    }) as ClerkJwtPayload;
     return payload;
   } catch {
     return null;
@@ -103,7 +113,11 @@ async function verifyClerkToken(token: string): Promise<ClerkJwtPayload | null> 
  * Only the `/me` endpoint makes a DB query for full profile data that
  * changes frequently (preferences, avatar, timezone, etc.).
  */
-export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function requireAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
     res.status(401).json({ error: "Token mancante" });
@@ -138,14 +152,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       try {
         const [dbUser] = await db
           .select({
-            id:                   usersTable.id,
-            name:                 usersTable.name,
-            email:                usersTable.email,
-            role:                 usersTable.role,
+            id: usersTable.id,
+            name: usersTable.name,
+            email: usersTable.email,
+            role: usersTable.role,
             stripeSubscriptionId: usersTable.stripeSubscriptionId,
-            journeyType:          usersTable.journeyType,
-            testSessionId:        usersTable.testSessionId,
-            onboardingCompleted:  usersTable.onboardingCompleted,
+            journeyType: usersTable.journeyType,
+            testSessionId: usersTable.testSessionId,
+            onboardingCompleted: usersTable.onboardingCompleted,
           })
           .from(usersTable)
           .where(eq(usersTable.clerkId, clerkPayload.sub))
@@ -153,14 +167,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
         if (dbUser) {
           req.user = {
-            id:                   dbUser.id,
-            name:                 dbUser.name,
-            email:                dbUser.email,
-            role:                 (dbUser.role as "user" | "admin") ?? "user",
+            id: dbUser.id,
+            name: dbUser.name,
+            email: dbUser.email,
+            role: (dbUser.role as "user" | "admin") ?? "user",
             stripeSubscriptionId: dbUser.stripeSubscriptionId,
-            journeyType:          dbUser.journeyType,
-            testSessionId:        dbUser.testSessionId,
-            onboardingCompleted:  dbUser.onboardingCompleted ?? false,
+            journeyType: dbUser.journeyType,
+            testSessionId: dbUser.testSessionId,
+            onboardingCompleted: dbUser.onboardingCompleted ?? false,
           };
 
           if (req.log) req.log = req.log.child({ userId: dbUser.id });
@@ -172,9 +186,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
         // Estrae email e nome dai claim del token Clerk (se presenti) o usa fallback
         const rawPayload = clerkPayload as unknown as Record<string, unknown>;
         const clerkEmail = rawPayload.email as string | undefined;
-        const clerkName  = (rawPayload.name as string | undefined)
-          ?? (rawPayload.username as string | undefined)
-          ?? "Utente";
+        const clerkName =
+          (rawPayload.name as string | undefined) ??
+          (rawPayload.username as string | undefined) ??
+          "Utente";
         const clerkSub = clerkPayload.sub;
 
         if (clerkEmail) {
@@ -190,47 +205,63 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
             if (existingByEmail) {
               // Collega clerkId all'account esistente
-              await db.update(usersTable)
-                .set({ clerkId: clerkSub, emailVerified: true, updatedAt: new Date() })
+              await db
+                .update(usersTable)
+                .set({
+                  clerkId: clerkSub,
+                  emailVerified: true,
+                  updatedAt: new Date(),
+                })
                 .where(eq(usersTable.id, existingByEmail.id));
               userId = existingByEmail.id;
             } else {
               // Crea nuovo utente
-              const [newUser] = await db.insert(usersTable)
+              const [newUser] = await db
+                .insert(usersTable)
                 .values({
-                  clerkId:       clerkSub,
-                  email:         clerkEmail.toLowerCase(),
-                  name:          clerkName,
+                  clerkId: clerkSub,
+                  email: clerkEmail.toLowerCase(),
+                  name: clerkName,
                   emailVerified: true,
-                  role:          "user",
-                  passwordHash:  "",
+                  role: "user",
+                  passwordHash: "",
                 })
                 .returning({ id: usersTable.id });
+              if (!newUser) throw new Error("Failed to create Clerk user");
               userId = newUser.id;
             }
 
             req.user = {
-              id:                   userId,
-              name:                 clerkName,
-              email:                clerkEmail,
-              role:                 "user",
+              id: userId,
+              name: clerkName,
+              email: clerkEmail,
+              role: "user",
               stripeSubscriptionId: null,
-              journeyType:          null,
-              testSessionId:        null,
-              onboardingCompleted:  false,
+              journeyType: null,
+              testSessionId: null,
+              onboardingCompleted: false,
             };
 
             if (req.log) req.log = req.log.child({ userId });
             next();
             return;
           } catch (upsertErr) {
-            rootLogger.warn({ upsertErr, clerkSub }, "[auth] auto-upsert Clerk user failed");
+            rootLogger.warn(
+              { upsertErr, clerkSub },
+              "[auth] auto-upsert Clerk user failed",
+            );
           }
         }
 
-        rootLogger.warn({ clerkId: clerkSub }, "[auth] Clerk user not synced, no email in token");
+        rootLogger.warn(
+          { clerkId: clerkSub },
+          "[auth] Clerk user not synced, no email in token",
+        );
       } catch (dbErr) {
-        rootLogger.warn({ dbErr }, "[auth] DB lookup/upsert for Clerk user failed");
+        rootLogger.warn(
+          { dbErr },
+          "[auth] DB lookup/upsert for Clerk user failed",
+        );
       }
     }
 
@@ -241,7 +272,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 }
 
-export async function requirePremium(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function requirePremium(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   if (!req.user?.id) {
     res.status(401).json({ error: "Unauthorized" });
     return;
@@ -249,13 +284,22 @@ export async function requirePremium(req: Request, res: Response, next: NextFunc
 
   const currentPlan = await getEffectivePlan(req.user.id);
   if (!planMeets(currentPlan, "pro")) {
-    res.status(403).json({ code: "PREMIUM_REQUIRED", error: "Funzione riservata agli abbonati Pro" });
+    res
+      .status(403)
+      .json({
+        code: "PREMIUM_REQUIRED",
+        error: "Funzione riservata agli abbonati Pro",
+      });
     return;
   }
   next();
 }
 
-export async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function requireAdmin(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   if (!req.user?.id) {
     res.status(401).json({ error: "Unauthorized" });
     return;
@@ -276,18 +320,29 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
     req.user.role = "admin";
     next();
   } catch (err) {
-    rootLogger.error({ err, userId: req.user.id }, "[auth] admin role check failed");
+    rootLogger.error(
+      { err, userId: req.user.id },
+      "[auth] admin role check failed",
+    );
     res.status(500).json({ error: "Errore verifica permessi admin" });
   }
 }
 
-export async function requireAdminAccess(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function requireAdminAccess(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   await requireAuth(req, res, async () => {
     await requireAdmin(req, res, next);
   });
 }
 
-export async function requireAdminToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function requireAdminToken(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   if (!req.user?.id) {
     res.status(401).json({ error: "Unauthorized" });
     return;
@@ -299,7 +354,11 @@ export async function requireAdminToken(req: Request, res: Response, next: NextF
  * optionalAuth — tries to authenticate via Bearer token but never blocks.
  * Sets req.user if a valid token is present, otherwise leaves it undefined.
  */
-export async function optionalAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
+export async function optionalAuth(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
     next();

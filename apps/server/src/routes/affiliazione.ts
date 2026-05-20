@@ -1,13 +1,26 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
-import { affiliationLeadsTable, auditLogTable, db, usersTable } from "@workspace/db";
+import type { SQL } from "drizzle-orm";
+import {
+  affiliationLeadsTable,
+  auditLogTable,
+  db,
+  usersTable,
+} from "@workspace/db";
 import { requireAdminAccess } from "../middleware/auth";
+import { getRequestBody } from "../lib/request-context";
+import { asPlainRecord, isOneOf } from "../lib/type-guards";
 
 const router = Router();
 
 router.use("/leads", requireAdminAccess);
 
-const LEAD_STATUSES = ["pending", "contacted", "converted", "rejected"] as const;
+const LEAD_STATUSES = [
+  "pending",
+  "contacted",
+  "converted",
+  "rejected",
+] as const;
 type LeadStatus = (typeof LEAD_STATUSES)[number];
 
 function stringValue(value: unknown, fallback = "") {
@@ -35,6 +48,10 @@ function normalizeLeadStatus(value: unknown): LeadStatus {
   return statusMap[requested] ?? "contacted";
 }
 
+function isSql(condition: SQL | undefined): condition is SQL {
+  return condition !== undefined;
+}
+
 function toAdminLead(lead: typeof affiliationLeadsTable.$inferSelect) {
   return {
     ...lead,
@@ -47,7 +64,11 @@ function toAdminLead(lead: typeof affiliationLeadsTable.$inferSelect) {
 
 async function getAdminAssignees() {
   return db
-    .select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
+    .select({
+      id: usersTable.id,
+      name: usersTable.name,
+      email: usersTable.email,
+    })
     .from(usersTable)
     .where(eq(usersTable.role, "admin"))
     .orderBy(asc(usersTable.name));
@@ -63,7 +84,12 @@ async function ensureAdminUser(id: number | null) {
   return admin ?? null;
 }
 
-async function writeLeadAudit(req: any, action: string, leadId: number, metadata: Record<string, unknown>) {
+async function writeLeadAudit(
+  req: Request,
+  action: string,
+  leadId: number,
+  metadata: Record<string, unknown>,
+) {
   await db.insert(auditLogTable).values({
     actorId: req.user?.id ?? null,
     targetId: null,
@@ -73,7 +99,7 @@ async function writeLeadAudit(req: any, action: string, leadId: number, metadata
   });
 }
 
-function leadsWhere(req: any) {
+function leadsWhere(req: Request) {
   const status = stringValue(req.query.status, "all");
   const read = stringValue(req.query.read, "all");
   const source = stringValue(req.query.source, "all");
@@ -81,8 +107,12 @@ function leadsWhere(req: any) {
   const search = stringValue(req.query.search);
   const pattern = `%${search}%`;
   const where = [
-    LEAD_STATUSES.includes(status as LeadStatus) ? eq(affiliationLeadsTable.status, status as LeadStatus) : undefined,
-    source !== "all" && source !== "" ? eq(affiliationLeadsTable.source, source) : undefined,
+    isOneOf(status, LEAD_STATUSES)
+      ? eq(affiliationLeadsTable.status, status)
+      : undefined,
+    source !== "all" && source !== ""
+      ? eq(affiliationLeadsTable.source, source)
+      : undefined,
     read === "unread" ? eq(affiliationLeadsTable.read, false) : undefined,
     read === "read" ? eq(affiliationLeadsTable.read, true) : undefined,
     assignedTo !== "all" && assignedTo !== ""
@@ -98,7 +128,7 @@ function leadsWhere(req: any) {
           ilike(affiliationLeadsTable.notes, pattern),
         )
       : undefined,
-  ].filter(Boolean) as any[];
+  ].filter(isSql);
   return where.length ? and(...where) : undefined;
 }
 
@@ -124,7 +154,10 @@ router.get("/leads", async (req, res) => {
         })
         .from(affiliationLeadsTable),
       db
-        .select({ source: affiliationLeadsTable.source, count: sql<number>`count(*)::int` })
+        .select({
+          source: affiliationLeadsTable.source,
+          count: sql<number>`count(*)::int`,
+        })
         .from(affiliationLeadsTable)
         .groupBy(affiliationLeadsTable.source)
         .orderBy(affiliationLeadsTable.source),
@@ -133,8 +166,19 @@ router.get("/leads", async (req, res) => {
 
     res.json({
       items: leads.map(toAdminLead),
-      stats: statsRows[0] ?? { total: 0, unread: 0, read: 0, pending: 0, contacted: 0, converted: 0, rejected: 0 },
-      sources: sourceRows.map((row) => ({ source: row.source, count: Number(row.count) || 0 })),
+      stats: statsRows[0] ?? {
+        total: 0,
+        unread: 0,
+        read: 0,
+        pending: 0,
+        contacted: 0,
+        converted: 0,
+        rejected: 0,
+      },
+      sources: sourceRows.map((row) => ({
+        source: row.source,
+        count: Number(row.count) || 0,
+      })),
       assignees,
       generatedAt: new Date().toISOString(),
     });
@@ -142,7 +186,15 @@ router.get("/leads", async (req, res) => {
     req.log?.warn?.({ err }, "affiliation leads unavailable");
     res.json({
       items: [],
-      stats: { total: 0, unread: 0, read: 0, pending: 0, contacted: 0, converted: 0, rejected: 0 },
+      stats: {
+        total: 0,
+        unread: 0,
+        read: 0,
+        pending: 0,
+        contacted: 0,
+        converted: 0,
+        rejected: 0,
+      },
       sources: [],
       assignees: [],
       generatedAt: new Date().toISOString(),
@@ -157,7 +209,8 @@ router.patch("/leads/:id/read", async (req, res) => {
     res.status(400).json({ error: "ID non valido" });
     return;
   }
-  const read = req.body?.read === false ? false : true;
+  const body = asPlainRecord(getRequestBody(req));
+  const read = body.read === false ? false : true;
   const [lead] = await db
     .update(affiliationLeadsTable)
     .set({ read, readAt: read ? new Date() : null, updatedAt: new Date() })
@@ -177,7 +230,8 @@ router.patch("/leads/:id/status", async (req, res) => {
     res.status(400).json({ error: "ID non valido" });
     return;
   }
-  const status = normalizeLeadStatus(req.body?.status);
+  const body = asPlainRecord(getRequestBody(req));
+  const status = normalizeLeadStatus(body.status);
 
   const [lead] = await db
     .update(affiliationLeadsTable)
@@ -200,7 +254,8 @@ router.patch("/leads/:id/notes", async (req, res) => {
     res.status(400).json({ error: "ID non valido" });
     return;
   }
-  const internalNotes = stringValue(req.body?.internalNotes);
+  const body = asPlainRecord(getRequestBody(req));
+  const internalNotes = stringValue(body.internalNotes);
   const [lead] = await db
     .update(affiliationLeadsTable)
     .set({ internalNotes: internalNotes || null, updatedAt: new Date() })
@@ -210,13 +265,19 @@ router.patch("/leads/:id/notes", async (req, res) => {
     res.status(404).json({ error: "Lead non trovato" });
     return;
   }
-  await writeLeadAudit(req, "affiliation_lead_notes_updated", id, { hasNotes: Boolean(internalNotes) });
+  await writeLeadAudit(req, "affiliation_lead_notes_updated", id, {
+    hasNotes: Boolean(internalNotes),
+  });
   res.json(toAdminLead(lead));
 });
 
 router.patch("/leads/:id/assign", async (req, res) => {
   const id = parseId(req.params.id);
-  const assignedTo = req.body?.assignedTo === null || req.body?.assignedTo === "" ? null : parseId(req.body?.assignedTo);
+  const body = asPlainRecord(getRequestBody(req));
+  const assignedTo =
+    body.assignedTo === null || body.assignedTo === ""
+      ? null
+      : parseId(body.assignedTo);
   if (!id) {
     res.status(400).json({ error: "ID non valido" });
     return;
@@ -235,7 +296,9 @@ router.patch("/leads/:id/assign", async (req, res) => {
     res.status(404).json({ error: "Lead non trovato" });
     return;
   }
-  await writeLeadAudit(req, "affiliation_lead_assigned", id, { assignedTo: assignedTo ?? null });
+  await writeLeadAudit(req, "affiliation_lead_assigned", id, {
+    assignedTo: assignedTo ?? null,
+  });
   res.json(toAdminLead(lead));
 });
 

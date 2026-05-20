@@ -11,6 +11,8 @@ import {
   usersTable,
 } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
+import { getRequestBody } from "../lib/request-context";
+import { asPlainRecord } from "../lib/type-guards";
 
 const router = Router();
 
@@ -21,10 +23,12 @@ function affiliateReserveCents(): number {
 
 function minWithdrawCents(): number {
   const explicitCents = Number(process.env.AFFILIATE_MIN_WITHDRAWAL_CENTS);
-  if (Number.isInteger(explicitCents) && explicitCents > 0) return explicitCents;
+  if (Number.isInteger(explicitCents) && explicitCents > 0)
+    return explicitCents;
 
   const explicitEur = Number(process.env.AFFILIATE_MIN_WITHDRAWAL_EUR);
-  if (Number.isFinite(explicitEur) && explicitEur > 0) return Math.round(explicitEur * 100);
+  if (Number.isFinite(explicitEur) && explicitEur > 0)
+    return Math.round(explicitEur * 100);
 
   return affiliateReserveCents();
 }
@@ -61,7 +65,12 @@ async function ensureAffiliateAccount(userId: number) {
   const [existing] = await db
     .select()
     .from(affiliateAccountsTable)
-    .where(and(eq(affiliateAccountsTable.userId, userId), isNull(affiliateAccountsTable.deletedAt)))
+    .where(
+      and(
+        eq(affiliateAccountsTable.userId, userId),
+        isNull(affiliateAccountsTable.deletedAt),
+      ),
+    )
     .limit(1);
 
   if (existing) {
@@ -72,7 +81,11 @@ async function ensureAffiliateAccount(userId: number) {
   }
 
   const [user] = await db
-    .select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
+    .select({
+      id: usersTable.id,
+      name: usersTable.name,
+      email: usersTable.email,
+    })
     .from(usersTable)
     .where(eq(usersTable.id, userId))
     .limit(1);
@@ -118,7 +131,10 @@ router.get("/dashboard", requireAuth, async (req, res) => {
         referredUserEmail: usersTable.email,
       })
       .from(affiliateReferralsTable)
-      .leftJoin(usersTable, eq(affiliateReferralsTable.referredUserId, usersTable.id))
+      .leftJoin(
+        usersTable,
+        eq(affiliateReferralsTable.referredUserId, usersTable.id),
+      )
       .where(eq(affiliateReferralsTable.affiliateId, account.id))
       .orderBy(desc(affiliateReferralsTable.activatedAt));
 
@@ -132,12 +148,21 @@ router.get("/dashboard", requireAuth, async (req, res) => {
       .from(affiliateCommissionsTable)
       .where(eq(affiliateCommissionsTable.affiliateId, account.id));
 
-    const commissionByUser = new Map<number, { amount: number; paidAt: Date | null }>();
+    const commissionByUser = new Map<
+      number,
+      { amount: number; paidAt: Date | null }
+    >();
     for (const commission of commissionRows) {
       if (commission.status === "void") continue;
-      const current = commissionByUser.get(commission.referredUserId) ?? { amount: 0, paidAt: null };
+      const current = commissionByUser.get(commission.referredUserId) ?? {
+        amount: 0,
+        paidAt: null,
+      };
       current.amount += commission.amountCents ?? 0;
-      if (commission.appliedAt && (!current.paidAt || commission.appliedAt > current.paidAt)) {
+      if (
+        commission.appliedAt &&
+        (!current.paidAt || commission.appliedAt > current.paidAt)
+      ) {
         current.paidAt = commission.appliedAt;
       }
       commissionByUser.set(commission.referredUserId, current);
@@ -176,12 +201,15 @@ router.get("/dashboard", requireAuth, async (req, res) => {
       minWithdrawAmount: minWithdrawCents(),
       rule: {
         lockedReserveCents: affiliateReserveCents(),
-        description: "Le commissioni coprono prima una soglia pari a un mese Premium; il resto diventa ritirabile.",
+        description:
+          "Le commissioni coprono prima una soglia pari a un mese Premium; il resto diventa ritirabile.",
       },
     });
   } catch (err) {
     req.log?.error?.({ err }, "affiliate dashboard error");
-    res.status(500).json({ error: "Errore caricamento dashboard affiliazione" });
+    res
+      .status(500)
+      .json({ error: "Errore caricamento dashboard affiliazione" });
   }
 });
 
@@ -211,9 +239,10 @@ router.get("/qr", requireAuth, async (req, res) => {
     const safeReferralLink = referralLink.replace(/--/g, "%2D%2D");
     const svg = `<!-- referralLink: ${safeReferralLink} -->\n${qrSvg}`;
 
-    const disposition = req.query.download === "1"
-      ? `attachment; filename="northstar-referral-${account.referralCode}.svg"`
-      : `inline; filename="northstar-referral-${account.referralCode}.svg"`;
+    const disposition =
+      req.query.download === "1"
+        ? `attachment; filename="northstar-referral-${account.referralCode}.svg"`
+        : `inline; filename="northstar-referral-${account.referralCode}.svg"`;
 
     res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
     res.setHeader("Cache-Control", "private, max-age=300");
@@ -228,9 +257,11 @@ router.get("/qr", requireAuth, async (req, res) => {
 router.post("/withdraw", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
-    const rawAmount = Number(req.body?.amount);
-    const method = req.body?.method === "bank_transfer" ? "bank_transfer" : "paypal";
-    const destination = typeof req.body?.destination === "string" ? req.body.destination.trim() : null;
+    const body = asPlainRecord(getRequestBody(req));
+    const rawAmount = Number(body.amount);
+    const method = body.method === "bank_transfer" ? "bank_transfer" : "paypal";
+    const destination =
+      typeof body.destination === "string" ? body.destination.trim() : null;
 
     if (!Number.isInteger(rawAmount) || rawAmount <= 0) {
       res.status(400).json({ error: "Importo non valido" });
@@ -239,7 +270,12 @@ router.post("/withdraw", requireAuth, async (req, res) => {
 
     const minimum = minWithdrawCents();
     if (rawAmount < minimum) {
-      res.status(400).json({ error: "Importo minimo prelievo non raggiunto", minWithdrawAmount: minimum });
+      res
+        .status(400)
+        .json({
+          error: "Importo minimo prelievo non raggiunto",
+          minWithdrawAmount: minimum,
+        });
       return;
     }
 
@@ -259,11 +295,15 @@ router.post("/withdraw", requireAuth, async (req, res) => {
         .limit(1);
 
       if (!fresh || fresh.status === "suspended") {
-        throw Object.assign(new Error("Account affiliazione non disponibile"), { statusCode: 403 });
+        throw Object.assign(new Error("Account affiliazione non disponibile"), {
+          statusCode: 403,
+        });
       }
 
       if (fresh.withdrawableBalance < rawAmount) {
-        throw Object.assign(new Error("Saldo ritirabile insufficiente"), { statusCode: 400 });
+        throw Object.assign(new Error("Saldo ritirabile insufficiente"), {
+          statusCode: 400,
+        });
       }
 
       const [withdrawal] = await tx
@@ -288,6 +328,10 @@ router.post("/withdraw", requireAuth, async (req, res) => {
 
       return withdrawal;
     });
+
+    if (!result) {
+      throw new Error("Prelievo non creato");
+    }
 
     res.status(201).json({
       ok: true,

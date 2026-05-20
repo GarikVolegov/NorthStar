@@ -1,5 +1,5 @@
 import {
-  pgTable, text, serial, timestamp, integer, boolean, jsonb,
+  pgTable, text, timestamp, integer, boolean, jsonb,
   index, uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";

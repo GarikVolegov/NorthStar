@@ -1,31 +1,40 @@
 import rateLimit, { ipKeyGenerator, type Options } from "express-rate-limit";
 import type { Request } from "express";
 import { getEffectivePlan, planMeets } from "./check-feature";
+import { createRedisRateLimitStore } from "../lib/rate-limit-redis";
 
-function requestIpKey(req: Request): string {
+export function requestIpKey(req: Request): string {
   return ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? "unknown");
 }
 
-function buildOptions(overrides: Partial<Options>): Partial<Options> {
+export function buildOptions(
+  prefix: string,
+  overrides: Partial<Options>,
+): Partial<Options> {
   const base: Partial<Options> = {
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: requestIpKey,
     message: { error: "Troppe richieste. Riprova tra poco." },
   };
+  const store = createRedisRateLimitStore(prefix);
+  if (store) base.store = store;
   return { ...base, ...overrides };
 }
 
 export const globalLimiter = rateLimit(
-  buildOptions({
+  buildOptions("rl:global:", {
     windowMs: 60 * 1000,
     max: 100,
-    skip: () => process.env.NODE_ENV === "development",
+    skip: (req: Request) =>
+      req.path.startsWith("/api/health") ||
+      process.env.NODE_ENV === "test" ||
+      process.env.USE_MOCK_AI === "true",
   }),
 );
 
 export const wendyLimiter = rateLimit(
-  buildOptions({
+  buildOptions("rl:wendy:", {
     windowMs: 60 * 1000,
     max: 30,
     skip: (_req: Request) =>
@@ -34,7 +43,7 @@ export const wendyLimiter = rateLimit(
 );
 
 export const wendyIpLimiter = rateLimit(
-  buildOptions({
+  buildOptions("rl:wendy-ip:", {
     windowMs: 60 * 1000,
     max: 10,
     keyGenerator: requestIpKey,
@@ -45,7 +54,7 @@ export const wendyIpLimiter = rateLimit(
 );
 
 export const authLimiter = rateLimit(
-  buildOptions({
+  buildOptions("rl:auth:", {
     windowMs: 15 * 60 * 1000,
     max: 10,
     skipSuccessfulRequests: true,
@@ -54,23 +63,31 @@ export const authLimiter = rateLimit(
 );
 
 export const adminLimiter = rateLimit(
-  buildOptions({ windowMs: 60 * 1000, max: 200 }),
+  buildOptions("rl:admin:", { windowMs: 60 * 1000, max: 200 }),
 );
 
-const FREE_AI_DAILY_LIMIT = parseInt(process.env.FREE_AI_DAILY_LIMIT ?? "10", 10);
-const PRO_AI_DAILY_LIMIT = parseInt(process.env.PRO_AI_DAILY_LIMIT ?? "200", 10);
+const FREE_AI_DAILY_LIMIT = parseInt(
+  process.env.FREE_AI_DAILY_LIMIT ?? "10",
+  10,
+);
+const PRO_AI_DAILY_LIMIT = parseInt(
+  process.env.PRO_AI_DAILY_LIMIT ?? "200",
+  10,
+);
 
 export const planQuotaLimiter = rateLimit(
-  buildOptions({
+  buildOptions("rl:plan:", {
     windowMs: 86400 * 1000,
     max: async (req: Request) => {
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       if (!userId) return FREE_AI_DAILY_LIMIT;
       const currentPlan = await getEffectivePlan(userId);
-      return planMeets(currentPlan, "pro") ? PRO_AI_DAILY_LIMIT : FREE_AI_DAILY_LIMIT;
+      return planMeets(currentPlan, "pro")
+        ? PRO_AI_DAILY_LIMIT
+        : FREE_AI_DAILY_LIMIT;
     },
     keyGenerator: (req: Request) => {
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       return userId ? `plan-user-${userId}` : `plan-ip-${requestIpKey(req)}`;
     },
     skip: (_req: Request) =>

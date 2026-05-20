@@ -22,11 +22,19 @@ import {
   usersTable,
 } from "@workspace/db";
 import { invalidatePlanCache } from "../middleware/check-feature";
+import { getRequestBody } from "../lib/request-context";
+import { asPlainRecord, isOneOf } from "../lib/type-guards";
 
 const router = Router();
-const log    = rootLogger.child({ module: "subscription" });
+const log = rootLogger.child({ module: "subscription" });
 
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
+const SUBSCRIPTION_PLANS = ["pro", "team"] as const;
+
+interface StripeLikeEvent {
+  type: string;
+  data: { object: Record<string, unknown> };
+}
 
 function affiliateCommissionPct(): number {
   const value = Number(process.env.AFFILIATE_COMMISSION_PCT ?? "20");
@@ -44,14 +52,48 @@ function monthKey(date: Date): string {
 
 function readSubscriptionId(obj: Record<string, unknown>): string | null {
   if (typeof obj.subscription === "string") return obj.subscription;
-  if (obj.subscription && typeof obj.subscription === "object" && "id" in obj.subscription) {
+  if (
+    obj.subscription &&
+    typeof obj.subscription === "object" &&
+    "id" in obj.subscription
+  ) {
     const id = (obj.subscription as { id?: unknown }).id;
     return typeof id === "string" ? id : null;
   }
   return null;
 }
 
-async function findUserIdByStripeSubscription(subId: string): Promise<number | null> {
+function normalizeStripeEvent(value: unknown): StripeLikeEvent | null {
+  const event = asPlainRecord(value);
+  const data = asPlainRecord(event.data);
+  const object = asPlainRecord(data.object);
+  return typeof event.type === "string" && Object.keys(object).length > 0
+    ? { type: event.type, data: { object } }
+    : null;
+}
+
+function readMetadata(value: unknown): Record<string, string> {
+  const metadata = asPlainRecord(value);
+  return Object.fromEntries(
+    Object.entries(metadata).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
+}
+
+function readSubscriptionPriceId(
+  obj: Record<string, unknown>,
+): string | undefined {
+  const items = asPlainRecord(obj.items);
+  const data = Array.isArray(items.data) ? items.data : [];
+  const firstItem = asPlainRecord(data[0]);
+  const price = asPlainRecord(firstItem.price);
+  return typeof price.id === "string" ? price.id : undefined;
+}
+
+async function findUserIdByStripeSubscription(
+  subId: string,
+): Promise<number | null> {
   const [subscription] = await db
     .select({ userId: subscriptionsTable.userId })
     .from(subscriptionsTable)
@@ -69,19 +111,32 @@ async function findUserIdByStripeSubscription(subId: string): Promise<number | n
   return user?.id ?? null;
 }
 
-async function applyAffiliateCommissionForInvoice(obj: Record<string, unknown>): Promise<void> {
+async function applyAffiliateCommissionForInvoice(
+  obj: Record<string, unknown>,
+): Promise<void> {
   const invoiceId = typeof obj.id === "string" ? obj.id : null;
   const subId = readSubscriptionId(obj);
   const amountPaid = Number(obj.amount_paid ?? 0);
 
-  if (!invoiceId || !subId || !Number.isInteger(amountPaid) || amountPaid <= 0) {
-    log.debug({ invoiceId, subId, amountPaid }, "[subscription] invoice.paid skipped for affiliate commission");
+  if (
+    !invoiceId ||
+    !subId ||
+    !Number.isInteger(amountPaid) ||
+    amountPaid <= 0
+  ) {
+    log.debug(
+      { invoiceId, subId, amountPaid },
+      "[subscription] invoice.paid skipped for affiliate commission",
+    );
     return;
   }
 
   const referredUserId = await findUserIdByStripeSubscription(subId);
   if (!referredUserId) {
-    log.debug({ invoiceId, subId }, "[subscription] invoice.paid has no local subscription user");
+    log.debug(
+      { invoiceId, subId },
+      "[subscription] invoice.paid has no local subscription user",
+    );
     return;
   }
 
@@ -89,7 +144,8 @@ async function applyAffiliateCommissionForInvoice(obj: Record<string, unknown>):
   const commissionCents = Math.round((amountPaid * rate) / 100);
   if (commissionCents <= 0) return;
 
-  const paidAt = typeof obj.created === "number" ? new Date(obj.created * 1000) : new Date();
+  const paidAt =
+    typeof obj.created === "number" ? new Date(obj.created * 1000) : new Date();
   const reserveCents = affiliateReserveCents();
 
   await db.transaction(async (tx) => {
@@ -136,7 +192,9 @@ async function applyAffiliateCommissionForInvoice(obj: Record<string, unknown>):
         status: "applied",
         appliedAt: new Date(),
       })
-      .onConflictDoNothing({ target: affiliateCommissionsTable.stripeInvoiceId })
+      .onConflictDoNothing({
+        target: affiliateCommissionsTable.stripeInvoiceId,
+      })
       .returning({ id: affiliateCommissionsTable.id });
 
     if (inserted.length === 0) return;
@@ -152,7 +210,10 @@ async function applyAffiliateCommissionForInvoice(obj: Record<string, unknown>):
       .where(eq(affiliateAccountsTable.id, account.id));
   });
 
-  log.info({ invoiceId, subId, referredUserId, commissionCents, rate }, "[subscription] affiliate commission applied");
+  log.info(
+    { invoiceId, subId, referredUserId, commissionCents, rate },
+    "[subscription] affiliate commission applied",
+  );
 }
 
 // ── GET /api/subscription ─────────────────────────────────────────────────────
@@ -163,26 +224,29 @@ router.get("/", requireAuth, async (req, res) => {
   try {
     const [sub] = await db
       .select({
-        plan:        subscriptionsTable.plan,
-        validUntil:  subscriptionsTable.validUntil,
+        plan: subscriptionsTable.plan,
+        validUntil: subscriptionsTable.validUntil,
         cancelledAt: subscriptionsTable.cancelledAt,
-        createdAt:   subscriptionsTable.createdAt,
+        createdAt: subscriptionsTable.createdAt,
       })
       .from(subscriptionsTable)
-      .where(and(
-        eq(subscriptionsTable.userId, userId),
-        isNull(subscriptionsTable.cancelledAt),
-      ))
+      .where(
+        and(
+          eq(subscriptionsTable.userId, userId),
+          isNull(subscriptionsTable.cancelledAt),
+        ),
+      )
       .orderBy(desc(subscriptionsTable.createdAt))
       .limit(1);
 
-    const effectivePlan = (sub?.validUntil && sub.validUntil < new Date())
-      ? "free"
-      : (sub?.plan ?? "free");
+    const effectivePlan =
+      sub?.validUntil && sub.validUntil < new Date()
+        ? "free"
+        : (sub?.plan ?? "free");
 
     res.json({
-      plan:        effectivePlan,
-      validUntil:  sub?.validUntil?.toISOString() ?? null,
+      plan: effectivePlan,
+      validUntil: sub?.validUntil?.toISOString() ?? null,
       cancelledAt: sub?.cancelledAt?.toISOString() ?? null,
     });
   } catch (e) {
@@ -194,57 +258,81 @@ router.get("/", requireAuth, async (req, res) => {
 // ── POST /api/subscription/webhook ───────────────────────────────────────────
 // Stripe webhook — richiede raw body (configurato in app.ts prima di express.json())
 
-router.post(
-  "/webhook",
-  async (req: Request, res: Response) => {
-    if (!STRIPE_WEBHOOK_SECRET) {
-      log.warn("[subscription] STRIPE_WEBHOOK_SECRET not set — skipping signature verification");
-    }
+router.post("/webhook", async (req: Request, res: Response) => {
+  if (!STRIPE_WEBHOOK_SECRET) {
+    log.warn(
+      "[subscription] STRIPE_WEBHOOK_SECRET not set — skipping signature verification",
+    );
+  }
 
-    let event: { type: string; data: { object: Record<string, unknown> } };
+  let event: StripeLikeEvent;
 
-    try {
-      // Verifica firma Stripe (in produzione)
-      if (STRIPE_WEBHOOK_SECRET) {
-        const stripe = await import("stripe").then((m) => new m.default(process.env.STRIPE_SECRET_KEY ?? ""));
-        const sig = req.headers["stripe-signature"] as string;
-        event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET) as any;
-      } else {
-        event = Buffer.isBuffer(req.body) || typeof req.body === "string"
-          ? JSON.parse(req.body.toString())
-          : req.body as any;
+  try {
+    const rawBody = getRequestBody(req);
+    // Verifica firma Stripe (in produzione)
+    if (STRIPE_WEBHOOK_SECRET) {
+      if (!Buffer.isBuffer(rawBody) && typeof rawBody !== "string") {
+        throw new Error("Stripe webhook requires raw body");
       }
-    } catch (e) {
-      log.warn({ e }, "[subscription] webhook signature invalid");
-      res.status(400).send("Webhook signature invalid");
-      return;
+      const stripe = await import("stripe").then(
+        (m) => new m.default(process.env.STRIPE_SECRET_KEY ?? ""),
+      );
+      const sig = req.headers["stripe-signature"];
+      if (typeof sig !== "string")
+        throw new Error("Missing stripe-signature header");
+      const parsedEvent = normalizeStripeEvent(
+        stripe.webhooks.constructEvent(rawBody, sig, STRIPE_WEBHOOK_SECRET),
+      );
+      if (!parsedEvent) throw new Error("Invalid Stripe event shape");
+      event = parsedEvent;
+    } else {
+      const parsedBody: unknown =
+        Buffer.isBuffer(rawBody) || typeof rawBody === "string"
+          ? JSON.parse(rawBody.toString())
+          : rawBody;
+      const parsedEvent = normalizeStripeEvent(parsedBody);
+      if (!parsedEvent) throw new Error("Invalid Stripe event shape");
+      event = parsedEvent;
     }
+  } catch (e) {
+    log.warn({ e }, "[subscription] webhook signature invalid");
+    res.status(400).send("Webhook signature invalid");
+    return;
+  }
 
-    try {
-      await handleStripeEvent(event);
-      res.json({ received: true });
-    } catch (e) {
-      log.error({ e, eventType: event.type }, "[subscription] webhook handler error");
-      res.status(500).json({ error: "Handler error" });
-    }
-  },
-);
+  try {
+    await handleStripeEvent(event);
+    res.json({ received: true });
+  } catch (e) {
+    log.error(
+      { e, eventType: event.type },
+      "[subscription] webhook handler error",
+    );
+    res.status(500).json({ error: "Handler error" });
+  }
+});
 
 // ── Stripe event handlers ─────────────────────────────────────────────────────
 
-async function handleStripeEvent(event: { type: string; data: { object: Record<string, unknown> } }): Promise<void> {
+async function handleStripeEvent(event: StripeLikeEvent): Promise<void> {
   const obj = event.data.object;
 
   switch (event.type) {
     case "checkout.session.completed": {
-      const customerId  = obj.customer as string;
-      const subId       = obj.subscription as string;
-      const metadata    = (obj.metadata ?? {}) as Record<string, string>;
-      const userId      = metadata.userId ? parseInt(metadata.userId) : null;
-      const plan        = (metadata.plan ?? "pro") as "pro" | "team";
+      const customerId = typeof obj.customer === "string" ? obj.customer : "";
+      const subId =
+        typeof obj.subscription === "string" ? obj.subscription : "";
+      const metadata = readMetadata(obj.metadata);
+      const userId = metadata.userId ? parseInt(metadata.userId) : null;
+      const plan = isOneOf(metadata.plan, SUBSCRIPTION_PLANS)
+        ? metadata.plan
+        : "pro";
 
       if (!userId || !subId) {
-        log.warn({ obj }, "[subscription] checkout.session.completed missing userId or subId");
+        log.warn(
+          { obj },
+          "[subscription] checkout.session.completed missing userId or subId",
+        );
         return;
       }
 
@@ -254,14 +342,14 @@ async function handleStripeEvent(event: { type: string; data: { object: Record<s
         .values({
           userId,
           plan,
-          stripeCustomerId:     customerId,
+          stripeCustomerId: customerId,
           stripeSubscriptionId: subId,
-          validUntil:           new Date(Date.now() + 31 * 24 * 60 * 60 * 1000), // +31 giorni
+          validUntil: new Date(Date.now() + 31 * 24 * 60 * 60 * 1000), // +31 giorni
         })
         .onConflictDoUpdate({
           target: subscriptionsTable.stripeSubscriptionId,
           set: { plan, updatedAt: new Date() },
-        } as any);
+        });
 
       // Aggiorna stripeSubscriptionId su users per backward compat
       await db
@@ -271,7 +359,11 @@ async function handleStripeEvent(event: { type: string; data: { object: Record<s
 
       invalidatePlanCache(userId);
 
-      if (typeof obj.invoice === "string" && typeof obj.amount_total === "number" && obj.amount_total > 0) {
+      if (
+        typeof obj.invoice === "string" &&
+        typeof obj.amount_total === "number" &&
+        obj.amount_total > 0
+      ) {
         await applyAffiliateCommissionForInvoice({
           id: obj.invoice,
           subscription: subId,
@@ -280,7 +372,10 @@ async function handleStripeEvent(event: { type: string; data: { object: Record<s
         });
       }
 
-      log.info({ userId, plan, subId }, "[subscription] checkout completed → plan upgraded");
+      log.info(
+        { userId, plan, subId },
+        "[subscription] checkout completed → plan upgraded",
+      );
       break;
     }
 
@@ -290,21 +385,24 @@ async function handleStripeEvent(event: { type: string; data: { object: Record<s
     }
 
     case "customer.subscription.updated": {
-      const subId    = obj.id as string;
-      const status   = obj.status as string;
-      const periodEnd = (obj.current_period_end as number) * 1000;
-      const priceId  = (obj.items as any)?.data?.[0]?.price?.id as string | undefined;
+      const subId = typeof obj.id === "string" ? obj.id : "";
+      const status = typeof obj.status === "string" ? obj.status : "";
+      const currentPeriodEnd = Number(obj.current_period_end);
+      const periodEnd = Number.isFinite(currentPeriodEnd)
+        ? currentPeriodEnd * 1000
+        : Date.now();
+      const priceId = readSubscriptionPriceId(obj);
 
       // Determina il piano dal price ID (configurabile via env)
       const teamPriceId = process.env.STRIPE_TEAM_PRICE_ID;
-      const plan = (priceId && priceId === teamPriceId) ? "team" : "pro";
+      const plan = priceId && priceId === teamPriceId ? "team" : "pro";
 
       const [updated] = await db
         .update(subscriptionsTable)
         .set({
-          plan:        status === "active" ? plan : "free",
-          validUntil:  new Date(periodEnd),
-          updatedAt:   new Date(),
+          plan: status === "active" ? plan : "free",
+          validUntil: new Date(periodEnd),
+          updatedAt: new Date(),
         })
         .where(eq(subscriptionsTable.stripeSubscriptionId, subId))
         .returning({ userId: subscriptionsTable.userId });
@@ -315,7 +413,7 @@ async function handleStripeEvent(event: { type: string; data: { object: Record<s
     }
 
     case "customer.subscription.deleted": {
-      const subId = obj.id as string;
+      const subId = typeof obj.id === "string" ? obj.id : "";
       const [cancelled] = await db
         .update(subscriptionsTable)
         .set({ cancelledAt: new Date(), plan: "free", updatedAt: new Date() })
@@ -330,12 +428,18 @@ async function handleStripeEvent(event: { type: string; data: { object: Record<s
           .set({ stripeSubscriptionId: null, updatedAt: new Date() })
           .where(eq(usersTable.id, cancelled.userId));
       }
-      log.info({ subId }, "[subscription] subscription.deleted → downgraded to free");
+      log.info(
+        { subId },
+        "[subscription] subscription.deleted → downgraded to free",
+      );
       break;
     }
 
     default:
-      log.debug({ eventType: event.type }, "[subscription] unhandled Stripe event");
+      log.debug(
+        { eventType: event.type },
+        "[subscription] unhandled Stripe event",
+      );
   }
 }
 

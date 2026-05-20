@@ -16,13 +16,28 @@ const MONTHLY_LIMITS = {
   enterprise: parseFloat(process.env.LLM_COST_LIMIT_ENTERPRISE ?? "100.00"),
 } as const;
 
+type CostGuardPlan = keyof typeof MONTHLY_LIMITS;
+
+declare global {
+  namespace Express {
+    interface Request {
+      costGuard?: {
+        plan: CostGuardPlan;
+        monthlyLimit: number;
+        currentCost: number;
+      };
+    }
+  }
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────
 
 /** Determine the user's plan tier based on the effective internal entitlement. */
-async function getPlan(req: Request): Promise<"free" | "pro" | "enterprise"> {
+async function getPlan(req: Request): Promise<CostGuardPlan> {
   if (process.env.LLM_COST_GUARD_DISABLED === "true") return "enterprise";
   // Enterprise: manual flag or specific env
-  if (req.user?.stripeSubscriptionId?.startsWith("enterprise_")) return "enterprise";
+  if (req.user?.stripeSubscriptionId?.startsWith("enterprise_"))
+    return "enterprise";
   if (!req.user?.id) return "free";
   const currentPlan = await getEffectivePlan(req.user.id);
   return currentPlan === "free" ? "free" : "pro";
@@ -46,7 +61,11 @@ function currentMonthRange(): { start: Date; end: Date } {
  * Usage:
  *   router.post("/ask", requireAuth, costGuard, wendyLimiter, handler);
  */
-export async function costGuard(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function costGuard(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   if (!req.user) {
     next();
     return;
@@ -97,7 +116,7 @@ export async function costGuard(req: Request, res: Response, next: NextFunction)
     }
 
     // Attach current usage info so downstream code can log it
-    (req as any).costGuard = { plan, monthlyLimit, currentCost };
+    req.costGuard = { plan, monthlyLimit, currentCost };
     next();
   } catch (err) {
     // If the guard itself fails (e.g. DB error), allow the request through

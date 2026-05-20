@@ -2,16 +2,32 @@ import { Router } from "express";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { db, userFavoritesTable } from "@workspace/db";
-import { sendOptionalReadFallback, sendPersistenceWriteError } from "../lib/persistence";
+import {
+  sendOptionalReadFallback,
+  sendPersistenceWriteError,
+} from "../lib/persistence";
+import { getRequestBody } from "../lib/request-context";
+import { asPlainRecord, isOneOf } from "../lib/type-guards";
 
 const router = Router();
+const FAVORITE_TYPES = ["sector", "news", "growth"] as const;
+
+function optionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function optionalNumber(value: unknown): number | null {
+  const numberValue = Number(value);
+  return Number.isInteger(numberValue) && numberValue > 0 ? numberValue : null;
+}
 
 /* ─── GET /api/favorites/:userId  ─── */
 router.get("/:userId", requireAuth, async (req, res) => {
   try {
-    const userId = parseInt(req.params.userId, 10);
+    const userId = parseInt(req.params.userId ?? "", 10);
     if (isNaN(userId) || userId !== req.user!.id) {
-      res.json({ favorites: [] }); return;
+      res.json({ favorites: [] });
+      return;
     }
 
     const favorites = await db
@@ -31,14 +47,29 @@ router.get("/:userId", requireAuth, async (req, res) => {
 router.post("/", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
-    const { type, sectorId, articleUrl, articleTitle, articleDescription, articleSource, articleImage, articleCategory, growthArticleId } = req.body;
+    const body = asPlainRecord(getRequestBody(req));
+    const type = isOneOf(body.type, FAVORITE_TYPES) ? body.type : null;
 
-    if (!type) { res.status(400).json({ error: "type richiesto" }); return; }
+    if (!type) {
+      res.status(400).json({ error: "type richiesto" });
+      return;
+    }
 
-    await db.insert(userFavoritesTable).values({
-      userId, type, sectorId, articleUrl, articleTitle,
-      articleDescription, articleSource, articleImage, articleCategory, growthArticleId,
-    }).onConflictDoNothing();
+    await db
+      .insert(userFavoritesTable)
+      .values({
+        userId,
+        type,
+        sectorId: optionalNumber(body.sectorId),
+        articleUrl: optionalString(body.articleUrl),
+        articleTitle: optionalString(body.articleTitle),
+        articleDescription: optionalString(body.articleDescription),
+        articleSource: optionalString(body.articleSource),
+        articleImage: optionalString(body.articleImage),
+        articleCategory: optionalString(body.articleCategory),
+        growthArticleId: optionalNumber(body.growthArticleId),
+      })
+      .onConflictDoNothing();
 
     res.json({ success: true });
   } catch (err) {
@@ -51,10 +82,17 @@ router.post("/", requireAuth, async (req, res) => {
 /* ─── DELETE /api/favorites/:id  ─── */
 router.delete("/:id", requireAuth, async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id ?? "", 10);
     const userId = req.user!.id;
 
-    await db.delete(userFavoritesTable).where(and(eq(userFavoritesTable.id, id), eq(userFavoritesTable.userId, userId)));
+    await db
+      .delete(userFavoritesTable)
+      .where(
+        and(
+          eq(userFavoritesTable.id, id),
+          eq(userFavoritesTable.userId, userId),
+        ),
+      );
     res.json({ success: true });
   } catch (err) {
     req.log?.error?.({ err }, "favorites delete error");

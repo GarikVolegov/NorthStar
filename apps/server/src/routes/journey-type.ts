@@ -3,29 +3,45 @@ import { eq } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { db, usersTable } from "@workspace/db";
 import { invalidateUserFeedCache } from "@workspace/ai-server";
+import { isOneOf } from "../lib/type-guards";
 
 const router = Router();
 
-const VALID_JOURNEY_TYPES = ["indeciso", "dipendente", "autonomo", "azienda", "investitore"] as const;
+const VALID_JOURNEY_TYPES = [
+  "indeciso",
+  "dipendente",
+  "autonomo",
+  "azienda",
+  "investitore",
+] as const;
 
 /* ─── PATCH /api/profile/me/journey-type  —  aggiorna tipo percorso (utente corrente) ─── */
 router.patch("/me/journey-type", requireAuth, async (req, res) => {
-
   try {
     const userId = req.user!.id;
     const { journeyType } = req.body as { journeyType: string };
 
-    if (!VALID_JOURNEY_TYPES.includes(journeyType as any)) {
-      res.status(400).json({ error: "Tipo percorso non valido", valid: VALID_JOURNEY_TYPES });
+    if (!isOneOf(journeyType, VALID_JOURNEY_TYPES)) {
+      res
+        .status(400)
+        .json({
+          error: "Tipo percorso non valido",
+          valid: VALID_JOURNEY_TYPES,
+        });
       return;
     }
 
-    await db.update(usersTable).set({ journeyType, updatedAt: new Date() }).where(eq(usersTable.id, userId));
+    await db
+      .update(usersTable)
+      .set({ journeyType, updatedAt: new Date() })
+      .where(eq(usersTable.id, userId));
     invalidateUserFeedCache(userId);
     res.json({ success: true, journeyType });
   } catch (err) {
     req.log?.error?.({ err }, "journey-type /me update error");
-    res.status(500).json({ error: "Errore nell'aggiornamento del tipo di percorso" });
+    res
+      .status(500)
+      .json({ error: "Errore nell'aggiornamento del tipo di percorso" });
   }
 });
 
@@ -35,8 +51,13 @@ router.patch("/:userId/journey-type", requireAuth, async (req, res) => {
     const userId = req.user!.id;
     const { journeyType } = req.body as { journeyType: string };
 
-    if (!VALID_JOURNEY_TYPES.includes(journeyType as any)) {
-      res.status(400).json({ error: "Tipo percorso non valido", valid: VALID_JOURNEY_TYPES });
+    if (!isOneOf(journeyType, VALID_JOURNEY_TYPES)) {
+      res
+        .status(400)
+        .json({
+          error: "Tipo percorso non valido",
+          valid: VALID_JOURNEY_TYPES,
+        });
       return;
     }
 
@@ -51,7 +72,9 @@ router.patch("/:userId/journey-type", requireAuth, async (req, res) => {
     res.json({ success: true, journeyType });
   } catch (err) {
     req.log?.error?.({ err }, "journey-type update error");
-    res.status(500).json({ error: "Errore nell'aggiornamento del tipo di percorso" });
+    res
+      .status(500)
+      .json({ error: "Errore nell'aggiornamento del tipo di percorso" });
   }
 });
 

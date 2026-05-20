@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import CircuitBreaker from "opossum";
 import { Pool } from "pg";
+import type { QueryResult } from "pg";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,9 +63,14 @@ const circuitBreakerOptions = {
 };
 
 // Create a circuit breaker for database operations
+type ProtectedOperation<T = unknown> = () => Promise<T>;
+
 export const dbCircuitBreaker = new CircuitBreaker(
-  async (operation: () => Promise<any>) => {
-    return await operation();
+  async (operation: unknown) => {
+    if (typeof operation !== "function") {
+      throw new Error("[db] Circuit breaker operation must be a function");
+    }
+    return await (operation as ProtectedOperation)();
   },
   circuitBreakerOptions
 );
@@ -97,15 +103,18 @@ export async function protectedDbQuery<T>(queryFn: () => Promise<T>): Promise<T>
         setTimeout(() => reject(new Error(`Database query timed out after ${queryTimeout}ms`)), queryTimeout)
       )
     ]);
-  });
+  }) as T;
 }
 
 // Export drizzle instance wrapped with circuit breaker protection
 export const db = drizzle(rawSql, { schema }) as NeonHttpDatabase<typeof schema>;
 
 // Export a helper function for making protected queries
-export async function query<T>(text: string, params?: any[]): Promise<T> {
-  return protectedDbQuery(() => pool.query(text, params)) as Promise<T>;
+export async function query<T extends Record<string, unknown>>(
+  text: string,
+  params?: unknown[],
+): Promise<QueryResult<T>> {
+  return protectedDbQuery(() => pool.query<T>(text, params));
 }
 
 // ── Schema Backup Functionality ──────────────────────────────────────────────
@@ -119,7 +128,7 @@ export async function backupSchema(): Promise<string> {
       const backupFileName = `schema-backup-${timestamp}.sql`;
       
       // Query to get the full schema
-      const { rows } = await client.query(`
+      await client.query(`
         SELECT pg_catalog.pg_get_userdefs(
           (SELECT oid FROM pg_catalog.pg_class WHERE relname = 'pg_dump')
         ) as schema_def
