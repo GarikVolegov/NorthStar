@@ -24,6 +24,7 @@ import {
 import { invalidatePlanCache } from "../middleware/check-feature";
 import { getRequestBody } from "../lib/request-context";
 import { asPlainRecord, isOneOf } from "../lib/type-guards";
+import { logSecurityEvent } from "../lib/security-events";
 
 const router = Router();
 const log = rootLogger.child({ module: "subscription" });
@@ -295,6 +296,10 @@ router.post("/webhook", async (req: Request, res: Response) => {
       event = parsedEvent;
     }
   } catch (e) {
+    logSecurityEvent("invalid_webhook_signature", {
+      ip: req.ip,
+      detail: "stripe_subscription_webhook",
+    });
     log.warn({ e }, "[subscription] webhook signature invalid");
     res.status(400).send("Webhook signature invalid");
     return;

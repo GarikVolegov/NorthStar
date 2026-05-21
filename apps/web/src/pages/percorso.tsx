@@ -118,7 +118,7 @@ export default function Percorso() {
     if (user && token) {
       setSaving(true);
       try {
-        await apiFetch(`${BASE}api/profile/${user.id}/journey-type`, {
+        await apiFetch(`${BASE}api/journey-type/${user.id}/journey-type`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ journeyType: selected }),

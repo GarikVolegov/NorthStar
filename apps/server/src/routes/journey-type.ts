@@ -15,7 +15,7 @@ const VALID_JOURNEY_TYPES = [
   "investitore",
 ] as const;
 
-/* ─── PATCH /api/profile/me/journey-type  —  aggiorna tipo percorso (utente corrente) ─── */
+/* ─── PATCH /api/journey-type/me/journey-type  —  aggiorna tipo percorso (utente corrente) ─── */
 router.patch("/me/journey-type", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
@@ -45,7 +45,7 @@ router.patch("/me/journey-type", requireAuth, async (req, res) => {
   }
 });
 
-/* ─── PATCH /api/profile/:userId/journey-type  —  aggiorna tipo percorso ─── */
+/* ─── PATCH /api/journey-type/:userId/journey-type  —  aggiorna tipo percorso ─── */
 router.patch("/:userId/journey-type", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;

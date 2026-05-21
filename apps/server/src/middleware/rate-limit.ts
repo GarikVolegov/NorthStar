@@ -2,6 +2,7 @@ import rateLimit, { ipKeyGenerator, type Options } from "express-rate-limit";
 import type { Request } from "express";
 import { getEffectivePlan, planMeets } from "./check-feature";
 import { createRedisRateLimitStore } from "../lib/rate-limit-redis";
+import { logSecurityEvent } from "../lib/security-events";
 
 export function requestIpKey(req: Request): string {
   return ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? "unknown");
@@ -16,6 +17,14 @@ export function buildOptions(
     legacyHeaders: false,
     keyGenerator: requestIpKey,
     message: { error: "Troppe richieste. Riprova tra poco." },
+    handler: (req, res, _next, options) => {
+      logSecurityEvent("rate_limit_hit", {
+        userId: req.user?.id,
+        ip: req.ip,
+        detail: req.path,
+      });
+      res.status(options.statusCode).send(options.message);
+    },
   };
   const store = createRedisRateLimitStore(prefix);
   if (store) base.store = store;

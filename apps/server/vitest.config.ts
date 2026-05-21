@@ -10,7 +10,7 @@ export default defineConfig({
       provider: "v8",
       all: false,
       reporter: ["text", "json", "html"],
-      include: ["src/middleware/**/*.ts", "src/lib/**/*.ts"],
+      include: ["src/middleware/**/*.ts", "src/lib/**/*.ts", "src/services/**/*.ts"],
       exclude: [
         "src/**/*.test.ts",
         "src/**/*.spec.ts",

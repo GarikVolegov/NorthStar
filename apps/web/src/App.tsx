@@ -16,78 +16,23 @@ import {
 } from "wouter";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { Footer } from "@/components/layout/footer";
-import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
-import { Navbar } from "@/components/layout/Navbar";
 import { PageLoader } from "@/components/PageLoader";
-import { ProtectedRoute, PublicOnlyRoute } from "@/components/ProtectedRoute";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { MainLayout } from "@/layouts/MainLayout";
 import { easings, useReducedMotion } from "@/lib/motion";
+import { RouterFromConfig } from "@/RouterFromConfig";
+import { routes as mainRoutes } from "@/route-config";
 import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
-const Home = lazy(() => import("@/pages/home"));
-const Test = lazy(() => import("@/pages/test"));
-const Results = lazy(() => import("@/pages/results"));
-const Sector = lazy(() => import("@/pages/sector"));
-const Register = lazy(() => import("@/pages/register"));
-const Premium = lazy(() => import("@/pages/premium"));
-const PremiumSuccess = lazy(() => import("@/pages/premium-success"));
-const News = lazy(() => import("@/pages/news"));
-const NewsDetail = lazy(() => import("@/pages/news-detail"));
-const ResetPassword = lazy(() => import("@/pages/reset-password"));
-const Profilo = lazy(() => import("@/pages/profilo"));
-const Wiki = lazy(() => import("@/pages/wiki"));
-const Roadmap = lazy(() => import("@/pages/roadmap"));
-const Grafo = lazy(() => import("@/pages/grafo"));
-const Archivio = lazy(() => import("@/pages/grafo-conoscenza"));
-const Settori = lazy(() => import("@/pages/settori"));
-const Confronta = lazy(() => import("@/pages/confronta"));
-const Contatti = lazy(() => import("@/pages/contatti"));
 const AdminReview = lazy(() => import("@/pages/admin-review"));
 const AdminOffice = lazy(() => import("@/pages/admin-office"));
-const SitemapPage = lazy(() => import("@/pages/sitemap"));
-const ChiSiamo = lazy(() => import("@/pages/chi-siamo"));
-const ComeFunziona = lazy(() => import("@/pages/come-funziona"));
-const PrivacyPolicy = lazy(() => import("@/pages/privacy-policy"));
-const TerminiDiServizio = lazy(() => import("@/pages/termini-di-servizio"));
-const Crescita = lazy(() => import("@/pages/growth"));
-const CrescitaCategoria = lazy(() => import("@/pages/crescita-categoria"));
-const CrescitaArticolo = lazy(() => import("@/pages/crescita-articolo"));
-const Candidature = lazy(() => import("@/pages/applications"));
-const Amici = lazy(() => import("@/pages/amici"));
-const Social = lazy(() => import("@/pages/social"));
-const Utente = lazy(() => import("@/pages/utente"));
-const Calendario = lazy(() => import("@/pages/calendar"));
-const Ruolo = lazy(() => import("@/pages/ruolo"));
-const Ruoli = lazy(() => import("@/pages/ruoli"));
-const Affiliazione = lazy(() => import("@/pages/affiliazione"));
-const Dashboard = lazy(() => import("@/pages/dashboard"));
-const AffiliazioneScuole = lazy(() => import("@/pages/affiliazione-scuole"));
-const AffiliazioneUniversita = lazy(
-  () => import("@/pages/affiliazione-universita"),
-);
-const AffiliazioneAgenzie = lazy(() => import("@/pages/affiliazione-agenzie"));
-const AffiliazioneFormazione = lazy(
-  () => import("@/pages/affiliazione-formazione"),
-);
-// ── Fase 4: Dashboard affiliato (area privata) ─────────────────────────────
-const AffiliazioneDashboard = lazy(
-  () => import("@/pages/affiliazione-dashboard"),
-);
-const Colloquio = lazy(() => import("@/pages/colloquio"));
-const SkillsGap = lazy(() => import("@/pages/skills-gap"));
-const Coach = lazy(() => import("@/pages/coach"));
-const IdeaPage = lazy(() => import("@/pages/validatore-idea"));
-const Percorso = lazy(() => import("@/pages/percorso"));
-const ScoreCard = lazy(() => import("@/pages/score-card"));
-const Lavori = lazy(() => import("@/pages/lavori"));
 const MemoriaWendy = lazy(() => import("@/pages/memoria-wendy"));
 const WorkspacePage = lazy(() => import("@/pages/workspace"));
 const BriefingPage = lazy(() => import("@/pages/briefing"));
 const CertificatePage = lazy(() => import("@/pages/certificato"));
-const SignInPage  = lazy(() => import("@/pages/sign-in"));
-const SignUpPage  = lazy(() => import("@/pages/sign-up"));
-
+const SignInPage = lazy(() => import("@/pages/sign-in"));
+const SignUpPage = lazy(() => import("@/pages/sign-up"));
 /**
  * QueryClient ottimizzato:
  * - staleTime 5 min: non refetcha se i dati sono freschi
@@ -114,183 +59,41 @@ const queryClient = new QueryClient({
 function AnimatedRoutes() {
   const [location] = useLocation();
   const prefersReduced = useReducedMotion();
-
-  const routes = (loc: string) => (
-    <Switch location={loc}>
-      <Route path="/" component={Home} />
-      <Route path="/test" component={Test} />
-      <Route path="/risultati/:id" component={Results} />
-      <Route path="/settore/:id" component={Sector} />
-      <Route path="/ruolo/:id" component={Ruolo} />
-      <Route path="/registra">
-        <PublicOnlyRoute component={Register} />
-      </Route>
-      <Route path="/register">
-        <PublicOnlyRoute component={Register} />
-      </Route>
-      {/* Clerk auth pages — routing="path" richiede route dedicate */}
-      <Route path="/sign-in">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <SignInPage />
-          </Suspense>
-        </ErrorBoundary>
-      </Route>
-      <Route path="/sign-in/:rest*">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <SignInPage />
-          </Suspense>
-        </ErrorBoundary>
-      </Route>
-      <Route path="/sign-up">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <SignUpPage />
-          </Suspense>
-        </ErrorBoundary>
-      </Route>
-      <Route path="/sign-up/:rest*">
-        <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <SignUpPage />
-          </Suspense>
-        </ErrorBoundary>
-      </Route>
-      <Route path="/reset-password">
-        <PublicOnlyRoute component={ResetPassword} />
-      </Route>
-      <Route path="/premium" component={Premium} />
-      <Route path="/premium/successo">
-        <ProtectedRoute component={PremiumSuccess} />
-      </Route>
-      <Route path="/news/:id" component={NewsDetail} />
-      <Route path="/news" component={News} />
-      <Route path="/profilo">
-        <ProtectedRoute component={Profilo} />
-      </Route>
-      <Route path="/candidature">
-        <ProtectedRoute component={Candidature} />
-      </Route>
-      <Route path="/calendario">
-        <ProtectedRoute component={Calendario} />
-      </Route>
-      <Route path="/amici">
-        <ProtectedRoute component={Amici} />
-      </Route>
-      <Route path="/social">
-        <ProtectedRoute component={Social} />
-      </Route>
-      <Route path="/utente/:id" component={Utente} />
-      <Route path="/wiki/:id">
-        <ProtectedRoute component={Wiki} />
-      </Route>
-      <Route path="/roadmap/:id">
-        <ProtectedRoute component={Roadmap} />
-      </Route>
-      {/* Archivio — new canonical routes */}
-      <Route path="/archivio">
-        <ProtectedRoute component={Archivio} />
-      </Route>
-      <Route path="/archivio/:id">
-        <ProtectedRoute component={Grafo} />
-      </Route>
-      {/* Legacy /grafo routes — permanent redirect to /archivio */}
-      <Route path="/grafo">
-        <Redirect to="/archivio" />
-      </Route>
-      <Route path="/grafo/:id">
-        {(params) => <Redirect to={`/archivio/${params.id}`} />}
-      </Route>
-      <Route path="/settori" component={Settori} />
-      <Route path="/ruoli" component={Ruoli} />
-      <Route path="/confronta" component={Confronta} />
-      <Route path="/contatti" component={Contatti} />
-      <Route path="/sitemap" component={SitemapPage} />
-      <Route path="/chi-siamo" component={ChiSiamo} />
-      <Route path="/come-funziona" component={ComeFunziona} />
-      <Route path="/privacy-policy" component={PrivacyPolicy} />
-      <Route path="/termini-di-servizio" component={TerminiDiServizio} />
-      <Route path="/crescita" component={Crescita} />
-      <Route path="/crescita/categoria/:cat" component={CrescitaCategoria} />
-      <Route path="/crescita/articolo/:slug" component={CrescitaArticolo} />
-      <Route path="/dashboard">
-        <ProtectedRoute component={Dashboard} />
-      </Route>
-      <Route path="/affiliazione" component={Affiliazione} />
-      <Route path="/affiliazione/scuole" component={AffiliazioneScuole} />
-      <Route
-        path="/affiliazione/universita"
-        component={AffiliazioneUniversita}
-      />
-      <Route
-        path="/affiliazione/agenzie-lavoro"
-        component={AffiliazioneAgenzie}
-      />
-      <Route
-        path="/affiliazione/centri-formazione"
-        component={AffiliazioneFormazione}
-      />
-      {/* Fase 4: dashboard privata affiliato — DOPO le route pubbliche /affiliazione/* */}
-      <Route path="/affiliazione/dashboard">
-        <ProtectedRoute component={AffiliazioneDashboard} />
-      </Route>
-      <Route path="/affiliate">
-        <ProtectedRoute component={AffiliazioneDashboard} />
-      </Route>
-      <Route path="/colloquio/:id">
-        <ProtectedRoute component={Colloquio} />
-      </Route>
-      <Route path="/skills-gap/:id">
-        <ProtectedRoute component={SkillsGap} />
-      </Route>
-      <Route path="/coach" component={Coach} />
-      <Route path="/validatore-idea">
-        <ProtectedRoute component={IdeaPage} />
-      </Route>
-      <Route path="/percorso">
-        <ProtectedRoute component={Percorso} />
-      </Route>
-      <Route path="/score/:userId" component={ScoreCard} />
-      <Route path="/lavori" component={Lavori} />
-      <Route component={NotFound} />
-    </Switch>
+  const content = (
+    <RouterFromConfig
+      routes={mainRoutes}
+      location={location}
+      fallback={<NotFound />}
+    />
   );
 
   if (prefersReduced) {
-    return (
-      <ErrorBoundary>
-        <Suspense fallback={<PageLoader />}>{routes(location)}</Suspense>
-      </ErrorBoundary>
-    );
+    return content;
   }
 
   return (
-    <ErrorBoundary>
-      <LazyMotion features={domAnimation} strict>
-        <AnimatePresence mode="sync" initial={false}>
-          <m.div
-            key={location}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{
-              opacity: 1,
-              y: 0,
-              transition: { duration: 0.12, ease: easings.easeOut },
-            }}
-            exit={{
-              opacity: 0,
-              y: -4,
-              transition: { duration: 0.08, ease: easings.easeIn },
-            }}
-          >
-            <Suspense fallback={<PageLoader />}>{routes(location)}</Suspense>
-          </m.div>
-        </AnimatePresence>
-      </LazyMotion>
-    </ErrorBoundary>
+    <LazyMotion features={domAnimation} strict>
+      <AnimatePresence mode="sync" initial={false}>
+        <m.div
+          key={location}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{
+            opacity: 1,
+            y: 0,
+            transition: { duration: 0.12, ease: easings.easeOut },
+          }}
+          exit={{
+            opacity: 0,
+            y: -4,
+            transition: { duration: 0.08, ease: easings.easeIn },
+          }}
+        >
+          {content}
+        </m.div>
+      </AnimatePresence>
+    </LazyMotion>
   );
 }
-
 function Router() {
   return (
     <Switch>
@@ -336,6 +139,35 @@ function Router() {
           </Suspense>
         </ErrorBoundary>
       </Route>
+      {/* Clerk auth pages: routing="path" requires dedicated escape-hatch routes. */}
+      <Route path="/sign-in">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <SignInPage />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+      <Route path="/sign-in/:rest*">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <SignInPage />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+      <Route path="/sign-up">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <SignUpPage />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+      <Route path="/sign-up/:rest*">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <SignUpPage />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
       <Route path="/certificato/:hash">
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
@@ -343,17 +175,16 @@ function Router() {
           </Suspense>
         </ErrorBoundary>
       </Route>
+      <Route path="/grafo">
+        <Redirect to="/archivio" />
+      </Route>
+      <Route path="/grafo/:id">
+        {(params) => <Redirect to={`/archivio/${params.id}`} />}
+      </Route>
       <Route>
-        <div className="flex flex-col min-h-dvh">
-          <MobileBottomNav />
-          <main className="flex-1 pt-12 md:pt-14 pb-16 md:pb-16">
-            <AnimatedRoutes />
-          </main>
-          <div className="hidden md:block">
-            <Footer />
-          </div>
-          <Navbar />
-        </div>
+        <MainLayout>
+          <AnimatedRoutes />
+        </MainLayout>
       </Route>
     </Switch>
   );

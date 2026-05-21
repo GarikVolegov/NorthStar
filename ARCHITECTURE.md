@@ -59,6 +59,56 @@ flowchart LR
 
 ---
 
+## Bounded Context
+
+| Context | Route Prefix | Service Layer | Descrizione |
+| --- | --- | --- | --- |
+| Core Journey | `/api/profile`, `/api/test-sessions`, `/api/roadmap`, `/api/journey-type` | `services/journey/` | Profilo utente, test orientamento, roadmap e tipo percorso |
+| Knowledge | `/api/knowledge`, `/api/wiki`, `/api/admin/rag` | `services/knowledge/` | Base di conoscenza, memory graph, RAG e strumenti admin RAG |
+| AI Coach | `/api/wendy`, `/api/ai/wendy`, `/api/coach` | `services/wendy/` | Wendy AI, coach, memoria, prompt e proactive insights |
+| Content | `/api/news`, `/api/crescita`, `/api/trending-sectors` | `services/content/` | News, articoli crescita, cataloghi editoriali e trending |
+| Social | `/api/friends`, `/api/social`, `/api/leaderboard` | `services/social/` | Amici, messaggi, social feed e gamification |
+| Monetization | `/api/subscription`, `/api/affiliate`, `/api/affiliazione` | `services/monetization/` | Stripe, piani, affiliate program e referral |
+| Admin | `/api/admin`, `/api/admin/rag`, `/api/ml` | `services/admin/` | Pannello admin, monitoring, cataloghi, ops e quality |
+| Personal Intelligence | `/api/openhuman`, `/api/graphify` | `lib/personal-intelligence-context.ts` | Bridge server-side per memoria personale e knowledge graph progetto |
+
+La fonte runtime dei mount point server e` `apps/server/src/route-config.ts`; la tabella generata vive in [`docs/api-routes.md`](./docs/api-routes.md).
+
+---
+
+## Frontend Structure
+
+- `apps/web/src/route-config.ts` contiene le route principali React, con guard e layout dichiarativi.
+- `apps/web/src/RouterFromConfig.tsx` applica lazy loading, `ProtectedRoute`, `PublicOnlyRoute`, `ErrorBoundary` e `Suspense`.
+- `apps/web/src/layouts/MainLayout.tsx` contiene Navbar, MobileBottomNav, Footer e padding mobile/desktop.
+- `apps/web/src/layouts/AdminLayout.tsx` e `PlainLayout.tsx` coprono superfici speciali senza navigazione pubblica.
+- `apps/web/src/App.tsx` mantiene solo escape hatch esplicite: Clerk path routing, admin special routes, certificati e redirect legacy.
+
+Per aggiungere una pagina ordinaria:
+
+1. Aggiungi il componente in `apps/web/src/pages/`.
+2. Aggiungi una voce in `apps/web/src/route-config.ts`.
+3. Scegli `guard: "public" | "publicOnly" | "protected"`.
+4. Scegli `layout: "default" | "admin" | "plain"`.
+5. Usa `PATHS` da `apps/web/src/route-paths.ts` quando il path e` condiviso.
+
+---
+
+## Come aggiungere una nuova feature
+
+1. Definisci il bounded context di appartenenza.
+2. Crea service in `apps/server/src/services/<context>/`.
+3. Crea repo in `apps/server/src/repos/<context>/` se la feature usa DB o storage esterno.
+4. Crea route in `apps/server/src/routes/<name>.ts` come thin wrapper HTTP.
+5. Aggiungi la route a `apps/server/src/route-config.ts` con auth level e descrizione.
+6. Rigenera `docs/api-routes.md` con `pnpm run docs:api-routes`.
+7. Crea page/component in `apps/web/src/pages/` o `components/`.
+8. Aggiungi la route frontend in `apps/web/src/route-config.ts`.
+9. Scrivi test unitari per il service senza DB reale.
+10. Esegui `pnpm run quality:required`.
+
+---
+
 ## Stack tecnologico effettivo
 
 | Layer    | Tecnologia                              |

@@ -78,7 +78,7 @@ export function OnboardingModal({ recommendations, riasecTypes }: OnboardingModa
     setSelectedJourney(value);
     setSavingJourney(true);
     try {
-      await apiFetch(`${BASE}api/profile/me/journey-type`, {
+      await apiFetch(`${BASE}api/journey-type/me/journey-type`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ journeyType: value }),

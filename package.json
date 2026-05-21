@@ -13,6 +13,7 @@
     "dev:all": "concurrently -n docker,server,web --kill-others-on-fail \"docker compose up -d postgres redis || echo Docker not available, using local services\" \"pnpm run dev:server\" \"pnpm run dev:web\"",
     "// ── BUILD ─────────────────────────────────────────": "---",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "build:analyze": "pnpm --filter @northstar/web exec vite build --config vite.config.ts --mode analyze && npx vite-bundle-visualizer",
     "build:server": "pnpm --filter @northstar/server run build",
     "start:server": "pnpm --filter @northstar/server run start",
     "// ── TYPE ─────────────────────────────────────────": "---",
@@ -63,6 +64,7 @@
     "audit:db-types": "node scripts/check-db-types.mjs",
     "audit:mojibake": "node scripts/check-mojibake.mjs",
     "audit:e2e-determinism": "node scripts/check-playwright-e2e.mjs",
+    "docs:api-routes": "tsx scripts/gen-api-docs.ts",
     "// ── CLEAN ────────────────────────────────────────": "---",
     "clean": "find . -name dist -not -path '*/node_modules/*' -exec rm -rf {} + ; find . -name .turbo -exec rm -rf {} +"
   },

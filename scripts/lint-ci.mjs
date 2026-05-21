@@ -61,7 +61,7 @@ const targets = [
   "apps/server/src/routes/admin/quality.ts",
   "apps/server/src/routes/admin/review.ts",
   "apps/server/src/routes/admin/subscriptions.ts",
-  "apps/server/src/routes/affiliazione.ts",
+  "apps/server/src/routes/affiliation-program.ts",
   "apps/server/src/routes/affiliate.ts",
   "apps/server/src/routes/ai-wendy.ts",
   "apps/server/src/routes/auth.ts",

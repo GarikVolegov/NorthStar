@@ -6,6 +6,7 @@ import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { getEffectivePlan, planMeets } from "./check-feature";
 import { JWT_SECRET } from "../lib/jwt-secret";
+import { logSecurityEvent } from "../lib/security-events";
 
 declare global {
   namespace Express {
@@ -268,6 +269,7 @@ export async function requireAuth(
     if (req.log) {
       req.log.error({ err: "auth_failed" }, "JWT verification failed");
     }
+    logSecurityEvent("auth_failed", { ip: req.ip, detail: "jwt_verification_failed" });
     res.status(401).json({ error: "Token non valido" });
   }
 }
@@ -318,6 +320,7 @@ export async function requireAdmin(
     }
 
     req.user.role = "admin";
+    logSecurityEvent("admin_access", { userId: req.user.id, ip: req.ip });
     next();
   } catch (err) {
     rootLogger.error(

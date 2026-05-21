@@ -21,6 +21,7 @@ import {
 import { JWT_SECRET } from "../lib/jwt-secret";
 import { getRequestBody } from "../lib/request-context";
 import { asPlainRecord } from "../lib/type-guards";
+import { logSecurityEvent } from "../lib/security-events";
 import { DEV_MODE, buildJwtPayload, findReferralAccount, generateToken, generateVerificationCode, readReferralCode, readStringField, recordReferral, type JwtPayload } from "./auth-shared";
 import { registerClerkSyncRoute } from "./auth-clerk-sync";
 import { registerGoogleTokenRoute } from "./auth-google-token";
@@ -144,12 +145,14 @@ router.post("/login", authLimiter, async (req, res) => {
       .limit(1);
 
     if (!user) {
+      logSecurityEvent("auth_failed", { ip: req.ip, detail: "login_user_not_found" });
       res.status(401).json({ error: "Email o password errati" });
       return;
     }
 
     const passwordHash = user.passwordHash;
     if (!passwordHash) {
+      logSecurityEvent("auth_failed", { ip: req.ip, detail: "login_provider_mismatch" });
       res
         .status(401)
         .json({ error: "Account registrato con Google. Accedi con Google." });
@@ -158,9 +161,12 @@ router.post("/login", authLimiter, async (req, res) => {
 
     const valid = await bcrypt.compare(password, passwordHash);
     if (!valid) {
+      logSecurityEvent("auth_failed", { ip: req.ip, detail: "login_invalid_password" });
       res.status(401).json({ error: "Email o password errati" });
       return;
     }
+
+    logSecurityEvent("auth_success", { userId: user.id, ip: req.ip, detail: "password_login" });
 
     // Email non ancora verificata → flusso verifica email
     if (!user.emailVerified) {

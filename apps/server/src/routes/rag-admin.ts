@@ -4,15 +4,15 @@
  * Tutte le route richiedono role = 'admin' (requireAuth + requireAdmin).
  *
  * Endpoints:
- *   GET  /api/admin/weak-signals                   — lista segnali filtrabili
- *   PATCH /api/admin/weak-signals/:id              — aggiorna status/strength
- *   POST /api/admin/weak-signals/:id/approve       — promuovi a ruolo ufficiale
- *   POST /api/admin/weak-signals/:id/dismiss       — marca come faded
- *   GET  /api/admin/rag-sources                    — lista fonti RAG con stats
- *   POST /api/admin/rag-sources                    — aggiungi nuova fonte
- *   POST /api/admin/rag-sources/:id/ingest-pdf     — ingesta PDF (base64 in body)
- *   POST /api/admin/rag-sources/:id/ingest-rss     — trigger ingestione RSS
- *   GET  /api/admin/rag-sources/:id/chunks         — lista chunk con stats
+ *   GET  /api/admin/rag/weak-signals                   — lista segnali filtrabili
+ *   PATCH /api/admin/rag/weak-signals/:id              — aggiorna status/strength
+ *   POST /api/admin/rag/weak-signals/:id/approve       — promuovi a ruolo ufficiale
+ *   POST /api/admin/rag/weak-signals/:id/dismiss       — marca come faded
+ *   GET  /api/admin/rag/rag-sources                    — lista fonti RAG con stats
+ *   POST /api/admin/rag/rag-sources                    — aggiungi nuova fonte
+ *   POST /api/admin/rag/rag-sources/:id/ingest-pdf     — ingesta PDF (base64 in body)
+ *   POST /api/admin/rag/rag-sources/:id/ingest-rss     — trigger ingestione RSS
+ *   GET  /api/admin/rag/rag-sources/:id/chunks         — lista chunk con stats
  */
 import { Router } from "express";
 import { eq, desc, sql } from "drizzle-orm";
@@ -37,7 +37,7 @@ const WEAK_SIGNAL_STATUSES = [
   "faded",
 ] as const;
 
-// ── GET /api/admin/weak-signals ──────────────────────────────────────────────
+// ── GET /api/admin/rag/weak-signals ──────────────────────────────────────────────
 
 router.get("/weak-signals", requireAuth, requireAdmin, async (req, res) => {
   const status = (req.query.status as string) || "emerging";
@@ -62,7 +62,7 @@ router.get("/weak-signals", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-// ── PATCH /api/admin/weak-signals/:id ───────────────────────────────────────
+// ── PATCH /api/admin/rag/weak-signals/:id ───────────────────────────────────────
 
 const PatchWeakSignalSchema = z.object({
   status: z.enum(["emerging", "confirmed", "mainstream", "faded"]).optional(),
@@ -113,7 +113,7 @@ router.patch(
   },
 );
 
-// ── POST /api/admin/weak-signals/:id/approve ────────────────────────────────
+// ── POST /api/admin/rag/weak-signals/:id/approve ────────────────────────────────
 // Promuove un segnale a 'confirmed' e opzionalmente lo lega a un settore.
 
 const ApproveSchema = z.object({
@@ -182,7 +182,7 @@ router.post(
   },
 );
 
-// ── POST /api/admin/weak-signals/:id/dismiss ────────────────────────────────
+// ── POST /api/admin/rag/weak-signals/:id/dismiss ────────────────────────────────
 
 router.post(
   "/weak-signals/:id/dismiss",
@@ -218,7 +218,7 @@ router.post(
   },
 );
 
-// ── GET /api/admin/rag-sources ───────────────────────────────────────────────
+// ── GET /api/admin/rag/rag-sources ───────────────────────────────────────────────
 
 router.get("/rag-sources", requireAuth, requireAdmin, async (_req, res) => {
   try {
@@ -234,7 +234,7 @@ router.get("/rag-sources", requireAuth, requireAdmin, async (_req, res) => {
   }
 });
 
-// ── POST /api/admin/rag-sources ─────────────────────────────────────────────
+// ── POST /api/admin/rag/rag-sources ─────────────────────────────────────────────
 
 const CreateSourceSchema = z.object({
   name: z.string().min(3).max(200),
@@ -284,7 +284,7 @@ router.post("/rag-sources", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-// ── GET /api/admin/rag-sources (override con stats chunk) ───────────────────
+// ── GET /api/admin/rag/rag-sources (override con stats chunk) ───────────────────
 
 router.get(
   "/rag-sources/stats",
@@ -316,7 +316,7 @@ router.get(
   },
 );
 
-// ── POST /api/admin/rag-sources/:id/ingest-pdf ──────────────────────────────
+// ── POST /api/admin/rag/rag-sources/:id/ingest-pdf ──────────────────────────────
 // Accetta il PDF come stringa base64 in body (nessuna dipendenza multer)
 
 const IngestPdfSchema = z.object({
@@ -368,7 +368,7 @@ router.post(
   },
 );
 
-// ── POST /api/admin/rag-sources/:id/ingest-rss ──────────────────────────────
+// ── POST /api/admin/rag/rag-sources/:id/ingest-rss ──────────────────────────────
 
 const IngestRssSchema = z.object({
   geography: z.array(z.string()).default([]),
@@ -438,7 +438,7 @@ router.post(
   },
 );
 
-// ── GET /api/admin/rag-sources/:id/chunks ───────────────────────────────────
+// ── GET /api/admin/rag/rag-sources/:id/chunks ───────────────────────────────────
 
 router.get(
   "/rag-sources/:id/chunks",
