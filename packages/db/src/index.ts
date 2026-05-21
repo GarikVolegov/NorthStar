@@ -11,10 +11,9 @@ const __dirname = path.dirname(__filename);
 // Load environment variables from the root of the monorepo
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
-import { drizzle } from "drizzle-orm/neon-http";
-import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "./schema";
-import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 // ── Fail fast ────────────────────────────────────────────────────────────────
 // Validate at import time so the process crashes immediately with a clear
@@ -88,9 +87,6 @@ dbCircuitBreaker.on('close', () => {
   console.info('[db] Circuit breaker closed - database connectivity restored');
 });
 
-// Wrap the neon SQL function with circuit breaker protection
-const rawSql = neon(DATABASE_URL);
-
 // Create a protected database function that applies circuit breaker and query timeout
 export async function protectedDbQuery<T>(queryFn: () => Promise<T>): Promise<T> {
   // Apply query timeout using Promise.race
@@ -106,8 +102,9 @@ export async function protectedDbQuery<T>(queryFn: () => Promise<T>): Promise<T>
   }) as T;
 }
 
-// Export drizzle instance wrapped with circuit breaker protection
-export const db = drizzle(rawSql, { schema }) as NeonHttpDatabase<typeof schema>;
+// Export drizzle instance backed by the same PostgreSQL pool used by health checks
+// and raw queries. This keeps local Node/Windows, CI, and deploy behavior aligned.
+export const db = drizzle(pool, { schema }) as NodePgDatabase<typeof schema>;
 
 // Export a helper function for making protected queries
 export async function query<T extends Record<string, unknown>>(

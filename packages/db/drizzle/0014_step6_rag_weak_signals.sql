@@ -38,7 +38,6 @@ CREATE TABLE IF NOT EXISTS "rag_chunks" (
   "content"      TEXT NOT NULL,
   "chunk_index"  INTEGER NOT NULL,
   "token_count"  INTEGER,
-  "embedding"    vector(1536),
   "geography"    TEXT[] NOT NULL DEFAULT '{}',
   "sectors"      TEXT[] NOT NULL DEFAULT '{}',
   "roles"        TEXT[] NOT NULL DEFAULT '{}',
@@ -52,11 +51,21 @@ CREATE INDEX IF NOT EXISTS "rag_chunks_geography_idx" ON "rag_chunks" USING GIN 
 CREATE INDEX IF NOT EXISTS "rag_chunks_published_idx" ON "rag_chunks" ("published_at");
 CREATE INDEX IF NOT EXISTS "rag_chunks_trust_idx"     ON "rag_chunks" ("trust_score");
 
--- Indice IVFFlat per ricerca vettoriale (cosine similarity)
--- lists=100 è adeguato fino a ~1M chunk; incrementare a 200+ oltre 1M righe.
-CREATE INDEX IF NOT EXISTS "rag_chunks_embedding_ivfflat_idx"
-  ON "rag_chunks" USING ivfflat ("embedding" vector_cosine_ops)
-  WITH (lists = 100);
+DO $$
+BEGIN
+  IF to_regtype('vector') IS NOT NULL THEN
+    ALTER TABLE "rag_chunks" ADD COLUMN IF NOT EXISTS "embedding" vector(1536);
+
+    -- Indice IVFFlat per ricerca vettoriale (cosine similarity)
+    -- lists=100 è adeguato fino a ~1M chunk; incrementare a 200+ oltre 1M righe.
+    CREATE INDEX IF NOT EXISTS "rag_chunks_embedding_ivfflat_idx"
+      ON "rag_chunks" USING ivfflat ("embedding" vector_cosine_ops)
+      WITH (lists = 100);
+  ELSE
+    ALTER TABLE "rag_chunks" ADD COLUMN IF NOT EXISTS "embedding" JSONB;
+    RAISE NOTICE 'pgvector type is not available; rag_chunks.embedding uses JSONB fallback';
+  END IF;
+END $$;
 
 -- 3. weak_signals
 CREATE TABLE IF NOT EXISTS "weak_signals" (

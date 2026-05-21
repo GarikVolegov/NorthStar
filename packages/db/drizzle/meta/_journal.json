@@ -204,6 +204,27 @@
       "when": 1779015000000,
       "tag": "0028_admin_subscription_entitlements_safety",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1779016000000,
+      "tag": "0029_seed_wendy_agent",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1779017000000,
+      "tag": "0030_users_runtime_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1779018000000,
+      "tag": "0031_users_deleted_at_repair",
+      "breakpoints": true
     }
   ]
 }

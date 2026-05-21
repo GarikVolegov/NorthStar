@@ -25,7 +25,7 @@ console.log("[migrate] DATABASE_URL_MIGRATOR from env:", process.env.DATABASE_UR
 
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { Pool } from "@neondatabase/serverless";
+import { Pool } from "pg";
 
 const DATABASE_URL_MIGRATOR = process.env.DATABASE_URL_MIGRATOR;
 if (!DATABASE_URL_MIGRATOR) {

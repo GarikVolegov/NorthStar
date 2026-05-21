@@ -1,4 +1,13 @@
-CREATE EXTENSION IF NOT EXISTS vector;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_available_extensions WHERE name = 'vector'
+  ) THEN
+    CREATE EXTENSION IF NOT EXISTS vector;
+  ELSE
+    RAISE NOTICE 'pgvector extension is not available; app_search_index.embedding uses JSONB fallback';
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS "app_search_index" (
   "id" serial PRIMARY KEY,
@@ -10,7 +19,6 @@ CREATE TABLE IF NOT EXISTS "app_search_index" (
   "url" text NOT NULL,
   "visibility" text NOT NULL DEFAULT 'public',
   "metadata" jsonb DEFAULT '{}'::jsonb,
-  "embedding" vector(1536),
   "created_at" timestamp with time zone NOT NULL DEFAULT now(),
   "updated_at" timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT "app_search_index_entity_type_check"
@@ -34,8 +42,16 @@ CREATE INDEX IF NOT EXISTS "app_search_index_type_idx"
 CREATE INDEX IF NOT EXISTS "app_search_index_updated_at_idx"
   ON "app_search_index" ("updated_at");
 
-CREATE INDEX IF NOT EXISTS "app_search_index_embedding_idx"
-  ON "app_search_index" USING hnsw ("embedding" vector_cosine_ops);
+DO $$
+BEGIN
+  IF to_regtype('vector') IS NOT NULL THEN
+    ALTER TABLE "app_search_index" ADD COLUMN IF NOT EXISTS "embedding" vector(1536);
+    CREATE INDEX IF NOT EXISTS "app_search_index_embedding_idx"
+      ON "app_search_index" USING hnsw ("embedding" vector_cosine_ops);
+  ELSE
+    ALTER TABLE "app_search_index" ADD COLUMN IF NOT EXISTS "embedding" JSONB;
+  END IF;
+END $$;
 
 INSERT INTO "app_search_index" ("entity_type", "entity_id", "title", "content", "url", "visibility", "metadata", "updated_at")
 SELECT

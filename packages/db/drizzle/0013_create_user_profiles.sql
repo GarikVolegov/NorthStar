@@ -22,10 +22,84 @@ CREATE TABLE IF NOT EXISTS user_profile_settings (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO user_profile_settings (user_id, banner_url, username, sector_id, cv_text, cv_json, is_public, timezone, work_preference, autonomy_preference, stability_preference, user_mode, city, city_place_id, bio, referred_by_code, referred_by_affiliate_id, referral_converted_at, is_affiliate, created_at, updated_at)
-SELECT id, banner_url, username, sector_id, cv_text, cv_json, is_public, timezone, work_preference, autonomy_preference, stability_preference, user_mode, city, city_place_id, bio, referred_by_code, referred_by_affiliate_id, referral_converted_at, is_affiliate, created_at, updated_at
-FROM users
-WHERE username IS NOT NULL OR banner_url IS NOT NULL OR cv_text IS NOT NULL OR is_public = true OR work_preference != 'unknown' OR user_mode != 'explorer' OR city IS NOT NULL OR bio IS NOT NULL OR referred_by_code IS NOT NULL OR is_affiliate = true;
+INSERT INTO user_profile_settings (user_id)
+SELECT id FROM users
+ON CONFLICT (user_id) DO NOTHING;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'banner_url') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET banner_url = u.banner_url FROM users u WHERE p.user_id = u.id AND u.banner_url IS NOT NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'username') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET username = u.username FROM users u WHERE p.user_id = u.id AND u.username IS NOT NULL AND NOT EXISTS (SELECT 1 FROM user_profile_settings other_p WHERE other_p.username = u.username AND other_p.user_id <> u.id)';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'sector_id') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET sector_id = u.sector_id FROM users u WHERE p.user_id = u.id AND u.sector_id IS NOT NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'cv_text') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET cv_text = u.cv_text FROM users u WHERE p.user_id = u.id AND u.cv_text IS NOT NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'cv_json') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET cv_json = u.cv_json FROM users u WHERE p.user_id = u.id AND u.cv_json IS NOT NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'is_public') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET is_public = u.is_public FROM users u WHERE p.user_id = u.id';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'timezone') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET timezone = u.timezone FROM users u WHERE p.user_id = u.id AND u.timezone IS NOT NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'work_preference') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET work_preference = u.work_preference FROM users u WHERE p.user_id = u.id AND u.work_preference IS NOT NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'autonomy_preference') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET autonomy_preference = u.autonomy_preference FROM users u WHERE p.user_id = u.id AND u.autonomy_preference IS NOT NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'stability_preference') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET stability_preference = u.stability_preference FROM users u WHERE p.user_id = u.id AND u.stability_preference IS NOT NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'user_mode') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET user_mode = u.user_mode FROM users u WHERE p.user_id = u.id AND u.user_mode IS NOT NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'city') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET city = u.city FROM users u WHERE p.user_id = u.id AND u.city IS NOT NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'city_place_id') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET city_place_id = u.city_place_id FROM users u WHERE p.user_id = u.id AND u.city_place_id IS NOT NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'bio') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET bio = u.bio FROM users u WHERE p.user_id = u.id AND u.bio IS NOT NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'referred_by_code') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET referred_by_code = u.referred_by_code FROM users u WHERE p.user_id = u.id AND u.referred_by_code IS NOT NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'referred_by_affiliate_id') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET referred_by_affiliate_id = u.referred_by_affiliate_id FROM users u WHERE p.user_id = u.id AND u.referred_by_affiliate_id IS NOT NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'referral_converted_at') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET referral_converted_at = u.referral_converted_at FROM users u WHERE p.user_id = u.id AND u.referral_converted_at IS NOT NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'is_affiliate') THEN
+    EXECUTE 'UPDATE user_profile_settings p SET is_affiliate = u.is_affiliate FROM users u WHERE p.user_id = u.id';
+  END IF;
+END $$;
 
 ALTER TABLE users DROP COLUMN IF EXISTS banner_url;
 ALTER TABLE users DROP COLUMN IF EXISTS username;
