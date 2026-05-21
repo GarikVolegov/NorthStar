@@ -2,7 +2,7 @@ import { AdminAuthGate } from "@/components/AdminAuthGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
-import { apiFetch } from "@/lib/api-fetch";
+import { getJson, patchJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import {
   Building2,
@@ -37,14 +37,14 @@ const PARTNER_LABELS: Record<string, string> = {
 };
 
 const PARTNER_COLORS: Record<string, string> = {
-  scuola_media: "bg-blue-100 text-blue-700",
-  scuola_superiore: "bg-emerald-100 text-emerald-700",
-  universita: "bg-violet-100 text-violet-700",
-  agenzia_lavoro: "bg-orange-100 text-orange-700",
-  centro_formazione: "bg-rose-100 text-rose-700",
-  ente_pubblico: "bg-teal-100 text-teal-700",
-  orientatore: "bg-amber-100 text-amber-700",
-  altro: "bg-slate-100 text-slate-700",
+  scuola_media: "bg-info-surface text-info",
+  scuola_superiore: "bg-success-surface text-success",
+  universita: "bg-info-surface text-info",
+  agenzia_lavoro: "bg-warning-surface text-warning",
+  centro_formazione: "bg-danger-surface text-danger",
+  ente_pubblico: "bg-info-surface text-info",
+  orientatore: "bg-warning-surface text-warning",
+  altro: "bg-muted text-muted-foreground",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -56,9 +56,9 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   nuovo: "bg-primary/10 text-primary border-primary/30",
-  contattato: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  in_trattativa: "bg-orange-100 text-orange-700 border-orange-200",
-  attivo: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  contattato: "bg-warning-surface text-warning border-warning-muted",
+  in_trattativa: "bg-warning-surface text-warning border-warning-muted",
+  attivo: "bg-success-surface text-success border-success-muted",
 };
 
 type Lead = {
@@ -105,11 +105,9 @@ export default function AdminAffiliazione() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiFetch(`${BASE}api/affiliazione/leads`, {
+      const data = await getJson<Lead[]>(`${BASE}api/affiliazione/leads`, {
         headers: { Authorization: `Bearer ${adminKey}` },
       });
-      if (!res.ok) throw new Error("Errore caricamento");
-      const data: Lead[] = await res.json();
       setLeads(data);
     } catch {
       setError("Errore di rete. Riprova.");
@@ -125,41 +123,32 @@ export default function AdminAffiliazione() {
   const [updatingStatus, setUpdatingStatus] = useState<number | null>(null);
 
   async function markContacted(id: number) {
-    const res = await apiFetch(`${BASE}api/affiliazione/leads/${id}/read`, {
-      method: "PATCH",
+    const updated = await patchJson<Lead>(`${BASE}api/affiliazione/leads/${id}/read`, undefined, {
       headers: { Authorization: `Bearer ${key}` },
     });
-    if (res.ok) {
-      const updated: Lead = await res.json();
-      setLeads((prev) =>
-        prev.map((l) =>
-          l.id === id ? { ...l, read: true, status: updated.status } : l,
-        ),
-      );
-    }
+    setLeads((prev) =>
+      prev.map((l) =>
+        l.id === id ? { ...l, read: true, status: updated.status } : l,
+      ),
+    );
   }
 
   async function updateStatus(id: number, status: string) {
     setUpdatingStatus(id);
     try {
-      const res = await apiFetch(`${BASE}api/affiliazione/leads/${id}/status`, {
-        method: "PATCH",
+      const updated = await patchJson<Lead>(`${BASE}api/affiliazione/leads/${id}/status`, { status }, {
         headers: {
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ status }),
       });
-      if (res.ok) {
-        const updated: Lead = await res.json();
-        setLeads((prev) =>
-          prev.map((l) =>
-            l.id === id
-              ? { ...l, status: updated.status, read: updated.read }
-              : l,
-          ),
-        );
-      }
+      setLeads((prev) =>
+        prev.map((l) =>
+          l.id === id
+            ? { ...l, status: updated.status, read: updated.read }
+            : l,
+        ),
+      );
     } finally {
       setUpdatingStatus(null);
     }
@@ -197,7 +186,7 @@ export default function AdminAffiliazione() {
       title="Admin Affiliazione"
       description="Gestisci le richieste di affiliazione"
     >
-      <div className="min-h-screen bg-slate-50/50">
+      <div className="min-h-screen bg-muted/20">
         {/* Top bar */}
         <div className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
           <div className="container mx-auto px-4 max-w-5xl flex h-14 items-center justify-between gap-4">
@@ -253,7 +242,7 @@ export default function AdminAffiliazione() {
               {
                 label: "Attivi",
                 value: activeCount,
-                color: "text-emerald-600",
+                color: "text-success",
               },
               {
                 label: "Mostrati",
@@ -568,7 +557,7 @@ export default function AdminAffiliazione() {
                         {!lead.read && (
                           <button
                             onClick={() => markContacted(lead.id)}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:underline ml-auto"
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-success hover:underline ml-auto"
                           >
                             <CheckCheck className="w-3.5 h-3.5" />
                             Segna come contattato

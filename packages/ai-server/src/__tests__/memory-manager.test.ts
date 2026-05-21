@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockDbInsert = vi.hoisted(() => vi.fn());
 const mockDbUpdate = vi.hoisted(() => vi.fn());
+const mockChatCreate = vi.hoisted(() => vi.fn());
 
 vi.mock("@workspace/db", () => ({
   db: { select: mockDbSelect, insert: mockDbInsert, update: mockDbUpdate },
@@ -14,7 +15,7 @@ vi.mock("../client", () => ({
   openai: {
     chat: {
       completions: {
-        create: vi.fn(),
+        create: mockChatCreate,
       },
     },
   },
@@ -26,7 +27,7 @@ vi.mock("../logger", () => ({
 
 vi.mock("./embedder", () => ({
   embedText: vi.fn(async (text: string) => {
-    const fake = new Array(256).fill(0);
+    const fake: number[] = new Array<number>(256).fill(0);
     const hash = text.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
     fake[0] = hash / 1000;
     return fake;
@@ -50,14 +51,12 @@ describe("extractMemory", () => {
   });
 
   it("returns extracted facts and patterns on success", async () => {
-    const { openai } = await import("../client");
-    const mockCreate = vi.mocked(openai.chat.completions.create);
-    mockCreate.mockResolvedValueOnce({
+    mockChatCreate.mockResolvedValueOnce({
       choices: [{ message: { content: JSON.stringify({
         facts: [{ key: "job", value: "sviluppatore" }],
         patterns: [{ patternType: "strength", description: "è analitico" }],
       }) } }],
-    } as any);
+    });
 
     const result = await extractMemory([
       { role: "user", content: "Lavoro come sviluppatore" },
@@ -67,14 +66,12 @@ describe("extractMemory", () => {
 
     expect(result).not.toBeNull();
     expect(result!.facts).toHaveLength(1);
-    expect(result!.facts[0].key).toBe("job");
+    expect(result!.facts[0]?.key).toBe("job");
     expect(result!.patterns).toHaveLength(1);
   });
 
   it("handles LLM failure gracefully", async () => {
-    const { openai } = await import("../client");
-    const mockCreate = vi.mocked(openai.chat.completions.create);
-    mockCreate.mockRejectedValueOnce(new Error("API error"));
+    mockChatCreate.mockRejectedValueOnce(new Error("API error"));
 
     const result = await extractMemory([
       { role: "user", content: "Messaggio 1" },

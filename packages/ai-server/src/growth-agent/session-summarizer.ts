@@ -74,14 +74,20 @@ export async function summarizeSession(
       return;
     }
 
+    const mood =
+      parsed.mood === "positive" ||
+      parsed.mood === "neutral" ||
+      parsed.mood === "negative" ||
+      parsed.mood === "mixed"
+        ? parsed.mood
+        : "neutral";
+
     await db.insert(sessionSummariesTable).values({
       userId,
       sessionId,
       summary:   parsed.summary.slice(0, 500),
       keyThemes: Array.isArray(parsed.keyThemes) ? parsed.keyThemes.slice(0, 4) : [],
-      mood:      (["positive", "neutral", "negative", "mixed"] as const).includes(parsed.mood as any)
-                   ? (parsed.mood as "positive" | "neutral" | "negative" | "mixed")
-                   : "neutral",
+      mood,
     });
 
     logger.info({ userId, sessionId }, "session summarized");

@@ -90,9 +90,13 @@ function BubbleContent({
     <span className="flex items-center gap-1.5">
       <span className="block min-w-0 flex-1 overflow-hidden">
         {showTicker ? (
-          <span className="block whitespace-nowrap animate-office-ticker">{title}</span>
+          <span className="block whitespace-nowrap animate-office-ticker">
+            {title}
+          </span>
         ) : (
-          <span className="block overflow-hidden text-ellipsis whitespace-nowrap">{title}</span>
+          <span className="block overflow-hidden text-ellipsis whitespace-nowrap">
+            {title}
+          </span>
         )}
       </span>
       {thinking && <ThinkingDots />}
@@ -102,10 +106,22 @@ function BubbleContent({
 
 function ThinkingDots() {
   return (
-    <span className="inline-flex items-center gap-0.5" aria-label="Sta pensando">
-      <span className="h-1 w-1 animate-bounce rounded-full bg-amber-400" style={{ animationDelay: "0ms" }} />
-      <span className="h-1 w-1 animate-bounce rounded-full bg-amber-400" style={{ animationDelay: "120ms" }} />
-      <span className="h-1 w-1 animate-bounce rounded-full bg-amber-400" style={{ animationDelay: "240ms" }} />
+    <span
+      className="inline-flex items-center gap-0.5"
+      aria-label="Sta pensando"
+    >
+      <span
+        className="h-1 w-1 animate-bounce rounded-full bg-warning"
+        style={{ animationDelay: "0ms" }}
+      />
+      <span
+        className="h-1 w-1 animate-bounce rounded-full bg-warning"
+        style={{ animationDelay: "120ms" }}
+      />
+      <span
+        className="h-1 w-1 animate-bounce rounded-full bg-warning"
+        style={{ animationDelay: "240ms" }}
+      />
     </span>
   );
 }

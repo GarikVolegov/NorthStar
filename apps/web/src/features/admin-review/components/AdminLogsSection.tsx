@@ -20,23 +20,23 @@ export function AdminLogsSection({ logs, fmtDate }: AdminLogsSectionProps) {
             <div
               className={cn(
                 "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                log.action === "approve" && "bg-emerald-100",
-                log.action === "reject" && "bg-red-100",
-                log.action === "archive" && "bg-slate-100",
-                log.action === "edit" && "bg-blue-100",
+                log.action === "approve" && "bg-success-surface",
+                log.action === "reject" && "bg-danger-surface",
+                log.action === "archive" && "bg-muted",
+                log.action === "edit" && "bg-info-surface",
               )}
             >
               {log.action === "approve" && (
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <CheckCircle2 className="w-4 h-4 text-success" />
               )}
               {log.action === "reject" && (
-                <XCircle className="w-4 h-4 text-red-600" />
+                <XCircle className="w-4 h-4 text-danger" />
               )}
               {log.action === "archive" && (
-                <Archive className="w-4 h-4 text-slate-500" />
+                <Archive className="w-4 h-4 text-muted-foreground" />
               )}
               {log.action === "edit" && (
-                <Pencil className="w-4 h-4 text-blue-600" />
+                <Pencil className="w-4 h-4 text-info" />
               )}
             </div>
             <div className="flex-1 min-w-0">

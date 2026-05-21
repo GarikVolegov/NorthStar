@@ -5,7 +5,7 @@
  * senza richiedere un refresh manuale.
  */
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch } from "@/lib/api-fetch";
+import { ApiClientError, getJson, postJson } from "@/lib/apiClient";
 import { API_ENDPOINTS, withParams } from "@/lib/constants";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -28,24 +28,28 @@ interface InsightsResponse {
 }
 
 async function fetchInsights(): Promise<InsightsResponse> {
-  const res = await apiFetch(API_ENDPOINTS.proactiveInsights.listUnread);
-  if (!res.ok) return { insights: [], unreadCount: 0 };
-  return res.json() as Promise<InsightsResponse>;
+  try {
+    return await getJson<InsightsResponse>(API_ENDPOINTS.proactiveInsights.listUnread);
+  } catch (error) {
+    if (error instanceof ApiClientError) return { insights: [], unreadCount: 0 };
+    throw error;
+  }
 }
 
 async function postInsightAction(id: number, action: "read" | "dismiss"): Promise<void> {
-  await apiFetch(withParams(API_ENDPOINTS.proactiveInsights.action, { id, action }), { method: "POST" });
+  await postJson(withParams(API_ENDPOINTS.proactiveInsights.action, { id, action }));
 }
 
 export function useProactiveInsights() {
   const queryClient = useQueryClient();
   const { user }    = useAuth();
+  const hasUser = user !== null && user !== undefined;
 
   const { data, isLoading, error } = useQuery<InsightsResponse>({
     queryKey:        ["proactive-insights"],
     queryFn:         fetchInsights,
-    enabled:         !!user,           // non chiamare se non loggato
-    refetchInterval: !!user ? 5 * 60 * 1000 : false,
+    enabled:         hasUser, // non chiamare se non loggato
+    refetchInterval: hasUser ? 5 * 60 * 1000 : false,
     staleTime:       2 * 60 * 1000,
   });
 

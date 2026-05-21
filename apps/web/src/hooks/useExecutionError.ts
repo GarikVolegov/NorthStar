@@ -28,6 +28,32 @@ export interface UseExecutionErrorReturn<TArgs extends unknown[], TReturn> {
 const MAX_ERROR_HISTORY = 50;
 let errorHistory: AppError[] = [];
 
+class ThrowableAppError extends Error implements AppError {
+  code: string;
+  messageIT: string;
+  messageEN: string;
+  severity: AppError["severity"];
+  recoveryAction: string;
+  category: AppError["category"];
+  details: string | null;
+  context: Record<string, unknown> | null;
+  timestamp: number;
+
+  constructor(error: AppError) {
+    super(error.messageIT);
+    this.name = "AppError";
+    this.code = error.code;
+    this.messageIT = error.messageIT;
+    this.messageEN = error.messageEN;
+    this.severity = error.severity;
+    this.recoveryAction = error.recoveryAction;
+    this.category = error.category;
+    this.details = error.details;
+    this.context = error.context;
+    this.timestamp = error.timestamp;
+  }
+}
+
 export function useExecutionError<TArgs extends unknown[], TReturn>(
   fn: (...args: TArgs) => Promise<TReturn>,
   options?: {
@@ -83,7 +109,7 @@ export function useExecutionError<TArgs extends unknown[], TReturn>(
         }));
 
         options?.onError?.(error);
-        throw error;
+        throw new ThrowableAppError(error);
       }
     },
     [options?.onError, options?.onSuccess]

@@ -94,6 +94,10 @@ export function useWendy(): WendyContextValue {
   return ctx;
 }
 
+export function useOptionalWendy(): WendyContextValue | null {
+  return useContext(WendyContext);
+}
+
 function WendyTTSBridge({ onSpeakingChange, onPhaseChange }: { onSpeakingChange: (v: boolean) => void; onPhaseChange: (p: WendyPhase) => void }) {
   // OpenAI TTS (alta qualità, richiede chiave)
   const { play: playOpenAI } = useWendyOpenAITTS({

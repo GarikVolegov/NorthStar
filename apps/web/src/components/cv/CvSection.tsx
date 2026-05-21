@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch } from "@/lib/api-fetch";
+import { deleteJson, getJson, postJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -61,7 +61,7 @@ export interface CvData {
   languages: Array<{ language: string; level: string }>;
   certifications: string[];
   extractedAt?: string;
-  generated?: any;
+  generated?: Record<string, unknown>;
   lastGenerated?: string;
   lastSaved?: string;
 }
@@ -77,14 +77,24 @@ interface GraphNode {
 function useCv(userId: number) {
   return useQuery<{ cvData: CvData | null; hasCv: boolean }>({
     queryKey: ["cv", userId],
-    queryFn: () =>
-      apiFetch(`${BASE}api/cv/${userId}`).then((r) => {
-        if (!r.ok) throw new Error(`cv ${r.status}`);
-        return r.json();
-      }),
+    queryFn: () => getJson<{ cvData: CvData | null; hasCv: boolean }>(`${BASE}api/cv/${userId}`),
     enabled: !!userId,
     staleTime: 60_000,
   });
+}
+
+function getStoredGraph(storageKey: string): { nodes: GraphNode[]; edges: unknown[] } {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(storageKey) ?? "null") as unknown;
+    if (!parsed || typeof parsed !== "object") return { nodes: [], edges: [] };
+    const record = parsed as { nodes?: unknown; edges?: unknown };
+    return {
+      nodes: Array.isArray(record.nodes) ? (record.nodes as GraphNode[]) : [],
+      edges: Array.isArray(record.edges) ? record.edges : [],
+    };
+  } catch {
+    return { nodes: [], edges: [] };
+  }
 }
 
 function ChipList({
@@ -151,17 +161,10 @@ function GraphSuggestions({
 }) {
   const { t } = useTranslation();
   const storageKey = `grafo_user_${sectorId}_${userId}`;
-  const existing = (() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      return raw ? JSON.parse(raw) : { nodes: [], edges: [] };
-    } catch {
-      return { nodes: [], edges: [] };
-    }
-  })();
+  const existing = getStoredGraph(storageKey);
 
   const existingLabels = new Set<string>(
-    (existing.nodes as GraphNode[]).map((n) => n.label.toLowerCase()),
+    existing.nodes.map((n) => n.label.toLowerCase()),
   );
 
   const suggestions: GraphNode[] = [
@@ -301,13 +304,7 @@ export function CvSection({
       } else if (payload.text) {
         formData.append("rawText", payload.text);
       }
-      const res = await apiFetch(`${BASE}api/cv/upload`, {
-        method: "POST",
-        body: formData,
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || t("cv.uploadError"));
-      return json;
+      return postJson<unknown>(`${BASE}api/cv/upload`, formData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cv", userId] });
@@ -320,10 +317,7 @@ export function CvSection({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () =>
-      apiFetch(`${BASE}api/cv/${userId}`, { method: "DELETE" }).then((r) =>
-        r.json(),
-      ),
+    mutationFn: () => deleteJson(`${BASE}api/cv/${userId}`),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["cv", userId] }),
   });

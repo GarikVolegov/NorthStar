@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { apiFetch } from "@/lib/api-fetch";
+import { getJson } from "@/lib/apiClient";
 import {
   CheckCircle2,
   Clock,
@@ -48,14 +49,14 @@ interface QueueData {
 
 function difficultyBadge(d: string) {
   if (d === "base")
-    return <Badge className="bg-blue-100 text-blue-700 text-xs">Base</Badge>;
+    return <Badge className="bg-info-surface text-info text-xs">Base</Badge>;
   if (d === "intermedio")
     return (
-      <Badge className="bg-amber-100 text-amber-700 text-xs">Intermedio</Badge>
+      <Badge className="bg-warning-surface text-warning text-xs">
+        Intermedio
+      </Badge>
     );
-  return (
-    <Badge className="bg-purple-100 text-purple-700 text-xs">Avanzato</Badge>
-  );
+  return <Badge className="bg-info-surface text-info text-xs">Avanzato</Badge>;
 }
 
 function EditModal({
@@ -135,7 +136,7 @@ function EditModal({
           </div>
           <div className="flex gap-2 pt-2">
             <Button
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+              className="flex-1 bg-success text-primary-foreground hover:bg-success/90"
               onClick={handleApprove}
               disabled={saving}
             >
@@ -268,7 +269,7 @@ function ArticleCard({
           <div className="flex gap-2 flex-wrap">
             <Button
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 h-7 text-xs"
+              className="bg-success text-primary-foreground hover:bg-success/90 h-7 text-xs"
               onClick={approve}
               disabled={loading}
             >
@@ -286,7 +287,7 @@ function ArticleCard({
             <Button
               size="sm"
               variant="outline"
-              className="h-7 text-xs text-amber-600 border-amber-200"
+              className="h-7 text-xs text-warning border-warning-muted"
               onClick={reject}
               disabled={loading}
             >
@@ -295,7 +296,7 @@ function ArticleCard({
             <Button
               size="sm"
               variant="ghost"
-              className="h-7 text-xs text-red-500 ml-auto"
+              className="h-7 text-xs text-danger ml-auto"
               onClick={remove}
               disabled={loading}
             >
@@ -316,10 +317,10 @@ export default function AdminCrescita() {
   const fetchData = useCallback(async (adminKey: string) => {
     setLoading(true);
     try {
-      const res = await apiFetch(`${BASE}api/admin/growth-queue`, {
+      const queueData = await getJson<QueueData>(`${BASE}api/admin/growth-queue`, {
         headers: { Authorization: `Bearer ${adminKey}` },
       });
-      if (res.ok) setData(await res.json());
+      setData(queueData);
     } finally {
       setLoading(false);
     }
@@ -366,7 +367,7 @@ export default function AdminCrescita() {
             <div className="grid grid-cols-3 gap-3">
               <Card>
                 <CardContent className="pt-4 text-center">
-                  <p className="text-2xl font-bold text-amber-500">
+                  <p className="text-2xl font-bold text-warning">
                     {data.stats.pending}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">In coda</p>
@@ -374,7 +375,7 @@ export default function AdminCrescita() {
               </Card>
               <Card>
                 <CardContent className="pt-4 text-center">
-                  <p className="text-2xl font-bold text-emerald-600">
+                  <p className="text-2xl font-bold text-success">
                     {data.stats.published}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
@@ -384,7 +385,7 @@ export default function AdminCrescita() {
               </Card>
               <Card>
                 <CardContent className="pt-4 text-center">
-                  <p className="text-2xl font-bold text-red-500">
+                  <p className="text-2xl font-bold text-danger">
                     {data.stats.rejected}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">Scartati</p>
@@ -406,7 +407,7 @@ export default function AdminCrescita() {
               <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
                 <CheckCircle2
                   size={32}
-                  className="mx-auto mb-3 text-emerald-500 opacity-60"
+                  className="mx-auto mb-3 text-success opacity-60"
                 />
                 <p className="font-medium">Nessun articolo in coda</p>
                 <p className="text-sm mt-1">

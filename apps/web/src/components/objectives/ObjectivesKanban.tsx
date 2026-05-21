@@ -4,7 +4,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { apiFetch } from "@/lib/api-fetch";
+import { deleteJson, getJson, patchJson, postJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { GripVertical, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
@@ -58,41 +58,30 @@ export function ObjectivesKanban({ userId }: Props) {
   const { data: objectives = [], isLoading } = useQuery<Objective[]>({
     queryKey: ["objectives", userId],
     queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/objectives`);
-      if (!res.ok) throw new Error("Errore");
-      return res.json();
+      return getJson<Objective[]>(`${BASE}api/objectives`);
     },
   });
 
   const patchObjective = useMutation({
     mutationFn: async ({ id, patch }: { id: number; patch: Partial<Objective> }) => {
-      const res = await apiFetch(`${BASE}api/objectives/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
-      });
-      if (!res.ok) throw new Error("Errore");
-      return res.json();
+      return patchJson<Objective>(`${BASE}api/objectives/${id}`, patch);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["objectives", userId] }),
   });
 
   const deleteObjective = useMutation({
     mutationFn: async (id: number) => {
-      await apiFetch(`${BASE}api/objectives/${id}`, { method: "DELETE" });
+      await deleteJson(`${BASE}api/objectives/${id}`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["objectives", userId] }),
   });
 
   const createObjective = useMutation({
     mutationFn: async (text: string) => {
-      const res = await apiFetch(`${BASE}api/objectives`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, category: "formazione" }),
+      return postJson<Objective>(`${BASE}api/objectives`, {
+        text,
+        category: "formazione",
       });
-      if (!res.ok) throw new Error("Errore");
-      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["objectives", userId] });

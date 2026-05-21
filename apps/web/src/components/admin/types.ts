@@ -10,6 +10,7 @@ import {
   Sparkles,
   TrendingUp,
   XCircle,
+  type LucideIcon,
 } from "lucide-react";
 
 export type SuggestionStatus =
@@ -99,36 +100,39 @@ export interface AgentRunRecord {
 
 export const STATUS_CONFIG: Record<
   SuggestionStatus,
-  { label: string; color: string; icon: any }
+  { label: string; color: string; icon: LucideIcon }
 > = {
   draft: {
     label: "Bozza",
-    color: "bg-slate-100 text-slate-700",
+    color: "bg-muted text-muted-foreground",
     icon: FileText,
   },
   pending_review: {
     label: "In Revisione",
-    color: "bg-amber-100 text-amber-700",
+    color: "bg-warning-surface text-warning",
     icon: Clock,
   },
   approved: {
     label: "Approvato",
-    color: "bg-emerald-100 text-emerald-700",
+    color: "bg-success-surface text-success",
     icon: CheckCircle2,
   },
   rejected: {
     label: "Rifiutato",
-    color: "bg-red-100 text-red-700",
+    color: "bg-danger-surface text-danger",
     icon: XCircle,
   },
   archived: {
     label: "Archiviato",
-    color: "bg-slate-100 text-slate-500",
+    color: "bg-muted text-muted-foreground",
     icon: Archive,
   },
 };
 
-export const ENTITY_CONFIG: Record<string, { label: string; icon: any }> = {
+export const ENTITY_CONFIG: Record<
+  string,
+  { label: string; icon: LucideIcon }
+> = {
   sector: { label: "Settore", icon: BarChart3 },
   role: { label: "Ruolo", icon: Briefcase },
   education_path: { label: "Percorso", icon: GraduationCap },

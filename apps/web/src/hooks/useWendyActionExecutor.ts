@@ -17,17 +17,20 @@ export type WendyActionStatus =
 
 export type WendyActionRisk = "low" | "medium" | "high";
 
+type KnownWendyActionType =
+  | "navigate"
+  | "set_filters"
+  | "fill_form"
+  | "create_objective"
+  | "update_objective_progress"
+  | "create_business_idea"
+  | "create_calendar_event";
+
+type WendyActionType = KnownWendyActionType | (string & {});
+
 export interface WendyAction {
   id: string;
-  type:
-    | "navigate"
-    | "set_filters"
-    | "fill_form"
-    | "create_objective"
-    | "update_objective_progress"
-    | "create_business_idea"
-    | "create_calendar_event"
-    | string;
+  type: WendyActionType;
   status: WendyActionStatus;
   risk: WendyActionRisk;
   label: string;

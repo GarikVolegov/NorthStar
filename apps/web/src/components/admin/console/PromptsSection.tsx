@@ -2,7 +2,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { Bot, CheckCircle2, ChevronDown, ChevronUp, Eye, History, Pencil, RefreshCw, RotateCcw, Save } from "lucide-react";
+import {
+  Bot,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  History,
+  Pencil,
+  RefreshCw,
+  RotateCcw,
+  Save,
+} from "lucide-react";
 import { PersistenceWarningBanner } from "./shared";
 import type {
   AgentPrompt,
@@ -33,8 +44,12 @@ type PromptsSectionProps = {
   onLoadPromptPreview: (key: string) => void;
   onExpandedKeyChange: (key: string | null) => void;
   onPromptTabChange: (tab: PromptEditorTab) => void;
-  onPromptEditValuesChange: (updater: (prev: Record<string, string>) => Record<string, string>) => void;
-  onPromptNotesChange: (updater: (prev: Record<string, string>) => Record<string, string>) => void;
+  onPromptEditValuesChange: (
+    updater: (prev: Record<string, string>) => Record<string, string>,
+  ) => void;
+  onPromptNotesChange: (
+    updater: (prev: Record<string, string>) => Record<string, string>,
+  ) => void;
   onSavePrompt: (key: string) => void;
   onPublishPrompt: (key: string) => void;
   onResetPrompt: (key: string) => void;
@@ -71,11 +86,15 @@ export function PromptsSection({
     <div className="p-4 sm:p-6 space-y-4 max-w-5xl">
       <div className="space-y-1">
         <p className="text-sm text-muted-foreground">
-          Modifica i prompt in bozza, verifica placeholder e preview, poi pubblica una versione attiva con rollback tracciabile.
+          Modifica i prompt in bozza, verifica placeholder e preview, poi
+          pubblica una versione attiva con rollback tracciabile.
         </p>
         <p className="text-xs text-muted-foreground">
           I placeholder ammessi sono dichiarati per prompt e scritti come{" "}
-          <code className="bg-muted px-1 py-0.5 rounded text-xs">{"{{PLACEHOLDER}}"}</code>.
+          <code className="bg-muted px-1 py-0.5 rounded text-xs">
+            {"{{PLACEHOLDER}}"}
+          </code>
+          .
         </p>
       </div>
 
@@ -88,16 +107,24 @@ export function PromptsSection({
                 Router modelli AI
               </p>
               <p className="text-xs text-muted-foreground">
-                Provider attivo: {aiModelPolicy.activeProvider} · Free router: {aiModelPolicy.openRouterFreeRouter}
+                Provider attivo: {aiModelPolicy.activeProvider} · Free router:{" "}
+                {aiModelPolicy.openRouterFreeRouter}
               </p>
             </div>
-            <Badge variant={aiModelPolicy.allowPaidModels ? "default" : "outline"}>
-              {aiModelPolicy.allowPaidModels ? "Paid abilitati" : "Solo modelli gratuiti"}
+            <Badge
+              variant={aiModelPolicy.allowPaidModels ? "default" : "outline"}
+            >
+              {aiModelPolicy.allowPaidModels
+                ? "Paid abilitati"
+                : "Solo modelli gratuiti"}
             </Badge>
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {aiModelPolicy.roles.slice(0, 9).map((role) => (
-              <div key={role.role} className="rounded-md border bg-background p-3">
+              <div
+                key={role.role}
+                className="rounded-md border bg-background p-3"
+              >
                 <p className="text-xs font-semibold">{role.role}</p>
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   {role.tier} · {role.route.provider}
@@ -109,7 +136,9 @@ export function PromptsSection({
             ))}
           </div>
           <p className="text-xs text-muted-foreground">
-            Gli override si fanno via env `MODEL_*`; con OpenRouter vengono accettati solo `openrouter/free` o modelli con suffisso `:free`, salvo `ALLOW_PAID_AI_MODELS=true`.
+            Gli override si fanno via env `MODEL_*`; con OpenRouter vengono
+            accettati solo `openrouter/free` o modelli con suffisso `:free`,
+            salvo `ALLOW_PAID_AI_MODELS=true`.
           </p>
         </div>
       )}
@@ -136,14 +165,19 @@ export function PromptsSection({
           const publishSaving = promptSaving.has(`${prompt.key}:publish`);
           const resetSaving = promptSaving.has(`${prompt.key}:reset`);
           const previewSaving = promptSaving.has(`${prompt.key}:preview`);
-          const isDirty = (promptEditValues[prompt.key] ?? "") !== (prompt.draftValue ?? prompt.currentValue);
+          const isDirty =
+            (promptEditValues[prompt.key] ?? "") !==
+            (prompt.draftValue ?? prompt.currentValue);
           const validation = prompt.validation;
           const preview = promptPreview[prompt.key];
           const versions = promptVersions[prompt.key] ?? [];
           const versionMeta = promptVersionPersistence[prompt.key] ?? {};
 
           return (
-            <div key={prompt.key} className="bg-card border rounded-xl overflow-hidden">
+            <div
+              key={prompt.key}
+              className="bg-card border rounded-xl overflow-hidden"
+            >
               <button
                 type="button"
                 className="min-h-11 w-full flex items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
@@ -161,7 +195,7 @@ export function PromptsSection({
                       v{prompt.activeVersionNumber ?? 1} attiva
                     </Badge>
                     {prompt.hasDraft && (
-                      <Badge className="text-[10px] bg-amber-100 text-amber-700 border-0">
+                      <Badge className="border-0 bg-warning-surface text-[10px] text-warning">
                         Bozza
                       </Badge>
                     )}
@@ -176,14 +210,19 @@ export function PromptsSection({
                   </p>
                   <div className="flex gap-1 flex-wrap mt-2">
                     {prompt.placeholders.map((placeholder) => (
-                      <code key={placeholder} className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                      <code
+                        key={placeholder}
+                        className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded"
+                      >
                         {placeholder}
                       </code>
                     ))}
                   </div>
                 </div>
                 <div className="hidden sm:block text-right text-xs text-muted-foreground">
-                  {prompt.updatedAt ? fmtShortDate(prompt.updatedAt) : "Mai pubblicato"}
+                  {prompt.updatedAt
+                    ? fmtShortDate(prompt.updatedAt)
+                    : "Mai pubblicato"}
                 </div>
                 {isExpanded ? (
                   <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -201,8 +240,16 @@ export function PromptsSection({
                         versionMeta.persistenceUnavailable ||
                         preview?.persistenceUnavailable,
                       ),
-                      reason: prompt.reason ?? versionMeta.reason ?? preview?.reason ?? null,
-                      setupAction: prompt.setupAction ?? versionMeta.setupAction ?? preview?.setupAction ?? null,
+                      reason:
+                        prompt.reason ??
+                        versionMeta.reason ??
+                        preview?.reason ??
+                        null,
+                      setupAction:
+                        prompt.setupAction ??
+                        versionMeta.setupAction ??
+                        preview?.setupAction ??
+                        null,
                     }}
                     title="Versioni prompt non persistite"
                     onRetry={() => {
@@ -213,20 +260,36 @@ export function PromptsSection({
                   />
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {[
-                      { key: "editor" as PromptEditorTab, label: "Editor", icon: Pencil },
-                      { key: "preview" as PromptEditorTab, label: "Preview", icon: Eye },
-                      { key: "versions" as PromptEditorTab, label: "Versioni", icon: History },
+                      {
+                        key: "editor" as PromptEditorTab,
+                        label: "Editor",
+                        icon: Pencil,
+                      },
+                      {
+                        key: "preview" as PromptEditorTab,
+                        label: "Preview",
+                        icon: Eye,
+                      },
+                      {
+                        key: "versions" as PromptEditorTab,
+                        label: "Versioni",
+                        icon: History,
+                      },
                     ].map((item) => {
                       const Icon = item.icon;
                       return (
                         <Button
                           key={item.key}
-                          variant={promptTab === item.key ? "default" : "outline"}
+                          variant={
+                            promptTab === item.key ? "default" : "outline"
+                          }
                           className="min-h-11 shrink-0"
                           onClick={() => {
                             onPromptTabChange(item.key);
-                            if (item.key === "preview") void onLoadPromptPreview(prompt.key);
-                            if (item.key === "versions") void onLoadPromptVersions(prompt.key);
+                            if (item.key === "preview")
+                              void onLoadPromptPreview(prompt.key);
+                            if (item.key === "versions")
+                              void onLoadPromptVersions(prompt.key);
                           }}
                         >
                           <Icon className="w-4 h-4 mr-2" />
@@ -237,13 +300,18 @@ export function PromptsSection({
                   </div>
 
                   {validation?.errors.length || validation?.warnings.length ? (
-                    <div className={cn(
-                      "rounded-lg border p-3 text-sm",
-                      validation.errors.length > 0
-                        ? "bg-red-50 border-red-200 text-red-800"
-                        : "bg-amber-50 border-amber-200 text-amber-800",
-                    )}>
-                      {[...(validation.errors ?? []), ...(validation.warnings ?? [])].map((message) => (
+                    <div
+                      className={cn(
+                        "rounded-lg border p-3 text-sm",
+                        validation.errors.length > 0
+                          ? "border-danger-muted bg-danger-surface text-danger"
+                          : "border-warning-muted bg-warning-surface text-warning",
+                      )}
+                    >
+                      {[
+                        ...(validation.errors ?? []),
+                        ...(validation.warnings ?? []),
+                      ].map((message) => (
                         <p key={message}>{message}</p>
                       ))}
                     </div>
@@ -259,7 +327,11 @@ export function PromptsSection({
                             [prompt.key]: event.target.value,
                           }))
                         }
-                        rows={Math.max(10, (promptEditValues[prompt.key] ?? "").split("\n").length + 2)}
+                        rows={Math.max(
+                          10,
+                          (promptEditValues[prompt.key] ?? "").split("\n")
+                            .length + 2,
+                        )}
                         className="w-full text-xs font-mono border rounded-xl p-3 bg-background resize-y focus:outline-none focus:ring-2 focus:ring-primary/30"
                       />
                       <Input
@@ -313,7 +385,7 @@ export function PromptsSection({
                           Reset default
                         </Button>
                         {isDirty && (
-                          <span className="text-xs text-amber-600">
+                          <span className="text-xs text-warning">
                             Bozza modificata non salvata
                           </span>
                         )}
@@ -324,14 +396,21 @@ export function PromptsSection({
                   {promptTab === "preview" && (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium">Prompt finale con variabili simulate</p>
+                        <p className="text-sm font-medium">
+                          Prompt finale con variabili simulate
+                        </p>
                         <Button
                           variant="outline"
                           disabled={previewSaving}
                           onClick={() => onLoadPromptPreview(prompt.key)}
                           className="min-h-11"
                         >
-                          <RefreshCw className={cn("w-4 h-4 mr-2", previewSaving && "animate-spin")} />
+                          <RefreshCw
+                            className={cn(
+                              "w-4 h-4 mr-2",
+                              previewSaving && "animate-spin",
+                            )}
+                          />
                           Rigenera
                         </Button>
                       </div>
@@ -341,12 +420,21 @@ export function PromptsSection({
                             {preview.rendered}
                           </pre>
                           <div className="grid gap-2 sm:grid-cols-2">
-                            {Object.entries(preview.variables).map(([key, value]) => (
-                              <div key={key} className="rounded-md border bg-background p-3">
-                                <p className="text-xs font-semibold text-muted-foreground">{key}</p>
-                                <p className="text-xs mt-1 break-words">{value}</p>
-                              </div>
-                            ))}
+                            {Object.entries(preview.variables).map(
+                              ([key, value]) => (
+                                <div
+                                  key={key}
+                                  className="rounded-md border bg-background p-3"
+                                >
+                                  <p className="text-xs font-semibold text-muted-foreground">
+                                    {key}
+                                  </p>
+                                  <p className="text-xs mt-1 break-words">
+                                    {value}
+                                  </p>
+                                </div>
+                              ),
+                            )}
                           </div>
                         </>
                       ) : (
@@ -367,32 +455,49 @@ export function PromptsSection({
                         versions.map((version) => {
                           const rollbackKey = `${prompt.key}:rollback:${version.id}`;
                           const rollbackSaving = promptSaving.has(rollbackKey);
-                          const canRollback = version.status !== "active" && version.status !== "draft";
+                          const canRollback =
+                            version.status !== "active" &&
+                            version.status !== "draft";
                           return (
-                            <div key={version.id} className="rounded-xl border bg-background p-4 space-y-3">
+                            <div
+                              key={version.id}
+                              className="rounded-xl border bg-background p-4 space-y-3"
+                            >
                               <div className="flex flex-wrap items-center justify-between gap-3">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-semibold text-sm">v{version.versionNumber}</span>
+                                  <span className="font-semibold text-sm">
+                                    v{version.versionNumber}
+                                  </span>
                                   <Badge
-                                    variant={version.status === "active" ? "default" : "outline"}
+                                    variant={
+                                      version.status === "active"
+                                        ? "default"
+                                        : "outline"
+                                    }
                                     className="capitalize"
                                   >
                                     {version.status}
                                   </Badge>
                                   {version.notes && (
-                                    <span className="text-xs text-muted-foreground">{version.notes}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {version.notes}
+                                    </span>
                                   )}
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs text-muted-foreground">
-                                    {fmtShortDate(version.publishedAt ?? version.updatedAt)}
+                                    {fmtShortDate(
+                                      version.publishedAt ?? version.updatedAt,
+                                    )}
                                   </span>
                                   {canRollback && (
                                     <Button
                                       variant="outline"
                                       size="sm"
                                       disabled={rollbackSaving}
-                                      onClick={() => onRollbackPrompt(prompt.key, version.id)}
+                                      onClick={() =>
+                                        onRollbackPrompt(prompt.key, version.id)
+                                      }
                                       className="min-h-11"
                                     >
                                       {rollbackSaving ? (

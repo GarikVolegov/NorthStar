@@ -6,6 +6,7 @@ import { useDashboardData } from "@/hooks/useDashboardData";
 import { usePageModule } from "@/hooks/usePageModule";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { apiFetch } from "@/lib/api-fetch";
+import { deleteJson, getJson, patchJson, postJson } from "@/lib/apiClient";
 import { usePageMeta } from "@/lib/seo";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -31,7 +32,7 @@ import { DashboardKpiStrip } from "@/components/dashboard/DashboardKpiStrip";
 import { DashboardObjectives } from "@/components/dashboard/DashboardObjectives";
 import { DashboardPersonality } from "@/components/dashboard/DashboardPersonality";
 import { ProactiveInsightCard } from "@/components/wendy/ProactiveInsightCard";
-import { useProactiveInsights } from "@/hooks/useProactiveInsights";
+import { useProactiveInsights, type ProactiveInsight } from "@/hooks/useProactiveInsights";
 
 import { AgentLoadingSkeleton } from "@/components/dashboard/AgentLoadingSkeleton";
 import type { JourneyId } from "@/components/dashboard/dashboard-sections";
@@ -69,11 +70,7 @@ const JOURNEY_META: Record<JourneyId, {
 function useLatestSession() {
   return useQuery<{ sessionId: number; recommendations: Array<{ sectorId: number; sectorName: string }> }>({
     queryKey: ["latest-session-dashboard"],
-    queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/test-sessions/latest`);
-      if (!res.ok) throw new Error("No session");
-      return res.json();
-    },
+    queryFn: () => getJson<{ sessionId: number; recommendations: Array<{ sectorId: number; sectorName: string }> }>(`${BASE}api/test-sessions/latest`),
     retry: false,
     staleTime: 120_000,
   });
@@ -84,11 +81,7 @@ function useSessionDetail(sessionId: number | null) {
     queryKey: ["session-detail-dashboard", sessionId],
     enabled: !!sessionId,
     staleTime: 600_000,
-    queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/test-sessions/${sessionId}`);
-      if (!res.ok) throw new Error("Errore sessione");
-      return res.json() as Promise<SessionDetail>;
-    },
+    queryFn: () => getJson<SessionDetail>(`${BASE}api/test-sessions/${sessionId}`),
   });
 }
 
@@ -146,31 +139,29 @@ export default function Dashboard() {
 
   const toggleObjective = async (id: number, current: boolean) => {
     try {
-      await apiFetch(`${BASE}api/objectives/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ completed: !current }),
-      });
+      await patchJson(`${BASE}api/objectives/${id}`, { completed: !current });
       queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
-    } catch {}
+    } catch {
+      return;
+    }
   };
 
   const deleteObjective = async (id: number) => {
     try {
-      await apiFetch(`${BASE}api/objectives/${id}`, { method: "DELETE" });
+      await deleteJson(`${BASE}api/objectives/${id}`);
       queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
-    } catch {}
+    } catch {
+      return;
+    }
   };
 
   const createObjective = async (text: string) => {
     try {
-      await apiFetch(`${BASE}api/objectives`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
+      await postJson(`${BASE}api/objectives`, { text });
       queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
-    } catch {}
+    } catch {
+      return;
+    }
   };
 
   useEffect(() => {
@@ -279,7 +270,7 @@ export default function Dashboard() {
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
                 Insight da Wendy
               </p>
-              {insights.slice(0, 2).map((insight: import("@/hooks/useProactiveInsights").ProactiveInsight) => (
+              {insights.slice(0, 2).map((insight: ProactiveInsight) => (
                 <ProactiveInsightCard
                   key={insight.id}
                   insight={insight}

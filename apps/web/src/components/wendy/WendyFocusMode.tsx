@@ -36,6 +36,50 @@ interface FocusMessage {
   sources?: string[];
 }
 
+type WendyFocusEvent =
+  | { type: "token"; value: string }
+  | { type: "done"; ragSourcesUsed: string[] }
+  | { type: "other"; rawType: string };
+
+function parseFocusEvent(line: string): WendyFocusEvent | null {
+  try {
+    const parsed = JSON.parse(line.slice(6)) as unknown;
+    if (typeof parsed !== "object" || parsed === null || !("type" in parsed)) {
+      return null;
+    }
+
+    const event = parsed as {
+      type?: unknown;
+      value?: unknown;
+      ragSourcesUsed?: unknown;
+    };
+    if (typeof event.type !== "string") return null;
+    if (event.type === "token") {
+      return {
+        type: "token",
+        value: typeof event.value === "string" ? event.value : "",
+      };
+    }
+    if (event.type === "done") {
+      return {
+        type: "done",
+        ragSourcesUsed: Array.isArray(event.ragSourcesUsed)
+          ? event.ragSourcesUsed.filter(
+              (source): source is string => typeof source === "string",
+            )
+          : [],
+      };
+    }
+    return { type: "other", rawType: event.type };
+  } catch {
+    return null;
+  }
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
 export function WendyFocusMode({ onClose }: WendyFocusModeProps) {
   useSubscription();
   const [input, setInput] = useState("");
@@ -106,25 +150,21 @@ export function WendyFocusMode({ onClose }: WendyFocusModeProps) {
 
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
-          try {
-            const event = JSON.parse(line.slice(6));
-            if (event.type === "token") {
-              accumulated += event.value;
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (!last) return prev;
-                if (last.role !== "assistant") return prev;
-                return [
-                  ...prev.slice(0, -1),
-                  { ...last, content: accumulated },
-                ];
-              });
-            }
-            if (event.type === "done" && event.ragSourcesUsed?.length) {
-              sources.push(...event.ragSourcesUsed);
-            }
-          } catch {
-            /* skip */
+          const event = parseFocusEvent(line);
+          if (event?.type === "token") {
+            accumulated += event.value;
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (!last) return prev;
+              if (last.role !== "assistant") return prev;
+              return [
+                ...prev.slice(0, -1),
+                { ...last, content: accumulated },
+              ];
+            });
+          }
+          if (event?.type === "done" && event.ragSourcesUsed.length > 0) {
+            sources.push(...event.ragSourcesUsed);
           }
         }
       }
@@ -140,7 +180,7 @@ export function WendyFocusMode({ onClose }: WendyFocusModeProps) {
         ];
       });
     } catch (e: unknown) {
-      if ((e as Error).name !== "AbortError") {
+      if (!isAbortError(e)) {
         setMessages((prev) => [
           ...prev.slice(0, -1),
           {

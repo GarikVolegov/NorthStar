@@ -1,4 +1,5 @@
 import { LinkedInImportWizard } from "@/components/LinkedInImportWizard";
+import { OpenHumanAgentCard } from "@/components/profile/OpenHumanAgentCard";
 import { JourneySectionRenderer, type JourneyType } from "@/components/profile/profile-sections";
 import { ProfileSettings } from "@/components/profile/ProfileSettings";
 import { BadgesAchievements } from "@/components/profile/sections/BadgesAchievements";
@@ -7,7 +8,7 @@ import type { AuthUser } from "@/contexts/AuthContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageModule } from "@/hooks/usePageModule";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
-import { apiFetch } from "@/lib/api-fetch";
+import { deleteJson, getJson, patchJson } from "@/lib/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import {
   Calendar,
@@ -38,11 +39,7 @@ interface ProfileData {
 function useProfile(userId: number) {
   return useQuery<ProfileData>({
     queryKey: ["profile", userId],
-    queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/profile/${userId}`);
-      if (!res.ok) throw new Error("Errore caricamento profilo");
-      return res.json();
-    },
+    queryFn: () => getJson<ProfileData>(`${BASE}api/profile/${userId}`),
     enabled: !!userId,
   });
 }
@@ -124,24 +121,14 @@ function ProfileHero({
       const maxSize = kind === "avatar" ? 2_000_000 : 1_500_000;
       const maxLabel = kind === "avatar" ? "2 MB" : "1.5 MB";
       const dataUrl = await readImageAsDataUrl(file, maxSize, maxLabel);
-      const res = await apiFetch(`${BASE}api/profile/${user.id}/${kind}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
+      const json = await patchJson<{ avatarUrl?: string | null; bannerUrl?: string | null }>(
+        `${BASE}api/profile/${user.id}/${kind}`,
           kind === "avatar"
             ? { avatarDataUrl: dataUrl }
             : { bannerDataUrl: dataUrl },
-        ),
-      });
-
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.error ?? "Errore upload");
-      }
-
-      const json = await res.json();
-      if (kind === "avatar") onAvatarUpdate(json.avatarUrl);
-      else onBannerUpdate(json.bannerUrl);
+      );
+      if (kind === "avatar") onAvatarUpdate(json.avatarUrl ?? null);
+      else onBannerUpdate(json.bannerUrl ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Errore upload");
     } finally {
@@ -155,7 +142,7 @@ function ProfileHero({
     setError(null);
     setUploading(kind);
     try {
-      await apiFetch(`${BASE}api/profile/${user.id}/${kind}`, { method: "DELETE" });
+      await deleteJson(`${BASE}api/profile/${user.id}/${kind}`);
       if (kind === "avatar") onAvatarUpdate(null);
       else onBannerUpdate(null);
     } catch {
@@ -382,12 +369,14 @@ export default function Profilo() {
     }
   }, [profile?.avatarUrl]);
 
-  const { data: completionData } = useQuery<CompletionResponse>({
+  const { data: completionData } = useQuery<CompletionResponse | null>({
     queryKey: ["completion-me"],
     queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/completion/me`);
-      if (!res.ok) return null;
-      return res.json();
+      try {
+        return await getJson<CompletionResponse>(`${BASE}api/completion/me`);
+      } catch {
+        return null;
+      }
     },
     enabled: !!user?.id,
     staleTime: 60_000,
@@ -433,6 +422,7 @@ export default function Profilo() {
             />
           </div>
           <BadgesAchievements completionData={completionData ?? null} />
+          <OpenHumanAgentCard />
         </div>
 
         <div className="space-y-5 md:col-span-2">

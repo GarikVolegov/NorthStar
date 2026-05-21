@@ -9,22 +9,34 @@ import {
   sectorsTable,
 } from "@workspace/db";
 import { and, asc, desc, eq, ilike, ne, or } from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
 import type { Request } from "express";
+import {
+  arrayValue,
+  asRecord,
+  CATALOG_ENUMS,
+  integerValue,
+  isAllowed,
+  isSql,
+  numberArrayValue,
+  numberValue,
+  stringValue,
+  type CatalogPayload,
+} from "./catalog-utils";
+export {
+  CATALOG_ENUMS,
+  stringValue,
+  type CatalogPayload,
+} from "./catalog-utils";
+export {
+  validateCatalogPayload,
+  type CatalogValidation,
+} from "./catalog-validation";
 
 export type CatalogType =
   | "sectors"
   | "professions"
   | "education_paths"
   | "growth_articles";
-export type CatalogValidation = {
-  ok: boolean;
-  fields: Record<string, string>;
-  payload: CatalogPayload;
-};
-
-type CatalogPayload = Record<string, unknown>;
-
 export const CATALOG_TYPES: CatalogType[] = [
   "sectors",
   "professions",
@@ -38,258 +50,6 @@ export const CATALOG_LABELS: Record<CatalogType, string> = {
   education_paths: "Percorsi",
   growth_articles: "Articoli crescita",
 };
-
-export const CATALOG_ENUMS = {
-  riasec: ["R", "I", "A", "S", "E", "C"],
-  automationRisk: ["low", "medium", "high"],
-  scalability: ["low", "medium", "high"],
-  trend: ["declining", "stable", "growing", "booming"],
-  workMode: ["dipendente", "autonomo", "ibrido"],
-  educationType: ["universitario", "professionale", "online", "bootcamp"],
-  articleStatus: ["draft", "pending", "published", "rejected", "archived"],
-  difficulty: ["base", "intermedio", "avanzato"],
-} as const;
-
-function asRecord(value: unknown): CatalogPayload {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? { ...(value as Record<string, unknown>) }
-    : {};
-}
-
-export function stringValue(value: unknown, fallback = "") {
-  return typeof value === "string" ? value.trim() : fallback;
-}
-
-function numberValue(value: unknown, fallback = 0) {
-  const n = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-function integerValue(value: unknown, fallback = 0) {
-  const n = Math.round(numberValue(value, fallback));
-  return Number.isFinite(n) ? n : fallback;
-}
-
-function booleanValue(value: unknown, fallback = true) {
-  if (typeof value === "boolean") return value;
-  if (value === "false") return false;
-  if (value === "true") return true;
-  return fallback;
-}
-
-function arrayValue(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return Array.from(
-      new Set(value.map((item) => String(item ?? "").trim()).filter(Boolean)),
-    );
-  }
-  if (typeof value === "string") {
-    return Array.from(
-      new Set(
-        value
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
-      ),
-    );
-  }
-  return [];
-}
-
-function numberArrayValue(value: unknown): number[] {
-  return Array.isArray(value)
-    ? value.map((id) => integerValue(id)).filter((id) => id > 0)
-    : [];
-}
-
-function enumValue<T extends readonly string[]>(
-  value: unknown,
-  allowed: T,
-  fallback: T[number],
-) {
-  const normalized = stringValue(value, fallback);
-  return allowed.includes(normalized) ? normalized : fallback;
-}
-
-function hasInvalidEnumValues(values: string[], allowed: readonly string[]) {
-  return values.some((value) => !allowed.includes(value));
-}
-
-function isSql(condition: SQL | undefined): condition is SQL {
-  return condition !== undefined;
-}
-
-function isAllowed<T extends readonly string[]>(
-  value: string,
-  allowed: T,
-): value is T[number] {
-  return allowed.includes(value);
-}
-
-function normalizeSteps(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item, index) => {
-      const row = asRecord(item);
-      return {
-        step: integerValue(row.step, index + 1),
-        title: stringValue(row.title),
-        description: stringValue(row.description),
-      };
-    })
-    .filter((step) => step.title && step.description);
-}
-
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 96);
-}
-
-export function validateCatalogPayload(
-  type: CatalogType,
-  input: unknown,
-): CatalogValidation {
-  const raw = asRecord(input);
-  const fields: Record<string, string> = {};
-
-  if (type === "sectors") {
-    const riasecTypes = arrayValue(raw.riasecTypes);
-    const workMode = arrayValue(raw.workMode);
-    const payload = {
-      name: stringValue(raw.name),
-      description: stringValue(raw.description),
-      riasecTypes,
-      skills: arrayValue(raw.skills),
-      avgSalaryMin: integerValue(raw.avgSalaryMin),
-      avgSalaryMax: integerValue(raw.avgSalaryMax),
-      growthRate: numberValue(raw.growthRate),
-      automationRisk: enumValue(
-        raw.automationRisk,
-        CATALOG_ENUMS.automationRisk,
-        "medium",
-      ),
-      scalability: enumValue(
-        raw.scalability,
-        CATALOG_ENUMS.scalability,
-        "medium",
-      ),
-      trend: enumValue(raw.trend, CATALOG_ENUMS.trend, "stable"),
-      timeToAutonomy: stringValue(raw.timeToAutonomy, "6-12 mesi"),
-      advantages: arrayValue(raw.advantages),
-      disadvantages: arrayValue(raw.disadvantages),
-      opportunities: arrayValue(raw.opportunities),
-      icon: stringValue(raw.icon, "briefcase"),
-      color: stringValue(raw.color, "#6366f1"),
-      isActive: booleanValue(raw.isActive, true),
-      workMode: workMode.length ? workMode : ["dipendente", "ibrido"],
-      autonomyScore: integerValue(raw.autonomyScore, 5),
-      stabilityScore: integerValue(raw.stabilityScore, 5),
-      clientAcquisitionRequired: booleanValue(
-        raw.clientAcquisitionRequired,
-        false,
-      ),
-      freelanceSteps: normalizeSteps(raw.freelanceSteps),
-      dipendentiSteps: normalizeSteps(raw.dipendentiSteps),
-      remoteFriendly: booleanValue(raw.remoteFriendly, true),
-    };
-    if (!payload.name) fields.name = "Nome obbligatorio.";
-    if (!payload.description) fields.description = "Descrizione obbligatoria.";
-    if (payload.avgSalaryMin < 0)
-      fields.avgSalaryMin = "Il salario minimo deve essere positivo.";
-    if (payload.avgSalaryMax < payload.avgSalaryMin)
-      fields.avgSalaryMax =
-        "Il salario massimo deve essere maggiore o uguale al minimo.";
-    if (hasInvalidEnumValues(payload.riasecTypes, CATALOG_ENUMS.riasec))
-      fields.riasecTypes = "RIASEC non valido.";
-    if (hasInvalidEnumValues(payload.workMode, CATALOG_ENUMS.workMode))
-      fields.workMode = "Modalita lavoro non valida.";
-    return { ok: Object.keys(fields).length === 0, fields, payload };
-  }
-
-  if (type === "professions") {
-    const riasecFit = arrayValue(raw.riasecFit);
-    const workModes = arrayValue(raw.workModes);
-    const payload = {
-      title: stringValue(raw.title),
-      sector: stringValue(raw.sector),
-      sectorId:
-        raw.sectorId == null || raw.sectorId === ""
-          ? null
-          : integerValue(raw.sectorId),
-      description: stringValue(raw.description),
-      riasecFit,
-      skills: arrayValue(raw.skills),
-      workModes,
-      salaryRange: stringValue(raw.salaryRange),
-      growthOutlook: stringValue(raw.growthOutlook),
-      autonomyScore: integerValue(raw.autonomyScore, 5),
-      stabilityScore: integerValue(raw.stabilityScore, 5),
-      isActive: booleanValue(raw.isActive, true),
-    };
-    if (!payload.title) fields.title = "Titolo obbligatorio.";
-    if (!payload.sector && !payload.sectorId)
-      fields.sector = "Settore o sectorId obbligatorio.";
-    if (!payload.salaryRange)
-      fields.salaryRange = "Fascia salario obbligatoria.";
-    if (!payload.growthOutlook)
-      fields.growthOutlook = "Prospettiva crescita obbligatoria.";
-    if (hasInvalidEnumValues(riasecFit, CATALOG_ENUMS.riasec))
-      fields.riasecFit = "RIASEC non valido.";
-    if (hasInvalidEnumValues(workModes, CATALOG_ENUMS.workMode))
-      fields.workModes = "Modalita lavoro non valida.";
-    return { ok: Object.keys(fields).length === 0, fields, payload };
-  }
-
-  if (type === "education_paths") {
-    const payload = {
-      path: stringValue(raw.path),
-      type: enumValue(raw.type, CATALOG_ENUMS.educationType, "online"),
-      duration: stringValue(raw.duration),
-      cost: stringValue(raw.cost),
-      steps: arrayValue(raw.steps),
-      careerOutcomes: arrayValue(raw.careerOutcomes),
-      sectorFit: arrayValue(raw.sectorFit),
-      professionIds: numberArrayValue(raw.professionIds),
-      isActive: booleanValue(raw.isActive, true),
-    };
-    if (!payload.path) fields.path = "Nome percorso obbligatorio.";
-    if (!payload.duration) fields.duration = "Durata obbligatoria.";
-    if (!payload.cost) fields.cost = "Costo obbligatorio.";
-    if (payload.steps.length === 0)
-      fields.steps = "Almeno uno step obbligatorio.";
-    if (payload.careerOutcomes.length === 0)
-      fields.careerOutcomes = "Almeno un outcome obbligatorio.";
-    return { ok: Object.keys(fields).length === 0, fields, payload };
-  }
-
-  const title = stringValue(raw.title);
-  const payload = {
-    title,
-    slug: slugify(stringValue(raw.slug) || title),
-    category: stringValue(raw.category),
-    subcategory: stringValue(raw.subcategory) || null,
-    description: stringValue(raw.description),
-    content: stringValue(raw.content),
-    tags: arrayValue(raw.tags),
-    difficulty: enumValue(raw.difficulty, CATALOG_ENUMS.difficulty, "base"),
-    personalityMatches: arrayValue(raw.personalityMatches),
-    sectorLinks: arrayValue(raw.sectorLinks),
-    status: enumValue(raw.status, CATALOG_ENUMS.articleStatus, "draft"),
-    readTimeMinutes: Math.max(1, integerValue(raw.readTimeMinutes, 3)),
-  };
-  if (!payload.title) fields.title = "Titolo obbligatorio.";
-  if (!payload.slug) fields.slug = "Slug obbligatorio.";
-  if (!payload.category) fields.category = "Categoria obbligatoria.";
-  if (!payload.description) fields.description = "Descrizione obbligatoria.";
-  if (!payload.content || payload.content.length < 40)
-    fields.content = "Contenuto obbligatorio, almeno 40 caratteri.";
-  return { ok: Object.keys(fields).length === 0, fields, payload };
-}
 
 export async function writeCatalogAudit(
   req: Request,

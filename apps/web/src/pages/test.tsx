@@ -13,6 +13,7 @@ import { ArrowLeft, ArrowRight, Check, Clock, Layers, Loader2, RotateCcw, Sparkl
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "wouter";
+import { readDraft, type TestDraft } from "./test-draft";
 
 const BASE = import.meta.env.BASE_URL || "/";
 const DRAFT_KEY = "northstar_test_draft";
@@ -138,30 +139,24 @@ const SLIDE_EASE_IN  = [0.4, 0, 1, 1] as const;
 const SLIDE_EASE_OUT = [0.16, 1, 0.3, 1] as const;
 const PHASE_OVERLAY_MS = 1600;
 
-interface TestDraft {
-  step: number;
-  answers: Record<string, number>;
-  savedAt: number;
-  sessionId?: number;
-}
-
 function loadDraft(): TestDraft | null {
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
     if (!raw) return null;
-    const d: TestDraft = JSON.parse(raw);
+    const d = readDraft(JSON.parse(raw) as unknown);
+    if (!d) return null;
     if (Date.now() - d.savedAt > DRAFT_TTL_MS) { localStorage.removeItem(DRAFT_KEY); return null; }
     return d;
   } catch { return null; }
 }
-function saveDraft(d: TestDraft) { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch {} }
-function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch {} }
+function saveDraft(d: TestDraft) { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch { /* ignore storage write failures */ } }
+function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore storage write failures */ } }
 async function assignUserToSession(sessionId: number, userId: number): Promise<void> {
   try {
     await apiFetch(`${BASE}api/test-sessions/${sessionId}/assign-user`, {
       method: "POST", body: JSON.stringify({ userId }),
     });
-  } catch {}
+  } catch { /* best effort session association */ }
 }
 
 // ── WendySpeechCaption ─────────────────────────────────────────────────────
@@ -586,9 +581,9 @@ export default function Test() {
   });
   useEffect(() => {
     setMuted(audioMuted);
-    try { localStorage.setItem(MUTE_STORAGE_KEY, audioMuted ? "1" : "0"); } catch {}
+    try { localStorage.setItem(MUTE_STORAGE_KEY, audioMuted ? "1" : "0"); } catch { /* ignore storage write failures */ }
   }, [audioMuted]);
-  useEffect(() => { if (isMuted() !== audioMuted) setMuted(audioMuted); }, []); // eslint-disable-line
+  useEffect(() => { if (isMuted() !== audioMuted) setMuted(audioMuted); }, []);
   const handleToggleMute = useCallback(() => setAudioMuted((p) => !p), []);
 
   const [speechText, setSpeechText]           = useState("");
@@ -662,14 +657,12 @@ export default function Test() {
     if (speakTimerRef.current) clearTimeout(speakTimerRef.current);
     speakTimerRef.current = setTimeout(() => speakWithCaption(text, { interrupt: true }), 350);
     return () => { if (speakTimerRef.current) clearTimeout(speakTimerRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, showWelcome, prefersReduced, audioMuted]);
 
   useEffect(() => {
     if (resumed || prefersReduced || currentStep !== 0) { setLyraHasEntered(true); return; }
     const id = setTimeout(() => setLyraHasEntered(true), 880);
     return () => clearTimeout(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch } from "@/lib/api-fetch";
+import { ApiClientError, deleteJson, getJson, postJson } from "@/lib/apiClient";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -56,9 +56,12 @@ export function useFavorites() {
   const { data: favorites = [] } = useQuery<Favorite[]>({
     queryKey: ["favorites", user?.id],
     queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/favorites/${user!.id}`);
-      if (!res.ok) return [];
-      return res.json();
+      try {
+        return await getJson<Favorite[]>(`${BASE}api/favorites/${user!.id}`);
+      } catch (error) {
+        if (error instanceof ApiClientError) return [];
+        throw error;
+      }
     },
     enabled: !!user,
     staleTime: 2 * 60 * 1000, // §6.3 — dati utente: 2 min
@@ -67,13 +70,10 @@ export function useFavorites() {
   // §6.5 — mutation ottimistica con rollback su errore
   const addMutation = useMutation({
     mutationFn: async (data: AddFavoriteData) => {
-      const res = await apiFetch(`${BASE}api/favorites`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user!.id, ...data }),
+      return postJson<Favorite>(`${BASE}api/favorites`, {
+        userId: user!.id,
+        ...data,
       });
-      if (!res.ok) throw new Error("Errore aggiunta preferito");
-      return res.json() as Promise<Favorite>;
     },
     onMutate: async (data: AddFavoriteData) => {
       await queryClient.cancelQueries({ queryKey: ["favorites", user?.id] });
@@ -116,10 +116,7 @@ export function useFavorites() {
   // §6.5 — rimozione ottimistica con rollback su errore
   const removeMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiFetch(`${BASE}api/favorites/${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Errore rimozione preferito");
+      await deleteJson(`${BASE}api/favorites/${id}`);
     },
     onMutate: async (id: number) => {
       await queryClient.cancelQueries({ queryKey: ["favorites", user?.id] });

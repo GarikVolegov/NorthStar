@@ -10,7 +10,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch } from "@/lib/api-fetch";
-import type { AgentEvent, AgentSnapshot } from "@workspace/api-zod/agent-registry";
+import type {
+  AgentEvent,
+  AgentSnapshot,
+} from "@workspace/api-zod/agent-registry";
 import { STATUS_DOT_CLASS, STATUS_LABEL } from "./status";
 
 type DrawerTab = "state" | "prompt" | "log";
@@ -21,7 +24,11 @@ interface AgentDrawerProps {
   onRefresh: () => void;
 }
 
-export function AgentDrawer({ agent, onOpenChange, onRefresh }: AgentDrawerProps) {
+export function AgentDrawer({
+  agent,
+  onOpenChange,
+  onRefresh,
+}: AgentDrawerProps) {
   const [tab, setTab] = useState<DrawerTab>("state");
 
   useEffect(() => {
@@ -30,17 +37,26 @@ export function AgentDrawer({ agent, onOpenChange, onRefresh }: AgentDrawerProps
 
   return (
     <Sheet open={agent !== null} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col gap-4 sm:max-w-[520px]">
+      <SheetContent
+        side="right"
+        className="flex w-full flex-col gap-4 sm:max-w-[520px]"
+      >
         {agent && (
           <>
             <SheetHeader>
               <SheetTitle className="flex items-center gap-2">
-                <span aria-hidden className={`text-2xl ${agent.color}`}>{agent.avatar}</span>
+                <span aria-hidden className={`text-2xl ${agent.color}`}>
+                  {agent.avatar}
+                </span>
                 <span>{agent.name}</span>
               </SheetTitle>
               <SheetDescription>{agent.role}</SheetDescription>
             </SheetHeader>
-            <Tabs value={tab} onValueChange={(v) => setTab(v as DrawerTab)} className="flex-1 overflow-hidden">
+            <Tabs
+              value={tab}
+              onValueChange={(v) => setTab(v as DrawerTab)}
+              className="flex-1 overflow-hidden"
+            >
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="state">Stato</TabsTrigger>
                 <TabsTrigger value="prompt">Istruzioni</TabsTrigger>
@@ -69,32 +85,49 @@ function StateTab({ agent }: { agent: AgentSnapshot }) {
     <dl className="space-y-3 text-sm">
       <Row label="Status">
         <span className="inline-flex items-center gap-2">
-          <span className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT_CLASS[agent.status]}`} aria-hidden />
+          <span
+            className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT_CLASS[agent.status]}`}
+            aria-hidden
+          />
           {STATUS_LABEL[agent.status]}
         </span>
       </Row>
       <Row label="Task corrente">
-        {agent.currentTask?.title ?? <span className="text-muted-foreground">—</span>}
+        {agent.currentTask?.title ?? (
+          <span className="text-muted-foreground">—</span>
+        )}
       </Row>
       <Row label="Ultimo task">
-        {agent.lastTask?.finishedAt
-          ? formatDateTime(agent.lastTask.finishedAt)
-          : <span className="text-muted-foreground">—</span>}
+        {agent.lastTask?.finishedAt ? (
+          formatDateTime(agent.lastTask.finishedAt)
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
       </Row>
       <Row label="Token ultimo task">
         {agent.lastTask?.tokensUsed?.toLocaleString("it-IT") ?? "—"}
       </Row>
       <Row label="Modello LLM">
-        {agent.lastTask?.modelUsed ?? <span className="text-muted-foreground">—</span>}
+        {agent.lastTask?.modelUsed ?? (
+          <span className="text-muted-foreground">—</span>
+        )}
       </Row>
     </dl>
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-4">
-      <dt className="text-xs uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+        {label}
+      </dt>
       <dd className="text-right text-foreground">{children}</dd>
     </div>
   );
@@ -161,7 +194,7 @@ function PromptTab({
         className="text-xs leading-relaxed"
         disabled={saving}
       />
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
       <div className="flex justify-end gap-2">
         <Button
           size="sm"
@@ -175,7 +208,11 @@ function PromptTab({
         >
           Annulla
         </Button>
-        <Button size="sm" onClick={onSave} disabled={saving || draft.trim().length === 0}>
+        <Button
+          size="sm"
+          onClick={onSave}
+          disabled={saving || draft.trim().length === 0}
+        >
           {saving ? "Salvataggio…" : "Salva"}
         </Button>
       </div>
@@ -185,7 +222,9 @@ function PromptTab({
 
 function LogTab({ events }: { events: AgentEvent[] }) {
   if (events.length === 0) {
-    return <p className="text-sm text-muted-foreground">Nessun evento ancora.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">Nessun evento ancora.</p>
+    );
   }
   const sorted = [...events].sort((a, b) => (a.at < b.at ? 1 : -1));
   return (
@@ -195,7 +234,9 @@ function LogTab({ events }: { events: AgentEvent[] }) {
           key={event.id}
           className="flex items-start gap-2 rounded-md border border-border bg-card/40 px-2 py-1.5"
         >
-          <span className="tabular-nums text-muted-foreground">{formatTime(event.at)}</span>
+          <span className="tabular-nums text-muted-foreground">
+            {formatTime(event.at)}
+          </span>
           <span className="flex-1 text-foreground">{event.description}</span>
         </li>
       ))}
@@ -237,7 +278,7 @@ function PauseResumeButton({
 
   return (
     <div className="border-t border-border pt-3">
-      {error && <p className="mb-2 text-xs text-red-500">{error}</p>}
+      {error && <p className="mb-2 text-xs text-danger">{error}</p>}
       <Button
         className="w-full"
         size="sm"
@@ -261,6 +302,9 @@ function formatTime(iso: string) {
 
 function formatDateTime(iso: string) {
   const d = new Date(iso);
-  const date = d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
+  const date = d.toLocaleDateString("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+  });
   return `${date} ${formatTime(iso)}`;
 }

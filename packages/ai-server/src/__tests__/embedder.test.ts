@@ -22,7 +22,10 @@ describe("embedder", () => {
     mockCreate.mockResolvedValueOnce({ data: [{ embedding: [0.1, 0.2] }] });
     const embedding = await embedText("x".repeat(9_000));
     expect(embedding).toEqual([0.1, 0.2]);
-    expect(mockCreate.mock.calls[0]?.[0].input).toHaveLength(8_000);
+    const request = mockCreate.mock.calls[0]?.[0] as
+      | { input?: unknown }
+      | undefined;
+    expect(request?.input).toHaveLength(8_000);
   });
 
   it("throws when the provider returns no embedding data", async () => {

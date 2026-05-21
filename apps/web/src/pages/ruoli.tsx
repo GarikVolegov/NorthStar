@@ -133,19 +133,13 @@ export default function Ruoli() {
 
   const { data: roles = [], isLoading } = useQuery<Role[]>({
     queryKey: ["all-roles"],
-    queryFn: async () => {
-      const data = await getJson<unknown>(`${BASE}api/roles`);
-      return Array.isArray(data) ? data : [];
-    },
+    queryFn: () => getJson<Role[]>(`${BASE}api/roles`),
     staleTime: 300_000,
   });
 
   const { data: sectors = [] } = useQuery<{ id: number; name: string }[]>({
     queryKey: ["all-sectors"],
-    queryFn: async () => {
-      const data = await getJson<unknown>(`${BASE}api/sectors`);
-      return Array.isArray(data) ? data.map((s: { id: number; name: string }) => ({ id: s.id, name: s.name })) : [];
-    },
+    queryFn: () => getJson<{ id: number; name: string }[]>(`${BASE}api/sectors`),
     staleTime: 300_000,
   });
 

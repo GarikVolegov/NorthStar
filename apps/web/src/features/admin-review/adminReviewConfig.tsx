@@ -29,14 +29,21 @@ import type {
   GrowthQueueStatus,
 } from "./adminReviewTypes";
 
-export const CATALOG_TABS: Array<{ type: CatalogType; label: string; icon: typeof BookOpen }> = [
+export const CATALOG_TABS: Array<{
+  type: CatalogType;
+  label: string;
+  icon: typeof BookOpen;
+}> = [
   { type: "sectors", label: "Settori", icon: BarChart3 },
   { type: "professions", label: "Professioni", icon: Briefcase },
   { type: "education_paths", label: "Percorsi", icon: GraduationCap },
   { type: "growth_articles", label: "Articoli", icon: FileText },
 ];
 
-export const GROWTH_STATUS_FILTERS: Array<{ value: GrowthQueueStatus; label: string }> = [
+export const GROWTH_STATUS_FILTERS: Array<{
+  value: GrowthQueueStatus;
+  label: string;
+}> = [
   { value: "all", label: "Tutti" },
   { value: "draft", label: "Bozze" },
   { value: "pending", label: "Pending" },
@@ -44,11 +51,26 @@ export const GROWTH_STATUS_FILTERS: Array<{ value: GrowthQueueStatus; label: str
   { value: "rejected", label: "Rifiutati" },
 ];
 
-const GROWTH_STATUS_UI: Record<Exclude<GrowthQueueStatus, "all">, { label: string; className: string }> = {
-  draft: { label: "Bozza", className: "bg-slate-100 text-slate-700 border-slate-200" },
-  pending: { label: "Pending", className: "bg-amber-100 text-amber-800 border-amber-200" },
-  published: { label: "Pubblicato", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
-  rejected: { label: "Rifiutato", className: "bg-red-100 text-red-800 border-red-200" },
+const GROWTH_STATUS_UI: Record<
+  Exclude<GrowthQueueStatus, "all">,
+  { label: string; className: string }
+> = {
+  draft: {
+    label: "Bozza",
+    className: "bg-muted text-muted-foreground border-muted-border",
+  },
+  pending: {
+    label: "Pending",
+    className: "bg-warning-surface text-warning border-warning-muted",
+  },
+  published: {
+    label: "Pubblicato",
+    className: "bg-success-surface text-success border-success-muted",
+  },
+  rejected: {
+    label: "Rifiutato",
+    className: "bg-danger-surface text-danger border-danger-muted",
+  },
 };
 
 const SECTION_BY_PATH: Record<string, SidebarSection> = {
@@ -137,7 +159,12 @@ export const ADMIN_NAV_GROUPS: Array<{
     label: "Operativo",
     items: [
       { key: "home", label: "Panoramica", icon: Home },
-      { key: "queue", label: "Queue Revisione", icon: ClipboardList, count: (stats) => stats?.pending },
+      {
+        key: "queue",
+        label: "Queue Revisione",
+        icon: ClipboardList,
+        count: (stats) => stats?.pending,
+      },
       { key: "suggestions", label: "Suggerimenti", icon: Bot },
       { key: "messaggi", label: "Messaggi", icon: MessageCircle },
     ],
@@ -181,7 +208,9 @@ export function sectionFromLocation(pathname: string): SidebarSection {
   return segment ? (SECTION_BY_PATH[segment] ?? "home") : "home";
 }
 
-export function defaultCatalogPayload(type: CatalogType): Record<string, unknown> {
+export function defaultCatalogPayload(
+  type: CatalogType,
+): Record<string, unknown> {
   if (type === "sectors") {
     return {
       name: "",
@@ -264,8 +293,10 @@ export function catalogTitle(type: CatalogType, item: CatalogEntity) {
 }
 
 export function catalogDescription(type: CatalogType, item: CatalogEntity) {
-  if (type === "education_paths") return `${item.type ?? "percorso"} · ${item.duration ?? "durata n/d"} · ${item.cost ?? "costo n/d"}`;
-  if (type === "growth_articles") return `${item.category ?? "categoria"} · ${item.status ?? "draft"} · ${item.readTimeMinutes ?? 0} min`;
+  if (type === "education_paths")
+    return `${item.type ?? "percorso"} · ${item.duration ?? "durata n/d"} · ${item.cost ?? "costo n/d"}`;
+  if (type === "growth_articles")
+    return `${item.category ?? "categoria"} · ${item.status ?? "draft"} · ${item.readTimeMinutes ?? 0} min`;
   return String(item.description ?? item.sector ?? "");
 }
 
@@ -274,7 +305,9 @@ export function isCatalogArchived(type: CatalogType, item: CatalogEntity) {
   return item.isActive === false;
 }
 
-export function growthArticleToForm(article: GrowthArticle | null): GrowthArticleForm {
+export function growthArticleToForm(
+  article: GrowthArticle | null,
+): GrowthArticleForm {
   return {
     title: article?.title ?? "",
     slug: article?.slug ?? "",
@@ -290,5 +323,9 @@ export function growthArticleToForm(article: GrowthArticle | null): GrowthArticl
 
 export function growthStatusBadge(status: GrowthArticle["status"]) {
   const cfg = GROWTH_STATUS_UI[status] ?? GROWTH_STATUS_UI.draft;
-  return <Badge variant="outline" className={cn("capitalize", cfg.className)}>{cfg.label}</Badge>;
+  return (
+    <Badge variant="outline" className={cn("capitalize", cfg.className)}>
+      {cfg.label}
+    </Badge>
+  );
 }

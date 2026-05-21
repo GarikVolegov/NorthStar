@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useChatEncryption } from "@/hooks/useChatEncryption";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { apiFetch } from "@/lib/api-fetch";
+import { readJsonResponse } from "@/lib/readJsonResponse";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -93,12 +94,6 @@ function initials(name?: string | null) {
     .slice(0, 2);
 }
 
-async function readJson<T>(res: Response): Promise<T> {
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || "Errore di rete");
-  return data as T;
-}
-
 function Avatar({ user, size = "md" }: { user: SocialAuthor; size?: "sm" | "md" | "lg" }) {
   const sizeClass = {
     sm: "h-8 w-8 text-xs",
@@ -152,17 +147,17 @@ export default function SocialPage() {
 
   const feedQuery = useQuery({
     queryKey: ["social-feed"],
-    queryFn: async () => readJson<{ posts: SocialPost[] }>(await apiFetch(`${BASE}api/social/feed`)),
+    queryFn: async () => readJsonResponse<{ posts: SocialPost[] }>(await apiFetch(`${BASE}api/social/feed`)),
   });
 
   const storiesQuery = useQuery({
     queryKey: ["social-stories"],
-    queryFn: async () => readJson<{ stories: SocialStory[] }>(await apiFetch(`${BASE}api/social/stories`)),
+    queryFn: async () => readJsonResponse<{ stories: SocialStory[] }>(await apiFetch(`${BASE}api/social/stories`)),
   });
 
   const friendsQuery = useQuery({
     queryKey: ["social-friends", user?.id],
-    queryFn: async () => readJson<{ friends: FriendEntry[]; incoming: FriendEntry[]; outgoing: FriendEntry[] }>(
+    queryFn: async () => readJsonResponse<{ friends: FriendEntry[]; incoming: FriendEntry[]; outgoing: FriendEntry[] }>(
       await apiFetch(`${BASE}api/friends/${user!.id}`),
     ),
     enabled: !!user?.id,
@@ -170,12 +165,12 @@ export default function SocialPage() {
 
   const myPostsQuery = useQuery({
     queryKey: ["social-my-posts", user?.id],
-    queryFn: async () => readJson<{ posts: SocialPost[] }>(await apiFetch(`${BASE}api/social/users/${user!.id}/posts`)),
+    queryFn: async () => readJsonResponse<{ posts: SocialPost[] }>(await apiFetch(`${BASE}api/social/users/${user!.id}/posts`)),
     enabled: !!user?.id,
   });
 
   const createPost = useMutation({
-    mutationFn: async () => readJson<{ post: SocialPost }>(await apiFetch(`${BASE}api/social/posts`, {
+    mutationFn: async () => readJsonResponse<{ post: SocialPost }>(await apiFetch(`${BASE}api/social/posts`, {
       method: "POST",
       body: JSON.stringify({ content: postText, visibility }),
     })),
@@ -187,7 +182,7 @@ export default function SocialPage() {
   });
 
   const createStory = useMutation({
-    mutationFn: async () => readJson<{ story: SocialStory }>(await apiFetch(`${BASE}api/social/stories`, {
+    mutationFn: async () => readJsonResponse<{ story: SocialStory }>(await apiFetch(`${BASE}api/social/stories`, {
       method: "POST",
       body: JSON.stringify({ content: storyText, visibility }),
     })),
@@ -198,7 +193,7 @@ export default function SocialPage() {
   });
 
   const deletePost = useMutation({
-    mutationFn: async (id: number) => readJson<{ ok: true }>(await apiFetch(`${BASE}api/social/posts/${id}`, { method: "DELETE" })),
+    mutationFn: async (id: number) => readJsonResponse<{ ok: true }>(await apiFetch(`${BASE}api/social/posts/${id}`, { method: "DELETE" })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["social-feed"] });
       queryClient.invalidateQueries({ queryKey: ["social-my-posts", user?.id] });
@@ -206,7 +201,7 @@ export default function SocialPage() {
   });
 
   const deleteStory = useMutation({
-    mutationFn: async (id: number) => readJson<{ ok: true }>(await apiFetch(`${BASE}api/social/stories/${id}`, { method: "DELETE" })),
+    mutationFn: async (id: number) => readJsonResponse<{ ok: true }>(await apiFetch(`${BASE}api/social/stories/${id}`, { method: "DELETE" })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["social-stories"] }),
   });
 
@@ -534,12 +529,12 @@ function FriendsPanel({
 
   const searchQuery = useQuery({
     queryKey: ["social-users-search", debouncedSearch],
-    queryFn: async () => readJson<{ users: SearchResult[] }>(await apiFetch(`${BASE}api/users/search?q=${encodeURIComponent(debouncedSearch)}`)),
+    queryFn: async () => readJsonResponse<{ users: SearchResult[] }>(await apiFetch(`${BASE}api/users/search?q=${encodeURIComponent(debouncedSearch)}`)),
     enabled: !!user?.id && debouncedSearch.length >= 2,
   });
 
   const sendRequest = useMutation({
-    mutationFn: async (receiverId: number) => readJson<unknown>(await apiFetch(`${BASE}api/friends/request`, {
+    mutationFn: async (receiverId: number) => readJsonResponse<unknown>(await apiFetch(`${BASE}api/friends/request`, {
       method: "POST",
       body: JSON.stringify({ requesterId: user!.id, receiverId }),
     })),
@@ -677,7 +672,7 @@ function PublicProfilePreview({ userId, posts, loading }: { userId: number; post
   const { user } = useAuth();
   const profileQuery = useQuery({
     queryKey: ["social-profile-preview", userId],
-    queryFn: async () => readJson<{
+    queryFn: async () => readJsonResponse<{
       name: string;
       email?: string;
       avatarUrl?: string | null;

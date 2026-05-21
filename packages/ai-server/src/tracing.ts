@@ -20,10 +20,9 @@ type AutoInstrumentationsModule = {
   getNodeAutoInstrumentations(options?: Record<string, unknown>): unknown;
 };
 
-const optionalImport = new Function(
-  "specifier",
-  "return import(specifier)",
-) as <T>(specifier: string) => Promise<T>;
+function optionalImport<T>(specifier: string): Promise<T> {
+  return import(specifier) as Promise<T>;
+}
 
 let tracer: TracerLike | null = null;
 let autoInstrumentationsRegistered = false;
@@ -46,13 +45,13 @@ export async function initTracing(serviceName: string = "ai-server"): Promise<vo
     const { trace } = await import("@opentelemetry/api");
     if (!autoInstrumentationsRegistered && process.env.OTEL_AUTO_INSTRUMENTATIONS !== "false") {
       try {
-        const [{ registerInstrumentations }, { getNodeAutoInstrumentations }] = await Promise.all([
+        const [instrumentationModule, autoInstrumentationModule] = await Promise.all([
           optionalImport<InstrumentationModule>("@opentelemetry/instrumentation"),
           optionalImport<AutoInstrumentationsModule>("@opentelemetry/auto-instrumentations-node"),
         ]);
-        registerInstrumentations({
+        instrumentationModule.registerInstrumentations({
           instrumentations: [
-            getNodeAutoInstrumentations({
+            autoInstrumentationModule.getNodeAutoInstrumentations({
               "@opentelemetry/instrumentation-fs": { enabled: false },
             }),
           ],

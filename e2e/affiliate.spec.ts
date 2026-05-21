@@ -3,6 +3,9 @@
  */
 import { test, expect } from '@playwright/test';
 import { loginViaApi, loginAsAffiliate, waitForAuthReady } from './helpers/auth';
+import { responseJson } from './helpers/json';
+
+type LoginResponse = { token?: string };
 
 test.describe('Route /affiliate', () => {
   test('redirect a /login se non autenticato', async ({ page }) => {
@@ -140,7 +143,8 @@ test.describe('Route /affiliate', () => {
       test.skip(true, 'Utente di test non disponibile in questo ambiente');
       return;
     }
-    const { token } = await loginRes.json();
+    const { token } = await responseJson<LoginResponse>(loginRes);
+    expect(token).toBeTruthy();
 
     const dashRes = await page.request.get('/api/affiliate/dashboard', {
       headers: { Authorization: `Bearer ${token}` },

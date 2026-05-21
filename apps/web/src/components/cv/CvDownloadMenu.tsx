@@ -8,15 +8,11 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Download, File, FileJson, FileText } from "lucide-react";
+import type { GeneratedCv } from "./CvEditorDrawer";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
 type CvTemplate = "classic" | "minimal" | "bold";
-
-interface GeneratedCv {
-  personalInfo?: { name?: string };
-  [key: string]: any;
-}
 
 interface Props {
   userId: number;

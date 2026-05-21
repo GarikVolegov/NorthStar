@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch } from "@/lib/api-fetch";
+import { getJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Briefcase, Clock, ExternalLink, Filter, MapPin, Sparkles, TrendingUp } from "lucide-react";
@@ -83,10 +83,7 @@ export default function Lavori() {
 
   const { data, isLoading } = useQuery<JobsResponse>({
     queryKey: ["jobs", user?.id],
-    queryFn: async () => {
-      const r = await apiFetch(`${BASE}api/jobs`);
-      return r.json();
-    },
+    queryFn: () => getJson<JobsResponse>(`${BASE}api/jobs`),
     enabled: isLoggedIn,
     staleTime: 60_000 * 10,
   });

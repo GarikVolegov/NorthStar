@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { apiFetch } from "@/lib/api-fetch";
+import { ApiClientError, getJson } from "@/lib/apiClient";
 import { CATEGORY_LABELS, CERTIFICATE_CATEGORY_COLORS } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -10,7 +10,7 @@ import {
   Gem,
   Info,
   Shield,
-  Sparkles
+  Sparkles,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -198,9 +198,12 @@ export function NftCertificateGallery({ userId }: Props) {
   const { data: certs = [], isLoading } = useQuery<NftCert[]>({
     queryKey: ["nft-certificates"],
     queryFn: async () => {
-      const r = await apiFetch(`${BASE}api/nft-certificates/me`);
-      if (!r.ok) return [];
-      return r.json();
+      try {
+        return await getJson<NftCert[]>("/api/nft-certificates/me");
+      } catch (error) {
+        if (error instanceof ApiClientError) return [];
+        throw error;
+      }
     },
     enabled: !!userId,
     staleTime: 30_000,

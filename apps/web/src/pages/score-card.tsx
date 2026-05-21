@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { apiFetch } from "@/lib/api-fetch";
+import { getJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -87,11 +87,7 @@ export default function ScoreCard() {
 
   const { data, isLoading, error } = useQuery<JourneyScore>({
     queryKey: ["journey-score", userId],
-    queryFn: async () => {
-      const r = await apiFetch(`${BASE}api/journey-score/${userId}`);
-      if (!r.ok) throw new Error("Score non trovato");
-      return r.json();
-    },
+    queryFn: () => getJson<JourneyScore>(`${BASE}api/journey-score/${userId}`),
     enabled: !!userId,
   });
 

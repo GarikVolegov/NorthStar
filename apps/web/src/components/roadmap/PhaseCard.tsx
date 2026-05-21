@@ -27,7 +27,7 @@ interface PhaseCardProps {
   phase: RoadmapPhase;
   index: number;
   isEditMode: boolean;
-  onUpdate: (phaseId: number, updates: Partial<RoadmapPhase>) => void;
+  onUpdate: (phaseId: number, updates: Partial<RoadmapPhase>) => void | Promise<void>;
   onCancel: () => void;
 }
 

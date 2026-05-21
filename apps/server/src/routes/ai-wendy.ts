@@ -11,7 +11,6 @@
  * PRIVACY: nessun contenuto integrale di messaggi nei log (PRIVACY_DESIGN.md).
  */
 import { Router, type Request, type Response } from "express";
-import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { requireAuth } from "../middleware/auth";
 import { wendyLimiter } from "../middleware/rate-limit";
@@ -37,80 +36,16 @@ import {
   estimateTokens,
   estimateCost,
 } from "@workspace/ai-server";
-import type {
-  CompressedHistory,
-  LLMMessage,
-  WendyPageContext,
-} from "@workspace/ai-server";
+import type { CompressedHistory, WendyPageContext } from "@workspace/ai-server";
+import {
+  isClientSideToolData,
+  isDoneWithLowEval,
+  WendyRequestSchema,
+  type WendyToolMessage,
+} from "./ai-wendy-shared";
+import { buildPersonalIntelligenceContext } from "../lib/personal-intelligence-context";
 
 const router = Router();
-type AssistantToolCall = {
-  id: string;
-  type: "function";
-  function: { name: string; arguments: string };
-};
-type WendyToolMessage = LLMMessage & { tool_calls?: AssistantToolCall[] };
-
-function isClientSideToolData(value: unknown): value is { clientSide: true } {
-  return Boolean(
-    value &&
-    typeof value === "object" &&
-    "clientSide" in value &&
-    value.clientSide === true,
-  );
-}
-
-function isDoneWithLowEval(
-  event: unknown,
-): event is { type: "done"; evalResult: { level: "low" } } {
-  return Boolean(
-    event &&
-    typeof event === "object" &&
-    "type" in event &&
-    event.type === "done" &&
-    "evalResult" in event &&
-    event.evalResult &&
-    typeof event.evalResult === "object" &&
-    "level" in event.evalResult &&
-    event.evalResult.level === "low",
-  );
-}
-
-// ── Zod schema ────────────────────────────────────────────────────────────────
-
-const CompressedHistorySchema = z.object({
-  summary: z.string().max(500).optional(),
-  recentMessages: z
-    .array(
-      z.object({
-        role: z.enum(["user", "assistant"]),
-        content: z.string().max(2000),
-      }),
-    )
-    .max(12),
-  totalTurns: z.number().int().min(0),
-});
-
-const WendyPageContextSchema = z.object({
-  page: z.string().max(50),
-  entityType: z.enum(["sector", "profession", "article", "news"]).optional(),
-  entityId: z.number().int().positive().optional(),
-  entityName: z.string().max(100).optional(),
-  journeyType: z.string().max(30).optional(),
-  data: z.record(z.string(), z.unknown()).optional(),
-});
-
-const WendyRequestSchema = z.object({
-  message: z.string().min(1).max(5000),
-  threadId: z.string().max(100).optional(),
-  compressedHistory: CompressedHistorySchema.optional(),
-  pageContext: WendyPageContextSchema.optional(),
-  locale: z.string().max(5).default("it"),
-  hasFileAttached: z.boolean().optional().default(false),
-  localHour: z.number().int().min(0).max(23).optional(),
-  localDayOfWeek: z.number().int().min(0).max(6).optional(),
-  focusMode: z.boolean().optional().default(false),
-});
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
@@ -291,6 +226,12 @@ router.post(
       }
     }
 
+    const personalContext = await buildPersonalIntelligenceContext({
+      query: message,
+      userId,
+      userRole: req.user!.role,
+    });
+
     // ── SSE headers ───────────────────────────────────────────────────────────
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -389,13 +330,14 @@ router.post(
     try {
       // ── 2. Fast path: navigation / simple_qa ────────────────────────────
       if (decision.skipFullPipeline) {
-        const systemPrompt = buildLightPrompt({
-          locale,
-          intent,
-          ...(pageContext
-            ? { pageContext: pageContext as WendyPageContext }
-            : {}),
-        });
+        const systemPrompt =
+          buildLightPrompt({
+            locale,
+            intent,
+            ...(pageContext
+              ? { pageContext: pageContext as WendyPageContext }
+              : {}),
+          }) + personalContext.context;
 
         const openAiTools = toolsToOpenAIFormat(decision.toolsEnabled);
         const llm = getLLMForRoute({
@@ -489,7 +431,8 @@ router.post(
       } else {
         // ── 3. Full path: growth agent completo ──────────────────────────
         const userMemory = await loadMemory(userId);
-        const memorySection = buildMemorySection(userMemory);
+        const memorySection =
+          buildMemorySection(userMemory) + personalContext.context;
 
         // Flatten compressed history per il growth agent
         const flatHistory = [

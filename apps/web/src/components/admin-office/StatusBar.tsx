@@ -2,11 +2,11 @@ import type { RegistryAggregates } from "@workspace/api-zod/agent-registry";
 import type { ConnectionState } from "@/contexts/AdminAgentContext";
 
 const CONNECTION_DOT: Record<ConnectionState, string> = {
-  idle: "bg-zinc-500",
-  connecting: "bg-amber-400 animate-pulse",
-  open: "bg-emerald-500",
-  reconnecting: "bg-amber-500 animate-pulse",
-  closed: "bg-red-500",
+  idle: "bg-muted-foreground",
+  connecting: "bg-warning animate-pulse",
+  open: "bg-success",
+  reconnecting: "bg-warning animate-pulse",
+  closed: "bg-danger",
 };
 
 const CONNECTION_LABEL: Record<ConnectionState, string> = {
@@ -37,7 +37,10 @@ export function StatusBar({ aggregates, connectionState }: StatusBarProps) {
       />
       <Stat label="Token oggi" value={tokens.toLocaleString("it-IT")} />
       <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-        <span className={`h-2 w-2 rounded-full ${CONNECTION_DOT[connectionState]}`} aria-hidden />
+        <span
+          className={`h-2 w-2 rounded-full ${CONNECTION_DOT[connectionState]}`}
+          aria-hidden
+        />
         {CONNECTION_LABEL[connectionState]}
       </div>
     </div>
@@ -55,8 +58,12 @@ function Stat({
 }) {
   return (
     <div className="flex items-baseline gap-1.5">
-      <span className="text-xs uppercase tracking-wider text-muted-foreground">{label}</span>
-      <span className={`text-base font-semibold text-foreground tabular-nums ${pulse ? "animate-pulse" : ""}`}>
+      <span className="text-xs uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <span
+        className={`text-base font-semibold text-foreground tabular-nums ${pulse ? "animate-pulse" : ""}`}
+      >
         {value}
       </span>
     </div>

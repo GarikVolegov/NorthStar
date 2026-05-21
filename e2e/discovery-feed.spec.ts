@@ -15,7 +15,7 @@
  *   - Test indipendenti — beforeEach fa login fresco
  *   - Usa page.waitForResponse per verificare le API call senza timing fragili
  */
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 const E2E_USER_EMAIL = process.env.E2E_USER_EMAIL ?? "e2e@northstar.it";
 const E2E_USER_PASSWORD = process.env.E2E_USER_PASSWORD;
@@ -24,7 +24,7 @@ if (!E2E_USER_PASSWORD) {
   throw new Error("E2E_USER_PASSWORD is required for discovery-feed E2E.");
 }
 
-async function loginUser(page: import("@playwright/test").Page) {
+async function loginUser(page: Page) {
   await page.goto("/auth");
   await page.getByTestId("auth-email-input").fill(E2E_USER_EMAIL);
   await page.getByTestId("auth-password-input").fill(E2E_USER_PASSWORD);
@@ -32,7 +32,7 @@ async function loginUser(page: import("@playwright/test").Page) {
   await page.waitForURL("**/dashboard", { timeout: 10_000 });
 }
 
-async function goToFeed(page: import("@playwright/test").Page) {
+async function goToFeed(page: Page) {
   await page.getByTestId("nav-discovery-feed").click();
   await expect(page.getByTestId("discovery-feed-page")).toBeVisible({
     timeout: 8_000,

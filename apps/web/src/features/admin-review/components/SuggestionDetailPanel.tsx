@@ -12,7 +12,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Archive, Bot, CheckCircle2, Eye, History, X, XCircle } from "lucide-react";
+import {
+  Archive,
+  Bot,
+  CheckCircle2,
+  Eye,
+  History,
+  X,
+  XCircle,
+} from "lucide-react";
 import type { SuggestionDetail } from "../adminReviewTypes";
 
 type SuggestionDetailPanelProps = {
@@ -52,11 +60,7 @@ export function SuggestionDetailPanel({
         <h3 className="font-semibold truncate flex-1">
           {detail.suggestion.entityName}
         </h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-        >
+        <Button variant="ghost" size="sm" onClick={onClose}>
           <X className="w-4 h-4" />
         </Button>
       </div>
@@ -73,9 +77,7 @@ export function SuggestionDetailPanel({
             {detail.suggestion.confidenceScore != null && (
               <span className="text-sm text-muted-foreground">
                 Confidence:{" "}
-                <ConfidenceBadge
-                  score={detail.suggestion.confidenceScore}
-                />
+                <ConfidenceBadge score={detail.suggestion.confidenceScore} />
               </span>
             )}
           </div>
@@ -97,27 +99,35 @@ export function SuggestionDetailPanel({
             <h4 className="text-sm font-semibold mb-3">Proposta</h4>
             {payloadEntries(detail.suggestion.payloadJson).length > 0 ? (
               <div className="grid gap-3 sm:grid-cols-2">
-                {payloadEntries(detail.suggestion.payloadJson).map(([key, value]) => (
-                  <div key={key} className="rounded-md bg-muted/40 p-3 min-w-0">
-                    <p className="text-xs font-medium text-muted-foreground">
-                      {humanizeKey(key)}
-                    </p>
-                    <p className="text-sm mt-1 break-words line-clamp-3">
-                      {formatValue(value)}
-                    </p>
-                  </div>
-                ))}
+                {payloadEntries(detail.suggestion.payloadJson).map(
+                  ([key, value]) => (
+                    <div
+                      key={key}
+                      className="rounded-md bg-muted/40 p-3 min-w-0"
+                    >
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {humanizeKey(key)}
+                      </p>
+                      <p className="text-sm mt-1 break-words line-clamp-3">
+                        {formatValue(value)}
+                      </p>
+                    </div>
+                  ),
+                )}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Nessun campo sintetico disponibile. Apri i dati tecnici per vedere il payload completo.
+                Nessun campo sintetico disponibile. Apri i dati tecnici per
+                vedere il payload completo.
               </p>
             )}
           </div>
 
           {payloadDiffs(detail.suggestion.payloadJson).length > 0 && (
             <div className="rounded-lg border bg-background p-4">
-              <h4 className="text-sm font-semibold mb-3">Cambiamenti proposti</h4>
+              <h4 className="text-sm font-semibold mb-3">
+                Cambiamenti proposti
+              </h4>
               <div className="space-y-3">
                 {payloadDiffs(detail.suggestion.payloadJson).map((diff) => (
                   <div key={diff.key} className="rounded-md border p-3">
@@ -125,13 +135,21 @@ export function SuggestionDetailPanel({
                       {humanizeKey(diff.key)}
                     </p>
                     <div className="grid gap-2 sm:grid-cols-2">
-                      <div className="rounded-md bg-red-50 p-2">
-                        <p className="text-[10px] font-semibold uppercase text-red-700">Prima</p>
-                        <p className="text-xs text-red-900 break-words">{formatValue(diff.before)}</p>
+                      <div className="rounded-md bg-danger-surface p-2">
+                        <p className="text-[10px] font-semibold uppercase text-danger">
+                          Prima
+                        </p>
+                        <p className="text-xs text-danger break-words">
+                          {formatValue(diff.before)}
+                        </p>
                       </div>
-                      <div className="rounded-md bg-emerald-50 p-2">
-                        <p className="text-[10px] font-semibold uppercase text-emerald-700">Dopo</p>
-                        <p className="text-xs text-emerald-900 break-words">{formatValue(diff.after)}</p>
+                      <div className="rounded-md bg-success-surface p-2">
+                        <p className="text-[10px] font-semibold uppercase text-success">
+                          Dopo
+                        </p>
+                        <p className="text-xs text-success break-words">
+                          {formatValue(diff.after)}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -155,7 +173,7 @@ export function SuggestionDetailPanel({
                   <p>Input: {detail.agentRun.inputSummary}</p>
                 )}
                 {detail.agentRun.errorMessage && (
-                  <p className="text-red-600">
+                  <p className="text-danger">
                     Errore: {detail.agentRun.errorMessage}
                   </p>
                 )}
@@ -172,7 +190,9 @@ export function SuggestionDetailPanel({
                 onClick={() => onTechnicalDataToggle((value) => !value)}
               >
                 <Eye className="w-4 h-4 mr-2" />
-                {showTechnicalData ? "Nascondi dati tecnici" : "Mostra dati tecnici"}
+                {showTechnicalData
+                  ? "Nascondi dati tecnici"
+                  : "Mostra dati tecnici"}
               </Button>
               {showTechnicalData && (
                 <pre className="mt-3 bg-muted/50 rounded-xl p-4 text-xs overflow-x-auto max-h-80 whitespace-pre-wrap font-mono">
@@ -183,13 +203,9 @@ export function SuggestionDetailPanel({
           )}
 
           {detail.suggestion.notes && (
-            <div className="bg-amber-50 rounded-xl p-4 border border-amber-100">
-              <h4 className="text-sm font-semibold text-amber-800 mb-1">
-                Note
-              </h4>
-              <p className="text-sm text-amber-700">
-                {detail.suggestion.notes}
-              </p>
+            <div className="bg-warning-surface rounded-xl p-4 border border-warning-muted">
+              <h4 className="text-sm font-semibold text-warning mb-1">Note</h4>
+              <p className="text-sm text-warning">{detail.suggestion.notes}</p>
             </div>
           )}
 
@@ -201,7 +217,7 @@ export function SuggestionDetailPanel({
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1"
+                  className="bg-success text-primary-foreground hover:bg-success/90 flex-1"
                   onClick={() => onApprove(detail.suggestion.id)}
                 >
                   <CheckCircle2 className="w-4 h-4 mr-1" /> Approva
@@ -266,7 +282,7 @@ export function SuggestionDetailPanel({
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  className="bg-blue-600 hover:bg-blue-700 text-white flex-1"
+                  className="bg-info text-primary-foreground hover:bg-info/90 flex-1"
                   onClick={() => onApply(detail.suggestion.id)}
                 >
                   <CheckCircle2 className="w-4 h-4 mr-1" /> Applica
@@ -280,24 +296,29 @@ export function SuggestionDetailPanel({
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                In questo step Applica chiude il workflow senza modificare i dati finali.
+                In questo step Applica chiude il workflow senza modificare i
+                dati finali.
               </p>
             </div>
           )}
 
           {detail.suggestion.status === "applied" && (
-            <div className="rounded-lg border bg-blue-50 p-4 text-blue-800">
+            <div className="rounded-lg border border-info-muted bg-info-surface p-4 text-info">
               <p className="text-sm font-semibold">Suggerimento applicato</p>
               <p className="text-xs mt-1">
-                Workflow completato. Nessuna modifica automatica ai cataloghi e stata eseguita in questo step.
+                Workflow completato. Nessuna modifica automatica ai cataloghi e
+                stata eseguita in questo step.
               </p>
             </div>
           )}
 
-          {(detail.suggestion.status === "rejected" || detail.suggestion.status === "archived") && (
+          {(detail.suggestion.status === "rejected" ||
+            detail.suggestion.status === "archived") && (
             <div className="rounded-lg border bg-muted/40 p-4">
               <p className="text-sm font-semibold">
-                {detail.suggestion.status === "archived" ? "Suggerimento archiviato" : "Suggerimento rifiutato"}
+                {detail.suggestion.status === "archived"
+                  ? "Suggerimento archiviato"
+                  : "Suggerimento rifiutato"}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 La decisione resta nello storico audit della proposta.
@@ -315,7 +336,9 @@ export function SuggestionDetailPanel({
                   <div key={event.id} className="rounded-md border p-3">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm font-medium">
-                        {humanizeKey(event.action.replace("admin_suggestion_", ""))}
+                        {humanizeKey(
+                          event.action.replace("admin_suggestion_", ""),
+                        )}
                       </p>
                       <p className="text-xs text-muted-foreground shrink-0">
                         {fmtShortDate(event.createdAt)}

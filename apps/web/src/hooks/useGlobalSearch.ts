@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api-fetch";
+import { getJson, postJson, stream } from "@/lib/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -93,13 +93,77 @@ function useDebounce<T>(value: T, delay: number): T {
 
 async function trackSearch(data: Record<string, unknown>) {
   try {
-    await apiFetch(`${BASE}api/search/track`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...data, sessionId }),
+    await postJson(`${BASE}api/search/track`, { ...data, sessionId }, {
       keepalive: true,
     });
-  } catch {}
+  } catch {
+    return;
+  }
+}
+
+type SearchStreamEvent =
+  | { type: "status"; value: string }
+  | { type: "route"; route: RouterOutput }
+  | { type: "results"; results: SearchResult[] }
+  | { type: "sources"; chunks: AiSource[] }
+  | { type: "token"; value: string }
+  | { type: "done" }
+  | { type: "error" }
+  | { type: "unknown" };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function parseSearchResults(value: unknown): SearchResult[] {
+  return Array.isArray(value) ? (value as SearchResult[]) : [];
+}
+
+function parseAiSources(value: unknown): AiSource[] {
+  return Array.isArray(value) ? (value as AiSource[]) : [];
+}
+
+function parseRouterOutput(value: unknown): RouterOutput {
+  if (!isRecord(value)) return DEFAULT_ROUTE;
+  return {
+    intent: typeof value.intent === "string" ? value.intent as RouterOutput["intent"] : DEFAULT_ROUTE.intent,
+    user_mode: typeof value.user_mode === "string" ? value.user_mode as RouterOutput["user_mode"] : DEFAULT_ROUTE.user_mode,
+    experience_level: typeof value.experience_level === "string" ? value.experience_level as RouterOutput["experience_level"] : DEFAULT_ROUTE.experience_level,
+    needs_clarification: value.needs_clarification === true,
+    clarifying_question: typeof value.clarifying_question === "string" ? value.clarifying_question : null,
+    ui_widget_type: typeof value.ui_widget_type === "string" ? value.ui_widget_type as RouterOutput["ui_widget_type"] : DEFAULT_ROUTE.ui_widget_type,
+    retrieval_strategy: typeof value.retrieval_strategy === "string" ? value.retrieval_strategy as RouterOutput["retrieval_strategy"] : DEFAULT_ROUTE.retrieval_strategy,
+    confidence: typeof value.confidence === "number" ? value.confidence : DEFAULT_ROUTE.confidence,
+  };
+}
+
+function parseSearchStreamEvent(line: string): SearchStreamEvent {
+  try {
+    const parsed = JSON.parse(line.slice(6)) as unknown;
+    if (!isRecord(parsed) || typeof parsed.type !== "string") {
+      return { type: "unknown" };
+    }
+    if (parsed.type === "status" && typeof parsed.value === "string") {
+      return { type: "status", value: parsed.value };
+    }
+    if (parsed.type === "route") {
+      return { type: "route", route: parseRouterOutput(parsed.route) };
+    }
+    if (parsed.type === "results") {
+      return { type: "results", results: parseSearchResults(parsed.results) };
+    }
+    if (parsed.type === "sources") {
+      return { type: "sources", chunks: parseAiSources(parsed.chunks) };
+    }
+    if (parsed.type === "token" && typeof parsed.value === "string") {
+      return { type: "token", value: parsed.value };
+    }
+    if (parsed.type === "done") return { type: "done" };
+    if (parsed.type === "error") return { type: "error" };
+    return { type: "unknown" };
+  } catch {
+    return { type: "unknown" };
+  }
 }
 
 export function useGlobalSearch() {
@@ -123,13 +187,10 @@ export function useGlobalSearch() {
     queryKey: ["global-search-hybrid", debouncedQuery],
     queryFn: async () => {
       if (debouncedQuery.length < 2) return { results: [], has_semantic: false };
-      const res = await apiFetch(`${BASE}api/search/hybrid`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ q: debouncedQuery, limit: 10 }),
+      return postJson<HybridResponse>(`${BASE}api/search/hybrid`, {
+        q: debouncedQuery,
+        limit: 10,
       });
-      if (!res.ok) throw new Error("Hybrid search failed");
-      return res.json();
     },
     enabled: debouncedQuery.length >= 2,
     staleTime: 30_000,
@@ -145,12 +206,10 @@ export function useGlobalSearch() {
     queryKey: ["global-search-suggest", debouncedQuery],
     queryFn: async () => {
       if (debouncedQuery.length < 2) return { suggestions: [] };
-      const res = await apiFetch(
+      return getJson<SuggestResponse>(
         `${BASE}api/search/suggest?q=${encodeURIComponent(debouncedQuery)}`,
         { headers: { Accept: "application/json" } },
       );
-      if (!res.ok) return { suggestions: [] };
-      return res.json();
     },
     enabled: debouncedQuery.length >= 2,
     staleTime: 60_000,
@@ -177,7 +236,7 @@ export function useGlobalSearch() {
     setIsStreaming(true);
 
     try {
-      const res = await apiFetch(`${BASE}api/search/orchestrate`, {
+      const res = await stream(`${BASE}api/search/orchestrate`, {
         method: "POST",
         credentials: "include",
         body: JSON.stringify({ q, sessionId, history: msgs }),
@@ -203,17 +262,14 @@ export function useGlobalSearch() {
 
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
-          let event: Record<string, unknown>;
-          try { event = JSON.parse(line.slice(6)); } catch { continue; }
-
-          if (event.type === "status")  setAiStatus(event.value as string);
-          if (event.type === "route") setAiRoute(event.route as RouterOutput);
-          if (event.type === "results") setOrchestratedResults((event.results as SearchResult[]) ?? []);
-          if (event.type === "sources") setAiSources(event.chunks as AiSource[]);
+          const event = parseSearchStreamEvent(line);
+          if (event.type === "status") setAiStatus(event.value);
+          if (event.type === "route") setAiRoute(event.route);
+          if (event.type === "results") setOrchestratedResults(event.results);
+          if (event.type === "sources") setAiSources(event.chunks);
           if (event.type === "token") {
-            const tok = event.value as string;
-            finalText += tok;
-            setAiTokens((t) => t + tok);
+            finalText += event.value;
+            setAiTokens((t) => t + event.value);
           }
           if (event.type === "done") {
             setIsStreaming(false);

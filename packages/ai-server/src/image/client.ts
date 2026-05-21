@@ -30,8 +30,8 @@ function getOpenAI(): OpenAI {
  * so that env vars are only required at call-time, not at module load time.
  */
 export const openai: OpenAI = new Proxy({} as OpenAI, {
-  get(_target, prop) {
-    return Reflect.get(getOpenAI(), prop);
+  get(_target, prop): unknown {
+    return Reflect.get(getOpenAI(), prop) as unknown;
   },
 });
 

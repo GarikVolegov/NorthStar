@@ -12,6 +12,32 @@ interface UseSSEStreamOptions {
   flushIntervalMs?: number; // default 50ms
 }
 
+type StreamEventPayload = {
+  type?: unknown;
+  value?: unknown;
+  content?: unknown;
+  text?: unknown;
+  choices?: Array<{ delta?: { content?: unknown } }>;
+};
+
+function readErrorMessage(value: unknown, fallback: string): string {
+  if (value && typeof value === "object" && "error" in value) {
+    const error = (value as { error?: unknown }).error;
+    if (typeof error === "string") return error;
+  }
+  return fallback;
+}
+
+function readTokenChunk(parsed: StreamEventPayload, eventType: string | undefined): string {
+  const providerChunk = parsed.choices?.[0]?.delta?.content;
+  if (typeof providerChunk === "string") return providerChunk;
+  if (eventType !== "token") return "";
+  if (typeof parsed.value === "string") return parsed.value;
+  if (typeof parsed.content === "string") return parsed.content;
+  if (typeof parsed.text === "string") return parsed.text;
+  return "";
+}
+
 export interface UseSSEStreamReturn {
   content: string;
   isStreaming: boolean;
@@ -88,10 +114,8 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
         const res = await fetch(url, { ...options, signal: controller.signal });
 
         if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(
-            (errData as { error?: string }).error ?? `Errore ${res.status}`,
-          );
+          const errData = (await res.json().catch(() => ({}))) as unknown;
+          throw new Error(readErrorMessage(errData, `Errore ${res.status}`));
         }
 
         const reader = res.body?.getReader();
@@ -105,7 +129,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
           const raw = line.slice(6).trim();
           if (raw === "[DONE]") return;
           try {
-            const parsed = JSON.parse(raw) as Record<string, unknown>;
+            const parsed = JSON.parse(raw) as StreamEventPayload;
             // Custom event types (ui_tool, status, rag_citations, token, etc.)
             // and provider-style deltas can be observed by callers. Returning
             // false keeps the canonical streamed-content buffer active.
@@ -116,12 +140,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
             if (eventType && eventType !== "token") {
               return;
             }
-            const chunk =
-              (parsed as { choices?: Array<{ delta?: { content?: string } }> }).choices?.[0]?.delta?.content ??
-              (eventType === "token" ? (parsed.value as string) : undefined) ??
-              (eventType === "token" ? (parsed.content as string) : undefined) ??
-              (eventType === "token" ? (parsed.text as string) : undefined) ??
-              "";
+            const chunk = readTokenChunk(parsed, eventType);
             if (chunk) {
               bufferRef.current += chunk;
               scheduleFlush();
@@ -161,7 +180,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
           for (const line of lines) processLine(line);
         }
       } catch (err) {
-        if ((err as Error).name === "AbortError") return;
+        if (err instanceof Error && err.name === "AbortError") return;
         const error = err instanceof Error ? err : new Error(String(err));
         setError(error);
         onError?.(error);

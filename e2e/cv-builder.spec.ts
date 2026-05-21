@@ -16,7 +16,7 @@
  *   - Nessuna dipendenza da ordine di esecuzione con altri spec
  *   - Stato iniziale pulito tramite API seed (authToken fisso da CI)
  */
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 const E2E_USER_EMAIL = process.env.E2E_USER_EMAIL ?? "e2e@northstar.it";
 const E2E_USER_PASSWORD = process.env.E2E_USER_PASSWORD;
@@ -27,7 +27,7 @@ if (!E2E_USER_PASSWORD) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function loginUser(page: import("@playwright/test").Page) {
+async function loginUser(page: Page) {
   await page.goto("/auth");
   await page.getByTestId("auth-email-input").fill(E2E_USER_EMAIL);
   await page.getByTestId("auth-password-input").fill(E2E_USER_PASSWORD);

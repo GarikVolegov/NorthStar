@@ -1,7 +1,6 @@
-import { apiFetch } from "@/lib/api-fetch";
 import { getJson } from "@/lib/apiClient";
 import { useQuery } from "@tanstack/react-query";
-import { HomeNewsItem, LatestResult, TrendingSector } from "./types";
+import type { HomeNewsItem, LatestResult, TrendingSector } from "./types";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -32,9 +31,11 @@ export function useLatestRecommendations(enabled: boolean) {
     queryKey: ["latest-recommendations"],
     enabled,
     queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/test-sessions/latest`);
-      if (!res.ok) throw new Error("No session");
-      return res.json();
+      try {
+        return await getJson<LatestResult>(`${BASE}api/test-sessions/latest`);
+      } catch {
+        throw new Error("No session");
+      }
     },
     staleTime: 60_000,
     retry: false,

@@ -16,6 +16,7 @@
  */
 
 import { useCallback, useState } from 'react';
+import { postJson } from '@/lib/apiClient';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -75,6 +76,27 @@ async function fileToBase64DataUri(file: File): Promise<string> {
   });
 }
 
+function readErrorMessage(value: unknown, fallback: string): string {
+  if (value && typeof value === 'object' && 'error' in value) {
+    const error = (value as { error?: unknown }).error;
+    if (typeof error === 'string') return error;
+  }
+  return fallback;
+}
+
+function readVisionChunk(value: unknown): string {
+  if (typeof value !== 'object' || value === null) return '';
+  const record = value as {
+    error?: unknown;
+    choices?: Array<{ delta?: { content?: unknown } }>;
+  };
+  if (typeof record.error === 'string') {
+    throw new Error(record.error);
+  }
+  const content = record.choices?.[0]?.delta?.content;
+  return typeof content === 'string' ? content : '';
+}
+
 /**
  * Legge uno stream SSE da /api/v1/ai/vision/analyze e aggrega i chunk.
  * Compatibile con il formato { choices: [{ delta: { content } }] }
@@ -102,9 +124,8 @@ async function readVisionSSE(
       if (raw === '[DONE]') return fullText;
 
       try {
-        const data = JSON.parse(raw);
-        if (data.error) throw new Error(data.error);
-        const chunk = data.choices?.[0]?.delta?.content;
+        const data = JSON.parse(raw) as unknown;
+        const chunk = readVisionChunk(data);
         if (chunk) {
           fullText += chunk;
           onChunk?.(chunk);
@@ -161,8 +182,10 @@ export function useWendyVision(options: UseWendyVisionOptions = {}): UseWendyVis
       });
 
       if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
-        throw new Error(err.error ?? 'Errore analisi immagine');
+        const err = (await resp.json().catch(() => ({
+          error: `HTTP ${resp.status}`,
+        }))) as unknown;
+        throw new Error(readErrorMessage(err, 'Errore analisi immagine'));
       }
 
       return await readVisionSSE(resp, onChunk);
@@ -194,26 +217,17 @@ export function useWendyVision(options: UseWendyVisionOptions = {}): UseWendyVis
     setVisionError(null);
 
     try {
-      const resp = await fetch(`${apiBaseUrl}/generate`, {
-        method:      'POST',
-        headers:     { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
+      const data = await postJson<{ images?: GeneratedImage[] }>(
+        `${apiBaseUrl}/generate`,
+        {
           prompt,
           model:   opts.model   ?? 'dall-e-3',
           size:    opts.size    ?? '1024x1024',
           quality: opts.quality ?? 'standard',
           style:   opts.style   ?? 'vivid',
-        }),
-      });
-
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
-        throw new Error(err.error ?? 'Errore generazione immagine');
-      }
-
-      const data = await resp.json();
-      return data.images as GeneratedImage[];
+        },
+      );
+      return data.images ?? [];
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Errore generazione';
       setVisionError(msg);

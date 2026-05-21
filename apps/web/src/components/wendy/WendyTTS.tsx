@@ -26,11 +26,23 @@
 import { useCallback, useRef, useState } from 'react';
 
 // VoiceID default — override con env VITE_WENDY_VOICE_ID
-const DEFAULT_VOICE_ID = import.meta.env?.VITE_WENDY_VOICE_ID ?? 'EXAVITQu4vr4xnSDxMaL'; // Sarah
+const env = import.meta.env as unknown as Record<string, unknown>;
+const DEFAULT_VOICE_ID =
+  typeof env.VITE_WENDY_VOICE_ID === 'string'
+    ? env.VITE_WENDY_VOICE_ID
+    : 'EXAVITQu4vr4xnSDxMaL'; // Sarah
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 type TTSState = 'idle' | 'loading' | 'playing' | 'error';
+
+function getTtsErrorMessage(value: unknown, fallback: string): string {
+  if (value && typeof value === 'object' && 'error' in value) {
+    const error = (value as { error?: unknown }).error;
+    if (typeof error === 'string') return error;
+  }
+  return fallback;
+}
 
 export interface UseWendyTTSReturn {
   state:  TTSState;
@@ -77,8 +89,10 @@ export function useWendyTTS(apiUrl = '/api/v1/ai/tts'): UseWendyTTSReturn {
       });
 
       if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` })) as { error: string };
-        throw new Error(err.error ?? 'Errore TTS');
+        const err = (await resp.json().catch(() => ({
+          error: `HTTP ${resp.status}`,
+        }))) as unknown;
+        throw new Error(getTtsErrorMessage(err, 'Errore TTS'));
       }
 
       const arrayBuffer = await resp.arrayBuffer();

@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch } from "@/lib/api-fetch";
+import { deleteJson, getJson, patchJson, postJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -40,7 +40,7 @@ import {
   TrendingUp,
   X
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type DragEvent as ReactDragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 
@@ -78,6 +78,9 @@ const STATUS_META: Record<AppStatus, { label: string; emoji: string; color: stri
 
 const COLUMNS: AppStatus[] = ["saved", "applied", "interview", "offer", "rejected"];
 const EMPTY_FORM = { company: "", role: "", url: "", status: "saved" as AppStatus, notes: "", salary: "", location: "" };
+type ApplicationForm = typeof EMPTY_FORM;
+type ApplicationsResponse = { applications: Application[] };
+type CoverLetterResponse = { error?: string; text?: string };
 
 function useFormatDate() {
   const { i18n } = useTranslation();
@@ -122,8 +125,7 @@ export default function Candidature() {
     queryKey: ["applications", user?.id],
     queryFn: async () => {
       if (!user?.id) return { applications: [] };
-      const res = await apiFetch(`${BASE}api/applications/${user.id}`);
-      return res.json() as Promise<{ applications: Application[] }>;
+      return getJson<ApplicationsResponse>(`${BASE}api/applications/${user.id}`);
     },
     enabled: !!user?.id,
   });
@@ -131,41 +133,27 @@ export default function Candidature() {
   const applications = data?.applications ?? [];
 
   const createMutation = useMutation({
-    mutationFn: async (payload: typeof EMPTY_FORM) => {
-      const res = await apiFetch(`${BASE}api/applications`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error("Errore nella creazione");
-      return res.json();
-    },
+    mutationFn: (payload: ApplicationForm) =>
+      postJson<Application>(`${BASE}api/applications`, { ...payload }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["applications", user?.id] });
       setAddOpen(false);
       setForm(EMPTY_FORM);
       setFormError(null);
     },
-    onError: (e: any) => setFormError(e.message),
+    onError: (error: Error) => setFormError(error.message),
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: Partial<Application> }) => {
-      const res = await apiFetch(`${BASE}api/applications/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      });
-      if (!res.ok) throw new Error("Errore nell'aggiornamento");
-      return res.json();
+      return patchJson<Application>(`${BASE}api/applications/${id}`, updates);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["applications", user?.id] }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiFetch(`${BASE}api/applications/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Errore nell'eliminazione");
+      await deleteJson(`${BASE}api/applications/${id}`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["applications", user?.id] }),
   });
@@ -377,7 +365,7 @@ export default function Candidature() {
                           onStatusChange={(s) => updateMutation.mutate({ id: app.id, updates: { status: s } })}
                           deleting={deleteMutation.isPending && deleteMutation.variables === app.id}
                           isDragging={draggingId === app.id}
-                          onDragStart={(e) => { (e as any).dataTransfer.setData("appId", String(app.id)); setDraggingId(app.id); }}
+                          onDragStart={(e) => { e.dataTransfer.setData("appId", String(app.id)); setDraggingId(app.id); }}
                           onDragEnd={() => setDraggingId(null)}
                           onCoverLetter={() => setCoverLetterApp(app)}
                         />
@@ -508,16 +496,15 @@ function CoverLetterDialog({ app, onClose }: { app: Application; onClose: () => 
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch(`${BASE}api/cover-letter/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company: app.company, role: app.role, jobDescription }),
+      const data = await postJson<CoverLetterResponse>(`${BASE}api/cover-letter/generate`, {
+        company: app.company,
+        role: app.role,
+        jobDescription,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Errore generazione");
+      if (data.error) throw new Error(data.error);
       setText(data.text ?? "");
-    } catch (e: any) {
-      setError(e.message);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Errore generazione");
     } finally {
       setLoading(false);
     }
@@ -605,7 +592,7 @@ function AppCard({
   onStatusChange: (s: AppStatus) => void;
   deleting: boolean;
   isDragging: boolean;
-  onDragStart: (e: DragEvent) => void;
+  onDragStart: (e: ReactDragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
   onCoverLetter: () => void;
 }) {
@@ -627,13 +614,9 @@ function AppCard({
 
   const addNoteMutation = useMutation({
     mutationFn: async (text: string) => {
-      const res = await apiFetch(`${BASE}api/applications/${app.id}/notes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+      return postJson<Application>(`${BASE}api/applications/${app.id}/notes`, {
+        text,
       });
-      if (!res.ok) throw new Error("Errore");
-      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["applications", userId] });
@@ -643,8 +626,7 @@ function AppCard({
 
   const deleteNoteMutation = useMutation({
     mutationFn: async (index: number) => {
-      const res = await apiFetch(`${BASE}api/applications/${app.id}/notes/${index}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Errore");
+      await deleteJson(`${BASE}api/applications/${app.id}/notes/${index}`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["applications", userId] }),
   });
@@ -658,7 +640,7 @@ function AppCard({
   return (
     <div
       draggable
-      onDragStart={onDragStart as any}
+      onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       className={cn(
         "bg-background rounded-xl border border-l-4 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing",

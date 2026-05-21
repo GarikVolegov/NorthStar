@@ -3,7 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { CalendarClock, CreditCard, RefreshCw, Save, Search, ShieldCheck } from "lucide-react";
+import {
+  CalendarClock,
+  CreditCard,
+  RefreshCw,
+  Save,
+  Search,
+  ShieldCheck,
+} from "lucide-react";
 import type {
   AdminSubscriptionDetail,
   AdminSubscriptionItem,
@@ -12,35 +19,81 @@ import type {
 } from "./types";
 import { fmtShortDate } from "./utils";
 
-const PLAN_UI: Record<AdminSubscriptionPlan, { label: string; className: string }> = {
-  free: { label: "Free", className: "bg-slate-100 text-slate-700 border-slate-200" },
-  pro: { label: "Pro", className: "bg-primary/10 text-primary border-primary/30" },
-  team: { label: "Team", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+const PLAN_UI: Record<
+  AdminSubscriptionPlan,
+  { label: string; className: string }
+> = {
+  free: {
+    label: "Free",
+    className: "bg-muted text-muted-foreground border-muted-border",
+  },
+  pro: {
+    label: "Pro",
+    className: "bg-primary/10 text-primary border-primary/30",
+  },
+  team: {
+    label: "Team",
+    className: "bg-success-surface text-success border-success-muted",
+  },
 };
 
 const STATUS_UI = {
-  free: { label: "Free", className: "bg-slate-100 text-slate-700 border-slate-200" },
-  active: { label: "Attivo", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
-  expired: { label: "Scaduto", className: "bg-amber-100 text-amber-800 border-amber-200" },
-  cancelled: { label: "Annullato", className: "bg-red-100 text-red-800 border-red-200" },
+  free: {
+    label: "Free",
+    className: "bg-muted text-muted-foreground border-muted-border",
+  },
+  active: {
+    label: "Attivo",
+    className: "bg-success-surface text-success border-success-muted",
+  },
+  expired: {
+    label: "Scaduto",
+    className: "bg-warning-surface text-warning border-warning-muted",
+  },
+  cancelled: {
+    label: "Annullato",
+    className: "bg-danger-surface text-danger border-danger-muted",
+  },
 };
 
 function planBadge(plan: AdminSubscriptionPlan) {
   const cfg = PLAN_UI[plan] ?? PLAN_UI.free;
-  return <Badge variant="outline" className={cfg.className}>{cfg.label}</Badge>;
+  return (
+    <Badge variant="outline" className={cfg.className}>
+      {cfg.label}
+    </Badge>
+  );
 }
 
 function statusBadge(status: keyof typeof STATUS_UI) {
   const cfg = STATUS_UI[status] ?? STATUS_UI.free;
-  return <Badge variant="outline" className={cfg.className}>{cfg.label}</Badge>;
+  return (
+    <Badge variant="outline" className={cfg.className}>
+      {cfg.label}
+    </Badge>
+  );
 }
 
 function sourceBadge(item: AdminSubscriptionItem["current"]) {
   if (item.hasStripeSubscription) {
-    return <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-800">Stripe collegato</Badge>;
+    return (
+      <Badge
+        variant="outline"
+        className="border-info-muted bg-info-surface text-info"
+      >
+        Stripe collegato
+      </Badge>
+    );
   }
   if (item.source === "internal") {
-    return <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-800">Override interno</Badge>;
+    return (
+      <Badge
+        variant="outline"
+        className="border-info-muted bg-info-surface text-info"
+      >
+        Override interno
+      </Badge>
+    );
   }
   return null;
 }
@@ -99,11 +152,22 @@ export function SubscriptionsSection({
             Abbonamenti utenti
           </h3>
           <p className="text-sm text-muted-foreground">
-            Controlla e modifica gli accessi interni NorthStar senza toccare Stripe.
+            Controlla e modifica gli accessi interni NorthStar senza toccare
+            Stripe.
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={onRefresh} disabled={loading} className="min-h-11">
-          {loading ? <RefreshCw size={13} className="animate-spin mr-1" /> : <RefreshCw size={13} className="mr-1" />}
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onRefresh}
+          disabled={loading}
+          className="min-h-11"
+        >
+          {loading ? (
+            <RefreshCw size={13} className="animate-spin mr-1" />
+          ) : (
+            <RefreshCw size={13} className="mr-1" />
+          )}
           Aggiorna
         </Button>
       </div>
@@ -135,13 +199,21 @@ export function SubscriptionsSection({
             }}
           />
         </div>
-        <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={planFilter} onChange={(event) => onPlanFilterChange(event.target.value)}>
+        <select
+          className="min-h-11 rounded-md border bg-background px-3 text-sm"
+          value={planFilter}
+          onChange={(event) => onPlanFilterChange(event.target.value)}
+        >
           <option value="all">Tutti i piani</option>
           <option value="free">Free</option>
           <option value="pro">Pro</option>
           <option value="team">Team</option>
         </select>
-        <select className="min-h-11 rounded-md border bg-background px-3 text-sm" value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value)}>
+        <select
+          className="min-h-11 rounded-md border bg-background px-3 text-sm"
+          value={statusFilter}
+          onChange={(event) => onStatusFilterChange(event.target.value)}
+        >
           <option value="all">Tutti gli stati</option>
           <option value="active">Attivi</option>
           <option value="expired">Scaduti</option>
@@ -162,13 +234,18 @@ export function SubscriptionsSection({
                 onClick={() => onSelectUser(item)}
                 className={cn(
                   "w-full min-h-11 text-left p-4 rounded-lg border bg-card hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                  detail?.user.id === item.user.id && "border-primary/50 bg-primary/5",
+                  detail?.user.id === item.user.id &&
+                    "border-primary/50 bg-primary/5",
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-semibold text-sm truncate">{item.user.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{item.user.email}</p>
+                    <p className="font-semibold text-sm truncate">
+                      {item.user.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {item.user.email}
+                    </p>
                   </div>
                   <div className="flex gap-2 shrink-0 flex-wrap justify-end">
                     {planBadge(item.current.plan)}
@@ -194,14 +271,22 @@ export function SubscriptionsSection({
 
           <div className="rounded-lg border bg-card min-w-0">
             {detailLoading ? (
-              <div className="p-8 text-center text-sm text-muted-foreground">Caricamento dettaglio...</div>
+              <div className="p-8 text-center text-sm text-muted-foreground">
+                Caricamento dettaglio...
+              </div>
             ) : detail ? (
               <div className="p-4 md:p-5 space-y-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h4 className="font-semibold truncate">{detail.user.name}</h4>
-                    <p className="text-sm text-muted-foreground truncate">{detail.user.email}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Utente #{detail.user.id}</p>
+                    <h4 className="font-semibold truncate">
+                      {detail.user.name}
+                    </h4>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {detail.user.email}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Utente #{detail.user.id}
+                    </p>
                   </div>
                   <div className="flex gap-2 flex-wrap justify-end">
                     {planBadge(detail.current.plan)}
@@ -212,21 +297,27 @@ export function SubscriptionsSection({
                 <div className="rounded-lg border bg-muted/20 p-3 text-sm">
                   <div className="flex items-center gap-2 flex-wrap">
                     <ShieldCheck className="w-4 h-4 text-primary" />
-                    <span className="font-medium">Modifica interna NorthStar</span>
+                    <span className="font-medium">
+                      Modifica interna NorthStar
+                    </span>
                     {sourceBadge(detail.current)}
                   </div>
                   <p className="mt-2 text-muted-foreground">
-                    Questa modifica cambia l’accesso nell’app, ma non aggiorna Stripe né la fatturazione reale.
+                    Questa modifica cambia l’accesso nell’app, ma non aggiorna
+                    Stripe né la fatturazione reale.
                   </p>
                   {detail.current.stripeSubscriptionId && (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Stripe subscription: <span className="font-mono">{detail.current.stripeSubscriptionId}</span>
+                      Stripe subscription:{" "}
+                      <span className="font-mono">
+                        {detail.current.stripeSubscriptionId}
+                      </span>
                     </p>
                   )}
                 </div>
 
                 {fields.general && (
-                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  <div className="rounded-lg border border-danger-muted bg-danger-surface p-3 text-sm text-danger">
                     {fields.general}
                   </div>
                 )}
@@ -237,24 +328,42 @@ export function SubscriptionsSection({
                     <select
                       className="w-full min-h-11 rounded-md border bg-background px-3 text-sm"
                       value={form.plan}
-                      onChange={(event) => onFormChange({ ...form, plan: event.target.value as AdminSubscriptionPlan })}
+                      onChange={(event) =>
+                        onFormChange({
+                          ...form,
+                          plan: event.target.value as AdminSubscriptionPlan,
+                        })
+                      }
                     >
                       <option value="free">Free</option>
                       <option value="pro">Pro</option>
                       <option value="team">Team</option>
                     </select>
-                    {fields.plan && <p className="text-xs text-red-600 mt-1">{fields.plan}</p>}
+                    {fields.plan && (
+                      <p className="text-xs text-danger mt-1">{fields.plan}</p>
+                    )}
                   </div>
                   <div>
-                    <p className="text-xs font-medium mb-1">Scadenza opzionale</p>
+                    <p className="text-xs font-medium mb-1">
+                      Scadenza opzionale
+                    </p>
                     <Input
                       type="date"
                       className="min-h-11"
                       value={form.validUntil}
-                      onChange={(event) => onFormChange({ ...form, validUntil: event.target.value })}
+                      onChange={(event) =>
+                        onFormChange({
+                          ...form,
+                          validUntil: event.target.value,
+                        })
+                      }
                       disabled={form.plan === "free"}
                     />
-                    {fields.validUntil && <p className="text-xs text-red-600 mt-1">{fields.validUntil}</p>}
+                    {fields.validUntil && (
+                      <p className="text-xs text-danger mt-1">
+                        {fields.validUntil}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -262,14 +371,26 @@ export function SubscriptionsSection({
                   <p className="text-xs font-medium mb-1">Motivo modifica</p>
                   <Textarea
                     value={form.reason}
-                    onChange={(event) => onFormChange({ ...form, reason: event.target.value })}
+                    onChange={(event) =>
+                      onFormChange({ ...form, reason: event.target.value })
+                    }
                     placeholder="Es. concessione manuale, supporto, correzione piano..."
                   />
-                  {fields.reason && <p className="text-xs text-red-600 mt-1">{fields.reason}</p>}
+                  {fields.reason && (
+                    <p className="text-xs text-danger mt-1">{fields.reason}</p>
+                  )}
                 </div>
 
-                <Button onClick={onSave} disabled={actionLoading} className="min-h-11">
-                  {actionLoading ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                <Button
+                  onClick={onSave}
+                  disabled={actionLoading}
+                  className="min-h-11"
+                >
+                  {actionLoading ? (
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-2" />
+                  )}
                   Salva abbonamento
                 </Button>
 
@@ -279,23 +400,43 @@ export function SubscriptionsSection({
                     Storico
                   </p>
                   <div className="space-y-2">
-                    {detail.history.length ? detail.history.map((row) => (
-                      <div key={row.id} className="rounded-lg border bg-background p-3 text-sm">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="flex gap-2 flex-wrap">
-                            {planBadge(row.effectivePlan)}
-                            {statusBadge(row.status)}
-                            {row.hasStripeSubscription && <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-800">Stripe</Badge>}
+                    {detail.history.length ? (
+                      detail.history.map((row) => (
+                        <div
+                          key={row.id}
+                          className="rounded-lg border bg-background p-3 text-sm"
+                        >
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex gap-2 flex-wrap">
+                              {planBadge(row.effectivePlan)}
+                              {statusBadge(row.status)}
+                              {row.hasStripeSubscription && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-info-muted bg-info-surface text-info"
+                                >
+                                  Stripe
+                                </Badge>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {fmtShortDate(row.createdAt)}
+                            </span>
                           </div>
-                          <span className="text-xs text-muted-foreground">{fmtShortDate(row.createdAt)}</span>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {row.validUntil
+                              ? `Scadenza ${fmtShortDate(row.validUntil)}`
+                              : "Nessuna scadenza"}
+                            {row.cancelledAt
+                              ? ` · Annullato ${fmtShortDate(row.cancelledAt)}`
+                              : ""}
+                          </p>
                         </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {row.validUntil ? `Scadenza ${fmtShortDate(row.validUntil)}` : "Nessuna scadenza"}
-                          {row.cancelledAt ? ` · Annullato ${fmtShortDate(row.cancelledAt)}` : ""}
-                        </p>
-                      </div>
-                    )) : (
-                      <p className="text-sm text-muted-foreground">Nessun abbonamento registrato.</p>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Nessun abbonamento registrato.
+                      </p>
                     )}
                   </div>
                 </div>
@@ -309,8 +450,16 @@ export function SubscriptionsSection({
         </div>
       ) : (
         <div className="rounded-lg border bg-card p-8 text-center">
-          <p className="text-sm text-muted-foreground">Nessun dato disponibile.</p>
-          <Button variant="outline" className="mt-3 min-h-11" onClick={onRefresh}>Riprova</Button>
+          <p className="text-sm text-muted-foreground">
+            Nessun dato disponibile.
+          </p>
+          <Button
+            variant="outline"
+            className="mt-3 min-h-11"
+            onClick={onRefresh}
+          >
+            Riprova
+          </Button>
         </div>
       )}
     </div>

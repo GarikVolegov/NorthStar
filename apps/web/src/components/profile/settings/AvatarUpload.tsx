@@ -1,8 +1,12 @@
-import { apiFetch } from "@/lib/api-fetch";
+import { deleteJson, patchJson } from "@/lib/apiClient";
 import { Camera, Loader2, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
+
+interface AvatarUploadResponse {
+  avatarUrl: string | null;
+}
 
 export function AvatarUpload({ userId, name, currentUrl, onUploaded }: {
   userId: number;
@@ -30,13 +34,9 @@ export function AvatarUpload({ userId, name, currentUrl, onUploaded }: {
         reader.readAsDataURL(file);
       });
 
-      const res = await apiFetch(`${BASE}api/profile/${userId}/avatar`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avatarDataUrl: dataUrl }),
+      const json = await patchJson<AvatarUploadResponse>(`${BASE}api/profile/${userId}/avatar`, {
+        avatarDataUrl: dataUrl,
       });
-      if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? "Errore upload"); }
-      const json = await res.json();
       onUploaded(json.avatarUrl);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Errore upload");
@@ -49,9 +49,7 @@ export function AvatarUpload({ userId, name, currentUrl, onUploaded }: {
   async function handleRemove() {
     setUploading(true);
     try {
-      await apiFetch(`${BASE}api/profile/${userId}/avatar`, {
-        method: "DELETE",
-      });
+      await deleteJson(`${BASE}api/profile/${userId}/avatar`);
       onUploaded(null);
     } finally {
       setUploading(false);

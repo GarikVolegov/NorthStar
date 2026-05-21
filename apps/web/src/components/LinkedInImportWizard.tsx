@@ -4,7 +4,7 @@ import {
   DialogDescription,
   DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { apiFetch } from "@/lib/api-fetch";
+import { postJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -42,6 +42,17 @@ interface ExtractedProfile {
   certifications: Cert[]; languages: string[];
   sector_suggestion: string; career_level: string;
   years_of_experience: number; north_star_notes: string;
+}
+
+interface ExtractLinkedInResponse {
+  data: ExtractedProfile;
+}
+
+interface ImportLinkedInResponse {
+  certsImported: number;
+  skillsFound: number;
+  experiencesFound: number;
+  educationFound: number;
 }
 
 const LINKEDIN_INSTRUCTIONS = [
@@ -83,10 +94,7 @@ export function LinkedInImportWizard({ open, onClose }: LinkedInImportWizardProp
   const [extracted, setExtracted] = useState<ExtractedProfile | null>(null);
   const [importCerts, setImportCerts] = useState(true);
   const [importSummary, setImportSummary] = useState(true);
-  const [importResult, setImportResult] = useState<{
-    certsImported: number; skillsFound: number;
-    experiencesFound: number; educationFound: number;
-  } | null>(null);
+  const [importResult, setImportResult] = useState<ImportLinkedInResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const qc = useQueryClient();
@@ -94,16 +102,9 @@ export function LinkedInImportWizard({ open, onClose }: LinkedInImportWizardProp
   const extractMut = useMutation({
     mutationFn: async () => {
       setError(null);
-      const r = await apiFetch(`${BASE}api/linkedin/extract`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileText: pastedText }),
+      return postJson<ExtractLinkedInResponse>(`${BASE}api/linkedin/extract`, {
+        profileText: pastedText,
       });
-      if (!r.ok) {
-        const d = await r.json();
-        throw new Error(d.error ?? "Errore durante l'analisi");
-      }
-      return r.json() as Promise<{ data: ExtractedProfile }>;
     },
     onMutate: () => setStep("analyzing"),
     onSuccess: (result) => {
@@ -118,21 +119,12 @@ export function LinkedInImportWizard({ open, onClose }: LinkedInImportWizardProp
 
   const importMut = useMutation({
     mutationFn: async () => {
-      const r = await apiFetch(`${BASE}api/linkedin/import`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profileText: pastedText,
-          extractedData: extracted,
-          importCertifications: importCerts,
-          importSummary,
-        }),
+      return postJson<ImportLinkedInResponse>(`${BASE}api/linkedin/import`, {
+        profileText: pastedText,
+        extractedData: extracted,
+        importCertifications: importCerts,
+        importSummary,
       });
-      if (!r.ok) {
-        const d = await r.json();
-        throw new Error(d.error ?? "Errore durante l'importazione");
-      }
-      return r.json();
     },
     onSuccess: (result) => {
       setImportResult(result);

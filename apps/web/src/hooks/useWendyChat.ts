@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { useWendy } from '../contexts/WendyProvider';
+import { useOptionalWendy } from '../contexts/WendyProvider';
 import { postJson } from '../lib/apiClient';
 import { clientLogger } from '../lib/clientLogger';
 import { TOKEN_STORAGE_KEY } from '../lib/storage-keys';
@@ -13,6 +13,7 @@ import {
 } from './useWendyActionExecutor';
 import { buildCompressedHistory, compactPageData } from './useWendyHistoryCompression';
 import { useWendyOpenAITTS } from './useWendyOpenAITTS.js';
+import { parseWendySseEvent, readNumberField, readStringField } from './useWendyChatSse';
 import { FATAL_ERRORS, THINKING_LABELS } from './wendy.config';
 
 export type MessageRole = 'user' | 'assistant' | 'error';
@@ -129,31 +130,26 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
   const actionExecutor = useWendyActionExecutor();
 
   // Global Wendy phase + page context
-  let _setPhase: ((p: 'idle' | 'thinking' | 'speaking' | 'listening') => void) | null = null;
-  let _wendyCtx: ReturnType<typeof useWendy> | null = null;
-  try { _wendyCtx = useWendy(); _setPhase = _wendyCtx.setPhase; } catch {}
+  const wendyCtx = useOptionalWendy();
+  const setWendyPhase = wendyCtx?.setPhase;
 
   // SSE stream
 
   const { start: startStream, stop: stopSSEStream, isStreaming } = useSSEStream({
     // Intercetta eventi SSE speciali (rag_citations) prima del testo
     onRawChunk: (raw: string) => {
-      try {
-        const data = JSON.parse(raw);
-        if (data?.type === 'status' && typeof data.value === 'string') {
+      const event = parseWendySseEvent(raw);
+      if (event.type === 'status') {
           if (!firstChunkReceivedRef.current) {
             setThinking((current) => ({
               active: true,
-              label: data.value as string,
+              label: event.value,
               startedAt: current.startedAt || Date.now(),
             }));
           }
           return true;
         }
-        if (data?.type === 'gate') {
-          const message = typeof data.message === 'string'
-            ? data.message
-            : 'Hai raggiunto un limite di utilizzo di Wendy.';
+        if (event.type === 'gate') {
           hasNonTextOutputRef.current = true;
           hasTerminalErrorRef.current = true;
           setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
@@ -161,21 +157,18 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantMsgIdRef.current
-                ? { ...m, role: 'error', content: message, isStreaming: false }
+                ? { ...m, role: 'error', content: event.message, isStreaming: false }
                 : m,
             ),
           );
           return true;
         }
-        if (data?.type === 'error') {
-          const technicalMessage = typeof data.message === 'string'
-            ? data.message
-            : 'Wendy non ha risposto correttamente.';
+        if (event.type === 'error') {
           const message = 'Wendy si è interrotta. Riprova.';
           hasNonTextOutputRef.current = true;
           hasTerminalErrorRef.current = true;
           setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
-          setStreamError(new Error(technicalMessage));
+          setStreamError(new Error(event.message));
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantMsgIdRef.current
@@ -185,36 +178,37 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
           );
           return true;
         }
-        if (data?.type === 'rag_citations' && Array.isArray(data.citations)) {
-          pendingCitationsRef.current = data.citations as RagCitation[];
+        if (event.type === 'rag_citations') {
+          pendingCitationsRef.current = event.citations;
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantMsgIdRef.current
-                ? { ...m, citations: data.citations }
+                ? { ...m, citations: event.citations }
                 : m,
             ),
           );
           return true;
         }
         // Cattura requestId e toolsUsed dal done event
-        if (data?.type === 'done') {
-          if (data.requestId) lastRequestIdRef.current = data.requestId as string;
+        if (event.type === 'done') {
+          if (event.requestId) lastRequestIdRef.current = event.requestId;
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantMsgIdRef.current
-                ? { ...m, requestId: data.requestId as string | undefined, toolsUsed: [...toolsUsedRef.current] }
+                ? { ...m, requestId: event.requestId, toolsUsed: [...toolsUsedRef.current] }
                 : m,
             ),
           );
+          return true;
         }
         // Cattura tool_call per mostrarlo nella UI
-        if (data?.type === 'tool_call' && typeof data.name === 'string') {
+        if (event.type === 'tool_call') {
           hasNonTextOutputRef.current = true;
-          toolsUsedRef.current = [...toolsUsedRef.current, data.name as string];
+          toolsUsedRef.current = [...toolsUsedRef.current, event.name];
           const action = normalizeWendyAction({
-            name: data.name as string,
-            args: data.args as Record<string, unknown> | undefined,
-            result: data.result,
+            name: event.name,
+            args: event.args,
+            result: event.result,
           });
           if (action) {
             const nextAction = action.requiresConfirmation ? action : actionExecutor.executeImmediate(action);
@@ -228,33 +222,22 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
           }
           return true;
         }
-        if (data?.type === 'ui_tool' && data?.name) {
+        if (event.type === 'ui_tool') {
           hasNonTextOutputRef.current = true;
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantMsgIdRef.current
                 ? {
                     ...m,
-                    uiTool: { name: data.name as string, args: data.args as Record<string, unknown> },
+                    uiTool: { name: event.name, args: event.args },
                   }
                 : m,
             ),
           );
           return true;
         }
-        const tokenChunk =
-          data?.type === 'token' && typeof data.value === 'string'
-            ? data.value
-            : data?.type === 'token' && typeof data.content === 'string'
-              ? data.content
-            : data?.type === 'token' && typeof data.text === 'string'
-              ? data.text
-            : typeof data?.choices?.[0]?.delta?.content === 'string'
-              ? data.choices[0].delta.content
-              : '';
-
-        if (tokenChunk) {
-          streamedContentRef.current += tokenChunk;
+        if (event.type === 'token') {
+          streamedContentRef.current += event.value;
           if (!firstChunkReceivedRef.current) {
             firstChunkReceivedRef.current = true;
             setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
@@ -267,9 +250,6 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
             ),
           );
         }
-      } catch {
-        // ignore JSON parse errors
-      }
       return false; // gestisci normalmente
     },
 
@@ -331,7 +311,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
       retriesRef.current = 0;
 
-      if (_setPhase) _setPhase('idle');
+      setWendyPhase?.('idle');
       if (ttsEnabled && completedContent.trim()) {
         openaiTts.play(completedContent).catch(() => {
           if (tts.supported) tts.speak(completedContent, sttLang);
@@ -347,7 +327,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
         setTimeout(() => _doStream(lastUserMessageRef.current), 1000 * retriesRef.current);
         return;
       }
-      if (_setPhase) _setPhase('idle');
+      setWendyPhase?.('idle');
       setStreamError(err);
       setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
       setMessages((prev) => {
@@ -378,8 +358,8 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
           : m,
       ),
     );
-    if (_setPhase) _setPhase('idle');
-  }, [stopSSEStream, _setPhase]);
+    setWendyPhase?.('idle');
+  }, [stopSSEStream, setWendyPhase, defaultThinkingLabel]);
 
   // Helpers
 
@@ -415,7 +395,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     setThinking({ active: true, label: THINKING_LABELS[labelIdx] ?? defaultThinkingLabel, startedAt: Date.now() });
     setStreamError(null);
 
-    if (_setPhase) _setPhase('thinking');
+    setWendyPhase?.('thinking');
 
     const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -425,13 +405,13 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     const compressed = buildCompressedHistory(historyRef.current, threadSummaryRef.current);
 
     // Page context dal WendyProvider (se disponibile)
-    const currentPage = _wendyCtx?.pageContext;
+    const currentPage = wendyCtx?.pageContext;
     const pageContext = currentPage ? {
       page:       currentPage.page,
-      entityType: (currentPage.data?.entityType as string) ?? undefined,
-      entityId:   (currentPage.data?.entityId as number)   ?? undefined,
-      entityName: (currentPage.data?.entityName as string) ?? undefined,
-      journeyType:(currentPage.data?.journeyType as string)?? undefined,
+      entityType: readStringField(currentPage.data, 'entityType'),
+      entityId:   readNumberField(currentPage.data, 'entityId'),
+      entityName: readStringField(currentPage.data, 'entityName'),
+      journeyType: readStringField(currentPage.data, 'journeyType'),
       data:       compactPageData(currentPage.data),
     } : undefined;
 

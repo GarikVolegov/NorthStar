@@ -4,7 +4,7 @@
  */
 import { Button } from "@/components/ui/button";
 import { CATEGORY_LABELS, CERTIFICATE_CATEGORY_COLORS } from "@/lib/constants";
-import { apiFetch } from "@/lib/api-fetch";
+import { getJson } from "@/lib/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -66,11 +66,7 @@ export default function CertificatePage() {
 
   const { data, isLoading, isError } = useQuery<VerifyResult>({
     queryKey: ["verify-cert", hash],
-    queryFn: async () => {
-      const r = await apiFetch(`${BASE}api/nft-certificates/verify/${hash}`);
-      if (!r.ok) throw new Error("not found");
-      return r.json();
-    },
+    queryFn: () => getJson<VerifyResult>(`${BASE}api/nft-certificates/verify/${hash}`),
     enabled: !!hash,
     retry: false,
     staleTime: Infinity,

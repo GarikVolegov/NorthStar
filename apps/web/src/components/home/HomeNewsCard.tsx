@@ -2,7 +2,8 @@ import { cn } from "@/lib/utils";
 import { ChevronRight, Clock } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
-import { CAT_COLOR, CAT_EMOJI, HomeNewsItem } from "./types";
+import { CAT_COLOR, CAT_EMOJI } from "./types";
+import type { HomeNewsItem } from "./types";
 
 interface HomeNewsCardProps {
   item: HomeNewsItem;
@@ -39,7 +40,9 @@ export function HomeNewsCard({ item }: HomeNewsCardProps) {
             alt={item.title}
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
           />
         </div>
       ) : (

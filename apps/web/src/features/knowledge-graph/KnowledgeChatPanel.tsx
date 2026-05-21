@@ -2,7 +2,7 @@ import { TYPE_META } from "@/components/knowledge-graph/types";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useSSEStream } from "@/hooks/useSSEStream";
-import { apiFetch } from "@/lib/api-fetch";
+import { stream } from "@/lib/apiClient";
 import { ChevronRight, Loader2, MessageCircleQuestion, Send, Sparkles, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { KNode, NodeType } from "./knowledgeGraphTypes";
@@ -27,6 +27,79 @@ interface ChatPanelProps {
   nodes: KNode[];
   onClose: () => void;
   onFocusNode: (id: number) => void;
+}
+
+type KnowledgeAskEvent =
+  | { kind: "content"; content: string }
+  | { kind: "status"; status: string }
+  | { kind: "citations"; citations: Citation[]; neighbors?: Citation[] }
+  | { kind: "error"; error: string };
+
+function isNodeType(value: unknown): value is NodeType {
+  return typeof value === "string" && value in TYPE_META;
+}
+
+function parseCitation(value: unknown): Citation | null {
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as {
+    id?: unknown;
+    title?: unknown;
+    type?: unknown;
+    score?: unknown;
+  };
+  if (
+    typeof record.id !== "number" ||
+    typeof record.title !== "string" ||
+    !isNodeType(record.type)
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    title: record.title,
+    type: record.type,
+    ...(typeof record.score === "number" ? { score: record.score } : {}),
+  };
+}
+
+function parseCitations(value: unknown): Citation[] {
+  return Array.isArray(value)
+    ? value.map(parseCitation).filter((item): item is Citation => item !== null)
+    : [];
+}
+
+function parseKnowledgeAskEvent(chunk: string): KnowledgeAskEvent | null {
+  try {
+    const parsed = JSON.parse(chunk) as unknown;
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const record = parsed as {
+      content?: unknown;
+      status?: unknown;
+      citations?: unknown;
+      neighbors?: unknown;
+      error?: unknown;
+    };
+    if (typeof record.content === "string") {
+      return { kind: "content", content: record.content };
+    }
+    if (typeof record.status === "string") {
+      return { kind: "status", status: record.status };
+    }
+    if (Array.isArray(record.citations)) {
+      const neighbors = parseCitations(record.neighbors);
+      return {
+        kind: "citations",
+        citations: parseCitations(record.citations),
+        ...(neighbors.length > 0 ? { neighbors } : {}),
+      };
+    }
+    if (typeof record.error === "string") {
+      return { kind: "error", error: record.error };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 // ── ChatPanel — SSE via useSSEStream (regola 4.1) ────────────────────────
@@ -79,7 +152,7 @@ export function KnowledgeChatPanel({
     // useSSEStream gestisce il fetch; per i messaggi strutturati (citations, status)
     // usiamo il pattern manuale solo per il parsing SSE semantico
     try {
-      const res = await apiFetch(`${BASE}api/knowledge/ask`, {
+      const res = await stream(`${BASE}api/knowledge/ask`, {
         method: "POST",
         body: JSON.stringify({ question: q }),
       });
@@ -95,37 +168,34 @@ export function KnowledgeChatPanel({
         buffer = parts.pop() ?? "";
         for (const part of parts) {
           if (!part.startsWith("data: ")) continue;
-          try {
-            const data = JSON.parse(part.slice(6));
-            setMessages((prev) => {
-              const next = prev.slice();
-              const last = next[next.length - 1];
-              if (!last || last.role !== "assistant") return prev;
-              if (data.content)
-                next[next.length - 1] = {
-                  ...last,
-                  content: last.content + data.content,
-                  status: undefined,
-                };
-              else if (data.status)
-                next[next.length - 1] = { ...last, status: data.status };
-              else if (data.citations)
-                next[next.length - 1] = {
-                  ...last,
-                  citations: data.citations,
-                  neighbors: data.neighbors,
-                };
-              else if (data.error)
-                next[next.length - 1] = {
-                  ...last,
-                  error: data.error,
-                  status: undefined,
-                };
-              return next;
-            });
-          } catch {
-            /* malformed sse */
-          }
+          const data = parseKnowledgeAskEvent(part.slice(6));
+          if (!data) continue;
+          setMessages((prev) => {
+            const next = prev.slice();
+            const last = next[next.length - 1];
+            if (!last || last.role !== "assistant") return prev;
+            if (data.kind === "content")
+              next[next.length - 1] = {
+                ...last,
+                content: last.content + data.content,
+                status: undefined,
+              };
+            else if (data.kind === "status")
+              next[next.length - 1] = { ...last, status: data.status };
+            else if (data.kind === "citations")
+              next[next.length - 1] = {
+                ...last,
+                citations: data.citations,
+                neighbors: data.neighbors,
+              };
+            else if (data.kind === "error")
+              next[next.length - 1] = {
+                ...last,
+                error: data.error,
+                status: undefined,
+              };
+            return next;
+          });
         }
       }
     } catch (err) {

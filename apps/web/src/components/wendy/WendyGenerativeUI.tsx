@@ -53,6 +53,8 @@ interface RiasecScores {
   R: number; I: number; A: number; S: number; E: number; C: number;
 }
 
+const RIASEC_KEYS = ['R', 'I', 'A', 'S', 'E', 'C'] as const;
+
 const RIASEC_COLORS: Record<keyof RiasecScores, string> = {
   R: 'hsl(var(--chart-1))', I: 'hsl(var(--chart-4))', A: 'hsl(var(--chart-5))',
   S: 'hsl(var(--chart-2))', E: 'hsl(var(--chart-1))', C: 'hsl(var(--chart-3))',
@@ -63,12 +65,12 @@ const RIASEC_LABELS: Record<keyof RiasecScores, string> = {
 };
 
 function RiasecBarChart({ scores, title }: { scores: RiasecScores; title?: string }) {
-  const max = Math.max(...Object.values(scores), 1);
+  const max = Math.max(...RIASEC_KEYS.map((key) => scores[key]), 1);
   return (
     <div className="p-4">
       {title && <p className="mb-3 text-sm font-semibold text-white/80">{title}</p>}
       <div className="space-y-2">
-        {(Object.keys(scores) as (keyof RiasecScores)[]).map((k) => (
+        {RIASEC_KEYS.map((k) => (
           <div key={k} className="flex items-center gap-2">
             <span
               className="w-24 shrink-0 text-[11px] font-medium"
@@ -139,7 +141,11 @@ function InterviewChecklist({ items, title }: { items: string[]; title?: string 
   const toggle = (i: number) => {
     setChecked((prev) => {
       const next = new Set(prev);
-      next.has(i) ? next.delete(i) : next.add(i);
+      if (next.has(i)) {
+        next.delete(i);
+      } else {
+        next.add(i);
+      }
       return next;
     });
   };

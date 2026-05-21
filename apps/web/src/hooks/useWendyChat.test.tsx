@@ -1,18 +1,21 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { WendyAction } from "./useWendyActionExecutor";
+
+type SseOptions = {
+  onRawChunk?: (raw: string) => boolean;
+  onComplete?: (content: string) => void;
+  onError?: (error: Error) => void;
+};
 
 const sse = vi.hoisted(() => ({
   start: vi.fn(),
   stop: vi.fn(),
-  options: undefined as undefined | {
-    onRawChunk?: (raw: string) => boolean;
-    onComplete?: (content: string) => void;
-    onError?: (error: Error) => void;
-  },
+  options: undefined as undefined | SseOptions,
 }));
 
 vi.mock("./useSSEStream.js", () => ({
-  useSSEStream: vi.fn((options) => {
+  useSSEStream: vi.fn((options: SseOptions) => {
     sse.options = options;
     return {
       start: sse.start,
@@ -28,6 +31,7 @@ vi.mock("./useSSEStream.js", () => ({
 
 vi.mock("../contexts/WendyProvider", () => ({
   useWendy: () => ({ setPhase: vi.fn(), pageContext: null }),
+  useOptionalWendy: () => ({ setPhase: vi.fn(), pageContext: null }),
 }));
 
 vi.mock("./useTTS.js", () => ({
@@ -50,15 +54,15 @@ vi.mock("./useWendyOpenAITTS.js", () => ({
 vi.mock("./useWendyActionExecutor", () => ({
   normalizeWendyAction: vi.fn(() => null),
   useWendyActionExecutor: () => ({
-    executeImmediate: vi.fn((action) => action),
-    confirm: vi.fn(async (action) => action),
-    cancel: vi.fn((action) => action),
+    executeImmediate: vi.fn((action: WendyAction) => action),
+    confirm: vi.fn(async (action: WendyAction) => action),
+    cancel: vi.fn((action: WendyAction) => action),
   }),
 }));
 
 vi.mock("./useWendyHistoryCompression", () => ({
   buildCompressedHistory: vi.fn(() => ({ messages: [] })),
-  compactPageData: vi.fn((data) => data),
+  compactPageData: vi.fn((data: Record<string, unknown> | undefined) => data),
 }));
 
 import { useWendyChat } from "./useWendyChat";

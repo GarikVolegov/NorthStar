@@ -3,8 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
-import { apiFetch } from "@/lib/api-fetch";
-import { getJson } from "@/lib/apiClient";
+import { deleteJson, getJson, postJson } from "@/lib/apiClient";
 import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -24,6 +23,10 @@ interface NewsItem {
 
 interface ProfileData {
   exploredSectors: Array<{ sectorId: number; name: string; icon: string; confirmed: boolean }>;
+}
+
+interface NewsSubscriptionsResponse {
+  subscriptions?: string[];
 }
 
 const CATEGORY_CONFIG = [
@@ -235,10 +238,12 @@ export default function News() {
   const { data: subsData } = useQuery<string[]>({
     queryKey: ["news-subscriptions", user?.id],
     queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/news/subscriptions`);
-      if (!res.ok) return [];
-      const json = await res.json();
-      return json.subscriptions ?? [];
+      try {
+        const json = await getJson<NewsSubscriptionsResponse>(`${BASE}api/news/subscriptions`);
+        return json.subscriptions ?? [];
+      } catch {
+        return [];
+      }
     },
     enabled: !!user?.id && user.id > 0,
     staleTime: 60_000,
@@ -248,13 +253,9 @@ export default function News() {
   const subMutation = useMutation({
     mutationFn: async ({ category, subscribe }: { category: string; subscribe: boolean }) => {
       if (subscribe) {
-        await apiFetch(`${BASE}api/news/subscriptions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ category }),
-        });
+        await postJson(`${BASE}api/news/subscriptions`, { category });
       } else {
-        await apiFetch(`${BASE}api/news/subscriptions/${category}`, { method: "DELETE" });
+        await deleteJson(`${BASE}api/news/subscriptions/${category}`);
       }
     },
     onSuccess: () => {
@@ -277,7 +278,6 @@ export default function News() {
         staleTime: NEWS_STALE_MS,
       });
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

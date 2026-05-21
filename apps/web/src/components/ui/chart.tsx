@@ -1,5 +1,10 @@
 import * as React from "react";
 import * as RechartsPrimitive from "recharts";
+import type {
+  NameType,
+  Payload as TooltipPayload,
+  ValueType,
+} from "recharts/types/component/DefaultTooltipContent";
 
 import { cn } from "@/lib/utils";
 
@@ -22,6 +27,8 @@ export type ChartConfig = {
 type ChartContextProps = {
   config: ChartConfig;
 };
+
+type ChartTooltipPayload = TooltipPayload<ValueType, NameType>;
 
 const ChartContext = React.createContext<ChartContextProps | null>(null);
 
@@ -142,7 +149,12 @@ const ChartTooltipContent = React.forwardRef<
         return null;
       }
 
-      const [item] = payload;
+      const tooltipPayload = normalizeTooltipPayload(payload);
+      const [item] = tooltipPayload;
+      if (!item) {
+        return null;
+      }
+
       const key = `${labelKey || item?.dataKey || item?.name || "value"}`;
       const itemConfig = getPayloadConfigFromPayload(config, item, key);
       const value =
@@ -189,12 +201,13 @@ const ChartTooltipContent = React.forwardRef<
       >
         {!nestLabel ? tooltipLabel : null}
         <div className="grid gap-1.5">
-          {payload
+          {normalizeTooltipPayload(payload)
             .filter((item) => item.type !== "none")
             .map((item, index) => {
               const key = `${nameKey || item.name || item.dataKey || "value"}`;
               const itemConfig = getPayloadConfigFromPayload(config, item, key);
-              const indicatorColor = color || item.payload.fill || item.color;
+              const indicatorColor =
+                color || getRecordString(item.payload, "fill") || item.color;
 
               return (
                 <div
@@ -205,7 +218,13 @@ const ChartTooltipContent = React.forwardRef<
                   )}
                 >
                   {formatter && item?.value !== undefined && item.name ? (
-                    formatter(item.value, item.name, item, index, item.payload)
+                    formatter(
+                      item.value,
+                      item.name,
+                      item,
+                      index,
+                      normalizeTooltipPayload(payload),
+                    )
                   ) : (
                     <>
                       {itemConfig?.icon ? (
@@ -291,7 +310,7 @@ const ChartLegendContent = React.forwardRef<
           className,
         )}
       >
-        {payload
+        {normalizeLegendPayload(payload)
           .filter((item) => item.type !== "none")
           .map((item) => {
             const key = `${nameKey || item.dataKey || "value"}`;
@@ -299,7 +318,7 @@ const ChartLegendContent = React.forwardRef<
 
             return (
               <div
-                key={item.value}
+                key={getLegendKey(item)}
                 className={cn(
                   "flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground",
                 )}
@@ -310,7 +329,8 @@ const ChartLegendContent = React.forwardRef<
                   <div
                     className="h-2 w-2 shrink-0 rounded-[2px]"
                     style={{
-                      backgroundColor: item.color,
+                      backgroundColor:
+                        typeof item.color === "string" ? item.color : undefined,
                     }}
                   />
                 )}
@@ -323,6 +343,56 @@ const ChartLegendContent = React.forwardRef<
   },
 );
 ChartLegendContent.displayName = "ChartLegend";
+
+function normalizeTooltipPayload(payload: unknown): ChartTooltipPayload[] {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload.filter(isChartTooltipPayload);
+}
+
+function isChartTooltipPayload(value: unknown): value is ChartTooltipPayload {
+  return typeof value === "object" && value !== null;
+}
+
+type ChartLegendPayload = NonNullable<
+  RechartsPrimitive.LegendProps["payload"]
+>[number];
+
+function normalizeLegendPayload(payload: unknown): ChartLegendPayload[] {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload.filter(isChartLegendPayload);
+}
+
+function isChartLegendPayload(value: unknown): value is ChartLegendPayload {
+  return typeof value === "object" && value !== null;
+}
+
+function getLegendKey(item: ChartLegendPayload): string {
+  const value = "value" in item ? (item as { value?: unknown }).value : undefined;
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+
+  const dataKey =
+    "dataKey" in item ? (item as { dataKey?: unknown }).dataKey : undefined;
+  return typeof dataKey === "string" || typeof dataKey === "number"
+    ? String(dataKey)
+    : "legend-item";
+}
+
+function getRecordString(value: unknown, key: string): string | undefined {
+  if (typeof value !== "object" || value === null || !(key in value)) {
+    return undefined;
+  }
+
+  const field = (value as Record<string, unknown>)[key];
+  return typeof field === "string" ? field : undefined;
+}
 
 // Helper to extract item config from a payload.
 function getPayloadConfigFromPayload(

@@ -174,9 +174,13 @@ export default function SkillsGap() {
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           try {
-            const data = JSON.parse(line.slice(6));
-            if (data.content) {
-              accumulated += data.content;
+            const data = JSON.parse(line.slice(6)) as unknown;
+            const content =
+              typeof data === "object" && data !== null && "content" in data && typeof data.content === "string"
+                ? data.content
+                : "";
+            if (content) {
+              accumulated += content;
               setResult(accumulated);
             }
           } catch {

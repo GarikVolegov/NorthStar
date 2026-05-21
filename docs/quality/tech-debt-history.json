@@ -77,6 +77,60 @@
         "adminHardcodedColors": 249,
         "productionDbAny": 0
       }
+    },
+    {
+      "sprint": "foundation-admin-design-tokens",
+      "date": "2026-05-20",
+      "tracked": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 113,
+        "productionDbAny": 0
+      },
+      "gated": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 113,
+        "productionDbAny": 0
+      }
+    },
+    {
+      "sprint": "foundation-admin-design-tokens-2",
+      "date": "2026-05-20",
+      "tracked": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 43,
+        "productionDbAny": 0
+      },
+      "gated": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 43,
+        "productionDbAny": 0
+      }
+    },
+    {
+      "sprint": "foundation-admin-design-tokens-zero",
+      "date": "2026-05-20",
+      "tracked": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 0,
+        "productionDbAny": 0
+      },
+      "gated": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 0,
+        "productionDbAny": 0
+      }
     }
   ]
 }

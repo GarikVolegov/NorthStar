@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch } from "@/lib/api-fetch";
+import { getJson, stream } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useGetSector } from "@workspace/api-client-react";
 import {
@@ -23,30 +23,10 @@ import {
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "wouter";
+import { parseStoredGraph, readChatChunkText } from "./grafo-storage";
+import type { GraphData, GraphEdge, GraphNode } from "./grafo-types";
 
 const BASE = import.meta.env.BASE_URL || "/";
-
-interface GraphNode {
-  id: string;
-  label: string;
-  type: "role" | "skill" | "tool" | "certification";
-  description: string;
-  userAdded?: boolean;
-  x?: number;
-  y?: number;
-}
-
-interface GraphEdge {
-  from: string;
-  to: string;
-  label?: string;
-  userAdded?: boolean;
-}
-
-interface GraphData {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-}
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -195,7 +175,7 @@ export default function Grafo() {
     const raw = localStorage.getItem(storageKey(id, user.id));
     if (raw) {
       try {
-        const parsed = JSON.parse(raw);
+        const parsed = parseStoredGraph(raw);
         setUserNodes(parsed.nodes ?? []);
         setUserEdges(parsed.edges ?? []);
       } catch {
@@ -229,9 +209,7 @@ export default function Grafo() {
       setIsLoading(true);
       try {
         const url = `${BASE}api/grafo/${id}${force ? "?refresh=1" : ""}`;
-        const res = await apiFetch(url);
-        if (!res.ok) throw new Error("Error");
-        const data: GraphData = await res.json();
+        const data = await getJson<GraphData>(url);
         setAiGraph(data);
       } catch {
         /* silent */
@@ -449,7 +427,7 @@ export default function Grafo() {
     setChatMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
     try {
-      const res = await apiFetch(`${BASE}api/grafo/${id}/chat`, {
+      const res = await stream(`${BASE}api/grafo/${id}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -478,9 +456,9 @@ export default function Grafo() {
           const payload = line.slice(6).trim();
           if (payload === "[DONE]") break;
           try {
-            const parsed = JSON.parse(payload);
-            if (parsed.text) {
-              accumulated += parsed.text;
+            const text = readChatChunkText(payload);
+            if (text) {
+              accumulated += text;
               setChatMessages((prev) => {
                 const updated = [...prev];
                 updated[assistantIndex] = {

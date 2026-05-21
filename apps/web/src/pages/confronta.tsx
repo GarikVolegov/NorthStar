@@ -1,9 +1,7 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { getJson } from "@/lib/apiClient";
 import { RIASEC_LABELS, SectorIcon } from "@/lib/sector-icon";
 import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   BarChart2,
@@ -23,17 +21,8 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
-
-const BASE = import.meta.env.BASE_URL || "/";
-
-type Sector = {
-  id: number; name: string; icon: string; description: string;
-  riasecTypes: string[]; skills: string[]; avgSalaryMin: number;
-  avgSalaryMax: number; growthRate: number; automationRisk: string;
-  scalability: string; trend: string; timeToAutonomy: string;
-  advantages: string[]; disadvantages: string[]; opportunities: string[];
-  color: string;
-};
+import { SalaryBar, WinnerBadge } from "./confronta-components";
+import { useAllSectors, type Sector } from "./confronta-data";
 
 const TREND_META: Record<string, { label: string; color: string; score: number }> = {
   booming:  { label: "In forte crescita", color: "text-emerald-700 bg-emerald-50 border-emerald-200", score: 4 },
@@ -46,16 +35,6 @@ const RISK_META: Record<string, { label: string; color: string; score: number }>
   medium: { label: "Medio",  color: "text-amber-700 bg-amber-50 border-amber-200",       score: 2 },
   high:   { label: "Alto",   color: "text-rose-700 bg-rose-50 border-rose-200",           score: 1 },
 };
-function useAllSectors() {
-  return useQuery<Sector[]>({
-    queryKey: ["all-sectors-compare"],
-    queryFn: async () => {
-      return getJson<Sector[]>(`${BASE}api/sectors`);
-    },
-    staleTime: 300_000,
-  });
-}
-
 function SectorPicker({
   sectors, value, onChange, label, otherValue,
 }: {
@@ -145,28 +124,6 @@ function SectorPicker({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function WinnerBadge({ side }: { side: "left" | "right" | "tie" }) {
-  const { t } = useTranslation();
-  if (side === "tie") return <span className="text-xs text-muted-foreground font-medium px-2 py-0.5 rounded-full bg-muted">{t("confronta.tie")}</span>;
-  return (
-    <span className={cn(
-      "text-xs font-bold px-2 py-0.5 rounded-full",
-      side === "left" ? "bg-primary/15 text-primary" : "bg-violet-100 text-violet-700"
-    )}>
-      {t("confronta.best")}
-    </span>
-  );
-}
-
-function SalaryBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
-  return (
-    <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: color }} />
     </div>
   );
 }

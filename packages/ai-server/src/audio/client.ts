@@ -26,6 +26,24 @@ export const openai = new OpenAI({
 });
 
 export type AudioFormat = "wav" | "mp3" | "webm" | "mp4" | "ogg" | "unknown";
+type AudioPayload = { transcript?: string; data?: string };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readAudioPayload(value: unknown): AudioPayload {
+  if (!isRecord(value)) return {};
+  const audio = isRecord(value.audio) ? value.audio : {};
+  const payload: AudioPayload = {};
+  if (typeof audio.transcript === "string") payload.transcript = audio.transcript;
+  if (typeof audio.data === "string") payload.data = audio.data;
+  return payload;
+}
+
+function readMessageText(value: unknown): string {
+  return isRecord(value) && typeof value.content === "string" ? value.content : "";
+}
 
 /**
  * Detect audio format from buffer magic bytes.
@@ -129,9 +147,10 @@ export async function voiceChat(
       ],
     }],
   });
-  const message = response.choices[0]?.message as any;
-  const transcript = message?.audio?.transcript || message?.content || "";
-  const audioData = message?.audio?.data ?? "";
+  const message = response.choices[0]?.message;
+  const audio = readAudioPayload(message);
+  const transcript = audio.transcript || readMessageText(message);
+  const audioData = audio.data ?? "";
   return {
     transcript,
     audioResponse: Buffer.from(audioData, "base64"),
@@ -160,13 +179,12 @@ export async function voiceChatStream(
 
   return (async function* () {
     for await (const chunk of stream) {
-      const delta = chunk.choices?.[0]?.delta as any;
-      if (!delta) continue;
-      if (delta?.audio?.transcript) {
-        yield { type: "transcript", data: delta.audio.transcript };
+      const audio = readAudioPayload(chunk.choices?.[0]?.delta);
+      if (audio.transcript) {
+        yield { type: "transcript", data: audio.transcript };
       }
-      if (delta?.audio?.data) {
-        yield { type: "audio", data: delta.audio.data };
+      if (audio.data) {
+        yield { type: "audio", data: audio.data };
       }
     }
   })();
@@ -187,7 +205,7 @@ export async function textToSpeech(
       { role: "user", content: `Repeat the following text verbatim: ${text}` },
     ],
   });
-  const audioData = (response.choices[0]?.message as any)?.audio?.data ?? "";
+  const audioData = readAudioPayload(response.choices[0]?.message).data ?? "";
   return Buffer.from(audioData, "base64");
 }
 
@@ -209,10 +227,9 @@ export async function textToSpeechStream(
 
   return (async function* () {
     for await (const chunk of stream) {
-      const delta = chunk.choices?.[0]?.delta as any;
-      if (!delta) continue;
-      if (delta?.audio?.data) {
-        yield delta.audio.data;
+      const audio = readAudioPayload(chunk.choices?.[0]?.delta);
+      if (audio.data) {
+        yield audio.data;
       }
     }
   })();

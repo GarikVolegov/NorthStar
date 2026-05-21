@@ -360,7 +360,7 @@ export type AdminOpsStatus = {
     databaseRestart: boolean;
   };
   server: {
-    status: "online" | "degraded" | "offline" | string;
+    status: string;
     uptimeSeconds: number;
     pid: number;
     nodeVersion: string;
@@ -370,7 +370,7 @@ export type AdminOpsStatus = {
     docker: { status: string; label: string };
   };
   database: {
-    status: "online" | "maintenance" | "offline" | string;
+    status: string;
     ready: boolean;
     maintenance: {
       enabled: boolean;

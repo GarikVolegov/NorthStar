@@ -2,7 +2,7 @@ import { AdminAuthGate } from "@/components/AdminAuthGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
-import { apiFetch } from "@/lib/api-fetch";
+import { getJson, patchJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import {
   CheckCheck,
@@ -31,12 +31,12 @@ const SUBJECTS: Record<string, string> = {
 };
 
 const SUBJECT_COLORS: Record<string, string> = {
-  info: "bg-blue-100 text-blue-700",
-  supporto: "bg-orange-100 text-orange-700",
-  premium: "bg-yellow-100 text-yellow-700",
-  privacy: "bg-emerald-100 text-emerald-700",
-  feedback: "bg-purple-100 text-purple-700",
-  altro: "bg-slate-100 text-slate-700",
+  info: "bg-info-surface text-info",
+  supporto: "bg-warning-surface text-warning",
+  premium: "bg-warning-surface text-warning",
+  privacy: "bg-success-surface text-success",
+  feedback: "bg-info-surface text-info",
+  altro: "bg-muted text-muted-foreground",
 };
 
 type Message = {
@@ -80,11 +80,9 @@ export default function AdminMessaggi() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiFetch(`${BASE}api/contact/messages`, {
+      const data = await getJson<Message[]>(`${BASE}api/contact/messages`, {
         headers: { Authorization: `Bearer ${adminKey}` },
       });
-      if (!res.ok) throw new Error("Errore caricamento");
-      const data: Message[] = await res.json();
       setMessages(data);
     } catch {
       setError("Errore di rete. Riprova.");
@@ -98,8 +96,7 @@ export default function AdminMessaggi() {
   }, [key, fetchMessages]);
 
   async function markRead(id: number) {
-    await apiFetch(`${BASE}api/contact/messages/${id}/read`, {
-      method: "PATCH",
+    await patchJson(`${BASE}api/contact/messages/${id}/read`, undefined, {
       headers: { Authorization: `Bearer ${key}` },
     });
     setMessages((prev) =>
@@ -139,7 +136,7 @@ export default function AdminMessaggi() {
       title="Admin Messaggi"
       description="Gestisci i messaggi di contatto degli utenti"
     >
-      <div className="min-h-screen bg-slate-50/50">
+      <div className="min-h-screen bg-muted/20">
         {/* Top bar */}
         <div className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
           <div className="container mx-auto px-4 max-w-5xl flex h-14 items-center justify-between gap-4">
@@ -191,7 +188,7 @@ export default function AdminMessaggi() {
               {
                 label: "Letti",
                 value: totalCount - unreadCount,
-                color: "text-emerald-600",
+                color: "text-success",
               },
               {
                 label: "Mostrati",
@@ -395,7 +392,7 @@ export default function AdminMessaggi() {
                         {!msg.read && (
                           <button
                             onClick={() => markRead(msg.id)}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:underline"
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-success hover:underline"
                           >
                             <CheckCheck className="w-3.5 h-3.5" />
                             Segna come letto

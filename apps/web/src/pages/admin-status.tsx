@@ -56,30 +56,28 @@ interface HealthData {
 }
 
 function statusColor(s: string) {
-  if (s === "ok") return "text-emerald-600 dark:text-emerald-400";
-  if (s === "degraded" || s === "not_configured")
-    return "text-amber-500 dark:text-amber-400";
-  return "text-red-500 dark:text-red-400";
+  if (s === "ok") return "text-success";
+  if (s === "degraded" || s === "not_configured") return "text-warning";
+  return "text-danger";
 }
 
 function statusBg(s: string) {
-  if (s === "ok")
-    return "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800";
+  if (s === "ok") return "bg-success-surface border-success-muted";
   if (s === "degraded" || s === "not_configured")
-    return "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800";
-  return "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800";
+    return "bg-warning-surface border-warning-muted";
+  return "bg-danger-surface border-danger-muted";
 }
 
 function StatusIcon({ status, size = 20 }: { status: string; size?: number }) {
   if (status === "ok")
-    return <CheckCircle2 size={size} className="text-emerald-500" />;
+    return <CheckCircle2 size={size} className="text-success" />;
   if (status === "not_configured")
-    return <AlertTriangle size={size} className="text-amber-500" />;
+    return <AlertTriangle size={size} className="text-warning" />;
   if (status === "degraded")
-    return <AlertTriangle size={size} className="text-amber-500" />;
+    return <AlertTriangle size={size} className="text-warning" />;
   if (status === "timeout" || status === "unreachable")
-    return <Wifi size={size} className="text-orange-500" />;
-  return <XCircle size={size} className="text-red-500" />;
+    return <Wifi size={size} className="text-warning" />;
+  return <XCircle size={size} className="text-danger" />;
 }
 
 function ServiceCard({
@@ -217,13 +215,13 @@ function IntegrationGuideCard({
   const [open, setOpen] = useState(false);
   return (
     <Card
-      className={`border transition-colors ${isMissing ? "border-amber-200 dark:border-amber-800" : "border-emerald-200 dark:border-emerald-800"}`}
+      className={`border transition-colors ${isMissing ? "border-warning-muted" : "border-success-muted"}`}
     >
       <CardContent className="pt-4 pb-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div
-              className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isMissing ? "bg-amber-100 text-amber-600 dark:bg-amber-950/30" : "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/30"}`}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isMissing ? "bg-warning-surface text-warning" : "bg-success-surface text-success"}`}
             >
               {guide.icon}
             </div>
@@ -233,14 +231,14 @@ function IntegrationGuideCard({
                 {isMissing ? (
                   <Badge
                     variant="outline"
-                    className="text-xs text-amber-600 border-amber-300"
+                    className="text-xs text-warning border-warning-muted"
                   >
                     Non configurato
                   </Badge>
                 ) : (
                   <Badge
                     variant="outline"
-                    className="text-xs text-emerald-600 border-emerald-300"
+                    className="text-xs text-success border-success-muted"
                   >
                     Attivo
                   </Badge>
@@ -260,7 +258,7 @@ function IntegrationGuideCard({
             </button>
           )}
           {!isMissing && (
-            <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+            <CheckCircle2 size={16} className="text-success shrink-0" />
           )}
         </div>
 
@@ -462,11 +460,11 @@ export default function AdminStatus() {
               </h2>
               {data && (
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-emerald-100 text-emerald-700 text-xs">
+                  <Badge className="bg-success-surface text-success text-xs">
                     {configuredCount} attive
                   </Badge>
                   {missingCount > 0 && (
-                    <Badge className="bg-amber-100 text-amber-700 text-xs">
+                    <Badge className="bg-warning-surface text-warning text-xs">
                       {missingCount} mancanti
                     </Badge>
                   )}
@@ -513,7 +511,7 @@ export default function AdminStatus() {
                   </div>
                   {data.env.missingRequired.length > 0 && (
                     <div className="space-y-1.5">
-                      <p className="text-xs font-semibold text-red-500 flex items-center gap-1">
+                      <p className="text-xs font-semibold text-danger flex items-center gap-1">
                         <XCircle size={12} /> Obbligatorie mancanti
                       </p>
                       <div className="flex flex-wrap gap-1.5">
@@ -531,7 +529,7 @@ export default function AdminStatus() {
                   )}
                   {data.env.missingRequired.length === 0 &&
                     data.env.missingOptional.length === 0 && (
-                      <p className="text-sm text-emerald-600 flex items-center gap-1.5">
+                      <p className="text-sm text-success flex items-center gap-1.5">
                         <CheckCircle2 size={14} /> Tutte le variabili
                         configurate
                       </p>

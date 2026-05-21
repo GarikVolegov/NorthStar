@@ -26,6 +26,13 @@ export interface LoginOptions {
   password?: string;
 }
 
+function readToken(body: unknown): string {
+  if (typeof body === "object" && body !== null && "token" in body && typeof body.token === "string") {
+    return body.token;
+  }
+  return "";
+}
+
 /**
  * loginViaApi — esegue login via API e inietta il token JWT in localStorage.
  * Più veloce e stabile del login via form UI.
@@ -46,8 +53,7 @@ export async function loginViaApi(
     200,
   );
 
-  const body = await res.json();
-  const token: string = body.token;
+  const token = readToken(await res.json());
   expect(
     token,
     "Il token JWT deve essere presente nella risposta di /api/auth/login",
@@ -68,10 +74,11 @@ export async function loginViaApi(
  * Utile per testare la dashboard affiliazione senza mock.
  */
 export async function loginAsAffiliate(page: Page): Promise<void> {
+  const email = process.env.TEST_AFFILIATE_EMAIL ?? process.env.TEST_USER_EMAIL;
+  const password = process.env.TEST_AFFILIATE_PASSWORD ?? process.env.TEST_USER_PASSWORD;
   await loginViaApi(page, {
-    email: process.env.TEST_AFFILIATE_EMAIL ?? process.env.TEST_USER_EMAIL,
-    password:
-      process.env.TEST_AFFILIATE_PASSWORD ?? process.env.TEST_USER_PASSWORD,
+    ...(email ? { email } : {}),
+    ...(password ? { password } : {}),
   });
 }
 
@@ -88,8 +95,7 @@ export async function loginAsTestUser(
     200,
   );
 
-  const body = await res.json();
-  const token: string = body.token;
+  const token = readToken(await res.json());
   expect(
     token,
     "Il token JWT deve essere presente nella risposta di /api/auth/login",

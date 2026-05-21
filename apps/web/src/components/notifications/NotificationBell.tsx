@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api-fetch";
+import { getJson, postJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Locale } from "date-fns";
@@ -19,6 +19,11 @@ interface NotificationLog {
   isRead: boolean;
   sentAt: string;
   eventId: number | null;
+}
+
+interface NotificationsResponse {
+  notifications: NotificationLog[];
+  unreadCount: number;
 }
 
 interface Props {
@@ -42,11 +47,10 @@ export function NotificationBell({ userId }: Props) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  const { data } = useQuery({
+  const { data } = useQuery<NotificationsResponse>({
     queryKey: ["notifications", userId],
     queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/notifications?limit=15`);
-      return res.json();
+      return getJson<NotificationsResponse>(`${BASE}api/notifications?limit=15`);
     },
     enabled: !!userId,
     refetchInterval: 60_000,
@@ -57,14 +61,14 @@ export function NotificationBell({ userId }: Props) {
 
   const readMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiFetch(`${BASE}api/notifications/${id}/read`, { method: "POST" });
+      await postJson<unknown>(`${BASE}api/notifications/${id}/read`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
   });
 
   const readAllMutation = useMutation({
     mutationFn: async () => {
-      await apiFetch(`${BASE}api/notifications/read-all`, { method: "POST" });
+      await postJson<unknown>(`${BASE}api/notifications/read-all`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
   });

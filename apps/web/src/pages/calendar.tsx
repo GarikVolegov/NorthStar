@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
-import { apiFetch } from "@/lib/api-fetch";
+import { deleteJson, getJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -130,12 +130,13 @@ export default function Calendario() {
 
   const { from, to } = getDateRange(view, currentDate);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<{ events: CalendarEvent[] }>({
     queryKey: ["calendar-events", user?.id, from.toISOString(), to.toISOString()],
     queryFn: async () => {
       if (!user?.id) return { events: [] };
-      const res = await apiFetch(`${BASE}api/calendar/events?from=${from.toISOString()}&to=${to.toISOString()}`);
-      return res.json();
+      return getJson<{ events: CalendarEvent[] }>(
+        `${BASE}api/calendar/events?from=${from.toISOString()}&to=${to.toISOString()}`,
+      );
     },
     enabled: !!user?.id,
   });
@@ -144,7 +145,7 @@ export default function Calendario() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiFetch(`${BASE}api/calendar/events/${id}`, { method: "DELETE" });
+      await deleteJson(`${BASE}api/calendar/events/${id}`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["calendar-events"] }),
   });

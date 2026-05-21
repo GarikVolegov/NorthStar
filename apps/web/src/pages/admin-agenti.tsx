@@ -63,25 +63,27 @@ interface HealthData {
 function statusBadge(status: AgentStat["status"]) {
   if (status === "healthy")
     return (
-      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
+      <Badge className="bg-success-surface text-success border-success-muted">
         Sano
       </Badge>
     );
   if (status === "degraded")
     return (
-      <Badge className="bg-amber-100 text-amber-700 border-amber-200">
+      <Badge className="bg-warning-surface text-warning border-warning-muted">
         Degradato
       </Badge>
     );
   return (
-    <Badge className="bg-red-100 text-red-700 border-red-200">Critico</Badge>
+    <Badge className="bg-danger-surface text-danger border-danger-muted">
+      Critico
+    </Badge>
   );
 }
 
 function rateColor(rate: number) {
-  if (rate >= 95) return "text-emerald-600";
-  if (rate >= 80) return "text-amber-500";
-  return "text-red-500";
+  if (rate >= 95) return "text-success";
+  if (rate >= 80) return "text-warning";
+  return "text-danger";
 }
 
 function AgentCard({ agent }: { agent: AgentStat }) {
@@ -120,7 +122,7 @@ function AgentCard({ agent }: { agent: AgentStat }) {
             <p className="text-xs text-muted-foreground mt-0.5">Successo 7g</p>
           </div>
           <div className="text-center p-2 rounded-lg bg-muted/40">
-            <p className="text-xl font-bold text-red-500">
+            <p className="text-xl font-bold text-danger">
               {agent.errorCount30d}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">Errori 30g</p>
@@ -141,7 +143,7 @@ function AgentCard({ agent }: { agent: AgentStat }) {
               onClick={() => setExpanded((e) => !e)}
               className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mb-2"
             >
-              <AlertTriangle size={11} className="text-amber-500" />
+              <AlertTriangle size={11} className="text-warning" />
               {agent.lastErrors.length} errori recenti â€”{" "}
               {expanded ? "nascondi" : "mostra"}
             </button>
@@ -150,7 +152,7 @@ function AgentCard({ agent }: { agent: AgentStat }) {
                 {agent.lastErrors.map((e, i) => (
                   <div
                     key={i}
-                    className="text-xs bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900 rounded-lg p-2"
+                    className="text-xs bg-danger-surface border border-danger-muted rounded-lg p-2"
                   >
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <span className="font-mono font-medium">
@@ -160,7 +162,7 @@ function AgentCard({ agent }: { agent: AgentStat }) {
                         {new Date(e.createdAt).toLocaleString("it-IT")}
                       </span>
                     </div>
-                    <p className="text-red-600 dark:text-red-400 break-all">
+                    <p className="text-danger break-all">
                       {e.error ?? "Errore sconosciuto"}
                     </p>
                   </div>
@@ -171,7 +173,7 @@ function AgentCard({ agent }: { agent: AgentStat }) {
         )}
 
         {agent.lastErrors.length === 0 && (
-          <p className="text-xs text-emerald-600 flex items-center gap-1">
+          <p className="text-xs text-success flex items-center gap-1">
             <CheckCircle2 size={12} /> Nessun errore negli ultimi 30 giorni
           </p>
         )}
@@ -263,13 +265,13 @@ export default function AdminAgenti() {
               )}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge className="bg-emerald-100 text-emerald-700">
+              <Badge className="bg-success-surface text-success">
                 {healthy} sani
               </Badge>
-              <Badge className="bg-amber-100 text-amber-700">
+              <Badge className="bg-warning-surface text-warning">
                 {degraded} degradati
               </Badge>
-              <Badge className="bg-red-100 text-red-700">
+              <Badge className="bg-danger-surface text-danger">
                 {critical} critici
               </Badge>
               <Button
@@ -289,7 +291,7 @@ export default function AdminAgenti() {
           </div>
 
           {error && (
-            <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-red-700 text-sm">
+            <div className="rounded-xl bg-danger-surface border border-danger-muted p-4 text-danger text-sm">
               {error}
             </div>
           )}
@@ -299,9 +301,7 @@ export default function AdminAgenti() {
             <div className="grid grid-cols-3 gap-3">
               <Card>
                 <CardContent className="pt-4 text-center">
-                  <p className="text-3xl font-bold text-emerald-600">
-                    {healthy}
-                  </p>
+                  <p className="text-3xl font-bold text-success">{healthy}</p>
                   <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
                     <TrendingUp size={11} /> Agenti sani
                   </p>
@@ -309,9 +309,7 @@ export default function AdminAgenti() {
               </Card>
               <Card>
                 <CardContent className="pt-4 text-center">
-                  <p className="text-3xl font-bold text-amber-500">
-                    {degraded}
-                  </p>
+                  <p className="text-3xl font-bold text-warning">{degraded}</p>
                   <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
                     <AlertTriangle size={11} /> Degradati
                   </p>
@@ -319,7 +317,7 @@ export default function AdminAgenti() {
               </Card>
               <Card>
                 <CardContent className="pt-4 text-center">
-                  <p className="text-3xl font-bold text-red-500">{critical}</p>
+                  <p className="text-3xl font-bold text-danger">{critical}</p>
                   <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
                     <TrendingDown size={11} /> Critici
                   </p>

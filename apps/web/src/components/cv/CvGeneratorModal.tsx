@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api-fetch";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { deleteJson, getJson, patchJson, postJson } from "@/lib/apiClient";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { CvAtsMobilePanel, CvAtsPanel } from "./CvAtsPanel";
 import {
@@ -13,28 +14,32 @@ import { CvErrorState, CvLoadingState, CvModalFooter } from "./CvModalState";
 import type { CvData } from "./CvSection";
 import { CvTailorMobilePanel, CvTailorPanel } from "./CvTailorPanel";
 import { CvToolbar } from "./CvToolbar";
-import type { AtsResult, CoverLetter, GeneratedCv, GraphNode } from "./cvTypes";
-import { errorMessage, savedCvData } from "./cvUtils";
+import type { AtsResult, CoverLetter, GeneratedCv } from "./cvTypes";
+import { savedCvData } from "./cvUtils";
+import {
+  readErrorMessage,
+  readGraphNodesFromStorage,
+  useProfileForCv,
+} from "./cvGeneratorData";
 import { CvVersionsMobilePanel, CvVersionsPanel } from "./CvVersionsPanel";
 import { useCvPrintStyle } from "./useCvPrintStyle";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
-type CvProfileSector = {
-  confirmed?: boolean;
-  name?: string;
-  skills?: string[];
+type CvVersion = {
+  id: string;
+  name: string;
+  targetRole: string;
+  savedAt: string;
 };
 
-function useProfileForCv(userId: number) {
-  return useQuery({
-    queryKey: ["profile", userId],
-    queryFn: () =>
-      apiFetch(`${BASE}api/profile/${userId}`).then((r) => r.json()),
-    enabled: !!userId,
-    staleTime: 60_000,
-  });
-}
+type VersionsResponse = { versions?: CvVersion[] };
+type VersionResponse = { version: CvVersion & { data: GeneratedCv } };
+type TailorResponse = { tailored: GeneratedCv };
+type GenerateResponse = { generated: GeneratedCv };
+type SaveResponse = { savedAt: string };
+type AtsResponse = { result: AtsResult };
+type CoverLetterResponse = { letter: CoverLetter };
 
 export function CvGeneratorModal({
   userId,
@@ -66,14 +71,7 @@ export function CvGeneratorModal({
 
   // -- Version history state ------------------------------------------
   const [showVersions, setShowVersions] = useState(false);
-  const [versions, setVersions] = useState<
-    Array<{
-      id: string;
-      name: string;
-      targetRole: string;
-      savedAt: string;
-    }>
-  >([]);
+  const [versions, setVersions] = useState<CvVersion[]>([]);
   const [versionSaveStatus, setVersionSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
@@ -117,8 +115,7 @@ export function CvGeneratorModal({
 
   async function fetchVersions() {
     try {
-      const res = await apiFetch(`${BASE}api/cv/${userId}/versions`);
-      const data = await res.json();
+      const data = await getJson<VersionsResponse>(`${BASE}api/cv/${userId}/versions`);
       setVersions(data.versions ?? []);
     } catch {
       /* silent */
@@ -129,13 +126,10 @@ export function CvGeneratorModal({
     if (!generated) return;
     setVersionSaveStatus("saving");
     try {
-      const res = await apiFetch(`${BASE}api/cv/${userId}/versions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ generated, name: newVersionName || undefined }),
+      const data = await postJson<{ version: CvVersion }>(`${BASE}api/cv/${userId}/versions`, {
+        generated,
+        name: newVersionName || undefined,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
       setVersions((prev) => [data.version, ...prev]);
       setNewVersionName("");
       setVersionSaveStatus("saved");
@@ -152,11 +146,7 @@ export function CvGeneratorModal({
       return;
     }
     try {
-      await apiFetch(`${BASE}api/cv/${userId}/versions/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: renameValue.trim() }),
-      });
+      await patchJson<unknown>(`${BASE}api/cv/${userId}/versions/${id}`, { name: renameValue.trim() });
       setVersions((prev) =>
         prev.map((v) => (v.id === id ? { ...v, name: renameValue.trim() } : v)),
       );
@@ -169,9 +159,7 @@ export function CvGeneratorModal({
 
   async function deleteVersion(id: string) {
     try {
-      await apiFetch(`${BASE}api/cv/${userId}/versions/${id}`, {
-        method: "DELETE",
-      });
+      await deleteJson(`${BASE}api/cv/${userId}/versions/${id}`);
       setVersions((prev) => prev.filter((v) => v.id !== id));
     } catch {
       /* silent */
@@ -184,13 +172,10 @@ export function CvGeneratorModal({
     setTailorError(null);
     setTailorKeywords([]);
     try {
-      const res = await apiFetch(`${BASE}api/cv/${userId}/tailor`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ generated, jobPosting }),
+      const data = await postJson<TailorResponse>(`${BASE}api/cv/${userId}/tailor`, {
+        generated,
+        jobPosting,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Errore nell'adattamento");
       setGenerated(data.tailored);
       setHasUnsavedChanges(true);
       setSaveStatus("idle");
@@ -205,7 +190,7 @@ export function CvGeneratorModal({
         .slice(0, 6);
       setTailorKeywords(matched);
     } catch (err: unknown) {
-      setTailorError(errorMessage(err, "Errore di rete. Riprova."));
+      setTailorError(readErrorMessage(err, "Errore di rete. Riprova."));
       setTailorStatus("error");
     }
   }
@@ -215,11 +200,7 @@ export function CvGeneratorModal({
     setDownloading(true);
     try {
       // First save the current state so the server has the latest version
-      await apiFetch(`${BASE}api/cv/${userId}/save`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ generated }),
-      });
+      await patchJson<unknown>(`${BASE}api/cv/${userId}/save`, { generated });
       // Then trigger download
       const a = document.createElement("a");
       a.href = `${BASE}api/cv/${userId}/pdf`;
@@ -237,9 +218,7 @@ export function CvGeneratorModal({
   async function loadVersion(id: string) {
     setLoadingVersionId(id);
     try {
-      const res = await apiFetch(`${BASE}api/cv/${userId}/versions/${id}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const data = await getJson<VersionResponse>(`${BASE}api/cv/${userId}/versions/${id}`);
       setGenerated(data.version.data);
       setHasUnsavedChanges(false);
       setSaveStatus("idle");
@@ -251,50 +230,31 @@ export function CvGeneratorModal({
     }
   }
 
-  function readGraphNodes(): GraphNode[] {
-    try {
-      const key = `grafo_user_${confirmedSectorId}_${userId}`;
-      const raw = localStorage.getItem(key);
-      if (!raw) return [];
-      return JSON.parse(raw).nodes ?? [];
-    } catch {
-      return [];
-    }
-  }
-
   async function generate() {
     setLoading(true);
     setError(null);
     setHasUnsavedChanges(false);
     try {
       const latestSession = profile?.testSessions?.[0];
-      const confirmedSector = (
-        profile?.exploredSectors as CvProfileSector[] | undefined
-      )?.find((sector) => sector.confirmed);
-      const graphNodes = readGraphNodes();
-      const res = await apiFetch(`${BASE}api/cv/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          profileData: {
-            name: user?.name ?? profile?.name ?? "",
-            email: user?.email ?? profile?.email ?? "",
-            riasecTypes: latestSession?.primaryTypes ?? [],
-            confirmedSector: confirmedSector?.name ?? "",
-            skills: confirmedSector?.skills ?? [],
-          },
-          graphNodes,
-          cvData: cvData ?? null,
-        }),
+      const confirmedSector = profile?.exploredSectors?.find((sector) => sector.confirmed);
+      const graphNodes = readGraphNodesFromStorage(confirmedSectorId, userId);
+      const data = await postJson<GenerateResponse>(`${BASE}api/cv/generate`, {
+        userId,
+        profileData: {
+          name: user?.name ?? profile?.name ?? "",
+          email: user?.email ?? profile?.email ?? "",
+          riasecTypes: latestSession?.primaryTypes ?? [],
+          confirmedSector: confirmedSector?.name ?? "",
+          skills: confirmedSector?.skills ?? [],
+        },
+        graphNodes,
+        cvData: cvData ?? null,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Errore nella generazione");
       setGenerated(data.generated);
       setIsEditing(false);
       setSaveStatus("idle");
     } catch (err: unknown) {
-      setError(errorMessage(err, "Errore di rete. Riprova."));
+      setError(readErrorMessage(err, "Errore di rete. Riprova."));
     } finally {
       setLoading(false);
     }
@@ -304,13 +264,7 @@ export function CvGeneratorModal({
     if (!generated) return;
     setSaveStatus("saving");
     try {
-      const res = await apiFetch(`${BASE}api/cv/${userId}/save`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ generated }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Errore nel salvataggio");
+      const data = await patchJson<SaveResponse>(`${BASE}api/cv/${userId}/save`, { generated });
       setLastSavedAt(data.savedAt);
       setSaveStatus("saved");
       setHasUnsavedChanges(false);
@@ -336,17 +290,14 @@ export function CvGeneratorModal({
     setAtsStatus("analyzing");
     setAtsError(null);
     try {
-      const res = await apiFetch(`${BASE}api/cv/${userId}/ats-score`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ generated, jobPosting: atsJobPosting }),
+      const data = await postJson<AtsResponse>(`${BASE}api/cv/${userId}/ats-score`, {
+        generated,
+        jobPosting: atsJobPosting,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Errore nell'analisi");
       setAtsResult(data.result);
       setAtsStatus("done");
     } catch (err: unknown) {
-      setAtsError(errorMessage(err, "Errore di rete. Riprova."));
+      setAtsError(readErrorMessage(err, "Errore di rete. Riprova."));
       setAtsStatus("error");
     }
   }
@@ -356,23 +307,17 @@ export function CvGeneratorModal({
     setLetterStatus("generating");
     setLetterError(null);
     try {
-      const res = await apiFetch(`${BASE}api/cv/${userId}/cover-letter`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          generated,
-          jobPosting: letterJobPosting,
-          companyName: letterCompany.trim() || undefined,
-          roleTitle: letterRole.trim() || undefined,
-          extraInfo: letterExtra.trim() || undefined,
-        }),
+      const data = await postJson<CoverLetterResponse>(`${BASE}api/cv/${userId}/cover-letter`, {
+        generated,
+        jobPosting: letterJobPosting,
+        companyName: letterCompany.trim() || undefined,
+        roleTitle: letterRole.trim() || undefined,
+        extraInfo: letterExtra.trim() || undefined,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Errore nella generazione");
       setLetter(data.letter);
       setLetterStatus("done");
     } catch (err: unknown) {
-      setLetterError(errorMessage(err, "Errore di rete. Riprova."));
+      setLetterError(readErrorMessage(err, "Errore di rete. Riprova."));
       setLetterStatus("error");
     }
   }

@@ -19,6 +19,19 @@ export interface KnowledgeNodeBrief {
   type: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readLinkSuggestion(value: unknown): { index: number; label?: string; reason?: string } | null {
+  if (!isRecord(value) || typeof value.index !== "number") return null;
+  return {
+    index: value.index,
+    ...(typeof value.label === "string" ? { label: value.label } : {}),
+    ...(typeof value.reason === "string" ? { reason: value.reason } : {}),
+  };
+}
+
 export async function suggestAutoLinks(
   sourceNode: KnowledgeNodeBrief,
   candidates: KnowledgeNodeBrief[],
@@ -59,11 +72,13 @@ Rispondi SOLO con un array JSON degli indici dei candidati da collegare, nel for
       "auto-link",
     );
 
-    const parsed = JSON.parse(response);
+    const parsed = JSON.parse(response) as unknown;
     if (!Array.isArray(parsed)) return [];
 
     return parsed
-      .map((item: { index: number; label?: string; reason?: string }) => ({
+      .map(readLinkSuggestion)
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+      .map((item) => ({
         ...item,
         candidateIndex: item.index > 0 ? item.index - 1 : item.index,
       }))

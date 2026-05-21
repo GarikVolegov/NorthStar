@@ -29,10 +29,11 @@ pnpm run check
 pnpm run qa
 ```
 
-- `check` e' il preflight rapido: `lint:ci` + typecheck.
-- `qa` e' il gate completo locale: `lint:ci`, typecheck, coverage AI/server/web e audit determinismo E2E.
-- `lint:ci` e' il lint bloccante usato da CI/Vercel sul perimetro Step 4-6.
-- `lint:legacy` resta un debt tracker globale e puo' fallire per debito preesistente.
+- `check` e' il preflight rapido: lint globale + typecheck.
+- `qa` e' il gate completo locale: lint globale, typecheck, coverage AI/server/web, audit determinismo E2E e ratchet qualita'.
+- `lint:ci` ora e' alias del lint globale: CI/Vercel bloccano tutto il perimetro applicativo TypeScript.
+- `lint:legacy` resta come alias compatibile di `lint` per i vecchi comandi di misurazione.
+- `audit:file-size` e' un ratchet: i monoliti legacy sono versionati in `docs/quality/file-size-baseline.json`, ma nessun PR puo' aggiungere nuovi offender o far crescere quelli esistenti.
 
 Per modifiche mirate puoi eseguire anche:
 

@@ -46,6 +46,9 @@ test-results/
 playwright-report/
 coverage/
 /typings
+graphify-out/
+apps/graphify-out/
+packages/graphify-out/
 
 # ── Temporary & backup files ───────────────────────────────────────────────
 *.tmp

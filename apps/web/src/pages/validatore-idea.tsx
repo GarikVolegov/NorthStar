@@ -9,6 +9,7 @@ import { createCompetitor, createExperimentFromTemplate, createTimelineEvent, no
 import { usePageModule } from "@/hooks/usePageModule";
 import { apiFetch } from "@/lib/api-fetch";
 import { type MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
+import { readResponseError } from "./validatore-idea-api";
 
 const BASE = import.meta.env.BASE_URL || "/";
 export default function ValidatoreIdea() {
@@ -393,7 +394,6 @@ export default function ValidatoreIdea() {
       if (scoreTimelineTimerRef.current) clearTimeout(scoreTimelineTimerRef.current);
       if (wendyAdviceTimelineTimerRef.current) clearTimeout(wendyAdviceTimelineTimerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -429,8 +429,7 @@ export default function ValidatoreIdea() {
       );
 
       if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.error ?? "Errore salvataggio");
+        throw new Error(await readResponseError(res, "Errore salvataggio"));
       }
 
       const json = (await res.json()) as { idea: BusinessIdea };
@@ -464,7 +463,6 @@ export default function ValidatoreIdea() {
     return () => {
       if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIdeaId, dirty, ideaName, oneLiner, status, averageScore, validationData]);
 
   const createNewIdea = async () => {
@@ -626,8 +624,7 @@ export default function ValidatoreIdea() {
       });
 
       if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.error ?? "Valutazione Wendy non disponibile");
+        throw new Error(await readResponseError(res, "Valutazione Wendy non disponibile"));
       }
 
       const suggestion = (await res.json()) as RadarSuggestion;
@@ -745,8 +742,7 @@ export default function ValidatoreIdea() {
       });
 
       if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.error ?? "Suggerimento decisione non disponibile");
+        throw new Error(await readResponseError(res, "Suggerimento decisione non disponibile"));
       }
 
       const suggestion = (await res.json()) as DecisionSuggestion;
@@ -874,8 +870,7 @@ export default function ValidatoreIdea() {
         }),
       });
       if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.error ?? "Errore nella creazione del task");
+        throw new Error(await readResponseError(res, "Errore nella creazione del task"));
       }
       const objective = (await res.json()) as { id: number };
       patchActiveExperiment({ objectiveId: objective.id });
@@ -926,8 +921,7 @@ export default function ValidatoreIdea() {
         }),
       });
       if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.error ?? "Errore nella creazione dell'evento");
+        throw new Error(await readResponseError(res, "Errore nella creazione dell'evento"));
       }
       const event = (await res.json()) as { id: number };
       patchActiveExperiment(
@@ -954,8 +948,7 @@ export default function ValidatoreIdea() {
           body: JSON.stringify({ completed: true }),
         });
         if (!res.ok && res.status !== 404) {
-          const json = await res.json().catch(() => ({}));
-          throw new Error(json.error ?? "Errore nel completamento del task");
+          throw new Error(await readResponseError(res, "Errore nel completamento del task"));
         }
       }
       patchActiveExperiment({

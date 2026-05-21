@@ -91,6 +91,14 @@ export function patchJson<T>(
   );
 }
 
+export function putJson<T>(
+  input: string,
+  body?: JsonBody,
+  init?: ApiClientInit,
+): Promise<T> {
+  return requestJson<T>(input, normalizeInit({ ...init, method: "PUT" }, body));
+}
+
 export function deleteJson<T = unknown>(
   input: string,
   init?: ApiClientInit,

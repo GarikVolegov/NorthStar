@@ -1,5 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { loginViaApi, waitForAuthReady } from './helpers/auth';
+import { responseJson } from './helpers/json';
+
+type AuthMeResponse = {
+  objectives: unknown[];
+  sectorName: string | null;
+  isPremium: boolean;
+  isAffiliate: boolean;
+};
 
 test.describe('Wendy nella barra di ricerca', () => {
   test.beforeEach(async ({ page }) => {
@@ -51,7 +59,7 @@ test.describe('Wendy nella barra di ricerca', () => {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(response.status()).toBe(200);
-    const body = await response.json();
+    const body = await responseJson<AuthMeResponse>(response);
 
     expect(Array.isArray(body.objectives), 'objectives deve essere un array').toBe(true);
     expect(body.sectorName === null || typeof body.sectorName === 'string').toBe(true);

@@ -1,8 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type EventHandler = (payload: any) => void;
+type EventHandler = (payload: unknown) => void;
+type TypedEventHandler<T> = (payload: T) => void;
+
+type WebSocketEnvelope = {
+  type: string;
+  payload?: unknown;
+};
 
 const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000];
+
+function parseWebSocketEnvelope(value: MessageEvent["data"]): WebSocketEnvelope | null {
+  try {
+    const parsed = JSON.parse(String(value)) as unknown;
+    if (typeof parsed !== "object" || parsed === null || !("type" in parsed)) {
+      return null;
+    }
+
+    const envelope = parsed as { type?: unknown; payload?: unknown };
+    return typeof envelope.type === "string"
+      ? { type: envelope.type, payload: envelope.payload }
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 export function useWebSocket(token: string | null, userId: number | null) {
   const wsRef = useRef<WebSocket | null>(null);
@@ -28,23 +50,23 @@ export function useWebSocket(token: string | null, userId: number | null) {
     };
 
     ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === "auth_ok" || data.type === "pong") {
-          if (data.type === "auth_ok") {
-            setIsConnected(true);
-            reconnectIdxRef.current = 0;
-          }
-          return;
-        }
+      const data = parseWebSocketEnvelope(event.data);
+      if (!data) return;
 
-        const handlers = handlersRef.current.get(data.type);
-        if (handlers) {
-          for (const handler of handlers) {
-            handler(data.payload ?? data);
-          }
+      if (data.type === "auth_ok" || data.type === "pong") {
+        if (data.type === "auth_ok") {
+          setIsConnected(true);
+          reconnectIdxRef.current = 0;
         }
-      } catch { }
+        return;
+      }
+
+      const handlers = handlersRef.current.get(data.type);
+      if (handlers) {
+        for (const handler of handlers) {
+          handler(data.payload ?? data);
+        }
+      }
     };
 
     ws.onclose = () => {
@@ -74,13 +96,17 @@ export function useWebSocket(token: string | null, userId: number | null) {
     };
   }, [connect]);
 
-  const on = useCallback((eventType: string, handler: EventHandler) => {
+  const on = useCallback(<T = unknown>(
+    eventType: string,
+    handler: TypedEventHandler<T>,
+  ) => {
     if (!handlersRef.current.has(eventType)) {
       handlersRef.current.set(eventType, new Set());
     }
-    handlersRef.current.get(eventType)!.add(handler);
+    const wrapped: EventHandler = (payload) => handler(payload as T);
+    handlersRef.current.get(eventType)!.add(wrapped);
     return () => {
-      handlersRef.current.get(eventType)?.delete(handler);
+      handlersRef.current.get(eventType)?.delete(wrapped);
     };
   }, []);
 

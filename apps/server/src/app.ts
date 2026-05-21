@@ -153,6 +153,8 @@ import certificationsRouter from "./routes/certifications";
 import contactRouter from "./routes/contact";
 import affiliazioneRouter from "./routes/affiliazione";
 import affiliateRouter from "./routes/affiliate";
+import openhumanRouter from "./routes/openhuman";
+import graphifyRouter from "./routes/graphify";
 
 app.use("/api/auth", authRouter);
 app.use("/api/profile", profileRouter);
@@ -215,6 +217,8 @@ app.use("/api/certifications", certificationsRouter);
 app.use("/api/contact", contactRouter);
 app.use("/api/affiliazione", affiliazioneRouter);
 app.use("/api/affiliate", affiliateRouter);
+app.use("/api/openhuman", openhumanRouter);
+app.use("/api/graphify", graphifyRouter);
 
 app.get("/api/health/live", (_req, res) => {
   res.json({ status: "alive" });

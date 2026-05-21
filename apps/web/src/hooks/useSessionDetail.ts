@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api-fetch";
+import { getJson } from "@/lib/apiClient";
 import { useQuery } from "@tanstack/react-query";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -15,9 +15,7 @@ export function useSessionDetail(sessionId: number | null) {
     enabled: !!sessionId,
     staleTime: 600_000,
     queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/test-sessions/${sessionId}`);
-      if (!res.ok) throw new Error("Errore sessione");
-      return res.json();
+      return getJson<SessionDetail>(`${BASE}api/test-sessions/${sessionId}`);
     },
   });
 }

@@ -17,11 +17,22 @@
  */
 
 import { test, expect, devices } from '@playwright/test';
+import { responseJson } from '../helpers/json';
 
 test.use({ ...devices['Pixel 5'] });
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:5173';
 const ENABLE_PWA = process.env.ENABLE_PWA_TESTS === 'true' || process.env.CI === 'true';
+
+type WebManifest = {
+  name?: string;
+  short_name?: string;
+  start_url?: string;
+  display?: string;
+  icons?: unknown[];
+  theme_color?: string;
+  background_color?: string;
+};
 
 test.describe('PWA & Offline — Pixel 5', () => {
 
@@ -32,7 +43,7 @@ test.describe('PWA & Offline — Pixel 5', () => {
     const response = await page.request.get(`${BASE_URL}/manifest.webmanifest`);
     expect(response.status()).toBe(200);
 
-    const manifest = await response.json();
+    const manifest = await responseJson<WebManifest>(response);
 
     // Campi obbligatori
     expect(manifest.name).toBeTruthy();
@@ -42,7 +53,7 @@ test.describe('PWA & Offline — Pixel 5', () => {
 
     // Icone
     expect(manifest.icons).toBeDefined();
-    expect(manifest.icons.length).toBeGreaterThanOrEqual(2);
+    expect(manifest.icons?.length ?? 0).toBeGreaterThanOrEqual(2);
 
     // Colori tema
     expect(manifest.theme_color).toBeTruthy();

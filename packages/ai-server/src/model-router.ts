@@ -98,6 +98,13 @@ const REASONING_OR   = env("MODEL_REASONING_OPENROUTER","openrouter/free");
 const PREMIUM_OPENAI = env("MODEL_PREMIUM_OPENAI",      "gpt-4o");
 const CHEAP_OPENAI   = env("MODEL_CHEAP_OPENAI",        "gpt-4o-mini");
 const ALLOW_PAID_MODELS = process.env.ALLOW_PAID_AI_MODELS === "true";
+const MODEL_PROVIDERS = ["openai", "groq", "openrouter"] as const;
+type ModelProvider = (typeof MODEL_PROVIDERS)[number];
+
+function readModelProvider(value: string | undefined): ModelProvider {
+  const normalized = value?.toLowerCase();
+  return MODEL_PROVIDERS.find((provider) => provider === normalized) ?? "openai";
+}
 
 /**
  * Active backend. If AI_PROVIDER=openrouter we prefer OpenRouter free-tier models
@@ -105,7 +112,7 @@ const ALLOW_PAID_MODELS = process.env.ALLOW_PAID_AI_MODELS === "true";
  * isn't configured. The actual HTTP call goes through llm/client.ts.
  */
 const ACTIVE_PROVIDER: "openai" | "groq" | "openrouter" =
-  (process.env.AI_PROVIDER?.toLowerCase() as any) ?? "openai";
+  readModelProvider(process.env.AI_PROVIDER);
 
 function enforceFreeOpenRouterModel(model: string) {
   if (ALLOW_PAID_MODELS) return model;

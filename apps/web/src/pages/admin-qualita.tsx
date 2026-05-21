@@ -44,14 +44,12 @@ function StatCard({
   sub?: string;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-4">
-      <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="text-xs text-muted-foreground uppercase tracking-wider">
         {label}
       </div>
-      <div className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
-        {value}
-      </div>
-      {sub && <div className="mt-0.5 text-xs text-gray-400">{sub}</div>}
+      <div className="mt-1 text-2xl font-bold text-foreground">{value}</div>
+      {sub && <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>}
     </div>
   );
 }
@@ -87,13 +85,13 @@ export default function AdminQualityPage() {
       <AdminShell>
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center space-y-4">
-            <p className="text-gray-500">
+            <p className="text-muted-foreground">
               Inserisci la chiave admin per vedere la dashboard qualità.
             </p>
             <input
               type="password"
               placeholder="Admin API Key"
-              className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 text-sm"
+              className="rounded-lg border border-border bg-background px-4 py-2 text-sm"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   const val = (e.target as HTMLInputElement).value;
@@ -114,13 +112,13 @@ export default function AdminQualityPage() {
     <AdminShell>
       <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+          <h1 className="text-xl font-semibold text-foreground">
             Qualità Wendy
           </h1>
           <button
             onClick={() => fetchQuality(adminKey)}
             disabled={loading}
-            className="rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+            className="rounded-lg bg-muted px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
           >
             {loading ? "Caricamento..." : "Aggiorna"}
           </button>
@@ -175,14 +173,14 @@ export default function AdminQualityPage() {
 
         {/* Per dominio */}
         {data?.qualityStats && data.qualityStats.length > 0 && (
-          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="px-4 py-3 border-b border-border text-sm font-medium text-foreground">
               Metriche per dominio
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 uppercase">
+                  <tr className="border-b border-border text-xs text-muted-foreground uppercase">
                     <th className="px-4 py-3 text-left">Dominio</th>
                     <th className="px-4 py-3 text-right">Turni</th>
                     <th className="px-4 py-3 text-right">Eval score</th>
@@ -196,18 +194,18 @@ export default function AdminQualityPage() {
                   {data.qualityStats.map((s) => (
                     <tr
                       key={s.domain}
-                      className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-900/50"
+                      className="border-b border-border hover:bg-muted/50"
                     >
-                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 capitalize">
+                      <td className="px-4 py-3 font-medium text-foreground capitalize">
                         {s.domain}
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                      <td className="px-4 py-3 text-right text-muted-foreground">
                         {s.total}
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                      <td className="px-4 py-3 text-right text-muted-foreground">
                         {(s.avgEvalScore * 100).toFixed(0)}%
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                      <td className="px-4 py-3 text-right text-muted-foreground">
                         {s.avgSupervisorScore
                           ? `${(s.avgSupervisorScore * 100).toFixed(0)}%`
                           : "—"}
@@ -216,8 +214,8 @@ export default function AdminQualityPage() {
                         <span
                           className={
                             s.rewrites > 0
-                              ? "text-amber-500 font-medium"
-                              : "text-gray-400"
+                              ? "text-warning font-medium"
+                              : "text-muted-foreground"
                           }
                         >
                           {s.rewrites} (
@@ -231,8 +229,8 @@ export default function AdminQualityPage() {
                         <span
                           className={
                             s.clarifications > 0
-                              ? "text-blue-500 font-medium"
-                              : "text-gray-400"
+                              ? "text-info font-medium"
+                              : "text-muted-foreground"
                           }
                         >
                           {s.clarifications}
@@ -242,8 +240,8 @@ export default function AdminQualityPage() {
                         <span
                           className={
                             s.uiTools > 0
-                              ? "text-green-500 font-medium"
-                              : "text-gray-400"
+                              ? "text-success font-medium"
+                              : "text-muted-foreground"
                           }
                         >
                           {s.uiTools}
@@ -259,14 +257,14 @@ export default function AdminQualityPage() {
 
         {/* Supervisor stats */}
         {data?.supervisorStats && data.supervisorStats.length > 0 && (
-          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="px-4 py-3 border-b border-border text-sm font-medium text-foreground">
               Supervisor — score prima/dopo rewrite
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 uppercase">
+                  <tr className="border-b border-border text-xs text-muted-foreground uppercase">
                     <th className="px-4 py-3 text-left">Dominio</th>
                     <th className="px-4 py-3 text-right">Rewrite totali</th>
                     <th className="px-4 py-3 text-right">
@@ -289,26 +287,26 @@ export default function AdminQualityPage() {
                     return (
                       <tr
                         key={s.domain}
-                        className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-900/50"
+                        className="border-b border-border hover:bg-muted/50"
                       >
-                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 capitalize">
+                        <td className="px-4 py-3 font-medium text-foreground capitalize">
                           {s.domain}
                         </td>
-                        <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                        <td className="px-4 py-3 text-right text-muted-foreground">
                           {s.total}
                         </td>
-                        <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                        <td className="px-4 py-3 text-right text-muted-foreground">
                           {s.avgScoreBefore
                             ? `${(s.avgScoreBefore * 100).toFixed(0)}%`
                             : "—"}
                         </td>
-                        <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                        <td className="px-4 py-3 text-right text-muted-foreground">
                           {s.avgScoreAfter
                             ? `${(s.avgScoreAfter * 100).toFixed(0)}%`
                             : "—"}
                         </td>
                         <td
-                          className={`px-4 py-3 text-right font-medium ${isPositive ? "text-green-500" : "text-red-400"}`}
+                          className={`px-4 py-3 text-right font-medium ${isPositive ? "text-success" : "text-danger"}`}
                         >
                           {improvement !== "—"
                             ? `${isPositive ? "+" : ""}${improvement}%`
@@ -324,7 +322,7 @@ export default function AdminQualityPage() {
         )}
 
         {!data && loading && (
-          <div className="text-center py-12 text-gray-400">
+          <div className="text-center py-12 text-muted-foreground">
             Caricamento dati qualità...
           </div>
         )}

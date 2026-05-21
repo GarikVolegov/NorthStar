@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api-fetch";
+import { getJson } from "@/lib/apiClient";
 import { useQuery } from "@tanstack/react-query";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -12,9 +12,7 @@ export function useObjectives() {
   return useQuery<Objective[]>({
     queryKey: ["objectives-dashboard"],
     queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/objectives/me`);
-      if (!res.ok) throw new Error("Errore obiettivi");
-      return res.json();
+      return getJson<Objective[]>(`${BASE}api/objectives/me`);
     },
     staleTime: 60_000,
     retry: false,

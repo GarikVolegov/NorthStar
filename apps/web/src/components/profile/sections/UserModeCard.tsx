@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { apiFetch } from "@/lib/api-fetch";
+import { getJson, patchJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Compass, TrendingUp } from "lucide-react";
@@ -7,34 +7,33 @@ import { useState } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
+type UserMode = "explorer" | "climber";
+
+function isUserMode(value: unknown): value is UserMode {
+  return value === "explorer" || value === "climber";
+}
+
 export function UserModeCard({ userId }: { userId: number }) {
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const { data, isLoading } = useQuery<{ userMode?: string }>({
+  const { data, isLoading } = useQuery<{ userMode?: unknown }>({
     queryKey: ["user-mode", userId],
     queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/profile/${userId}`);
-      if (!res.ok) throw new Error("Errore");
-      return res.json();
+      return getJson<{ userMode?: unknown }>(`${BASE}api/profile/${userId}`);
     },
     enabled: !!userId,
     staleTime: 60_000,
   });
 
-  const currentMode = (data?.userMode ?? "explorer") as "explorer" | "climber";
+  const currentMode: UserMode = isUserMode(data?.userMode) ? data.userMode : "explorer";
 
-  const switchMode = async (mode: "explorer" | "climber") => {
+  const switchMode = async (mode: UserMode) => {
     if (mode === currentMode || saving) return;
     setSaving(true);
     try {
-      const res = await apiFetch(`${BASE}api/profile/${userId}/mode`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userMode: mode }),
-      });
-      if (!res.ok) throw new Error("Errore");
+      await patchJson<unknown>(`${BASE}api/profile/${userId}/mode`, { userMode: mode });
       queryClient.invalidateQueries({ queryKey: ["user-mode", userId] });
       queryClient.invalidateQueries({ queryKey: ["user-mode-dashboard"] });
       setSaved(true);

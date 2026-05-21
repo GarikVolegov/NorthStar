@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { responseJson } from "./helpers/json";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:5000";
 
@@ -24,7 +25,7 @@ test.describe("Test RIASEC", () => {
     const apiBase = process.env.API_URL ?? "http://localhost:8080";
     const response = await request.get(`${apiBase}/api/health/live`);
     expect(response.status()).toBe(200);
-    const body = await response.json();
+    const body = await responseJson<{ status: string }>(response);
     expect(body.status).toBe("alive");
   });
 
@@ -32,7 +33,7 @@ test.describe("Test RIASEC", () => {
     const apiBase = process.env.API_URL ?? "http://localhost:8080";
     const response = await request.get(`${apiBase}/api/health`);
     expect(response.status()).toBe(200);
-    const body = await response.json();
+    const body = await responseJson<{ status: string }>(response);
     expect(body.status).toBe("ok");
   });
 });

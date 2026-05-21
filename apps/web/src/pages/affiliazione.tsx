@@ -305,14 +305,6 @@ export default function Affiliazione() {
     { q: "Qual è il costo per l'istituzione?", a: "Dipende dal modello. Il referral non ha costi iniziali. La licenza istituzionale è concordata su volume. Contattaci per un preventivo gratuito." },
   ], []);
 
-  const STATS = useMemo(() => [
-    { n: "21", label: t("affiliazione.schools") === "Schools" ? "Professional areas" : "Aree professionali" },
-    { n: "RIASEC", label: t("affiliazione.schools") === "Schools" ? "Globally validated test" : "Test validato globalmente" },
-    { n: "100%", label: "GDPR" },
-    { n: "Free", label: t("affiliazione.contactFree").split(",")[0] },
-  ], [t]);
-  void STATS;
-
   const SOLUTION_FEATURES = [
     { icon: Brain, title: "Test di personalità", desc: "RIASEC + Bussola Interiore in meno di 3 minuti. Validato scientificamente, pensato per il contesto italiano." },
     { icon: Compass, title: "Matching con 21 aree", desc: "L'algoritmo incrocia il profilo con dati reali di mercato: stipendi, crescita, rischio AI, trend." },

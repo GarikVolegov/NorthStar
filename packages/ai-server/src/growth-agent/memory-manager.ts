@@ -1,42 +1,4 @@
-/**
- * Memory Manager — persistent memory across coach sessions.
- *
- * ARCHITECTURE
- * ────────────
- * WRITE path (fires AFTER each conversation, non-blocking):
- *   conversation messages
- *       ↓
- *   extractMemory()  ← GPT-4o-mini analyzes the exchange
- *       ↓
- *   { facts: [...], patterns: [...] }
- *       ↓
- *   mergeMemory()    ← upserts facts, increments pattern confidence
- *       ↓
- *   coach_memory_facts + coach_memory_patterns tables
- *
- * READ path (fires BEFORE each response, parallel with RAG retrieval):
- *   loadMemory(userId)
- *       ↓
- *   { facts, patterns }  ← top patterns by confidence + all facts
- *       ↓
- *   buildMemorySection() ← injected into system prompt
- *
- * CONFIDENCE SCORING for patterns:
- *   1st observation  → 0.50
- *   2nd observation  → 0.65
- *   3rd observation  → 0.80
- *   4th+ observation → 0.90 (capped)
- *
- * This means the coach mentions a pattern with certainty only after
- * seeing it multiple times — avoids false positives from a single session.
- */
-import { db } from "@workspace/db";
-import {
-  coachMemoryFactsTable,
-  coachMemoryPatternsTable,
-  type CoachMemoryFact,
-  type CoachMemoryPattern,
-} from "@workspace/db";
+import { coachMemoryFactsTable, coachMemoryPatternsTable, db, type CoachMemoryFact, type CoachMemoryPattern } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { openai } from "../client";
 import { embedText } from "./embedder";
@@ -52,12 +14,7 @@ export interface MemoryFact {
 }
 
 export interface MemoryPattern {
-  patternType:
-    | "limiting_belief"
-    | "strength"
-    | "recurring_theme"
-    | "emotional_trigger"
-    | "growth_edge";
+  patternType: "limiting_belief" | "strength" | "recurring_theme" | "emotional_trigger" | "growth_edge";
   description: string;
 }
 
@@ -387,7 +344,7 @@ export async function loadMemory(userId: number): Promise<UserMemory> {
  * Only included if there's actually something to say.
  */
 export function buildMemorySection(memory: UserMemory): string {
-  const hasFacts    = memory.facts.length > 0;
+  const hasFacts = memory.facts.length > 0;
   const hasPatterns = memory.patterns.length > 0;
 
   if (!hasFacts && !hasPatterns) return "";

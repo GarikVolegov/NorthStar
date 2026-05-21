@@ -44,6 +44,7 @@ export async function ingestPdf(
       `[pdf-parser] Failed to parse PDF "${opts.sourceName}": ${
         err instanceof Error ? err.message : String(err)
       }`,
+      { cause: err },
     );
   }
 

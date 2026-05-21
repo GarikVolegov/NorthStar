@@ -72,9 +72,15 @@ const clerkAppearance = {
   },
 };
 
+const env = import.meta.env as unknown as Record<string, unknown>;
+const clerkPublishableKey =
+  typeof env.VITE_CLERK_PUBLISHABLE_KEY === "string"
+    ? env.VITE_CLERK_PUBLISHABLE_KEY
+    : "";
+
 createRoot(document.getElementById("root")!).render(
   <ClerkProvider
-    publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}
+    publishableKey={clerkPublishableKey}
     afterSignOutUrl="/"
     appearance={clerkAppearance}
   >

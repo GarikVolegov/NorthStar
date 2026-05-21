@@ -26,26 +26,38 @@ export function PersistenceWarningBanner({
         : "Risolvi setup/migration";
 
   return (
-    <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-900" role="alert">
+    <div
+      className="rounded-xl border border-danger-muted bg-danger-surface p-4 text-danger"
+      role="alert"
+    >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex gap-3">
-          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
           <div>
             <p className="text-sm font-semibold">{title}</p>
             <p className="mt-1 text-sm">
-              Dati non disponibili per problema di persistenza, non per assenza di contenuti.
+              Dati non disponibili per problema di persistenza, non per assenza
+              di contenuti.
             </p>
-            <p className="mt-1 break-words text-xs text-red-800/80">
+            <p className="mt-1 break-words text-xs text-danger/80">
               Motivo tecnico: <code>{reason}</code>
             </p>
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          <Button variant="outline" className="min-h-11 border-red-300 bg-white/70 text-red-900 hover:bg-white" onClick={onOpenStatus}>
+          <Button
+            variant="outline"
+            className="min-h-11 border-danger-muted bg-background/70 text-danger hover:bg-background"
+            onClick={onOpenStatus}
+          >
             {setupLabel}
           </Button>
           {onRetry && (
-            <Button variant="outline" className="min-h-11 border-red-300 bg-white/70 text-red-900 hover:bg-white" onClick={onRetry}>
+            <Button
+              variant="outline"
+              className="min-h-11 border-danger-muted bg-background/70 text-danger hover:bg-background"
+              onClick={onRetry}
+            >
               <RefreshCw className="mr-2 h-4 w-4" />
               Riprova
             </Button>
@@ -85,13 +97,8 @@ export function ConfidenceBadge({ score }: { score: number | null }) {
   if (score == null) return null;
   const pct = Math.round(score * 100);
   const color =
-    pct >= 80
-      ? "text-emerald-600"
-      : pct >= 50
-        ? "text-amber-600"
-        : "text-red-600";
+    pct >= 80 ? "text-success" : pct >= 50 ? "text-warning" : "text-danger";
   return (
     <span className={cn("text-xs font-mono font-semibold", color)}>{pct}%</span>
   );
 }
-

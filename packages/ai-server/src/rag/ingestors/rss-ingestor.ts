@@ -86,7 +86,7 @@ export async function ingestRssToRag(opts: RssIngestOptions): Promise<RssIngestR
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     xml = await res.text();
   } catch (e) {
-    throw new Error(`[rss-ingestor] fetch fallito (${opts.feedUrl}): ${String(e)}`);
+    throw new Error(`[rss-ingestor] fetch fallito (${opts.feedUrl}): ${String(e)}`, { cause: e });
   }
 
   const items = parseXmlItems(xml)

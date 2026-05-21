@@ -61,6 +61,7 @@ import { useGrowthQueue } from "@/features/admin-review/hooks/useGrowthQueue";
 import { useMemoryGraph } from "@/features/admin-review/hooks/useMemoryGraph";
 import { apiFetch as rawApiFetch } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
+import { readApiError, readApiErrorFields } from "./admin-review-api";
 import {
   Bot,
   CheckCircle2,
@@ -196,7 +197,7 @@ export default function AdminReview() {
   const [homeLoading, setHomeLoading] = useState(false);
 
   const apiFetch = useCallback(
-    async <T = any,>(path: string, options?: RequestInit): Promise<T> => {
+    async <T = unknown,>(path: string, options?: RequestInit): Promise<T> => {
       if (!token || adminForbidden) {
         throw new Error("auth");
       }
@@ -228,10 +229,10 @@ export default function AdminReview() {
         throw new Error("forbidden");
       }
       if (!res.ok) {
-        let errorBody: any = null;
+        let errorBody: unknown = null;
         let errorText: string | null = null;
         try {
-          errorBody = await res.clone().json();
+          errorBody = (await res.clone().json()) as unknown;
         } catch {
           try {
             errorText = await res.text();
@@ -241,16 +242,17 @@ export default function AdminReview() {
         }
         const message = isLocalProxyFailure(res.status, errorText)
           ? localApiUnavailableMessage(path)
-          : (errorBody?.error ??
+          : (readApiError(errorBody) ??
             `Errore ${res.status} durante il caricamento della console admin.`);
         setAdminError(message);
         const error = new Error(message) as Error & {
           fields?: Record<string, string>;
         };
-        error.fields = errorBody?.fields;
+        const fields = readApiErrorFields(errorBody);
+        if (fields) error.fields = fields;
         throw error;
       }
-      const data = await res.json();
+      const data = (await res.json()) as unknown;
       setAdminError(null);
       setLastUpdatedAt(new Date().toISOString());
       return data as T;
@@ -317,7 +319,7 @@ export default function AdminReview() {
 
   const loadStats = useCallback(async () => {
     try {
-      const data = await apiFetch("/admin/stats");
+      const data = await apiFetch<DashboardStats>("/admin/stats");
       setStats(data);
     } catch {
       /* handled by apiFetch */
@@ -335,7 +337,7 @@ export default function AdminReview() {
         params.set("confidence_min", filterConfidence);
       if (searchTerm) params.set("search", searchTerm);
       params.set("limit", "100");
-      const data = await apiFetch(`/admin/suggestions?${params}`);
+      const data = await apiFetch<{ items: Suggestion[]; total: number }>(`/admin/suggestions?${params}`);
       setSuggestions(data.items);
       setSuggestionsTotal(data.total);
     } catch {
@@ -354,7 +356,7 @@ export default function AdminReview() {
   const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiFetch("/admin/logs?limit=100");
+      const data = await apiFetch<AuditLogEntry[]>("/admin/logs?limit=100");
       setLogs(data);
     } catch {
       /* handled */
@@ -366,7 +368,7 @@ export default function AdminReview() {
     async (id: number) => {
       setDetailLoading(true);
       try {
-        const data = await apiFetch(`/admin/suggestions/${id}`);
+        const data = await apiFetch<SuggestionDetail>(`/admin/suggestions/${id}`);
         setDetail(data);
         setShowTechnicalData(false);
       } catch {
@@ -381,16 +383,14 @@ export default function AdminReview() {
     setPromptsLoading(true);
     try {
       const [data, policyData] = await Promise.all([
-        apiFetch("/admin/prompts"),
-        apiFetch("/admin/ai/model-policy"),
+        apiFetch<AgentPrompt[]>("/admin/prompts"),
+        apiFetch<{ policy?: AiModelPolicy | null }>("/admin/ai/model-policy"),
       ]);
-      setPrompts(data as AgentPrompt[]);
-      setAiModelPolicy(
-        (policyData as { policy?: AiModelPolicy | null }).policy ?? null,
-      );
+      setPrompts(data);
+      setAiModelPolicy(policyData.policy ?? null);
       const vals: Record<string, string> = {};
       const notes: Record<string, string> = {};
-      for (const p of data as AgentPrompt[]) {
+      for (const p of data) {
         vals[p.key] = p.draftValue ?? p.currentValue;
         notes[p.key] = "";
       }
@@ -405,12 +405,12 @@ export default function AdminReview() {
   const loadPromptVersions = useCallback(
     async (key: string) => {
       try {
-        const data = (await apiFetch(`/admin/prompts/${key}/versions`)) as {
+        const data = await apiFetch<{
           versions?: PromptVersion[];
-        } & PersistenceMeta;
+        } & PersistenceMeta>(`/admin/prompts/${key}/versions`);
         setPromptVersions((prev) => ({
           ...prev,
-          [key]: (data.versions ?? []) as PromptVersion[],
+          [key]: data.versions ?? [],
         }));
         setPromptVersionPersistence((prev) => ({
           ...prev,
@@ -431,13 +431,13 @@ export default function AdminReview() {
     async (key: string) => {
       setPromptSaving((prev) => new Set(prev).add(`${key}:preview`));
       try {
-        const data = await apiFetch(`/admin/prompts/${key}/preview`, {
+        const data = await apiFetch<PromptPreview>(`/admin/prompts/${key}/preview`, {
           method: "POST",
           body: JSON.stringify({ value: promptEditValues[key] ?? "" }),
         });
         setPromptPreview((prev) => ({
           ...prev,
-          [key]: data as PromptPreview,
+          [key]: data,
         }));
       } catch {
         /* handled */
@@ -454,10 +454,10 @@ export default function AdminReview() {
   const loadAgentsOverview = useCallback(async () => {
     setAgentsOverviewLoading(true);
     try {
-      const data = await apiFetch(
+      const data = await apiFetch<AgentsOverview>(
         `/admin/agents/overview?days=${agentDays}&limit=100`,
       );
-      setAgentsOverviewData(data as AgentsOverview);
+      setAgentsOverviewData(data);
     } catch {
       /* handled */
     }
@@ -467,10 +467,10 @@ export default function AdminReview() {
   const loadQualita = useCallback(async () => {
     setQualitaLoading(true);
     try {
-      const data = await apiFetch(
+      const data = await apiFetch<WendyQualityOverview>(
         `/admin/quality/overview?days=${qualitaDays}&limit=50`,
       );
-      setQualitaData(data as WendyQualityOverview);
+      setQualitaData(data);
     } catch {
       /* handled */
     }
@@ -480,7 +480,7 @@ export default function AdminReview() {
   const loadHome = useCallback(async () => {
     setHomeLoading(true);
     try {
-      const data = await apiFetch("/admin/overview");
+      const data = await apiFetch<AdminOverview>("/admin/overview");
       setHomeData(data);
     } catch {
       /* handled */
@@ -497,7 +497,7 @@ export default function AdminReview() {
         [agentKey]: { ok: false, data: { status: "running..." } },
       }));
       try {
-        const data = await apiFetch(path, {
+        const data = await apiFetch<Record<string, unknown>>(path, {
           method: "POST",
           body: JSON.stringify(body ?? {}),
         });
@@ -863,35 +863,35 @@ export default function AdminReview() {
       {stats && (
         <div className="p-4 border-b">
           <div className="grid grid-cols-2 gap-2">
-            <div className="bg-amber-50 rounded-lg p-3 text-center">
-              <div className="text-xl font-bold text-amber-700">
+            <div className="bg-warning-surface rounded-lg p-3 text-center">
+              <div className="text-xl font-bold text-warning">
                 {stats.pending}
               </div>
-              <div className="text-[10px] text-amber-600 uppercase tracking-wider">
+              <div className="text-[10px] text-warning uppercase tracking-wider">
                 In Attesa
               </div>
             </div>
-            <div className="bg-emerald-50 rounded-lg p-3 text-center">
-              <div className="text-xl font-bold text-emerald-700">
+            <div className="bg-success-surface rounded-lg p-3 text-center">
+              <div className="text-xl font-bold text-success">
                 {stats.approved}
               </div>
-              <div className="text-[10px] text-emerald-600 uppercase tracking-wider">
+              <div className="text-[10px] text-success uppercase tracking-wider">
                 Approvati
               </div>
             </div>
-            <div className="bg-red-50 rounded-lg p-3 text-center">
-              <div className="text-xl font-bold text-red-700">
+            <div className="bg-danger-surface rounded-lg p-3 text-center">
+              <div className="text-xl font-bold text-danger">
                 {stats.rejected}
               </div>
-              <div className="text-[10px] text-red-600 uppercase tracking-wider">
+              <div className="text-[10px] text-danger uppercase tracking-wider">
                 Rifiutati
               </div>
             </div>
-            <div className="bg-slate-50 rounded-lg p-3 text-center">
-              <div className="text-xl font-bold text-slate-700">
+            <div className="bg-muted rounded-lg p-3 text-center">
+              <div className="text-xl font-bold text-foreground">
                 {stats.totalRuns}
               </div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider">
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
                 Esecuzioni
               </div>
             </div>
@@ -924,7 +924,7 @@ export default function AdminReview() {
                     <Icon className="w-4 h-4 shrink-0" />
                     <span className="flex-1">{item.label}</span>
                     {count != null && count > 0 && (
-                      <span className="text-xs bg-amber-500 text-white px-1.5 py-0.5 rounded-full min-w-5 text-center">
+                      <span className="text-xs bg-warning text-primary-foreground px-1.5 py-0.5 rounded-full min-w-5 text-center">
                         {count}
                       </span>
                     )}
@@ -1162,7 +1162,7 @@ export default function AdminReview() {
                     </div>
                   ) : queueSuggestions.length === 0 ? (
                     <div className="p-12 text-center">
-                      <CheckCircle2 className="w-12 h-12 text-emerald-300 mx-auto mb-4" />
+                      <CheckCircle2 className="w-12 h-12 text-success mx-auto mb-4 opacity-60" />
                       <p className="text-muted-foreground font-medium">
                         {section === "queue"
                           ? "Nessun elemento in attesa di revisione"

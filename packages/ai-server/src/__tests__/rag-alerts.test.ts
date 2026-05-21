@@ -10,7 +10,7 @@ import { logger } from "../logger";
 import { recordRagAlertSample, resetRagAlertSamples } from "../rag/alerts";
 
 describe("RAG alerts", () => {
-  const captureMessage = vi.fn();
+  const captureMessage = vi.fn<(message: string) => void>();
 
   beforeEach(() => {
     vi.useFakeTimers();

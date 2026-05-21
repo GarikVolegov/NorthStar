@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { responseJson } from "./helpers/json";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:5000";
 const API_BASE = process.env.API_URL ?? "http://localhost:8080";
@@ -56,7 +57,7 @@ test.describe("API Pubblica", () => {
   test("GET /api/sectors restituisce lista settori", async ({ request }) => {
     const response = await request.get(`${API_BASE}/api/sectors`);
     expect(response.status()).toBe(200);
-    const body = await response.json();
+    const body = await responseJson<unknown[]>(response);
     expect(Array.isArray(body)).toBeTruthy();
     if (body.length > 0) {
       expect(body[0]).toHaveProperty("id");
@@ -68,7 +69,7 @@ test.describe("API Pubblica", () => {
     const response = await request.get(`${API_BASE}/api/news`);
     expect([200, 404]).toContain(response.status());
     if (response.status() === 200) {
-      const body = await response.json();
+      const body = await responseJson<unknown>(response);
       expect(Array.isArray(body) || typeof body === "object").toBeTruthy();
     }
   });

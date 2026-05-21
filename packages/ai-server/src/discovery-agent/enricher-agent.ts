@@ -152,7 +152,7 @@ async function pLimit<T>(
   tasks:       Array<() => Promise<T>>,
   concurrency: number,
 ): Promise<Array<T | Error>> {
-  const results: Array<T | Error> = new Array(tasks.length);
+  const results: Array<T | Error> = new Array<T | Error>(tasks.length);
   let index = 0;
 
   async function worker() {

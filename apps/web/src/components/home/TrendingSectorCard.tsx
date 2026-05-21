@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
-import { RISK_COLOR, TREND_COLOR, TrendingSector } from "./types";
+import { RISK_COLOR, TREND_COLOR } from "./types";
+import type { TrendingSector } from "./types";
 
 interface TrendingSectorCardProps {
   sector: TrendingSector;

@@ -1,13 +1,19 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useAdminAgents, type ConnectionState } from "@/contexts/AdminAgentContext";
+import {
+  useAdminAgents,
+  type ConnectionState,
+} from "@/contexts/AdminAgentContext";
 import { useOfficeView } from "@/hooks/useOfficeView";
 import { AgentDesk } from "@/components/admin-office/AgentDesk";
 import { AgentDrawer } from "@/components/admin-office/AgentDrawer";
 import { AgentGrid } from "@/components/admin-office/AgentGrid";
 import { StatusBar } from "@/components/admin-office/StatusBar";
 import { positionFor } from "@/components/admin-office/positions";
-import { STATUS_DOT_CLASS, STATUS_LABEL } from "@/components/admin-office/status";
+import {
+  STATUS_DOT_CLASS,
+  STATUS_LABEL,
+} from "@/components/admin-office/status";
 import type { AgentStatus } from "@workspace/api-zod/agent-registry";
 
 const FLOOR_BG_STYLE: CSSProperties = {
@@ -38,7 +44,8 @@ export default function AdminOfficePage() {
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Agent Room</h1>
           <p className="text-sm text-muted-foreground">
-            Vista live degli agenti AI di NorthStar. Clicca un agente per i dettagli.
+            Vista live degli agenti AI di NorthStar. Clicca un agente per i
+            dettagli.
           </p>
         </div>
         <ToggleGroup
@@ -58,7 +65,10 @@ export default function AdminOfficePage() {
         </ToggleGroup>
       </header>
 
-      <StatusBar aggregates={snapshot?.aggregates ?? null} connectionState={connectionState} />
+      <StatusBar
+        aggregates={snapshot?.aggregates ?? null}
+        connectionState={connectionState}
+      />
 
       {view === "office" ? (
         <>
@@ -117,7 +127,7 @@ function FloorPlan({ children }: { children: ReactNode }) {
 
 function Window({ position }: { position: "top" | "left" | "right" }) {
   const base =
-    "absolute bg-gradient-to-b from-sky-400/30 to-sky-200/10 border border-sky-300/40 rounded-sm";
+    "absolute rounded-sm border border-info-muted bg-gradient-to-b from-info/30 to-info/10";
   if (position === "top") {
     return (
       <>
@@ -140,8 +150,10 @@ interface DecorationDef {
 }
 
 function Decoration({ dec }: { dec: DecorationDef }) {
-  if (dec.type === "meeting-room") return <MeetingRoom xPct={dec.xPct} yPct={dec.yPct} />;
-  if (dec.type === "coffee") return <CoffeeArea xPct={dec.xPct} yPct={dec.yPct} />;
+  if (dec.type === "meeting-room")
+    return <MeetingRoom xPct={dec.xPct} yPct={dec.yPct} />;
+  if (dec.type === "coffee")
+    return <CoffeeArea xPct={dec.xPct} yPct={dec.yPct} />;
   return <Plant xPct={dec.xPct} yPct={dec.yPct} />;
 }
 
@@ -153,7 +165,9 @@ function MeetingRoom({ xPct, yPct }: { xPct: number; yPct: number }) {
       style={{ left: `${xPct}%`, top: `${yPct}%` }}
       aria-label="Sala meeting"
     >
-      <span className="text-xs uppercase tracking-wider text-muted-foreground">Meeting</span>
+      <span className="text-xs uppercase tracking-wider text-muted-foreground">
+        Meeting
+      </span>
       {chairs.map((i) => (
         <span
           key={i}
@@ -172,12 +186,16 @@ function MeetingRoom({ xPct, yPct }: { xPct: number; yPct: number }) {
 function CoffeeArea({ xPct, yPct }: { xPct: number; yPct: number }) {
   return (
     <div
-      className="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 rounded-md border border-amber-300/30 bg-amber-100/10 px-3 py-2"
+      className="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 rounded-md border border-warning-muted bg-warning-surface px-3 py-2"
       style={{ left: `${xPct}%`, top: `${yPct}%` }}
       aria-label="Coffee area"
     >
-      <span className="text-2xl" aria-hidden>☕</span>
-      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Coffee</span>
+      <span className="text-2xl" aria-hidden>
+        ☕
+      </span>
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+        Coffee
+      </span>
     </div>
   );
 }
@@ -196,16 +214,19 @@ function Plant({ xPct, yPct }: { xPct: number; yPct: number }) {
 
 function EmptyState({ connectionState }: { connectionState: ConnectionState }) {
   let title = "Nessun agente da mostrare";
-  let body =
-    "La pagina e' caricata ma il registry non ha popolato gli agenti.";
+  let body = "La pagina e' caricata ma il registry non ha popolato gli agenti.";
   let hint: string | null = null;
 
   if (connectionState === "idle") {
     title = "Auth non pronta o non sei admin";
     body =
       "Il provider non avvia il fetch finche` `user.role !== \"admin\"`. Verifica che il login sia completato e che il tuo utente abbia role='admin' nel DB.";
-    hint = "Console (dev): controlla `[AdminAgentProvider]` per role e authReady.";
-  } else if (connectionState === "connecting" || connectionState === "reconnecting") {
+    hint =
+      "Console (dev): controlla `[AdminAgentProvider]` per role e authReady.";
+  } else if (
+    connectionState === "connecting" ||
+    connectionState === "reconnecting"
+  ) {
     title = "Connessione al backend in corso";
     body =
       "Lo snapshot sta per arrivare. Se resta cosi` a lungo, controlla che il server gira (porta 3001) e che `/api/admin/agents` risponda 200.";
@@ -223,7 +244,9 @@ function EmptyState({ connectionState }: { connectionState: ConnectionState }) {
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center p-6">
       <div className="max-w-md rounded-xl border border-border bg-card/90 p-6 shadow-2xl backdrop-blur-sm">
-        <h2 className="mb-2 text-base font-semibold text-foreground">{title}</h2>
+        <h2 className="mb-2 text-base font-semibold text-foreground">
+          {title}
+        </h2>
         <p className="text-sm text-muted-foreground">{body}</p>
         {hint && (
           <p className="mt-2 text-xs text-muted-foreground/80">{hint}</p>
@@ -246,7 +269,9 @@ function Legend() {
       <span className="font-medium text-foreground">Stati</span>
       {entries.map((e) => (
         <span key={e.status} className="flex items-center gap-1.5">
-          <span className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT_CLASS[e.status]}`} />
+          <span
+            className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT_CLASS[e.status]}`}
+          />
           {e.label}
         </span>
       ))}

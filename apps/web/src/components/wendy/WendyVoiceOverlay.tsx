@@ -22,7 +22,8 @@
  *   - Trap focus sull'overlay (close button)
  *   - aria-live per la trascrizione
  */
-import { AvatarState, WendyAvatar } from '@/components/wendy-avatar';
+import { WendyAvatar } from '@/components/wendy-avatar';
+import type { AvatarState } from '@/components/wendy-avatar';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef } from 'react';
 import type { UseVoiceChatReturn, VoiceChatMessage, VoiceChatPhase } from '../../hooks/useVoiceChat.js';
@@ -72,7 +73,7 @@ export function WendyVoiceOverlay({
   // Stop everything when overlay closes
   useEffect(() => {
     if (!open) vc.cancelAll();
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, vc]);
 
   // Keyboard: Escape closes
   useEffect(() => {

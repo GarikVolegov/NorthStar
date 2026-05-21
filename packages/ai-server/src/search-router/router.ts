@@ -31,6 +31,56 @@ const DEFAULT_ROUTE: RouterOutput = {
   confidence: 0.5,
 };
 
+const INTENTS = ["explore", "learn", "solve", "compare", "find_job", "clarify"] as const;
+const USER_MODES = ["exploring", "goal_oriented", "lost", "expert"] as const;
+const EXPERIENCE_LEVELS = ["beginner", "intermediate", "advanced"] as const;
+const UI_WIDGET_TYPES = ["results_list", "chat", "quick_actions", "sector_cards"] as const;
+const RETRIEVAL_STRATEGIES = ["semantic", "keyword", "hybrid", "none"] as const;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function oneOf<const T extends readonly string[]>(
+  values: T,
+  value: unknown,
+  fallback: T[number],
+): T[number] {
+  return typeof value === "string" && values.includes(value) ? value : fallback;
+}
+
+function readRoute(value: unknown): RouterOutput {
+  if (!isRecord(value)) return DEFAULT_ROUTE;
+  return {
+    intent: oneOf(INTENTS, value.intent, DEFAULT_ROUTE.intent),
+    user_mode: oneOf(USER_MODES, value.user_mode, DEFAULT_ROUTE.user_mode),
+    experience_level: oneOf(
+      EXPERIENCE_LEVELS,
+      value.experience_level,
+      DEFAULT_ROUTE.experience_level,
+    ),
+    needs_clarification:
+      typeof value.needs_clarification === "boolean"
+        ? value.needs_clarification
+        : false,
+    clarifying_question:
+      typeof value.clarifying_question === "string"
+        ? value.clarifying_question
+        : null,
+    ui_widget_type: oneOf(
+      UI_WIDGET_TYPES,
+      value.ui_widget_type,
+      DEFAULT_ROUTE.ui_widget_type,
+    ),
+    retrieval_strategy: oneOf(
+      RETRIEVAL_STRATEGIES,
+      value.retrieval_strategy,
+      DEFAULT_ROUTE.retrieval_strategy,
+    ),
+    confidence: typeof value.confidence === "number" ? value.confidence : 0.5,
+  };
+}
+
 const ROUTER_PROMPT = `Sei un AI Router specializzato nell'instradare utenti verso il tool, widget o servizio migliore all'interno di una piattaforma software complessa.
 
 Non devi rispondere come assistente generico.
@@ -89,18 +139,7 @@ export async function routeQuery(input: RouterInput): Promise<RouterOutput> {
     );
 
     const cleaned = response.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-    const parsed = JSON.parse(cleaned);
-
-    return {
-      intent: parsed.intent ?? DEFAULT_ROUTE.intent,
-      user_mode: parsed.user_mode ?? DEFAULT_ROUTE.user_mode,
-      experience_level: parsed.experience_level ?? DEFAULT_ROUTE.experience_level,
-      needs_clarification: parsed.needs_clarification ?? false,
-      clarifying_question: parsed.clarifying_question ?? null,
-      ui_widget_type: parsed.ui_widget_type ?? DEFAULT_ROUTE.ui_widget_type,
-      retrieval_strategy: parsed.retrieval_strategy ?? DEFAULT_ROUTE.retrieval_strategy,
-      confidence: parsed.confidence ?? 0.5,
-    };
+    return readRoute(JSON.parse(cleaned) as unknown);
   } catch (err) {
     logger.warn({ err, query: input.q }, "search-router fallback to default");
     return DEFAULT_ROUTE;

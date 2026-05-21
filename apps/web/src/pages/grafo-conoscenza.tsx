@@ -100,7 +100,7 @@ export default function Archivio() {
 
   const rafId = useRef<number | null>(null);
   const pendingPositions = useRef<Map<number, { x: number; y: number }>>(
-    new globalThis.Map(),
+    new globalThis.Map<number, { x: number; y: number }>(),
   );
   const flushTimer = useRef<number | null>(null);
 
@@ -186,7 +186,6 @@ export default function Archivio() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, linkMode, chatOpen, contextMenu, edgeLabelEdit]);
 
   useEffect(() => {
@@ -257,7 +256,7 @@ export default function Archivio() {
       x: p.x,
       y: p.y,
     }));
-    pendingPositions.current = new globalThis.Map();
+    pendingPositions.current = new globalThis.Map<number, { x: number; y: number }>();
     void apiFetch(`${BASE}api/knowledge/nodes/positions`, {
       method: "POST",
       body: JSON.stringify({ positions }),
@@ -736,7 +735,6 @@ export default function Archivio() {
       setData((d) => ({ ...d, nodes: next }));
       next.forEach((n) => queuePosition(n.id, n.x, n.y));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.nodes.length]);
 
   if (!authReady || (user && loading)) {

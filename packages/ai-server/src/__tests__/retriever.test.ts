@@ -19,7 +19,7 @@ vi.mock("@workspace/db", () => ({
 
 vi.mock("../growth-agent/embedder", () => ({
   embedText: vi.fn(async (text: string) => {
-    const fake = new Array(1536).fill(0);
+    const fake: number[] = new Array<number>(1536).fill(0);
     const hash = text.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
     fake[0] = hash / 1000;
     fake[1] = 0.5;
@@ -63,7 +63,7 @@ describe("Retriever", () => {
     });
 
     it("does not query pgvector when the query embedding is invalid", async () => {
-      const invalid = new Array(1536).fill(0);
+      const invalid: number[] = new Array<number>(1536).fill(0);
       invalid[10] = Number.NaN;
       vi.mocked(embedText).mockResolvedValueOnce(invalid);
 
@@ -103,7 +103,9 @@ describe("Retriever", () => {
       const query = "similar text";
       const result = await retrieve(query, 1, { topK: 5, minScore: 0.0 });
       for (let i = 1; i < result.length; i++) {
-        expect(result[i].score).toBeLessThanOrEqual(result[i - 1].score);
+        const current = result[i];
+        const previous = result[i - 1];
+        expect(current?.score).toBeLessThanOrEqual(previous?.score ?? 0);
       }
     });
 
@@ -134,7 +136,7 @@ describe("Retriever", () => {
         minScore: 0.30,
         sourceTypes: ["platform_content", "document"],
       });
-      const sqlText = mockPoolQuery.mock.calls[0][0] as string;
+      const sqlText = String(mockPoolQuery.mock.calls[0]?.[0] ?? "");
       expect(sqlText).toContain("user_id = $2 OR user_id = $5");
     });
 
@@ -145,7 +147,7 @@ describe("Retriever", () => {
         minScore: 0.30,
         sourceTypes: ["document"],
       });
-      const sqlText = mockPoolQuery.mock.calls[0][0] as string;
+      const sqlText = String(mockPoolQuery.mock.calls[0]?.[0] ?? "");
       expect(sqlText).not.toContain("user_id = $2 OR user_id = $5");
     });
 

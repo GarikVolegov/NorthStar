@@ -201,7 +201,7 @@ export default function Sector() {
     } else if (workPreference === "dipendente" && stepsView !== "dipendente") {
       setStepsView("dipendente");
     }
-  }, [workPreference]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [workPreference]);
 
   const {
     data: _sector,

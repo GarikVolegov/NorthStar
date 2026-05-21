@@ -39,9 +39,11 @@ function parseJsonPayload(
   setFields: (fields: Record<string, string>) => void,
 ) {
   try {
-    const parsed = JSON.parse(payloadText);
+    const parsed = JSON.parse(payloadText) as unknown;
     setFields({});
-    return parsed as Record<string, unknown>;
+    return typeof parsed === "object" && parsed !== null
+      ? (parsed as Record<string, unknown>)
+      : {};
   } catch {
     setFields({ json: "JSON non valido: correggi la sintassi prima di continuare." });
     return null;

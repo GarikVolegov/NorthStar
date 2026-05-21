@@ -52,6 +52,5 @@ export function useWendyPageContext(ctx: WendyPageContextInput): void {
     };
     setPageContext(pageCtx);
     return () => setPageContext({ page: 'default' });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx.page, ctx.entityId, ctx.journeyType, setPageContext]);
 }

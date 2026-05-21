@@ -17,6 +17,7 @@ import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { useProactiveInsights } from "@/hooks/useProactiveInsights";
 import { SUPPORTED_LANGUAGES } from "@/i18n";
 import { apiFetch } from "@/lib/api-fetch";
+import { getJson } from "@/lib/apiClient";
 import { NAV_LABELS } from "@/lib/constants";
 import { useReducedMotion } from "@/lib/motion";
 import { useClerk } from "@clerk/react";
@@ -160,11 +161,10 @@ export function Navbar() {
       []
     ).join(",");
 
-    apiFetch(`${BASE}api/news?multi=true&categories=${cats}&perCategory=2`)
-      .then((response) => response.json())
+    getJson<{ news?: Array<{ title: string }> }>(`${BASE}api/news?multi=true&categories=${cats}&perCategory=2`)
       .then((data) => {
         if (data?.news?.length) {
-          setNewsTitles(data.news.map((item: { title: string }) => item.title));
+          setNewsTitles(data.news.map((item) => item.title));
         }
       })
       .catch(() => {});

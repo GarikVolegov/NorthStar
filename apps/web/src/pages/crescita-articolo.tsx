@@ -2,7 +2,7 @@ import { SafeMarkdown } from "@/components/SafeMarkdown";
 import { Button } from "@/components/ui/button";
 import { TTSButton } from "@/components/ui/tts-button";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch } from "@/lib/api-fetch";
+import { getJson, postJson } from "@/lib/apiClient";
 import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -97,11 +97,7 @@ export default function CrescitaArticolo() {
     error,
   } = useQuery<ArticleDetail>({
     queryKey: ["crescita-articolo", slug],
-    queryFn: () =>
-      apiFetch(`${BASE}api/crescita/${slug}`).then(async (r) => {
-        if (!r.ok) throw new Error("not found");
-        return r.json();
-      }),
+    queryFn: () => getJson<ArticleDetail>(`${BASE}api/crescita/${slug}`),
     staleTime: 1000 * 60 * 5,
     enabled: !!slug,
     retry: false,
@@ -119,10 +115,7 @@ export default function CrescitaArticolo() {
     if (!isLoggedIn || !article) return;
     setSaveLoading(true);
     try {
-      const res = await apiFetch(`${BASE}api/crescita/${article.id}/salva`, {
-        method: "POST",
-      });
-      const data = await res.json();
+      const data = await postJson<{ saved: boolean }>(`${BASE}api/crescita/${article.id}/salva`);
       setSaved(data.saved);
       queryClient.invalidateQueries({ queryKey: ["crescita-salvati"] });
     } finally {

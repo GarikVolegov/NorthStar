@@ -27,14 +27,14 @@ NorthStar è una piattaforma SaaS modulare composta da:
 
 ### Servizi Docker
 
-| Servizio             | Base/Image                              | Porta | Scopo                          |
-| -------------------- | --------------------------------------- | ----- | ------------------------------ |
-| **PostgreSQL**       | postgres:16-alpine                      | 5432  | Database principale            |
-| **Redis**            | redis:7-alpine                          | 6379  | Cache + rate limiting          |
-| **AI Agents (ML)**   | Python FastAPI (`main.py`)              | 8000  | ML training/predizione modelli |
-| **NorthStar Server** | Express + TS (`apps/server/`)           | 3001  | API REST principale            |
-| **Frontend**         | React + Vite (`apps/web/`)              | 5173  | SPA frontend                   |
-| **Jaeger**           | jaegertracing/all-in-one                | 16686 | Distributed tracing UI         |
+| Servizio             | Base/Image                    | Porta | Scopo                          |
+| -------------------- | ----------------------------- | ----- | ------------------------------ |
+| **PostgreSQL**       | postgres:16-alpine            | 5432  | Database principale            |
+| **Redis**            | redis:7-alpine                | 6379  | Cache + rate limiting          |
+| **AI Agents (ML)**   | Python FastAPI (`main.py`)    | 8000  | ML training/predizione modelli |
+| **NorthStar Server** | Express + TS (`apps/server/`) | 3001  | API REST principale            |
+| **Frontend**         | React + Vite (`apps/web/`)    | 5173  | SPA frontend                   |
+| **Jaeger**           | jaegertracing/all-in-one      | 16686 | Distributed tracing UI         |
 
 ### Pacchetti Condivisi (pnpm workspace)
 
@@ -244,10 +244,11 @@ pnpm dev:web           # solo frontend Vite
 pnpm dev:server        # solo northstar-server
 pnpm build             # build per produzione
 pnpm typecheck         # controlla tipi TypeScript (root + pacchetti)
-pnpm lint:ci           # gate ESLint bloccante CI/Vercel sul perimetro Step 4-6
-pnpm lint:legacy       # ESLint globale manuale; puo' fallire per debito legacy noto
-pnpm check             # lint:ci + typecheck
-pnpm qa                # lint:ci, typecheck, coverage e audit determinismo E2E
+pnpm lint:ci           # alias del lint globale bloccante CI/Vercel
+pnpm lint:legacy       # alias compatibile del lint globale
+pnpm check             # lint globale + typecheck
+pnpm qa                # lint globale, typecheck, coverage e audit/ratchet qualita'
+pnpm audit:file-size   # ratchet file-size: blocca nuovi monoliti o crescita legacy
 pnpm test:ai           # test AI server
 pnpm test:e2e          # test end-to-end (Playwright)
 pnpm db:generate       # genera migrazioni Drizzle
@@ -469,7 +470,7 @@ Gli script in `scripts/` gestiscono:
 
 | Workflow         | Trigger                    | Descrizione                                                     |
 | ---------------- | -------------------------- | --------------------------------------------------------------- |
-| `ci.yml`         | Push main/develop, PR main | Audit, `lint:ci`, typecheck, coverage gate, build, E2E          |
+| `ci.yml`         | Push main/develop, PR main | Audit, lint globale, typecheck, coverage gate, build, E2E       |
 | `staging.yml`    | Push develop               | Migration versionate, deploy Railway staging, release Sentry    |
 | `production.yml` | Push main                  | Dry-run migration, migration production, deploy Railway, Sentry |
 | `rollback.yml`   | Manuale                    | Rollback applicativo con DB safety check                        |
@@ -477,7 +478,7 @@ Gli script in `scripts/` gestiscono:
 
 ### Gate qualita locali
 
-`lint:ci` e' il gate lint bloccante usato da CI e Vercel per il perimetro Step 4-6. `lint:legacy` resta disponibile come debt tracker globale e puo' fallire finche' il cleanup completo del monorepo non viene pianificato separatamente.
+`lint:ci` e' il gate lint bloccante usato da CI e Vercel ed e' ora alias del lint globale. `lint:legacy` resta disponibile come alias compatibile per i comandi storici.
 
 ### Percorso nuovo contributor
 

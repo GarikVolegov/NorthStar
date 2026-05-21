@@ -16,7 +16,7 @@
  * Domain icons are resolved from DOMAIN_STATUS_ICONS at runtime.
  * Memory wiring from v3 is preserved unchanged.
  */
-import OpenAI from "openai";
+import type OpenAI from "openai";
 import { openai } from "../client";
 import { retrieve } from "./retriever";
 import { searchWeb, MIN_LOCAL_CHUNKS } from "./web-search";

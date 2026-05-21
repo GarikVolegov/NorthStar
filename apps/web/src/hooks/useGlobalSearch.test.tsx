@@ -19,8 +19,10 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 function jsonResponse(body: unknown) {
+  const text = JSON.stringify(body);
   return {
     ok: true,
+    text: async () => text,
     json: async () => body,
   } as Response;
 }

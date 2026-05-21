@@ -4,7 +4,7 @@ import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWendy } from "@/contexts/WendyProvider";
-import { apiFetch } from "@/lib/api-fetch";
+import { getJson } from "@/lib/apiClient";
 import { useReducedMotion } from "@/lib/motion";
 import { SectorIcon } from "@/lib/sector-icon";
 import { cn } from "@/lib/utils";
@@ -148,13 +148,9 @@ interface Persona {
 function useHomeNews() {
   return useQuery<{ news: HomeNewsItem[] }>({
     queryKey: ["home-news"],
-    queryFn: async () => {
-      const res = await apiFetch(
-        `${BASE}api/news?multi=true&categories=technology,business,education&perCategory=1`,
-      );
-      if (!res.ok) throw new Error("news error");
-      return res.json();
-    },
+    queryFn: () => getJson<{ news: HomeNewsItem[] }>(
+      `${BASE}api/news?multi=true&categories=technology,business,education&perCategory=1`,
+    ),
     staleTime: 600_000,
   });
 }
@@ -162,11 +158,7 @@ function useHomeNews() {
 function useTrendingSectors() {
   return useQuery<TrendingSector[]>({
     queryKey: ["trending-sectors"],
-    queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/trending-sectors`);
-      if (!res.ok) throw new Error("error");
-      return res.json();
-    },
+    queryFn: () => getJson<TrendingSector[]>(`${BASE}api/trending-sectors`),
     staleTime: 300_000,
   });
 }
@@ -175,11 +167,7 @@ function useLatestRecommendations(enabled: boolean) {
   return useQuery<LatestResult>({
     queryKey: ["latest-recommendations"],
     enabled,
-    queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/test-sessions/latest`);
-      if (!res.ok) throw new Error("No session");
-      return res.json();
-    },
+    queryFn: () => getJson<LatestResult>(`${BASE}api/test-sessions/latest`),
     staleTime: 60_000,
     retry: false,
   });
@@ -1266,17 +1254,14 @@ export default function Home() {
   const { data: newsData, isLoading: isNewsLoading } = useHomeNews();
   const { isLoggedIn, user, updateUser, authReady } = useAuth();
   const [, navigateTo] = useLocation();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const { data: latestResult, isLoading: isLatestLoading } =
+    useLatestRecommendations(authReady && isLoggedIn && !!user);
 
   // Utenti registrati vanno direttamente alla dashboard — la home è solo per ospiti
   useEffect(() => {
     if (authReady && isLoggedIn) navigateTo("/dashboard");
   }, [authReady, isLoggedIn, navigateTo]);
-
-  if (authReady && isLoggedIn) return null;
-  const [showOnboarding, setShowOnboarding] = useState(false);
-
-  const { data: latestResult, isLoading: isLatestLoading } =
-    useLatestRecommendations(isLoggedIn && !!user);
 
   // Show onboarding wizard once per browser — after login, if not already completed
   useEffect(() => {
@@ -1286,6 +1271,8 @@ export default function Home() {
     const t = setTimeout(() => setShowOnboarding(true), 600);
     return () => clearTimeout(t);
   }, [isLoggedIn, user, isLatestLoading]);
+
+  if (authReady && isLoggedIn) return null;
 
   if (isLoggedIn && user && isLatestLoading) {
     return (

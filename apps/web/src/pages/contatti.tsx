@@ -45,7 +45,7 @@ export default function Contatti() {
     reset,
     formState: { errors },
   } = useForm<ContactFormData>({
-    resolver: zodResolver(contactSchema as any),
+    resolver: zodResolver(contactSchema),
     defaultValues: { name: "", email: "", subject: "info", message: "" },
   });
 

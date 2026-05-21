@@ -15,7 +15,7 @@ import {
   SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import { apiFetch } from "@/lib/api-fetch";
+import { patchJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -139,13 +139,7 @@ export function CvEditorDrawer({ open, onClose, userId, initialCv }: Props) {
   // ── Save mutation
   const saveMutation = useMutation({
     mutationFn: async (data: GeneratedCv) => {
-      const res = await apiFetch(`${BASE}api/cv/mine/generated`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ generated: data }),
-      });
-      if (!res.ok) throw new Error("Errore salvataggio");
-      return res.json();
+      return patchJson<unknown>(`${BASE}api/cv/mine/generated`, { generated: data });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cvs-mine", userId] });
@@ -163,7 +157,11 @@ export function CvEditorDrawer({ open, onClose, userId, initialCv }: Props) {
   }, []);
   const removeExp = useCallback((id: string) =>
     setCv((c) => ({ ...c, experience: c.experience.filter((e) => e.id !== id) })), []);
-  const setExp = useCallback((id: string, k: string, v: any) =>
+  const setExp = useCallback(<K extends keyof GeneratedCv["experience"][number]>(
+    id: string,
+    k: K,
+    v: GeneratedCv["experience"][number][K],
+  ) =>
     setCv((c) => ({ ...c, experience: c.experience.map((e) => e.id === id ? { ...e, [k]: v } : e) })), []);
 
   // ── Educazione helpers

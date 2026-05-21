@@ -28,6 +28,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getJson } from '@/lib/apiClient';
 
 type VoiceState = 'idle' | 'listening' | 'thinking' | 'error';
 
@@ -45,6 +46,41 @@ const DG_WS_URL = (token: string, lang: string) =>
   `model=nova-3&language=${lang}&punctuate=true&interim_results=true&` +
   `encoding=opus&container=webm&sample_rate=48000&token=${token}`;
 
+type VoiceTokenResponse = {
+  token: string;
+};
+
+function isVoiceTokenResponse(value: unknown): value is VoiceTokenResponse {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'token' in value &&
+    typeof (value as { token?: unknown }).token === 'string'
+  );
+}
+
+function readDeepgramTranscript(value: unknown): {
+  transcript: string;
+  isFinal: boolean;
+} {
+  if (typeof value !== 'object' || value === null) {
+    return { transcript: '', isFinal: false };
+  }
+
+  const record = value as {
+    channel?: {
+      alternatives?: Array<{ transcript?: unknown }>;
+    };
+    is_final?: unknown;
+  };
+
+  const transcript = record.channel?.alternatives?.[0]?.transcript;
+  return {
+    transcript: typeof transcript === 'string' ? transcript : '',
+    isFinal: record.is_final === true,
+  };
+}
+
 export function WendyVoiceInput({
   onTranscript,
   onPartial,
@@ -61,12 +97,6 @@ export function WendyVoiceInput({
   const wsRef       = useRef<WebSocket | null>(null);
   const streamRef   = useRef<MediaStream | null>(null);
 
-  // Cleanup garantito allo smontaggio
-  useEffect(() => {
-    return () => stopAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const stopAll = useCallback(() => {
     mediaRef.current?.stop();
     mediaRef.current = null;
@@ -76,6 +106,11 @@ export function WendyVoiceInput({
     streamRef.current = null;
   }, []);
 
+  // Cleanup garantito allo smontaggio
+  useEffect(() => {
+    return () => stopAll();
+  }, [stopAll]);
+
   const startListening = useCallback(async () => {
     setErrMsg('');
     setPartial('');
@@ -83,9 +118,11 @@ export function WendyVoiceInput({
 
     try {
       // 1. Ottieni token Deepgram temporaneo dal backend
-      const tokenResp = await fetch(apiTokenUrl, { credentials: 'include' });
-      if (!tokenResp.ok) throw new Error('Impossibile ottenere il token vocale');
-      const { token } = await tokenResp.json() as { token: string };
+      const tokenResponse = await getJson<unknown>(apiTokenUrl);
+      if (!isVoiceTokenResponse(tokenResponse)) {
+        throw new Error('Impossibile ottenere il token vocale');
+      }
+      const { token } = tokenResponse;
 
       // 2. Apri WebSocket verso Deepgram
       const ws = new WebSocket(DG_WS_URL(token, language));
@@ -100,12 +137,11 @@ export function WendyVoiceInput({
       // 3. Handler messaggi Deepgram
       ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data as string);
-          const transcript: string =
-            data?.channel?.alternatives?.[0]?.transcript ?? '';
+          const data = JSON.parse(String(event.data)) as unknown;
+          const { transcript, isFinal } = readDeepgramTranscript(data);
           if (!transcript) return;
 
-          if (data.is_final) {
+          if (isFinal) {
             onTranscript(transcript);
             setPartial('');
           } else {

@@ -44,7 +44,7 @@ export function KnowledgeNodeEditor({
     setContent(node.content);
     setType(node.type);
     setUrl(node.url ?? "");
-  }, [node.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [node.content, node.id, node.title, node.type, node.url]);
 
   const dirty =
     title !== node.title ||
@@ -67,7 +67,6 @@ export function KnowledgeNodeEditor({
         setSavedBadge(true);
         setTimeout(() => setSavedBadge(false), 2000);
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     },
     [dirty, title, content, type, url, onSave],
   );
@@ -81,16 +80,14 @@ export function KnowledgeNodeEditor({
     return () => {
       if (autoSaveTimer.current) window.clearTimeout(autoSaveTimer.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, content, type, url]);
+  }, [dirty, save, title, content, type, url]);
 
   useEffect(() => {
     onSaveRef.current = dirty ? () => void save(false) : null;
     return () => {
       onSaveRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dirty, title, content, type, url]);
+  }, [dirty, onSaveRef, save, title, content, type, url]);
 
   const meta = TYPE_META[type] ?? TYPE_META.note;
   const Icon = meta.Icon;

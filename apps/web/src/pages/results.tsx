@@ -146,7 +146,7 @@ function SectorBookmarkButton({ sectorId }: { sectorId: number }) {
   const favId = getSectorFavoriteId(sectorId);
   return (
     <button
-      onClick={(e) => { e.stopPropagation(); saved && favId !== undefined ? removeFavorite(favId) : addFavorite({ type: "sector", sectorId }); }}
+      onClick={(e) => { e.stopPropagation(); if (saved && favId !== undefined) removeFavorite(favId); else addFavorite({ type: "sector", sectorId }); }}
       disabled={isLoading}
       title={saved ? t("results.bookmarkRemove") : t("results.bookmarkSave")}
       className={cn(
@@ -434,12 +434,12 @@ export default function Results() {
   };
 
   // useAgentAnalysis deve stare prima di tutti i return condizionali (Rules of Hooks)
+  const sessionWithSpirit = session as { spiritScores?: Record<string, number> | undefined };
   const { data: agentData, isLoading: agentLoading, isError: agentError } = useAgentAnalysis({
     sessionId: Number(id),
     riasecScores: session?.riasecScores as Record<string, number> | undefined,
     primaryTypes: session?.primaryTypes as string[] | undefined,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    spiritScores: (session as any)?.spiritScores as Record<string, number> | undefined,
+    spiritScores: sessionWithSpirit.spiritScores,
     topSectors: ((session?.recommendations as Rec[] | undefined) ?? [])
       .map((r: Rec) => ({ sectorName: r.sector?.name ?? "" }))
       .filter((r: { sectorName: string }) => r.sectorName),

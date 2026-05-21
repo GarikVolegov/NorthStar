@@ -33,7 +33,7 @@ export function ChangePasswordSection({ userId }: { userId: number }) {
     reset,
     formState: { errors, isSubmitting },
   } = useForm<PasswordFormData>({
-    resolver: zodResolver(passwordSchema as any),
+    resolver: zodResolver(passwordSchema),
   });
 
   async function onSubmit(data: PasswordFormData) {

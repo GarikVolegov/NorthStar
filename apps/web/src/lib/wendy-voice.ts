@@ -186,8 +186,18 @@ export function stopAmbientPad(fadeSec = 2): void {
   masterGain.gain.cancelScheduledValues(now);
   masterGain.gain.linearRampToValueAtTime(0, now + fadeSec);
   setTimeout(() => {
-    oscillators.forEach((o) => { try { o.stop(); } catch {} });
-    try { lfo.stop(); } catch {}
+    oscillators.forEach((o) => {
+      try {
+        o.stop();
+      } catch {
+        o.disconnect();
+      }
+    });
+    try {
+      lfo.stop();
+    } catch {
+      lfo.disconnect();
+    }
     if (ctx.state !== "closed") {
       void ctx.close().catch(() => {});
     }

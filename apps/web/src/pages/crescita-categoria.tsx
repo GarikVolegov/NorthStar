@@ -1,5 +1,5 @@
 import { Input } from "@/components/ui/input";
-import { apiFetch } from "@/lib/api-fetch";
+import { getJson } from "@/lib/apiClient";
 import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -99,8 +99,7 @@ export default function CrescitaCategoria() {
 
   const { data: catData = [] } = useQuery<Category[]>({
     queryKey: ["crescita-categorie"],
-    queryFn: () =>
-      apiFetch(`${BASE}api/crescita/categorie`).then((r) => r.json()),
+    queryFn: () => getJson<Category[]>(`${BASE}api/crescita/categorie`),
     staleTime: 1000 * 60 * 10,
   });
 
@@ -108,10 +107,7 @@ export default function CrescitaCategoria() {
 
   const { data, isLoading } = useQuery<{ articles: Article[]; total: number }>({
     queryKey: ["crescita", cat],
-    queryFn: () =>
-      apiFetch(`${BASE}api/crescita?category=${cat}&limit=50`).then((r) =>
-        r.json(),
-      ),
+    queryFn: () => getJson<{ articles: Article[]; total: number }>(`${BASE}api/crescita?category=${cat}&limit=50`),
     staleTime: 1000 * 60 * 5,
     enabled: !!cat,
   });
@@ -235,7 +231,7 @@ export default function CrescitaCategoria() {
           <div className="flex-1 min-w-0">
             {isLoading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[...Array(6)].map((_, i) => (
+                {Array.from({ length: 6 }, (_, i) => (
                   <div
                     key={i}
                     className="rounded-2xl border bg-card p-5 h-48 animate-pulse"

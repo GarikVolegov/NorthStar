@@ -10,7 +10,10 @@ type MemoryGraphSectionProps = {
   fmtShortDate: (value: string) => string;
 };
 
-export function MemoryGraphSection({ memory, fmtShortDate }: MemoryGraphSectionProps) {
+export function MemoryGraphSection({
+  memory,
+  fmtShortDate,
+}: MemoryGraphSectionProps) {
   return (
     <div className="p-4 sm:p-6 space-y-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -20,7 +23,8 @@ export function MemoryGraphSection({ memory, fmtShortDate }: MemoryGraphSectionP
             Cervello Wendy
           </h3>
           <p className="text-sm text-muted-foreground">
-            Governance del memory graph: salute, relazioni candidate, backfill e provenance.
+            Governance del memory graph: salute, relazioni candidate, backfill e
+            provenance.
           </p>
           {memory.data?.generatedAt && (
             <p className="text-xs text-muted-foreground mt-1">
@@ -34,7 +38,9 @@ export function MemoryGraphSection({ memory, fmtShortDate }: MemoryGraphSectionP
           disabled={memory.loading}
           className="min-h-11"
         >
-          <RefreshCw className={cn("w-4 h-4 mr-2", memory.loading && "animate-spin")} />
+          <RefreshCw
+            className={cn("w-4 h-4 mr-2", memory.loading && "animate-spin")}
+          />
           Aggiorna
         </Button>
       </div>
@@ -50,7 +56,11 @@ export function MemoryGraphSection({ memory, fmtShortDate }: MemoryGraphSectionP
           <p className="text-sm text-muted-foreground mt-1">
             Controlla migration, DB e stato servizi in Status & Setup.
           </p>
-          <Button className="mt-4 min-h-11" variant="outline" onClick={memory.load}>
+          <Button
+            className="mt-4 min-h-11"
+            variant="outline"
+            onClick={memory.load}
+          >
             Riprova
           </Button>
         </div>
@@ -65,7 +75,10 @@ export function MemoryGraphSection({ memory, fmtShortDate }: MemoryGraphSectionP
               ["Embedding mancanti", memory.data.health.staleEmbeddings],
               ["Nodi orfani", memory.data.health.orphanNodes],
             ].map(([label, value]) => (
-              <div key={String(label)} className="rounded-xl border bg-card p-4">
+              <div
+                key={String(label)}
+                className="rounded-xl border bg-card p-4"
+              >
                 <p className="text-2xl font-bold">{String(value)}</p>
                 <p className="text-xs text-muted-foreground">{String(label)}</p>
               </div>
@@ -81,23 +94,34 @@ export function MemoryGraphSection({ memory, fmtShortDate }: MemoryGraphSectionP
                     Wendy e gli agenti propongono, l'admin approva o rifiuta.
                   </p>
                 </div>
-                <Badge variant="outline">{memory.data.candidateRelations.length}</Badge>
+                <Badge variant="outline">
+                  {memory.data.candidateRelations.length}
+                </Badge>
               </div>
               {memory.data.candidateRelations.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-8 text-center">
-                  Nessuna relazione candidata. Il grafo non richiede decisioni ora.
+                  Nessuna relazione candidata. Il grafo non richiede decisioni
+                  ora.
                 </p>
               ) : (
                 <div className="space-y-2">
                   {memory.data.candidateRelations.map((relation) => (
-                    <div key={relation.id} className="rounded-lg border bg-background p-3">
+                    <div
+                      key={relation.id}
+                      className="rounded-lg border bg-background p-3"
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-sm font-medium">
-                            {relation.source?.title ?? `Nodo ${relation.sourceId}`} → {relation.target?.title ?? `Nodo ${relation.targetId}`}
+                            {relation.source?.title ??
+                              `Nodo ${relation.sourceId}`}{" "}
+                            →{" "}
+                            {relation.target?.title ??
+                              `Nodo ${relation.targetId}`}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {relation.label ?? relation.relationType} · confidence {Math.round(relation.confidence * 100)}%
+                            {relation.label ?? relation.relationType} ·
+                            confidence {Math.round(relation.confidence * 100)}%
                           </p>
                           {relation.reason && (
                             <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
@@ -111,8 +135,12 @@ export function MemoryGraphSection({ memory, fmtShortDate }: MemoryGraphSectionP
                         <Button
                           size="sm"
                           className="min-h-11"
-                          disabled={memory.actionLoading === `approve:${relation.id}`}
-                          onClick={() => void memory.reviewRelation(relation.id, "approve")}
+                          disabled={
+                            memory.actionLoading === `approve:${relation.id}`
+                          }
+                          onClick={() =>
+                            void memory.reviewRelation(relation.id, "approve")
+                          }
                         >
                           <CheckCircle2 className="w-4 h-4 mr-2" />
                           Approva
@@ -121,8 +149,12 @@ export function MemoryGraphSection({ memory, fmtShortDate }: MemoryGraphSectionP
                           size="sm"
                           variant="outline"
                           className="min-h-11"
-                          disabled={memory.actionLoading === `reject:${relation.id}`}
-                          onClick={() => void memory.reviewRelation(relation.id, "reject")}
+                          disabled={
+                            memory.actionLoading === `reject:${relation.id}`
+                          }
+                          onClick={() =>
+                            void memory.reviewRelation(relation.id, "reject")
+                          }
                         >
                           <XCircle className="w-4 h-4 mr-2" />
                           Rifiuta
@@ -138,7 +170,8 @@ export function MemoryGraphSection({ memory, fmtShortDate }: MemoryGraphSectionP
               <div className="rounded-xl border bg-card p-4">
                 <h4 className="font-semibold mb-2">Backfill utente</h4>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Crea/aggiorna nodi da idee, obiettivi, calendario, profilo e memoria Wendy.
+                  Crea/aggiorna nodi da idee, obiettivi, calendario, profilo e
+                  memoria Wendy.
                 </p>
                 <div className="flex gap-2">
                   <Input
@@ -165,11 +198,16 @@ export function MemoryGraphSection({ memory, fmtShortDate }: MemoryGraphSectionP
               <div className="rounded-xl border bg-card p-4">
                 <h4 className="font-semibold mb-3">Fonti memoria</h4>
                 {memory.data.sourceBreakdown.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nessuna fonte indicizzata.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Nessuna fonte indicizzata.
+                  </p>
                 ) : (
                   <div className="space-y-2">
                     {memory.data.sourceBreakdown.map((source) => (
-                      <div key={source.sourceType} className="flex items-center justify-between gap-3 text-sm">
+                      <div
+                        key={source.sourceType}
+                        className="flex items-center justify-between gap-3 text-sm"
+                      >
                         <span className="truncate">{source.sourceType}</span>
                         <Badge variant="outline">{source.count}</Badge>
                       </div>
@@ -178,10 +216,11 @@ export function MemoryGraphSection({ memory, fmtShortDate }: MemoryGraphSectionP
                 )}
               </div>
 
-              <div className="rounded-xl border bg-amber-50 border-amber-200 p-4 text-amber-900">
+              <div className="rounded-xl border border-warning-muted bg-warning-surface p-4 text-warning">
                 <h4 className="font-semibold mb-1">Regola di sicurezza</h4>
                 <p className="text-xs">
-                  Wendy puo proporre memoria e relazioni, ma modifiche globali e relazioni dubbie passano dalla governance.
+                  Wendy puo proporre memoria e relazioni, ma modifiche globali e
+                  relazioni dubbie passano dalla governance.
                 </p>
               </div>
             </div>

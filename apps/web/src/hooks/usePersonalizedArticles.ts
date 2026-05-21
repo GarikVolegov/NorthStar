@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api-fetch";
+import { getJson } from "@/lib/apiClient";
 import { useQuery } from "@tanstack/react-query";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -12,9 +12,9 @@ export function usePersonalizedArticles() {
   return useQuery<{ articles: GrowthArticle[]; hasProfile: boolean }>({
     queryKey: ["crescita-per-te-dashboard"],
     queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/crescita/per-te`);
-      if (!res.ok) throw new Error("Errore articoli");
-      return res.json();
+      return getJson<{ articles: GrowthArticle[]; hasProfile: boolean }>(
+        `${BASE}api/crescita/per-te`,
+      );
     },
     staleTime: 300_000,
     retry: false,

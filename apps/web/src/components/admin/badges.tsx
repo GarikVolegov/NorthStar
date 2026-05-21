@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { FileText } from "lucide-react";
-import { ENTITY_CONFIG, STATUS_CONFIG, SuggestionStatus } from "./types";
+import { ENTITY_CONFIG, STATUS_CONFIG } from "./types";
+import type { SuggestionStatus } from "./types";
 
 export function StatusBadge({ status }: { status: SuggestionStatus }) {
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.draft;
@@ -31,11 +32,7 @@ export function ConfidenceBadge({ score }: { score: number | null }) {
   if (score == null) return null;
   const pct = Math.round(score * 100);
   const color =
-    pct >= 80
-      ? "text-emerald-600"
-      : pct >= 50
-        ? "text-amber-600"
-        : "text-red-600";
+    pct >= 80 ? "text-success" : pct >= 50 ? "text-warning" : "text-danger";
   return (
     <span className={cn("text-xs font-mono font-semibold", color)}>{pct}%</span>
   );

@@ -15,6 +15,7 @@ import OpenAI from "openai";
 import Groq from "groq-sdk";
 import pRetry from "p-retry";
 import { logger } from "../logger";
+import { readToolCalls } from "./tool-call-parser";
 
 export interface LLMMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -152,11 +153,7 @@ function createOpenAIProvider(): LLMProvider {
         { retries: 2, onFailedAttempt: (err) => logger.warn({ err, attempt: err.attemptNumber }, "LLM chatWithTools retry") },
       );
       const msg = res.choices[0]?.message;
-      const toolCalls: ToolCall[] = (msg?.tool_calls ?? []).map((tc: any) => ({
-        id:        tc.id,
-        name:      tc.function?.name ?? "",
-        arguments: (() => { try { return JSON.parse(tc.function?.arguments ?? "{}"); } catch { return {}; } })(),
-      }));
+      const toolCalls = readToolCalls(msg?.tool_calls);
       return {
         content:      msg?.content ?? "",
         toolCalls,
@@ -258,11 +255,7 @@ function createGroqProvider(): LLMProvider {
         { retries: 2, onFailedAttempt: (err) => logger.warn({ err, attempt: err.attemptNumber }, "Groq chatWithTools retry") },
       );
       const msg = res.choices[0]?.message;
-      const toolCalls: ToolCall[] = (msg?.tool_calls ?? []).map((tc: any) => ({
-        id:        tc.id,
-        name:      tc.function.name,
-        arguments: (() => { try { return JSON.parse(tc.function.arguments); } catch { return {}; } })(),
-      }));
+      const toolCalls = readToolCalls(msg?.tool_calls);
       return {
         content:      msg?.content ?? "",
         toolCalls,
@@ -353,11 +346,7 @@ function createOpenRouterProvider(): LLMProvider {
         { retries: 2, onFailedAttempt: (err) => logger.warn({ err, attempt: err.attemptNumber }, "OpenRouter chatWithTools retry") },
       );
       const msg = res.choices[0]?.message;
-      const toolCalls: ToolCall[] = (msg?.tool_calls ?? []).map((tc: any) => ({
-        id:        tc.id,
-        name:      tc.function?.name ?? "",
-        arguments: (() => { try { return JSON.parse(tc.function?.arguments ?? "{}"); } catch { return {}; } })(),
-      }));
+      const toolCalls = readToolCalls(msg?.tool_calls);
       return {
         content:      msg?.content ?? "",
         toolCalls,
@@ -392,10 +381,7 @@ export function getLLM(): LLMProvider {
   return _provider;
 }
 
-/** Reset provider (for testing) */
-export function resetLLM(): void {
-  _provider = null;
-}
+export function resetLLM(): void { _provider = null; }
 
 /**
  * Restituisce un provider LLM specifico per route, permettendo chiamate

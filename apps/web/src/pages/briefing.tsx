@@ -6,7 +6,7 @@
  */
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch } from "@/lib/api-fetch";
+import { getJson, patchJson, postJson } from "@/lib/apiClient";
 import { API_ENDPOINTS, withParams } from "@/lib/constants";
 import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
@@ -24,22 +24,19 @@ interface Briefing {
 }
 
 async function fetchBriefings(): Promise<{ briefings: Briefing[] }> {
-  const res = await apiFetch(API_ENDPOINTS.briefings.list);
-  if (!res.ok) return { briefings: [] };
-  return res.json();
+  try {
+    return await getJson<{ briefings: Briefing[] }>(API_ENDPOINTS.briefings.list);
+  } catch {
+    return { briefings: [] };
+  }
 }
 
 async function generateBriefing(): Promise<{ content: string; briefingId: number }> {
-  const res = await apiFetch(API_ENDPOINTS.briefings.generate, { method: "POST" });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error ?? "Generazione fallita");
-  }
-  return res.json();
+  return postJson<{ content: string; briefingId: number }>(API_ENDPOINTS.briefings.generate);
 }
 
 async function markRead(id: number) {
-  await apiFetch(withParams(API_ENDPOINTS.briefings.markRead, { id }), { method: "PATCH" });
+  await patchJson(withParams(API_ENDPOINTS.briefings.markRead, { id }));
 }
 
 const TYPE_LABELS: Record<string, string> = {
