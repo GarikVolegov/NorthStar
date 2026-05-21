@@ -1,9 +1,114 @@
-import type { Router } from "express";
+import type { Response, Router } from "express";
 import { eq } from "drizzle-orm";
 import { db, generateUsername, protectedDbQuery, userProfileSettingsTable, usersTable } from "@workspace/db";
 import { getRequestBody } from "../lib/request-context";
 import { asPlainRecord } from "../lib/type-guards";
 import { buildJwtPayload, findReferralAccount, generateToken, readReferralCode, readStringField, recordReferral } from "./auth-shared";
+
+type ClerkSyncUser = {
+  id: number;
+  name: string;
+  email: string;
+  role: string | null;
+  testSessionId: number | null;
+  emailVerified: boolean | null;
+  stripeSubscriptionId: string | null;
+  workPreference: string | null;
+  autonomyPreference: number | null;
+  stabilityPreference: number | null;
+  timezone: string | null;
+  userMode: string | null;
+  journeyType: string | null;
+  avatarUrl: string | null;
+  isPublic: boolean | null;
+  isAffiliate: boolean | null;
+  onboardingCompleted: boolean | null;
+};
+
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: unknown }).code === "23505"
+  );
+}
+
+function userProjection() {
+  return {
+    id: usersTable.id,
+    name: usersTable.name,
+    email: usersTable.email,
+    role: usersTable.role,
+    testSessionId: usersTable.testSessionId,
+    emailVerified: usersTable.emailVerified,
+    stripeSubscriptionId: usersTable.stripeSubscriptionId,
+    workPreference: userProfileSettingsTable.workPreference,
+    autonomyPreference: userProfileSettingsTable.autonomyPreference,
+    stabilityPreference: userProfileSettingsTable.stabilityPreference,
+    timezone: userProfileSettingsTable.timezone,
+    userMode: userProfileSettingsTable.userMode,
+    journeyType: usersTable.journeyType,
+    avatarUrl: usersTable.avatarUrl,
+    isPublic: userProfileSettingsTable.isPublic,
+    isAffiliate: userProfileSettingsTable.isAffiliate,
+    onboardingCompleted: usersTable.onboardingCompleted,
+  };
+}
+
+async function selectUserByClerkId(clerkId: string): Promise<ClerkSyncUser | null> {
+  const [user] = await protectedDbQuery(async () => {
+    return await db
+      .select(userProjection())
+      .from(usersTable)
+      .leftJoin(
+        userProfileSettingsTable,
+        eq(usersTable.id, userProfileSettingsTable.userId),
+      )
+      .where(eq(usersTable.clerkId, clerkId))
+      .limit(1);
+  });
+  return user ?? null;
+}
+
+async function selectUserByEmail(email: string): Promise<ClerkSyncUser | null> {
+  const [user] = await protectedDbQuery(async () => {
+    return await db
+      .select(userProjection())
+      .from(usersTable)
+      .leftJoin(
+        userProfileSettingsTable,
+        eq(usersTable.id, userProfileSettingsTable.userId),
+      )
+      .where(eq(usersTable.email, email))
+      .limit(1);
+  });
+  return user ?? null;
+}
+
+async function ensureProfileSettings(
+  userId: number,
+  displayName: string,
+  referralAccountId: number | null,
+  referralConvertedAt: Date | null,
+): Promise<void> {
+  await protectedDbQuery(async () => {
+    return await db
+      .insert(userProfileSettingsTable)
+      .values({
+        userId,
+        username: generateUsername(displayName, userId),
+        referredByAffiliateId: referralAccountId,
+        referralConvertedAt,
+      })
+      .onConflictDoNothing();
+  });
+}
+
+function respondWithUser(res: Response, user: ClerkSyncUser, status = 200): void {
+  const northstarToken = generateToken(buildJwtPayload(user));
+  res.status(status).json({ ...user, northstar_token: northstarToken });
+}
 
 export function registerClerkSyncRoute(router: Router): void {
 router.post("/clerk-sync", async (req, res) => {
@@ -62,39 +167,10 @@ router.post("/clerk-sync", async (req, res) => {
         ? await findReferralAccount(referralCode)
         : null;
 
-      let [user] = await protectedDbQuery(async () => {
-        return await db
-          .select({
-            id: usersTable.id,
-            name: usersTable.name,
-            email: usersTable.email,
-            role: usersTable.role,
-            testSessionId: usersTable.testSessionId,
-            emailVerified: usersTable.emailVerified,
-            stripeSubscriptionId: usersTable.stripeSubscriptionId,
-            workPreference: userProfileSettingsTable.workPreference,
-            autonomyPreference: userProfileSettingsTable.autonomyPreference,
-            stabilityPreference: userProfileSettingsTable.stabilityPreference,
-            timezone: userProfileSettingsTable.timezone,
-            userMode: userProfileSettingsTable.userMode,
-            journeyType: usersTable.journeyType,
-            avatarUrl: usersTable.avatarUrl,
-            isPublic: userProfileSettingsTable.isPublic,
-            isAffiliate: userProfileSettingsTable.isAffiliate,
-            onboardingCompleted: usersTable.onboardingCompleted,
-          })
-          .from(usersTable)
-          .leftJoin(
-            userProfileSettingsTable,
-            eq(usersTable.id, userProfileSettingsTable.userId),
-          )
-          .where(eq(usersTable.clerkId, clerkId))
-          .limit(1);
-      });
+      let user = await selectUserByClerkId(clerkId);
 
       if (user) {
-        const northstarToken = generateToken(buildJwtPayload(user));
-        res.json({ ...user, northstar_token: northstarToken });
+        respondWithUser(res, user);
         return;
       }
 
@@ -107,47 +183,34 @@ router.post("/clerk-sync", async (req, res) => {
       });
 
       if (existingByEmail) {
-        await db
-          .update(usersTable)
-          .set({
-            clerkId,
-            emailVerified: true,
-            name: displayName,
-            updatedAt: new Date(),
-          })
-          .where(eq(usersTable.id, existingByEmail.id));
+        try {
+          await protectedDbQuery(async () => {
+            return await db
+              .update(usersTable)
+              .set({
+                clerkId,
+                emailVerified: true,
+                name: displayName,
+                updatedAt: new Date(),
+              })
+              .where(eq(usersTable.id, existingByEmail.id));
+          });
+        } catch (err) {
+          if (!isUniqueViolation(err)) throw err;
+        }
 
-        const [updated] = await db
-          .select({
-            id: usersTable.id,
-            name: usersTable.name,
-            email: usersTable.email,
-            role: usersTable.role,
-            testSessionId: usersTable.testSessionId,
-            emailVerified: usersTable.emailVerified,
-            stripeSubscriptionId: usersTable.stripeSubscriptionId,
-            workPreference: userProfileSettingsTable.workPreference,
-            autonomyPreference: userProfileSettingsTable.autonomyPreference,
-            stabilityPreference: userProfileSettingsTable.stabilityPreference,
-            timezone: userProfileSettingsTable.timezone,
-            userMode: userProfileSettingsTable.userMode,
-            journeyType: usersTable.journeyType,
-            avatarUrl: usersTable.avatarUrl,
-            isPublic: userProfileSettingsTable.isPublic,
-            isAffiliate: userProfileSettingsTable.isAffiliate,
-            onboardingCompleted: usersTable.onboardingCompleted,
-          })
-          .from(usersTable)
-          .leftJoin(
-            userProfileSettingsTable,
-            eq(usersTable.id, userProfileSettingsTable.userId),
-          )
-          .where(eq(usersTable.id, existingByEmail.id))
-          .limit(1);
+        await ensureProfileSettings(
+          existingByEmail.id,
+          displayName,
+          referralAccount?.id ?? null,
+          referralAccount ? new Date() : null,
+        );
 
+        const updated =
+          (await selectUserByClerkId(clerkId)) ??
+          (await selectUserByEmail(normalizedEmail));
         if (updated) {
-          const northstarToken = generateToken(buildJwtPayload(updated));
-          res.json({ ...updated, northstar_token: northstarToken });
+          respondWithUser(res, updated);
         } else {
           res.status(500).json({ error: "Errore aggiornamento utente" });
         }
@@ -155,67 +218,51 @@ router.post("/clerk-sync", async (req, res) => {
       }
 
       try {
-        const [created] = await db
-          .insert(usersTable)
-          .values({
-            name: displayName,
-            email: normalizedEmail,
-            clerkId,
-            emailVerified: true,
-          })
-          .returning({ id: usersTable.id });
+        const [created] = await protectedDbQuery(async () => {
+          return await db
+            .insert(usersTable)
+            .values({
+              name: displayName,
+              email: normalizedEmail,
+              clerkId,
+              emailVerified: true,
+            })
+            .returning({ id: usersTable.id });
+        });
 
         if (!created) {
           res.status(500).json({ error: "Errore creazione utente", code: "CLERK_SYNC_USER_INSERT" });
           return;
         }
 
-        await db.insert(userProfileSettingsTable).values({
-          userId: created.id,
-          username: generateUsername(displayName, created.id),
-          referredByAffiliateId: referralAccount?.id ?? null,
-          referralConvertedAt: referralAccount ? new Date() : null,
-        });
+        await ensureProfileSettings(
+          created.id,
+          displayName,
+          referralAccount?.id ?? null,
+          referralAccount ? new Date() : null,
+        );
 
         await recordReferral(referralAccount, created.id);
 
-        const [newUser] = await db
-          .select({
-            id: usersTable.id,
-            name: usersTable.name,
-            email: usersTable.email,
-            role: usersTable.role,
-            testSessionId: usersTable.testSessionId,
-            emailVerified: usersTable.emailVerified,
-            stripeSubscriptionId: usersTable.stripeSubscriptionId,
-            workPreference: userProfileSettingsTable.workPreference,
-            autonomyPreference: userProfileSettingsTable.autonomyPreference,
-            stabilityPreference: userProfileSettingsTable.stabilityPreference,
-            timezone: userProfileSettingsTable.timezone,
-            userMode: userProfileSettingsTable.userMode,
-            journeyType: usersTable.journeyType,
-            avatarUrl: usersTable.avatarUrl,
-            isPublic: userProfileSettingsTable.isPublic,
-            isAffiliate: userProfileSettingsTable.isAffiliate,
-            onboardingCompleted: usersTable.onboardingCompleted,
-          })
-          .from(usersTable)
-          .leftJoin(
-            userProfileSettingsTable,
-            eq(usersTable.id, userProfileSettingsTable.userId),
-          )
-          .where(eq(usersTable.id, created.id))
-          .limit(1);
+        const newUser = await selectUserByClerkId(clerkId);
 
         if (newUser) {
-          const northstarToken = generateToken(buildJwtPayload(newUser));
-          res.status(201).json({ ...newUser, northstar_token: northstarToken });
+          respondWithUser(res, newUser, 201);
         } else {
           res
             .status(500)
             .json({ error: "Errore creazione utente", code: "CLERK_SYNC_USER_FETCH" });
         }
       } catch (dbErr) {
+        if (isUniqueViolation(dbErr)) {
+          const recovered =
+            (await selectUserByClerkId(clerkId)) ??
+            (await selectUserByEmail(normalizedEmail));
+          if (recovered) {
+            respondWithUser(res, recovered);
+            return;
+          }
+        }
         req.log?.error?.({ err: dbErr }, "clerk-sync db write failed");
         const dbDetails =
           process.env.NODE_ENV !== "production" && dbErr instanceof Error
