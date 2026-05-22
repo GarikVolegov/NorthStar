@@ -2,11 +2,15 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "workspaces": {
     ".": {
+      "entry": ["api/**/*.js"],
       "ignore": ["scripts/preinstall.js", "cli-printing-press/**"]
     },
     "apps/web": {
       "entry": ["src/main.tsx", "index.html"],
       "project": ["src/**/*.{ts,tsx}"],
+      "paths": {
+        "@/*": ["src/*"]
+      },
       "ignore": [
         "src/components/ui/**",
         "src/__tests__/**"
@@ -39,5 +43,56 @@
     "e2e/**",
     "docs/eval-wendy/**"
   ],
-  "ignoreBinaries": ["docker", "concurrently"]
+  "ignoreDependencies": [
+    "@opentelemetry/auto-instrumentations-node",
+    "@opentelemetry/resources",
+    "@opentelemetry/semantic-conventions",
+    "@opentelemetry/instrumentation-http",
+    "react-speech-recognition",
+    "stripe",
+    "bcryptjs",
+    "@workspace/design-tokens",
+    "drizzle-orm",
+    "@workspace/db",
+    "@esbuild/win32-x64",
+    "@rollup/rollup-win32-x64-msvc",
+    "prettier",
+    "esbuild",
+    "@clerk/types",
+    "@radix-ui/react-aspect-ratio",
+    "@radix-ui/react-avatar",
+    "@radix-ui/react-checkbox",
+    "@radix-ui/react-context-menu",
+    "@radix-ui/react-hover-card",
+    "@radix-ui/react-menubar",
+    "@radix-ui/react-navigation-menu",
+    "@radix-ui/react-progress",
+    "@radix-ui/react-radio-group",
+    "@radix-ui/react-scroll-area",
+    "@radix-ui/react-slider",
+    "@tailwindcss/typography",
+    "@testing-library/user-event",
+    "@types/react-speech-recognition",
+    "embla-carousel-react",
+    "input-otp",
+    "react-day-picker",
+    "react-icons",
+    "react-resizable-panels",
+    "tailwindcss",
+    "tw-animate-css",
+    "vaul",
+    "@types/bcryptjs"
+  ],
+  "ignoreBinaries": [
+    "docker",
+    "concurrently",
+    "serve",
+    "wait-on",
+    "vite-bundle-visualizer",
+    "cli-printing-press/printing-press.exe"
+  ],
+  "ignoreIssues": {
+    "**/*.{ts,tsx}": ["exports", "types", "duplicates"],
+    "pnpm-workspace.yaml": ["catalog"]
+  }
 }

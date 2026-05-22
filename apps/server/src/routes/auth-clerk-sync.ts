@@ -92,17 +92,21 @@ async function ensureProfileSettings(
   referralAccountId: number | null,
   referralConvertedAt: Date | null,
 ): Promise<void> {
-  await protectedDbQuery(async () => {
-    return await db
-      .insert(userProfileSettingsTable)
-      .values({
-        userId,
-        username: generateUsername(displayName, userId),
-        referredByAffiliateId: referralAccountId,
-        referralConvertedAt,
-      })
-      .onConflictDoNothing();
-  });
+  try {
+    await protectedDbQuery(async () => {
+      return await db
+        .insert(userProfileSettingsTable)
+        .values({
+          userId,
+          username: generateUsername(displayName, userId),
+          referredByAffiliateId: referralAccountId,
+          referralConvertedAt,
+        })
+        .onConflictDoNothing();
+    });
+  } catch (err) {
+    if (!isUniqueViolation(err)) throw err;
+  }
 }
 
 function respondWithUser(res: Response, user: ClerkSyncUser, status = 200): void {

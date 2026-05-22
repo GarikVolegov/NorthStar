@@ -189,13 +189,6 @@ export default defineConfig(async () => ({
           ) {
             return "vendor-i18n";
           }
-          if (
-            id.includes("/src/pages/admin-") ||
-            id.includes("/src/components/admin/") ||
-            id.includes("/src/features/admin-review/")
-          ) {
-            return "feature-admin";
-          }
         },
       },
     },

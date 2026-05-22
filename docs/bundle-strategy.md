@@ -12,14 +12,12 @@ NorthStar uses route-level lazy loading plus Vite manual chunking.
 - `vendor-forms`: form and validation libraries.
 - `vendor-i18n`: localization runtime.
 
-## Feature Chunks
+## Feature Loading
 
-- `feature-admin`: admin pages, admin console components and admin review feature modules.
-
-The admin chunk follows a source-path boundary because those modules are mostly isolated
-behind admin-only routes. Wendy and affiliation surfaces stay route-lazy without manual
-chunk names because they share runtime dependencies; letting Rollup place them avoids
-circular chunk warnings while preserving lazy loading.
+Feature pages are loaded through route-level `import()` boundaries. Admin, Wendy and
+affiliation surfaces intentionally avoid manual chunk names because several of them share
+runtime dependencies; letting Rollup place the chunks avoids circular chunk warnings and
+large forced feature bundles while preserving lazy loading.
 
 ## Analysis
 

@@ -189,4 +189,48 @@ describe("auth clerk-sync route", () => {
     expect(body.email).toBe("new@example.com");
     expect(body.northstar_token).toEqual(expect.any(String));
   });
+
+  it("accepts sync requests without a bearer token and does not return 500", async () => {
+    insertBehavior.rows = [{ id: 44 }];
+    selectRows.queue = [
+      [],
+      [],
+      [syncedUser({ id: 44, email: "tokenless@example.com" })],
+    ];
+
+    const response = await request(app())
+      .post("/api/auth/clerk-sync")
+      .set("Content-Type", "application/json")
+      .send(JSON.stringify({
+        clerkId: "clerk-tokenless",
+        email: "tokenless@example.com",
+        name: "Tokenless User",
+      }))
+      .expect(201);
+
+    const body = response.body as ClerkSyncResponseBody;
+    expect(body.id).toBe(44);
+    expect(body.northstar_token).toEqual(expect.any(String));
+  });
+
+  it("recovers when profile settings already exist during email linking", async () => {
+    profileInsertMock.mockRejectedValueOnce(Object.assign(new Error("duplicate profile"), { code: "23505" }));
+    selectRows.queue = [
+      [],
+      [{ id: 45 }],
+      [syncedUser({ id: 45, email: "linked@example.com" })],
+    ];
+
+    const response = await request(app())
+      .post("/api/auth/clerk-sync")
+      .set("Authorization", `Bearer ${clerkJwt("clerk-linked")}`)
+      .set("Content-Type", "application/json")
+      .send(JSON.stringify({
+        clerkId: "clerk-linked",
+        email: "linked@example.com",
+        name: "Linked User",
+      }));
+
+    expect(response.status, JSON.stringify(response.body)).not.toBe(500);
+  });
 });
