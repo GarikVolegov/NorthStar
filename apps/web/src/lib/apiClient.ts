@@ -49,6 +49,13 @@ function errorMessage(status: number, body: unknown): string {
     if (typeof maybe.error === "string") return maybe.error;
     if (typeof maybe.message === "string") return maybe.message;
   }
+  if (
+    import.meta.env.DEV &&
+    status >= 500 &&
+    (body == null || body === "")
+  ) {
+    return "Server API locale non raggiungibile. Avvia il backend NorthStar su porta 3001 con `pnpm run dev:server` oppure usa `pnpm run dev:all`.";
+  }
   return `API request failed with status ${status}`;
 }
 

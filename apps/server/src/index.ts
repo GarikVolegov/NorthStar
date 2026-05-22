@@ -1,11 +1,13 @@
-import "./tracing";
+import { otelReady } from "./tracing";
 import "./sentry";
-import app from "./app";
 import http from "node:http";
 import { rootLogger } from "./middleware/logger";
 import { pool } from "@workspace/db";
 
 const PORT = process.env.PORT || 3001;
+
+await otelReady;
+const { default: app } = await import("./app");
 
 const httpServer = http.createServer(app);
 const { createWsServer } = await import("@workspace/ws-server");

@@ -46,6 +46,7 @@
   "ignoreDependencies": [
     "@opentelemetry/auto-instrumentations-node",
     "@opentelemetry/resources",
+    "@opentelemetry/sdk-logs",
     "@opentelemetry/semantic-conventions",
     "@opentelemetry/instrumentation-http",
     "react-speech-recognition",

@@ -74,6 +74,28 @@ describe("apiClient", () => {
     } satisfies Partial<ApiClientError>);
   });
 
+  it("explains empty dev proxy 500 responses as a missing local API server", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("", { status: 500 }),
+    );
+
+    let error: unknown;
+    try {
+      await getJson("/api/test");
+    } catch (err) {
+      error = err;
+    }
+
+    expect(error).toMatchObject({
+      name: "ApiClientError",
+      status: 500,
+    } satisfies Partial<ApiClientError>);
+    expect(error).toBeInstanceOf(ApiClientError);
+    expect((error as ApiClientError).message).toContain(
+      "Avvia il backend NorthStar",
+    );
+  });
+
   it("dispatches auth-expired when a tokenized request gets 401", async () => {
     sessionStorage.setItem(TOKEN_STORAGE_KEY, "stored");
     vi.spyOn(globalThis, "fetch").mockResolvedValue(

@@ -18,7 +18,9 @@ declare global {
 const isVercel = Boolean(process.env.VERCEL);
 const hasExplicitEndpoint = Boolean(process.env.OTEL_EXPORTER_OTLP_ENDPOINT);
 const isDisabled =
-  process.env.OTEL_DISABLED === "true" || (isVercel && !hasExplicitEndpoint);
+  process.env.OTEL_DISABLED === "true" ||
+  !hasExplicitEndpoint ||
+  (isVercel && !hasExplicitEndpoint);
 
 function traceEndpoint(): string {
   const endpoint =
@@ -28,10 +30,15 @@ function traceEndpoint(): string {
     : `${endpoint.replace(/\/$/, "")}/v1/traces`;
 }
 
-if (!isDisabled && !globalThis.__northstarOtelStarted) {
+export const otelReady: Promise<void> =
+  !isDisabled && !globalThis.__northstarOtelStarted
+    ? startOpenTelemetry()
+    : Promise.resolve();
+
+function startOpenTelemetry(): Promise<void> {
   globalThis.__northstarOtelStarted = true;
 
-  (async () => {
+  return (async () => {
     try {
       const { NodeSDK } = await import("@opentelemetry/sdk-node");
       const { OTLPTraceExporter } = await import(
