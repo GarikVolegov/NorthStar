@@ -1,13 +1,12 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-21T00:00:00.000Z",
+  "updatedAt": "2026-05-22T00:00:00.000Z",
   "limits": {
     "apps": 600,
     "packages": 400
   },
   "offenders": {
     "apps": [
-      { "file": "apps/web/src/pages/home.tsx", "lines": 1675 },
       { "file": "apps/web/src/pages/admin-review.tsx", "lines": 1458 },
       { "file": "apps/web/src/pages/test.tsx", "lines": 1241 },
       { "file": "apps/web/src/pages/results.tsx", "lines": 1208 },
@@ -17,8 +16,6 @@
       { "file": "apps/web/src/pages/applications.tsx", "lines": 998 },
       { "file": "apps/web/src/pages/sector.tsx", "lines": 902 },
       { "file": "apps/web/src/components/layout/Navbar.tsx", "lines": 884 },
-      { "file": "apps/web/src/components/auth/LoginDialog.tsx", "lines": 814 },
-      { "file": "apps/web/src/components/cv/CvSection.tsx", "lines": 781 },
       { "file": "apps/web/src/pages/social.tsx", "lines": 768 },
       { "file": "apps/web/src/pages/admin-metriche.tsx", "lines": 738 },
       { "file": "apps/web/src/components/search/SearchDialog.tsx", "lines": 737 },
