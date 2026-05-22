@@ -7,7 +7,6 @@
   },
   "offenders": {
     "apps": [
-      { "file": "apps/web/src/pages/admin-review.tsx", "lines": 1458 },
       { "file": "apps/web/src/pages/test.tsx", "lines": 1241 },
       { "file": "apps/web/src/pages/results.tsx", "lines": 1208 },
       { "file": "apps/web/src/pages/grafo-conoscenza.tsx", "lines": 1197 },
