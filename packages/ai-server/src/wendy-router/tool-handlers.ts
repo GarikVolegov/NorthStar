@@ -44,7 +44,7 @@ export function err(code: string, message: string): ToolResult {
   return { ok: false, code, message };
 }
 
-type WendyActionStatus = "draft" | "needs_confirmation" | "running" | "done" | "failed"; type WendyActionRisk = "low" | "medium" | "high";
+type WendyActionStatus = "preview" | "needs_confirmation" | "running" | "executed" | "failed"; type WendyActionRisk = "low" | "medium" | "high";
 
 interface WendyActionPayload {
   id: string;
@@ -129,7 +129,7 @@ export async function handleOpenView(
   const url = viewMap[args.viewId] ?? "/dashboard";
   return wendyAction({
     type: "navigate",
-    status: "done",
+    status: "executed",
     risk: "low",
     label: "Apro la pagina",
     description: `Ti porto in ${url}.`,
@@ -147,7 +147,7 @@ export async function handleSetFilters(
 ): Promise<ToolResult> {
   return wendyAction({
     type: "set_filters",
-    status: "done",
+    status: "executed",
     risk: "low",
     label: "Applico i filtri",
     description: `Imposto i filtri sulla lista ${args.listType}.`,
@@ -244,6 +244,28 @@ function proposeCalendarEvent(args: { title?: string; date?: string; type?: stri
   });
 }
 
+function proposeMemoryFact(args: { key?: string; value?: string }): ToolResult {
+  const key = args.key?.trim().replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) ?? "";
+  const value = args.value?.trim() ?? "";
+  if (!key) return err("INVALID_INPUT", "La chiave della memoria è obbligatoria");
+  if (!value) return err("INVALID_INPUT", "Il valore della memoria è obbligatorio");
+  if (value.length > 300) return err("INVALID_INPUT", "Memoria troppo lunga — max 300 caratteri");
+  return wendyAction({
+    type: "create_memory_fact",
+    status: "needs_confirmation",
+    risk: "medium",
+    label: "Vuoi che Wendy lo ricordi?",
+    description: "Salvo questo fatto nella memoria personale solo dopo la tua conferma.",
+    requiresConfirmation: true,
+    targetRoute: "/wendy/memoria",
+    payload: { key, value, source: "user_manual" },
+    preview: [
+      { label: "Memoria", value },
+      { label: "Chiave", value: key },
+    ],
+  });
+}
+
 // ── 3. get_sector_detail ─────────────────────────────────────────────────────
 
 // ── 15. save_business_idea ───────────────────────────────────────────────────
@@ -276,6 +298,7 @@ export async function executeToolCall(
     case "get_learning_paths":         result = await handleGetLearningPaths(typedArgs(args)); break;
     case "save_business_idea":         result = proposeSaveBusinessIdea(typedArgs(args)); break;
     case "add_calendar_event":         result = proposeCalendarEvent(typedArgs(args)); break;
+    case "save_memory_fact":           result = proposeMemoryFact(typedArgs(args)); break;
     case "get_user_context":           result = await handleGetUserContext({}, userId); break;
 
     // Step 6: RAG + Job Market Intelligence

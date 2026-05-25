@@ -30,26 +30,14 @@ test.describe("Pagine principali accessibili", () => {
 
   test("pagina profilo reindirizza se non autenticato", async ({ page }) => {
     await page.goto(`${BASE}/profilo`);
-    await expect
-      .poll(async () => {
-        const url = page.url();
-        const isHome = url === BASE || url === `${BASE}/` || url.endsWith("/");
-        const hasLoginPrompt = await page.locator("text=/accedi|login|registr/i").isVisible().catch(() => false);
-        return isHome || hasLoginPrompt;
-      }, { timeout: 5_000 })
-      .toBeTruthy();
+    await expect(page).toHaveURL(/\/sign-in/, { timeout: 10_000 });
+    await expect(page.getByText(/accedi|sign in|login|registr/i).first()).toBeVisible();
   });
 
   test("dashboard reindirizza se non autenticato", async ({ page }) => {
     await page.goto(`${BASE}/dashboard`);
-    await expect
-      .poll(async () => {
-        const url = page.url();
-        const isHome = url === BASE || url === `${BASE}/` || url.endsWith("/");
-        const hasLoginPrompt = await page.locator("text=/accedi|login|registr/i").isVisible().catch(() => false);
-        return isHome || hasLoginPrompt;
-      }, { timeout: 5_000 })
-      .toBeTruthy();
+    await expect(page).toHaveURL(/\/sign-in/, { timeout: 10_000 });
+    await expect(page.getByText(/accedi|sign in|login|registr/i).first()).toBeVisible();
   });
 });
 

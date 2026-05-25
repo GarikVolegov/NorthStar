@@ -27,6 +27,11 @@ void agentRegistry.refresh().catch((err) => {
   rootLogger.warn({ err }, "Initial agent registry refresh failed");
 });
 
+const { initAIPlugins } = await import("@workspace/ai-server");
+void initAIPlugins().catch((err) => {
+  rootLogger.warn({ err }, "AI plugin bootstrap failed");
+});
+
 httpServer.listen(PORT, () => {
   rootLogger.info({ port: PORT, wsPath: "/ws" }, "NorthStar API Server started");
 });

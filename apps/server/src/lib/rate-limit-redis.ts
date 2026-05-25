@@ -10,6 +10,14 @@ const BYPASS_RATE_LIMIT_REDIS =
 let client: Redis | null = null;
 let connectPromise: Promise<Redis> | null = null;
 
+export function isRateLimitRedisRequired(): boolean {
+  if (BYPASS_RATE_LIMIT_REDIS) return false;
+  return (
+    process.env.RATE_LIMIT_REDIS_REQUIRED === "true" ||
+    process.env.REDIS_REQUIRED === "true"
+  );
+}
+
 function createRateLimitClient(): Redis {
   const redisUrl = resolveRedisUrl();
   if (!redisUrl) {
@@ -58,6 +66,7 @@ export function createRedisRateLimitStore(
   prefix: string,
 ): RedisStore | undefined {
   if (BYPASS_RATE_LIMIT_REDIS) return undefined;
+  if (!isRateLimitRedisRequired()) return undefined;
 
   return new RedisStore({
     prefix,
@@ -81,7 +90,11 @@ export async function requireRateLimitRedis(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  if (BYPASS_RATE_LIMIT_REDIS || req.path.startsWith("/api/health")) {
+  if (
+    BYPASS_RATE_LIMIT_REDIS ||
+    !isRateLimitRedisRequired() ||
+    req.path.startsWith("/api/health")
+  ) {
     next();
     return;
   }

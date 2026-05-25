@@ -13,7 +13,9 @@ import { parseComposePs, splitServices, validateOpsAction } from "./admin-ops";
 
 describe("admin ops helpers", () => {
   beforeEach(() => {
+    delete process.env.VERCEL;
     delete process.env.ADMIN_OPS_ENABLED;
+    delete process.env.ADMIN_OPS_ALLOW_VERCEL;
     delete process.env.ADMIN_OPS_ALLOWED_SERVICES;
     delete process.env.ADMIN_OPS_ALLOW_DB_RESTART;
     delete process.env.ADMIN_OPS_REQUIRE_CONFIRMATION;

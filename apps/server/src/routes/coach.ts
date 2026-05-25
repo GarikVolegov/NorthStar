@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, isNull } from "drizzle-orm";
 import { z } from "zod/v4";
-import { db, coachSessionsTable } from "@workspace/db";
+import { db, coachMemoryFactsTable, coachSessionsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import {
   wendyLimiter,
@@ -28,12 +28,129 @@ const askSchema = z.object({
   message: z.string().min(1).max(5000),
 });
 
+const addMemoryFactSchema = z.object({
+  key: z.string().min(1).max(64).default("user_manual"),
+  value: z.string().min(1).max(500),
+  source: z.enum(["user_manual", "conversation", "onboarding", "system"]).default("user_manual"),
+});
+
 const COACH_SYSTEM_PROMPT = `Sei Wendy, coach di crescita personale e orientamento professionale di NorthStar.
 Sei empatica, diretta, competente. Rispondi sempre in italiano.
 Usa un tono caldo ma concreto — mai vago o generico.
 Se non sei sicura, dillo esplicitamente piuttosto che inventare.`;
 
 // ── LIST sessions ──────────────────────────────────────────────
+type MemoryFactRow = {
+  id: number;
+  key: string;
+  value: string;
+  sourceSessionId: number | null;
+  confirmedCount: number;
+  createdAt: Date | string;
+};
+
+function memorySource(row: Pick<MemoryFactRow, "key" | "sourceSessionId">): string {
+  if (row.key.startsWith("user_manual")) return "user_manual";
+  if (row.key.startsWith("onboarding")) return "onboarding";
+  if (row.sourceSessionId) return "conversation";
+  return "system";
+}
+
+function serializeMemoryFact(row: MemoryFactRow) {
+  const createdAt =
+    row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt;
+  return {
+    id: row.id,
+    key: row.key,
+    value: row.value,
+    source: memorySource(row),
+    confirmedCount: row.confirmedCount,
+    createdAt,
+  };
+}
+
+function manualMemoryKey(inputKey: string, source: string): string {
+  const normalized = inputKey.trim().replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 48);
+  if (source === "user_manual" && normalized === "user_manual") {
+    return `user_manual_${Date.now().toString(36)}`;
+  }
+  return normalized || "user_manual";
+}
+
+router.get("/memory", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const rows = await db
+    .select({
+      id: coachMemoryFactsTable.id,
+      key: coachMemoryFactsTable.key,
+      value: coachMemoryFactsTable.value,
+      sourceSessionId: coachMemoryFactsTable.sourceSessionId,
+      confirmedCount: coachMemoryFactsTable.confirmedCount,
+      createdAt: coachMemoryFactsTable.createdAt,
+    })
+    .from(coachMemoryFactsTable)
+    .where(and(eq(coachMemoryFactsTable.userId, userId), isNull(coachMemoryFactsTable.deletedAt)))
+    .orderBy(desc(coachMemoryFactsTable.updatedAt));
+
+  res.json({ facts: rows.map((row) => serializeMemoryFact(row)) });
+});
+
+router.post("/memory", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const parsed = addMemoryFactSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Memoria non valida", details: parsed.error.flatten() });
+    return;
+  }
+
+  const key = manualMemoryKey(parsed.data.key, parsed.data.source);
+  const [row] = await db
+    .insert(coachMemoryFactsTable)
+    .values({
+      userId,
+      key,
+      value: parsed.data.value.trim(),
+      sourceSessionId: null,
+    })
+    .returning({
+      id: coachMemoryFactsTable.id,
+      key: coachMemoryFactsTable.key,
+      value: coachMemoryFactsTable.value,
+      sourceSessionId: coachMemoryFactsTable.sourceSessionId,
+      confirmedCount: coachMemoryFactsTable.confirmedCount,
+      createdAt: coachMemoryFactsTable.createdAt,
+    });
+
+  if (!row) {
+    res.status(500).json({ error: "Memoria non salvata" });
+    return;
+  }
+
+  res.status(201).json({ fact: serializeMemoryFact(row) });
+});
+
+router.delete("/memory/:id", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const id = Number.parseInt(req.params.id ?? "", 10);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "ID memoria non valido" });
+    return;
+  }
+
+  const [row] = await db
+    .update(coachMemoryFactsTable)
+    .set({ deletedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(coachMemoryFactsTable.id, id), eq(coachMemoryFactsTable.userId, userId)))
+    .returning({ id: coachMemoryFactsTable.id });
+
+  if (!row) {
+    res.status(404).json({ error: "Memoria non trovata" });
+    return;
+  }
+
+  res.status(204).send();
+});
+
 router.get("/sessions", requireAuth, async (req, res) => {
   const userId = req.user!.id;
 

@@ -6,7 +6,10 @@ import {
   type EmbedderHealthSnapshot,
 } from "@workspace/ai-server";
 
-import { getRateLimitRedisClient } from "./rate-limit-redis";
+import {
+  getRateLimitRedisClient,
+  isRateLimitRedisRequired,
+} from "./rate-limit-redis";
 
 type BasicStatus = "ok" | "fail";
 type OverallStatus = "ok" | "degraded" | "fail";
@@ -45,7 +48,9 @@ export interface HealthPayload {
 }
 
 const CHECK_TIMEOUT_MS = Number(process.env.HEALTH_CHECK_TIMEOUT_MS ?? 1500);
-const EMBED_PROBE_TTL_MS = Number(process.env.HEALTH_EMBED_PROBE_TTL_MS ?? 300_000);
+const EMBED_PROBE_TTL_MS = Number(
+  process.env.HEALTH_EMBED_PROBE_TTL_MS ?? 300_000,
+);
 const EMBED_STALE_MS = Number(process.env.HEALTH_EMBED_STALE_MS ?? 900_000);
 const EMBED_PROBE_ENABLED = process.env.HEALTH_EMBED_PROBE_ENABLED !== "false";
 const HAS_EMBED_API_KEY = Boolean(process.env.AI_INTEGRATIONS_OPENAI_API_KEY);
@@ -124,7 +129,7 @@ export async function checkPgvectorHealth(): Promise<DependencyCheck> {
 
 export async function checkRedisHealth(): Promise<RedisDependencyCheck> {
   const start = performance.now();
-  const required = !REDIS_BYPASSED;
+  const required = !REDIS_BYPASSED && isRateLimitRedisRequired();
 
   if (!required) {
     return { status: "ok", latencyMs: elapsedSince(start), required };
@@ -153,7 +158,8 @@ function snapshotToEmbedderCheck(
   latencyMs?: number,
 ): EmbedderDependencyCheck {
   const lastOkMs = snapshot.lastOkAt ? Date.parse(snapshot.lastOkAt) : NaN;
-  const isStale = Number.isFinite(lastOkMs) && Date.now() - lastOkMs > EMBED_STALE_MS;
+  const isStale =
+    Number.isFinite(lastOkMs) && Date.now() - lastOkMs > EMBED_STALE_MS;
   const status: EmbedderStatus =
     snapshot.status === "ok" && isStale ? "stale" : snapshot.status;
 
@@ -209,11 +215,14 @@ export async function getHealthPayload(): Promise<HealthPayload> {
     pgvector.status === "fail" ||
     (redis.required && redis.status === "fail") ||
     (REQUIRE_EMBED_OK && embedder.status !== "ok");
+  const embedderCanDegrade = HAS_EMBED_API_KEY || REQUIRE_EMBED_OK;
   const degraded =
     !criticalFailed &&
-    (embedder.status === "stale" ||
-      embedder.status === "unknown" ||
-      embedder.status === "fail");
+    ((redis.status === "fail" && !redis.required) ||
+      (embedderCanDegrade &&
+        (embedder.status === "stale" ||
+          embedder.status === "unknown" ||
+          embedder.status === "fail")));
 
   return {
     status: criticalFailed ? "fail" : degraded ? "degraded" : "ok",

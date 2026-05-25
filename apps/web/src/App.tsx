@@ -1,4 +1,6 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { UserBackgroundLayer } from "@/components/user-background/UserBackgroundLayer";
+import { WendyInsightToastRunner } from "@/components/wendy/WendyInsightToastRunner";
 import { AppStateProvider } from "@/contexts/AppStateContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AdminAgentProvider } from "@/contexts/AdminAgentContext";
@@ -199,9 +201,13 @@ function App() {
             <TooltipProvider>
               <WendyProvider>
                 <AdminAgentProvider>
-                  <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                    <Router />
-                  </WouterRouter>
+                  <UserBackgroundLayer />
+                  <div className="relative z-10 min-h-screen">
+                    <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                      <Router />
+                    </WouterRouter>
+                  </div>
+                  <WendyInsightToastRunner />
                   <Toaster />
                 </AdminAgentProvider>
               </WendyProvider>

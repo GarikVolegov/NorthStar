@@ -1,4 +1,6 @@
 import { ChangePasswordSection } from "@/components/profile/settings/ChangePasswordSection";
+import { BackgroundPicker } from "@/components/user-background/BackgroundPicker";
+import { Button } from "@/components/ui/button";
 import { PrivacyCard } from "@/components/profile/settings/PrivacyCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -6,6 +8,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import type { AuthUser } from "@/contexts/AuthContext";
 import { useLefty } from "@/hooks/useLefty";
 import { Calendar, Globe, Hand, KeyRound, Mail, Palette, ShieldCheck, User } from "lucide-react";
+import { useState } from "react";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("it-IT", {
@@ -20,6 +23,7 @@ interface ProfileSettingsProps {
 
 export function ProfileSettings({ user, createdAt }: ProfileSettingsProps) {
   const { isLefty, setIsLefty } = useLefty();
+  const [backgroundPickerOpen, setBackgroundPickerOpen] = useState(false);
 
   return (
     <Card className="rounded-2xl">
@@ -87,6 +91,19 @@ export function ProfileSettings({ user, createdAt }: ProfileSettingsProps) {
           <ThemeToggle />
         </div>
 
+        <div className="flex items-center justify-between gap-3 pt-1 border-t border-border">
+          <div className="flex items-center gap-2">
+            <Palette className="w-4 h-4 text-primary" />
+            <div>
+              <span className="text-sm font-medium">Sfondo app</span>
+              <p className="text-xs text-muted-foreground">Personalizza l'atmosfera della tua area NorthStar.</p>
+            </div>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => setBackgroundPickerOpen(true)}>
+            Personalizza sfondo
+          </Button>
+        </div>
+
         <div className="flex items-center justify-between pt-1 border-t border-border">
           <div className="flex items-center gap-2">
             <Hand className="w-4 h-4 text-primary" />
@@ -95,6 +112,11 @@ export function ProfileSettings({ user, createdAt }: ProfileSettingsProps) {
           <Switch checked={isLefty} onCheckedChange={setIsLefty} />
         </div>
       </CardContent>
+      <BackgroundPicker
+        userId={user.id}
+        open={backgroundPickerOpen}
+        onOpenChange={setBackgroundPickerOpen}
+      />
     </Card>
   );
 }

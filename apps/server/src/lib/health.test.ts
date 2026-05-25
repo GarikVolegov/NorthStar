@@ -16,6 +16,8 @@ vi.mock("@workspace/db", () => ({
 
 vi.mock("./rate-limit-redis", () => ({
   getRateLimitRedisClient: mocks.getRateLimitRedisClient,
+  isRateLimitRedisRequired: () =>
+    process.env.RATE_LIMIT_REDIS_REQUIRED === "true",
 }));
 
 vi.mock("@workspace/ai-server", () => ({
@@ -32,6 +34,7 @@ describe("health checks", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.NODE_ENV = "production";
+    process.env.RATE_LIMIT_REDIS_REQUIRED = "true";
     process.env.AI_INTEGRATIONS_OPENAI_API_KEY = "test-key";
     delete process.env.HEALTH_REQUIRE_EMBED_OK;
     delete process.env.HEALTH_EMBED_PROBE_ENABLED;
@@ -97,7 +100,7 @@ describe("health checks", () => {
     });
   });
 
-  it("marks embedder as degraded when probe is disabled and no call happened yet", async () => {
+  it("keeps readiness ok when optional embedder has no key and no call happened yet", async () => {
     delete process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
     process.env.HEALTH_REQUIRE_EMBED_OK = "false";
     mocks.getEmbedderHealthSnapshot.mockReturnValue({ status: "unknown" });
@@ -105,7 +108,7 @@ describe("health checks", () => {
 
     const payload = await getHealthPayload();
 
-    expect(payload.status).toBe("degraded");
+    expect(payload.status).toBe("ok");
     expect(payload.checks.embedder).toMatchObject({
       status: "unknown",
       probe: "disabled",

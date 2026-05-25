@@ -11,6 +11,46 @@ export type WendyToolMessage = LLMMessage & {
   tool_calls?: AssistantToolCall[];
 };
 
+export type WendyContextSource =
+  | "app-data"
+  | "rag"
+  | "openhuman"
+  | "graphify"
+  | "semantic-memory";
+
+const APP_DATA_TOOLS = new Set([
+  "get_sector_detail",
+  "list_sectors",
+  "get_profession_detail",
+  "search_professions",
+  "compare_sectors",
+  "get_market_trend",
+  "get_growth_articles",
+  "get_news_summary",
+  "get_learning_paths",
+  "get_user_objectives",
+  "get_user_context",
+]);
+
+export function buildWendyContextSources(input: {
+  personalSources: Array<"openhuman" | "graphify" | "semantic-memory">;
+  toolsUsed: string[];
+  ragChunksRetrieved: number;
+}): WendyContextSource[] {
+  const sources = new Set<WendyContextSource>();
+  for (const source of input.personalSources) sources.add(source);
+  if (
+    input.ragChunksRetrieved > 0 ||
+    input.toolsUsed.includes("search_rag")
+  ) {
+    sources.add("rag");
+  }
+  if (input.toolsUsed.some((tool) => APP_DATA_TOOLS.has(tool))) {
+    sources.add("app-data");
+  }
+  return [...sources];
+}
+
 export function isClientSideToolData(
   value: unknown,
 ): value is { clientSide: true } {

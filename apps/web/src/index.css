@@ -86,6 +86,49 @@ html.lefty #root th {
   }
 }
 
+@layer utilities {
+  :root {
+    --app-glass-alpha: 0.72;
+    --app-glass-blur: 18px;
+    --app-glass-saturation: 1.08;
+    --app-bg-overlay: 0.32;
+  }
+
+  .liquid-card,
+  .liquid-panel,
+  .liquid-widget,
+  .liquid-nav {
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      backdrop-filter 180ms ease;
+  }
+
+  html[data-user-background="active"] .liquid-card,
+  html[data-user-background="active"] .liquid-panel,
+  html[data-user-background="active"] .liquid-widget,
+  html[data-user-background="active"] .liquid-nav {
+    background-color: hsl(var(--card) / var(--app-glass-alpha)) !important;
+    border-color: hsl(var(--card-border) / 0.62) !important;
+    box-shadow:
+      0 18px 50px hsl(220 30% 8% / 0.16),
+      inset 0 1px 0 hsl(0 0% 100% / 0.18);
+    backdrop-filter: blur(var(--app-glass-blur)) saturate(var(--app-glass-saturation));
+    -webkit-backdrop-filter: blur(var(--app-glass-blur)) saturate(var(--app-glass-saturation));
+  }
+
+  html[data-user-background="active"] #root [class*="bg-card"] {
+    background-color: hsl(var(--card) / var(--app-glass-alpha)) !important;
+    backdrop-filter: blur(var(--app-glass-blur)) saturate(var(--app-glass-saturation));
+    -webkit-backdrop-filter: blur(var(--app-glass-blur)) saturate(var(--app-glass-saturation));
+  }
+
+  html[data-user-background="active"] body {
+    background: transparent;
+  }
+}
+
 /* Utility classes inherited from @workspace/design-tokens/northstar-theme.css (glass, pill-nav, hero-navy, section-growth, shimmer, gold-line, badge-gold, glow effects, touch-scroll-x, typography helpers) */
 
 /* ── Clerk Custom Theme Overrides ───────────────────────────────────────────

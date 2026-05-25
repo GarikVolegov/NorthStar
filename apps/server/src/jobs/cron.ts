@@ -1,4 +1,4 @@
-import { runCollector, runEnricher, runSectorDataAgent, runNewsPublisher } from "@workspace/ai-server";
+import { runCollector, runEnricher, runSectorDataAgent, runNewsPublisher, refreshCatalog } from "@workspace/ai-server";
 import { rootLogger } from "../middleware/logger";
 import { runWeakSignalDetector } from "./weak-signal-detector";
 import { runProactiveInsightGenerator } from "./proactive-insight-generator";
@@ -60,6 +60,20 @@ async function safeRunSectorData(): Promise<void> {
 }
 
 const SECTOR_DATA_INTERVAL_MS = Number(process.env.SECTOR_DATA_INTERVAL_MS) || 7 * 24 * 60 * 60 * 1000; // 7 giorni
+const MODEL_DISCOVERY_INTERVAL_MS = Number(process.env.MODEL_DISCOVERY_INTERVAL_MS) || 7 * 24 * 60 * 60 * 1000; // 7 giorni
+
+async function safeRunModelDiscovery(): Promise<void> {
+  try {
+    rootLogger.info("[cron] model-discovery starting");
+    const report = await refreshCatalog();
+    rootLogger.info(
+      { candidates: report.candidates.length, source: report.source, message: report.message },
+      "[cron] model-discovery complete",
+    );
+  } catch (err) {
+    rootLogger.error({ err }, "[cron] model-discovery failed");
+  }
+}
 
 async function safeRunWeakSignalDetector(): Promise<void> {
   try {
@@ -139,6 +153,13 @@ export function startCronJobs(): void {
       }
     }, BRIEFING_WEEKLY_INTERVAL_MS);
   }, 15 * 60 * 1000);
+
+  // Model discovery settimanale (cerca modelli nuovi presso i provider)
+  // Delay di 25 min per non gravare sullo startup
+  setTimeout(() => {
+    void safeRunModelDiscovery();
+    setInterval(() => { void safeRunModelDiscovery(); }, MODEL_DISCOVERY_INTERVAL_MS);
+  }, 25 * 60 * 1000);
 
   // Briefing giornaliero (ore 7:00 circa — Team)
   setTimeout(() => {

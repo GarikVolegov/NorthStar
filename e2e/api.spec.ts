@@ -27,7 +27,7 @@ test.describe("API health", () => {
     const res = await request.get(`${API_BASE}/api/health/ready`);
     expect([200, 503]).toContain(res.status());
     const body = await responseJson<unknown>(res);
-    expect(["ready", "not ready"]).toContain(readStringField(body, "status"));
+    expect(["ok", "degraded", "fail"]).toContain(readStringField(body, "status"));
   });
 
   test("GET /api/sectors returns an array", async ({ request }) => {

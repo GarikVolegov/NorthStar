@@ -162,15 +162,8 @@ jobs:
           echo "Web app did not become healthy"
           exit 1
 
-      - name: Run API E2E tests
-        run: pnpm run test:e2e
-        env:
-          API_URL: http://localhost:3001
-          BASE_URL: http://localhost:5000
-          CI: "true"
-
-      - name: Run browser E2E tests
-        run: pnpm run test:e2e:browser
+      - name: Runtime quality gate
+        run: pnpm run quality:runtime
         env:
           API_URL: http://localhost:3001
           BASE_URL: http://localhost:5000

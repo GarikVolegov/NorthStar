@@ -1,12 +1,11 @@
-import { AffiliateInviteCard } from "@/components/affiliate/AffiliateInviteCard";
+import {
+  NavbarDesktopProfileMenu,
+  NavbarMobileProfileMenu,
+} from "@/components/layout/NavbarProfileMenus";
 import { SearchDialog } from "@/components/search/SearchDialog";
-import { SubscriptionChip } from "@/components/subscription/SubscriptionStatus";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,7 +14,12 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useAffiliateInvitePreview } from "@/hooks/useAffiliateInvitePreview";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { useProactiveInsights } from "@/hooks/useProactiveInsights";
-import { SUPPORTED_LANGUAGES } from "@/i18n";
+import {
+  BASE,
+  JOURNEY_CATEGORIES,
+  type NavPhase,
+  prefetchRoute,
+} from "@/components/layout/navbarConfig";
 import { apiFetch } from "@/lib/api-fetch";
 import { getJson } from "@/lib/apiClient";
 import { NAV_LABELS } from "@/lib/constants";
@@ -23,89 +27,13 @@ import { useReducedMotion } from "@/lib/motion";
 import { useClerk } from "@clerk/react";
 import { LazyMotion, domAnimation, m } from "framer-motion";
 import {
-  Brain,
-  Briefcase,
-  Globe2,
-  LogOut,
-  MapPin,
   Menu,
-  Monitor,
-  Moon,
   Newspaper,
-  Settings,
-  Sparkles,
-  Sun,
-  Users,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "wouter";
-
-const BASE = import.meta.env.BASE_URL || "/";
-
-const LANGUAGE_LABELS: Record<string, string> = {
-  it: "Italiano",
-  en: "English",
-  es: "Español",
-  fr: "Français",
-  de: "Deutsch",
-};
-
-const MOBILE_THEME_OPTIONS = [
-  { value: "system", label: "Auto", icon: Monitor },
-  { value: "light", label: "Chiaro", icon: Sun },
-  { value: "dark", label: "Scuro", icon: Moon },
-] as const;
-
-const JOURNEY_LABELS: Record<string, { label: string; color: string }> = {
-  indeciso: {
-    label: "Indeciso",
-    color: "text-primary bg-primary/10 border-primary/30",
-  },
-  dipendente: {
-    label: "Dipendente",
-    color: "text-growth bg-growth/10 border-growth/30",
-  },
-  autonomo: {
-    label: "Autonomo",
-    color: "text-primary bg-primary/10 border-primary/30",
-  },
-  azienda: {
-    label: "Azienda",
-    color: "text-growth bg-growth/10 border-growth/30",
-  },
-  investitore: {
-    label: "Investitore",
-    color: "text-primary bg-primary/10 border-primary/30",
-  },
-};
-
-type NavPhase =
-  | "guest"
-  | "new-user"
-  | "indeciso"
-  | "dipendente"
-  | "autonomo"
-  | "azienda"
-  | "investitore";
-
-const PREFETCH_MAP: Record<string, () => Promise<unknown>> = {
-  "/news": () => import("@/pages/news"),
-  "/percorso": () => import("@/pages/percorso"),
-  "/profilo": () => import("@/pages/profilo"),
-  "/candidature": () => import("@/pages/applications"),
-  "/dashboard": () => import("@/pages/dashboard"),
-  "/affiliazione/dashboard": () => import("@/pages/affiliazione-dashboard"),
-  "/wendy/memoria": () => import("@/pages/memoria-wendy"),
-  "/profilo/briefing": () => import("@/pages/briefing"),
-  "/workspace": () => import("@/pages/workspace"),
-  "/sign-in": () => import("@/pages/sign-in"),
-};
-
-function prefetchRoute(path: string) {
-  PREFETCH_MAP[path]?.();
-}
 
 export function Navbar() {
   const { t, i18n } = useTranslation();
@@ -134,32 +62,12 @@ export function Navbar() {
     ? "guest"
     : !user?.journeyType
       ? "new-user"
-      : [
-            "indeciso",
-            "dipendente",
-            "autonomo",
-            "azienda",
-            "investitore",
-          ].includes(user.journeyType)
+      : ["indeciso", "dipendente", "autonomo", "azienda", "investitore"].includes(user.journeyType)
         ? (user.journeyType as NavPhase)
         : "new-user";
 
-  const JOURNEY_CATEGORIES: Record<string, string[]> = {
-    guest: ["technology", "business", "education"],
-    "new-user": ["technology", "education", "general"],
-    indeciso: ["education", "technology", "general"],
-    dipendente: ["technology", "business", "education"],
-    autonomo: ["business", "technology", "finance"],
-    azienda: ["business", "finance", "technology"],
-    investitore: ["finance", "business", "technology"],
-  };
-
   useEffect(() => {
-    const cats = (
-      JOURNEY_CATEGORIES[phase] ??
-      JOURNEY_CATEGORIES.guest ??
-      []
-    ).join(",");
+    const cats = JOURNEY_CATEGORIES[phase].join(",");
 
     getJson<{ news?: Array<{ title: string }> }>(`${BASE}api/news?multi=true&categories=${cats}&perCategory=2`)
       .then((data) => {
@@ -272,382 +180,30 @@ export function Navbar() {
     await copyAffiliateLink();
   };
 
-  const renderAffiliateInviteBlock = (compact = false) => (
-    <AffiliateInviteCard
-      preview={affiliatePreview}
-      copied={affiliateLinkCopied}
-      compact={compact}
-      onCopy={() => void copyAffiliateLink()}
-      onShare={() => void shareAffiliateLink()}
-      onOpenDashboard={() => goToProfilePath("/affiliazione/dashboard")}
-      onPrefetchDashboard={() => prefetchRoute("/affiliazione/dashboard")}
-    />
-  );
-
-  const profileMenuBody = user ? (
-    <>
-      <DropdownMenuLabel className="p-0 font-normal">
-        <div className="h-12 overflow-hidden bg-muted">
-          {profileBannerUrl ? (
-            <img
-              src={profileBannerUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="h-full w-full bg-[radial-gradient(circle_at_20%_20%,hsl(var(--primary)/0.28),transparent_35%),linear-gradient(135deg,hsl(var(--muted)),hsl(var(--background)))]" />
-          )}
-        </div>
-        <div className="px-3 pb-2 pt-2">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-card bg-primary/10 text-sm font-bold text-primary shadow-sm">
-              {user.avatarUrl ? (
-                <img
-                  src={user.avatarUrl}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                initial
-              )}
-            </span>
-            <div className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold leading-5 text-foreground">
-                {displayName}
-              </span>
-              <span className="block truncate text-xs text-muted-foreground">
-                {user.email}
-              </span>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                {user.journeyType && JOURNEY_LABELS[user.journeyType] && (
-                  <span
-                    className={`inline-flex w-fit rounded-full border px-2 py-0.5 text-xs font-semibold ${JOURNEY_LABELS[user.journeyType]?.color ?? ""}`}
-                  >
-                    {JOURNEY_LABELS[user.journeyType]?.label}
-                  </span>
-                )}
-                <SubscriptionChip />
-              </div>
-            </div>
-          </div>
-        </div>
-      </DropdownMenuLabel>
-      <DropdownMenuSeparator />
-      <DropdownMenuItem
-        onClick={() => goToProfilePath("/profilo#impostazioni")}
-        onMouseEnter={() => prefetchRoute("/profilo")}
-        onFocus={() => prefetchRoute("/profilo")}
-        className="min-h-9 cursor-pointer"
-      >
-        <Settings className="mr-2 h-4 w-4 text-primary" />
-        Impostazioni profilo
-      </DropdownMenuItem>
-      <DropdownMenuSeparator />
-      {insightsUnread > 0 && (
-        <>
-          <DropdownMenuItem
-            onClick={() => goToProfilePath("/dashboard")}
-            className="min-h-9 cursor-pointer text-amber-500 focus:text-amber-600"
-          >
-            <Sparkles className="mr-2 h-4 w-4" />
-            Wendy ha {insightsUnread > 9 ? "9+" : insightsUnread} insight
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-        </>
-      )}
-      {!user.journeyType && (
-        <DropdownMenuItem
-          onClick={() => goToProfilePath("/percorso")}
-          onMouseEnter={() => prefetchRoute("/percorso")}
-          className="min-h-9 cursor-pointer"
-        >
-          <MapPin className="mr-2 h-4 w-4 text-primary" />
-          Imposta percorso
-        </DropdownMenuItem>
-      )}
-      <DropdownMenuItem
-        onClick={() => goToProfilePath("/candidature")}
-        className="min-h-9 cursor-pointer"
-      >
-        <Briefcase className="mr-2 h-4 w-4" />
-        {t("nav.applications")}
-      </DropdownMenuItem>
-      <DropdownMenuItem
-        onClick={() => goToProfilePath("/wendy/memoria")}
-        onMouseEnter={() => prefetchRoute("/wendy/memoria")}
-        className="min-h-9 cursor-pointer text-sm text-muted-foreground"
-      >
-        <Brain className="mr-2 h-4 w-4" />
-        Memoria di Wendy
-      </DropdownMenuItem>
-      <DropdownMenuItem
-        onClick={() => goToProfilePath("/profilo/briefing")}
-        onMouseEnter={() => prefetchRoute("/profilo/briefing")}
-        className="min-h-9 cursor-pointer text-sm text-muted-foreground"
-      >
-        <Sparkles className="mr-2 h-4 w-4" />
-        Briefing Wendy
-      </DropdownMenuItem>
-      <DropdownMenuItem
-        onClick={() => goToProfilePath("/workspace")}
-        onMouseEnter={() => prefetchRoute("/workspace")}
-        className="min-h-9 cursor-pointer text-sm text-muted-foreground"
-      >
-        <Users className="mr-2 h-4 w-4" />
-        Workspace
-      </DropdownMenuItem>
-      <DropdownMenuSeparator />
-      <div className="flex min-h-9 items-center gap-2 px-2 py-1">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Tema
-        </p>
-        <div className="ml-auto grid grid-cols-3 gap-1">
-          {MOBILE_THEME_OPTIONS.map((option) => {
-            const Icon = option.icon;
-            const active = (theme ?? "system") === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setTheme(option.value)}
-                className={`flex min-h-7 items-center justify-center gap-1 rounded-full border px-2 text-[10px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${
-                  active
-                    ? "border-primary/40 bg-primary/10 text-primary"
-                    : "border-border bg-background text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <DropdownMenuSeparator />
-      <div className="flex min-h-9 items-center gap-2 px-2 py-1">
-        <div className="flex min-w-0 flex-1 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          <Globe2 className="h-4 w-4 shrink-0" />
-          <span>Lingua</span>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {SUPPORTED_LANGUAGES.map((code) => {
-            const active = activeLanguage === code;
-            return (
-              <button
-                key={code}
-                type="button"
-                onClick={() => void i18n.changeLanguage(code)}
-                className={`min-h-7 rounded-full border px-2 text-[10px] font-bold uppercase transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${
-                  active
-                    ? "border-primary/40 bg-primary/10 text-primary"
-                    : "border-border bg-background text-muted-foreground hover:text-foreground"
-                }`}
-                aria-label={`Cambia lingua in ${LANGUAGE_LABELS[code] ?? code.toUpperCase()}`}
-              >
-                {code.toUpperCase()}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <DropdownMenuSeparator />
-      {renderAffiliateInviteBlock(true)}
-      <DropdownMenuSeparator />
-      <DropdownMenuItem
-        onClick={() => {
+  const profileMenuProps = user
+    ? {
+        user,
+        displayName,
+        initial,
+        profileBannerUrl,
+        activeLanguage,
+        theme,
+        insightsUnread,
+        affiliatePreview,
+        affiliateLinkCopied,
+        applicationsLabel: t("nav.applications"),
+        logoutLabel: t("nav.logout"),
+        onNavigate: goToProfilePath,
+        onCopyAffiliate: () => void copyAffiliateLink(),
+        onShareAffiliate: () => void shareAffiliateLink(),
+        onThemeChange: setTheme,
+        onLanguageChange: (language: string) => void i18n.changeLanguage(language),
+        onSignOut: () => {
           setProfileMenuOpen(false);
           void signOut();
-        }}
-        className="min-h-9 cursor-pointer text-destructive focus:text-destructive"
-      >
-        <LogOut className="mr-2 h-4 w-4" />
-        {t("nav.logout")}
-      </DropdownMenuItem>
-    </>
-  ) : null;
-
-  const profileMenuMobileBody = user ? (
-    <>
-      <div className="p-0 font-normal">
-        <div className="h-12 overflow-hidden bg-muted">
-          {profileBannerUrl ? (
-            <img
-              src={profileBannerUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="h-full w-full bg-[radial-gradient(circle_at_20%_20%,hsl(var(--primary)/0.28),transparent_35%),linear-gradient(135deg,hsl(var(--muted)),hsl(var(--background)))]" />
-          )}
-        </div>
-        <div className="px-3 pb-2 pt-2">
-          <div className="flex items-center gap-2">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-card bg-primary/10 text-sm font-bold text-primary shadow-sm">
-              {user.avatarUrl ? (
-                <img
-                  src={user.avatarUrl}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                initial
-              )}
-            </span>
-            <div className="min-w-0">
-              <span className="block truncate text-[15px] font-semibold leading-5 text-foreground">
-                {displayName}
-              </span>
-              <span className="block truncate text-[11px] text-muted-foreground">
-                {user.email}
-              </span>
-              <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                {user.journeyType && JOURNEY_LABELS[user.journeyType] && (
-                  <span
-                    className={`inline-flex w-fit rounded-full border px-2 py-0.5 text-[11px] font-semibold ${JOURNEY_LABELS[user.journeyType]?.color ?? ""}`}
-                  >
-                    {JOURNEY_LABELS[user.journeyType]?.label}
-                  </span>
-                )}
-                <SubscriptionChip />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="h-px bg-border" />
-      <div className="px-2 py-1">
-        <button
-          type="button"
-          onClick={() => goToProfilePath("/profilo#impostazioni")}
-          onMouseEnter={() => prefetchRoute("/profilo")}
-          onFocus={() => prefetchRoute("/profilo")}
-          className="flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-semibold text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-        >
-          <Settings className="h-4 w-4 text-primary" />
-          Impostazioni profilo
-        </button>
-        {insightsUnread > 0 && (
-          <button
-            type="button"
-            onClick={() => goToProfilePath("/dashboard")}
-            className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-amber-500 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-          >
-            <Sparkles className="h-4 w-4" />
-            Wendy ha {insightsUnread > 9 ? "9+" : insightsUnread} insight
-          </button>
-        )}
-        {!user.journeyType && (
-          <button
-            type="button"
-            onClick={() => goToProfilePath("/percorso")}
-            onMouseEnter={() => prefetchRoute("/percorso")}
-            className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-          >
-            <MapPin className="h-4 w-4 text-primary" />
-            Imposta percorso
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => goToProfilePath("/candidature")}
-          className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-        >
-          <Briefcase className="h-4 w-4" />
-          {t("nav.applications")}
-        </button>
-        <div className="mt-1 grid grid-cols-3 gap-1.5">
-          {[
-            { label: "Memoria", icon: Brain, path: "/wendy/memoria" },
-            { label: "Briefing", icon: Sparkles, path: "/profilo/briefing" },
-            { label: "Workspace", icon: Users, path: "/workspace" },
-          ].map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.path}
-                type="button"
-                onClick={() => goToProfilePath(item.path)}
-                onMouseEnter={() => prefetchRoute(item.path)}
-                className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg border border-border/70 bg-background/60 px-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-              >
-                <Icon className="h-4 w-4" />
-                <span className="truncate">{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <div className="h-px bg-border" />
-      <div className="space-y-1 px-2 py-1.5">
-        <div className="flex min-h-9 items-center gap-2">
-          <p className="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Tema
-          </p>
-          <div className="grid min-w-0 flex-1 grid-cols-3 gap-1">
-            {MOBILE_THEME_OPTIONS.map((option) => {
-              const Icon = option.icon;
-              const active = (theme ?? "system") === option.value;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setTheme(option.value)}
-                  className={`flex min-h-9 items-center justify-center gap-1 rounded-full border px-1.5 text-[10px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${
-                    active
-                      ? "border-primary/40 bg-primary/10 text-primary"
-                      : "border-border bg-background text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span>{option.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="flex min-h-9 items-center gap-2">
-          <div className="flex w-16 shrink-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            <Globe2 className="h-3.5 w-3.5 shrink-0" />
-            <span>Lingua</span>
-          </div>
-          <div className="grid min-w-0 flex-1 grid-cols-5 gap-1">
-            {SUPPORTED_LANGUAGES.map((code) => {
-              const active = activeLanguage === code;
-              return (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => void i18n.changeLanguage(code)}
-                  className={`min-h-9 rounded-full border px-1 text-[10px] font-bold uppercase transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${
-                    active
-                      ? "border-primary/40 bg-primary/10 text-primary"
-                      : "border-border bg-background text-muted-foreground hover:text-foreground"
-                  }`}
-                  aria-label={`Cambia lingua in ${LANGUAGE_LABELS[code] ?? code.toUpperCase()}`}
-                >
-                  {code.toUpperCase()}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-      <div className="h-px bg-border" />
-      {renderAffiliateInviteBlock(true)}
-      <div className="h-px bg-border" />
-      <button
-        type="button"
-        onClick={() => {
-          setProfileMenuOpen(false);
-          void signOut();
-        }}
-        className="mx-2 my-1 flex min-h-10 w-[calc(100%-1rem)] items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-destructive transition-colors hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-      >
-        <LogOut className="h-4 w-4" />
-        {t("nav.logout")}
-      </button>
-    </>
-  ) : null;
+        },
+      }
+    : null;
 
   return (
     <LazyMotion features={domAnimation} strict>
@@ -663,7 +219,7 @@ export function Navbar() {
           onClick={() => setProfileMenuOpen(false)}
         />
       )}
-      {profileMenuOpen && isMobile && user && (
+      {profileMenuOpen && isMobile && profileMenuProps && (
         <m.div
           role="dialog"
           aria-modal="true"
@@ -677,7 +233,7 @@ export function Navbar() {
           animate={prefersReduced ? {} : { opacity: 1 }}
           transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
         >
-          {profileMenuMobileBody}
+          <NavbarMobileProfileMenu {...profileMenuProps} />
         </m.div>
       )}
       <m.header
@@ -729,9 +285,17 @@ export function Navbar() {
           <button
             type="button"
             onClick={() => search.setIsOpen(true)}
-            aria-label="Apri ricerca Wendy"
+            aria-label={insightsUnread > 0 ? `Apri Wendy (${insightsUnread > 9 ? '9+' : insightsUnread} insight non letti)` : "Apri ricerca Wendy"}
             className="group relative h-12 min-w-0 flex-1 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
           >
+            {insightsUnread > 0 && (
+              <span
+                aria-hidden
+                className="absolute right-3 top-1.5 z-20 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold text-white shadow-md ring-2 ring-card"
+              >
+                {insightsUnread > 9 ? "9+" : insightsUnread}
+              </span>
+            )}
             <div className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2">
               {isWendyActive ? (
                 <m.div
@@ -845,7 +409,9 @@ export function Navbar() {
                     }}
                     className="w-80 overflow-hidden border-border bg-card p-0 shadow-2xl"
                   >
-                    {profileMenuBody}
+                    {profileMenuProps ? (
+                      <NavbarDesktopProfileMenu {...profileMenuProps} />
+                    ) : null}
                   </DropdownMenuContent>
                 )}
               </DropdownMenu>

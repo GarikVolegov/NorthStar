@@ -10,6 +10,10 @@ interface UseSSEStreamOptions {
   onRawChunk?: (raw: string) => boolean;
   onError?: (error: Error) => void;
   flushIntervalMs?: number; // default 50ms
+  /** Hard timeout on the whole stream (ms). Aborts with Error('SSE_TIMEOUT') if exceeded. 0 disables. */
+  timeoutMs?: number;
+  /** If true, the timeout window is reset whenever a chunk is received. Default true. */
+  resetTimeoutOnChunk?: boolean;
 }
 
 type StreamEventPayload = {
@@ -56,7 +60,14 @@ export interface UseSSEStreamReturn {
  * Il flush finale è sincrono per mostrare il contenuto completo.
  */
 export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamReturn {
-  const { onComplete, onRawChunk, onError, flushIntervalMs = 50 } = options;
+  const {
+    onComplete,
+    onRawChunk,
+    onError,
+    flushIntervalMs = 50,
+    timeoutMs = 0,
+    resetTimeoutOnChunk = true,
+  } = options;
 
   const [content, setContent] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -66,6 +77,24 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
   const abortRef = useRef<AbortController | null>(null);
   const bufferRef = useRef("");
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutHitRef = useRef(false);
+
+  const clearTimeoutTimer = useCallback(() => {
+    if (timeoutTimerRef.current !== null) {
+      clearTimeout(timeoutTimerRef.current);
+      timeoutTimerRef.current = null;
+    }
+  }, []);
+
+  const armTimeout = useCallback(() => {
+    if (!timeoutMs || timeoutMs <= 0) return;
+    clearTimeoutTimer();
+    timeoutTimerRef.current = setTimeout(() => {
+      timeoutHitRef.current = true;
+      abortRef.current?.abort();
+    }, timeoutMs);
+  }, [timeoutMs, clearTimeoutTimer]);
 
   const scheduleFlush = useCallback(() => {
     if (flushTimerRef.current !== null) return;
@@ -83,8 +112,9 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
       clearTimeout(flushTimerRef.current);
       flushTimerRef.current = null;
     }
+    clearTimeoutTimer();
     setIsStreaming(false);
-  }, []);
+  }, [clearTimeoutTimer]);
 
   const reset = useCallback(() => {
     stop();
@@ -101,6 +131,8 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
         clearTimeout(flushTimerRef.current);
         flushTimerRef.current = null;
       }
+      clearTimeoutTimer();
+      timeoutHitRef.current = false;
       bufferRef.current = "";
 
       const controller = new AbortController();
@@ -109,6 +141,7 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
       setContent("");
       setError(null);
       setIsStreaming(true);
+      armTimeout();
 
       try {
         const res = await fetch(url, { ...options, signal: controller.signal });
@@ -175,20 +208,29 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
           }
 
           lineBuffer += decoder.decode(value, { stream: true });
+          if (resetTimeoutOnChunk) armTimeout();
           const lines = lineBuffer.split("\n");
           lineBuffer = lines.pop() ?? "";
           for (const line of lines) processLine(line);
         }
       } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") return;
+        if (err instanceof Error && err.name === "AbortError") {
+          if (timeoutHitRef.current) {
+            const timeoutError = new Error("SSE_TIMEOUT");
+            setError(timeoutError);
+            onError?.(timeoutError);
+          }
+          return;
+        }
         const error = err instanceof Error ? err : new Error(String(err));
         setError(error);
         onError?.(error);
       } finally {
+        clearTimeoutTimer();
         setIsStreaming(false);
       }
     },
-    [scheduleFlush, onComplete, onError, onRawChunk],
+    [scheduleFlush, onComplete, onError, onRawChunk, armTimeout, clearTimeoutTimer, resetTimeoutOnChunk],
   );
 
   return { content, isStreaming, isPending, error, start, stop, reset };

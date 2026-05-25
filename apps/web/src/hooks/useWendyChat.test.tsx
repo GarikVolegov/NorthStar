@@ -83,7 +83,11 @@ describe("useWendyChat", () => {
         JSON.stringify({ type: "rag_citations", citations: [{ nodeId: 1, title: "Doc", type: "note", score: 91, url: null }] }),
       );
       sse.options?.onRawChunk?.(JSON.stringify({ type: "token", value: "Ciao" }));
-      sse.options?.onRawChunk?.(JSON.stringify({ type: "done", requestId: "req-1" }));
+      sse.options?.onRawChunk?.(JSON.stringify({
+        type: "done",
+        requestId: "req-1",
+        contextSources: ["rag", "openhuman", "graphify"],
+      }));
       sse.options?.onComplete?.("Ciao");
     });
 
@@ -102,6 +106,7 @@ describe("useWendyChat", () => {
       role: "assistant",
       content: "Ciao",
       requestId: "req-1",
+      contextSources: ["rag", "openhuman", "graphify"],
       isStreaming: false,
     });
   });

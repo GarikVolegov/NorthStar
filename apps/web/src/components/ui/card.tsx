@@ -17,7 +17,7 @@ const Card = React.forwardRef<HTMLDivElement, MotionCardProps>(
         <motion.div
           ref={ref}
           className={cn(
-            "rounded-xl border bg-card text-card-foreground shadow",
+            "liquid-card rounded-xl border bg-card text-card-foreground shadow",
             className
           )}
           whileHover={{ y: -3, boxShadow: "0 8px 24px -4px hsl(160 20% 30% / 0.12)", transition: { type: "spring", stiffness: 400, damping: 28 } }}
@@ -31,7 +31,7 @@ const Card = React.forwardRef<HTMLDivElement, MotionCardProps>(
       <div
         ref={ref}
         className={cn(
-          "rounded-xl border bg-card text-card-foreground shadow",
+          "liquid-card rounded-xl border bg-card text-card-foreground shadow",
           className
         )}
         {...props}

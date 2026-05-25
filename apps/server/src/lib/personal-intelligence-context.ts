@@ -1,5 +1,6 @@
 import { buildGraphifyContext } from "./graphify-client";
 import { buildOpenHumanContext } from "./openhuman-client";
+import { buildSemanticMemoryContext } from "./semantic-memory";
 
 interface BuildPersonalIntelligenceContextInput {
   query: string;
@@ -9,7 +10,7 @@ interface BuildPersonalIntelligenceContextInput {
 
 export interface PersonalIntelligenceContext {
   context: string;
-  sources: Array<"openhuman" | "graphify">;
+  sources: Array<"openhuman" | "graphify" | "semantic-memory">;
 }
 
 function graphifyAdminOnly(): boolean {
@@ -22,7 +23,17 @@ export async function buildPersonalIntelligenceContext({
   userRole,
 }: BuildPersonalIntelligenceContextInput): Promise<PersonalIntelligenceContext> {
   const chunks: string[] = [];
-  const sources: Array<"openhuman" | "graphify"> = [];
+  const sources: Array<"openhuman" | "graphify" | "semantic-memory"> = [];
+
+  try {
+    const semanticMemory = await buildSemanticMemoryContext(query, userId);
+    if (semanticMemory) {
+      chunks.push(semanticMemory);
+      sources.push("semantic-memory");
+    }
+  } catch {
+    // Optional provider: semantic memory must never block Wendy.
+  }
 
   try {
     const openHuman = await buildOpenHumanContext(query, userId);

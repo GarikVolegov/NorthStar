@@ -8,9 +8,10 @@ import { useLocation } from "wouter";
 const BASE = import.meta.env.BASE_URL || "/";
 
 export type WendyActionStatus =
-  | "draft"
+  | "preview"
   | "needs_confirmation"
   | "running"
+  | "executed"
   | "done"
   | "failed"
   | "cancelled";
@@ -24,7 +25,8 @@ type KnownWendyActionType =
   | "create_objective"
   | "update_objective_progress"
   | "create_business_idea"
-  | "create_calendar_event";
+  | "create_calendar_event"
+  | "create_memory_fact";
 
 type WendyActionType = KnownWendyActionType | (string & {});
 
@@ -67,6 +69,21 @@ function previewFromRecord(record: Record<string, unknown>) {
       label,
       value: typeof value === "string" ? value : JSON.stringify(value),
     }));
+}
+
+function normalizeActionStatus(value: unknown): WendyActionStatus {
+  if (value === "done") return "executed";
+  if (
+    value === "preview" ||
+    value === "needs_confirmation" ||
+    value === "running" ||
+    value === "executed" ||
+    value === "failed" ||
+    value === "cancelled"
+  ) {
+    return value;
+  }
+  return "preview";
 }
 
 function buildQuery(filters: Record<string, unknown>) {
@@ -125,7 +142,7 @@ export function normalizeWendyAction(event: ToolCallEvent): WendyAction | null {
     return {
       id: String(serverAction.id),
       type: String(serverAction.type),
-      status: (serverAction.status as WendyActionStatus) ?? "draft",
+      status: normalizeActionStatus(serverAction.status),
       risk: (serverAction.risk as WendyActionRisk) ?? "low",
       label: String(serverAction.label ?? "Azione Wendy"),
       description: String(serverAction.description ?? ""),
@@ -147,7 +164,7 @@ export function normalizeWendyAction(event: ToolCallEvent): WendyAction | null {
     return {
       id: createActionId("navigate"),
       type: "navigate",
-      status: "done",
+      status: "executed",
       risk: "low",
       label: "Apro la pagina",
       description: `Ti porto in ${url}.`,
@@ -165,7 +182,7 @@ export function normalizeWendyAction(event: ToolCallEvent): WendyAction | null {
     return {
       id: createActionId("set_filters"),
       type: "set_filters",
-      status: "done",
+      status: "executed",
       risk: "low",
       label: "Applico i filtri",
       description: `Imposto i filtri su ${listType}.`,
@@ -198,7 +215,7 @@ export function useWendyActionExecutor() {
         const url = action.targetRoute ?? String(action.payload.url ?? "/dashboard");
         setLocation(url);
         toast({ title: "Wendy apre la pagina", description: url });
-        return { ...action, status: "done", error: undefined };
+        return { ...action, status: "executed", error: undefined };
       }
 
       if (action.type === "set_filters") {
@@ -210,13 +227,13 @@ export function useWendyActionExecutor() {
         eventBus.emit("page:message", { to: listType, type: "wendy:set_filters", filters });
         setLocation(route);
         toast({ title: "Filtri impostati", description: "Wendy ha preparato la vista richiesta." });
-        return { ...action, status: "done", targetRoute: route, error: undefined };
+        return { ...action, status: "executed", targetRoute: route, error: undefined };
       }
 
       if (action.type === "fill_form") {
         eventBus.emit("wendy:action", { type: "fill_form", payload: action.payload });
         toast({ title: "Bozza pronta", description: "Wendy ha inviato i dati alla pagina corrente." });
-        return { ...action, status: "done", error: undefined };
+        return { ...action, status: "executed", error: undefined };
       }
 
       return action;
@@ -252,7 +269,7 @@ export function useWendyActionExecutor() {
         if (!res.ok) throw new Error("Non sono riuscita a creare l'obiettivo.");
         invalidateOperationalData();
         toast({ title: "Obiettivo creato", description: "Wendy lo ha salvato nella tua dashboard." });
-        return { ...running, status: "done" };
+        return { ...running, status: "executed" };
       }
 
       if (action.type === "update_objective_progress") {
@@ -265,7 +282,7 @@ export function useWendyActionExecutor() {
         if (!res.ok) throw new Error("Non sono riuscita ad aggiornare l'obiettivo.");
         invalidateOperationalData();
         toast({ title: "Progresso aggiornato", description: `Progresso al ${progress}%.` });
-        return { ...running, status: "done" };
+        return { ...running, status: "executed" };
       }
 
       if (action.type === "create_business_idea") {
@@ -281,7 +298,7 @@ export function useWendyActionExecutor() {
         if (!res.ok) throw new Error("Non sono riuscita a salvare l'idea.");
         invalidateOperationalData();
         toast({ title: "Idea salvata", description: "L'ho messa tra le bozze del validatore." });
-        return { ...running, status: "done" };
+        return { ...running, status: "executed" };
       }
 
       if (action.type === "create_calendar_event") {
@@ -292,7 +309,22 @@ export function useWendyActionExecutor() {
         if (!res.ok) throw new Error("Non sono riuscita a creare l'evento.");
         invalidateOperationalData();
         toast({ title: "Evento creato", description: "Wendy lo ha aggiunto al calendario." });
-        return { ...running, status: "done" };
+        return { ...running, status: "executed" };
+      }
+
+      if (action.type === "create_memory_fact") {
+        const res = await apiFetch(`${BASE}api/coach/memory`, {
+          method: "POST",
+          body: JSON.stringify({
+            key: String(action.payload.key ?? "user_manual"),
+            value: String(action.payload.value ?? ""),
+            source: "user_manual",
+          }),
+        });
+        if (!res.ok) throw new Error("Non sono riuscita a salvare la memoria.");
+        invalidateOperationalData();
+        toast({ title: "Memoria salvata", description: "Wendy potrà usarla nelle prossime risposte." });
+        return { ...running, status: "executed" };
       }
 
       return executeImmediate(running);

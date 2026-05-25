@@ -144,6 +144,14 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
       { name: "sectorName",  type: "string", description: "Settore di riferimento" },
     ],
   },
+  save_memory_fact: {
+    name:        "save_memory_fact",
+    description: "Prepara un fatto da salvare nella memoria personale di Wendy. Usare solo quando l'utente dichiara una preferenza, obiettivo o fatto stabile e sembra utile ricordarlo. Il salvataggio reale richiede conferma esplicita nel client.",
+    parameters: [
+      { name: "key",   type: "string", description: "Chiave breve snake_case, es. study_preference | goal_main | constraint_main", required: true },
+      { name: "value", type: "string", description: "Fatto in linguaggio naturale, max 300 caratteri", required: true },
+    ],
+  },
   add_calendar_event: {
     name:        "add_calendar_event",
     description: "Prepara una milestone o scadenza per il calendario dell'utente. L'aggiunta reale richiede conferma esplicita nel client. La data deve essere futura.",
@@ -210,6 +218,32 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
       { name: "limit",        type: "number", description: "Max skill correlate (default 8)" },
     ],
   },
+
+  // ── Personal Intelligence: OpenHuman + Graphify ────────────────────────────
+  ask_openhuman_memory: {
+    name:        "ask_openhuman_memory",
+    description: "Interroga la memoria personale di lungo termine dell'utente in OpenHuman (il suo \"agente personale\" esterno). Usare per domande tipo \"cosa ricordi di me?\", \"cosa abbiamo deciso l'altra volta?\", \"hai memoria di X?\". Restituisce frammenti di memoria con fonte. Se non disponibile, fallisce in modo gentile.",
+    parameters: [
+      { name: "query", type: "string", description: "Domanda in linguaggio naturale sulla memoria personale dell'utente", required: true },
+      { name: "limit", type: "number", description: "Max frammenti (default 5)" },
+    ],
+  },
+  recall_semantic_memory: {
+    name:        "recall_semantic_memory",
+    description: "Interroga la memoria semantica conversazionale di Wendy (plugin Mem0/Zep se configurato). Usare per ricordare discussioni passate, decisioni implicite, contesto emotivo o preferenze emerse in chat. Se non disponibile, continua senza bloccare.",
+    parameters: [
+      { name: "query", type: "string", description: "Domanda o tema da cercare nella memoria semantica dell'utente", required: true },
+      { name: "limit", type: "number", description: "Max frammenti (default 5)" },
+    ],
+  },
+  explain_app_with_graphify: {
+    name:        "explain_app_with_graphify",
+    description: "Interroga il knowledge graph del codice di NorthStar (Graphify) per spiegare come funziona una parte dell'app stessa. Usare per \"come funziona X di NorthStar?\", \"dov'è la logica di Y?\", \"quali pagine usano Z?\". Restituisce nodi e relazioni del codice. Disponibile solo se Graphify è abilitato.",
+    parameters: [
+      { name: "query", type: "string", description: "Domanda sul funzionamento dell'app o su una sua parte (es. \"calendario\", \"validatore di idee\", \"flusso di onboarding\")", required: true },
+      { name: "limit", type: "number", description: "Max nodi da recuperare (default 5)" },
+    ],
+  },
 };
 
 // ── Matrice intent → tool abilitati ──────────────────────────────────────────
@@ -227,9 +261,14 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_news_summary",
     "search_rag",          // Step 6: grounding RAG per domande su trend/ruoli
     "get_weak_signals",    // Step 6: segnali emergenti
+    "recall_semantic_memory",     // Plugin memory: recall conversazionale
+    "ask_openhuman_memory",       // Personal Intelligence: memoria utente
+    "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
   ],
   conversation: [
+    "open_view",
     "get_sector_detail",
+    "list_sectors",
     "get_profession_detail",
     "search_professions",
     "get_user_objectives",
@@ -239,8 +278,13 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_user_context",
     "search_memory_graph",
     "get_growth_articles",
+    "add_calendar_event",
+    "save_memory_fact",
     "search_rag",          // Step 6: grounding su domande di mercato
     "get_weak_signals",    // Step 6: anticipare trend nel settore utente
+    "recall_semantic_memory",     // Plugin memory: recall conversazionale
+    "ask_openhuman_memory",       // Personal Intelligence: memoria utente
+    "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
   ],
   planning: [
     "get_sector_detail",
@@ -255,12 +299,14 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_market_trend",
     "save_business_idea",
     "add_calendar_event",
+    "save_memory_fact",
     "get_user_context",
     "search_memory_graph",
     "search_rag",                // Step 6: grounding per piano basato su dati reali
     "get_weak_signals",          // Step 6: ruoli emergenti rilevanti per il piano
     "get_job_posting_trend",     // Step 6: trend domanda per il ruolo target
     "get_skill_cooccurrences",   // Step 6: skill complementari per il piano
+    "recall_semantic_memory",    // Plugin memory: recall conversazionale
   ],
   deep_analysis: [
     "get_sector_detail",
@@ -277,6 +323,9 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_weak_signals",          // Step 6: segnali emergenti nel settore
     "get_job_posting_trend",     // Step 6: confronto periodi e crescita domanda
     "get_skill_cooccurrences",   // Step 6: mappa skill correlate
+    "recall_semantic_memory",     // Plugin memory: recall conversazionale
+    "ask_openhuman_memory",       // Personal Intelligence: memoria utente
+    "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
   ],
 };
 

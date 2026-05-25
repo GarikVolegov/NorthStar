@@ -10,4 +10,7 @@ export const FF = {
   chainOfThought: isEnabled("FF_CHAIN_OF_THOUGHT", true),
   supervisorEnabled: isEnabled("FF_SUPERVISOR", true),
   memoryEnabled: isEnabled("FF_MEMORY", true),
+  semanticMemoryEnabled: isEnabled("FF_SEMANTIC_MEMORY", false),
+  voicePluginEnabled: isEnabled("FF_VOICE_PLUGIN", false),
+  visionPluginEnabled: isEnabled("FF_VISION_PLUGIN", false),
 };

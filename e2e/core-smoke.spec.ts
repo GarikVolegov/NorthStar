@@ -7,11 +7,25 @@ const WEB_BASE = process.env.BASE_URL ?? "http://localhost:5000";
 const MISMATCHED_CLERK_JWT = "eyJhbGciOiJub25lIn0.eyJzdWIiOiJvdGhlciJ9.sig";
 
 test.describe("core usage smoke", () => {
-  test("readiness endpoint proves dependencies before browser smoke", async ({ request }) => {
-    const res = await request.get(`${API_BASE}/api/health/ready`);
-    expect(res.status()).toBe(200);
-    const body = await responseJson<unknown>(res);
-    expect(readStringField(body, "status")).toBe("ok");
+  test("readiness endpoint proves dependencies before browser smoke", async ({
+    request,
+  }) => {
+    await expect
+      .poll(
+        async () => {
+          const res = await request.get(`${API_BASE}/api/health/ready`);
+          const body = await responseJson<unknown>(res);
+          return {
+            statusCode: res.status(),
+            status: readStringField(body, "status"),
+          };
+        },
+        {
+          intervals: [500, 1000, 2000],
+          timeout: 15_000,
+        },
+      )
+      .toEqual({ statusCode: 200, status: "ok" });
   });
 
   test("landing page renders without runtime crash", async ({ page }) => {
@@ -20,7 +34,9 @@ test.describe("core usage smoke", () => {
     await expect(page.locator("body")).toBeVisible();
   });
 
-  test("protected dashboard redirects unauthenticated users to sign-in", async ({ page }) => {
+  test("protected dashboard redirects unauthenticated users to sign-in", async ({
+    page,
+  }) => {
     await page.goto(`${WEB_BASE}/dashboard`);
     await expect(page).toHaveURL(/\/sign-in/);
   });
@@ -30,7 +46,9 @@ test.describe("core usage smoke", () => {
     await expect(page).toHaveURL(/\/sign-in/);
   });
 
-  test("Clerk sync never returns 500 for tokenless first sync payloads", async ({ request }) => {
+  test("Clerk sync never returns 500 for tokenless first sync payloads", async ({
+    request,
+  }) => {
     const timestamp = Date.now();
     const res = await request.post(`${API_BASE}/api/auth/clerk-sync`, {
       data: {
@@ -42,7 +60,9 @@ test.describe("core usage smoke", () => {
     expect(res.status(), await res.text()).not.toBe(500);
   });
 
-  test("Clerk sync rejects mismatched bearer token without 500", async ({ request }) => {
+  test("Clerk sync rejects mismatched bearer token without 500", async ({
+    request,
+  }) => {
     const timestamp = Date.now();
     const res = await request.post(`${API_BASE}/api/auth/clerk-sync`, {
       headers: {

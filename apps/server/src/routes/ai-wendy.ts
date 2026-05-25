@@ -28,7 +28,6 @@ import {
   buildMemorySection,
   resolveWendyRoute,
   buildLightPrompt,
-  getLocalWendyReply,
   toolsToOpenAIFormat,
   executeToolCall,
   recordAiCall,
@@ -38,12 +37,21 @@ import {
 } from "@workspace/ai-server";
 import type { CompressedHistory, WendyPageContext } from "@workspace/ai-server";
 import {
+  buildWendyContextSources,
   isClientSideToolData,
   isDoneWithLowEval,
   WendyRequestSchema,
   type WendyToolMessage,
 } from "./ai-wendy-shared";
 import { buildPersonalIntelligenceContext } from "../lib/personal-intelligence-context";
+import { isHostTool, executeHostTool } from "../lib/wendy-host-tools";
+import { storeSemanticTurnInBackground } from "../lib/semantic-memory";
+import {
+  buildFastPathFallback,
+  readPositiveInt,
+  withRouteTimeout,
+} from "../lib/wendy-fast-path";
+import { resolveWendyLocale } from "../lib/wendy-locale";
 
 const router = Router();
 
@@ -70,9 +78,10 @@ router.post(
       threadId,
       compressedHistory,
       pageContext,
-      locale,
+      locale: rawLocale,
       hasFileAttached,
     } = parsed.data;
+    const locale = resolveWendyLocale(rawLocale, message);
 
     // SECURITY: userId SEMPRE dal JWT, mai dal body
     const userId = req.user!.id;
@@ -134,60 +143,6 @@ router.post(
         rootLogger.warn({ err }, "[ai/wendy] agent registry clear failed");
       }
     };
-
-    const localReply = getLocalWendyReply(message);
-    if (localReply) {
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-      res.setHeader("X-Accel-Buffering", "no");
-      res.flushHeaders();
-
-      res.write(
-        `data: ${JSON.stringify({ type: "status", value: "Ci sono." })}\n\n`,
-      );
-      res.write(
-        `data: ${JSON.stringify({ type: "token", value: localReply.text })}\n\n`,
-      );
-      res.write(
-        `data: ${JSON.stringify({
-          type: "done",
-          intent: "simple_qa",
-          requestId,
-          usage: {
-            model: "local-wendy-reply",
-            inputTokens: 0,
-            outputTokens: 0,
-          },
-        })}\n\n`,
-      );
-      res.end();
-      markIdle();
-
-      recordAiCall({
-        requestId,
-        userId,
-        ...(threadId ? { threadId } : {}),
-        intent: "simple_qa",
-        tier: "nano",
-        model: "local-wendy-reply",
-        inputTokens: 0,
-        outputTokens: 0,
-        costUsdEst: 0,
-        latencyMs: Date.now() - startedAt,
-        totalTurns: compressedHistory?.totalTurns ?? 0,
-        status: "success",
-        locale,
-        toolCallsCount: 0,
-        toolsUsed: [],
-        responseCategory: "success",
-        searchMode: "none",
-        ragChunksRetrieved: 0,
-        ragTopSimilarity: null,
-        ragSourcesUsed: [],
-      });
-      return;
-    }
 
     const currentPlan = await getEffectivePlan(userId);
     const isPremium = planMeets(currentPlan, "pro");
@@ -297,6 +252,11 @@ router.post(
     let errorCode: string | undefined;
     let inputTokens = 0;
     let outputTokens = 0;
+    let assistantResponseForMemory = "";
+    const fastPathTimeoutMs = readPositiveInt(
+      process.env.WENDY_FAST_PATH_TIMEOUT_MS,
+      8_000,
+    );
 
     // Telemetria Step 5
     const toolsUsedInRequest: string[] = [];
@@ -312,6 +272,17 @@ router.post(
     let ragChunksRetrieved = 0;
     let ragTopSimilarity: number | null = null;
     const ragSourcesUsed: string[] = [];
+
+    const donePayload = (extra: Record<string, unknown> = {}) => ({
+      type: "done",
+      requestId,
+      contextSources: buildWendyContextSources({
+        personalSources: personalContext.sources,
+        toolsUsed: toolsUsedInRequest,
+        ragChunksRetrieved,
+      }),
+      ...extra,
+    });
 
     // Routing fuori dal try — serve nel finally per il logging
     const { intent, decision } = resolveWendyRoute({
@@ -358,11 +329,15 @@ router.post(
         let finalText = "";
 
         while (toolTurns < MAX_TOOL_TURNS) {
-          const result = await llm.chatWithTools(msgs, openAiTools, {
-            model: decision.model,
-            temperature: 0.1,
-            maxTokens: 400,
-          });
+          const result = await withRouteTimeout(
+            llm.chatWithTools(msgs, openAiTools, {
+              model: decision.model,
+              temperature: 0.1,
+              maxTokens: 400,
+            }),
+            fastPathTimeoutMs,
+            "wendy fast path",
+          );
           outputTokens += estimateTokens(result.content);
 
           if (result.toolCalls.length === 0 || result.finishReason === "stop") {
@@ -386,11 +361,9 @@ router.post(
 
           // Esegui ogni tool call e aggiungi i risultati al thread
           for (const tc of result.toolCalls) {
-            const toolResult = await executeToolCall(
-              tc.name,
-              tc.arguments,
-              userId,
-            );
+            const toolResult = isHostTool(tc.name)
+              ? await executeHostTool(tc.name, tc.arguments, userId)
+              : await executeToolCall(tc.name, tc.arguments, userId);
             const toolData = toolResult.ok
               ? toolResult.data
               : { error: toolResult.message };
@@ -404,10 +377,10 @@ router.post(
             // Navigazione client-side — termina subito senza risposta testuale
             if (toolResult.ok && isClientSideToolData(toolData)) {
               send({
-                type: "done",
-                intent,
-                requestId,
-                usage: { model: decision.model, inputTokens, outputTokens },
+                ...donePayload({
+                  intent,
+                  usage: { model: decision.model, inputTokens, outputTokens },
+                }),
               });
               return;
             }
@@ -422,11 +395,21 @@ router.post(
           toolTurns++;
         }
 
-        if (finalText) send({ type: "token", value: finalText });
+        if (!finalText && intent === "simple_qa") {
+          finalText = buildFastPathFallback(message);
+          status = "error_timeout";
+          responseCategory = "error_model";
+        }
+
+        if (finalText) {
+          assistantResponseForMemory += finalText;
+          send({ type: "token", value: finalText });
+        }
         send({
-          type: "done",
-          intent,
-          usage: { model: decision.model, inputTokens, outputTokens },
+          ...donePayload({
+            intent,
+            usage: { model: decision.model, inputTokens, outputTokens },
+          }),
         });
       } else {
         // ── 3. Full path: growth agent completo ──────────────────────────
@@ -466,9 +449,15 @@ router.post(
           wendyIntent: intent, // abilita i Wendy domain tools nel full path
         })) {
           if (aborted) break;
-          send(event);
-          if (event.type === "token")
+          if (event.type === "done") {
+            send(donePayload(event as Record<string, unknown>));
+          } else {
+            send(event);
+          }
+          if (event.type === "token") {
             outputTokens += estimateTokens(event.value);
+            assistantResponseForMemory += event.value;
+          }
           if (event.type === "done" || event.type === "error") {
             if (event.type === "error") {
               status = "error_model";
@@ -485,24 +474,44 @@ router.post(
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      status = msg.includes("timeout")
-        ? "error_timeout"
-        : msg.includes("rate")
-          ? "error_ratelimit"
-          : "error_internal";
-      errorCode = msg.slice(0, 50);
-      responseCategory = status.startsWith("error")
-        ? "error_model"
-        : responseCategory;
+      const isTimeout = msg.toLowerCase().includes("timeout");
+      const fallbackText =
+        intent === "simple_qa"
+          ? buildFastPathFallback(message)
+          : null;
       rootLogger.error(
         { err, userId, requestId },
         "[ai/wendy] unhandled error",
       );
-      send({
-        type: "error",
-        message: "Qualcosa è andato storto. Riprova.",
-        code: status,
-      });
+      if (fallbackText) {
+        status = isTimeout ? "error_timeout" : "error_model";
+        responseCategory = "error_model";
+        errorCode = isTimeout ? "FAST_PATH_TIMEOUT" : msg.slice(0, 50);
+        outputTokens += estimateTokens(fallbackText);
+        assistantResponseForMemory += fallbackText;
+        send({ type: "token", value: fallbackText });
+        send({
+          ...donePayload({
+            intent,
+            usage: { model: "local-wendy-fallback", inputTokens, outputTokens },
+          }),
+        });
+      } else {
+        status = msg.includes("timeout")
+          ? "error_timeout"
+          : msg.includes("rate")
+            ? "error_ratelimit"
+            : "error_internal";
+        errorCode = msg.slice(0, 50);
+        responseCategory = status.startsWith("error")
+          ? "error_model"
+          : responseCategory;
+        send({
+          type: "error",
+          message: "Qualcosa è andato storto. Riprova.",
+          code: status,
+        });
+      }
     } finally {
       // Inferisci responseCategory da status se non già impostato
       if (responseCategory === "success" && status !== "success") {
@@ -520,6 +529,13 @@ router.post(
       }
 
       const latencyMs = Date.now() - startedAt;
+      if (status === "success" || assistantResponseForMemory.trim()) {
+        storeSemanticTurnInBackground({
+          userId,
+          userMessage: message,
+          assistantResponse: assistantResponseForMemory,
+        });
+      }
       recordAiCall({
         requestId,
         userId,

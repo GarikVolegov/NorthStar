@@ -9,7 +9,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch } from "@/lib/api-fetch";
+import { deleteJson, getJson, postJson } from "@/lib/apiClient";
 import { API_ENDPOINTS, withParams } from "@/lib/constants";
 import { usePageMeta } from "@/lib/seo";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -26,6 +26,7 @@ interface MemoryFact {
 }
 
 interface MemoryResponse { facts: MemoryFact[] }
+interface AddMemoryResponse { fact: MemoryFact }
 
 // Mappa source → label leggibile
 const SOURCE_LABELS: Record<string, string> = {
@@ -37,20 +38,19 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 async function fetchMemory(): Promise<MemoryResponse> {
-  const res = await apiFetch(API_ENDPOINTS.coachMemory.list);
-  if (!res.ok) return { facts: [] };
-  return res.json() as Promise<MemoryResponse>;
+  return getJson<MemoryResponse>(API_ENDPOINTS.coachMemory.list, { okStatuses: [404] })
+    .catch(() => ({ facts: [] }));
 }
 
 async function deleteFact(id: number): Promise<void> {
-  await apiFetch(withParams(API_ENDPOINTS.coachMemory.remove, { id }), { method: "DELETE" });
+  await deleteJson(withParams(API_ENDPOINTS.coachMemory.remove, { id }));
 }
 
 async function addFact(value: string): Promise<void> {
-  await apiFetch(API_ENDPOINTS.coachMemory.add, {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ key: "user_manual", value, source: "user_manual" }),
+  await postJson<AddMemoryResponse>(API_ENDPOINTS.coachMemory.add, {
+    key: "user_manual",
+    value,
+    source: "user_manual",
   });
 }
 

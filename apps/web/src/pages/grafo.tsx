@@ -1,23 +1,18 @@
-import { SafeMarkdown } from "@/components/SafeMarkdown";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
+import { SectorGraphAddPanel, type SectorGraphAddForm } from "@/features/sector-graph/SectorGraphAddPanel";
+import { SectorGraphCanvas } from "@/features/sector-graph/SectorGraphCanvas";
+import { SectorGraphChatPanel, type SectorGraphChatMessage } from "@/features/sector-graph/SectorGraphChatPanel";
+import { SectorGraphHeader } from "@/features/sector-graph/SectorGraphHeader";
+import { NODE_CONFIG } from "@/features/sector-graph/sectorGraphConfig";
+import { layoutSectorGraphNodes } from "@/features/sector-graph/sectorGraphLayout";
 import { getJson, stream } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useGetSector } from "@workspace/api-client-react";
 import {
-  ArrowLeft,
-  Bot,
-  Download,
   Loader2,
   MessageSquare,
   Network,
-  Plus,
-  RefreshCw,
-  Send,
-  Sparkles,
-  User,
   X,
 } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -27,105 +22,6 @@ import { parseStoredGraph, readChatChunkText } from "./grafo-storage";
 import type { GraphData, GraphEdge, GraphNode } from "./grafo-types";
 
 const BASE = import.meta.env.BASE_URL || "/";
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-}
-
-const NODE_CONFIG = {
-  role: {
-    color: "hsl(var(--chart-4))",
-    bg: "hsl(var(--chart-4) / 0.1)",
-    border: "hsl(var(--chart-4) / 0.4)",
-    label: "Ruolo",
-    emoji: "👤",
-  },
-  skill: {
-    color: "hsl(var(--chart-2))",
-    bg: "hsl(var(--chart-2) / 0.1)",
-    border: "hsl(var(--chart-2) / 0.4)",
-    label: "Competenza",
-    emoji: "⚡",
-  },
-  tool: {
-    color: "hsl(var(--chart-1))",
-    bg: "hsl(var(--chart-1) / 0.1)",
-    border: "hsl(var(--chart-1) / 0.4)",
-    label: "Strumento",
-    emoji: "🔧",
-  },
-  certification: {
-    color: "hsl(var(--chart-4))",
-    bg: "hsl(var(--chart-4) / 0.1)",
-    border: "hsl(var(--chart-4) / 0.4)",
-    label: "Certificazione",
-    emoji: "🏅",
-  },
-};
-
-const TYPE_OPTIONS = [
-  { value: "role", label: "Ruolo", emoji: "👤" },
-  { value: "skill", label: "Competenza", emoji: "⚡" },
-  { value: "tool", label: "Strumento", emoji: "🔧" },
-  { value: "certification", label: "Certificazione", emoji: "🏅" },
-] as const;
-
-const CX = 500;
-const CY = 400;
-
-function layoutNodes(nodes: GraphNode[]): GraphNode[] {
-  const byType: Record<GraphNode["type"], GraphNode[]> = {
-    role: [],
-    skill: [],
-    tool: [],
-    certification: [],
-  };
-  nodes.forEach((n) => {
-    const t: GraphNode["type"] = n.type in byType ? n.type : "skill";
-    byType[t].push(n);
-  });
-
-  const positioned: GraphNode[] = [];
-
-  const place = (group: GraphNode[], radius: number, offsetAngle = 0) => {
-    group.forEach((n, i) => {
-      const angle =
-        (2 * Math.PI * i) / group.length + offsetAngle - Math.PI / 2;
-      positioned.push({
-        ...n,
-        x: CX + radius * Math.cos(angle),
-        y: CY + radius * Math.sin(angle),
-      });
-    });
-  };
-
-  place(byType.role, 140, 0);
-  place(
-    byType.skill,
-    255,
-    byType.skill.length > 0 ? Math.PI / byType.skill.length : 0,
-  );
-
-  const outer = [
-    ...byType.tool.map((n) => ({ ...n })),
-    ...byType.certification.map((n) => ({ ...n })),
-  ];
-  outer.forEach((n, i) => {
-    const angle = (2 * Math.PI * i) / outer.length - Math.PI / 2;
-    positioned.push({
-      ...n,
-      x: CX + 360 * Math.cos(angle),
-      y: CY + 360 * Math.sin(angle),
-    });
-  });
-
-  return positioned;
-}
-
-function renderMarkdown(text: string): React.ReactNode {
-  return <SafeMarkdown content={text} className="space-y-1" />;
-}
 
 function storageKey(sectorId: number, userId: number | undefined) {
   return `grafo_user_${sectorId}_${userId ?? "guest"}`;
@@ -147,15 +43,15 @@ export default function Grafo() {
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
 
   const [showAddPanel, setShowAddPanel] = useState(false);
-  const [addForm, setAddForm] = useState<{
-    type: "role" | "skill" | "tool" | "certification";
-    label: string;
-    description: string;
-    connectTo: string;
-  }>({ type: "skill", label: "", description: "", connectTo: "" });
+  const [addForm, setAddForm] = useState<SectorGraphAddForm>({
+    type: "skill",
+    label: "",
+    description: "",
+    connectTo: "",
+  });
 
   const [activeTab, setActiveTab] = useState<"graph" | "chat">("graph");
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatMessages, setChatMessages] = useState<SectorGraphChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -196,7 +92,7 @@ export default function Grafo() {
   );
 
   useEffect(() => {
-    const pos = layoutNodes(allNodes);
+    const pos = layoutSectorGraphNodes(allNodes);
     setPositioned(pos);
     const map = new Map<string, GraphNode>();
     pos.forEach((n) => map.set(n.id, n));
@@ -415,7 +311,7 @@ export default function Grafo() {
     const text = chatInput.trim();
     if (!text || chatLoading) return;
 
-    const newMessages: ChatMessage[] = [
+    const newMessages: SectorGraphChatMessage[] = [
       ...chatMessages,
       { role: "user", content: text },
     ];
@@ -517,189 +413,28 @@ export default function Grafo() {
 
   return (
     <div className="container mx-auto px-4 py-8 md:py-12 max-w-5xl">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="rounded-full h-9 w-9 shrink-0"
-          asChild
-        >
-          <Link href={`/settore/${id}`}>
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-        </Button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="font-serif font-bold text-2xl truncate">
-              {t("grafo.title")}
-            </h1>
-            <Badge
-              variant="outline"
-              className="text-[10px] px-1.5 py-0 border-primary/20 text-primary bg-primary/5 shrink-0"
-            >
-              <Sparkles className="w-2 h-2 mr-1" />
-              Premium
-            </Badge>
-          </div>
-          {sector && (
-            <p className="text-sm text-muted-foreground">{sector.name}</p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {aiGraph && positioned.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-xl"
-              onClick={handleExportPNG}
-              disabled={isExporting}
-              title={t("grafo.downloadPng")}
-            >
-              {isExporting ? (
-                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-              ) : (
-                <Download className="w-3.5 h-3.5 mr-1.5" />
-              )}
-              {isExporting ? t("grafo.exporting") : "PNG"}
-            </Button>
-          )}
-          {aiGraph && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-xl"
-              onClick={() => fetchGraph(true)}
-              disabled={isLoading}
-            >
-              <RefreshCw
-                className={cn(
-                  "w-3.5 h-3.5 mr-1.5",
-                  isLoading && "animate-spin",
-                )}
-              />
-              {t("grafo.regenerate")}
-            </Button>
-          )}
-          {aiGraph && (
-            <Button
-              size="sm"
-              className="rounded-xl"
-              onClick={() => setShowAddPanel((v) => !v)}
-            >
-              <Plus className="w-3.5 h-3.5 mr-1.5" />
-              {t("grafo.addNode")}
-            </Button>
-          )}
-        </div>
-      </div>
+      <SectorGraphHeader
+        sectorId={id}
+        sectorName={sector?.name}
+        hasGraph={Boolean(aiGraph)}
+        hasPositionedNodes={positioned.length > 0}
+        isExporting={isExporting}
+        isLoading={isLoading}
+        onExportPng={handleExportPNG}
+        onRefresh={() => fetchGraph(true)}
+        onToggleAddPanel={() => setShowAddPanel((value) => !value)}
+        t={t}
+      />
 
-      {/* Add node panel */}
       {showAddPanel && (
-        <div className="mb-5 bg-card border rounded-2xl p-5 animate-in slide-in-from-top-2 fade-in duration-200">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-sm">{t("grafo.addNodeTitle")}</h3>
-            <button
-              onClick={() => setShowAddPanel(false)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-muted-foreground mb-1.5 block font-medium">
-                {t("grafo.nodeTypeLabel")}
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {TYPE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() =>
-                      setAddForm((f) => ({ ...f, type: opt.value }))
-                    }
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors",
-                      addForm.type === opt.value
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border bg-background text-muted-foreground hover:border-primary/40",
-                    )}
-                  >
-                    {opt.emoji} {t(`grafo.nodeTypes.${opt.value}`)}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1.5 block font-medium">
-                {t("grafo.connectTo")}
-              </label>
-              <select
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                value={addForm.connectTo}
-                onChange={(e) =>
-                  setAddForm((f) => ({ ...f, connectTo: e.target.value }))
-                }
-              >
-                <option value="">{t("grafo.noConnection")}</option>
-                {allNodes.map((n) => (
-                  <option key={n.id} value={n.id}>
-                    {NODE_CONFIG[n.type]?.emoji} {n.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1.5 block font-medium">
-                {t("grafo.nodeName")}
-              </label>
-              <input
-                type="text"
-                placeholder={`es. "${addForm.type === "role" ? "Product Manager" : addForm.type === "skill" ? "Agile Scrum" : addForm.type === "tool" ? "Jira" : "PMP"}"`}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                value={addForm.label}
-                onChange={(e) =>
-                  setAddForm((f) => ({ ...f, label: e.target.value }))
-                }
-                onKeyDown={(e) => e.key === "Enter" && handleAddNode()}
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1.5 block font-medium">
-                {t("grafo.nodeDescription")}
-              </label>
-              <input
-                type="text"
-                placeholder={t("grafo.nodeDescPlaceholder")}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                value={addForm.description}
-                onChange={(e) =>
-                  setAddForm((f) => ({ ...f, description: e.target.value }))
-                }
-                onKeyDown={(e) => e.key === "Enter" && handleAddNode()}
-              />
-            </div>
-          </div>
-          <div className="flex justify-end mt-4 gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="rounded-xl"
-              onClick={() => setShowAddPanel(false)}
-            >
-              {t("grafo.cancel")}
-            </Button>
-            <Button
-              size="sm"
-              className="rounded-xl"
-              onClick={handleAddNode}
-              disabled={!addForm.label.trim()}
-            >
-              <Plus className="w-3.5 h-3.5 mr-1.5" />
-              {t("grafo.addNode")}
-            </Button>
-          </div>
-        </div>
+        <SectorGraphAddPanel
+          addForm={addForm}
+          allNodes={allNodes}
+          onChange={setAddForm}
+          onAdd={handleAddNode}
+          onClose={() => setShowAddPanel(false)}
+          t={t}
+        />
       )}
 
       {/* User-added nodes list */}
@@ -798,337 +533,35 @@ export default function Grafo() {
       )}
 
       {/* Graph area */}
-      {activeTab === "graph" &&
-        (isLoading ? (
-          <div className="flex flex-col items-center justify-center py-24 bg-card border rounded-3xl">
-            <Loader2 className="w-10 h-10 animate-spin text-primary/30 mb-4" />
-            <p className="text-muted-foreground text-sm">
-              {t("grafo.building")}
-            </p>
-            <p className="text-xs text-muted-foreground/50 mt-1">
-              {t("grafo.buildingHint")}
-            </p>
-          </div>
-        ) : positioned.length > 0 ? (
-          <div className="relative">
-            <div className="bg-card border rounded-3xl overflow-hidden shadow-sm">
-              <svg
-                ref={svgRef}
-                viewBox="0 0 1000 800"
-                className="w-full"
-                style={{ maxHeight: "70vh" }}
-                onMouseLeave={() => setHoveredNode(null)}
-              >
-                {/* Edges */}
-                {allEdges.map((edge, i) => {
-                  const f = nodeMap.get(edge.from);
-                  const t = nodeMap.get(edge.to);
-                  if (!f || !t) return null;
-                  const active = hoveredNode
-                    ? edge.from === hoveredNode.id || edge.to === hoveredNode.id
-                    : false;
-                  return (
-                    <line
-                      key={i}
-                      x1={f.x}
-                      y1={f.y}
-                      x2={t.x}
-                      y2={t.y}
-                      stroke={
-                        active
-                          ? "hsl(var(--chart-4))"
-                          : edge.userAdded
-                            ? "hsl(var(--muted-foreground))"
-                            : "hsl(var(--border))"
-                      }
-                      strokeWidth={active ? 1.5 : 1}
-                      strokeDasharray={
-                        active ? undefined : edge.userAdded ? "6 4" : "4 3"
-                      }
-                      opacity={hoveredNode && !active ? 0.15 : 1}
-                      className="transition-all duration-200"
-                    />
-                  );
-                })}
-
-                {/* Center */}
-                <circle
-                  cx={CX}
-                  cy={CY}
-                  r={50}
-                  fill="hsl(var(--background))"
-                  stroke="hsl(var(--border))"
-                  strokeWidth={1.5}
-                />
-                <text
-                  x={CX}
-                  y={CY - 6}
-                  textAnchor="middle"
-                  fontSize="11"
-                  fontWeight="600"
-                  fill="hsl(var(--muted-foreground))"
-                  className="select-none"
-                >
-                  {sector?.icon ?? "🏢"}
-                </text>
-                <text
-                  x={CX}
-                  y={CY + 10}
-                  textAnchor="middle"
-                  fontSize="9"
-                  fill="hsl(var(--muted-foreground))"
-                  className="select-none"
-                >
-                  {(sector?.name ?? "").split(" ").slice(0, 2).join(" ")}
-                </text>
-
-                {/* Nodes */}
-                {positioned.map((node) => {
-                  const cfg = NODE_CONFIG[node.type] ?? NODE_CONFIG.skill;
-                  const active = isConnected(node.id);
-                  const r =
-                    node.type === "role" ? 26 : node.type === "skill" ? 22 : 20;
-                  const isUser = node.userAdded;
-                  return (
-                    <g
-                      key={node.id}
-                      transform={`translate(${node.x},${node.y})`}
-                      className="cursor-pointer"
-                      onMouseEnter={() => setHoveredNode(node)}
-                    >
-                      <circle
-                        r={r}
-                        fill={active ? cfg.bg : "hsl(var(--background))"}
-                        stroke={active ? cfg.border : "hsl(var(--border))"}
-                        strokeWidth={hoveredNode?.id === node.id ? 2.5 : 1.5}
-                        strokeDasharray={isUser ? "4 2" : undefined}
-                        className="transition-all duration-200"
-                        opacity={hoveredNode && !active ? 0.4 : 1}
-                      />
-                      <text
-                        textAnchor="middle"
-                        dy="0.35em"
-                        fontSize={node.type === "role" ? "14" : "12"}
-                        className="select-none"
-                        opacity={hoveredNode && !active ? 0.4 : 1}
-                      >
-                        {cfg.emoji}
-                      </text>
-                      {isUser && (
-                        <circle
-                          cx={r - 5}
-                          cy={-(r - 5)}
-                          r={5}
-                          fill="hsl(var(--chart-4))"
-                          opacity={hoveredNode && !active ? 0.4 : 1}
-                        />
-                      )}
-                      <text
-                        y={r + 12}
-                        textAnchor="middle"
-                        fontSize="9"
-                        fontWeight={hoveredNode?.id === node.id ? "600" : "400"}
-                        fill={
-                          active ? cfg.color : "hsl(var(--muted-foreground))"
-                        }
-                        className="select-none"
-                        opacity={hoveredNode && !active ? 0.4 : 1}
-                      >
-                        {node.label.length > 14
-                          ? node.label.slice(0, 13) + "…"
-                          : node.label}
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
-            </div>
-
-            {/* Tooltip */}
-            {hoveredNode && (
-              <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-auto md:bottom-6 md:max-w-xs bg-popover border rounded-xl shadow-lg p-4 pointer-events-none z-10 animate-in fade-in duration-150">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-base">
-                    {NODE_CONFIG[hoveredNode.type]?.emoji}
-                  </span>
-                  <span
-                    className="text-xs font-semibold uppercase tracking-wide"
-                    style={{ color: NODE_CONFIG[hoveredNode.type]?.color }}
-                  >
-                    {t(`grafo.nodeTypes.${hoveredNode.type}`)}
-                  </span>
-                  {hoveredNode.userAdded && (
-                    <span className="ml-auto text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">
-                      {t("grafo.yourNode")}
-                    </span>
-                  )}
-                </div>
-                <p className="font-semibold text-sm mb-1">
-                  {hoveredNode.label}
-                </p>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {hoveredNode.description}
-                </p>
-                {allEdges.filter(
-                  (e) => e.from === hoveredNode.id || e.to === hoveredNode.id,
-                ).length > 0 && (
-                  <p className="text-[10px] text-muted-foreground/50 mt-2">
-                    {t("grafo.connections", {
-                      count: allEdges.filter(
-                        (e) =>
-                          e.from === hoveredNode.id || e.to === hoveredNode.id,
-                      ).length,
-                    })}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-24 bg-card border rounded-3xl">
-            <div className="text-4xl mb-4">🕸️</div>
-            <p className="text-muted-foreground text-sm mb-4">
-              {t("grafo.notAvailable")}
-            </p>
-            <Button
-              onClick={() => fetchGraph()}
-              variant="outline"
-              className="rounded-xl"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              {t("grafo.generateGraph")}
-            </Button>
-          </div>
-        ))}
-
+      {activeTab === "graph" && (
+        <SectorGraphCanvas
+          sector={sector}
+          positioned={positioned}
+          allEdges={allEdges}
+          nodeMap={nodeMap}
+          hoveredNode={hoveredNode}
+          isLoading={isLoading}
+          svgRef={svgRef}
+          onHoverNode={setHoveredNode}
+          onGenerate={() => fetchGraph()}
+          isConnected={isConnected}
+          t={t}
+        />
+      )}
       {/* Chat tab */}
       {activeTab === "chat" && (
-        <div
-          className="bg-card border rounded-3xl overflow-hidden flex flex-col"
-          style={{ height: "65vh" }}
-        >
-          {/* Chat messages */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-4">
-            {chatMessages.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full text-center py-8">
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 text-2xl">
-                  🕸️
-                </div>
-                <h3 className="font-semibold text-foreground mb-2">
-                  {t("grafo.tabChat")}
-                </h3>
-                <p className="text-sm text-muted-foreground max-w-xs mb-6">
-                  {t("grafo.chatDesc")}
-                </p>
-                <div className="flex flex-col gap-2 w-full max-w-sm">
-                  {[
-                    t("grafo.chatQuestion1"),
-                    t("grafo.chatQuestion2"),
-                    t("grafo.chatQuestion3"),
-                  ].map((q: string) => (
-                    <button
-                      key={q}
-                      onClick={() => {
-                        setChatInput(q);
-                        chatInputRef.current?.focus();
-                      }}
-                      className="text-left text-xs px-4 py-2.5 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/5 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {chatMessages.map((msg, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "flex gap-3",
-                  msg.role === "user" ? "justify-end" : "justify-start",
-                )}
-              >
-                {msg.role === "assistant" && (
-                  <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <Bot className="w-4 h-4 text-primary" />
-                  </div>
-                )}
-                <div
-                  className={cn(
-                    "max-w-[80%] rounded-2xl px-4 py-3 text-sm",
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground rounded-tr-sm"
-                      : "bg-muted text-foreground rounded-tl-sm",
-                  )}
-                >
-                  {msg.role === "assistant" ? (
-                    <div className="space-y-1">
-                      {msg.content === "" && chatLoading ? (
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span className="text-xs">Elaborazione…</span>
-                        </div>
-                      ) : (
-                        renderMarkdown(msg.content)
-                      )}
-                    </div>
-                  ) : (
-                    <p>{msg.content}</p>
-                  )}
-                </div>
-                {msg.role === "user" && (
-                  <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shrink-0 mt-0.5">
-                    <User className="w-4 h-4 text-primary-foreground" />
-                  </div>
-                )}
-              </div>
-            ))}
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* Chat input */}
-          <div className="border-t p-4">
-            {allNodes.length === 0 && (
-              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">
-                {t("grafo.generateFirst")}
-              </p>
-            )}
-            <div className="flex gap-2 items-end">
-              <Textarea
-                ref={chatInputRef}
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder={t("grafo.chatPlaceholder")}
-                className="resize-none rounded-xl text-sm min-h-[44px] max-h-[120px]"
-                rows={1}
-                disabled={chatLoading || allNodes.length === 0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendChat();
-                  }
-                }}
-              />
-              <Button
-                size="icon"
-                className="rounded-xl h-11 w-11 shrink-0"
-                onClick={handleSendChat}
-                disabled={
-                  !chatInput.trim() || chatLoading || allNodes.length === 0
-                }
-              >
-                {chatLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <SectorGraphChatPanel
+          messages={chatMessages}
+          input={chatInput}
+          loading={chatLoading}
+          allNodes={allNodes}
+          inputRef={chatInputRef}
+          endRef={chatEndRef}
+          onInputChange={setChatInput}
+          onSend={handleSendChat}
+          t={t}
+        />
       )}
-
       {/* Stats */}
       {aiGraph && activeTab === "graph" && (
         <div className="grid grid-cols-4 gap-3 mt-4">

@@ -40,6 +40,8 @@ router.get("/:userId", async (req, res) => {
           emailVerified: usersTable.emailVerified,
           avatarUrl: usersTable.avatarUrl,
           bannerUrl: userProfileSettingsTable.bannerUrl,
+          activeBackgroundId: userProfileSettingsTable.activeBackgroundId,
+          backgroundLibrary: userProfileSettingsTable.backgroundLibrary,
           createdAt: usersTable.createdAt,
         })
         .from(usersTable)
@@ -67,7 +69,9 @@ router.get("/:userId", async (req, res) => {
         .from(usersTable)
         .where(eq(usersTable.id, userId))
         .limit(1);
-      user = baseUser ? { ...baseUser, bannerUrl: null } : undefined;
+      user = baseUser
+        ? { ...baseUser, bannerUrl: null, activeBackgroundId: null, backgroundLibrary: [] as unknown[] }
+        : undefined;
     }
 
     if (!user) {

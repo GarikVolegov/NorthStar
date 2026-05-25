@@ -1,25 +1,12 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-22T00:00:00.000Z",
+  "updatedAt": "2026-05-25T00:00:00.000Z",
   "limits": {
     "apps": 600,
     "packages": 400
   },
   "offenders": {
-    "apps": [
-      { "file": "apps/web/src/pages/test.tsx", "lines": 1241 },
-      { "file": "apps/web/src/pages/results.tsx", "lines": 1208 },
-      { "file": "apps/web/src/pages/grafo-conoscenza.tsx", "lines": 1197 },
-      { "file": "apps/web/src/pages/validatore-idea.tsx", "lines": 1177 },
-      { "file": "apps/web/src/pages/grafo.tsx", "lines": 1167 },
-      { "file": "apps/web/src/pages/applications.tsx", "lines": 998 },
-      { "file": "apps/web/src/pages/sector.tsx", "lines": 902 },
-      { "file": "apps/web/src/components/layout/Navbar.tsx", "lines": 884 },
-      { "file": "apps/web/src/pages/social.tsx", "lines": 768 },
-      { "file": "apps/web/src/pages/admin-metriche.tsx", "lines": 738 },
-      { "file": "apps/web/src/components/search/SearchDialog.tsx", "lines": 737 },
-      { "file": "apps/web/src/components/ui/sidebar.tsx", "lines": 728 }
-    ],
+    "apps": [],
     "packages": []
   }
 }

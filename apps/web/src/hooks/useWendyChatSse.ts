@@ -6,12 +6,14 @@ export interface WendySseRagCitation {
   url: string | null;
 }
 
+export type WendyContextSource = 'app-data' | 'rag' | 'openhuman' | 'graphify' | 'semantic-memory';
+
 export type WendySseEvent =
   | { type: 'status'; value: string }
   | { type: 'gate'; message: string }
   | { type: 'error'; message: string }
   | { type: 'rag_citations'; citations: WendySseRagCitation[] }
-  | { type: 'done'; requestId?: string | undefined }
+  | { type: 'done'; requestId?: string | undefined; contextSources: WendyContextSource[] }
   | { type: 'tool_call'; name: string; args?: Record<string, unknown> | undefined; result?: unknown }
   | { type: 'ui_tool'; name: string; args: Record<string, unknown> }
   | { type: 'token'; value: string }
@@ -55,6 +57,19 @@ function parseRagCitation(value: unknown): WendySseRagCitation | null {
 function parseRagCitations(value: unknown): WendySseRagCitation[] {
   if (!Array.isArray(value)) return [];
   return value.map(parseRagCitation).filter((citation): citation is WendySseRagCitation => citation !== null);
+}
+
+function isWendyContextSource(value: unknown): value is WendyContextSource {
+  return value === 'app-data'
+    || value === 'rag'
+    || value === 'openhuman'
+    || value === 'graphify'
+    || value === 'semantic-memory';
+}
+
+function parseContextSources(value: unknown): WendyContextSource[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter(isWendyContextSource))];
 }
 
 function readProviderToken(record: Record<string, unknown>): string {
@@ -104,6 +119,7 @@ export function parseWendySseEvent(raw: string): WendySseEvent {
     return {
       type: 'done',
       requestId: typeof parsed.requestId === 'string' ? parsed.requestId : undefined,
+      contextSources: parseContextSources(parsed.contextSources),
     };
   }
   if (type === 'tool_call' && typeof parsed.name === 'string') {

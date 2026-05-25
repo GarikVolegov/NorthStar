@@ -8,6 +8,8 @@ import adminRouter from "./routes/admin";
 import friendsRouter from "./routes/friends";
 import socialRouter from "./routes/social";
 import profileRouter from "./routes/profile";
+import profileBackgroundRouter from "./routes/profile-background";
+import profileVisionRouter from "./routes/profile-vision";
 import knowledgeRouter from "./routes/knowledge";
 import wikiRouter from "./routes/wiki";
 import interviewRouter from "./routes/interview";
@@ -122,6 +124,8 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/contact", router: contactRouter, auth: "public", description: "Messaggi contatto" },
 
   { path: "/api/profile", router: profileRouter, auth: "authenticated", description: "Profilo utente" },
+  { path: "/api/profile", router: profileBackgroundRouter, auth: "authenticated", description: "Sfondo personalizzabile profilo" },
+  { path: "/api/profile-vision", router: profileVisionRouter, auth: "authenticated", description: "Analisi profilo con vision AI" },
   { path: "/api/users", router: usersRouter, auth: "authenticated", description: "Utenti" },
   { path: "/api/friends", router: friendsRouter, auth: "authenticated", description: "Amici e chat" },
   { path: "/api/social", router: socialRouter, auth: "authenticated", description: "Social feed" },
