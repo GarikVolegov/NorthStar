@@ -1,25 +1,46 @@
-import { useState, useEffect, useCallback } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { useWendyPageContext } from "@/hooks/useWendyPageContext";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  ChevronLeft, ChevronRight, Plus, Calendar, Clock,
-  AlertCircle, CheckCircle2, Circle, PauseCircle, Loader2, Download,
-} from "lucide-react";
-import {
-  format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  addMonths, subMonths, addWeeks, subWeeks, addDays, subDays,
-  startOfDay, endOfDay,
-  isSameMonth, isSameDay, isToday, parseISO, isBefore,
-} from "date-fns";
-import { it } from "date-fns/locale";
-import { cn } from "@/lib/utils";
-import { Link, useLocation } from "wouter";
 import { CalendarioEventoModal } from "@/components/calendario/CalendarioEventoModal";
 import { PushOptInBanner } from "@/components/calendario/PushOptInBanner";
-import { apiFetch } from "@/lib/api-fetch";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
+import { deleteJson, getJson } from "@/lib/apiClient";
+import { cn } from "@/lib/utils";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  addDays,
+  addMonths,
+  addWeeks,
+  endOfDay,
+  endOfMonth,
+  endOfWeek,
+  format,
+  isBefore,
+  isSameDay,
+  isSameMonth,
+  isToday, parseISO,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  subDays,
+  subMonths,
+  subWeeks,
+} from "date-fns";
+import { it } from "date-fns/locale";
+import {
+  AlertCircle,
+  Calendar,
+  CheckCircle2,
+  ChevronLeft, ChevronRight,
+  Circle,
+  Clock,
+  Download,
+  Loader2,
+  PauseCircle,
+  Plus,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -109,12 +130,13 @@ export default function Calendario() {
 
   const { from, to } = getDateRange(view, currentDate);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<{ events: CalendarEvent[] }>({
     queryKey: ["calendar-events", user?.id, from.toISOString(), to.toISOString()],
     queryFn: async () => {
       if (!user?.id) return { events: [] };
-      const res = await apiFetch(`${BASE}api/calendar/events?from=${from.toISOString()}&to=${to.toISOString()}`);
-      return res.json();
+      return getJson<{ events: CalendarEvent[] }>(
+        `${BASE}api/calendar/events?from=${from.toISOString()}&to=${to.toISOString()}`,
+      );
     },
     enabled: !!user?.id,
   });
@@ -123,7 +145,7 @@ export default function Calendario() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiFetch(`${BASE}api/calendar/events/${id}`, { method: "DELETE" });
+      await deleteJson(`${BASE}api/calendar/events/${id}`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["calendar-events"] }),
   });
@@ -305,7 +327,6 @@ function MonthView({ currentDate, events, onDayClick, onEventClick }: {
   onDayClick: (d: Date) => void;
   onEventClick: (e: CalendarEvent, ev: React.MouseEvent) => void;
 }) {
-  const { locale } = { locale: it };
   const start = startOfWeek(startOfMonth(currentDate), { locale: it });
   const end = endOfWeek(endOfMonth(currentDate), { locale: it });
 

@@ -19,6 +19,19 @@ export interface KnowledgeNodeBrief {
   type: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readLinkSuggestion(value: unknown): { index: number; label?: string; reason?: string } | null {
+  if (!isRecord(value) || typeof value.index !== "number") return null;
+  return {
+    index: value.index,
+    ...(typeof value.label === "string" ? { label: value.label } : {}),
+    ...(typeof value.reason === "string" ? { reason: value.reason } : {}),
+  };
+}
+
 export async function suggestAutoLinks(
   sourceNode: KnowledgeNodeBrief,
   candidates: KnowledgeNodeBrief[],
@@ -33,7 +46,7 @@ export async function suggestAutoLinks(
 
     const scored = candidates.map((c, i) => ({
       node: c,
-      similarity: cosineSimilarity(sourceEmbedding, candidateEmbeddings[i]),
+      similarity: cosineSimilarity(sourceEmbedding, candidateEmbeddings[i] ?? []),
     }));
 
     scored.sort((a, b) => b.similarity - a.similarity);
@@ -59,21 +72,23 @@ Rispondi SOLO con un array JSON degli indici dei candidati da collegare, nel for
       "auto-link",
     );
 
-    const parsed = JSON.parse(response);
+    const parsed = JSON.parse(response) as unknown;
     if (!Array.isArray(parsed)) return [];
 
     return parsed
-      .map((item: { index: number; label?: string; reason?: string }) => ({
+      .map(readLinkSuggestion)
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+      .map((item) => ({
         ...item,
         candidateIndex: item.index > 0 ? item.index - 1 : item.index,
       }))
       .filter((item) => Number.isInteger(item.candidateIndex) && topCandidates[item.candidateIndex])
       .map((item) => ({
-        targetNodeId: topCandidates[item.candidateIndex].node.id,
-        targetTitle: topCandidates[item.candidateIndex].node.title,
+        targetNodeId: topCandidates[item.candidateIndex]?.node.id ?? 0,
+        targetTitle: topCandidates[item.candidateIndex]?.node.title ?? "",
         label: item.label ?? "collegato",
         reason: item.reason ?? "",
-        score: topCandidates[item.candidateIndex].similarity,
+        score: topCandidates[item.candidateIndex]?.similarity ?? 0,
       }));
   } catch (err) {
     logger.warn({ err }, "auto-link failed");
@@ -85,9 +100,11 @@ function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
   let dot = 0, magA = 0, magB = 0;
   for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    magA += a[i] * a[i];
-    magB += b[i] * b[i];
+    const av = a[i] ?? 0;
+    const bv = b[i] ?? 0;
+    dot += av * bv;
+    magA += av * av;
+    magB += bv * bv;
   }
   const denom = Math.sqrt(magA) * Math.sqrt(magB);
   return denom === 0 ? 0 : dot / denom;

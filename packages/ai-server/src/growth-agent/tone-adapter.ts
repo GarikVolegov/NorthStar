@@ -99,7 +99,7 @@ const TONE_PROFILES: Record<string, ToneProfile> = {
 };
 
 /** Default fallback if journeyType is unknown */
-const DEFAULT_PROFILE = TONE_PROFILES["dipendente"];
+const DEFAULT_PROFILE = TONE_PROFILES["dipendente"]!;
 
 /**
  * Returns the ToneProfile for the given journeyType.

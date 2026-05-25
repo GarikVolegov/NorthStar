@@ -3,7 +3,6 @@ import { db, sectorsTable, professionsTable, growthArticlesTable, newsArticlesTa
 import { runGrowthAgent, type GrowthAgentOptions } from "../growth-agent/agent";
 import { routeQuery }                              from "../search-router/router";
 import { loadMemory, buildMemorySection }          from "../growth-agent/memory-manager";
-import { recordLlmUsage }                          from "../cost-tracking";
 import { logger }                                  from "../logger";
 import type { UserContext }                        from "../growth-agent/prompt-builder";
 import type { ChatMessage }                        from "../growth-agent/agent";

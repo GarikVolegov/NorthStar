@@ -1,6 +1,6 @@
+import { useWendy } from "@/contexts/WendyProvider";
 import { useEffect } from "react";
 import { useLocation } from "wouter";
-import { useWendy } from "@/contexts/WendyProvider";
 
 export default function Colloquio() {
   const wendy = useWendy();

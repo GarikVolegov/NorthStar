@@ -1,5 +1,5 @@
-import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (

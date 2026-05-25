@@ -1,3 +1,10 @@
+import { setInMemoryToken } from "@/lib/api-fetch";
+import { postJson } from "@/lib/apiClient";
+import { clientLogger } from "@/lib/clientLogger";
+import { AUTH_EXPIRED_EVENT, TOKEN_STORAGE_KEY } from "@/lib/storage-keys";
+import { useClerk, useAuth as useClerkAuth, useUser } from "@clerk/react";
+import { useQueryClient } from "@tanstack/react-query";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
 import {
   createContext,
   useCallback,
@@ -7,11 +14,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useAuth as useClerkAuth, useClerk, useUser } from "@clerk/react";
-import { setAuthTokenGetter } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { AUTH_EXPIRED_EVENT, TOKEN_STORAGE_KEY } from "@/lib/storage-keys";
-import { setInMemoryToken } from "@/lib/api-fetch";
 
 export interface AuthUser {
   id: number;
@@ -184,41 +186,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const res = await fetch(`${BASE}api/auth/clerk-sync`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${clerkToken}`,
-          },
-          body: JSON.stringify({
+        const data = await postJson<AuthUser & { northstar_token?: string }>(
+          `${BASE}api/auth/clerk-sync`,
+          {
             clerkId: clerkUser.id,
             email: clerkEmail,
             name: clerkUser.fullName ?? clerkUser.username ?? clerkEmail ?? "Utente",
             referralCode: readReferralCode(),
-          }),
-          signal: ctrl.signal,
-        });
-
-        if (!res.ok) {
-          let serverMessage = `Sincronizzazione fallita (${res.status}).`;
-          try {
-            const body = (await res.json()) as { error?: unknown };
-            if (typeof body.error === "string" && body.error.trim()) {
-              serverMessage = body.error;
-            }
-          } catch {
-            // Keep generic message.
-          }
-          if (import.meta.env.DEV) {
-            console.warn("[auth] clerk-sync failed", { status: res.status, error: serverMessage });
-          }
-          clearNorthStarSession();
-          setAuthSyncFailed(true);
-          setAuthSyncError(serverMessage);
-          return;
-        }
-
-        const data = (await res.json()) as AuthUser & { northstar_token?: string };
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${clerkToken}`,
+            },
+            signal: ctrl.signal,
+          },
+        );
         const { northstar_token: nsToken, ...serverUser } = data;
         if (!nsToken) {
           clearNorthStarSession();
@@ -240,9 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         if (ctrl.signal.aborted) return;
         const message = err instanceof Error ? err.message : "Errore di rete durante la sincronizzazione.";
-        if (import.meta.env.DEV) {
-          console.warn("[auth] clerk-sync request failed", err);
-        }
+        clientLogger.warn("[auth] clerk-sync request failed", { error: message });
         clearNorthStarSession();
         setAuthSyncFailed(true);
         setAuthSyncError(message);

@@ -1,5 +1,5 @@
 import {
-  pgTable, text, serial, timestamp, integer, boolean, jsonb,
+  pgTable, text, timestamp, integer, boolean, jsonb,
   index, uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
@@ -37,6 +37,36 @@ export const userProfileSettingsTable = pgTable("user_profile_settings", {
   city: text("city"),
   cityPlaceId: text("city_place_id"),
   bio: text("bio"),
+
+  // Sfondo personalizzabile post-login (Fase H)
+  // - activeBackgroundId: id del preset ("preset:<slug>") o entry utente ("user:<uuid>")
+  // - backgroundLibrary: array di BackgroundEntry (max 5) salvati come DataURL base64
+  activeBackgroundId: text("active_background_id"),
+  backgroundLibrary: jsonb("background_library").$type<Array<{
+    id: string;
+    dataUrl: string;
+    dataUrlMobile: string;
+    createdAt: string;
+    label?: string;
+    luma?: number;
+  }>>().default([]),
+  backgroundAppearance: jsonb("background_appearance").$type<{
+    mode: "auto" | "manual";
+    glassOpacity: number;
+    blur: number;
+    overlay: number;
+    saturation: number;
+    desktopPosition: "center" | "top" | "bottom";
+    mobilePosition: "center" | "top" | "bottom";
+  }>().default({
+    mode: "auto",
+    glassOpacity: 0.72,
+    blur: 18,
+    overlay: 0.32,
+    saturation: 1.08,
+    desktopPosition: "center",
+    mobilePosition: "center",
+  }),
 
   referredByCode: text("referred_by_code"),
   referredByAffiliateId: integer("referred_by_affiliate_id"),

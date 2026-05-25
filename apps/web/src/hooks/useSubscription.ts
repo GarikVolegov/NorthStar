@@ -7,10 +7,10 @@
  *   isTeam: boolean
  *   canAccess(feature): boolean — controlla accesso a feature gate
  */
-import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api-fetch";
 import { API_ENDPOINTS } from "@/lib/constants";
-import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
 
 export type Plan = "free" | "pro" | "team";
 

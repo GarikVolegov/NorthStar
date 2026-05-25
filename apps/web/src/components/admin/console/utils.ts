@@ -18,7 +18,8 @@ export function formatLastUpdated(iso: string | null) {
 export function formatValue(value: unknown): string {
   if (value == null) return "-";
   if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
   if (Array.isArray(value)) return value.map(formatValue).join(", ");
   return JSON.stringify(value);
 }
@@ -32,16 +33,32 @@ export function humanizeKey(key: string): string {
 
 export function payloadEntries(payload: Record<string, unknown> | null) {
   if (!payload) return [];
-  const hidden = new Set(["before", "after", "changes", "diff", "raw", "metadata"]);
+  const hidden = new Set([
+    "before",
+    "after",
+    "changes",
+    "diff",
+    "raw",
+    "metadata",
+  ]);
   return Object.entries(payload)
-    .filter(([key, value]) => !hidden.has(key) && value != null && typeof value !== "object")
+    .filter(
+      ([key, value]) =>
+        !hidden.has(key) && value != null && typeof value !== "object",
+    )
     .slice(0, 8);
 }
 
 export function payloadDiffs(payload: Record<string, unknown> | null) {
   if (!payload) return [];
-  const before = typeof payload.before === "object" && payload.before ? payload.before as Record<string, unknown> : null;
-  const after = typeof payload.after === "object" && payload.after ? payload.after as Record<string, unknown> : null;
+  const before =
+    typeof payload.before === "object" && payload.before
+      ? (payload.before as Record<string, unknown>)
+      : null;
+  const after =
+    typeof payload.after === "object" && payload.after
+      ? (payload.after as Record<string, unknown>)
+      : null;
   if (before && after) {
     return Array.from(new Set([...Object.keys(before), ...Object.keys(after)]))
       .filter((key) => formatValue(before[key]) !== formatValue(after[key]))
@@ -49,9 +66,16 @@ export function payloadDiffs(payload: Record<string, unknown> | null) {
       .map((key) => ({ key, before: before[key], after: after[key] }));
   }
 
-  const changes = Array.isArray(payload.changes) ? payload.changes : Array.isArray(payload.diff) ? payload.diff : [];
+  const changes = Array.isArray(payload.changes)
+    ? payload.changes
+    : Array.isArray(payload.diff)
+      ? payload.diff
+      : [];
   return changes
-    .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+    .filter(
+      (item): item is Record<string, unknown> =>
+        typeof item === "object" && item !== null,
+    )
     .slice(0, 8)
     .map((item, index) => ({
       key: String(item.field ?? item.key ?? `Cambio ${index + 1}`),
@@ -79,7 +103,10 @@ export function fmtShortDate(iso: string) {
   });
 }
 
-export function assigneeLabel(assignees: AdminAssignee[], id: number | null | undefined) {
+export function assigneeLabel(
+  assignees: AdminAssignee[],
+  id: number | null | undefined,
+) {
   if (!id) return "Non assegnato";
   const assignee = assignees.find((item) => item.id === id);
   return assignee ? assignee.name || assignee.email : `Admin #${id}`;
@@ -114,9 +141,11 @@ export function agentStatusLabel(status: AgentHealthStatus) {
 }
 
 export function agentStatusClass(status: AgentHealthStatus) {
-  if (status === "healthy") return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (status === "degraded") return "border-amber-200 bg-amber-50 text-amber-800";
-  return "border-red-200 bg-red-50 text-red-800";
+  if (status === "healthy")
+    return "border-success-muted bg-success-surface text-success";
+  if (status === "degraded")
+    return "border-warning-muted bg-warning-surface text-warning";
+  return "border-danger-muted bg-danger-surface text-danger";
 }
 
 export function recordValue(value: unknown): Record<string, unknown> {
@@ -127,10 +156,15 @@ export function recordValue(value: unknown): Record<string, unknown> {
 
 export function arrayRecords(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value)
-    ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+    ? value.filter(
+        (item): item is Record<string, unknown> =>
+          Boolean(item) && typeof item === "object" && !Array.isArray(item),
+      )
     : [];
 }
 
 export function stringList(value: unknown): string[] {
-  return Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean) : [];
+  return Array.isArray(value)
+    ? value.map((item) => String(item)).filter(Boolean)
+    : [];
 }

@@ -1,3 +1,6 @@
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   BarChart3,
   CheckCircle2,
@@ -7,9 +10,6 @@ import {
   ShieldAlert,
   Terminal,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { PersistenceWarningBanner } from "./shared";
 import type { WendyQualityOverview } from "./types";
 import { fmtDuration, fmtPct, fmtScore, fmtShortDate } from "./utils";
@@ -58,8 +58,15 @@ export function QualitySection({
             <option value="7">Ultimi 7 giorni</option>
             <option value="30">Ultimi 30 giorni</option>
           </select>
-          <Button variant="outline" onClick={onRefresh} disabled={loading} className="min-h-11">
-            <RefreshCw className={cn("w-4 h-4 mr-2", loading && "animate-spin")} />
+          <Button
+            variant="outline"
+            onClick={onRefresh}
+            disabled={loading}
+            className="min-h-11"
+          >
+            <RefreshCw
+              className={cn("w-4 h-4 mr-2", loading && "animate-spin")}
+            />
             Riprova
           </Button>
         </div>
@@ -68,7 +75,10 @@ export function QualitySection({
       {loading && !data ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {[0, 1, 2, 3, 4].map((item) => (
-            <div key={item} className="h-28 rounded-xl border bg-card animate-pulse" />
+            <div
+              key={item}
+              className="h-28 rounded-xl border bg-card animate-pulse"
+            />
           ))}
         </div>
       ) : !data ? (
@@ -87,7 +97,9 @@ export function QualitySection({
             {[
               {
                 label: "Score qualita",
-                value: fmtScore(data.summary.avgEvalScore ?? data.summary.avgSupervisorScore),
+                value: fmtScore(
+                  data.summary.avgEvalScore ?? data.summary.avgSupervisorScore,
+                ),
                 detail: `${data.summary.total.toLocaleString("it-IT")} turni`,
                 icon: CheckCircle2,
               },
@@ -120,11 +132,15 @@ export function QualitySection({
               return (
                 <div key={item.label} className="border rounded-xl p-4 bg-card">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-muted-foreground">{item.label}</span>
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {item.label}
+                    </span>
                     <Icon className="w-4 h-4 text-muted-foreground" />
                   </div>
                   <p className="text-2xl font-bold mt-2">{item.value}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{item.detail}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {item.detail}
+                  </p>
                 </div>
               );
             })}
@@ -135,14 +151,18 @@ export function QualitySection({
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
                   <p className="font-semibold">Alert qualita</p>
-                  <p className="text-xs text-muted-foreground">Soglie calcolate in tempo reale</p>
+                  <p className="text-xs text-muted-foreground">
+                    Soglie calcolate in tempo reale
+                  </p>
                 </div>
-                <Badge variant={data.alerts.length > 0 ? "destructive" : "secondary"}>
+                <Badge
+                  variant={data.alerts.length > 0 ? "destructive" : "secondary"}
+                >
                   {data.alerts.length} alert
                 </Badge>
               </div>
               {data.alerts.length === 0 ? (
-                <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-4 text-sm text-emerald-800">
+                <div className="rounded-lg bg-success-surface border border-success-muted p-4 text-sm text-success">
                   Nessun alert: Wendy e stabile nel periodo selezionato.
                 </div>
               ) : (
@@ -153,13 +173,16 @@ export function QualitySection({
                       className={cn(
                         "rounded-lg border p-3",
                         alert.level === "critical"
-                          ? "bg-red-50 border-red-200 text-red-900"
-                          : "bg-amber-50 border-amber-200 text-amber-900",
+                          ? "bg-danger-surface border-danger-muted text-danger"
+                          : "bg-warning-surface border-warning-muted text-warning",
                       )}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <p className="text-sm font-semibold">{alert.title}</p>
-                        <Badge variant="outline" className="capitalize bg-background/70">
+                        <Badge
+                          variant="outline"
+                          className="capitalize bg-background/70"
+                        >
                           {alert.level}
                         </Badge>
                       </div>
@@ -179,9 +202,14 @@ export function QualitySection({
               ) : (
                 <div className="space-y-2">
                   {data.rewriteReasons.slice(0, 6).map((reason) => (
-                    <div key={reason.reason} className="flex items-start justify-between gap-3 rounded-lg border p-3">
+                    <div
+                      key={reason.reason}
+                      className="flex items-start justify-between gap-3 rounded-lg border p-3"
+                    >
                       <p className="text-sm break-words">{reason.reason}</p>
-                      <Badge variant="outline" className="shrink-0">{reason.count}</Badge>
+                      <Badge variant="outline" className="shrink-0">
+                        {reason.count}
+                      </Badge>
                     </div>
                   ))}
                 </div>
@@ -193,7 +221,9 @@ export function QualitySection({
             <div className="flex items-center justify-between gap-3 mb-3">
               <div>
                 <p className="font-semibold">Trend nel tempo</p>
-                <p className="text-xs text-muted-foreground">Score, rewrite, chiarificazioni e latenza giornaliera</p>
+                <p className="text-xs text-muted-foreground">
+                  Score, rewrite, chiarificazioni e latenza giornaliera
+                </p>
               </div>
               <Badge variant="outline">{data.trends.length} giorni</Badge>
             </div>
@@ -207,15 +237,37 @@ export function QualitySection({
                   <div key={day.day} className="rounded-lg border p-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-medium">
-                        {new Date(day.day).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}
+                        {new Date(day.day).toLocaleDateString("it-IT", {
+                          day: "2-digit",
+                          month: "short",
+                        })}
                       </p>
-                      <span className="text-xs text-muted-foreground">{day.total} turni</span>
+                      <span className="text-xs text-muted-foreground">
+                        {day.total} turni
+                      </span>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                      <span>Score <strong>{fmtScore(day.avgEvalScore ?? day.avgSupervisorScore)}</strong></span>
-                      <span>Rewrite <strong>{fmtPct(day.rewriteRate)}</strong></span>
-                      <span>Chiarif. <strong>{fmtPct(day.clarificationRate)}</strong></span>
-                      <span>Latenza <strong>{day.avgLatencyMs ? fmtDuration(day.avgLatencyMs) : "N/D"}</strong></span>
+                      <span>
+                        Score{" "}
+                        <strong>
+                          {fmtScore(day.avgEvalScore ?? day.avgSupervisorScore)}
+                        </strong>
+                      </span>
+                      <span>
+                        Rewrite <strong>{fmtPct(day.rewriteRate)}</strong>
+                      </span>
+                      <span>
+                        Chiarif.{" "}
+                        <strong>{fmtPct(day.clarificationRate)}</strong>
+                      </span>
+                      <span>
+                        Latenza{" "}
+                        <strong>
+                          {day.avgLatencyMs
+                            ? fmtDuration(day.avgLatencyMs)
+                            : "N/D"}
+                        </strong>
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -235,21 +287,31 @@ export function QualitySection({
                   {data.domains.slice(0, 8).map((domain) => (
                     <div key={domain.domain} className="rounded-lg border p-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="font-medium text-sm capitalize truncate">{domain.domain}</p>
+                        <p className="font-medium text-sm capitalize truncate">
+                          {domain.domain}
+                        </p>
                         <Badge
                           variant="outline"
                           className={cn(
                             "capitalize",
-                            domain.status === "healthy" && "bg-emerald-50 text-emerald-700",
-                            domain.status === "attention" && "bg-amber-50 text-amber-700",
-                            domain.status === "critical" && "bg-red-50 text-red-700",
+                            domain.status === "healthy" &&
+                              "bg-success-surface text-success",
+                            domain.status === "attention" &&
+                              "bg-warning-surface text-warning",
+                            domain.status === "critical" &&
+                              "bg-danger-surface text-danger",
                           )}
                         >
                           {domain.status}
                         </Badge>
                       </div>
                       <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                        <span>Score {fmtScore(domain.avgEvalScore ?? domain.avgSupervisorScore)}</span>
+                        <span>
+                          Score{" "}
+                          {fmtScore(
+                            domain.avgEvalScore ?? domain.avgSupervisorScore,
+                          )}
+                        </span>
                         <span>{domain.total} turni</span>
                         <span>Rewrite {fmtPct(domain.rewriteRate)}</span>
                         <span>Tool {fmtPct(domain.toolUsageRate)}</span>
@@ -276,16 +338,30 @@ export function QualitySection({
                             {item.domain} / {item.intent}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            Sessione #{item.sessionId ?? "N/D"} - {fmtShortDate(item.createdAt)}
+                            Sessione #{item.sessionId ?? "N/D"} -{" "}
+                            {fmtShortDate(item.createdAt)}
                           </p>
                         </div>
-                        <Badge variant={item.source === "feedback" ? "destructive" : "outline"} className="shrink-0">
-                          {item.score != null ? fmtScore(item.score) : "feedback"}
+                        <Badge
+                          variant={
+                            item.source === "feedback"
+                              ? "destructive"
+                              : "outline"
+                          }
+                          className="shrink-0"
+                        >
+                          {item.score != null
+                            ? fmtScore(item.score)
+                            : "feedback"}
                         </Badge>
                       </div>
-                      <p className="text-xs mt-2 text-muted-foreground break-words">{item.snippet}</p>
+                      <p className="text-xs mt-2 text-muted-foreground break-words">
+                        {item.snippet}
+                      </p>
                       {item.reason && (
-                        <p className="text-xs mt-2 text-amber-700 break-words">Motivo: {item.reason}</p>
+                        <p className="text-xs mt-2 text-warning break-words">
+                          Motivo: {item.reason}
+                        </p>
                       )}
                     </div>
                   ))}

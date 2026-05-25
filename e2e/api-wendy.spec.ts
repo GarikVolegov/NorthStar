@@ -4,6 +4,13 @@
  */
 import { test, expect } from "@playwright/test";
 import { loginAsTestUser, TEST_API_URL } from "./helpers/auth";
+import { responseJson } from "./helpers/json";
+
+type CoachSession = {
+  id: number;
+  title: string;
+  messages: unknown[];
+};
 
 test.describe("Wendy Coach API", () => {
   let headers: Record<string, string>;
@@ -21,7 +28,7 @@ test.describe("Wendy Coach API", () => {
       },
     });
     expect(res.status()).toBe(201);
-    const body = await res.json();
+    const body = await responseJson<CoachSession>(res);
     expect(body).toHaveProperty("id");
     expect(body.title).toBe("Test E2E");
     expect(body.messages).toHaveLength(1);
@@ -30,7 +37,7 @@ test.describe("Wendy Coach API", () => {
   test("GET /api/coach/sessions — lists user sessions", async ({ request }) => {
     const res = await request.get(`${TEST_API_URL}/api/coach/sessions`, { headers });
     expect(res.status()).toBe(200);
-    const body = await res.json();
+    const body = await responseJson<unknown>(res);
     expect(Array.isArray(body)).toBe(true);
   });
 
@@ -40,7 +47,7 @@ test.describe("Wendy Coach API", () => {
       headers,
       data: { title: "Test SSE", firstMessage: "Chi sei?" },
     });
-    const session = await createRes.json();
+    const session = await responseJson<CoachSession>(createRes);
 
     // Ask
     const askRes = await request.post(`${TEST_API_URL}/api/coach/sessions/${session.id}/ask`, {
@@ -59,13 +66,26 @@ test.describe("Wendy Coach API", () => {
       headers,
       data: { title: "Da cancellare" },
     });
-    const session = await createRes.json();
+    const session = await responseJson<CoachSession>(createRes);
 
     const delRes = await request.delete(
       `${TEST_API_URL}/api/coach/sessions/${session.id}`,
       { headers },
     );
     expect(delRes.status()).toBe(204);
+  });
+
+  test("POST /api/ai/wendy — small talk locale risponde via SSE senza pipeline completa", async ({ request }) => {
+    const res = await request.post(`${TEST_API_URL}/api/ai/wendy`, {
+      headers,
+      data: { message: "come stai?" },
+    });
+    expect(res.status()).toBe(200);
+
+    const text = await res.text();
+    expect(text).toContain('"type":"token"');
+    expect(text).toContain("local-wendy-reply");
+    expect(text).not.toContain('"type":"error"');
   });
 
   test("POST /api/wendy/ask — RAG streaming endpoint", async ({ request }) => {

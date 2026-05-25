@@ -1,21 +1,13 @@
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -23,56 +15,47 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Loader2,
-  Trash2,
-  Bell,
-  Crown,
-  AlertTriangle,
-  ExternalLink,
-  BookOpen,
-  Map,
-} from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { ApiClientError } from "@/lib/apiClient";
+import { cn } from "@/lib/utils";
 import type {
   CalendarEvent,
   EventCategory,
   EventPriority,
   EventStatus,
 } from "@/pages/calendar";
-import { cn } from "@/lib/utils";
-import { apiFetch } from "@/lib/api-fetch";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import {
+  BookOpen,
+  Crown,
+  ExternalLink,
+  Loader2,
+  Map,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { CalendarReminderFields, FREE_REMINDER_MINUTES, PREMIUM_REMINDER_MINUTES } from "./CalendarioEventoModal.reminders";
+import { buildCalendarEventPayload, eventFormSchema, type EventFormValues } from "./CalendarioEventoModal.schema";
+import {
+  fetchCalendarQuota,
+  fetchObjectives,
+  fetchSectors,
+  getCalendarErrorCode,
+  getCalendarErrorText,
+  saveCalendarEvent,
+  type Objective,
+  type Sector,
+} from "./CalendarioEventoModal.api";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
-const PREMIUM_REMINDER_MINUTES = [10, 30, 120, 1440];
-const FREE_REMINDER_MINUTES = [30, 120];
 
-const eventFormSchema = z.object({
-  title: z.string().min(1, "Titolo obbligatorio").max(200),
-  description: z.string().max(2000).optional(),
-  startDate: z.string().min(1, "Data obbligatoria"),
-  startTime: z.string().optional(),
-  endDate: z.string().min(1, "Data obbligatoria"),
-  endTime: z.string().optional(),
-  allDay: z.boolean().default(false),
-  category: z.enum([
-    "study",
-    "training",
-    "interview",
-    "deadline",
-    "task",
-    "follow-up",
-  ] as const),
-  priority: z.enum(["low", "medium", "high"] as const),
-  status: z.enum(["todo", "in-progress", "done", "postponed"] as const),
-  linkedGoal: z.string().max(500).optional(),
-  linkedSectorId: z.string().optional(),
-});
-
-type EventFormValues = z.infer<typeof eventFormSchema>;
 
 interface Props {
   open: boolean;
@@ -82,19 +65,6 @@ interface Props {
   editingEvent: CalendarEvent | null;
   onSaved: () => void;
   onDeleted: (id: number) => void;
-}
-
-interface Sector {
-  id: number;
-  name: string;
-  icon: string;
-}
-
-interface Objective {
-  id: number;
-  text: string;
-  category: string;
-  completed: boolean;
 }
 
 export function CalendarioEventoModal({
@@ -116,15 +86,7 @@ export function CalendarioEventoModal({
 
   const { data: quotaData } = useQuery({
     queryKey: ["calendar-quota"],
-    queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/calendar/quota`);
-      if (!res.ok) return { isPremium: false };
-      return res.json() as Promise<{
-        isPremium: boolean;
-        eventCount: number;
-        eventLimit: number | null;
-      }>;
-    },
+    queryFn: () => fetchCalendarQuota(BASE),
     enabled: !!userId,
   });
   const isPremium = !!quotaData?.isPremium;
@@ -134,22 +96,13 @@ export function CalendarioEventoModal({
 
   const { data: sectors = [] } = useQuery<Sector[]>({
     queryKey: ["sectors-list"],
-    queryFn: async () => {
-      const res = await fetch(`${BASE}api/sectors`);
-      if (!res.ok) return [];
-      const data = await res.json();
-      return (data as Sector[]) ?? [];
-    },
+    queryFn: () => fetchSectors(BASE),
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: objectives = [] } = useQuery<Objective[]>({
     queryKey: ["objectives-me"],
-    queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/objectives/me`);
-      if (!res.ok) return [];
-      return res.json() as Promise<Objective[]>;
-    },
+    queryFn: () => fetchObjectives(BASE),
     enabled: !!userId,
     staleTime: 1000 * 60 * 5,
   });
@@ -238,75 +191,17 @@ export function CalendarioEventoModal({
     setReminderToggles((prev) => ({ ...prev, [minutes]: !prev[minutes] }));
   };
 
-  const buildPayload = (values: EventFormValues) => {
-    const localToUtc = (date: string, time: string) =>
-      new Date(`${date}T${time || "00:00"}`).toISOString();
-
-    const startAt = values.allDay
-      ? `${values.startDate}T00:00:00.000Z`
-      : localToUtc(values.startDate, values.startTime || "00:00");
-    const endAt = values.allDay
-      ? `${values.endDate}T23:59:59.000Z`
-      : localToUtc(values.endDate, values.endTime || "23:59");
-
-    const reminders = PREMIUM_REMINDER_MINUTES.filter(
-      (m) => reminderToggles[m],
-    ).map((m) => ({ minutesBefore: m, enabled: true }));
-
-    return {
-      title: values.title,
-      description: values.description || null,
-      startAt,
-      endAt,
-      allDay: values.allDay,
-      category: values.category,
-      priority: values.priority,
-      status: values.status,
-      linkedGoal: values.linkedGoal || null,
-      linkedSectorId: values.linkedSectorId
-        ? parseInt(values.linkedSectorId, 10)
-        : null,
-      reminders,
-    };
-  };
 
   const onSubmit = async (values: EventFormValues) => {
     setSaving(true);
     try {
-      const payload = buildPayload(values);
+      const payload = buildCalendarEventPayload(values, reminderToggles);
       const url = editingEvent
         ? `${BASE}api/calendar/events/${editingEvent.id}`
         : `${BASE}api/calendar/events`;
       const method = editingEvent ? "PATCH" : "POST";
 
-      const res = await apiFetch(url, {
-        method,
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (data.code === "FREE_LIMIT_REACHED") {
-          toast({
-            title: t("calendar.freeLimitTitle"),
-            description: data.message,
-            variant: "destructive",
-          });
-        } else if (data.code === "PREMIUM_REQUIRED") {
-          toast({
-            title: t("calendar.premiumFeatureTitle"),
-            description: t("calendar.premiumFeatureDesc"),
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: t("calendar.errorTitle"),
-            description: data.error || t("calendar.errorSaving"),
-            variant: "destructive",
-          });
-        }
-        return;
-      }
+      await saveCalendarEvent(url, method, payload);
 
       toast({
         title: editingEvent
@@ -316,7 +211,30 @@ export function CalendarioEventoModal({
       });
       onSaved();
       onOpenChange(false);
-    } catch {
+    } catch (error) {
+      if (error instanceof ApiClientError) {
+        const code = getCalendarErrorCode(error.body);
+        if (code === "FREE_LIMIT_REACHED") {
+          toast({
+            title: t("calendar.freeLimitTitle"),
+            description: getCalendarErrorText(error.body, "message") ?? undefined,
+            variant: "destructive",
+          });
+        } else if (code === "PREMIUM_REQUIRED") {
+          toast({
+            title: t("calendar.premiumFeatureTitle"),
+            description: t("calendar.premiumFeatureDesc"),
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: t("calendar.errorTitle"),
+            description: getCalendarErrorText(error.body, "error") ?? t("calendar.errorSaving"),
+            variant: "destructive",
+          });
+        }
+        return;
+      }
       toast({ title: t("calendar.networkError"), variant: "destructive" });
     } finally {
       setSaving(false);
@@ -329,12 +247,6 @@ export function CalendarioEventoModal({
     (s) => s.id.toString() === selectedSectorId,
   );
 
-  const reminderLabels: Record<number, string> = {
-    10: t("calendar.remindersLabels.10"),
-    30: t("calendar.remindersLabels.30"),
-    120: t("calendar.remindersLabels.120"),
-    1440: t("calendar.remindersLabels.1440"),
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -346,7 +258,6 @@ export function CalendarioEventoModal({
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          {/* Title */}
           <div>
             <Label htmlFor="title">{t("calendar.title")}</Label>
             <Input
@@ -362,7 +273,6 @@ export function CalendarioEventoModal({
             )}
           </div>
 
-          {/* Description */}
           <div>
             <Label htmlFor="description">{t("calendar.description")}</Label>
             <Textarea
@@ -648,59 +558,12 @@ export function CalendarioEventoModal({
             )}
           </div>
 
-          {/* Reminders */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Bell className="h-4 w-4 text-primary" />
-              <Label>{t("calendar.reminders")}</Label>
-            </div>
-            <div className="space-y-2">
-              {PREMIUM_REMINDER_MINUTES.map((minutes) => {
-                const isAllowed = allowedReminders.includes(minutes);
-                const isActive = !!reminderToggles[minutes];
-                return (
-                  <div
-                    key={minutes}
-                    className={cn(
-                      "flex items-center justify-between px-3 py-2 rounded-lg border",
-                      !isAllowed && "opacity-60",
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">{reminderLabels[minutes]}</span>
-                      {!isAllowed && (
-                        <Badge
-                          variant="outline"
-                          className="text-xs gap-1 text-amber-600 border-amber-300"
-                        >
-                          <Crown className="h-3 w-3" /> Premium
-                        </Badge>
-                      )}
-                    </div>
-                    <Switch
-                      checked={isActive}
-                      onCheckedChange={() => toggleReminder(minutes)}
-                      disabled={!isAllowed}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-            {showUpgradeHint && (
-              <div className="flex items-start gap-2 mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200">
-                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-700">
-                  {t("calendar.premiumReminders")}{" "}
-                  <a
-                    href={`${BASE}premium`}
-                    className="font-semibold underline"
-                  >
-                    {t("calendar.upgradePremium")}
-                  </a>
-                </p>
-              </div>
-            )}
-          </div>
+          <CalendarReminderFields
+            allowedReminders={allowedReminders}
+            reminderToggles={reminderToggles}
+            toggleReminder={toggleReminder}
+            showUpgradeHint={showUpgradeHint}
+          />
 
           <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
             {editingEvent && (

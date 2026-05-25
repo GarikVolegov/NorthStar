@@ -1,16 +1,16 @@
-import { useState, useEffect } from "react";
-import { usePageMeta } from "@/lib/seo";
 import { NewsGridSkeleton } from "@/components/skeletons/NewsCardSkeleton";
-import { useQuery, useQueryClient, useMutation, keepPreviousData } from "@tanstack/react-query";
-import { Newspaper, ExternalLink, Clock, Tag, Sparkles, RefreshCw, Bookmark, BookmarkCheck, Bell, BellOff, TrendingUp, Eye } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Link, useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
+import { deleteJson, getJson, postJson } from "@/lib/apiClient";
+import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bell, BellOff, Bookmark, BookmarkCheck, Clock, ExternalLink, Newspaper, RefreshCw, Sparkles, Tag } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { apiFetch } from "@/lib/api-fetch";
+import { Link, useLocation } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -25,6 +25,10 @@ interface ProfileData {
   exploredSectors: Array<{ sectorId: number; name: string; icon: string; confirmed: boolean }>;
 }
 
+interface NewsSubscriptionsResponse {
+  subscriptions?: string[];
+}
+
 const CATEGORY_CONFIG = [
   { id: "general",    emoji: "🌍", gradient: "from-blue-500/20 to-blue-600/10" },
   { id: "technology", emoji: "💻", gradient: "from-cyan-500/20 to-blue-600/10" },
@@ -35,7 +39,6 @@ const CATEGORY_CONFIG = [
   { id: "education",  emoji: "🎓", gradient: "from-indigo-500/20 to-blue-600/10" },
 ] as const;
 
-const CATEGORY_IDS = CATEGORY_CONFIG.map((c) => c.id);
 const NEWS_STALE_MS = 15 * 60_000;
 
 function timeAgoLabel(dateStr: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
@@ -57,7 +60,7 @@ function CategoryFallbackImage({ category, emoji }: { category: string; emoji: s
   );
 }
 
-function SubscribeToggle({ category, subscribed, onToggle }: { category: string; subscribed: boolean; onToggle: () => void }) {
+export function SubscribeToggle({ category, subscribed, onToggle }: { category: string; subscribed: boolean; onToggle: () => void }) {
   const { t } = useTranslation();
   const config = CATEGORY_CONFIG.find((c) => c.id === category);
 
@@ -103,13 +106,14 @@ function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boole
         articleTitle: item.title,
         articleDescription: item.description,
         articleSource: item.source,
-        articleImage: item.image ?? undefined,
         articleCategory: item.category,
+        ...(item.image ? { articleImage: item.image } : {}),
       });
     }
   }
 
   const catLabel = t(`news.categories.${item.category}`, { defaultValue: item.category });
+  const tr = (key: string, opts?: Record<string, unknown>) => opts ? t(key, opts) : t(key);
 
   return (
     <article
@@ -144,7 +148,7 @@ function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boole
             <Badge variant="secondary" className="text-xs font-medium">{catLabel}</Badge>
             <span className="text-xs text-muted-foreground flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              {timeAgoLabel(item.publishedAt, t)}
+              {timeAgoLabel(item.publishedAt, tr)}
             </span>
           </div>
           {showSave && user && (
@@ -223,10 +227,7 @@ export default function News() {
 
   const { data: profile } = useQuery<ProfileData>({
     queryKey: ["profile", user?.id],
-    queryFn: async () => {
-      const res = await fetch(`${BASE}api/profile/${user!.id}`);
-      return res.json();
-    },
+    queryFn: () => getJson<ProfileData>(`${BASE}api/profile/${user!.id}`),
     enabled: !!user?.id && user.id > 0,
     staleTime: 5 * 60_000,
   });
@@ -237,10 +238,12 @@ export default function News() {
   const { data: subsData } = useQuery<string[]>({
     queryKey: ["news-subscriptions", user?.id],
     queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/news/subscriptions`);
-      if (!res.ok) return [];
-      const json = await res.json();
-      return json.subscriptions ?? [];
+      try {
+        const json = await getJson<NewsSubscriptionsResponse>(`${BASE}api/news/subscriptions`);
+        return json.subscriptions ?? [];
+      } catch {
+        return [];
+      }
     },
     enabled: !!user?.id && user.id > 0,
     staleTime: 60_000,
@@ -250,13 +253,9 @@ export default function News() {
   const subMutation = useMutation({
     mutationFn: async ({ category, subscribe }: { category: string; subscribe: boolean }) => {
       if (subscribe) {
-        await apiFetch(`${BASE}api/news/subscriptions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ category }),
-        });
+        await postJson(`${BASE}api/news/subscriptions`, { category });
       } else {
-        await apiFetch(`${BASE}api/news/subscriptions/${category}`, { method: "DELETE" });
+        await deleteJson(`${BASE}api/news/subscriptions/${category}`);
       }
     },
     onSuccess: () => {
@@ -275,37 +274,26 @@ export default function News() {
     CATEGORY_CONFIG.forEach(({ id }) => {
       queryClient.prefetchQuery({
         queryKey: ["news", id],
-        queryFn: async () => {
-          const res = await fetch(`${BASE}api/news?category=${id}&limit=12`);
-          if (!res.ok) throw new Error("error");
-          return res.json() as Promise<{ news: NewsItem[]; source: "live" | "static" }>;
-        },
+        queryFn: () => getJson<{ news: NewsItem[]; source: "live" | "static" }>(`${BASE}api/news?category=${id}&limit=12`),
         staleTime: NEWS_STALE_MS,
       });
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!confirmedSector) return;
     queryClient.prefetchQuery({
       queryKey: ["news", "sector", confirmedSector.name],
-      queryFn: async () => {
-        const res = await fetch(`${BASE}api/news/sector/${encodeURIComponent(confirmedSector.name)}?limit=12`);
-        if (!res.ok) throw new Error();
-        return res.json() as Promise<{ news: NewsItem[]; source: "live" | "static" }>;
-      },
+      queryFn: () => getJson<{ news: NewsItem[]; source: "live" | "static" }>(
+        `${BASE}api/news/sector/${encodeURIComponent(confirmedSector.name)}?limit=12`,
+      ),
       staleTime: NEWS_STALE_MS,
     });
   }, [confirmedSector?.name, queryClient]);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["news", activeTab],
-    queryFn: async () => {
-      const res = await fetch(`${BASE}api/news?category=${activeTab}&limit=12`);
-      if (!res.ok) throw new Error("error");
-      return res.json() as Promise<{ news: NewsItem[]; source: "live" | "static" }>;
-    },
+    queryFn: () => getJson<{ news: NewsItem[]; source: "live" | "static" }>(`${BASE}api/news?category=${activeTab}&limit=12`),
     enabled: activeTab !== "__sector__",
     staleTime: NEWS_STALE_MS,
     placeholderData: keepPreviousData,
@@ -313,11 +301,9 @@ export default function News() {
 
   const { data: sectorNewsData, isLoading: sectorLoading } = useQuery({
     queryKey: ["news", "sector", confirmedSector?.name],
-    queryFn: async () => {
-      const res = await fetch(`${BASE}api/news/sector/${encodeURIComponent(confirmedSector!.name)}?limit=12`);
-      if (!res.ok) throw new Error();
-      return res.json() as Promise<{ news: NewsItem[]; source: "live" | "static" }>;
-    },
+    queryFn: () => getJson<{ news: NewsItem[]; source: "live" | "static" }>(
+      `${BASE}api/news/sector/${encodeURIComponent(confirmedSector!.name)}?limit=12`,
+    ),
     enabled: !!confirmedSector,
     staleTime: NEWS_STALE_MS,
     placeholderData: keepPreviousData,

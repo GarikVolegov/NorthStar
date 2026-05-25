@@ -16,7 +16,7 @@
 import 'dotenv/config';
 import { execSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { resolve, relative } from 'path';
+import { resolve } from 'path';
 import OpenAI from 'openai';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -235,7 +235,9 @@ async function main() {
 
   for (let i = 0; i < batches.length; i++) {
     console.log(`🔎  Analisi batch ${i + 1}/${batches.length}...`);
-    const result = await analyzeFiles(client, batches[i]);
+    const batch = batches[i];
+    if (!batch) continue;
+    const result = await analyzeFiles(client, batch);
     allFindings.push(...result.findings);
     allRules.push(...result.rules);
   }

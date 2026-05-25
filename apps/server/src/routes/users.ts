@@ -2,19 +2,57 @@ import { Router } from "express";
 import { eq, and, or, like, sql, ne } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 const { sign } = jwt;
-import { db, pool, usersTable, userProfileSettingsTable, friendshipsTable } from "@workspace/db";
+import {
+  db,
+  pool,
+  usersTable,
+  userProfileSettingsTable,
+  friendshipsTable,
+} from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
-import { isPersistenceSchemaError, sendOptionalReadFallback, sendPersistenceWriteError } from "../lib/persistence";
+import {
+  isPersistenceSchemaError,
+  sendOptionalReadFallback,
+  sendPersistenceWriteError,
+} from "../lib/persistence";
+import { JWT_SECRET } from "../lib/jwt-secret";
+import { getRequestBody } from "../lib/request-context";
+import { asPlainRecord } from "../lib/type-guards";
 
 const router = Router();
 
-const JWT_SECRET: string = process.env.JWT_SECRET ?? "";
+type PublicUserRow = {
+  id: number;
+  name: string;
+  email: string;
+  avatarUrl: string | null;
+  createdAt: Date;
+  journeyType: string;
+  isPublic: boolean | null;
+  workPreference: string | null;
+  bannerUrl: string | null;
+  bio: string | null;
+  city: string | null;
+  userMode: string | null;
+};
 
 function generateToken(userId: number): string {
   return sign({ userId }, JWT_SECRET, { expiresIn: "7d" });
 }
 
-async function upsertProfileSettings(userId: number, values: Partial<typeof userProfileSettingsTable.$inferInsert>) {
+function readString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function readInteger(value: unknown): number | null {
+  const numberValue = Number(value);
+  return Number.isInteger(numberValue) ? numberValue : null;
+}
+
+async function upsertProfileSettings(
+  userId: number,
+  values: Partial<typeof userProfileSettingsTable.$inferInsert>,
+) {
   const now = new Date();
   await db
     .insert(userProfileSettingsTable)
@@ -28,7 +66,11 @@ async function upsertProfileSettings(userId: number, values: Partial<typeof user
 /* ─── POST /api/users  —  registrazione rapida (solo nome + email) ── */
 router.post("/", async (req, res) => {
   try {
-    const { name, email, testSessionId } = req.body;
+    const body = asPlainRecord(getRequestBody(req));
+    const name = readString(body.name);
+    const email = readString(body.email);
+    const normalizedEmail = email?.toLowerCase() ?? null;
+    const testSessionId = readInteger(body.testSessionId);
     if (!name || !email) {
       res.status(400).json({ error: "Nome e email richiesti" });
       return;
@@ -36,31 +78,43 @@ router.post("/", async (req, res) => {
 
     const { rows: existing } = await pool.query<{ id: number }>(
       `SELECT id FROM users WHERE lower(email) = $1 LIMIT 1`,
-      [email.toLowerCase()],
+      [normalizedEmail],
     );
 
     if (existing.length > 0) {
-      const token = generateToken(existing[0].id);
+      const existingUser = existing[0];
+      if (!existingUser) {
+        res.status(500).json({ error: "Errore durante la registrazione" });
+        return;
+      }
+      const token = generateToken(existingUser.id);
       res.json({
-        id: existing[0].id,
+        id: existingUser.id,
         name,
-        email: email.toLowerCase(),
+        email: normalizedEmail,
         token,
       });
       return;
     }
 
     const { rows: user } = await pool.query<{
-      id: number; name: string; email: string;
-      test_session_id: number | null; created_at: string;
+      id: number;
+      name: string;
+      email: string;
+      test_session_id: number | null;
+      created_at: string;
     }>(
       `INSERT INTO users (name, email, email_verified, test_session_id)
        VALUES ($1, $2, true, $3)
        RETURNING id, name, email, test_session_id, created_at`,
-      [name, email.toLowerCase(), testSessionId ?? null],
+      [name, normalizedEmail, testSessionId],
     );
 
     const u = user[0];
+    if (!u) {
+      res.status(500).json({ error: "Errore durante la registrazione" });
+      return;
+    }
     const token = generateToken(u.id);
 
     res.status(201).json({
@@ -91,10 +145,14 @@ router.patch("/onboarding", requireAuth, async (req, res) => {
 /* ─── GET /api/users/:userId/public  —  profilo pubblico ──────────── */
 router.get("/:userId/public", async (req, res) => {
   try {
-    const targetId = parseInt(req.params.userId, 10);
-    const viewerId = req.query.viewerId ? parseInt(req.query.viewerId as string, 10) : null;
+    const targetId = readInteger(req.params.userId);
+    const viewerId = readInteger(req.query.viewerId);
+    if (targetId === null) {
+      res.status(400).json({ error: "ID utente non valido" });
+      return;
+    }
 
-    let user;
+    let user: PublicUserRow | undefined;
     try {
       [user] = await db
         .select({
@@ -112,12 +170,18 @@ router.get("/:userId/public", async (req, res) => {
           userMode: userProfileSettingsTable.userMode,
         })
         .from(usersTable)
-        .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
+        .leftJoin(
+          userProfileSettingsTable,
+          eq(usersTable.id, userProfileSettingsTable.userId),
+        )
         .where(eq(usersTable.id, targetId))
         .limit(1);
     } catch (err) {
       if (!isPersistenceSchemaError(err)) throw err;
-      req.log?.warn?.({ err, route: "users.public", targetId, setupAction: "run_migrations" }, "profile settings unavailable");
+      req.log?.warn?.(
+        { err, route: "users.public", targetId, setupAction: "run_migrations" },
+        "profile settings unavailable",
+      );
       const [baseUser] = await db
         .select({
           id: usersTable.id,
@@ -131,7 +195,15 @@ router.get("/:userId/public", async (req, res) => {
         .where(eq(usersTable.id, targetId))
         .limit(1);
       user = baseUser
-        ? { ...baseUser, isPublic: false, workPreference: "unknown", bannerUrl: null, bio: null, city: null, userMode: "explorer" }
+        ? {
+            ...baseUser,
+            isPublic: false,
+            workPreference: "unknown",
+            bannerUrl: null,
+            bio: null,
+            city: null,
+            userMode: "explorer",
+          }
         : undefined;
     }
 
@@ -148,7 +220,10 @@ router.get("/:userId/public", async (req, res) => {
     if (viewerId && viewerId !== targetId) {
       try {
         const { rows: friendships } = await pool.query<{
-          id: number; status: string; requester_id: number; receiver_id: number;
+          id: number;
+          status: string;
+          requester_id: number;
+          receiver_id: number;
         }>(
           `SELECT id, status, requester_id, receiver_id
            FROM friendships
@@ -169,7 +244,16 @@ router.get("/:userId/public", async (req, res) => {
         }
       } catch (err) {
         if (!isPersistenceSchemaError(err)) throw err;
-        req.log?.warn?.({ err, route: "users.public.friendship", targetId, viewerId, setupAction: "run_migrations" }, "friendships unavailable");
+        req.log?.warn?.(
+          {
+            err,
+            route: "users.public.friendship",
+            targetId,
+            viewerId,
+            setupAction: "run_migrations",
+          },
+          "friendships unavailable",
+        );
       }
     }
 
@@ -214,13 +298,18 @@ router.get("/:userId/public", async (req, res) => {
 
 /* ─── PATCH /api/users/:userId/privacy  —  imposta privacy ────────── */
 router.patch("/:userId/privacy", requireAuth, async (req, res) => {
-  const targetId = parseInt(req.params.userId, 10);
+  const targetId = readInteger(req.params.userId);
+  if (targetId === null) {
+    res.status(400).json({ error: "ID utente non valido" });
+    return;
+  }
   if (targetId !== req.user!.id) {
     res.status(403).json({ error: "Accesso negato" });
     return;
   }
 
-  const { isPublic } = req.body;
+  const body = asPlainRecord(getRequestBody(req));
+  const isPublic = body.isPublic;
   if (typeof isPublic !== "boolean") {
     res.status(400).json({ error: "isPublic deve essere boolean" });
     return;
@@ -231,14 +320,15 @@ router.patch("/:userId/privacy", requireAuth, async (req, res) => {
     res.json({ isPublic });
   } catch (err) {
     req.log?.error?.({ err }, "privacy update error");
-    if (sendPersistenceWriteError(req, res, err, "users.privacy.update")) return;
+    if (sendPersistenceWriteError(req, res, err, "users.privacy.update"))
+      return;
     res.status(500).json({ error: "Errore nel salvataggio privacy" });
   }
 });
 
 /* ─── GET /api/users/search  —  cerca utenti per nome/email ───────── */
 router.get("/search", requireAuth, async (req, res) => {
-  const q = req.query.q as string;
+  const q = readString(req.query.q);
   const userId = req.user!.id;
 
   if (!q || q.length < 2) {
@@ -254,13 +344,15 @@ router.get("/search", requireAuth, async (req, res) => {
       friendId: sql<number>`CASE WHEN ${friendshipsTable.requesterId} = ${userId} THEN ${friendshipsTable.receiverId} ELSE ${friendshipsTable.requesterId} END`,
     })
     .from(friendshipsTable)
-    .where(and(
-      or(
-        eq(friendshipsTable.requesterId, userId),
-        eq(friendshipsTable.receiverId, userId),
+    .where(
+      and(
+        or(
+          eq(friendshipsTable.requesterId, userId),
+          eq(friendshipsTable.receiverId, userId),
+        ),
+        eq(friendshipsTable.status, "accepted"),
       ),
-      eq(friendshipsTable.status, "accepted"),
-    ));
+    );
 
   const friendIdSet = new Set(friendIds.map((r) => r.friendId));
 
@@ -274,44 +366,59 @@ router.get("/search", requireAuth, async (req, res) => {
       city: userProfileSettingsTable.city,
     })
     .from(usersTable)
-    .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
-    .where(and(
-      ne(usersTable.id, userId),
-      or(
-        like(usersTable.name, likePattern),
-        like(usersTable.email, likePattern),
-        like(userProfileSettingsTable.city, likePattern),
+    .leftJoin(
+      userProfileSettingsTable,
+      eq(usersTable.id, userProfileSettingsTable.userId),
+    )
+    .where(
+      and(
+        ne(usersTable.id, userId),
+        or(
+          like(usersTable.name, likePattern),
+          like(usersTable.email, likePattern),
+          like(userProfileSettingsTable.city, likePattern),
+        ),
+        or(
+          eq(userProfileSettingsTable.isPublic, true),
+          sql`${usersTable.id} = ANY(${friendIdSet.size > 0 ? [...friendIdSet] : [0]}::int[])`,
+        ),
       ),
-      or(
-        eq(userProfileSettingsTable.isPublic, true),
-        sql`${usersTable.id} = ANY(${friendIdSet.size > 0 ? [...friendIdSet] : [0]}::int[])`,
-      ),
-    ))
+    )
     .limit(20);
 
   // Arricchisci con friendship status
-  const users = await Promise.all(found.map(async (u) => {
-    const [fs] = await db
-      .select()
-      .from(friendshipsTable)
-      .where(or(
-        and(eq(friendshipsTable.requesterId, userId), eq(friendshipsTable.receiverId, u.id)),
-        and(eq(friendshipsTable.requesterId, u.id), eq(friendshipsTable.receiverId, userId)),
-      ))
-      .limit(1);
+  const users = await Promise.all(
+    found.map(async (u) => {
+      const [fs] = await db
+        .select()
+        .from(friendshipsTable)
+        .where(
+          or(
+            and(
+              eq(friendshipsTable.requesterId, userId),
+              eq(friendshipsTable.receiverId, u.id),
+            ),
+            and(
+              eq(friendshipsTable.requesterId, u.id),
+              eq(friendshipsTable.receiverId, userId),
+            ),
+          ),
+        )
+        .limit(1);
 
-    return {
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      isPublic: u.isPublic,
-      avatarUrl: u.avatarUrl,
-      city: u.city,
-      friendshipId: fs?.id ?? null,
-      friendshipStatus: fs?.status ?? null,
-      iAmRequester: fs ? fs.requesterId === userId : null,
-    };
-  }));
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        isPublic: u.isPublic,
+        avatarUrl: u.avatarUrl,
+        city: u.city,
+        friendshipId: fs?.id ?? null,
+        friendshipStatus: fs?.status ?? null,
+        iAmRequester: fs ? fs.requesterId === userId : null,
+      };
+    }),
+  );
 
   res.json({ users });
 });
@@ -328,7 +435,12 @@ router.get("/me/work-preference", requireAuth, async (req, res) => {
     res.json({ workPreference: profile?.workPreference ?? "unknown" });
   } catch (err) {
     req.log?.error?.({ err }, "work-preference get error");
-    if (sendOptionalReadFallback(req, res, err, "users.workPreference.get", { workPreference: "unknown" })) return;
+    if (
+      sendOptionalReadFallback(req, res, err, "users.workPreference.get", {
+        workPreference: "unknown",
+      })
+    )
+      return;
     res.status(500).json({ error: "Errore nel caricamento preferenza" });
   }
 });
@@ -337,9 +449,11 @@ router.get("/me/work-preference", requireAuth, async (req, res) => {
 router.patch("/me/work-preference", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
-    const { workPreference } = req.body;
-    if (!workPreference || typeof workPreference !== "string") {
-      res.status(400).json({ error: "workPreference richiesto" }); return;
+    const body = asPlainRecord(getRequestBody(req));
+    const workPreference = readString(body.workPreference);
+    if (!workPreference) {
+      res.status(400).json({ error: "workPreference richiesto" });
+      return;
     }
 
     await upsertProfileSettings(userId, { workPreference });
@@ -347,7 +461,8 @@ router.patch("/me/work-preference", requireAuth, async (req, res) => {
     res.json({ workPreference });
   } catch (err) {
     req.log?.error?.({ err }, "work-preference update error");
-    if (sendPersistenceWriteError(req, res, err, "users.workPreference.update")) return;
+    if (sendPersistenceWriteError(req, res, err, "users.workPreference.update"))
+      return;
     res.status(500).json({ error: "Errore nel salvataggio preferenza" });
   }
 });

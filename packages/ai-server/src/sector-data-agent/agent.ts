@@ -10,11 +10,11 @@
  * Eseguito: settimanale via cron (apps/server/src/jobs/cron.ts) o
  * manualmente via POST /api/admin/agents/sector-data.
  */
-import { eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, sectorsTable, professionsTable } from "@workspace/db";
 import { getLLM } from "../llm/client";
 import { selectModelFor } from "../model-router";
-import { estimateTokens, estimateCost, recordLlmUsage } from "../cost-tracking";
+import { estimateTokens, recordLlmUsage } from "../cost-tracking";
 import { logger } from "../logger";
 
 export interface SectorDataResult {
@@ -36,6 +36,17 @@ interface ProfessionEnrichment {
   skills:        string[];
   growthOutlook: string;
   salaryRange:   string;
+}
+
+const SECTOR_TRENDS = ["declining", "stable", "growing", "booming"] as const;
+const AUTOMATION_RISKS = ["low", "medium", "high"] as const;
+
+function isSectorTrend(value: unknown): value is SectorEnrichment["trend"] {
+  return typeof value === "string" && SECTOR_TRENDS.some((item) => item === value);
+}
+
+function isAutomationRisk(value: unknown): value is SectorEnrichment["automationRisk"] {
+  return typeof value === "string" && AUTOMATION_RISKS.some((item) => item === value);
 }
 
 const ENRICH_SECTOR_PROMPT = (name: string, desc: string) => `
@@ -96,14 +107,14 @@ async function enrichSector(
     const jsonStart = raw.indexOf("{");
     const jsonEnd   = raw.lastIndexOf("}");
     if (jsonStart === -1 || jsonEnd === -1) return false;
-    const data: SectorEnrichment = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
+    const data = JSON.parse(raw.slice(jsonStart, jsonEnd + 1)) as Partial<SectorEnrichment>;
 
     await db.update(sectorsTable).set({
       skills:         Array.isArray(data.skills) ? data.skills.slice(0, 10) : [],
       opportunities:  Array.isArray(data.opportunities) ? data.opportunities.slice(0, 5) : [],
-      trend:          ["declining","stable","growing","booming"].includes(data.trend) ? data.trend : "stable",
+      trend:          isSectorTrend(data.trend) ? data.trend : "stable",
       growthRate:     typeof data.growthRate === "number" ? Math.max(0, Math.min(1, data.growthRate)) : 0.1,
-      automationRisk: ["low","medium","high"].includes(data.automationRisk) ? data.automationRisk : "medium",
+      automationRisk: isAutomationRisk(data.automationRisk) ? data.automationRisk : "medium",
     }).where(eq(sectorsTable.id, sector.id));
 
     return true;
@@ -141,7 +152,7 @@ async function enrichProfession(
     const jsonStart = raw.indexOf("{");
     const jsonEnd   = raw.lastIndexOf("}");
     if (jsonStart === -1 || jsonEnd === -1) return false;
-    const data: ProfessionEnrichment = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
+    const data = JSON.parse(raw.slice(jsonStart, jsonEnd + 1)) as Partial<ProfessionEnrichment>;
 
     await db.update(professionsTable).set({
       skills:        Array.isArray(data.skills) ? data.skills.slice(0, 8) : [],

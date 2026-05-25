@@ -1,20 +1,32 @@
-import { useState, useRef, useEffect } from "react";
-import { useTranslation } from "react-i18next";
-import { Link } from "wouter";
-import { useAuth } from "@/contexts/AuthContext";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useWebSocket } from "@/hooks/useWebSocket";
-import { useChatEncryption } from "@/hooks/useChatEncryption";
 import { ChatDrawer } from "@/components/chat/ChatDrawer";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Users, UserPlus, Search, Check, X, Loader2, Star,
-  UserCheck, Clock, Globe, Lock, Trash2, ExternalLink,
-  UserMinus, ChevronRight, MessageCircle, Shield,
-} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { deleteJson, getJson, patchJson, postJson } from "@/lib/apiClient";
+import { useChatEncryption } from "@/hooks/useChatEncryption";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import { cn } from "@/lib/utils";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Check,
+  Clock,
+  ExternalLink,
+  Globe,
+  Loader2,
+  Lock,
+  MessageCircle,
+  Search,
+  UserCheck,
+  UserMinus,
+  UserPlus,
+  Users,
+  X
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
+import { Avatar, EmptyState, LoadingGrid } from "./amici-components";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -29,7 +41,6 @@ interface FriendEntry {
   isPublic: boolean;
   createdAt?: string;
 }
-
 interface SearchResult {
   id: number;
   name: string;
@@ -48,10 +59,6 @@ interface ChatMessage {
   readAt?: string | null;
 }
 
-function initials(name: string) {
-  return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
-}
-
 function useFormatRelDate() {
   const { t, i18n } = useTranslation();
   return (iso: string) => {
@@ -59,21 +66,11 @@ function useFormatRelDate() {
     if (d === 0) return t("amici.today");
     if (d === 1) return t("amici.yesterday");
     if (d < 7) return `${d}d`;
-    return new Date(iso).toLocaleDateString(i18n.language, { day: "numeric", month: "short" });
+    return new Date(iso).toLocaleDateString(i18n.language, {
+      day: "numeric",
+      month: "short",
+    });
   };
-}
-
-const AVATAR_COLORS = [
-  "bg-violet-100 text-violet-700",
-  "bg-blue-100 text-blue-700",
-  "bg-emerald-100 text-emerald-700",
-  "bg-amber-100 text-amber-700",
-  "bg-rose-100 text-rose-700",
-  "bg-cyan-100 text-cyan-700",
-];
-
-function avatarColor(id: number) {
-  return AVATAR_COLORS[id % AVATAR_COLORS.length];
 }
 
 /* ═══════════════════════════════════════════════════════════════════════ */
@@ -120,8 +117,9 @@ export default function Amici() {
   const { data: friendsData, isLoading: friendsLoading } = useQuery({
     queryKey: ["friends", user?.id],
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/friends/${user!.id}`);
-      return res.json() as Promise<{ friends: FriendEntry[]; incoming: FriendEntry[]; outgoing: FriendEntry[] }>;
+      return getJson<{ friends: FriendEntry[]; incoming: FriendEntry[]; outgoing: FriendEntry[] }>(
+        `${BASE}api/friends/${user!.id}`,
+      );
     },
     enabled: !!user?.id,
   });
@@ -129,8 +127,9 @@ export default function Amici() {
   const { data: searchData, isLoading: searchLoading } = useQuery({
     queryKey: ["users-search", debouncedSearch, user?.id],
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/users/search?q=${encodeURIComponent(debouncedSearch)}&userId=${user!.id}`);
-      return res.json() as Promise<{ users: SearchResult[] }>;
+      return getJson<{ users: SearchResult[] }>(
+        `${BASE}api/users/search?q=${encodeURIComponent(debouncedSearch)}&userId=${user!.id}`,
+      );
     },
     enabled: !!user?.id && debouncedSearch.length >= 2,
   });
@@ -142,8 +141,9 @@ export default function Amici() {
       const friends = friendsData?.friends ?? [];
       const counts: Record<number, number> = {};
       for (const f of friends) {
-        const res = await fetch(`${BASE}api/friends/messages/${f.friendshipId}?limit=100`);
-        const data = await res.json();
+        const data = await getJson<{ messages?: ChatMessage[] }>(
+          `${BASE}api/friends/messages/${f.friendshipId}?limit=100`,
+        );
         const msgs: ChatMessage[] = data.messages ?? [];
         counts[f.friendshipId] = msgs.filter((m) => m.senderId !== user!.id && !m.readAt).length;
       }
@@ -162,37 +162,28 @@ export default function Amici() {
 
   const sendRequestMutation = useMutation({
     mutationFn: async (receiverId: number) => {
-      const res = await fetch(`${BASE}api/friends/request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: user!.id, receiverId }),
-      });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Errore"); }
-      return res.json();
+      return postJson(`${BASE}api/friends/request`, { requesterId: user!.id, receiverId });
     },
     onSuccess: () => { invalidateFriends(); invalidateSearch(); },
   });
 
   const acceptMutation = useMutation({
     mutationFn: async (friendshipId: number) => {
-      const res = await fetch(`${BASE}api/friends/${friendshipId}/accept`, { method: "PATCH" });
-      if (!res.ok) throw new Error("Errore");
+      await patchJson(`${BASE}api/friends/${friendshipId}/accept`);
     },
     onSuccess: () => { invalidateFriends(); invalidateSearch(); },
   });
 
   const rejectMutation = useMutation({
     mutationFn: async (friendshipId: number) => {
-      const res = await fetch(`${BASE}api/friends/${friendshipId}/reject`, { method: "PATCH" });
-      if (!res.ok) throw new Error("Errore");
+      await patchJson(`${BASE}api/friends/${friendshipId}/reject`);
     },
     onSuccess: () => { invalidateFriends(); invalidateSearch(); },
   });
 
   const removeMutation = useMutation({
     mutationFn: async (friendshipId: number) => {
-      const res = await fetch(`${BASE}api/friends/${friendshipId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Errore");
+      await deleteJson(`${BASE}api/friends/${friendshipId}`);
     },
     onSuccess: () => { invalidateFriends(); invalidateSearch(); },
   });
@@ -445,15 +436,6 @@ export default function Amici() {
 
 /* ── Sub-components ────────────────────────────────────────────────────── */
 
-function Avatar({ name, userId, size = "md" }: { name: string; userId: number; size?: "sm" | "md" | "lg" }) {
-  const sizeClass = { sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-14 h-14 text-xl" }[size];
-  return (
-    <div className={cn("rounded-full flex items-center justify-center font-bold shrink-0", sizeClass, avatarColor(userId))}>
-      {initials(name)}
-    </div>
-  );
-}
-
 function FriendCard({ friend, isOnline, unreadCount, onChat, onRemove, removing }: {
   friend: FriendEntry; isOnline: boolean; unreadCount: number;
   onChat: () => void; onRemove: () => void; removing: boolean;
@@ -571,35 +553,6 @@ function SearchResultCard({ user, onSendRequest, onCancel, sendingRequest, cance
           </Button>
         )}
       </div>
-    </div>
-  );
-}
-
-function EmptyState({ icon, title, desc, action }: {
-  icon: React.ReactNode; title: string; desc: string; action?: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-muted/60 flex items-center justify-center mb-4">{icon}</div>
-      <h3 className="text-base font-semibold mb-1">{title}</h3>
-      <p className="text-sm text-muted-foreground max-w-xs mb-5">{desc}</p>
-      {action}
-    </div>
-  );
-}
-
-function LoadingGrid({ rows = 4 }: { rows?: number }) {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="bg-background rounded-2xl border p-4 flex items-center gap-3 animate-pulse">
-          <div className="w-10 h-10 rounded-full bg-muted shrink-0" />
-          <div className="flex-1 space-y-2">
-            <div className="h-3.5 bg-muted rounded w-32" />
-            <div className="h-3 bg-muted rounded w-48" />
-          </div>
-        </div>
-      ))}
     </div>
   );
 }

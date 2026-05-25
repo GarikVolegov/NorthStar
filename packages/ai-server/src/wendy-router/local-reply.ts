@@ -68,7 +68,7 @@ const IDENTITY_MESSAGES = new Set([
   "aiutami a capire cosa puoi fare",
 ]);
 
-const LOCAL_REPLIES: Record<LocalWendyReplyKind, string> = {
+export const LOCAL_REPLIES: Record<LocalWendyReplyKind, string> = {
   greeting: "Ciao. Ci sono. Dimmi pure cosa vuoi capire o sistemare in NorthStar.",
   wellbeing: "Ci sono. Meglio quando posso aiutarti a sciogliere un nodo concreto. Dimmi pure cosa vuoi sistemare.",
   thanks: "Figurati. Quando vuoi, riprendiamo da qui.",
@@ -77,6 +77,11 @@ const LOCAL_REPLIES: Record<LocalWendyReplyKind, string> = {
 };
 
 export function getLocalWendyReply(message: string): LocalWendyReply | null {
+  void message;
+  return null;
+}
+
+export function getLocalWendyFallbackReply(message: string): LocalWendyReply | null {
   const normalized = normalizeLocalMessage(message);
 
   if (GREETING_MESSAGES.has(normalized)) return { kind: "greeting", text: LOCAL_REPLIES.greeting };
@@ -89,5 +94,5 @@ export function getLocalWendyReply(message: string): LocalWendyReply | null {
 }
 
 export function isLocalWendyReplyMessage(message: string): boolean {
-  return getLocalWendyReply(message) !== null;
+  return getLocalWendyFallbackReply(message) !== null;
 }

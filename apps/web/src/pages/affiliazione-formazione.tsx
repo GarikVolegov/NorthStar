@@ -1,9 +1,9 @@
-import { Link } from "wouter";
-import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/lib/seo";
-import { BookOpen, CheckCircle2, ArrowRight, Brain, Compass, BarChart3, TrendingUp, Award } from "lucide-react";
+import { ArrowRight, Award, BarChart3, BookOpen, Brain, CheckCircle2, Compass, TrendingUp } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 export default function AffiliazioneFormazione() {
   const { t } = useTranslation();

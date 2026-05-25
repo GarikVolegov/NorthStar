@@ -46,7 +46,7 @@ import { logger } from "../logger";
 import { openai } from "../client";
 import { db }     from "@workspace/db";
 import { discoveryItemsTable } from "@workspace/db";
-import { eq, and, lt, isNull, or, asc, desc, sql } from "drizzle-orm";
+import { eq, and, lt, desc } from "drizzle-orm";
 import type { DiscoveryItem } from "@workspace/db";
 import { selectModelFor } from "../model-router";
 
@@ -152,7 +152,7 @@ async function pLimit<T>(
   tasks:       Array<() => Promise<T>>,
   concurrency: number,
 ): Promise<Array<T | Error>> {
-  const results: Array<T | Error> = new Array(tasks.length);
+  const results: Array<T | Error> = new Array<T | Error>(tasks.length);
   let index = 0;
 
   async function worker() {

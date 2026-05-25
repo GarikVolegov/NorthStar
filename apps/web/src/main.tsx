@@ -1,8 +1,10 @@
+import { ClerkProvider } from "@clerk/react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import "./index.css";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./i18n";
-import { ClerkProvider } from "@clerk/react";
+import "./index.css";
+import "./lib/sentry";
 
 /**
  * Registra il Service Worker in idle time, non al caricamento iniziale.
@@ -70,12 +72,20 @@ const clerkAppearance = {
   },
 };
 
+const env = import.meta.env as unknown as Record<string, unknown>;
+const clerkPublishableKey =
+  typeof env.VITE_CLERK_PUBLISHABLE_KEY === "string"
+    ? env.VITE_CLERK_PUBLISHABLE_KEY
+    : "";
+
 createRoot(document.getElementById("root")!).render(
   <ClerkProvider
-    publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}
+    publishableKey={clerkPublishableKey}
     afterSignOutUrl="/"
     appearance={clerkAppearance}
   >
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </ClerkProvider>
 );

@@ -24,7 +24,7 @@ function toLevel(score: number): { level: string; levelEmoji: string } {
 
 router.get("/:userId", requireAuth, async (req, res) => {
   try {
-    const userId = parseInt(req.params.userId, 10);
+    const userId = parseInt(req.params.userId ?? "", 10);
     if (isNaN(userId)) {
       res.status(400).json({ error: "userId non valido" });
       return;

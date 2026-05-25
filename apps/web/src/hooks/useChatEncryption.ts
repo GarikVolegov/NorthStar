@@ -1,6 +1,6 @@
+import { getJson, postJson } from "@/lib/apiClient";
+import { get, set } from "idb-keyval";
 import { useCallback } from "react";
-import { get, set, del } from "idb-keyval";
-import { apiFetch } from "@/lib/api-fetch";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -42,7 +42,7 @@ export async function storePrivateKey(userId: number, privateKeyB64: string): Pr
 }
 
 export async function getPrivateKey(userId: number): Promise<CryptoKey | null> {
-  const b64 = await get(`rsa-priv-${userId}`);
+  const b64 = await get<string>(`rsa-priv-${userId}`);
   if (!b64) return null;
 
   return crypto.subtle.importKey(
@@ -141,18 +141,14 @@ export async function decryptMessage(
 /* ─── API helpers ──────────────────────────────────────────────────── */
 
 export async function fetchPublicKey(userId: number): Promise<string> {
-  const res = await apiFetch(`${BASE}api/friends/keys/${userId}`);
-  if (!res.ok) throw new Error("Chiave non trovata");
-  const data = await res.json();
-  return data.publicKey as string;
+  const data = await getJson<{ publicKey: string }>(
+    `${BASE}api/friends/keys/${userId}`,
+  );
+  return data.publicKey;
 }
 
 export async function uploadPublicKey(publicKey: string): Promise<void> {
-  await apiFetch(`${BASE}api/friends/keys`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ publicKey }),
-  });
+  await postJson(`${BASE}api/friends/keys`, { publicKey });
 }
 
 export async function exchangeKeys(
@@ -160,18 +156,18 @@ export async function exchangeKeys(
   keyForRequester: string,
   keyForReceiver: string,
 ): Promise<void> {
-  await apiFetch(`${BASE}api/friends/keys/exchange`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ friendshipId, keyForRequester, keyForReceiver }),
+  await postJson(`${BASE}api/friends/keys/exchange`, {
+    friendshipId,
+    keyForRequester,
+    keyForReceiver,
   });
 }
 
 export async function fetchEncryptedKey(friendshipId: number): Promise<string> {
-  const res = await apiFetch(`${BASE}api/friends/keys/exchange/${friendshipId}`);
-  if (!res.ok) throw new Error("Chiave conversazione non trovata");
-  const data = await res.json();
-  return data.encryptedKey as string;
+  const data = await getJson<{ encryptedKey: string }>(
+    `${BASE}api/friends/keys/exchange/${friendshipId}`,
+  );
+  return data.encryptedKey;
 }
 
 /* ─── Hook React ──────────────────────────────────────────────────── */
@@ -179,7 +175,7 @@ export async function fetchEncryptedKey(friendshipId: number): Promise<string> {
 export function useChatEncryption(userId: number | null) {
   const ensureKeys = useCallback(async () => {
     if (!userId) return;
-    const existing = await get(`rsa-priv-${userId}`);
+    const existing = await get<string>(`rsa-priv-${userId}`);
     if (existing) return true;
 
     const { publicKey, privateKey } = await generateRsaKeyPair();

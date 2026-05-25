@@ -2,7 +2,7 @@ import { Router } from "express";
 import { eq, sql, and } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
-import { XP_REWARDS, XP_PER_LEVEL, xpProgress, DAILY_LIMITS } from "./xp-constants";
+import { XP_REWARDS, xpProgress, DAILY_LIMITS } from "./xp-constants";
 
 const router = Router();
 router.use(requireAuth);

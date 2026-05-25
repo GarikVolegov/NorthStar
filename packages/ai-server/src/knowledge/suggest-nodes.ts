@@ -9,6 +9,10 @@ export interface NodeSuggestion {
   reason: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export async function suggestMissingNodes(
   existingNodes: Array<{ title: string; type: string; content: string }>,
   sectorName?: string,
@@ -42,13 +46,16 @@ Rispondi SOLO con un array JSON nel formato:
       "suggest-nodes",
     );
 
-    const parsed = JSON.parse(response);
+    const parsed = JSON.parse(response) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.slice(0, 3).map((item: { title?: string; type?: string; reason?: string }) => ({
-      title: item.title ?? "Nuovo nodo",
-      type: item.type ?? "user_note",
-      reason: item.reason ?? "",
-    }));
+    return parsed.slice(0, 3).map((item) => {
+      const record = isRecord(item) ? item : {};
+      return {
+        title: typeof record.title === "string" ? record.title : "Nuovo nodo",
+        type: typeof record.type === "string" ? record.type : "user_note",
+        reason: typeof record.reason === "string" ? record.reason : "",
+      };
+    });
   } catch (err) {
     logger.warn({ err }, "suggest-nodes failed");
     return [];

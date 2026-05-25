@@ -7,19 +7,121 @@ Per la mappa fisica del monorepo e le regole di posizionamento dei file, vedi
 
 ---
 
+## System Overview (C4 livello 2)
+
+```mermaid
+flowchart LR
+  user[Utente / Admin]
+  web[apps/web<br/>React + Vite]
+  server[apps/server<br/>Express API]
+  ai[packages/ai-server<br/>Growth Agent + Wendy]
+  db[(PostgreSQL + pgvector<br/>Drizzle schema)]
+  redis[(Redis<br/>cache + rate limit)]
+  sentry[Sentry / OTel<br/>errori + tracing]
+  clerk[Clerk JWKS<br/>auth fallback]
+  llm[LLM provider<br/>OpenAI / Groq / OpenRouter]
+
+  user --> web
+  web -->|apiFetch + JWT / SSE| server
+  server -->|requireAuth / requireAdmin| db
+  server -->|rate limit + cache| redis
+  server -->|Wendy, RAG, tools| ai
+  ai -->|retrieve pgvector| db
+  ai -->|JS fallback / circuit breaker| db
+  ai -->|chat, embeddings, TTS| llm
+  server -->|Clerk token verify fallback| clerk
+  server --> sentry
+  ai --> sentry
+```
+
+### Flusso request principale
+
+1. Il frontend Vite usa `apiFetch` per inviare JWT e normalizzare 401.
+2. `apps/server` valida JWT NorthStar; se fallisce, prova fallback Clerk via JWKS e risolve `clerkId` su DB.
+3. Le route server accedono a PostgreSQL via Drizzle e a Redis per cache/rate limit.
+4. Le route AI/Wendy chiamano `packages/ai-server` per routing, memoria, RAG e generazione.
+5. Metriche Prometheus e Sentry/OTel osservano API, RAG, fallback e failure.
+
+### Flusso RAG
+
+1. Fonti admin/RSS/PDF vengono indicizzate in `rag_sources` e `rag_chunks`.
+2. `retrieve()` valida embedding e tenta pgvector.
+3. Se pgvector fallisce, il circuit breaker/fallback JS evita un errore cieco.
+4. Le metriche `rag_*` alimentano `/api/admin/wendy-metrics` e la sezione "RAG Core".
+5. Se non ci sono chunk affidabili, Wendy deve dichiarare dati insufficienti invece di inventare.
+
+### Autenticazione
+
+- Auth primaria: JWT NorthStar emesso da `apps/server/src/routes/auth.ts`.
+- Auth fallback: token Clerk verificato con JWKS e mappato su `users.clerkId`.
+- Autorizzazione admin: `requireAuth` + `requireAdmin`.
+- Il frontend conserva token/sessione via `AuthContext` e passa sempre da `apiFetch`.
+
+---
+
+## Bounded Context
+
+| Context | Route Prefix | Service Layer | Descrizione |
+| --- | --- | --- | --- |
+| Core Journey | `/api/profile`, `/api/test-sessions`, `/api/roadmap`, `/api/journey-type` | `services/journey/` | Profilo utente, test orientamento, roadmap e tipo percorso |
+| Knowledge | `/api/knowledge`, `/api/wiki`, `/api/admin/rag` | `services/knowledge/` | Base di conoscenza, memory graph, RAG e strumenti admin RAG |
+| AI Coach | `/api/wendy`, `/api/ai/wendy`, `/api/coach` | `services/wendy/` | Wendy AI, coach, memoria, prompt e proactive insights |
+| Content | `/api/news`, `/api/crescita`, `/api/trending-sectors` | `services/content/` | News, articoli crescita, cataloghi editoriali e trending |
+| Social | `/api/friends`, `/api/social`, `/api/leaderboard` | `services/social/` | Amici, messaggi, social feed e gamification |
+| Monetization | `/api/subscription`, `/api/affiliate`, `/api/affiliazione` | `services/monetization/` | Stripe, piani, affiliate program e referral |
+| Admin | `/api/admin`, `/api/admin/rag`, `/api/ml` | `services/admin/` | Pannello admin, monitoring, cataloghi, ops e quality |
+| Personal Intelligence | `/api/openhuman`, `/api/graphify` | `lib/personal-intelligence-context.ts` | Bridge server-side per memoria personale e knowledge graph progetto |
+
+La fonte runtime dei mount point server e` `apps/server/src/route-config.ts`; la tabella generata vive in [`docs/api-routes.md`](./docs/api-routes.md).
+
+---
+
+## Frontend Structure
+
+- `apps/web/src/route-config.ts` contiene le route principali React, con guard e layout dichiarativi.
+- `apps/web/src/RouterFromConfig.tsx` applica lazy loading, `ProtectedRoute`, `PublicOnlyRoute`, `ErrorBoundary` e `Suspense`.
+- `apps/web/src/layouts/MainLayout.tsx` contiene Navbar, MobileBottomNav, Footer e padding mobile/desktop.
+- `apps/web/src/layouts/AdminLayout.tsx` e `PlainLayout.tsx` coprono superfici speciali senza navigazione pubblica.
+- `apps/web/src/App.tsx` mantiene solo escape hatch esplicite: Clerk path routing, admin special routes, certificati e redirect legacy.
+
+Per aggiungere una pagina ordinaria:
+
+1. Aggiungi il componente in `apps/web/src/pages/`.
+2. Aggiungi una voce in `apps/web/src/route-config.ts`.
+3. Scegli `guard: "public" | "publicOnly" | "protected"`.
+4. Scegli `layout: "default" | "admin" | "plain"`.
+5. Usa `PATHS` da `apps/web/src/route-paths.ts` quando il path e` condiviso.
+
+---
+
+## Come aggiungere una nuova feature
+
+1. Definisci il bounded context di appartenenza.
+2. Crea service in `apps/server/src/services/<context>/`.
+3. Crea repo in `apps/server/src/repos/<context>/` se la feature usa DB o storage esterno.
+4. Crea route in `apps/server/src/routes/<name>.ts` come thin wrapper HTTP.
+5. Aggiungi la route a `apps/server/src/route-config.ts` con auth level e descrizione.
+6. Rigenera `docs/api-routes.md` con `pnpm run docs:api-routes`.
+7. Crea page/component in `apps/web/src/pages/` o `components/`.
+8. Aggiungi la route frontend in `apps/web/src/route-config.ts`.
+9. Scrivi test unitari per il service senza DB reale.
+10. Esegui `pnpm run quality:required`.
+
+---
+
 ## Stack tecnologico effettivo
 
-| Layer | Tecnologia |
-|---|---|
-| Frontend | React 18 + Vite + TypeScript |
-| Styling | Tailwind CSS + shadcn/ui (Radix UI) |
-| Router | wouter |
-| State | React Context + TanStack Query v5 |
+| Layer    | Tecnologia                              |
+| -------- | --------------------------------------- |
+| Frontend | React 18 + Vite + TypeScript            |
+| Styling  | Tailwind CSS + shadcn/ui (Radix UI)     |
+| Router   | wouter                                  |
+| State    | React Context + TanStack Query v5       |
 | Realtime | EventBus (BroadcastChannel) + WebSocket |
-| Backend | Express + Node.js + TypeScript |
-| DB | PostgreSQL (Neon) + Drizzle ORM |
-| Cache | Redis (ioredis) |
-| AI | OpenRouter / Groq / OpenAI via SSE |
+| Backend  | Express + Node.js + TypeScript          |
+| DB       | PostgreSQL (Neon) + Drizzle ORM         |
+| Cache    | Redis (ioredis)                         |
+| AI       | OpenRouter / Groq / OpenAI via SSE      |
 
 ---
 
@@ -70,9 +172,12 @@ Query con React Query:
 ```typescript
 const { data } = useQuery({
   queryKey: ["feature", id],
-  queryFn:  () => apiFetch(withParams(API_ENDPOINTS.myFeature.detail, { id })).then(r => r.json()),
+  queryFn: () =>
+    apiFetch(withParams(API_ENDPOINTS.myFeature.detail, { id })).then((r) =>
+      r.json(),
+    ),
   staleTime: 5 * 60 * 1000, // default globale in App.tsx
-  enabled:  !!user,
+  enabled: !!user,
 });
 ```
 
@@ -97,7 +202,7 @@ bus.emit("page:message", { to: "wendy-chat", body: "apri modale" });
 
 // Ricezione messaggi:
 usePageModule({
-  pageId:    "wendy-chat",
+  pageId: "wendy-chat",
   onMessage: (e) => console.log("ricevuto:", e.payload),
 });
 ```
@@ -153,13 +258,13 @@ Config in `knip.json` (root). Output è solo report — nessun delete automatico
 
 I pattern OOP sono documentati con `@pattern` nei file chiave:
 
-| Pattern | File | Uso |
-|---|---|---|
-| **Singleton + Observer + BroadcastChannel** | `lib/event-bus.ts` | Cross-tab sync, messaging inter-pagina |
-| **Factory + Registry** | `growth-agent/specialist-agent.ts` | Creazione/lookup agenti AI per dominio |
-| **Template Method** | `components/ErrorBoundary.tsx` | Lifecycle React (getDerivedStateFromError → render) |
-| **Singleton + Ring Buffer** | `lib/execution-monitor.ts` | Aggregazione errori server |
-| **Observer + cleanup** | `hooks/usePageBus.ts` | Sottoscrizione con unsubscribe automatico |
+| Pattern                                     | File                               | Uso                                                 |
+| ------------------------------------------- | ---------------------------------- | --------------------------------------------------- |
+| **Singleton + Observer + BroadcastChannel** | `lib/event-bus.ts`                 | Cross-tab sync, messaging inter-pagina              |
+| **Factory + Registry**                      | `growth-agent/specialist-agent.ts` | Creazione/lookup agenti AI per dominio              |
+| **Template Method**                         | `components/ErrorBoundary.tsx`     | Lifecycle React (getDerivedStateFromError → render) |
+| **Singleton + Ring Buffer**                 | `lib/execution-monitor.ts`         | Aggregazione errori server                          |
+| **Observer + cleanup**                      | `hooks/usePageBus.ts`              | Sottoscrizione con unsubscribe automatico           |
 
 ---
 
@@ -210,11 +315,11 @@ Prima di fare merge di una nuova pagina:
 
 ## Convenzioni di naming
 
-| Tipo | Convention | Esempio |
-|---|---|---|
-| Pagine | `kebab-case.tsx` | `admin-rag.tsx` |
-| Componenti | `PascalCase.tsx` | `ProactiveInsightCard.tsx` |
-| Hook | `camelCase.ts` con prefisso `use` | `usePageModule.ts` |
-| Costanti | `UPPER_SNAKE_CASE` | `API_ENDPOINTS`, `ROUTES` |
-| Route backend | `kebab-case.ts` | `rag-admin.ts` |
-| Schema DB | `camelCase.ts` con suffix `Table` | `ragChunksTable` |
+| Tipo          | Convention                        | Esempio                    |
+| ------------- | --------------------------------- | -------------------------- |
+| Pagine        | `kebab-case.tsx`                  | `admin-rag.tsx`            |
+| Componenti    | `PascalCase.tsx`                  | `ProactiveInsightCard.tsx` |
+| Hook          | `camelCase.ts` con prefisso `use` | `usePageModule.ts`         |
+| Costanti      | `UPPER_SNAKE_CASE`                | `API_ENDPOINTS`, `ROUTES`  |
+| Route backend | `kebab-case.ts`                   | `rag-admin.ts`             |
+| Schema DB     | `camelCase.ts` con suffix `Table` | `ragChunksTable`           |

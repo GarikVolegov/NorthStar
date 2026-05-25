@@ -7,6 +7,7 @@
  * PRIVACY: content deve contenere SOLO testo pubblico — nessun PII.
  */
 import { db, ragChunksTable, ragSourcesTable } from "@workspace/db";
+import { upsertRoutingKey } from "./sparse-retriever";
 import { eq } from "drizzle-orm";
 import { embedBatch } from "../growth-agent/embedder";
 import { logger } from "../logger";
@@ -14,10 +15,10 @@ import { logger } from "../logger";
 export interface IndexOptions {
   sourceId:    number;
   docType:     "report" | "news" | "job_agg" | "generic";
-  geography?:  string[];
-  sectors?:    string[];
-  roles?:      string[];
-  publishedAt?: Date;
+  geography?:  string[] | undefined;
+  sectors?:    string[] | undefined;
+  roles?:      string[] | undefined;
+  publishedAt?: Date | undefined;
 }
 
 export interface IndexResult {
@@ -90,6 +91,9 @@ export async function indexChunks(
     .update(ragSourcesTable)
     .set({ lastIngestedAt: new Date(), updatedAt: new Date() })
     .where(eq(ragSourcesTable.id, opts.sourceId));
+
+  // Calcola routing key (centroide MSA) — non blocca in caso di errore
+  await upsertRoutingKey(opts.sourceId);
 
   const durationMs = Date.now() - t0;
   logger.info({ sourceId: opts.sourceId, chunksIndexed: totalInserted, durationMs }, "[indexer] indexing complete");

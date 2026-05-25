@@ -1,7 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useLocation } from "wouter";
-import { useTranslation } from "react-i18next";
-import { m, AnimatePresence } from "framer-motion";
+import { WendyThinkingIndicator } from "@/components/WendyThinkingIndicator";
 import {
   Command,
   CommandEmpty,
@@ -10,35 +7,26 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import type { SearchResult, RouterOutput, AiSource } from "@/hooks/useGlobalSearch";
+import { useWendy } from "@/contexts/WendyProvider";
+import type { RouterOutput, SearchResult } from "@/hooks/useGlobalSearch";
+import { useWendyChat } from "@/hooks/useWendyChat";
+import { cn } from "@/lib/utils";
+import { SearchChatComposer } from "./SearchChatComposer";
+import { ORDER, SUGGESTIONS_DEFAULTS, TYPE_CONFIG } from "./searchDialogConfig";
+import { useSearchDialogMobile } from "./useSearchDialogMobile";
+import { WendyMessageBubble } from "./WendyMessageBubble";
+import { WendyEmptyState } from "@/components/wendy/WendyEmptyState";
+import { AnimatePresence, m, useDragControls } from "framer-motion";
 import {
-  Briefcase,
-  BookOpenText,
-  Newspaper,
-  Layers,
+  Lightbulb,
+  RotateCcw,
+  Search,
   Sparkles,
   TrendingUp,
-  Lightbulb,
-  ChevronDown,
-  ChevronRight,
-  Send,
-  Search,
-  Calendar,
-  BadgeCheck,
-  Brain,
-  Target,
-  User,
-  Users,
-  Mic,
-  RotateCcw,
-  Square,
 } from "lucide-react";
-import { useWendy } from "@/contexts/WendyProvider";
-import { cn } from "@/lib/utils";
-import { useWendyChat, type ChatMessage as WendyMessage } from "@/hooks/useWendyChat";
-import { WendyThinkingIndicator } from "@/components/WendyThinkingIndicator";
-import { WendyActionCard } from "@/components/wendy/WendyActionCard";
-import { UiToolRenderer } from "@/components/wendy/UiToolRenderer";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useLocation } from "wouter";
 
 interface SearchDialogProps {
   query: string;
@@ -56,114 +44,6 @@ interface SearchDialogProps {
   trackClick: (result: SearchResult) => void;
 }
 
-const TYPE_CONFIG = {
-  sector:  { labelKey: "search.sectors",  icon: Layers,       className: "text-blue-400 bg-blue-500/10"   },
-  role:    { labelKey: "search.roles",    icon: Briefcase,    className: "text-green-400 bg-green-500/10" },
-  article: { labelKey: "search.articles", icon: BookOpenText, className: "text-amber-400 bg-amber-500/10" },
-  news:    { labelKey: "search.news",     icon: Newspaper,    className: "text-purple-400 bg-purple-500/10"},
-  idea:    { labelKey: "Idee",             icon: Lightbulb,    className: "text-yellow-400 bg-yellow-500/10"},
-  objective: { labelKey: "Obiettivi",      icon: Target,       className: "text-emerald-400 bg-emerald-500/10"},
-  calendar: { labelKey: "Calendario",      icon: Calendar,     className: "text-cyan-400 bg-cyan-500/10"},
-  certification: { labelKey: "Certificazioni", icon: BadgeCheck, className: "text-blue-400 bg-blue-500/10"},
-  memory:  { labelKey: "Memoria Wendy",    icon: Brain,        className: "text-violet-400 bg-violet-500/10"},
-  workspace: { labelKey: "Workspace",      icon: Users,        className: "text-teal-400 bg-teal-500/10"},
-  profile: { labelKey: "Profilo",          icon: User,         className: "text-slate-400 bg-slate-500/10"},
-} as const;
-
-const SUGGESTIONS_DEFAULTS = [
-  { title: "Esplora i settori",   description: "Scopri tutti i settori disponibili",      url: "/settori" },
-  { title: "Fai il test",         description: "Scopri la tua personalità professionale", url: "/test"    },
-  { title: "Trend di mercato",    description: "Le ultime tendenze del lavoro",           url: "/news"    },
-  { title: "Chiedi a Wendy",      description: "Parla con l'assistente AI di NorthStar",  url: "#wendy"   },
-];
-
-const ORDER: Array<keyof typeof TYPE_CONFIG> = [
-  "idea",
-  "objective",
-  "calendar",
-  "memory",
-  "workspace",
-  "profile",
-  "certification",
-  "sector",
-  "role",
-  "article",
-  "news",
-];
-
-// ── Micro components ────────────────────────────────────────────────────────
-
-function SourcesAccordion({ sources }: { sources: AiSource[] }) {
-  const [open, setOpen] = useState(false);
-  if (sources.length === 0) return null;
-  return (
-    <div className="mt-4 border-t border-border/50 pt-3">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-      >
-        {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-        <BookOpenText className="h-3 w-3" />
-        {sources.length} fonte{sources.length > 1 ? "i" : ""} usate
-      </button>
-      <AnimatePresence>
-        {open && (
-          <m.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="overflow-hidden"
-          >
-            <div className="mt-2 space-y-1.5">
-              {sources.map((s, i) => (
-                <div key={i} className="text-[11px] text-muted-foreground bg-muted/40 rounded-lg px-2.5 py-1.5">
-                  <span className="font-medium text-foreground/70">{s.source}</span>
-                  {" — "}
-                  {s.content.slice(0, 100)}{s.content.length > 100 ? "…" : ""}
-                </div>
-              ))}
-            </div>
-          </m.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function WendySources({ message }: { message: WendyMessage }) {
-  if (!message.citations?.length) return null;
-  return (
-    <div className="mt-3 flex flex-wrap gap-1.5">
-      {message.citations.slice(0, 4).map((source) => (
-        <a
-          key={`${message.id}-${source.nodeId}`}
-          href={source.url ?? "#"}
-          onClick={(event) => {
-            if (!source.url) event.preventDefault();
-          }}
-          className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
-        >
-          {source.title}
-        </a>
-      ))}
-    </div>
-  );
-}
-
-// ── Mobile detection ────────────────────────────────────────────────────────
-
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(
-    () => typeof window !== "undefined" && window.innerWidth < 768,
-  );
-  useEffect(() => {
-    const fn = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", fn, { passive: true });
-    return () => window.removeEventListener("resize", fn);
-  }, []);
-  return isMobile;
-}
 
 // ── Main component ───────────────────────────────────────────────────────────
 
@@ -178,7 +58,6 @@ export function SearchDialog({
   indexStatus = "ready",
   isLoading,
   isOpen,
-  setIsOpen,
   close,
   trackClick,
 }: SearchDialogProps) {
@@ -191,8 +70,9 @@ export function SearchDialog({
   const inputRef = useRef<HTMLInputElement>(null);
   const aiPanelRef = useRef<HTMLDivElement>(null);
   const [slowThinking, setSlowThinking] = useState(false);
-  const isMobile = useIsMobile();
+  const isMobile = useSearchDialogMobile();
   const chat = useWendyChat({ apiUrl: "/api/ai/wendy", maxRetries: 0 });
+  const dragControls = useDragControls();
 
   useEffect(() => {
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 50);
@@ -241,7 +121,12 @@ export function SearchDialog({
   }, [chat.messages, chat.thinking.active]);
 
   const grouped = results.reduce(
-    (acc, r) => { if (!acc[r.type]) acc[r.type] = []; acc[r.type].push(r); return acc; },
+    (acc, r) => {
+      const bucket = acc[r.type] ?? [];
+      bucket.push(r);
+      acc[r.type] = bucket;
+      return acc;
+    },
     {} as Record<string, typeof results>,
   );
 
@@ -273,11 +158,6 @@ export function SearchDialog({
     void chat.sendMessage(label);
   }
 
-  function handleComposerSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    askCurrentQuery();
-  }
-
   const showDefaultSuggestions = query.length < 2 && !isLoading;
   const showResults = !isLoading && results.length > 0;
   const hasSuggestions = suggestions.length > 0;
@@ -291,105 +171,29 @@ export function SearchDialog({
   const queryLong  = query.length >= 3 || hasConversation;
   const showSideResults = isLoading || showResults;
 
-  function renderWendyMessage(message: WendyMessage) {
-    if (message.role === "error") {
-      return (
-        <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {message.content}
-        </div>
-      );
-    }
+  const renderWendyMessage = (message: Parameters<typeof WendyMessageBubble>[0]["message"]) => (
+    <WendyMessageBubble
+      message={message}
+      onConfirmAction={(messageId, actionId) => void chat.confirmAction(messageId, actionId)}
+      onCancelAction={(messageId, actionId) => chat.cancelAction(messageId, actionId)}
+    />
+  );
 
-    const hasBody = !!message.content || !!message.uiTool;
-    return (
-      <div className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}>
-        <div className={cn("max-w-[92%]", message.role === "user" ? "text-right" : "text-left")}>
-          {hasBody && (
-            <div
-              className={cn(
-                "rounded-3xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap",
-                message.role === "user"
-                  ? "rounded-tr-md bg-primary text-primary-foreground"
-                  : "rounded-tl-md bg-muted/65 text-foreground",
-              )}
-            >
-              {message.uiTool ? (
-                <UiToolRenderer name={message.uiTool.name} args={message.uiTool.args} />
-              ) : (
-                message.content
-              )}
-            </div>
-          )}
-          {message.role === "assistant" && (
-            <>
-              {message.actions?.map((action) => (
-                <WendyActionCard
-                  key={action.id}
-                  action={action}
-                  onConfirm={() => void chat.confirmAction(message.id, action.id)}
-                  onCancel={() => chat.cancelAction(message.id, action.id)}
-                />
-              ))}
-              <WendySources message={message} />
-            </>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  function renderChatComposer(compact = false) {
-    return (
-      <form
-        onSubmit={handleComposerSubmit}
-        className={cn(
-          "flex items-center gap-2 border-t border-white/10 bg-card/80 backdrop-blur-xl",
-          compact ? "px-3 py-2" : "px-4 py-3",
-        )}
-      >
-        {chat.stt.supported && (
-          <button
-            type="button"
-            onClick={() => chat.stt.isListening ? chat.commitSTT() : chat.stt.start()}
-            className={cn(
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
-              chat.stt.isListening ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground hover:text-foreground",
-            )}
-            aria-label={chat.stt.isListening ? "Invia dettatura" : "Detta a Wendy"}
-          >
-            <Mic className="h-4 w-4" />
-          </button>
-        )}
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Chiedi a Wendy..."
-          className="min-h-10 flex-1 rounded-full border border-white/10 bg-background/70 px-4 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/60"
-        />
-        {chat.isStreaming ? (
-          <button
-            type="button"
-            onClick={chat.stopStream}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive transition-colors hover:bg-destructive/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-            aria-label="Interrompi Wendy"
-          >
-            <Square className="h-4 w-4 fill-current" />
-          </button>
-        ) : (
-          <button
-            type="submit"
-            disabled={query.trim().length < 2}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-            aria-label="Invia a Wendy"
-          >
-            <Send className="h-4 w-4" />
-          </button>
-        )}
-      </form>
-    );
-  }
+  const renderChatComposer = (compact = false) => (
+    <SearchChatComposer
+      compact={compact}
+      inputRef={inputRef}
+      query={query}
+      setQuery={setQuery}
+      isStreaming={chat.isStreaming}
+      sttSupported={chat.stt.supported}
+      sttIsListening={chat.stt.isListening}
+      commitSTT={chat.commitSTT}
+      startSTT={chat.stt.start}
+      stopStream={chat.stopStream}
+      askCurrentQuery={askCurrentQuery}
+    />
+  );
 
   return (
     <AnimatePresence>
@@ -421,10 +225,24 @@ export function SearchDialog({
             transition={isMobile
               ? { type: "spring", stiffness: 300, damping: 35 }
               : { duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            drag={isMobile ? "y" : false}
+            dragListener={false}
+            dragControls={dragControls}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={isMobile ? 0.35 : 0}
+            onDragEnd={(_, info) => {
+              if (!isMobile) return;
+              if (info.offset.y > 120 || info.velocity.y > 500) handleClose();
+            }}
           >
-            {/* Drag handle (solo mobile) */}
+            {/* Drag handle (solo mobile, attiva il drag-to-dismiss) */}
             {isMobile && (
-              <div className="flex justify-center pt-2.5 pb-1 shrink-0">
+              <div
+                onPointerDown={(e) => dragControls.start(e)}
+                className="flex justify-center pt-2.5 pb-1 shrink-0 touch-none cursor-grab active:cursor-grabbing"
+                role="separator"
+                aria-label="Trascina verso il basso per chiudere"
+              >
                 <div className="h-1 w-10 rounded-full bg-muted-foreground/30" />
               </div>
             )}
@@ -492,9 +310,10 @@ export function SearchDialog({
                         {showResults && ORDER.filter((type) => grouped[type]?.length).map((type) => {
                           const config = TYPE_CONFIG[type];
                           const Icon   = config.icon;
+                          const typeResults = grouped[type] ?? [];
                           return (
                             <CommandGroup key={type} heading={t(config.labelKey)}>
-                              {grouped[type].slice(0, 3).map((item) => (
+                              {typeResults.slice(0, 3).map((item) => (
                                 <CommandItem
                                   key={`${type}-${item.id}`}
                                   value={`${item.title} ${item.description}`}
@@ -550,18 +369,42 @@ export function SearchDialog({
                       </div>
 
                       <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+                        {chat.messages.length === 0 && !chat.thinking.active && !chat.streamError && (
+                          <WendyEmptyState
+                            starterPrompts={quickActions.map((a) => ({ label: a.label, icon: a.icon }))}
+                            onPromptSelect={(prompt) => askQuickAction(prompt)}
+                          />
+                        )}
                         {chat.messages.map((message) => (
                           <div key={message.id}>{renderWendyMessage(message)}</div>
                         ))}
                         <WendyThinkingIndicator thinking={chat.thinking} />
-                        {slowThinking && chat.thinking.active && (
+                        {chat.retryState.active && (
+                          <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-600">
+                            <span>
+                              Riprovo a connettere... ({chat.retryState.attempt}/{chat.retryState.max})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={chat.stopStream}
+                              className="font-semibold underline underline-offset-2"
+                            >
+                              Annulla
+                            </button>
+                          </div>
+                        )}
+                        {slowThinking && chat.thinking.active && !chat.retryState.active && (
                           <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
                             Wendy sta ancora lavorando. Puoi interrompere e riprovare con una domanda piu breve.
                           </div>
                         )}
-                        {chat.streamError && (
+                        {chat.streamError && !chat.retryState.active && (
                           <div className="flex items-center justify-between gap-3 rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                            <span>Wendy non ha risposto correttamente.</span>
+                            <span>
+                              {chat.streamError.message === 'SSE_TIMEOUT'
+                                ? 'La risposta è andata in timeout.'
+                                : 'Wendy non ha risposto correttamente.'}
+                            </span>
                             <button type="button" onClick={() => void chat.retryLast()} className="font-semibold underline underline-offset-2">
                               Riprova
                             </button>
@@ -666,9 +509,10 @@ export function SearchDialog({
                       ORDER.filter((type) => grouped[type]?.length).map((type) => {
                         const config = TYPE_CONFIG[type];
                         const Icon   = config.icon;
+                        const typeResults = grouped[type] ?? [];
                         return (
                           <CommandGroup key={type} heading={t(config.labelKey)}>
-                            {grouped[type].map((item) => (
+                            {typeResults.map((item) => (
                               <CommandItem key={`${type}-${item.id}`} value={`${item.title} ${item.description}`} onSelect={() => handleResultSelect(item)} className="cursor-pointer">
                                 <div className={`flex h-7 w-7 items-center justify-center rounded-full ${config.className}`}>
                                   <Icon className="h-3.5 w-3.5" />
@@ -699,18 +543,43 @@ export function SearchDialog({
                     </div>
 
                     <div className="space-y-3">
+                      {chat.messages.length === 0 && !chat.thinking.active && !chat.streamError && (
+                        <WendyEmptyState
+                          starterPrompts={quickActions.map((a) => ({ label: a.label, icon: a.icon }))}
+                          onPromptSelect={(prompt) => askQuickAction(prompt)}
+                          compact
+                        />
+                      )}
                       {chat.messages.map((message) => (
                         <div key={message.id}>{renderWendyMessage(message)}</div>
                       ))}
                       <WendyThinkingIndicator thinking={chat.thinking} />
-                      {slowThinking && chat.thinking.active && (
+                      {chat.retryState.active && (
+                        <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-600">
+                          <span>
+                            Riprovo a connettere... ({chat.retryState.attempt}/{chat.retryState.max})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={chat.stopStream}
+                            className="font-semibold underline underline-offset-2"
+                          >
+                            Annulla
+                          </button>
+                        </div>
+                      )}
+                      {slowThinking && chat.thinking.active && !chat.retryState.active && (
                         <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
                           Wendy sta ancora lavorando. Puoi interrompere e riprovare.
                         </div>
                       )}
-                      {chat.streamError && (
+                      {chat.streamError && !chat.retryState.active && (
                         <div className="flex items-center justify-between gap-3 rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                          <span>Wendy non ha risposto correttamente.</span>
+                          <span>
+                            {chat.streamError.message === 'SSE_TIMEOUT'
+                              ? 'La risposta è andata in timeout.'
+                              : 'Wendy non ha risposto correttamente.'}
+                          </span>
                           <button type="button" onClick={() => void chat.retryLast()} className="font-semibold underline underline-offset-2">
                             Riprova
                           </button>

@@ -1,5 +1,5 @@
+import { ArrowRight, Search, Users } from "lucide-react";
 import { Link } from "wouter";
-import { Users, ArrowRight, Search } from "lucide-react";
 
 export function DashboardCandidateSearch() {
   return (

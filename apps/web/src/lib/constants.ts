@@ -329,14 +329,14 @@ export const API_ENDPOINTS = {
   // ── Admin (RAG, weak signals, error report) ──
   admin: {
     rag: {
-      sourcesStats:    "/api/admin/rag-sources/stats",
-      sources:         "/api/admin/rag-sources",
-      ingestRss:       "/api/admin/rag-sources/:id/ingest-rss",
+      sourcesStats:    "/api/admin/rag/rag-sources/stats",
+      sources:         "/api/admin/rag/rag-sources",
+      ingestRss:       "/api/admin/rag/rag-sources/:id/ingest-rss",
     },
     weakSignals: {
-      list:    "/api/admin/weak-signals",
-      approve: "/api/admin/weak-signals/:id/approve",
-      dismiss: "/api/admin/weak-signals/:id/dismiss",
+      list:    "/api/admin/rag/weak-signals",
+      approve: "/api/admin/rag/weak-signals/:id/approve",
+      dismiss: "/api/admin/rag/weak-signals/:id/dismiss",
     },
     errorReport: "/api/admin/error-report",
   },

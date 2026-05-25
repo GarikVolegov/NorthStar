@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 export type OpenAITTSState = 'idle' | 'loading' | 'playing' | 'error';
 
@@ -31,6 +31,14 @@ function playEarcon(ctx: AudioContext) {
   osc.stop(ctx.currentTime + 0.2);
 }
 
+function readErrorMessage(value: unknown, fallback: string): string {
+  if (value && typeof value === 'object' && 'error' in value) {
+    const error = (value as { error?: unknown }).error;
+    if (typeof error === 'string') return error;
+  }
+  return fallback;
+}
+
 export function useWendyOpenAITTS(options: UseWendyOpenAITTSOptions = {}): UseWendyOpenAITTSReturn {
   const {
     apiUrl = '/api/wendy/voice',
@@ -55,7 +63,11 @@ export function useWendyOpenAITTS(options: UseWendyOpenAITTSOptions = {}): UseWe
       gain.gain.cancelScheduledValues(ctx.currentTime);
       gain.gain.setTargetAtTime(0, ctx.currentTime, 0.07);
       setTimeout(() => {
-        try { sourceRef.current?.stop(); } catch {}
+        try {
+          sourceRef.current?.stop();
+        } catch {
+          sourceRef.current = null;
+        }
         sourceRef.current = null;
       }, 250);
     }
@@ -81,8 +93,10 @@ export function useWendyOpenAITTS(options: UseWendyOpenAITTSOptions = {}): UseWe
       });
 
       if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
-        throw new Error((err as { error: string }).error ?? `HTTP ${resp.status}`);
+        const err = (await resp.json().catch(() => ({
+          error: `HTTP ${resp.status}`,
+        }))) as unknown;
+        throw new Error(readErrorMessage(err, `HTTP ${resp.status}`));
       }
 
       const arrayBuffer = await resp.arrayBuffer();

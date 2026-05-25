@@ -3,24 +3,36 @@
  * Drawer full-height per modificare manualmente ogni campo del CV generato.
  * Salva via PATCH /api/cv/mine/generated
  */
-import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
-} from "@/components/ui/sheet";
 import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
-  ChevronDown, Plus, Trash2, Loader2, CheckCircle2,
-  User, Briefcase, GraduationCap, Wrench, Globe, Award, Save,
-} from "lucide-react";
+  Sheet, SheetContent,
+  SheetDescription,
+  SheetHeader, SheetTitle,
+} from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
+import { patchJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api-fetch";
+import {
+  Award,
+  Briefcase,
+  CheckCircle2,
+  ChevronDown,
+  Globe,
+  GraduationCap,
+  Loader2,
+  Plus,
+  Save,
+  Trash2,
+  User,
+  Wrench,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -127,13 +139,7 @@ export function CvEditorDrawer({ open, onClose, userId, initialCv }: Props) {
   // ── Save mutation
   const saveMutation = useMutation({
     mutationFn: async (data: GeneratedCv) => {
-      const res = await apiFetch(`${BASE}api/cv/mine/generated`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ generated: data }),
-      });
-      if (!res.ok) throw new Error("Errore salvataggio");
-      return res.json();
+      return patchJson<unknown>(`${BASE}api/cv/mine/generated`, { generated: data });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cvs-mine", userId] });
@@ -151,7 +157,11 @@ export function CvEditorDrawer({ open, onClose, userId, initialCv }: Props) {
   }, []);
   const removeExp = useCallback((id: string) =>
     setCv((c) => ({ ...c, experience: c.experience.filter((e) => e.id !== id) })), []);
-  const setExp = useCallback((id: string, k: string, v: any) =>
+  const setExp = useCallback(<K extends keyof GeneratedCv["experience"][number]>(
+    id: string,
+    k: K,
+    v: GeneratedCv["experience"][number][K],
+  ) =>
     setCv((c) => ({ ...c, experience: c.experience.map((e) => e.id === id ? { ...e, [k]: v } : e) })), []);
 
   // ── Educazione helpers

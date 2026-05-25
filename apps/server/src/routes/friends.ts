@@ -1,11 +1,37 @@
-import { Router } from "express";
-import { eq, and, or, desc, lt, sql } from "drizzle-orm";
-import { db, friendshipsTable, usersTable, userProfileSettingsTable, chatMessagesTable } from "@workspace/db";
+import { Router, type Response } from "express";
+import { eq, and, or, desc, lt, sql, type SQL } from "drizzle-orm";
+import {
+  db,
+  friendshipsTable,
+  usersTable,
+  userProfileSettingsTable,
+  chatMessagesTable,
+} from "@workspace/db";
 import { userKeysTable, friendshipKeysTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { getWss } from "../ws";
+import { getRequestBody } from "../lib/request-context";
+import { asPlainRecord } from "../lib/type-guards";
 
 const router = Router();
+
+function readInteger(value: unknown): number | null {
+  const numberValue = Number(value);
+  return Number.isInteger(numberValue) ? numberValue : null;
+}
+
+function readPositiveInteger(value: unknown): number | null {
+  const numberValue = readInteger(value);
+  return numberValue !== null && numberValue > 0 ? numberValue : null;
+}
+
+function readString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function invalidId(res: Response) {
+  res.status(400).json({ error: "ID non valido" });
+}
 
 /* ────────────────────────────────────────────────────────────────────
  * Middleware: tutte le route richiedono autenticazione
@@ -14,8 +40,8 @@ router.use(requireAuth);
 
 /* ─── GET /api/friends/:userId  —  lista amici / richieste ─────────── */
 router.get("/:userId", async (req, res) => {
-  const userId = parseInt(req.params.userId, 10);
-  if (isNaN(userId) || userId !== req.user!.id) {
+  const userId = readPositiveInteger(req.params.userId);
+  if (userId === null || userId !== req.user!.id) {
     res.status(403).json({ error: "Accesso negato" });
     return;
   }
@@ -30,18 +56,26 @@ router.get("/:userId", async (req, res) => {
       isPublic: userProfileSettingsTable.isPublic,
     })
     .from(friendshipsTable)
-    .innerJoin(usersTable, sql`(
+    .innerJoin(
+      usersTable,
+      sql`(
       CASE WHEN ${friendshipsTable.requesterId} = ${userId} THEN ${friendshipsTable.receiverId}
       ELSE ${friendshipsTable.requesterId} END
-    ) = ${usersTable.id}`)
-    .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
-    .where(and(
-      or(
-        eq(friendshipsTable.requesterId, userId),
-        eq(friendshipsTable.receiverId, userId),
+    ) = ${usersTable.id}`,
+    )
+    .leftJoin(
+      userProfileSettingsTable,
+      eq(usersTable.id, userProfileSettingsTable.userId),
+    )
+    .where(
+      and(
+        or(
+          eq(friendshipsTable.requesterId, userId),
+          eq(friendshipsTable.receiverId, userId),
+        ),
+        eq(friendshipsTable.status, "accepted"),
       ),
-      eq(friendshipsTable.status, "accepted"),
-    ));
+    );
 
   // Richieste in entrata (receiver = userId, status = pending)
   const incoming = await db
@@ -55,11 +89,16 @@ router.get("/:userId", async (req, res) => {
     })
     .from(friendshipsTable)
     .innerJoin(usersTable, eq(friendshipsTable.requesterId, usersTable.id))
-    .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
-    .where(and(
-      eq(friendshipsTable.receiverId, userId),
-      eq(friendshipsTable.status, "pending"),
-    ));
+    .leftJoin(
+      userProfileSettingsTable,
+      eq(usersTable.id, userProfileSettingsTable.userId),
+    )
+    .where(
+      and(
+        eq(friendshipsTable.receiverId, userId),
+        eq(friendshipsTable.status, "pending"),
+      ),
+    );
 
   // Richieste in uscita (requester = userId, status = pending)
   const outgoing = await db
@@ -73,18 +112,29 @@ router.get("/:userId", async (req, res) => {
     })
     .from(friendshipsTable)
     .innerJoin(usersTable, eq(friendshipsTable.receiverId, usersTable.id))
-    .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
-    .where(and(
-      eq(friendshipsTable.requesterId, userId),
-      eq(friendshipsTable.status, "pending"),
-    ));
+    .leftJoin(
+      userProfileSettingsTable,
+      eq(usersTable.id, userProfileSettingsTable.userId),
+    )
+    .where(
+      and(
+        eq(friendshipsTable.requesterId, userId),
+        eq(friendshipsTable.status, "pending"),
+      ),
+    );
 
   res.json({ friends: accepted, incoming, outgoing });
 });
 
 /* ─── POST /api/friends/request  —  invia richiesta amicizia ───────── */
 router.post("/request", async (req, res) => {
-  const { requesterId, receiverId } = req.body;
+  const body = asPlainRecord(getRequestBody(req));
+  const requesterId = readPositiveInteger(body.requesterId);
+  const receiverId = readPositiveInteger(body.receiverId);
+  if (requesterId === null || receiverId === null) {
+    invalidId(res);
+    return;
+  }
   if (requesterId !== req.user!.id) {
     res.status(403).json({ error: "Accesso negato" });
     return;
@@ -97,10 +147,18 @@ router.post("/request", async (req, res) => {
   const [existing] = await db
     .select()
     .from(friendshipsTable)
-    .where(or(
-      and(eq(friendshipsTable.requesterId, requesterId), eq(friendshipsTable.receiverId, receiverId)),
-      and(eq(friendshipsTable.requesterId, receiverId), eq(friendshipsTable.receiverId, requesterId)),
-    ))
+    .where(
+      or(
+        and(
+          eq(friendshipsTable.requesterId, requesterId),
+          eq(friendshipsTable.receiverId, receiverId),
+        ),
+        and(
+          eq(friendshipsTable.requesterId, receiverId),
+          eq(friendshipsTable.receiverId, requesterId),
+        ),
+      ),
+    )
     .limit(1);
 
   if (existing) {
@@ -118,7 +176,11 @@ router.post("/request", async (req, res) => {
 
 /* ─── PATCH /api/friends/:id/accept  —  accetta richiesta ──────────── */
 router.patch("/:id/accept", async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = readPositiveInteger(req.params.id);
+  if (id === null) {
+    invalidId(res);
+    return;
+  }
   const userId = req.user!.id;
 
   const [friendship] = await db
@@ -143,7 +205,11 @@ router.patch("/:id/accept", async (req, res) => {
 
 /* ─── PATCH /api/friends/:id/reject  —  rifiuta richiesta ──────────── */
 router.patch("/:id/reject", async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = readPositiveInteger(req.params.id);
+  if (id === null) {
+    invalidId(res);
+    return;
+  }
   const userId = req.user!.id;
 
   const [friendship] = await db
@@ -168,7 +234,11 @@ router.patch("/:id/reject", async (req, res) => {
 
 /* ─── DELETE /api/friends/:id  —  elimina/cancella amicizia ────────── */
 router.delete("/:id", async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = readPositiveInteger(req.params.id);
+  if (id === null) {
+    invalidId(res);
+    return;
+  }
   const userId = req.user!.id;
 
   const [friendship] = await db
@@ -197,10 +267,15 @@ router.delete("/:id", async (req, res) => {
 
 /* ─── GET /api/friends/messages/:friendshipId  —  storico messaggi ── */
 router.get("/messages/:friendshipId", async (req, res) => {
-  const friendshipId = parseInt(req.params.friendshipId, 10);
+  const friendshipId = readPositiveInteger(req.params.friendshipId);
+  if (friendshipId === null) {
+    invalidId(res);
+    return;
+  }
   const userId = req.user!.id;
-  const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
-  const before = req.query.before ? parseInt(req.query.before as string) : undefined;
+  const requestedLimit = readPositiveInteger(req.query.limit);
+  const limit = Math.min(requestedLimit ?? 50, 100);
+  const before = readPositiveInteger(req.query.before);
 
   const [friendship] = await db
     .select()
@@ -208,13 +283,16 @@ router.get("/messages/:friendshipId", async (req, res) => {
     .where(eq(friendshipsTable.id, friendshipId))
     .limit(1);
 
-  if (!friendship || (friendship.requesterId !== userId && friendship.receiverId !== userId)) {
+  if (
+    !friendship ||
+    (friendship.requesterId !== userId && friendship.receiverId !== userId)
+  ) {
     res.status(403).json({ error: "Accesso negato" });
     return;
   }
 
-  const conditions = [eq(chatMessagesTable.friendshipId, friendshipId)];
-  if (before) conditions.push(lt(chatMessagesTable.id, before));
+  const conditions: SQL[] = [eq(chatMessagesTable.friendshipId, friendshipId)];
+  if (before !== null) conditions.push(lt(chatMessagesTable.id, before));
 
   const messages = await db
     .select()
@@ -229,18 +307,30 @@ router.get("/messages/:friendshipId", async (req, res) => {
 /* ─── POST /api/friends/messages  —  invia messaggio criptato ─────── */
 router.post("/messages", async (req, res) => {
   const userId = req.user!.id;
-  const { friendshipId, encryptedContent, iv } = req.body;
+  const body = asPlainRecord(getRequestBody(req));
+  const friendshipId = readPositiveInteger(body.friendshipId);
+  const encryptedContent = readString(body.encryptedContent);
+  const iv = readString(body.iv);
+  if (friendshipId === null || encryptedContent === null || iv === null) {
+    res.status(400).json({ error: "Payload messaggio non valido" });
+    return;
+  }
 
   const [friendship] = await db
     .select()
     .from(friendshipsTable)
-    .where(and(
-      eq(friendshipsTable.id, friendshipId),
-      eq(friendshipsTable.status, "accepted"),
-    ))
+    .where(
+      and(
+        eq(friendshipsTable.id, friendshipId),
+        eq(friendshipsTable.status, "accepted"),
+      ),
+    )
     .limit(1);
 
-  if (!friendship || (friendship.requesterId !== userId && friendship.receiverId !== userId)) {
+  if (
+    !friendship ||
+    (friendship.requesterId !== userId && friendship.receiverId !== userId)
+  ) {
     res.status(403).json({ error: "Accesso negato" });
     return;
   }
@@ -255,10 +345,15 @@ router.post("/messages", async (req, res) => {
     })
     .returning();
 
+  if (!saved) {
+    throw new Error("Messaggio non salvato");
+  }
+
   // Determina il destinatario
-  const receiverId = friendship.requesterId === userId
-    ? friendship.receiverId
-    : friendship.requesterId;
+  const receiverId =
+    friendship.requesterId === userId
+      ? friendship.receiverId
+      : friendship.requesterId;
 
   const wss = getWss();
   if (wss) {
@@ -296,7 +391,11 @@ router.post("/messages", async (req, res) => {
 
 /* ─── PATCH /api/friends/messages/:id/read  —  marca come letto ────── */
 router.patch("/messages/:id/read", async (req, res) => {
-  const messageId = parseInt(req.params.id, 10);
+  const messageId = readPositiveInteger(req.params.id);
+  if (messageId === null) {
+    invalidId(res);
+    return;
+  }
   const userId = req.user!.id;
 
   const [msg] = await db
@@ -320,7 +419,10 @@ router.patch("/messages/:id/read", async (req, res) => {
     .where(eq(friendshipsTable.id, msg.friendshipId))
     .limit(1);
 
-  if (!friendship || (friendship.requesterId !== userId && friendship.receiverId !== userId)) {
+  if (
+    !friendship ||
+    (friendship.requesterId !== userId && friendship.receiverId !== userId)
+  ) {
     res.status(403).json({ error: "Accesso negato" });
     return;
   }
@@ -353,7 +455,11 @@ router.patch("/messages/:id/read", async (req, res) => {
 
 /* ─── GET /api/friends/keys/:userId  —  chiave pubblica utente ─────── */
 router.get("/keys/:userId", async (req, res) => {
-  const targetId = parseInt(req.params.userId, 10);
+  const targetId = readPositiveInteger(req.params.userId);
+  if (targetId === null) {
+    invalidId(res);
+    return;
+  }
   const [key] = await db
     .select()
     .from(userKeysTable)
@@ -371,7 +477,12 @@ router.get("/keys/:userId", async (req, res) => {
 /* ─── POST /api/friends/keys  —  salva chiave pubblica ────────────── */
 router.post("/keys", async (req, res) => {
   const userId = req.user!.id;
-  const { publicKey } = req.body;
+  const body = asPlainRecord(getRequestBody(req));
+  const publicKey = readString(body.publicKey);
+  if (publicKey === null) {
+    res.status(400).json({ error: "publicKey richiesto" });
+    return;
+  }
 
   await db
     .insert(userKeysTable)
@@ -387,18 +498,34 @@ router.post("/keys", async (req, res) => {
 /* ─── POST /api/friends/keys/exchange  —  salva chiavi conversazione ─ */
 router.post("/keys/exchange", async (req, res) => {
   const userId = req.user!.id;
-  const { friendshipId, keyForRequester, keyForReceiver } = req.body;
+  const body = asPlainRecord(getRequestBody(req));
+  const friendshipId = readPositiveInteger(body.friendshipId);
+  const keyForRequester = readString(body.keyForRequester);
+  const keyForReceiver = readString(body.keyForReceiver);
+  if (
+    friendshipId === null ||
+    keyForRequester === null ||
+    keyForReceiver === null
+  ) {
+    res.status(400).json({ error: "Payload chiavi non valido" });
+    return;
+  }
 
   const [friendship] = await db
     .select()
     .from(friendshipsTable)
-    .where(and(
-      eq(friendshipsTable.id, friendshipId),
-      eq(friendshipsTable.status, "accepted"),
-    ))
+    .where(
+      and(
+        eq(friendshipsTable.id, friendshipId),
+        eq(friendshipsTable.status, "accepted"),
+      ),
+    )
     .limit(1);
 
-  if (!friendship || (friendship.requesterId !== userId && friendship.receiverId !== userId)) {
+  if (
+    !friendship ||
+    (friendship.requesterId !== userId && friendship.receiverId !== userId)
+  ) {
     res.status(403).json({ error: "Accesso negato" });
     return;
   }
@@ -416,7 +543,11 @@ router.post("/keys/exchange", async (req, res) => {
 
 /* ─── GET /api/friends/keys/exchange/:friendshipId  —  leggi chiavi ── */
 router.get("/keys/exchange/:friendshipId", async (req, res) => {
-  const friendshipId = parseInt(req.params.friendshipId, 10);
+  const friendshipId = readPositiveInteger(req.params.friendshipId);
+  if (friendshipId === null) {
+    invalidId(res);
+    return;
+  }
   const userId = req.user!.id;
 
   const [friendship] = await db
@@ -425,7 +556,10 @@ router.get("/keys/exchange/:friendshipId", async (req, res) => {
     .where(eq(friendshipsTable.id, friendshipId))
     .limit(1);
 
-  if (!friendship || (friendship.requesterId !== userId && friendship.receiverId !== userId)) {
+  if (
+    !friendship ||
+    (friendship.requesterId !== userId && friendship.receiverId !== userId)
+  ) {
     res.status(403).json({ error: "Accesso negato" });
     return;
   }
@@ -441,9 +575,10 @@ router.get("/keys/exchange/:friendshipId", async (req, res) => {
     return;
   }
 
-  const myEncryptedKey = userId === friendship.requesterId
-    ? keys.keyForRequester
-    : keys.keyForReceiver;
+  const myEncryptedKey =
+    userId === friendship.requesterId
+      ? keys.keyForRequester
+      : keys.keyForReceiver;
 
   res.json({ encryptedKey: myEncryptedKey });
 });

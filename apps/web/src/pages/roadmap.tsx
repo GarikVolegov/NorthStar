@@ -1,21 +1,28 @@
-import { useState, useMemo, useEffect } from "react";
-import { useParams, Link } from "wouter";
-import { useGetSector } from "@workspace/api-client-react";
-import { Button } from "@/components/ui/button";
+import { PhaseCard } from "@/components/roadmap/PhaseCard";
 import { Badge } from "@/components/ui/badge";
-import {
-  ArrowLeft, Sparkles, Loader2, Zap, BookOpen, Award, Target,
-  TrendingUp, Lightbulb, CheckCircle2, ChevronDown, ChevronUp,
-  MapPin, Euro, Users, GraduationCap, Rocket, Briefcase, Wrench,
-  School, BookMarked, Star, Info, ThumbsUp, ThumbsDown, Plus,
-} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api-fetch";
+import { patchJson } from "@/lib/apiClient";
+import { ERROR_MESSAGES, ROADMAP_TEXT } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { PhaseCard } from "@/components/roadmap/PhaseCard";
-import { ROADMAP_TEXT, ERROR_MESSAGES } from "@/lib/constants";
+import { useGetSector } from "@workspace/api-client-react";
+import { ArrowLeft, CheckCircle2, Euro, Info, Lightbulb, Loader2, MapPin, Sparkles, Star, TrendingUp, Users, Zap } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Link, useParams } from "wouter";
+import { fitScoreColor, PathCard, ProsConsBlock, useRotatingMessage } from "./roadmap-components";
+import { readRoadmapErrorMessage, readRoadmapSseChunk } from "./roadmap-sse";
 
 const BASE = import.meta.env.BASE_URL || "/";
+const ROADMAP_WAITING_MESSAGES = [
+  "Sto analizzando il tuo profilo RIASECâ€¦",
+  "Confronto laurea, ITS, bootcamp e autodidattaâ€¦",
+  "Calcolo i tempi e i costi per ogni percorsoâ€¦",
+  "Valuto i pro e i contro su misura per teâ€¦",
+  "Identifico le certificazioni piÃ¹ utiliâ€¦",
+  "Preparo la tua raccomandazione personalizzataâ€¦",
+  "Quasi pronto, ancora qualche secondoâ€¦",
+];
 
 interface RoadmapResource {
   type: string;
@@ -76,138 +83,6 @@ interface RoadmapData {
   keyTip: string;
 }
 
-function pathTypeIcon(type: string): React.ReactNode {
-  const t = type.toLowerCase();
-  if (t.includes("università") || t.includes("laurea") || t.includes("master")) return <GraduationCap className="w-4 h-4" />;
-  if (t.includes("its")) return <School className="w-4 h-4" />;
-  if (t.includes("bootcamp")) return <Rocket className="w-4 h-4" />;
-  if (t.includes("apprendistato")) return <Briefcase className="w-4 h-4" />;
-  if (t.includes("autodidatta") || t.includes("certificazion")) return <Wrench className="w-4 h-4" />;
-  return <BookOpen className="w-4 h-4" />;
-}
-
-function fitScoreColor(score: number): string {
-  if (score >= 80) return "text-emerald-700 bg-emerald-50 border-emerald-200";
-  if (score >= 60) return "text-amber-700 bg-amber-50 border-amber-200";
-  return "text-slate-600 bg-slate-50 border-slate-200";
-}
-
-// ─── Phase card ─────────────────────────────────────────────────────────────
-// ─── Path option card (selector) ────────────────────────────────────────────
-function PathCard({
-  path,
-  isSelected,
-  isRecommended,
-  onClick,
-}: {
-  path: PathOption;
-  isSelected: boolean;
-  isRecommended: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "text-left rounded-2xl border bg-card p-4 transition-all hover:shadow-md hover:-translate-y-0.5",
-        isSelected ? "border-primary ring-2 ring-primary/20 shadow-sm" : "border-border",
-      )}
-    >
-      <div className="flex items-start gap-3 mb-2">
-        <div
-          className={cn(
-            "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
-            isSelected ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
-          )}
-        >
-          {pathTypeIcon(path.type)}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0">{path.type}</Badge>
-            {isRecommended && (
-              <Badge className="text-[10px] px-1.5 py-0 bg-primary text-primary-foreground border-primary">
-                <Star className="w-2.5 h-2.5 mr-0.5" /> Consigliato per te
-              </Badge>
-            )}
-          </div>
-          <h3 className="font-semibold text-sm leading-tight">{path.title}</h3>
-        </div>
-        <div
-          className={cn(
-            "shrink-0 px-2 py-1 rounded-lg border text-xs font-bold",
-            fitScoreColor(path.fitScore),
-          )}
-          title={`Affinità con il tuo profilo: ${path.fitScore}/100`}
-        >
-          {path.fitScore}%
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{path.shortDescription}</p>
-      <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-        <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{path.duration}</span>
-        <span className="flex items-center gap-1"><Euro className="w-3 h-3" />{path.estimatedCost}</span>
-      </div>
-    </button>
-  );
-}
-
-// ─── Pros / cons ────────────────────────────────────────────────────────────
-function ProsConsBlock({ pros, cons }: { pros: string[]; cons: string[] }) {
-  return (
-    <div className="grid sm:grid-cols-2 gap-3">
-      <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <ThumbsUp className="w-4 h-4 text-emerald-600" />
-          <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700">{ROADMAP_TEXT.content.prosCons.pros}</span>
-        </div>
-        <ul className="space-y-1.5">
-          {pros.map((p, i) => (
-            <li key={i} className="text-sm flex items-start gap-2">
-              <Plus className="w-3 h-3 text-emerald-600 shrink-0 mt-1" />
-              <span>{p}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div className="bg-rose-50/40 border border-rose-100 rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <ThumbsDown className="w-4 h-4 text-rose-600" />
-          <span className="text-xs font-semibold uppercase tracking-wider text-rose-700">{ROADMAP_TEXT.content.prosCons.cons}</span>
-        </div>
-        <ul className="space-y-1.5">
-          {cons.map((c, i) => (
-            <li key={i} className="text-sm flex items-start gap-2">
-              <span className="text-rose-600 shrink-0 mt-0.5 font-bold leading-none">−</span>
-              <span>{c}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-const ROADMAP_WAITING_MESSAGES = [
-  "Sto analizzando il tuo profilo RIASEC…",
-  "Confronto laurea, ITS, bootcamp e autodidatta…",
-  "Calcolo i tempi e i costi per ogni percorso…",
-  "Valuto i pro e i contro su misura per te…",
-  "Identifico le certificazioni più utili…",
-  "Preparo la tua raccomandazione personalizzata…",
-  "Quasi pronto, ancora qualche secondo…",
-];
-
-function useRotatingMessage(messages: string[], intervalMs: number, active: boolean) {
-  const [idx, setIdx] = useState(0);
-  useEffect(() => {
-    if (!active) { setIdx(0); return; }
-    const id = setInterval(() => setIdx((i) => (i + 1) % messages.length), intervalMs);
-    return () => clearInterval(id);
-  }, [active, messages.length, intervalMs]);
-  return messages[idx];
-}
-
 // ─── Page ───────────────────────────────────────────────────────────────────
 export default function Roadmap() {
   const params = useParams();
@@ -252,8 +127,8 @@ export default function Roadmap() {
        });
  
         if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          setErrorMsg(errData.error ?? ROADMAP_TEXT.generateState.error.aiUnavailable);
+          const errData = (await res.json().catch(() => ({}))) as unknown;
+          setErrorMsg(readRoadmapErrorMessage(errData) ?? ROADMAP_TEXT.generateState.error.aiUnavailable);
           return;
         }
        const reader = res.body?.getReader();
@@ -272,7 +147,7 @@ export default function Roadmap() {
          for (const part of parts) {
            if (!part.startsWith("data: ")) continue;
            try {
-             const data = JSON.parse(part.slice(6));
+             const data = readRoadmapSseChunk(part.slice(6));
              if (data.content) fullText += data.content;
              if (data.error) {
                parseErr = true;
@@ -282,7 +157,7 @@ export default function Roadmap() {
                const jsonMatch = fullText.match(/\{[\s\S]*\}/);
                if (jsonMatch) {
                  try {
-                   const parsed: RoadmapData = JSON.parse(jsonMatch[0]);
+                   const parsed = JSON.parse(jsonMatch[0]) as RoadmapData;
                    setRoadmap(parsed);
                    setSelectedPathId(parsed.recommendedPathId ?? parsed.paths[0]?.id ?? null);
                   } catch {
@@ -310,11 +185,7 @@ export default function Roadmap() {
 
    const handleUpdatePhase = async (phaseId: number, updates: Partial<RoadmapPhase>) => {
      try {
-       // Make the actual API call
-       await apiFetch(`${BASE}api/roadmap/${id}/phases/${phaseId}`, {
-         method: "PATCH",
-         body: JSON.stringify(updates),
-       });
+       await patchJson(`${BASE}api/roadmap/${id}/phases/${phaseId}`, updates);
        
        // Update the roadmap optimistically (will be corrected if API fails)
        if (roadmap && selected) {

@@ -9,12 +9,12 @@
  *     <WendyFocusButton />
  *   </UpgradeGate>
  */
-import { Link } from "wouter";
-import { Crown, Zap, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { useSubscription } from "@/hooks/useSubscription";
 import type { Plan } from "@/hooks/useSubscription";
+import { useSubscription } from "@/hooks/useSubscription";
+import { cn } from "@/lib/utils";
+import { Crown, Lock, Zap } from "lucide-react";
+import { Link } from "wouter";
 
 const PLAN_LABELS: Record<Plan, string> = {
   free: "Free",
@@ -106,7 +106,12 @@ export function UpgradeGate({ feature, plan, children, compact, message, classNa
 
   return (
     <div className={className}>
-      <UpgradePrompt feature={feature} requiredPlan={plan} compact={compact} message={message} />
+      <UpgradePrompt
+        feature={feature}
+        requiredPlan={plan}
+        {...(compact !== undefined ? { compact } : {})}
+        {...(message !== undefined ? { message } : {})}
+      />
     </div>
   );
 }

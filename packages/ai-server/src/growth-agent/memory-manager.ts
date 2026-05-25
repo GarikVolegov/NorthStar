@@ -1,47 +1,10 @@
-/**
- * Memory Manager — persistent memory across coach sessions.
- *
- * ARCHITECTURE
- * ────────────
- * WRITE path (fires AFTER each conversation, non-blocking):
- *   conversation messages
- *       ↓
- *   extractMemory()  ← GPT-4o-mini analyzes the exchange
- *       ↓
- *   { facts: [...], patterns: [...] }
- *       ↓
- *   mergeMemory()    ← upserts facts, increments pattern confidence
- *       ↓
- *   coach_memory_facts + coach_memory_patterns tables
- *
- * READ path (fires BEFORE each response, parallel with RAG retrieval):
- *   loadMemory(userId)
- *       ↓
- *   { facts, patterns }  ← top patterns by confidence + all facts
- *       ↓
- *   buildMemorySection() ← injected into system prompt
- *
- * CONFIDENCE SCORING for patterns:
- *   1st observation  → 0.50
- *   2nd observation  → 0.65
- *   3rd observation  → 0.80
- *   4th+ observation → 0.90 (capped)
- *
- * This means the coach mentions a pattern with certainty only after
- * seeing it multiple times — avoids false positives from a single session.
- */
-import { db } from "@workspace/db";
-import {
-  coachMemoryFactsTable,
-  coachMemoryPatternsTable,
-  type CoachMemoryFact,
-  type CoachMemoryPattern,
-} from "@workspace/db";
+import { coachMemoryFactsTable, coachMemoryPatternsTable, db, type CoachMemoryFact, type CoachMemoryPattern } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { openai } from "../client";
 import { embedText } from "./embedder";
 import { logger } from "../logger";
 import { selectModelFor } from "../model-router";
+import { ragConfig } from "../config/rag";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,12 +14,7 @@ export interface MemoryFact {
 }
 
 export interface MemoryPattern {
-  patternType:
-    | "limiting_belief"
-    | "strength"
-    | "recurring_theme"
-    | "emotional_trigger"
-    | "growth_edge";
+  patternType: "limiting_belief" | "strength" | "recurring_theme" | "emotional_trigger" | "growth_edge";
   description: string;
 }
 
@@ -81,21 +39,20 @@ function computeConfidence(observedCount: number): number {
 
 // ── Semantic similarity ─────────────────────────────────────────────────────
 
-const SIMILARITY_THRESHOLD = 0.85;
-
 interface CacheEntry {
   embedding: number[];
   expiresAt: number;
 }
 const patternEmbeddingCache = new Map<number, CacheEntry>();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0, na = 0, nb = 0;
   for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    na += a[i] * a[i];
-    nb += b[i] * b[i];
+    const av = a[i] ?? 0;
+    const bv = b[i] ?? 0;
+    dot += av * bv;
+    na += av * av;
+    nb += bv * bv;
   }
   return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-10);
 }
@@ -107,10 +64,10 @@ async function getPatternEmbedding(
   const cached = patternEmbeddingCache.get(id);
   if (cached && cached.expiresAt > Date.now()) return cached.embedding;
   const emb = await embedText(description);
-  patternEmbeddingCache.set(id, { embedding: emb, expiresAt: Date.now() + CACHE_TTL_MS });
+  patternEmbeddingCache.set(id, { embedding: emb, expiresAt: Date.now() + ragConfig.memory.embeddingCacheTtlMs });
   // Keep cache bounded
-  if (patternEmbeddingCache.size > 500) {
-    const firstKey = patternEmbeddingCache.keys().next().value;
+  if (patternEmbeddingCache.size > ragConfig.memory.maxEmbeddingCacheEntries) {
+    const firstKey = patternEmbeddingCache.keys().next().value as number | undefined;
     if (firstKey !== undefined) patternEmbeddingCache.delete(firstKey);
   }
   return emb;
@@ -213,7 +170,7 @@ export async function mergeMemory(
   extracted: ExtractedMemory,
 ): Promise<void> {
   // ── Load existing data for this user (max 1000 rows each) ───────
-  const MAX_MEMORY_ROWS = 1000;
+  const MAX_MEMORY_ROWS = ragConfig.memory.maxMemoryRows;
   const [allExistingFacts, allExistingPatterns] = await Promise.all([
     db
       .select()
@@ -311,7 +268,7 @@ export async function mergeMemory(
       if (existing.patternType !== pattern.patternType) continue;
       const existingEmb = await getPatternEmbedding(existing.id, existing.description);
       const score = cosineSimilarity(newEmbedding, existingEmb);
-      if (score > bestScore && score >= SIMILARITY_THRESHOLD) {
+      if (score > bestScore && score >= ragConfig.memory.similarityThreshold) {
         bestMatch = existing;
         bestScore = score;
       }
@@ -373,9 +330,9 @@ export async function loadMemory(userId: number): Promise<UserMemory> {
   ]);
 
   const topPatterns = patterns
-    .filter((p) => p.confidence >= 0.50)
+    .filter((p) => p.confidence >= ragConfig.memory.minPatternConfidence)
     .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, 8); // max 8 patterns in prompt
+    .slice(0, ragConfig.memory.maxPromptPatterns);
 
   return { facts, patterns: topPatterns };
 }
@@ -387,7 +344,7 @@ export async function loadMemory(userId: number): Promise<UserMemory> {
  * Only included if there's actually something to say.
  */
 export function buildMemorySection(memory: UserMemory): string {
-  const hasFacts    = memory.facts.length > 0;
+  const hasFacts = memory.facts.length > 0;
   const hasPatterns = memory.patterns.length > 0;
 
   if (!hasFacts && !hasPatterns) return "";

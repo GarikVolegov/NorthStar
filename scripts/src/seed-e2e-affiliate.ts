@@ -11,7 +11,7 @@
  * Env vars attese:
  *   DATABASE_URL             — connection string Postgres
  *   AFFILIATE_SEED_EMAIL     — email utente affiliate  (default: affiliate-e2e@northstar.it)
- *   AFFILIATE_SEED_PASSWORD  — password in chiaro      (default: AffiliateE2e123!)
+ *   AFFILIATE_SEED_PASSWORD  — password in chiaro      (required)
  *
  * L'utente viene creato con:
  *   - isAffiliate=true
@@ -20,28 +20,41 @@
  *   - affiliateBalance=0, affiliateClicks=5, affiliateConversions=2 (dati demo)
  */
 
-import 'dotenv/config';
-import * as crypto from 'crypto';
-import { db } from '@workspace/db';
-import { sql } from 'drizzle-orm';
+import "dotenv/config";
+import * as crypto from "crypto";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
-  console.error('❌  DATABASE_URL non impostata');
+  console.error("❌  DATABASE_URL non impostata");
   process.exit(1);
 }
 
-const EMAIL    = process.env.AFFILIATE_SEED_EMAIL    ?? 'affiliate-e2e@northstar.it';
-const PASSWORD = process.env.AFFILIATE_SEED_PASSWORD ?? 'AffiliateE2e123!';
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} is required; refusing to use a default test password.`);
+  }
+  return value;
+}
+
+const EMAIL = process.env.AFFILIATE_SEED_EMAIL ?? "affiliate-e2e@northstar.it";
+const PASSWORD = requireEnv("AFFILIATE_SEED_PASSWORD");
 
 function hashPassword(plain: string): string {
-  return crypto.createHash('sha256').update(plain).digest('hex');
+  return crypto.createHash("sha256").update(plain).digest("hex");
 }
 
 /** Genera un referral code deterministico dall'email (6 char uppercase hex) */
 function referralCodeFromEmail(email: string): string {
-  return crypto.createHash('md5').update(email).digest('hex').slice(0, 8).toUpperCase();
+  return crypto
+    .createHash("md5")
+    .update(email)
+    .digest("hex")
+    .slice(0, 8)
+    .toUpperCase();
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -52,12 +65,13 @@ async function main() {
 
     // Prende il primo settore disponibile
     const sectorRes: any = await db.execute(
-      sql`SELECT id FROM sectors ORDER BY id LIMIT 1`
+      sql`SELECT id FROM sectors ORDER BY id LIMIT 1`,
     );
-    const sectorId: number | null = sectorRes.length > 0 ? sectorRes[0].id : null;
+    const sectorId: number | null =
+      sectorRes.length > 0 ? sectorRes[0].id : null;
 
-    const passwordHash  = hashPassword(PASSWORD);
-    const referralCode  = referralCodeFromEmail(EMAIL);
+    const passwordHash = hashPassword(PASSWORD);
+    const referralCode = referralCodeFromEmail(EMAIL);
 
     // Upsert utente affiliate
     const upsertRes: any = await db.execute(
@@ -88,7 +102,7 @@ async function main() {
           referred_by_code  = EXCLUDED.referred_by_code,
           updated_at        = NOW()
         RETURNING id
-      `
+      `,
     );
     const userId: number = upsertRes.length > 0 ? upsertRes[0].id : 0;
     console.log(`✅  Utente affiliate upserted: ${EMAIL} (id=${userId})`);
@@ -113,13 +127,15 @@ async function main() {
             clicks      = 5,
             conversions = 2,
             updated_at  = NOW()
-        `
+        `,
       );
-      console.log('✅  affiliate_stats upserted');
+      console.log("✅  affiliate_stats upserted");
     } catch (statsErr: any) {
-      if (statsErr.code === '42P01') {
+      if (statsErr.code === "42P01") {
         // Tabella non esiste ancora — skip silenzioso
-        console.log('ℹ️   tabella affiliate_stats non presente, skip stats seed');
+        console.log(
+          "ℹ️   tabella affiliate_stats non presente, skip stats seed",
+        );
       } else {
         throw statsErr;
       }
@@ -127,7 +143,7 @@ async function main() {
 
     // Objectives minimi per non rompere GET /api/auth/me
     const existingObj: any = await db.execute(
-      sql`SELECT COUNT(*) AS count FROM objectives WHERE user_id = ${userId}`
+      sql`SELECT COUNT(*) AS count FROM objectives WHERE user_id = ${userId}`,
     );
     if (existingObj.length > 0 && parseInt(existingObj[0].count, 10) === 0) {
       await db.execute(
@@ -140,17 +156,17 @@ async function main() {
             0,
             NOW()
           )
-        `
+        `,
       );
-      console.log('✅  Objective placeholder creato');
+      console.log("✅  Objective placeholder creato");
     }
   } catch (err) {
-    console.error('Error in seed-e2e-affiliate:', err);
+    console.error("Error in seed-e2e-affiliate:", err);
     throw err;
   }
 }
 
 main().catch((err) => {
-  console.error('❌  seed-e2e-affiliate failed:', err);
+  console.error("❌  seed-e2e-affiliate failed:", err);
   process.exit(1);
 });

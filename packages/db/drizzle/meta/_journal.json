@@ -204,6 +204,48 @@
       "when": 1779015000000,
       "tag": "0028_admin_subscription_entitlements_safety",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1779016000000,
+      "tag": "0029_seed_wendy_agent",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1779017000000,
+      "tag": "0030_users_runtime_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1779018000000,
+      "tag": "0031_users_deleted_at_repair",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1779739000000,
+      "tag": "0032_user_background_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1779739100000,
+      "tag": "0033_user_background_appearance",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1779742600000,
+      "tag": "0034_rag_routing_keys",
+      "breakpoints": true
     }
   ]
 }

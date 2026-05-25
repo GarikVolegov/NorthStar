@@ -8,6 +8,7 @@
  */
 import { db, subscriptionsTable } from "@workspace/db";
 import { eq, and, desc, isNull } from "drizzle-orm";
+import type { Request, Response, NextFunction } from "express";
 
 // ── Feature gate definitions ──────────────────────────────────────────────────
 
@@ -70,7 +71,7 @@ export async function getEffectivePlan(userId: number): Promise<"free" | "pro" |
 }
 
 export function planMeets(currentPlan: string, requiredPlan: "free" | "pro" | "team"): boolean {
-  return PLAN_RANK[currentPlan] >= PLAN_RANK[requiredPlan];
+  return (PLAN_RANK[currentPlan] ?? 0) >= (PLAN_RANK[requiredPlan] ?? 0);
 }
 
 export function invalidatePlanCache(userId: number): void {
@@ -91,7 +92,7 @@ export async function checkFeatureAccess(
 
 /** Express middleware factory — risponde con SSE gate event o JSON 402 */
 export function requireFeature(feature: FeatureKey, responseType: "json" | "sse" = "json") {
-  return async (req: any, res: any, next: any) => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const userId = req.user?.id;
     if (!userId) { res.status(401).json({ error: "Non autenticato" }); return; }
 

@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "updatedAt": "2026-05-20T00:00:00.000Z",
+  "sprints": [
+    {
+      "sprint": "step-9-preflight",
+      "date": "2026-05-20",
+      "metrics": {
+        "directApiFetch": 98,
+        "globalNamespacePollution": 4,
+        "hotConsole": 0,
+        "adminHardcodedColors": 249,
+        "productionDbAny": 42
+      }
+    },
+    {
+      "sprint": "step-9-gate",
+      "date": "2026-05-20",
+      "metrics": {
+        "directApiFetch": 69,
+        "globalNamespacePollution": 4,
+        "hotConsole": 0,
+        "adminHardcodedColors": 249,
+        "productionDbAny": 29
+      }
+    },
+    {
+      "sprint": "step-9-continuation",
+      "date": "2026-05-20",
+      "tracked": {
+        "directApiFetch": 56,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 249,
+        "productionDbAny": 22
+      },
+      "gated": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 249,
+        "productionDbAny": 22
+      }
+    },
+    {
+      "sprint": "foundation-api-fetch-zero",
+      "date": "2026-05-20",
+      "tracked": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 249,
+        "productionDbAny": 22
+      },
+      "gated": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 249,
+        "productionDbAny": 22
+      }
+    },
+    {
+      "sprint": "foundation-production-types",
+      "date": "2026-05-20",
+      "tracked": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 249,
+        "productionDbAny": 0
+      },
+      "gated": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 249,
+        "productionDbAny": 0
+      }
+    },
+    {
+      "sprint": "foundation-admin-design-tokens",
+      "date": "2026-05-20",
+      "tracked": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 113,
+        "productionDbAny": 0
+      },
+      "gated": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 113,
+        "productionDbAny": 0
+      }
+    },
+    {
+      "sprint": "foundation-admin-design-tokens-2",
+      "date": "2026-05-20",
+      "tracked": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 43,
+        "productionDbAny": 0
+      },
+      "gated": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 43,
+        "productionDbAny": 0
+      }
+    },
+    {
+      "sprint": "foundation-admin-design-tokens-zero",
+      "date": "2026-05-20",
+      "tracked": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 0,
+        "productionDbAny": 0
+      },
+      "gated": {
+        "directApiFetch": 0,
+        "globalNamespacePollution": 0,
+        "hotConsole": 0,
+        "adminHardcodedColors": 0,
+        "productionDbAny": 0
+      }
+    }
+  ]
+}

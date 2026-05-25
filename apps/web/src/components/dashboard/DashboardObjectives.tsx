@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { Plus, CheckCircle2, Circle, Trash2, Target, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import type { DashboardObjective } from "@/hooks/useDashboardData";
+import { cn } from "@/lib/utils";
+import { CheckCircle2, Circle, Clock, Plus, Target, Trash2 } from "lucide-react";
+import { useState } from "react";
 
 function DueDateBadge({ dueDate, completed }: { dueDate: string | null; completed: boolean }) {
   if (!dueDate || completed) return null;

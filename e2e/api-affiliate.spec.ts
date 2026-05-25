@@ -3,6 +3,19 @@
  */
 import { test, expect } from "@playwright/test";
 import { loginAsTestUser, TEST_API_URL } from "./helpers/auth";
+import { responseJson } from "./helpers/json";
+
+type AffiliateDashboard = {
+  referralCode: string;
+  referralLink: string;
+  qrCodeUrl: string;
+};
+
+type Objective = {
+  id: number;
+  text: string;
+  completed: boolean;
+};
 
 test.describe("Affiliate API", () => {
   test("GET /api/affiliate/dashboard returns 401 without auth", async ({ request }) => {
@@ -15,7 +28,7 @@ test.describe("Affiliate API", () => {
     const res = await request.get(`${TEST_API_URL}/api/affiliate/dashboard`, { headers });
     expect(res.status()).toBe(200);
 
-    const body = await res.json();
+    const body = await responseJson<AffiliateDashboard>(res);
     expect(body.referralCode).toBeTruthy();
     expect(body.referralLink).toMatch(/^https?:\/\/.+\/sign-up\?ref=/);
     expect(body.referralLink).toContain(encodeURIComponent(body.referralCode));
@@ -31,7 +44,7 @@ test.describe("Affiliate API", () => {
     const headers = await loginAsTestUser(request);
     const dashboardRes = await request.get(`${TEST_API_URL}/api/affiliate/dashboard`, { headers });
     expect(dashboardRes.status()).toBe(200);
-    const dashboard = await dashboardRes.json();
+    const dashboard = await responseJson<AffiliateDashboard>(dashboardRes);
 
     const qrRes = await request.get(`${TEST_API_URL}/api/affiliate/qr`, { headers });
     expect(qrRes.status()).toBe(200);
@@ -50,7 +63,7 @@ test.describe("Affiliate API", () => {
     const headers = await loginAsTestUser(request);
     const res = await request.get(`${TEST_API_URL}/api/dashboard`, { headers });
     expect(res.status()).toBe(200);
-    const body = await res.json();
+    const body = await responseJson<Record<string, unknown>>(res);
     expect(body).toHaveProperty("user");
     expect(body).toHaveProperty("objectives");
     expect(body).toHaveProperty("objectivesProgress");
@@ -68,7 +81,7 @@ test.describe("Affiliate API", () => {
       data: { text: "Test E2E objective", category: "test" },
     });
     expect(createRes.status()).toBe(201);
-    const objective = await createRes.json();
+    const objective = await responseJson<Objective>(createRes);
     expect(objective.text).toBe("Test E2E objective");
 
     const updateRes = await request.patch(
@@ -76,7 +89,7 @@ test.describe("Affiliate API", () => {
       { headers, data: { completed: true } },
     );
     expect(updateRes.status()).toBe(200);
-    const updated = await updateRes.json();
+    const updated = await responseJson<Objective>(updateRes);
     expect(updated.completed).toBe(true);
 
     const delRes = await request.delete(

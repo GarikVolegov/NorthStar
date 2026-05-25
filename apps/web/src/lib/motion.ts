@@ -1,5 +1,5 @@
+import type { Easing, Transition, Variants } from "framer-motion";
 import { useReducedMotion as useFramerReducedMotion } from "framer-motion";
-import type { Variants, Transition, Easing } from "framer-motion";
 
 export function useReducedMotion() {
   return useFramerReducedMotion() ?? false;

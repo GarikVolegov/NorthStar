@@ -12,8 +12,8 @@
  *
  * @pattern Observer (wrapper di EventBus singleton)
  */
-import { useCallback, useEffect, useMemo, useRef } from "react";
 import { eventBus, type AppEvent, type EventName } from "@/lib/event-bus";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 export interface PageBus {
   /** ID logico della pagina (es. "dashboard", "wendy-chat") — usato in payload e telemetry */

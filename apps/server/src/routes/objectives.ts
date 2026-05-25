@@ -109,7 +109,7 @@ router.post("/seed", requireAuth, async (req, res) => {
     return;
   }
 
-  const defaults = SEED_OBJECTIVES[journeyType] ?? SEED_OBJECTIVES.indeciso;
+  const defaults = SEED_OBJECTIVES[journeyType] ?? SEED_OBJECTIVES.indeciso ?? [];
 
   const inserted = await db
     .insert(userObjectivesTable)
@@ -127,7 +127,7 @@ router.post("/seed", requireAuth, async (req, res) => {
 router.patch("/:id", requireAuth, async (req, res) => {
   try {
   const userId = req.user!.id;
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id ?? "", 10);
   const data = updateObjectiveSchema.parse(req.body);
 
   const [existing] = await db
@@ -171,7 +171,7 @@ router.patch("/:id", requireAuth, async (req, res) => {
 router.delete("/:id", requireAuth, async (req, res) => {
   try {
   const userId = req.user!.id;
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id ?? "", 10);
 
   const [existing] = await db
     .select()

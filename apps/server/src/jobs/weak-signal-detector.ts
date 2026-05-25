@@ -127,8 +127,6 @@ export async function runWeakSignalDetector(): Promise<{
 
       const evidence = {
         jobPostingCount: curCount,
-        googleTrendsScore: undefined,
-        communityMentions: undefined,
       };
 
       if (existing[0]) {

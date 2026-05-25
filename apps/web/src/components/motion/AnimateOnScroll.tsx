@@ -1,8 +1,7 @@
-import { useRef, type ReactNode } from "react";
-import { motion, useInView } from "framer-motion";
-import { useReducedMotion, easings, durations } from "@/lib/motion";
+import { durations, easings, useReducedMotion } from "@/lib/motion";
 import type { Variants } from "framer-motion";
-import { staggerContainer } from "@/lib/motion";
+import { motion, useInView } from "framer-motion";
+import { useRef, type ReactNode } from "react";
 
 interface AnimateOnScrollProps {
   children: ReactNode;

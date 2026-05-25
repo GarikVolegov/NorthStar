@@ -32,7 +32,7 @@ function computeScores(answers: Record<string, number>) {
   const riasecRaw: Record<string, number[]> = { R: [], I: [], A: [], S: [], E: [], C: [] };
   for (const [qId, val] of Object.entries(answers)) {
     const dim = RIASEC_MAP[qId];
-    if (dim) riasecRaw[dim].push(val);
+    if (dim) riasecRaw[dim]?.push(val);
   }
   const riasecScores: Record<string, number> = {};
   for (const [dim, vals] of Object.entries(riasecRaw)) {
@@ -55,8 +55,8 @@ function computeScores(answers: Record<string, number>) {
       ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
       : 0;
   }
-  const dominantSpirit = SPIRIT_KEYS.reduce((best, k) =>
-    (spiritScores[k] ?? 0) > (spiritScores[best] ?? 0) ? k : best, SPIRIT_KEYS[0]);
+  const dominantSpirit = SPIRIT_KEYS.reduce<string>((best, k) =>
+    (spiritScores[k] ?? 0) > (spiritScores[best] ?? 0) ? k : best, SPIRIT_KEYS[0] ?? "autonomo");
 
   return { riasecScores, primaryTypes, spiritScores, dominantSpirit };
 }
@@ -165,7 +165,6 @@ router.post("/", async (req, res) => {
 /* ─── GET /api/test-sessions/latest  —  ultima sessione utente ─── */
 router.get("/latest", requireAuth, async (req, res) => {
   try {
-    const userId = req.user!.id;
     res.json({
       sessionId: 1,
       recommendations: [
@@ -182,7 +181,7 @@ router.get("/latest", requireAuth, async (req, res) => {
 /* ─── GET /api/test-sessions/:sessionId  —  dettagli sessione ─── */
 router.get("/:sessionId", async (req, res) => {
   try {
-    const sessionId = parseInt(req.params.sessionId, 10);
+    const sessionId = parseInt(req.params.sessionId ?? "", 10);
     if (isNaN(sessionId)) { res.status(400).json({ error: "ID non valido" }); return; }
 
     const [session] = await db
@@ -203,8 +202,6 @@ router.get("/:sessionId", async (req, res) => {
 /* ─── POST /api/test-sessions/:sessionId/assign-user  —  assegna sessione ─── */
 router.post("/:sessionId/assign-user", requireAuth, async (req, res) => {
   try {
-    const userId = req.user!.id;
-    const sessionId = parseInt(req.params.sessionId, 10);
     res.json({ success: true });
   } catch (err) {
     req.log?.error?.({ err }, "test-sessions assign-user error");
@@ -225,7 +222,6 @@ router.post("/objectives/seed", requireAuth, async (req, res) => {
 /* ─── GET /api/objectives  —  lista obiettivi ─── */
 router.get("/objectives", requireAuth, async (req, res) => {
   try {
-    const userId = req.user!.id;
     res.json([]);
   } catch (err) {
     req.log?.error?.({ err }, "objectives get error");

@@ -39,7 +39,7 @@ function boolEnv(name: string, fallback = false): boolean {
   return ["1", "true", "yes", "on"].includes(value.toLowerCase());
 }
 
-function splitServices(value: string | undefined): OpsService[] {
+export function splitServices(value: string | undefined): OpsService[] {
   const allowed = new Set(DEFAULT_ALLOWED_SERVICES);
   return (value ?? DEFAULT_ALLOWED_SERVICES.join(","))
     .split(",")
@@ -54,11 +54,14 @@ function resolveComposeFile(): { file: string; cwd: string; exists: boolean } {
     path.resolve(process.cwd(), "..", "..", configured),
     path.resolve(process.cwd(), "..", configured),
   ];
-  const file = candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0];
+  const file = candidates.find((candidate) => fs.existsSync(candidate)) ?? path.resolve(process.cwd(), configured);
   return { file, cwd: path.dirname(file), exists: fs.existsSync(file) };
 }
 
 function opsEnabled() {
+  if (process.env.VERCEL === "1" && !boolEnv("ADMIN_OPS_ALLOW_VERCEL", false)) {
+    return false;
+  }
   return boolEnv("ADMIN_OPS_ENABLED", false);
 }
 
@@ -83,7 +86,7 @@ async function runDockerCompose(args: string[]) {
   });
 }
 
-function parseComposePs(stdout: string): Record<string, DockerServiceStatus> {
+export function parseComposePs(stdout: string): Record<string, DockerServiceStatus> {
   const services: Record<string, DockerServiceStatus> = {};
   const trimmed = stdout.trim();
   if (!trimmed) return services;
@@ -98,14 +101,14 @@ function parseComposePs(stdout: string): Record<string, DockerServiceStatus> {
   };
 
   try {
-    const parsed = JSON.parse(trimmed);
+    const parsed: unknown = JSON.parse(trimmed);
     if (Array.isArray(parsed)) parsed.forEach(parseRow);
     else parseRow(parsed);
     return services;
   } catch {
     for (const line of trimmed.split(/\r?\n/)) {
       try {
-        parseRow(JSON.parse(line));
+        parseRow(JSON.parse(line) as unknown);
       } catch {
         // Ignore non-JSON compose output.
       }

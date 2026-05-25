@@ -9,7 +9,7 @@
  * solo artefatti esplicitamente condivisi sono visibili.
  */
 import {
-  pgTable, serial, integer, text, timestamp, boolean, index, uniqueIndex,
+  pgTable, serial, integer, text, timestamp, boolean, index,
 } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 

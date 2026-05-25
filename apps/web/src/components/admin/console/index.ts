@@ -1,6 +1,6 @@
+export * from "./AffiliationSection";
 export * from "./AgentLaunchResult";
 export * from "./AgentsSection";
-export * from "./AffiliationSection";
 export * from "./BusinessMetricsSection";
 export * from "./config";
 export * from "./HomeSection";

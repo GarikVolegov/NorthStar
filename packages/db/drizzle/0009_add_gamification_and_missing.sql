@@ -54,6 +54,29 @@ CREATE TABLE IF NOT EXISTS "profession_education_paths" (
 );
 --> statement-breakpoint
 
+CREATE TABLE IF NOT EXISTS "knowledge_nodes" (
+  "id" serial PRIMARY KEY,
+  "user_id" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+  "type" varchar(32) NOT NULL DEFAULT 'document',
+  "title" varchar(200) NOT NULL,
+  "content" text NOT NULL DEFAULT '',
+  "color" varchar(16),
+  "url" text,
+  "sector_id" integer,
+  "x" real NOT NULL DEFAULT 0,
+  "y" real NOT NULL DEFAULT 0,
+  "embedding" jsonb,
+  "embedded_text" text,
+  "metadata" jsonb NOT NULL DEFAULT '{}'::jsonb,
+  "created_at" timestamptz NOT NULL DEFAULT now(),
+  "updated_at" timestamptz NOT NULL DEFAULT now()
+);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "knowledge_nodes_user_idx" ON "knowledge_nodes" ("user_id");
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "knowledge_nodes_type_idx" ON "knowledge_nodes" ("type");
+--> statement-breakpoint
+
 CREATE TABLE IF NOT EXISTS "knowledge_edges" (
   "id" serial PRIMARY KEY,
   "user_id" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,

@@ -16,7 +16,7 @@
  * Domain icons are resolved from DOMAIN_STATUS_ICONS at runtime.
  * Memory wiring from v3 is preserved unchanged.
  */
-import OpenAI from "openai";
+import type OpenAI from "openai";
 import { openai } from "../client";
 import { retrieve } from "./retriever";
 import { searchWeb, MIN_LOCAL_CHUNKS } from "./web-search";
@@ -32,7 +32,6 @@ import type { RetrievedChunk } from "./retriever";
 import type { CoTResult } from "./chain-of-thought";
 import type { EvalResult } from "./self-evaluator";
 import type { Domain, RouteDecision } from "./router-agent";
-import type { MemoryPattern } from "./memory-manager";
 import { selectModelFor, modelFor } from "../model-router";
 
 /**
@@ -66,21 +65,21 @@ const DOMAIN_LABELS: Record<Domain, string> = {
 
 export interface SpecialistRunOptions {
   userId:                number;
-  userContext:           UserContext & { memorySection?: string };
+  userContext:           UserContext & { memorySection?: string | undefined };
   history:               ChatMessage[];
   userMessage:           string;
   routeDecision:         RouteDecision;
-  memoryFactCount?:      number;
-  maxHistory?:           number;
-  requestId?:            string;
-  behavioralPatterns?:   Array<{ patternType: string; description: string; confidence: number }>;
-  routingHistorySummary?: string;
+  memoryFactCount?:      number | undefined;
+  maxHistory?:           number | undefined;
+  requestId?:            string | undefined;
+  behavioralPatterns?:   Array<{ patternType: string; description: string; confidence: number }> | undefined;
+  routingHistorySummary?: string | undefined;
 }
 
 export type SpecialistEvent =
   | { type: "token";  value: string }
   | { type: "status"; value: string }           // ← NEW v4
-  | { type: "done";   sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult; routeDecision: RouteDecision; supervisorResult?: SupervisorResult }
+  | { type: "done";   sources: RetrievedChunk[]; cot?: CoTResult | null | undefined; evalResult?: EvalResult | undefined; routeDecision: RouteDecision; supervisorResult?: SupervisorResult | undefined }
   | { type: "error";  message: string };
 
 // ── Abstract base ─────────────────────────────────────────────────────────────

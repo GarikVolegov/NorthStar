@@ -31,7 +31,7 @@ Rispondi SOLO con un array JSON di stringhe, esattamente 3 domande. Esempio:
       "suggest-questions",
     );
 
-    const parsed = JSON.parse(response);
+    const parsed = JSON.parse(response) as unknown;
     if (Array.isArray(parsed)) return parsed.slice(0, 3).map(String);
     return [];
   } catch (err) {

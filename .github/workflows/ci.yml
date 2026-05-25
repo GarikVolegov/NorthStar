@@ -10,467 +10,171 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# ─── Reusable env ─────────────────────────────────────────────────────────────────
 env:
-  NODE_VERSION: '20'
-  PNPM_VERSION: '9'
-  PYTHON_VERSION: '3.12'
+  NODE_VERSION: "20.10.x"
+  PNPM_VERSION: "11.0.9"
 
 jobs:
-  # ─── 1. Typecheck ─────────────────────────────────────────────────────────────────────
-  typecheck:
-    name: TypeScript typecheck
+  audit:
+    name: Security audit
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Get pnpm store path
-        id: pnpm-cache
-        run: echo "store=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.store }}
-          key: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run typecheck
-
-  # ─── 2. AI Server tests (Vitest) ────────────────────────────────────────────────────
-  ai-server-tests:
-    name: AI Server tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Get pnpm store path
-        id: pnpm-cache
-        run: echo "store=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.store }}
-          key: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Run AI Server unit tests
-        run: pnpm --filter @workspace/ai-server run test
-        env:
-          NODE_ENV: test
-          USE_MOCK_AI: 'true'
-
-  # ─── 3. Unit test (Vitest) ──────────────────────────────────────────────────────────
-  unit-tests:
-    name: Unit tests (Vitest)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Get pnpm store path
-        id: pnpm-cache
-        run: echo "store=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.store }}
-          key: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Run Vitest unit tests
-        run: pnpm --filter @workspace/api-server run test:unit
-        env:
-          NODE_ENV: test
-          JWT_SECRET: ci-jwt-secret-32-chars-minimum!
-          ADMIN_KEY: ci-admin-key
-          USE_MOCK_AI: 'true'
-          SENTRY_DSN: ''
-
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: unit-coverage
-          path: artifacts/api-server/coverage/
-          retention-days: 7
-
-  # ─── 3. Integration test (Supertest) ───────────────────────────────────────────────
-  integration-tests:
-    name: Integration tests (Supertest)
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: northstar
-          POSTGRES_PASSWORD: northstar
-          POSTGRES_DB: northstar_test
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Get pnpm store path
-        id: pnpm-cache
-        run: echo "store=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.store }}
-          key: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Run DB migrations
-        run: pnpm --filter @workspace/db exec drizzle-kit push
-        env:
-          DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_test
-
-      - name: Run Vitest integration tests
-        run: pnpm --filter @workspace/api-server run test:integration
-        env:
-          NODE_ENV: test
-          DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_test
-          JWT_SECRET: ci-jwt-secret-32-chars-minimum!
-          ADMIN_KEY: ci-admin-key
-          AI_AGENTS_URL: http://localhost:8000
-          USE_MOCK_AI: 'true'
-          OPENAI_API_KEY: 'mock-not-used'
-          ANTHROPIC_API_KEY: 'mock-not-used'
-          GROQ_API_KEY: 'mock-not-used'
-          SENTRY_DSN: ''
-
-  # ─── 4. Python ML tests (pytest) ─────────────────────────────────────────────────────────────
-  python-tests:
-    name: Python ML tests (pytest)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: pip-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            pip-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
-
-      - name: Install Python dependencies (ai-agents)
-        run: pip install -r artifacts/ai-agents/requirements.txt
-
-      - name: Install Python dependencies (ml-service)
-        run: pip install -r artifacts/ml-service/requirements.txt
-
-      - name: Run pytest — ai-agents ML module
-        run: |
-          cd artifacts/ai-agents
-          pytest ml/tests/ -v --tb=short
-        env:
-          PYTHONPATH: '.'
-
-      - name: Run pytest — ml-service
-        run: |
-          cd artifacts/ml-service
-          pytest tests/ -v --tb=short 2>/dev/null || \
-          python -c "from app.main import app; print('ml-service import OK')"
-        env:
-          PYTHONPATH: '.'
-
-  # ─── 5. AI Eval (regression check) ──────────────────────────────────────────────
-  eval-tests:
-    name: AI Eval regression
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: northstar
-          POSTGRES_PASSWORD: northstar
-          POSTGRES_DB: northstar_eval
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Get pnpm store path
-        id: pnpm-cache
-        run: echo "store=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.store }}
-          key: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Run DB migrations
-        run: pnpm --filter @workspace/db exec drizzle-kit push
-        env:
-          DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_eval
-
-      - name: Run eval suite
-        run: pnpm tsx eval/run-eval.ts
-        continue-on-error: true
-        env:
-          NODE_ENV: test
-          USE_MOCK_AI: 'true'
-          DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_eval
-          JWT_SECRET: ci-jwt-secret-32-chars-minimum!
-          ADMIN_KEY: ci-admin-key
-          OPENAI_API_KEY: ''
-          ANTHROPIC_API_KEY: ''
-          GROQ_API_KEY: ''
-
-      - name: Archive eval results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: eval-results
-          path: eval/results/
-          retention-days: 30
-
-  # ─── 6. E2E test (Playwright) ────────────────────────────────────────────────────────────────
-  #
-  # Env var mapping (helpers/auth.ts ⇔ CI):
-  #   TEST_USER_EMAIL      = utente base autenticato  (wendy, affiliate CTA)
-  #   TEST_USER_PASSWORD   = password utente base
-  #   TEST_AFFILIATE_EMAIL = utente con isAffiliate=true (affiliate dashboard)
-  #   TEST_AFFILIATE_PASSWORD = password utente affiliate
-  #
-  # Seed:
-  #   seed:e2e          → crea TEST_USER (base, objectives, sectorId)
-  #   seed:e2e-affiliate → crea TEST_AFFILIATE (isAffiliate=true) [graceful skip]
-  #
-  e2e-tests:
-    name: E2E tests (Playwright)
-    runs-on: ubuntu-latest
-    needs: [unit-tests, integration-tests]
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: northstar
-          POSTGRES_PASSWORD: northstar
-          POSTGRES_DB: northstar_e2e
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Get pnpm store path
-        id: pnpm-cache
-        run: echo "store=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.store }}
-          key: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Get Playwright version
-        id: pw-version
-        run: echo "version=$(pnpm ls --filter @workspace/orientamento @playwright/test --depth=0 --json | jq -r '.[0].devDependencies["@playwright/test"].version // "unknown"')" >> $GITHUB_OUTPUT
-
-      - uses: actions/cache@v4
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
-
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Run DB migrations
-        run: pnpm --filter @workspace/db exec drizzle-kit push
-        env:
-          DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_e2e
-
-      - name: Seed E2E base user
-        # Crea l'utente base con objectives e sectorId per le spec
-        # wendy.spec.ts e affiliate.spec.ts (branch non-affiliate)
-        run: |
-          pnpm --filter @workspace/api-server run seed:e2e 2>/dev/null || \
-          echo 'seed:e2e script non presente, skip'
-        env:
-          DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_e2e
-          E2E_USER_EMAIL: ${{ vars.TEST_USER_EMAIL || 'e2e@northstar.it' }}
-          E2E_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD || 'E2ePassword123!' }}
-
-      - name: Seed E2E affiliate user
-        # Crea l'utente con isAffiliate=true per affiliate.spec.ts
-        # (branch "Affiliato": stats card, referral link, dialog ritiro)
-        # Graceful skip se lo script non è ancora implementato.
-        run: |
-          pnpm --filter @workspace/api-server run seed:e2e-affiliate 2>/dev/null || \
-          echo 'seed:e2e-affiliate script non presente, skip'
-        env:
-          DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_e2e
-          AFFILIATE_SEED_EMAIL: ${{ vars.TEST_AFFILIATE_EMAIL || 'affiliate-e2e@northstar.it' }}
-          AFFILIATE_SEED_PASSWORD: ${{ secrets.TEST_AFFILIATE_PASSWORD || 'AffiliateE2e123!' }}
-
-      - name: Build API server
-        run: pnpm --filter @workspace/api-server run build
-
-      - name: Start services
-        run: |
-          PORT=8080 \
-          DATABASE_URL=postgresql://northstar:northstar@localhost:5432/northstar_e2e \
-          JWT_SECRET=ci-jwt-secret-32-chars-minimum! \
-          ADMIN_KEY=ci-admin-key \
-          AI_AGENTS_URL=http://localhost:8000 \
-          USE_MOCK_AI=true \
-          OPENAI_API_KEY=mock-not-used \
-          ANTHROPIC_API_KEY=mock-not-used \
-          GROQ_API_KEY=mock-not-used \
-          SENTRY_DSN='' \
-          node artifacts/api-server/dist/index.mjs &
-
-          PORT=5000 pnpm --filter @workspace/orientamento run build
-          pnpm exec serve -s artifacts/orientamento/dist -l 5000 &
-
-          npx wait-on \
-            http://localhost:8080/api/health/live \
-            http://localhost:8080/api/health/ready \
-            http://localhost:5000 \
-            --timeout 60000
-
-      - name: Run Playwright E2E
-        run: pnpm test:e2e
-        env:
-          BASE_URL: http://localhost:5000
-          API_URL: http://localhost:8080
-          # Nomi usati da e2e/helpers/auth.ts (loginViaApi, loginAsAffiliate)
-          TEST_USER_EMAIL: ${{ vars.TEST_USER_EMAIL || 'e2e@northstar.it' }}
-          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD || 'E2ePassword123!' }}
-          TEST_AFFILIATE_EMAIL: ${{ vars.TEST_AFFILIATE_EMAIL || 'affiliate-e2e@northstar.it' }}
-          TEST_AFFILIATE_PASSWORD: ${{ secrets.TEST_AFFILIATE_PASSWORD || 'AffiliateE2e123!' }}
-          # Retrocompatibilità con spec precedenti che usano E2E_USER_*
-          E2E_USER_EMAIL: ${{ vars.TEST_USER_EMAIL || 'e2e@northstar.it' }}
-          E2E_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD || 'E2ePassword123!' }}
-          CI: 'true'
-          USE_MOCK_AI: 'true'
-
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 7
-
-      - name: Upload Playwright trace (on failure)
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-traces
-          path: test-results/
-          retention-days: 3
-
-  # ─── 6. Sentry Release (solo su push a main) ───────────────────────────────────────────────
-  sentry-release:
-    name: Sentry release (main only)
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [typecheck, unit-tests, integration-tests]
-    environment: production
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Create Sentry release
-        run: |
-          npm install -g @sentry/cli --silent
-          RELEASE="production@$(git rev-parse --short HEAD)"
-          echo "SENTRY_RELEASE=$RELEASE" >> $GITHUB_ENV
+      - uses: ./.github/actions/setup
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          pnpm-version: ${{ env.PNPM_VERSION }}
 
-          sentry-cli releases new "$RELEASE"
-          sentry-cli releases set-commits "$RELEASE" --auto
-          sentry-cli releases finalize "$RELEASE"
-          sentry-cli releases deploys "$RELEASE" new \
-            --env production \
-            --name "$(git rev-parse --short HEAD)" \
-            --url "${{ vars.PRODUCTION_URL }}"
-          echo "✅ Sentry release $RELEASE creata e finalizzata"
+      - name: Dependency audit
+        run: pnpm audit --prod --audit-level=high
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
         env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Snyk audit
+        if: ${{ env.SNYK_TOKEN != '' }}
+        run: pnpm dlx snyk test --all-projects
+
+      - name: Snyk skipped
+        if: ${{ env.SNYK_TOKEN == '' }}
+        run: echo "SNYK_TOKEN is not configured; skipping optional Snyk audit."
+
+  quality:
+    name: Typecheck, tests, audits, build (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    needs: audit
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["20.10.x", "24.x"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+        with:
+          node-version: ${{ matrix.node-version }}
+          pnpm-version: ${{ env.PNPM_VERSION }}
+
+      - name: Required quality gate
+        run: pnpm run quality:required
+        env:
+          NODE_ENV: test
+          JWT_SECRET: ci-jwt-secret-for-github-actions-32chars
+          USE_MOCK_AI: "true"
+
+      - name: Web production build
+        run: pnpm --filter @northstar/web run build
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            apps/web/coverage
+            apps/server/coverage
+            packages/ai-server/coverage
+          if-no-files-found: ignore
+
+  e2e:
+    name: E2E API and browser (Playwright)
+    runs-on: ubuntu-latest
+    needs: quality
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: northstar
+          POSTGRES_PASSWORD: northstar
+          POSTGRES_DB: northstar_e2e
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          pnpm-version: ${{ env.PNPM_VERSION }}
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Chromium
+        run: pnpm exec playwright install chromium
+
+      - name: Run DB migrations
+        run: pnpm --filter @workspace/db exec drizzle-kit push
+        env:
+          DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_e2e
+
+      - name: Build server
+        run: pnpm --filter @northstar/server run build
+
+      - name: Start API server
+        run: |
+          PORT=3001 \
+          DATABASE_URL=postgresql://northstar:northstar@localhost:5432/northstar_e2e \
+          JWT_SECRET=CiJwtValue9f47b63a2d81ZetaAlpha! \
+          ADMIN_KEY=ci-admin-key \
+          USE_MOCK_AI=true \
+          OPENAI_API_KEY=mock-not-used \
+          ANTHROPIC_API_KEY=mock-not-used \
+          GROQ_API_KEY=mock-not-used \
+          SENTRY_DSN="" \
+          pnpm --filter @northstar/server exec tsx src/index.ts &
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3001/api/health/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Server did not become healthy"
+          exit 1
+
+      - name: Start web app
+        run: |
+          VITE_PORT=5000 pnpm --filter @northstar/web exec vite --config vite.config.ts --host 0.0.0.0 --port 5000 &
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:5000/ >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Web app did not become healthy"
+          exit 1
+
+      - name: Runtime quality gate
+        run: pnpm run quality:runtime
+        env:
+          API_URL: http://localhost:3001
+          BASE_URL: http://localhost:5000
+          CI: "true"
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore

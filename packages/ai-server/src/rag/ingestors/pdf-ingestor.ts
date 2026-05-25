@@ -32,6 +32,13 @@ export interface PdfIngestResult {
   durationMs:    number;
 }
 
+type PdfParse = (buf: Buffer) => Promise<{ text: string; numpages: number }>;
+type PdfParseModule = { default?: PdfParse } | PdfParse;
+
+function resolvePdfParse(module: PdfParseModule): PdfParse {
+  return typeof module === "function" ? module : module.default ?? (() => Promise.reject(new Error("pdf-parse default export missing")));
+}
+
 export async function ingestPdfToRag(
   buffer: Buffer,
   opts: PdfIngestOptions,
@@ -39,9 +46,7 @@ export async function ingestPdfToRag(
   const t0 = Date.now();
 
   // Dynamic import per non caricare pdf-parse a freddo
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pdfParse: (buf: Buffer) => Promise<{ text: string; numpages: number }> =
-    await import("pdf-parse").then((m) => (m as any).default ?? m);
+  const pdfParse = resolvePdfParse(await import("pdf-parse") as unknown as PdfParseModule);
 
   let rawText: string;
   let numPages = 0;
@@ -51,7 +56,7 @@ export async function ingestPdfToRag(
     rawText   = parsed.text;
     numPages  = parsed.numpages;
   } catch (e) {
-    throw new Error(`[pdf-ingestor] parse fallito per sourceId=${opts.sourceId}: ${String(e)}`);
+    throw new Error(`[pdf-ingestor] parse fallito per sourceId=${opts.sourceId}: ${String(e)}`, { cause: e });
   }
 
   // Pulizia testo

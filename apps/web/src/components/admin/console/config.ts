@@ -21,37 +21,40 @@ export const STATUS_CONFIG: Record<
 > = {
   draft: {
     label: "Bozza",
-    color: "bg-slate-100 text-slate-700",
+    color: "bg-muted text-muted-foreground",
     icon: FileText,
   },
   pending_review: {
     label: "In Revisione",
-    color: "bg-amber-100 text-amber-700",
+    color: "bg-warning-surface text-warning",
     icon: Clock,
   },
   approved: {
     label: "Approvato",
-    color: "bg-emerald-100 text-emerald-700",
+    color: "bg-success-surface text-success",
     icon: CheckCircle2,
   },
   rejected: {
     label: "Rifiutato",
-    color: "bg-red-100 text-red-700",
+    color: "bg-danger-surface text-danger",
     icon: XCircle,
   },
   applied: {
     label: "Applicato",
-    color: "bg-blue-100 text-blue-700",
+    color: "bg-info-surface text-info",
     icon: CheckCircle2,
   },
   archived: {
     label: "Archiviato",
-    color: "bg-slate-100 text-slate-500",
+    color: "bg-muted text-muted-foreground",
     icon: Archive,
   },
 };
 
-export const ENTITY_CONFIG: Record<string, { label: string; icon: LucideIcon }> = {
+export const ENTITY_CONFIG: Record<
+  string,
+  { label: string; icon: LucideIcon }
+> = {
   sector: { label: "Settore", icon: BarChart3 },
   role: { label: "Ruolo", icon: Briefcase },
   education_path: { label: "Piano", icon: GraduationCap },
@@ -63,20 +66,20 @@ export const ENTITY_CONFIG: Record<string, { label: string; icon: LucideIcon }> 
 export const HEALTH_UI = {
   healthy: {
     label: "Tutto stabile",
-    tone: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    dot: "bg-emerald-500",
+    tone: "border-success-muted bg-success-surface text-success",
+    dot: "bg-success",
     icon: CheckCircle2,
   },
   attention: {
     label: "Attenzione",
-    tone: "border-amber-200 bg-amber-50 text-amber-800",
-    dot: "bg-amber-500",
+    tone: "border-warning-muted bg-warning-surface text-warning",
+    dot: "bg-warning",
     icon: Clock,
   },
   critical: {
     label: "Intervento richiesto",
-    tone: "border-red-200 bg-red-50 text-red-800",
-    dot: "bg-red-500",
+    tone: "border-danger-muted bg-danger-surface text-danger",
+    dot: "bg-danger",
     icon: ShieldAlert,
   },
 } as const;

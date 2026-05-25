@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Star, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ApiClientError, postJson } from "@/lib/apiClient";
+import { AlertTriangle, CheckCircle2, Loader2, Star } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -56,19 +57,14 @@ export default function ResetPassword() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${BASE}api/auth/reset-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, newPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || t("resetPassword.resetError"));
-      } else {
-        setDone(true);
-      }
-    } catch {
-      setError(t("resetPassword.networkError"));
+      await postJson(`${BASE}api/auth/reset-password`, { token, newPassword });
+      setDone(true);
+    } catch (error) {
+      setError(
+        error instanceof ApiClientError
+          ? error.message
+          : t("resetPassword.networkError"),
+      );
     } finally {
       setLoading(false);
     }

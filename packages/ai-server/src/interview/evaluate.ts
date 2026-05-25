@@ -12,6 +12,15 @@ export interface AnswerEvaluation {
   suggestions: string[];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function numberField(record: Record<string, unknown>, key: string, fallback: number): number {
+  const value = record[key];
+  return typeof value === "number" ? value : fallback;
+}
+
 export async function evaluateAnswer(
   question: string,
   answer: string,
@@ -50,14 +59,18 @@ Rispondi SOLO con un oggetto JSON:
       "interview-evaluate",
     );
 
-    const parsed = JSON.parse(response);
+    const parsed = JSON.parse(response) as unknown;
+    const data = isRecord(parsed) ? parsed : {};
+    const suggestions = Array.isArray(data.suggestions)
+      ? data.suggestions.slice(0, 3).map(String)
+      : [];
     return {
-      score: clamp(parsed.score ?? 5, 0, 10),
-      clarity: clamp(parsed.clarity ?? 5, 0, 10),
-      relevance: clamp(parsed.relevance ?? 5, 0, 10),
-      depth: clamp(parsed.depth ?? 5, 0, 10),
-      feedback: parsed.feedback ?? "Risposta ricevuta.",
-      suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.slice(0, 3).map(String) : [],
+      score: clamp(numberField(data, "score", 5), 0, 10),
+      clarity: clamp(numberField(data, "clarity", 5), 0, 10),
+      relevance: clamp(numberField(data, "relevance", 5), 0, 10),
+      depth: clamp(numberField(data, "depth", 5), 0, 10),
+      feedback: typeof data.feedback === "string" ? data.feedback : "Risposta ricevuta.",
+      suggestions,
     };
   } catch (err) {
     logger.warn({ err }, "interview-evaluate failed");

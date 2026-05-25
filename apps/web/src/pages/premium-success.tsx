@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
-import { Link } from "wouter";
-import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, ArrowRight, Sparkles, BrainCircuit, GraduationCap, Zap } from "lucide-react";
 import { useWendy } from "@/contexts/WendyProvider";
+import { BrainCircuit, CheckCircle2, GraduationCap, Sparkles, Zap } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 function AnimatedCounter({ end, suffix = "" }: { end: number; suffix?: string }) {
   const [count, setCount] = useState(0);

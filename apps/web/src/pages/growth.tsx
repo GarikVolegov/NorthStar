@@ -1,11 +1,12 @@
-import { usePageMeta } from "@/lib/seo";
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
-import { ArrowRight, BookOpen, Clock, Sparkles, TrendingUp, Star, Lock } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTranslation } from "react-i18next";
+import { getJson } from "@/lib/apiClient";
+import { usePageMeta } from "@/lib/seo";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import { ArrowRight, BookOpen, Clock, Lock, Sparkles, Star, TrendingUp } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -122,7 +123,7 @@ function ArticleCard({ article, recommended }: { article: Article; recommended?:
 function PerTeSection({ userId }: { userId: number }) {
   const { data, isLoading } = useQuery<PerTeData>({
     queryKey: ["crescita-per-te", userId],
-    queryFn: () => fetch(`${BASE}api/crescita/per-te`).then(r => r.json()),
+    queryFn: () => getJson<PerTeData>(`${BASE}api/crescita/per-te`),
     staleTime: 1000 * 60 * 10,
   });
 
@@ -135,7 +136,7 @@ function PerTeSection({ userId }: { userId: number }) {
             <div className="h-6 w-48 bg-muted animate-pulse rounded" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
+            {Array.from({ length: 4 }, (_, i) => (
               <div key={i} className="h-44 rounded-2xl bg-muted animate-pulse" />
             ))}
           </div>
@@ -253,20 +254,15 @@ export default function Crescita() {
 
   const { data: catData = [] } = useQuery<Category[]>({
     queryKey: ["crescita-categorie"],
-    queryFn: async () => {
-      const res = await fetch(`${BASE}api/crescita/categorie`);
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
-    },
+    queryFn: () => getJson<Category[]>(`${BASE}api/crescita/categorie`),
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: recentData } = useQuery<{ articles: Article[] }>({
     queryKey: ["crescita-recent"],
     queryFn: async () => {
-      const res = await fetch(`${BASE}api/crescita?limit=6`);
-      const data = await res.json();
-      return Array.isArray(data?.articles) ? data : { articles: [] };
+      const data = await getJson<{ articles?: Article[] }>(`${BASE}api/crescita?limit=6`);
+      return { articles: Array.isArray(data?.articles) ? data.articles : [] };
     },
     staleTime: 1000 * 60 * 5,
   });

@@ -1,14 +1,30 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import { eq, and, gte, asc, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import { db, calendarEventsTable } from "@workspace/db";
-import { format, parseISO, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays, subDays } from "date-fns";
+import {
+  parseISO,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+} from "date-fns";
 import { it } from "date-fns/locale";
 import { sendOptionalReadFallback } from "../lib/persistence";
+import { getRequestBody } from "../lib/request-context";
+import { asPlainRecord, isOneOf } from "../lib/type-guards";
 
 const router = Router();
 
-const EVENT_CATEGORIES = ["study", "training", "interview", "deadline", "task", "follow-up"] as const;
+const EVENT_CATEGORIES = [
+  "study",
+  "training",
+  "interview",
+  "deadline",
+  "task",
+  "follow-up",
+] as const;
 const EVENT_PRIORITIES = ["low", "medium", "high"] as const;
 const EVENT_STATUSES = ["todo", "in-progress", "done", "postponed"] as const;
 
@@ -31,11 +47,13 @@ function enumValue<T extends readonly string[]>(
   allowed: T,
   fallback: T[number],
 ): T[number] {
-  return typeof value === "string" && allowed.includes(value) ? value : fallback;
+  return isOneOf(value, allowed) ? value : fallback;
 }
 
 function arrayValue<T>(value: unknown, fallback: T[]): T[] {
-  return Array.isArray(value) ? (value as T[]) : fallback;
+  return Array.isArray(value)
+    ? value.filter((item): item is T => item != null)
+    : fallback;
 }
 
 function normalizeCalendarEventCreate(body: CalendarEventInput) {
@@ -53,7 +71,8 @@ function normalizeCalendarEventCreate(body: CalendarEventInput) {
   return {
     data: {
       title,
-      description: typeof body.description === "string" ? body.description : null,
+      description:
+        typeof body.description === "string" ? body.description : null,
       startAt,
       endAt,
       allDay: typeof body.allDay === "boolean" ? body.allDay : false,
@@ -62,11 +81,14 @@ function normalizeCalendarEventCreate(body: CalendarEventInput) {
       status: enumValue(body.status, EVENT_STATUSES, "todo"),
       color: typeof body.color === "string" ? body.color : null,
       tags: arrayValue<string>(body.tags, []),
-      linkedSectorId: typeof body.linkedSectorId === "number" ? body.linkedSectorId : null,
+      linkedSectorId:
+        typeof body.linkedSectorId === "number" ? body.linkedSectorId : null,
       linkedGoal: typeof body.linkedGoal === "string" ? body.linkedGoal : null,
       linkedContentIds: arrayValue<number>(body.linkedContentIds, []),
-      isRecurring: typeof body.isRecurring === "boolean" ? body.isRecurring : false,
-      recurrenceRule: typeof body.recurrenceRule === "string" ? body.recurrenceRule : null,
+      isRecurring:
+        typeof body.isRecurring === "boolean" ? body.isRecurring : false,
+      recurrenceRule:
+        typeof body.recurrenceRule === "string" ? body.recurrenceRule : null,
     },
   };
 }
@@ -81,7 +103,8 @@ function normalizeCalendarEventUpdate(body: CalendarEventInput) {
   }
 
   if ("description" in body) {
-    data.description = typeof body.description === "string" ? body.description : null;
+    data.description =
+      typeof body.description === "string" ? body.description : null;
   }
   if ("startAt" in body) {
     const startAt = parseDateInput(body.startAt);
@@ -93,20 +116,32 @@ function normalizeCalendarEventUpdate(body: CalendarEventInput) {
     if (!endAt) return { error: "Data fine evento non valida" };
     data.endAt = endAt;
   }
-  if ("allDay" in body) data.allDay = typeof body.allDay === "boolean" ? body.allDay : false;
-  if ("category" in body) data.category = enumValue(body.category, EVENT_CATEGORIES, "task");
-  if ("priority" in body) data.priority = enumValue(body.priority, EVENT_PRIORITIES, "medium");
-  if ("status" in body) data.status = enumValue(body.status, EVENT_STATUSES, "todo");
-  if ("color" in body) data.color = typeof body.color === "string" ? body.color : null;
+  if ("allDay" in body)
+    data.allDay = typeof body.allDay === "boolean" ? body.allDay : false;
+  if ("category" in body)
+    data.category = enumValue(body.category, EVENT_CATEGORIES, "task");
+  if ("priority" in body)
+    data.priority = enumValue(body.priority, EVENT_PRIORITIES, "medium");
+  if ("status" in body)
+    data.status = enumValue(body.status, EVENT_STATUSES, "todo");
+  if ("color" in body)
+    data.color = typeof body.color === "string" ? body.color : null;
   if ("tags" in body) data.tags = arrayValue<string>(body.tags, []);
   if ("linkedSectorId" in body) {
-    data.linkedSectorId = typeof body.linkedSectorId === "number" ? body.linkedSectorId : null;
+    data.linkedSectorId =
+      typeof body.linkedSectorId === "number" ? body.linkedSectorId : null;
   }
-  if ("linkedGoal" in body) data.linkedGoal = typeof body.linkedGoal === "string" ? body.linkedGoal : null;
-  if ("linkedContentIds" in body) data.linkedContentIds = arrayValue<number>(body.linkedContentIds, []);
-  if ("isRecurring" in body) data.isRecurring = typeof body.isRecurring === "boolean" ? body.isRecurring : false;
+  if ("linkedGoal" in body)
+    data.linkedGoal =
+      typeof body.linkedGoal === "string" ? body.linkedGoal : null;
+  if ("linkedContentIds" in body)
+    data.linkedContentIds = arrayValue<number>(body.linkedContentIds, []);
+  if ("isRecurring" in body)
+    data.isRecurring =
+      typeof body.isRecurring === "boolean" ? body.isRecurring : false;
   if ("recurrenceRule" in body) {
-    data.recurrenceRule = typeof body.recurrenceRule === "string" ? body.recurrenceRule : null;
+    data.recurrenceRule =
+      typeof body.recurrenceRule === "string" ? body.recurrenceRule : null;
   }
 
   return { data };
@@ -117,55 +152,58 @@ router.get("/events", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
     const { from, to } = req.query;
-    
+
     let startDate: Date | undefined;
     let endDate: Date | undefined;
-    
+
     if (from) {
       startDate = parseISO(from as string);
     }
     if (to) {
       endDate = parseISO(to as string);
     }
-    
+
     // Default to current month if no dates provided
     if (!startDate && !endDate) {
       const now = new Date();
       startDate = startOfWeek(startOfMonth(now), { locale: it });
       endDate = endOfWeek(endOfMonth(now), { locale: it });
     }
-    
-    const conditions: ReturnType<typeof eq>[] = [eq(calendarEventsTable.userId, userId) as any];
-    if (startDate) conditions.push(gte(calendarEventsTable.startAt, startDate) as any);
-    if (endDate)   conditions.push(sql`${calendarEventsTable.endAt} <= ${endDate}` as any);
+
+    const conditions: SQL[] = [eq(calendarEventsTable.userId, userId)];
+    if (startDate) conditions.push(gte(calendarEventsTable.startAt, startDate));
+    if (endDate)
+      conditions.push(sql`${calendarEventsTable.endAt} <= ${endDate}`);
 
     const events = await db
       .select({
-        id:               calendarEventsTable.id,
-        title:            calendarEventsTable.title,
-        description:      calendarEventsTable.description,
-        startAt:          calendarEventsTable.startAt,
-        endAt:            calendarEventsTable.endAt,
-        allDay:           calendarEventsTable.allDay,
-        category:         calendarEventsTable.category,
-        priority:         calendarEventsTable.priority,
-        status:           calendarEventsTable.status,
-        color:            calendarEventsTable.color,
-        tags:             calendarEventsTable.tags,
-        linkedSectorId:   calendarEventsTable.linkedSectorId,
-        linkedGoal:       calendarEventsTable.linkedGoal,
+        id: calendarEventsTable.id,
+        title: calendarEventsTable.title,
+        description: calendarEventsTable.description,
+        startAt: calendarEventsTable.startAt,
+        endAt: calendarEventsTable.endAt,
+        allDay: calendarEventsTable.allDay,
+        category: calendarEventsTable.category,
+        priority: calendarEventsTable.priority,
+        status: calendarEventsTable.status,
+        color: calendarEventsTable.color,
+        tags: calendarEventsTable.tags,
+        linkedSectorId: calendarEventsTable.linkedSectorId,
+        linkedGoal: calendarEventsTable.linkedGoal,
         linkedContentIds: calendarEventsTable.linkedContentIds,
-        isRecurring:      calendarEventsTable.isRecurring,
-        recurrenceRule:   calendarEventsTable.recurrenceRule,
+        isRecurring: calendarEventsTable.isRecurring,
+        recurrenceRule: calendarEventsTable.recurrenceRule,
       })
       .from(calendarEventsTable)
       .where(and(...conditions))
       .orderBy(asc(calendarEventsTable.startAt));
-    
+
     res.json({ events });
   } catch (err) {
     req.log?.error?.({ err }, "calendar events error");
-    res.status(500).json({ error: "Errore nel caricamento degli eventi del calendario" });
+    res
+      .status(500)
+      .json({ error: "Errore nel caricamento degli eventi del calendario" });
   }
 });
 
@@ -173,8 +211,8 @@ router.get("/events", requireAuth, async (req, res) => {
 router.get("/events/:id", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
-    const eventId = parseInt(req.params.id, 10);
-    
+    const eventId = parseInt(req.params.id ?? "", 10);
+
     const [event] = await db
       .select({
         id: calendarEventsTable.id,
@@ -198,15 +236,15 @@ router.get("/events/:id", requireAuth, async (req, res) => {
       .where(
         and(
           eq(calendarEventsTable.id, eventId),
-          eq(calendarEventsTable.userId, userId)
-        )
+          eq(calendarEventsTable.userId, userId),
+        ),
       );
-    
+
     if (!event) {
       res.status(404).json({ error: "Evento non trovato" });
       return;
     }
-    
+
     res.json(event);
   } catch (err) {
     req.log?.error?.({ err }, "calendar event get error");
@@ -218,7 +256,9 @@ router.get("/events/:id", requireAuth, async (req, res) => {
 router.post("/events", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
-    const normalized = normalizeCalendarEventCreate(req.body ?? {});
+    const normalized = normalizeCalendarEventCreate(
+      asPlainRecord(getRequestBody(req)),
+    );
     if ("error" in normalized) {
       res.status(400).json({ error: normalized.error });
       return;
@@ -231,7 +271,7 @@ router.post("/events", requireAuth, async (req, res) => {
         ...normalized.data,
       })
       .returning();
-    
+
     res.status(201).json(event);
   } catch (err) {
     req.log?.error?.({ err }, "calendar event create error");
@@ -243,29 +283,31 @@ router.post("/events", requireAuth, async (req, res) => {
 router.patch("/events/:id", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
-    const eventId = parseInt(req.params.id, 10);
-    const normalized = normalizeCalendarEventUpdate(req.body ?? {});
+    const eventId = parseInt(req.params.id ?? "", 10);
+    const normalized = normalizeCalendarEventUpdate(
+      asPlainRecord(getRequestBody(req)),
+    );
     if ("error" in normalized) {
       res.status(400).json({ error: normalized.error });
       return;
     }
-    
+
     const [event] = await db
       .update(calendarEventsTable)
       .set(normalized.data)
       .where(
         and(
           eq(calendarEventsTable.id, eventId),
-          eq(calendarEventsTable.userId, userId)
-        )
+          eq(calendarEventsTable.userId, userId),
+        ),
       )
       .returning();
-    
+
     if (!event) {
       res.status(404).json({ error: "Evento non trovato" });
       return;
     }
-    
+
     res.json(event);
   } catch (err) {
     req.log?.error?.({ err }, "calendar event update error");
@@ -277,17 +319,17 @@ router.patch("/events/:id", requireAuth, async (req, res) => {
 router.delete("/events/:id", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
-    const eventId = parseInt(req.params.id, 10);
-    
+    const eventId = parseInt(req.params.id ?? "", 10);
+
     await db
       .delete(calendarEventsTable)
       .where(
         and(
           eq(calendarEventsTable.id, eventId),
-          eq(calendarEventsTable.userId, userId)
-        )
+          eq(calendarEventsTable.userId, userId),
+        ),
       );
-    
+
     res.json({ success: true });
   } catch (err) {
     req.log?.error?.({ err }, "calendar event delete error");
@@ -301,7 +343,7 @@ router.get("/upcoming", requireAuth, async (req, res) => {
     const userId = req.user!.id;
     const now = new Date();
     const limit = Math.max(1, Math.min(Number(req.query.limit) || 5, 20));
-    
+
     const events = await db
       .select({
         id: calendarEventsTable.id,
@@ -319,16 +361,19 @@ router.get("/upcoming", requireAuth, async (req, res) => {
         and(
           eq(calendarEventsTable.userId, userId),
           gte(calendarEventsTable.endAt, now),
-        )
+        ),
       )
       .orderBy(asc(calendarEventsTable.startAt))
       .limit(limit);
-    
+
     res.json(events);
   } catch (err) {
     req.log?.error?.({ err }, "calendar upcoming error");
-    if (sendOptionalReadFallback(req, res, err, "calendar.upcoming", [])) return;
-    res.status(500).json({ error: "Errore nel caricamento degli eventi imminenti" });
+    if (sendOptionalReadFallback(req, res, err, "calendar.upcoming", []))
+      return;
+    res
+      .status(500)
+      .json({ error: "Errore nel caricamento degli eventi imminenti" });
   }
 });
 
@@ -348,30 +393,33 @@ router.get("/export.ics", requireAuth, async (req, res) => {
       .from(calendarEventsTable)
       .where(eq(calendarEventsTable.userId, userId))
       .orderBy(asc(calendarEventsTable.startAt));
-    
+
     // Generate iCal content
     let icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//NorthStar//Calendar//IT\n`;
-    
+
     for (const event of events) {
       const startDate = new Date(event.startAt);
       const endDate = new Date(event.endAt);
-      
+
       icsContent += `BEGIN:VEVENT\n`;
       icsContent += `UID:${event.id}@northstar.it\n`;
-      icsContent += `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '')}Z\n`;
-      icsContent += `DTSTART:${startDate.toISOString().replace(/[-:]/g, '').replace(/\..+/, '')}Z\n`;
-      icsContent += `DTEND:${endDate.toISOString().replace(/[-:]/g, '').replace(/\..+/, '')}Z\n`;
+      icsContent += `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "")}Z\n`;
+      icsContent += `DTSTART:${startDate.toISOString().replace(/[-:]/g, "").replace(/\..+/, "")}Z\n`;
+      icsContent += `DTEND:${endDate.toISOString().replace(/[-:]/g, "").replace(/\..+/, "")}Z\n`;
       icsContent += `SUMMARY:${event.title}\n`;
       if (event.description) {
         icsContent += `DESCRIPTION:${event.description}\n`;
       }
       icsContent += `END:VEVENT\n`;
     }
-    
+
     icsContent += `END:VCALENDAR`;
-    
-    res.setHeader('Content-Type', 'text/calendar');
-    res.setHeader('Content-Disposition', 'attachment; filename="northstar-calendar.ics"');
+
+    res.setHeader("Content-Type", "text/calendar");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="northstar-calendar.ics"',
+    );
     res.send(icsContent);
   } catch (err) {
     req.log?.error?.({ err }, "calendar export error");

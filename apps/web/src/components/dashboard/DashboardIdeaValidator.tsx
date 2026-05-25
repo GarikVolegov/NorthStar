@@ -1,7 +1,7 @@
+import { ArrowRight, Lightbulb, Sparkles } from "lucide-react";
 import { Link } from "wouter";
-import { Lightbulb, ArrowRight, Sparkles } from "lucide-react";
 
-export function DashboardIdeaValidator({ userId }: { userId?: number }) {
+export function DashboardIdeaValidator({ userId: _userId }: { userId?: number }) {
   return (
     <div className="rounded-2xl border bg-card p-5">
       <div className="flex items-center gap-3 mb-4">

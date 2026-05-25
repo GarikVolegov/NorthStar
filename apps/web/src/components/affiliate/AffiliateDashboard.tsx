@@ -1,14 +1,6 @@
-import { useEffect, useState } from 'react';
-import {
-  useAffiliateDashboard,
-  useAffiliateWithdraw,
-  useAffiliateCopyLink,
-  formatCents,
-} from '@/hooks/useAffiliateDashboard';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +10,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  formatCents,
+  useAffiliateCopyLink,
+  useAffiliateDashboard,
+  useAffiliateWithdraw,
+} from '@/hooks/useAffiliateDashboard';
+import { apiFetch } from '@/lib/api-fetch';
 import {
   AlertCircle,
   Check,
@@ -31,7 +31,7 @@ import {
   TrendingUp,
   Wallet,
 } from 'lucide-react';
-import { apiFetch } from '@/lib/api-fetch';
+import { useEffect, useState } from 'react';
 
 function StatsCardSkeleton() {
   return (
@@ -370,7 +370,9 @@ export function AffiliateDashboard() {
         ) : (
           <div className="divide-y">
             {data!.referrals.map((r) => {
-              const { label, variant } = STATUS_LABELS[r.status] ?? STATUS_LABELS.pending;
+              const statusMeta =
+                STATUS_LABELS[r.status] ?? STATUS_LABELS.pending ?? { label: r.status, variant: "outline" as const };
+              const { label, variant } = statusMeta;
               return (
                 <div key={r.id} className="flex items-center justify-between py-3">
                   <div>

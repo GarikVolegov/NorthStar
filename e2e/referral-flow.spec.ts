@@ -7,7 +7,7 @@
  *   3. Registrazione tramite referral (un nuovo utente si iscrive con ?ref=CODE)
  *
  * Prerequisiti ENV:
- *   TEST_USER_EMAIL / TEST_USER_PASSWORD   → utente esistente con isAffiliate=true
+ *   TEST_USER_EMAIL / TEST_USER_PASSWORD   → utente esistente
  *   TEST_AFFILIATE_EMAIL / TEST_AFFILIATE_PASSWORD → opzionale
  *
  * I test che creano utenti usa email univoche (timestamp) così possono
@@ -17,7 +17,30 @@
  *   pnpm exec playwright test e2e/referral-flow.spec.ts
  */
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { loginViaApi, loginAsAffiliate, waitForAuthReady } from './helpers/auth';
+import { loginAsAffiliate, waitForAuthReady } from './helpers/auth';
+import { responseJson } from './helpers/json';
+
+type RegisterResponse = {
+  token?: string;
+  userId?: number | string;
+  email?: string;
+  user?: { id?: number | string; email?: string };
+};
+
+type LoginResponse = { token?: string };
+
+type AffiliateDashboard = {
+  referralCode?: string;
+  code?: string;
+  referralLink?: string;
+  link?: string;
+  totalReferrals?: number;
+  referralsCount?: number;
+};
+
+function readReferralCount(body: AffiliateDashboard): number {
+  return body.totalReferrals ?? body.referralsCount ?? 0;
+}
 
 // ── Utility ─────────────────────────────────────────────────────────────────
 
@@ -53,11 +76,11 @@ async function registerUser(
     `Registrazione fallita per ${user.email} — risposta: ${res.status()}`,
   ).toBe(201);
 
-  const body = await res.json();
+  const body = await responseJson<RegisterResponse>(res);
   expect(body.token,  'Token JWT assente nella risposta di /api/auth/register').toBeTruthy();
   expect(body.userId ?? body.user?.id, 'userId assente nella risposta').toBeTruthy();
 
-  return { token: body.token, userId: body.userId ?? body.user?.id };
+  return { token: body.token ?? "", userId: body.userId ?? body.user?.id ?? "" };
 }
 
 /**
@@ -73,10 +96,10 @@ async function getAffiliateDashboard(
   });
   expect(res.status(), 'GET /api/affiliate/dashboard deve rispondere 200').toBe(200);
 
-  const body = await res.json();
+  const body = await responseJson<AffiliateDashboard>(res);
   expect(body.referralCode ?? body.code, 'Codice referral assente').toBeTruthy();
 
-  const code = body.referralCode ?? body.code;
+  const code = body.referralCode ?? body.code ?? "";
   const link = body.referralLink ?? body.link ?? `${process.env.BASE_URL ?? 'http://localhost:5173'}?ref=${code}`;
   return { referralCode: code, referralLink: link };
 }
@@ -96,7 +119,7 @@ test.describe('Percorso Critico — Referral Flow', () => {
       });
       expect(res.status()).toBe(201);
 
-      const body = await res.json();
+      const body = await responseJson<RegisterResponse>(res);
       expect(body.token).toBeTruthy();
       expect(body.userId ?? body.user?.id).toBeTruthy();
     });
@@ -132,7 +155,7 @@ test.describe('Percorso Critico — Referral Flow', () => {
         data: { email: user.email, password: user.password },
       });
       expect(loginRes.status()).toBe(200);
-      const body = await loginRes.json();
+      const body = await responseJson<LoginResponse>(loginRes);
       expect(body.token).toBeTruthy();
     });
 
@@ -142,7 +165,7 @@ test.describe('Percorso Critico — Referral Flow', () => {
 
   test.describe('Step 2 · Generazione Link Affiliazione', () => {
 
-    test('utente affiliato riceve referralCode e referralLink validi', async ({ page, request }) => {
+    test('utente affiliato riceve referralCode e referralLink validi', async ({ request }) => {
       // Login come affiliato per ottenere il token
       const loginRes = await request.post('/api/auth/login', {
         data: {
@@ -154,9 +177,10 @@ test.describe('Percorso Critico — Referral Flow', () => {
         test.skip(true, 'Credenziali affiliato non disponibili in questo ambiente');
         return;
       }
-      const { token } = await loginRes.json();
+      const { token } = await responseJson<LoginResponse>(loginRes);
+      expect(token).toBeTruthy();
 
-      const { referralCode, referralLink } = await getAffiliateDashboard(request, token);
+      const { referralCode, referralLink } = await getAffiliateDashboard(request, token ?? "");
       expect(referralCode).toMatch(/^[a-zA-Z0-9_-]{4,}$/);
       expect(referralLink).toMatch(/^https?:\/\/.+/);
     });
@@ -166,15 +190,17 @@ test.describe('Percorso Critico — Referral Flow', () => {
       expect(res.status()).toBe(401);
     });
 
-    test('utente NON affiliato → GET /api/affiliate/dashboard restituisce 403', async ({ request }) => {
+    test('utente normale → GET /api/affiliate/dashboard restituisce 200 e genera referral', async ({ request }) => {
       const user = uniqueUser('nonaff');
       const { token } = await registerUser(request, user);
 
       const res = await request.get('/api/affiliate/dashboard', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // Utente appena registrato non è affiliato → 403
-      expect([403, 200]).toContain(res.status());
+      expect(res.status()).toBe(200);
+      const body = await responseJson<AffiliateDashboard>(res);
+      expect(body.referralCode ?? body.code).toBeTruthy();
+      expect(body.referralLink ?? body.link).toMatch(/\/sign-up\?ref=/);
     });
 
     test('UI: input readonly mostra link che inizia con http', async ({ page }) => {
@@ -208,8 +234,8 @@ test.describe('Percorso Critico — Referral Flow', () => {
         test.skip(true, 'Credenziali affiliato non disponibili');
         return;
       }
-      const { token: affiliateToken } = await loginRes.json();
-      const { referralCode } = await getAffiliateDashboard(request, affiliateToken);
+      const { token: affiliateToken } = await responseJson<LoginResponse>(loginRes);
+      const { referralCode } = await getAffiliateDashboard(request, affiliateToken ?? "");
 
       // 2) Registra nuovo utente con il codice referral
       const newUser = uniqueUser('referred');
@@ -222,7 +248,7 @@ test.describe('Percorso Critico — Referral Flow', () => {
         },
       });
       expect(res.status()).toBe(201);
-      const body = await res.json();
+      const body = await responseJson<RegisterResponse>(res);
       expect(body.token).toBeTruthy();
     });
 
@@ -250,25 +276,28 @@ test.describe('Percorso Critico — Referral Flow', () => {
         test.skip(true, 'Credenziali affiliato non disponibili');
         return;
       }
-      const { token: affiliateToken } = await loginRes.json();
+      const { token: affiliateToken } = await responseJson<LoginResponse>(loginRes);
+      expect(affiliateToken).toBeTruthy();
 
       // Snapshot prima
-      const before = await (await request.get('/api/affiliate/dashboard', {
+      const beforeRes = await request.get('/api/affiliate/dashboard', {
         headers: { Authorization: `Bearer ${affiliateToken}` },
-      })).json();
-      const countBefore: number = before.totalReferrals ?? before.referralsCount ?? 0;
+      });
+      const before = await responseJson<AffiliateDashboard>(beforeRes);
+      const countBefore = readReferralCount(before);
 
       // Registra nuovo utente con referral
-      const { referralCode } = await getAffiliateDashboard(request, affiliateToken);
+      const { referralCode } = await getAffiliateDashboard(request, affiliateToken ?? "");
       const newUser = uniqueUser('tracked');
       await registerUser(request, newUser, referralCode);
 
       // Snapshot dopo (piccolo ritardo per propagazione asincrona)
       await new Promise(r => setTimeout(r, 800));
-      const after = await (await request.get('/api/affiliate/dashboard', {
+      const afterRes = await request.get('/api/affiliate/dashboard', {
         headers: { Authorization: `Bearer ${affiliateToken}` },
-      })).json();
-      const countAfter: number = after.totalReferrals ?? after.referralsCount ?? 0;
+      });
+      const after = await responseJson<AffiliateDashboard>(afterRes);
+      const countAfter = readReferralCount(after);
 
       expect(countAfter).toBeGreaterThanOrEqual(countBefore + 1);
     });
@@ -303,18 +332,20 @@ test.describe('Percorso Critico — Referral Flow', () => {
         test.skip(true, 'Credenziali affiliato non configurate — imposta TEST_AFFILIATE_EMAIL e TEST_AFFILIATE_PASSWORD');
         return;
       }
-      const { token: affiliateToken } = await affiliateLoginRes.json();
+      const { token: affiliateToken } = await responseJson<LoginResponse>(affiliateLoginRes);
+      expect(affiliateToken).toBeTruthy();
 
       // B) Recupera codice referral dell'affiliato
-      const { referralCode, referralLink } = await getAffiliateDashboard(request, affiliateToken);
+      const { referralCode, referralLink } = await getAffiliateDashboard(request, affiliateToken ?? "");
       expect(referralCode).toBeTruthy();
       expect(referralLink).toMatch(/^https?:\/\//);
 
       // C) Snapshot contatore referral prima
-      const dashBefore = await (await request.get('/api/affiliate/dashboard', {
+      const dashBeforeRes = await request.get('/api/affiliate/dashboard', {
         headers: { Authorization: `Bearer ${affiliateToken}` },
-      })).json();
-      const refCountBefore: number = dashBefore.totalReferrals ?? dashBefore.referralsCount ?? 0;
+      });
+      const dashBefore = await responseJson<AffiliateDashboard>(dashBeforeRes);
+      const refCountBefore = readReferralCount(dashBefore);
 
       // D) Nuovo utente si registra tramite il codice referral
       const referred = uniqueUser('e2e-flow');
@@ -326,15 +357,16 @@ test.describe('Percorso Critico — Referral Flow', () => {
         headers: { Authorization: `Bearer ${referredToken}` },
       });
       expect(meRes.status()).toBe(200);
-      const me = await meRes.json();
+      const me = await responseJson<RegisterResponse>(meRes);
       expect(me.email ?? me.user?.email).toBe(referred.email);
 
       // F) Verifica che il contatore referral sia aumentato
       await new Promise(r => setTimeout(r, 800));
-      const dashAfter = await (await request.get('/api/affiliate/dashboard', {
+      const dashAfterRes = await request.get('/api/affiliate/dashboard', {
         headers: { Authorization: `Bearer ${affiliateToken}` },
-      })).json();
-      const refCountAfter: number = dashAfter.totalReferrals ?? dashAfter.referralsCount ?? 0;
+      });
+      const dashAfter = await responseJson<AffiliateDashboard>(dashAfterRes);
+      const refCountAfter = readReferralCount(dashAfter);
 
       expect(refCountAfter).toBeGreaterThanOrEqual(refCountBefore + 1);
     });
@@ -351,12 +383,12 @@ test.describe('Percorso Critico — Referral Flow', () => {
         test.skip(true, 'Credenziali affiliato non disponibili');
         return;
       }
-      const { token } = await loginRes.json();
-      const { referralCode } = await getAffiliateDashboard(request, token);
+      const { token } = await responseJson<LoginResponse>(loginRes);
+      const { referralCode } = await getAffiliateDashboard(request, token ?? "");
 
       // Naviga alla pagina di registrazione con il codice referral nel querystring
       await page.goto(`/register?ref=${referralCode}`);
-      await page.waitForLoadState('networkidle', { timeout: 15_000 });
+      await expect(page.locator('body')).toBeVisible({ timeout: 10_000 });
 
       // Verifica che il codice sia memorizzato (localStorage o campo nascosto)
       const stored = await page.evaluate(

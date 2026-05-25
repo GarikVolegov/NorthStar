@@ -6,7 +6,6 @@ const router = Router();
 /* ─── GET /api/applications/:userId  —  lista applicazioni ───── */
 router.get("/:userId", requireAuth, async (req, res) => {
   try {
-    const userId = req.user!.id;
     res.json({ applications: [] });
   } catch (err) {
     req.log?.error?.({ err }, "applications get error");

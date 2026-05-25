@@ -7,25 +7,69 @@ import { tmpdir } from "os";
 import { join } from "path";
 import pRetry from "p-retry";
 import { logger } from "../logger";
-
-if (!process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
-  throw new Error(
-    "AI_INTEGRATIONS_OPENAI_BASE_URL must be set. Did you forget to provision the OpenAI AI integration?",
-  );
-}
-
-if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
-  throw new Error(
-    "AI_INTEGRATIONS_OPENAI_API_KEY must be set. Did you forget to provision the OpenAI AI integration?",
-  );
-}
+import { FF } from "../feature-flags";
+import { aiPlugins } from "../plugins/registry";
 
 export const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? "missing-openai-key",
+  ...(process.env.AI_INTEGRATIONS_OPENAI_BASE_URL
+    ? { baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL }
+    : {}),
 });
 
 export type AudioFormat = "wav" | "mp3" | "webm" | "mp4" | "ogg" | "unknown";
+type AudioPayload = { transcript?: string; data?: string };
+type OpenAIVoice = "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
+type TtsFormat = "wav" | "mp3" | "flac" | "opus" | "pcm16";
+
+function assertOpenAIConfig(): void {
+  if (!process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
+    throw new Error(
+      "AI_INTEGRATIONS_OPENAI_BASE_URL must be set. Did you forget to provision the OpenAI AI integration?",
+    );
+  }
+
+  if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+    throw new Error(
+      "AI_INTEGRATIONS_OPENAI_API_KEY must be set. Did you forget to provision the OpenAI AI integration?",
+    );
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readAudioPayload(value: unknown): AudioPayload {
+  if (!isRecord(value)) return {};
+  const audio = isRecord(value.audio) ? value.audio : {};
+  const payload: AudioPayload = {};
+  if (typeof audio.transcript === "string") payload.transcript = audio.transcript;
+  if (typeof audio.data === "string") payload.data = audio.data;
+  return payload;
+}
+
+function readMessageText(value: unknown): string {
+  return isRecord(value) && typeof value.content === "string" ? value.content : "";
+}
+
+function readVoicePluginAudio(value: unknown): Buffer | undefined {
+  if (!isRecord(value)) return undefined;
+  return Buffer.isBuffer(value.audio) ? value.audio : undefined;
+}
+
+async function runExternalVoicePlugin(input: {
+  text: string;
+  voice?: string;
+  voiceId?: string;
+  format?: TtsFormat;
+}): Promise<Buffer | undefined> {
+  if (!FF.voicePluginEnabled) return undefined;
+  const plugin = aiPlugins.getBest("voice");
+  if (!plugin || plugin.id === "voice-openai-tts") return undefined;
+  const output = await plugin.execute(input);
+  return readVoicePluginAudio(output);
+}
 
 /**
  * Detect audio format from buffer magic bytes.
@@ -117,6 +161,7 @@ export async function voiceChat(
   inputFormat: "wav" | "mp3" = "wav",
   outputFormat: "wav" | "mp3" = "mp3"
 ): Promise<{ transcript: string; audioResponse: Buffer }> {
+  assertOpenAIConfig();
   const audioBase64 = audioBuffer.toString("base64");
   const response = await openai.chat.completions.create({
     model: "gpt-audio",
@@ -129,9 +174,10 @@ export async function voiceChat(
       ],
     }],
   });
-  const message = response.choices[0]?.message as any;
-  const transcript = message?.audio?.transcript || message?.content || "";
-  const audioData = message?.audio?.data ?? "";
+  const message = response.choices[0]?.message;
+  const audio = readAudioPayload(message);
+  const transcript = audio.transcript || readMessageText(message);
+  const audioData = audio.data ?? "";
   return {
     transcript,
     audioResponse: Buffer.from(audioData, "base64"),
@@ -144,6 +190,7 @@ export async function voiceChatStream(
   voice: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer" = "alloy",
   inputFormat: "wav" | "mp3" = "wav"
 ): Promise<AsyncIterable<{ type: "transcript" | "audio"; data: string }>> {
+  assertOpenAIConfig();
   const audioBase64 = audioBuffer.toString("base64");
   const stream = await openai.chat.completions.create({
     model: "gpt-audio",
@@ -160,13 +207,12 @@ export async function voiceChatStream(
 
   return (async function* () {
     for await (const chunk of stream) {
-      const delta = chunk.choices?.[0]?.delta as any;
-      if (!delta) continue;
-      if (delta?.audio?.transcript) {
-        yield { type: "transcript", data: delta.audio.transcript };
+      const audio = readAudioPayload(chunk.choices?.[0]?.delta);
+      if (audio.transcript) {
+        yield { type: "transcript", data: audio.transcript };
       }
-      if (delta?.audio?.data) {
-        yield { type: "audio", data: delta.audio.data };
+      if (audio.data) {
+        yield { type: "audio", data: audio.data };
       }
     }
   })();
@@ -175,9 +221,21 @@ export async function voiceChatStream(
 /** Text-to-Speech using gpt-audio. */
 export async function textToSpeech(
   text: string,
-  voice: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer" = "alloy",
-  format: "wav" | "mp3" | "flac" | "opus" | "pcm16" = "wav"
+  voice: OpenAIVoice = "alloy",
+  format: TtsFormat = "wav"
 ): Promise<Buffer> {
+  const pluginAudio = await runExternalVoicePlugin({ text, voice, format });
+  if (pluginAudio) return pluginAudio;
+  return textToSpeechNativeOpenAI(text, voice, format);
+}
+
+/** Native OpenAI TTS fallback. Plugin adapters call this to avoid registry recursion. */
+export async function textToSpeechNativeOpenAI(
+  text: string,
+  voice: OpenAIVoice = "alloy",
+  format: TtsFormat = "wav"
+): Promise<Buffer> {
+  assertOpenAIConfig();
   const response = await openai.chat.completions.create({
     model: "gpt-audio",
     modalities: ["text", "audio"],
@@ -187,7 +245,7 @@ export async function textToSpeech(
       { role: "user", content: `Repeat the following text verbatim: ${text}` },
     ],
   });
-  const audioData = (response.choices[0]?.message as any)?.audio?.data ?? "";
+  const audioData = readAudioPayload(response.choices[0]?.message).data ?? "";
   return Buffer.from(audioData, "base64");
 }
 
@@ -196,6 +254,7 @@ export async function textToSpeechStream(
   text: string,
   voice: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer" = "alloy"
 ): Promise<AsyncIterable<string>> {
+  assertOpenAIConfig();
   const stream = await openai.chat.completions.create({
     model: "gpt-audio",
     modalities: ["text", "audio"],
@@ -209,10 +268,9 @@ export async function textToSpeechStream(
 
   return (async function* () {
     for await (const chunk of stream) {
-      const delta = chunk.choices?.[0]?.delta as any;
-      if (!delta) continue;
-      if (delta?.audio?.data) {
-        yield delta.audio.data;
+      const audio = readAudioPayload(chunk.choices?.[0]?.delta);
+      if (audio.data) {
+        yield audio.data;
       }
     }
   })();
@@ -221,10 +279,26 @@ export async function textToSpeechStream(
 /** Wendy TTS — OpenAI gpt-4o-mini-tts with voice style instructions. */
 export async function wendyTextToSpeech(
   text: string,
-  voice: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer" = "nova",
+  voice: OpenAIVoice = "nova",
   responseFormat: "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm16" = "opus",
   instructions?: string,
 ): Promise<Buffer> {
+  const pluginInput: {
+    text: string;
+    voice: OpenAIVoice;
+    voiceId?: string;
+    format: "mp3";
+  } = {
+    text: instructions ? `${instructions}\n\n${text}` : text,
+    voice,
+    format: "mp3",
+  };
+  const wendyVoiceId = process.env.ELEVENLABS_WENDY_VOICE_ID ?? process.env.ELEVENLABS_VOICE_ID;
+  if (wendyVoiceId) pluginInput.voiceId = wendyVoiceId;
+  const pluginAudio = await runExternalVoicePlugin(pluginInput);
+  if (pluginAudio) return pluginAudio;
+
+  assertOpenAIConfig();
   const styleInstructions =
     instructions ??
     "Parla in italiano con una voce femminile giovane, tono elegante e professionale ma amichevole. " +
@@ -255,6 +329,7 @@ export async function speechToText(
   audioBuffer: Buffer,
   format: "wav" | "mp3" | "webm" = "wav"
 ): Promise<string> {
+  assertOpenAIConfig();
   const file = await toFile(audioBuffer, `audio.${format}`);
   const response = await openai.audio.transcriptions.create({
     file,
@@ -268,6 +343,7 @@ export async function speechToTextStream(
   audioBuffer: Buffer,
   format: "wav" | "mp3" | "webm" = "wav"
 ): Promise<AsyncIterable<string>> {
+  assertOpenAIConfig();
   const file = await toFile(audioBuffer, `audio.${format}`);
   const stream = await openai.audio.transcriptions.create({
     file,

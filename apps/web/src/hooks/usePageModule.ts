@@ -18,9 +18,9 @@
  * @pattern Observer + Lifecycle hook
  * @see usePageBus per il livello più basso
  */
+import type { AppEvent } from "@/lib/event-bus";
 import { useEffect } from "react";
 import { usePageBus, type PageBus } from "./usePageBus";
-import type { AppEvent } from "@/lib/event-bus";
 
 export interface UsePageModuleOptions {
   /** Identificatore stabile della pagina (es. "dashboard", "wendy-chat") */

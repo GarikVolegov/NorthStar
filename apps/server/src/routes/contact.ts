@@ -1,13 +1,26 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
-import { auditLogTable, contactMessagesTable, db, usersTable } from "@workspace/db";
+import type { SQL } from "drizzle-orm";
+import {
+  auditLogTable,
+  contactMessagesTable,
+  db,
+  usersTable,
+} from "@workspace/db";
 import { requireAdminAccess } from "../middleware/auth";
+import { getRequestBody } from "../lib/request-context";
+import { asPlainRecord, isOneOf } from "../lib/type-guards";
 
 const router = Router();
 
 router.use("/messages", requireAdminAccess);
 
-const MESSAGE_STATUSES = ["new", "in_progress", "resolved", "archived"] as const;
+const MESSAGE_STATUSES = [
+  "new",
+  "in_progress",
+  "resolved",
+  "archived",
+] as const;
 type MessageStatus = (typeof MESSAGE_STATUSES)[number];
 
 function stringValue(value: unknown, fallback = "") {
@@ -21,12 +34,20 @@ function parseId(value: unknown) {
 
 function normalizeMessageStatus(value: unknown): MessageStatus | null {
   const status = stringValue(value);
-  return MESSAGE_STATUSES.includes(status as MessageStatus) ? (status as MessageStatus) : null;
+  return isOneOf(status, MESSAGE_STATUSES) ? status : null;
+}
+
+function isSql(condition: SQL | undefined): condition is SQL {
+  return condition !== undefined;
 }
 
 async function getAdminAssignees() {
   return db
-    .select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
+    .select({
+      id: usersTable.id,
+      name: usersTable.name,
+      email: usersTable.email,
+    })
     .from(usersTable)
     .where(eq(usersTable.role, "admin"))
     .orderBy(asc(usersTable.name));
@@ -42,7 +63,12 @@ async function ensureAdminUser(id: number | null) {
   return admin ?? null;
 }
 
-async function writeContactAudit(req: any, action: string, messageId: number, metadata: Record<string, unknown>) {
+async function writeContactAudit(
+  req: Request,
+  action: string,
+  messageId: number,
+  metadata: Record<string, unknown>,
+) {
   await db.insert(auditLogTable).values({
     actorId: req.user?.id ?? null,
     targetId: null,
@@ -52,7 +78,7 @@ async function writeContactAudit(req: any, action: string, messageId: number, me
   });
 }
 
-function messageWhere(req: any) {
+function messageWhere(req: Request) {
   const status = normalizeMessageStatus(req.query.status);
   const read = stringValue(req.query.read, "all");
   const assignedTo = stringValue(req.query.assignedTo, "all");
@@ -76,7 +102,7 @@ function messageWhere(req: any) {
           ilike(contactMessagesTable.message, pattern),
         )
       : undefined,
-  ].filter(Boolean) as any[];
+  ].filter(isSql);
   return and(...where);
 }
 
@@ -107,7 +133,15 @@ router.get("/messages", async (req, res) => {
 
     res.json({
       items,
-      stats: statsRows[0] ?? { total: 0, unread: 0, read: 0, new: 0, inProgress: 0, resolved: 0, archived: 0 },
+      stats: statsRows[0] ?? {
+        total: 0,
+        unread: 0,
+        read: 0,
+        new: 0,
+        inProgress: 0,
+        resolved: 0,
+        archived: 0,
+      },
       assignees,
       generatedAt: new Date().toISOString(),
     });
@@ -115,7 +149,15 @@ router.get("/messages", async (req, res) => {
     req.log?.warn?.({ err }, "contact messages unavailable");
     res.json({
       items: [],
-      stats: { total: 0, unread: 0, read: 0, new: 0, inProgress: 0, resolved: 0, archived: 0 },
+      stats: {
+        total: 0,
+        unread: 0,
+        read: 0,
+        new: 0,
+        inProgress: 0,
+        resolved: 0,
+        archived: 0,
+      },
       assignees: [],
       generatedAt: new Date().toISOString(),
       error: "Messaggi temporaneamente non disponibili",
@@ -131,11 +173,17 @@ router.patch("/messages/:id/read", async (req, res) => {
       return;
     }
 
-    const read = req.body?.read === false ? false : true;
+    const body = asPlainRecord(getRequestBody(req));
+    const read = body.read === false ? false : true;
     const [message] = await db
       .update(contactMessagesTable)
       .set({ read, readAt: read ? new Date() : null, updatedAt: new Date() })
-      .where(and(eq(contactMessagesTable.id, id), isNull(contactMessagesTable.deletedAt)))
+      .where(
+        and(
+          eq(contactMessagesTable.id, id),
+          isNull(contactMessagesTable.deletedAt),
+        ),
+      )
       .returning();
 
     if (!message) {
@@ -154,7 +202,8 @@ router.patch("/messages/:id/read", async (req, res) => {
 router.patch("/messages/:id/status", async (req, res) => {
   try {
     const id = parseId(req.params.id);
-    const status = normalizeMessageStatus(req.body?.status);
+    const body = asPlainRecord(getRequestBody(req));
+    const status = normalizeMessageStatus(body.status);
     if (!id || !status) {
       res.status(400).json({ error: "Status non valido" });
       return;
@@ -163,7 +212,12 @@ router.patch("/messages/:id/status", async (req, res) => {
     const [message] = await db
       .update(contactMessagesTable)
       .set({ status, updatedAt: new Date() })
-      .where(and(eq(contactMessagesTable.id, id), isNull(contactMessagesTable.deletedAt)))
+      .where(
+        and(
+          eq(contactMessagesTable.id, id),
+          isNull(contactMessagesTable.deletedAt),
+        ),
+      )
       .returning();
 
     if (!message) {
@@ -171,7 +225,9 @@ router.patch("/messages/:id/status", async (req, res) => {
       return;
     }
 
-    await writeContactAudit(req, "contact_message_status_changed", id, { status });
+    await writeContactAudit(req, "contact_message_status_changed", id, {
+      status,
+    });
     res.json(message);
   } catch (err) {
     req.log?.warn?.({ err }, "contact message status unavailable");
@@ -186,17 +242,25 @@ router.patch("/messages/:id/notes", async (req, res) => {
       res.status(400).json({ error: "ID non valido" });
       return;
     }
-    const internalNotes = stringValue(req.body?.internalNotes);
+    const body = asPlainRecord(getRequestBody(req));
+    const internalNotes = stringValue(body.internalNotes);
     const [message] = await db
       .update(contactMessagesTable)
       .set({ internalNotes: internalNotes || null, updatedAt: new Date() })
-      .where(and(eq(contactMessagesTable.id, id), isNull(contactMessagesTable.deletedAt)))
+      .where(
+        and(
+          eq(contactMessagesTable.id, id),
+          isNull(contactMessagesTable.deletedAt),
+        ),
+      )
       .returning();
     if (!message) {
       res.status(404).json({ error: "Messaggio non trovato" });
       return;
     }
-    await writeContactAudit(req, "contact_message_notes_updated", id, { hasNotes: Boolean(internalNotes) });
+    await writeContactAudit(req, "contact_message_notes_updated", id, {
+      hasNotes: Boolean(internalNotes),
+    });
     res.json(message);
   } catch (err) {
     req.log?.warn?.({ err }, "contact message notes unavailable");
@@ -207,7 +271,11 @@ router.patch("/messages/:id/notes", async (req, res) => {
 router.patch("/messages/:id/assign", async (req, res) => {
   try {
     const id = parseId(req.params.id);
-    const assignedTo = req.body?.assignedTo === null || req.body?.assignedTo === "" ? null : parseId(req.body?.assignedTo);
+    const body = asPlainRecord(getRequestBody(req));
+    const assignedTo =
+      body.assignedTo === null || body.assignedTo === ""
+        ? null
+        : parseId(body.assignedTo);
     if (!id) {
       res.status(400).json({ error: "ID non valido" });
       return;
@@ -220,13 +288,20 @@ router.patch("/messages/:id/assign", async (req, res) => {
     const [message] = await db
       .update(contactMessagesTable)
       .set({ assignedTo: assignedTo ?? null, updatedAt: new Date() })
-      .where(and(eq(contactMessagesTable.id, id), isNull(contactMessagesTable.deletedAt)))
+      .where(
+        and(
+          eq(contactMessagesTable.id, id),
+          isNull(contactMessagesTable.deletedAt),
+        ),
+      )
       .returning();
     if (!message) {
       res.status(404).json({ error: "Messaggio non trovato" });
       return;
     }
-    await writeContactAudit(req, "contact_message_assigned", id, { assignedTo: assignedTo ?? null });
+    await writeContactAudit(req, "contact_message_assigned", id, {
+      assignedTo: assignedTo ?? null,
+    });
     res.json(message);
   } catch (err) {
     req.log?.warn?.({ err }, "contact message assign unavailable");

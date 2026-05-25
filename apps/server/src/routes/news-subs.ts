@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod/v4";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db, newsSubscriptionsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 
@@ -47,7 +47,7 @@ router.delete("/:category", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
     const { category } = req.params;
-    if (!FREE_CATEGORIES.includes(category)) {
+    if (!category || !FREE_CATEGORIES.includes(category)) {
       res.status(400).json({ error: "Categoria non valida" });
       return;
     }

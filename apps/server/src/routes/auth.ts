@@ -1,12 +1,9 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-const { sign } = jwt;
-import { eq, and, isNull, or, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import crypto from "node:crypto";
 import {
-  affiliateAccountsTable,
-  affiliateReferralsTable,
   db,
   protectedDbQuery,
   usersTable,
@@ -15,126 +12,38 @@ import {
 } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { authLimiter } from "../middleware/rate-limit";
-import { sendVerificationCode, send2faCode, sendPasswordReset, sendWelcomeEmail } from "../lib/email";
+import {
+  sendVerificationCode,
+  send2faCode,
+  sendPasswordReset,
+  sendWelcomeEmail,
+} from "../lib/email";
+import { JWT_SECRET } from "../lib/jwt-secret";
+import { getRequestBody } from "../lib/request-context";
+import { asPlainRecord } from "../lib/type-guards";
+import { logSecurityEvent } from "../lib/security-events";
+import { DEV_MODE, buildJwtPayload, findReferralAccount, generateToken, generateVerificationCode, readReferralCode, readStringField, recordReferral, type JwtPayload } from "./auth-shared";
+import { registerClerkSyncRoute } from "./auth-clerk-sync";
+import { registerGoogleTokenRoute } from "./auth-google-token";
 
 const router = Router();
-
-const JWT_SECRET: string = process.env.JWT_SECRET ?? "";
-const DEV_MODE = process.env.NODE_ENV !== "production";
-
-/** Stable user data embedded in JWT — no DB query needed on every request */
-interface JwtPayload {
-  userId: number;
-  name: string;
-  email: string;
-  role: "user" | "admin";
-  onboardingCompleted: boolean;
-  journeyType: string | null;
-  stripeSubscriptionId: string | null;
-  testSessionId: number | null;
-}
-
-function generateToken(user: JwtPayload): string {
-  return sign(user, JWT_SECRET, { expiresIn: "7d" });
-}
-
-function generateVerificationCode(): string {
-  return crypto.randomInt(100000, 999999).toString();
-}
-
-/** Fields to select when we need stable data for the JWT */
-const tokenUserSelect = {
-  id: usersTable.id,
-  name: usersTable.name,
-  email: usersTable.email,
-  role: usersTable.role,
-  onboardingCompleted: usersTable.onboardingCompleted,
-  journeyType: usersTable.journeyType,
-  stripeSubscriptionId: usersTable.stripeSubscriptionId,
-  testSessionId: usersTable.testSessionId,
-} as const;
-
-function buildJwtPayload(user: {
-  id: number;
-  name: string;
-  email: string;
-  role: string | null;
-  onboardingCompleted: boolean | null;
-  journeyType: string | null;
-  stripeSubscriptionId: string | null;
-  testSessionId: number | null;
-}): JwtPayload {
-  return {
-    userId: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role === "admin" ? "admin" : "user",
-    onboardingCompleted: user.onboardingCompleted ?? false,
-    journeyType: user.journeyType,
-    stripeSubscriptionId: user.stripeSubscriptionId,
-    testSessionId: user.testSessionId,
-  };
-}
-
-type ReferralAccount = typeof affiliateAccountsTable.$inferSelect;
-
-function readReferralCode(input: unknown): string | null {
-  if (typeof input !== "string") return null;
-  const code = input.trim();
-  return code.length > 0 ? code : null;
-}
-
-async function findReferralAccount(referralCode: string | null): Promise<ReferralAccount | null> {
-  if (!referralCode) return null;
-  const [account] = await db
-    .select()
-    .from(affiliateAccountsTable)
-    .where(and(
-      eq(affiliateAccountsTable.referralCode, referralCode),
-      isNull(affiliateAccountsTable.deletedAt),
-    ))
-    .limit(1);
-  if (!account || account.status === "suspended") return null;
-  return account;
-}
-
-async function recordReferral(account: ReferralAccount | null, referredUserId: number): Promise<void> {
-  if (!account || account.userId === referredUserId) return;
-
-  const inserted = await db
-    .insert(affiliateReferralsTable)
-    .values({
-      affiliateId: account.id,
-      referrerUserId: account.userId,
-      referredUserId,
-      status: "active",
-      activatedAt: new Date(),
-    })
-    .onConflictDoNothing()
-    .returning({ id: affiliateReferralsTable.id });
-
-  if (inserted.length === 0) return;
-
-  await db
-    .update(affiliateAccountsTable)
-    .set({
-      totalReferrals: sql`${affiliateAccountsTable.totalReferrals} + 1`,
-      updatedAt: new Date(),
-    })
-    .where(eq(affiliateAccountsTable.id, account.id));
-}
 
 /* ─── POST /api/auth/register  —  registrazione ──────────────────── */
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password } = req.body;
-    const referralCode = readReferralCode(req.body?.referralCode);
+    const body = asPlainRecord(getRequestBody(req));
+    const name = readStringField(body, "name");
+    const email = readStringField(body, "email");
+    const password = readStringField(body, "password");
+    const referralCode = readReferralCode(body.referralCode);
     if (!name || !email || !password) {
       res.status(400).json({ error: "Nome, email e password richiesti" });
       return;
     }
     if (password.length < 6) {
-      res.status(400).json({ error: "Password deve essere almeno 6 caratteri" });
+      res
+        .status(400)
+        .json({ error: "Password deve essere almeno 6 caratteri" });
       return;
     }
 
@@ -151,7 +60,9 @@ router.post("/register", async (req, res) => {
       return;
     }
 
-    const referralAccount = referralCode ? await findReferralAccount(referralCode) : null;
+    const referralAccount = referralCode
+      ? await findReferralAccount(referralCode)
+      : null;
     if (referralCode && !referralAccount) {
       res.status(400).json({ error: "Codice referral non valido" });
       return;
@@ -181,6 +92,11 @@ router.post("/register", async (req, res) => {
         testSessionId: usersTable.testSessionId,
         createdAt: usersTable.createdAt,
       });
+
+    if (!user) {
+      res.status(500).json({ error: "Errore creazione utente" });
+      return;
+    }
 
     await db.insert(userProfileSettingsTable).values({
       userId: user.id,
@@ -214,7 +130,9 @@ router.post("/register", async (req, res) => {
 /* ─── POST /api/auth/login  —  login ─────────────────────────────── */
 router.post("/login", authLimiter, async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const body = asPlainRecord(getRequestBody(req));
+    const email = readStringField(body, "email");
+    const password = readStringField(body, "password");
     if (!email || !password) {
       res.status(400).json({ error: "Email e password richiesti" });
       return;
@@ -227,21 +145,28 @@ router.post("/login", authLimiter, async (req, res) => {
       .limit(1);
 
     if (!user) {
+      logSecurityEvent("auth_failed", { ip: req.ip, detail: "login_user_not_found" });
       res.status(401).json({ error: "Email o password errati" });
       return;
     }
 
     const passwordHash = user.passwordHash;
     if (!passwordHash) {
-      res.status(401).json({ error: "Account registrato con Google. Accedi con Google." });
+      logSecurityEvent("auth_failed", { ip: req.ip, detail: "login_provider_mismatch" });
+      res
+        .status(401)
+        .json({ error: "Account registrato con Google. Accedi con Google." });
       return;
     }
 
     const valid = await bcrypt.compare(password, passwordHash);
     if (!valid) {
+      logSecurityEvent("auth_failed", { ip: req.ip, detail: "login_invalid_password" });
       res.status(401).json({ error: "Email o password errati" });
       return;
     }
+
+    logSecurityEvent("auth_success", { userId: user.id, ip: req.ip, detail: "password_login" });
 
     // Email non ancora verificata → flusso verifica email
     if (!user.emailVerified) {
@@ -267,13 +192,16 @@ router.post("/login", authLimiter, async (req, res) => {
     }
 
     // Email verificata → 2FA: invia OTP via email prima di emettere il JWT
-    const twoFaCode    = generateVerificationCode();
+    const twoFaCode = generateVerificationCode();
     const twoFaExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minuti
 
     await protectedDbQuery(async () => {
       return await db
         .update(usersTable)
-        .set({ verificationCode: twoFaCode, verificationCodeExpires: twoFaExpires })
+        .set({
+          verificationCode: twoFaCode,
+          verificationCodeExpires: twoFaExpires,
+        })
         .where(eq(usersTable.id, user.id));
     });
 
@@ -294,7 +222,9 @@ router.post("/login", authLimiter, async (req, res) => {
 /* ─── POST /api/auth/verify-email  —  verifica email ─────────────── */
 router.post("/verify-email", async (req, res) => {
   try {
-    const { email, code } = req.body;
+    const body = asPlainRecord(getRequestBody(req));
+    const email = readStringField(body, "email");
+    const code = readStringField(body, "code");
     if (!email || !code) {
       res.status(400).json({ error: "Email e codice richiesti" });
       return;
@@ -313,7 +243,10 @@ router.post("/verify-email", async (req, res) => {
       return;
     }
 
-    if (user.verificationCodeExpires && new Date() > user.verificationCodeExpires) {
+    if (
+      user.verificationCodeExpires &&
+      new Date() > user.verificationCodeExpires
+    ) {
       res.status(400).json({ error: "Codice scaduto. Richiedine uno nuovo." });
       return;
     }
@@ -332,7 +265,14 @@ router.post("/verify-email", async (req, res) => {
 
     const token = generateToken(buildJwtPayload(user));
 
-    const { passwordHash: _, verificationCode: __, verificationCodeExpires: ___, resetToken: ____, resetTokenExpires: ______, ...safeUser } = user;
+    const {
+      passwordHash: _,
+      verificationCode: __,
+      verificationCodeExpires: ___,
+      resetToken: ____,
+      resetTokenExpires: ______,
+      ...safeUser
+    } = user;
 
     res.json({
       ...safeUser,
@@ -350,7 +290,9 @@ router.post("/verify-email", async (req, res) => {
 /* ─── POST /api/auth/verify-2fa  —  conferma codice 2FA ─────────── */
 router.post("/verify-2fa", authLimiter, async (req, res) => {
   try {
-    const { email, code } = req.body;
+    const body = asPlainRecord(getRequestBody(req));
+    const email = readStringField(body, "email");
+    const code = readStringField(body, "code");
     if (!email || !code) {
       res.status(400).json({ error: "Email e codice richiesti" });
       return;
@@ -369,8 +311,13 @@ router.post("/verify-2fa", authLimiter, async (req, res) => {
       return;
     }
 
-    if (user.verificationCodeExpires && new Date() > user.verificationCodeExpires) {
-      res.status(400).json({ error: "Codice scaduto. Rieffettua il login per riceverne uno nuovo." });
+    if (
+      user.verificationCodeExpires &&
+      new Date() > user.verificationCodeExpires
+    ) {
+      res.status(400).json({
+        error: "Codice scaduto. Rieffettua il login per riceverne uno nuovo.",
+      });
       return;
     }
 
@@ -388,7 +335,14 @@ router.post("/verify-2fa", authLimiter, async (req, res) => {
     });
 
     const token = generateToken(buildJwtPayload(user));
-    const { passwordHash: _, verificationCode: __, verificationCodeExpires: ___, resetToken: ____, resetTokenExpires: _____, ...safeUser } = user;
+    const {
+      passwordHash: _,
+      verificationCode: __,
+      verificationCodeExpires: ___,
+      resetToken: ____,
+      resetTokenExpires: _____,
+      ...safeUser
+    } = user;
 
     res.json({ ...safeUser, token });
   } catch (err) {
@@ -400,7 +354,8 @@ router.post("/verify-2fa", authLimiter, async (req, res) => {
 /* ─── POST /api/auth/resend-verification  —  rimanda codice ──────── */
 router.post("/resend-verification", async (req, res) => {
   try {
-    const { email } = req.body;
+    const body = asPlainRecord(getRequestBody(req));
+    const email = readStringField(body, "email");
     if (!email) {
       res.status(400).json({ error: "Email richiesta" });
       return;
@@ -445,7 +400,8 @@ router.post("/resend-verification", async (req, res) => {
 /* ─── POST /api/auth/forgot-password  —  richiesta reset password ─── */
 router.post("/forgot-password", authLimiter, async (req, res) => {
   try {
-    const { email } = req.body;
+    const body = asPlainRecord(getRequestBody(req));
+    const email = readStringField(body, "email");
     if (!email) {
       res.status(400).json({ error: "Email richiesta" });
       return;
@@ -477,13 +433,17 @@ router.post("/forgot-password", authLimiter, async (req, res) => {
 /* ─── POST /api/auth/reset-password  —  cambio password ──────────── */
 router.post("/reset-password", authLimiter, async (req, res) => {
   try {
-    const { token, newPassword } = req.body;
+    const body = asPlainRecord(getRequestBody(req));
+    const token = readStringField(body, "token");
+    const newPassword = readStringField(body, "newPassword");
     if (!token || !newPassword) {
       res.status(400).json({ error: "Token e nuova password richiesti" });
       return;
     }
     if (newPassword.length < 6) {
-      res.status(400).json({ error: "Password deve essere almeno 6 caratteri" });
+      res
+        .status(400)
+        .json({ error: "Password deve essere almeno 6 caratteri" });
       return;
     }
 
@@ -527,114 +487,8 @@ router.post("/reset-password", authLimiter, async (req, res) => {
 });
 
 /* ─── POST /api/auth/google-token  —  login con Google ────────────── */
-router.post("/google-token", async (req, res) => {
-  try {
-    const { credential } = req.body;
-    if (!credential) {
-      res.status(400).json({ error: "Credential richiesto" });
-      return;
-    }
+registerGoogleTokenRoute(router);
 
-    const googlePayload = JSON.parse(
-      Buffer.from(credential.split(".")[1], "base64").toString(),
-    ) as {
-      sub: string;
-      email: string;
-      name: string;
-      picture?: string;
-    };
-
-    const googleId = googlePayload.sub;
-    const email = googlePayload.email.toLowerCase();
-    const name = googlePayload.name;
-    const avatarUrl = googlePayload.picture ?? null;
-
-    let [existing] = await protectedDbQuery(async () => {
-      return await db
-        .select()
-        .from(usersTable)
-        .where(
-          or(
-            eq(usersTable.googleId, googleId),
-            eq(usersTable.email, email),
-          ),
-        )
-        .limit(1);
-    });
-
-    if (existing) {
-      if (!existing.googleId) {
-       await protectedDbQuery(async () => {
-         return await db
-           .update(usersTable)
-           .set({
-             googleId,
-             emailVerified: true,
-             avatarUrl: avatarUrl ?? existing.avatarUrl,
-             updatedAt: new Date(),
-           })
-           .where(eq(usersTable.id, existing.id));
-       });
-      }
-    } else {
-       const [created] = await protectedDbQuery(async () => {
-         return await db
-           .insert(usersTable)
-           .values({
-             name,
-             email,
-             googleId,
-             avatarUrl,
-             emailVerified: true,
-           })
-           .returning({ id: usersTable.id });
-       });
-
-      await db.insert(userProfileSettingsTable).values({
-        userId: created.id,
-        username: generateUsername(name, created.id),
-      });
-    }
-
-    const [user] = await db
-      .select({
-        id: usersTable.id,
-        name: usersTable.name,
-        email: usersTable.email,
-        role: usersTable.role,
-        testSessionId: usersTable.testSessionId,
-        emailVerified: usersTable.emailVerified,
-        stripeSubscriptionId: usersTable.stripeSubscriptionId,
-        workPreference: userProfileSettingsTable.workPreference,
-        autonomyPreference: userProfileSettingsTable.autonomyPreference,
-        stabilityPreference: userProfileSettingsTable.stabilityPreference,
-        timezone: userProfileSettingsTable.timezone,
-        userMode: userProfileSettingsTable.userMode,
-        journeyType: usersTable.journeyType,
-        avatarUrl: usersTable.avatarUrl,
-        isPublic: userProfileSettingsTable.isPublic,
-        isAffiliate: userProfileSettingsTable.isAffiliate,
-        onboardingCompleted: usersTable.onboardingCompleted,
-        createdAt: usersTable.createdAt,
-      })
-      .from(usersTable)
-      .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
-      .where(eq(usersTable.email, email))
-      .limit(1);
-
-    const token = generateToken(buildJwtPayload(user));
-
-    res.json({
-      ...user,
-      token,
-    });
-  } catch (err) {
-    req.log?.error?.({ err }, "google-token error");
-    res.status(500).json({ error: "Errore durante l'accesso con Google" });
-  }
-});
-
-/* ─── POST /api/auth/refresh  —  refresh token ───────────────────── */
 router.post("/refresh", async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -654,196 +508,7 @@ router.post("/refresh", async (req, res) => {
 });
 
 /* ─── POST /api/auth/clerk-sync  —  sync Clerk user with local DB ─── */
-router.post("/clerk-sync", async (req, res) => {
-  try {
-    // SECURITY: verifica che il Bearer token (Clerk JWT) contenga
-    // lo stesso sub/clerkId inviato nel body — previene impersonificazione.
-    const authHeader = req.headers.authorization;
-    const { clerkId: bodyClerkId, email, name } = req.body;
-    const referralCode = readReferralCode(req.body?.referralCode);
-
-    const missingFields = [
-      !bodyClerkId ? "clerkId" : null,
-      typeof email !== "string" || !email.trim() ? "email" : null,
-    ].filter(Boolean);
-
-    if (missingFields.length > 0) {
-      res.status(400).json({
-        error: "Dati Clerk incompleti: clerkId ed email sono richiesti.",
-        code: "CLERK_SYNC_INVALID_PAYLOAD",
-        missingFields,
-      });
-      return;
-    }
-
-    const displayName = typeof name === "string" && name.trim()
-      ? name.trim()
-      : email.trim();
-
-    if (authHeader?.startsWith("Bearer ")) {
-      try {
-        const token = authHeader.slice(7);
-        // Decode JWT payload senza verifica firma (la firma è verificata da Clerk SDK client-side)
-        // Usiamo solo per confrontare sub con clerkId fornito nel body
-        const parts = token.split(".");
-        if (parts.length === 3) {
-          const payloadJson = Buffer.from(parts[1], "base64url").toString("utf-8");
-          const tokenPayload = JSON.parse(payloadJson) as { sub?: string };
-          if (tokenPayload.sub && tokenPayload.sub !== bodyClerkId) {
-            res.status(403).json({ error: "Token non corrisponde al clerkId" });
-            return;
-          }
-        }
-      } catch {
-        // Token malformato — procedi comunque (protezione soft)
-      }
-    }
-
-    const clerkId = bodyClerkId;
-    const normalizedEmail = email.trim().toLowerCase();
-    const referralAccount = referralCode ? await findReferralAccount(referralCode) : null;
-
-    let [user] = await protectedDbQuery(async () => {
-      return await db
-        .select({
-          id: usersTable.id,
-          name: usersTable.name,
-          email: usersTable.email,
-          role: usersTable.role,
-          testSessionId: usersTable.testSessionId,
-          emailVerified: usersTable.emailVerified,
-          stripeSubscriptionId: usersTable.stripeSubscriptionId,
-          workPreference: userProfileSettingsTable.workPreference,
-          autonomyPreference: userProfileSettingsTable.autonomyPreference,
-          stabilityPreference: userProfileSettingsTable.stabilityPreference,
-          timezone: userProfileSettingsTable.timezone,
-          userMode: userProfileSettingsTable.userMode,
-          journeyType: usersTable.journeyType,
-          avatarUrl: usersTable.avatarUrl,
-          isPublic: userProfileSettingsTable.isPublic,
-          isAffiliate: userProfileSettingsTable.isAffiliate,
-          onboardingCompleted: usersTable.onboardingCompleted,
-        })
-        .from(usersTable)
-        .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
-        .where(eq(usersTable.clerkId, clerkId))
-        .limit(1);
-    });
-
-    if (user) {
-      const northstarToken = generateToken(buildJwtPayload(user));
-      res.json({ ...user, northstar_token: northstarToken });
-      return;
-    }
-
-    let [existingByEmail] = await protectedDbQuery(async () => {
-      return await db
-        .select({ id: usersTable.id })
-        .from(usersTable)
-        .where(eq(usersTable.email, normalizedEmail))
-        .limit(1);
-    });
-
-    if (existingByEmail) {
-      await db
-        .update(usersTable)
-        .set({
-          clerkId,
-          emailVerified: true,
-          name: displayName,
-          updatedAt: new Date(),
-        })
-        .where(eq(usersTable.id, existingByEmail.id));
-
-      const [updated] = await db
-        .select({
-          id: usersTable.id,
-          name: usersTable.name,
-          email: usersTable.email,
-          role: usersTable.role,
-          testSessionId: usersTable.testSessionId,
-          emailVerified: usersTable.emailVerified,
-          stripeSubscriptionId: usersTable.stripeSubscriptionId,
-          workPreference: userProfileSettingsTable.workPreference,
-          autonomyPreference: userProfileSettingsTable.autonomyPreference,
-          stabilityPreference: userProfileSettingsTable.stabilityPreference,
-          timezone: userProfileSettingsTable.timezone,
-          userMode: userProfileSettingsTable.userMode,
-          journeyType: usersTable.journeyType,
-          avatarUrl: usersTable.avatarUrl,
-          isPublic: userProfileSettingsTable.isPublic,
-          isAffiliate: userProfileSettingsTable.isAffiliate,
-          onboardingCompleted: usersTable.onboardingCompleted,
-        })
-        .from(usersTable)
-        .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
-        .where(eq(usersTable.id, existingByEmail.id))
-        .limit(1);
-
-      if (updated) {
-        const northstarToken = generateToken(buildJwtPayload(updated));
-        res.json({ ...updated, northstar_token: northstarToken });
-      } else {
-        res.status(500).json({ error: "Errore aggiornamento utente" });
-      }
-      return;
-    }
-
-    const [created] = await db
-      .insert(usersTable)
-      .values({
-        name: displayName,
-        email: normalizedEmail,
-        clerkId,
-        emailVerified: true,
-      })
-      .returning({ id: usersTable.id });
-
-    await db.insert(userProfileSettingsTable).values({
-      userId: created.id,
-      username: generateUsername(displayName, created.id),
-      referredByAffiliateId: referralAccount?.id ?? null,
-      referralConvertedAt: referralAccount ? new Date() : null,
-    });
-
-    await recordReferral(referralAccount, created.id);
-
-    const [newUser] = await db
-      .select({
-        id: usersTable.id,
-        name: usersTable.name,
-        email: usersTable.email,
-        role: usersTable.role,
-        testSessionId: usersTable.testSessionId,
-        emailVerified: usersTable.emailVerified,
-        stripeSubscriptionId: usersTable.stripeSubscriptionId,
-        workPreference: userProfileSettingsTable.workPreference,
-        autonomyPreference: userProfileSettingsTable.autonomyPreference,
-        stabilityPreference: userProfileSettingsTable.stabilityPreference,
-        timezone: userProfileSettingsTable.timezone,
-        userMode: userProfileSettingsTable.userMode,
-        journeyType: usersTable.journeyType,
-        avatarUrl: usersTable.avatarUrl,
-        isPublic: userProfileSettingsTable.isPublic,
-        isAffiliate: userProfileSettingsTable.isAffiliate,
-        onboardingCompleted: usersTable.onboardingCompleted,
-      })
-      .from(usersTable)
-      .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
-      .where(eq(usersTable.id, created.id))
-      .limit(1);
-
-    if (newUser) {
-      const northstarToken = generateToken(buildJwtPayload(newUser));
-      res.status(201).json({ ...newUser, northstar_token: northstarToken });
-    } else {
-      res.status(500).json({ error: "Errore creazione utente" });
-    }
-  } catch (err) {
-    req.log?.error?.({ err }, "clerk-sync error");
-    res.status(500).json({ error: "Errore durante la sincronizzazione con Clerk" });
-  }
-});
+registerClerkSyncRoute(router);
 
 /* ─── GET /api/auth/me  —  profilo corrente ──────────────────────── */
 router.get("/me", requireAuth, async (req, res) => {
@@ -869,7 +534,10 @@ router.get("/me", requireAuth, async (req, res) => {
         onboardingCompleted: usersTable.onboardingCompleted,
       })
       .from(usersTable)
-      .leftJoin(userProfileSettingsTable, eq(usersTable.id, userProfileSettingsTable.userId))
+      .leftJoin(
+        userProfileSettingsTable,
+        eq(usersTable.id, userProfileSettingsTable.userId),
+      )
       .where(eq(usersTable.id, req.user!.id))
       .limit(1);
 

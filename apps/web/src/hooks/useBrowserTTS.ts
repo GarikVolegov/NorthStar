@@ -6,7 +6,7 @@
  *
  * Compatibile con Chrome, Firefox, Safari, Edge.
  */
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface UseBrowserTTSReturn {
   isPlaying:  boolean;

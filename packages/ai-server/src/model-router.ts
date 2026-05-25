@@ -1,7 +1,5 @@
 /**
  * model-router.ts — Centralized model selection for every agent / task.
- *
- * ─────────────────────────────────────────────────────────────────────────────
  * GOAL: each agent picks the cheapest model that still delivers the required
  * quality for its task. Free-first strategy:
  *
@@ -18,10 +16,9 @@
  * Every default is overridable via env (MODEL_<ROLE>). Set AI_PROVIDER to
  * route the actual HTTP call (openrouter | groq | openai). See README of
  * packages/ai-server.
- * ─────────────────────────────────────────────────────────────────────────────
  */
 
-// ── Public types ──────────────────────────────────────────────────────────────
+import { aiPlugins } from "./plugins/registry";
 
 export type RequestComplexity = "simple" | "standard" | "deep";
 
@@ -66,6 +63,19 @@ export interface RouterOptions {
   complexity?: RequestComplexity;
   /** Force a provider preference — overrides defaults below. */
   preferGroq?: boolean;
+  // Context-aware signals (all optional, backward-compatible)
+  /** Approximate prompt size in tokens; used to escalate tier when above thresholds. */
+  messageTokens?: number;
+  /** True if the prompt includes file/image attachments. */
+  hasFile?: boolean;
+  /** True if multimodal input requires a vision-capable model. */
+  requiresVision?: boolean;
+  /** True if effective context (system + history + RAG) is expected to be very long. */
+  requiresLongContext?: boolean;
+  /** Number of prior retries for this turn; >0 escalates the tier. */
+  retryCount?: number;
+  /** Page or feature surfacing the call; used for optional context-based overrides. */
+  pageContext?: string;
 }
 
 export interface ModelRoute {
@@ -74,6 +84,8 @@ export interface ModelRoute {
   temperature: number;
   maxTokens: number;
   reason: string;
+  /** Set when the route is fulfilled by a registered AIPlugin; consumer should dispatch via the plugin. */
+  pluginId?: string;
 }
 
 // ── Default model catalogue (env-overridable) ─────────────────────────────────
@@ -98,6 +110,13 @@ const REASONING_OR   = env("MODEL_REASONING_OPENROUTER","openrouter/free");
 const PREMIUM_OPENAI = env("MODEL_PREMIUM_OPENAI",      "gpt-4o");
 const CHEAP_OPENAI   = env("MODEL_CHEAP_OPENAI",        "gpt-4o-mini");
 const ALLOW_PAID_MODELS = process.env.ALLOW_PAID_AI_MODELS === "true";
+const MODEL_PROVIDERS = ["openai", "groq", "openrouter"] as const;
+type ModelProvider = (typeof MODEL_PROVIDERS)[number];
+
+function readModelProvider(value: string | undefined): ModelProvider {
+  const normalized = value?.toLowerCase();
+  return MODEL_PROVIDERS.find((provider) => provider === normalized) ?? "openai";
+}
 
 /**
  * Active backend. If AI_PROVIDER=openrouter we prefer OpenRouter free-tier models
@@ -105,7 +124,7 @@ const ALLOW_PAID_MODELS = process.env.ALLOW_PAID_AI_MODELS === "true";
  * isn't configured. The actual HTTP call goes through llm/client.ts.
  */
 const ACTIVE_PROVIDER: "openai" | "groq" | "openrouter" =
-  (process.env.AI_PROVIDER?.toLowerCase() as any) ?? "openai";
+  readModelProvider(process.env.AI_PROVIDER);
 
 function enforceFreeOpenRouterModel(model: string) {
   if (ALLOW_PAID_MODELS) return model;
@@ -185,6 +204,57 @@ const ROLE_CONFIG: Record<AgentRole, RoleConfig> = {
   "search-orchestrate":      { tier: "nano",      temperature: 0.1, maxTokens: 300 },
 };
 
+// ── Context-aware tier escalation ─────────────────────────────────────────────
+
+const TIER_ORDER: RoleConfig["tier"][] = ["nano", "micro", "standard", "reasoning"];
+
+function tierIndex(tier: RoleConfig["tier"]): number {
+  return TIER_ORDER.indexOf(tier);
+}
+
+function maxTier(a: RoleConfig["tier"], b: RoleConfig["tier"]): RoleConfig["tier"] {
+  return tierIndex(a) >= tierIndex(b) ? a : b;
+}
+
+interface ContextSignalsResult {
+  tier: RoleConfig["tier"];
+  reasons: string[];
+}
+
+/**
+ * Apply context-aware signals to upgrade the base tier of a role.
+ * Returns the (possibly upgraded) tier and the reasons that drove the change.
+ */
+export function applyContextSignals(
+  baseTier: RoleConfig["tier"],
+  opts: RouterOptions,
+): ContextSignalsResult {
+  let tier = baseTier;
+  const reasons: string[] = [];
+
+  if (opts.messageTokens && opts.messageTokens > 3000) {
+    const next = maxTier(tier, "standard");
+    if (next !== tier) reasons.push(`long-message(${opts.messageTokens})`);
+    tier = next;
+  }
+  if (opts.requiresLongContext) {
+    const next = maxTier(tier, "standard");
+    if (next !== tier) reasons.push("long-context");
+    tier = next;
+  }
+  if (opts.retryCount && opts.retryCount > 0) {
+    const next = maxTier(tier, "reasoning");
+    if (next !== tier) reasons.push(`retry(${opts.retryCount})`);
+    tier = next;
+  }
+  if (opts.hasFile || opts.requiresVision) {
+    const next = maxTier(tier, "standard");
+    if (next !== tier) reasons.push(opts.requiresVision ? "vision" : "file");
+    tier = next;
+  }
+  return { tier, reasons };
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
@@ -192,9 +262,12 @@ const ROLE_CONFIG: Record<AgentRole, RoleConfig> = {
  *
  * Behaviour:
  *   1. Looks up the role's tier (nano | micro | standard | reasoning).
- *   2. If the user is Premium AND complexity is "deep" AND the role opts in
+ *   2. Applies context signals (long message, retry, file, vision) which may
+ *      escalate the tier.
+ *   3. If a registered AIPlugin covers the chosen tier, returns the plugin route.
+ *   4. If the user is Premium AND complexity is "deep" AND the role opts in
  *      to upgrades, returns the premium OpenAI model.
- *   3. Otherwise returns the free/cheap default tier model, honouring the
+ *   5. Otherwise returns the free/cheap default tier model, honouring the
  *      active `AI_PROVIDER`.
  */
 export function selectModelFor(role: AgentRole, opts: RouterOptions = {}): ModelRoute {
@@ -210,6 +283,19 @@ export function selectModelFor(role: AgentRole, opts: RouterOptions = {}): Model
       maxTokens: cfg.maxTokens,
       reason: `${role}:groq-preferred`,
     };
+  }
+
+  // Context-aware tier upgrade (may stay same)
+  const signals = applyContextSignals(cfg.tier, opts);
+  const effectiveTier = signals.tier;
+  const signalSuffix = signals.reasons.length > 0 ? `+signals[${signals.reasons.join(",")}]` : "";
+
+  // Plugin-aware reasoning override
+  if (effectiveTier === "reasoning") {
+    const pluginRoute = lookupReasoningPluginRoute(role, cfg);
+    if (pluginRoute) {
+      return { ...pluginRoute, reason: `${pluginRoute.reason}${signalSuffix}` };
+    }
   }
 
   // Premium upgrade path (only when the role opts in)
@@ -233,19 +319,42 @@ export function selectModelFor(role: AgentRole, opts: RouterOptions = {}): Model
     };
   }
 
-  // Tier-based default
+  // Tier-based default (uses effectiveTier from context signals)
   const pick =
-    cfg.tier === "nano"      ? nanoModel()      :
-    cfg.tier === "micro"     ? microModel()     :
-    cfg.tier === "reasoning" ? reasoningModel() :
-    /* standard */             standardModel();
+    effectiveTier === "nano"      ? nanoModel()      :
+    effectiveTier === "micro"     ? microModel()     :
+    effectiveTier === "reasoning" ? reasoningModel() :
+    /* standard */                  standardModel();
 
   return {
     model: pick.model,
     provider: pick.provider,
     temperature: cfg.temperature,
     maxTokens: cfg.maxTokens,
-    reason: `${role}:${cfg.tier}`,
+    reason: `${role}:${effectiveTier}${signalSuffix}`,
+  };
+}
+
+// ── Plugin-aware reasoning lookup ─────────────────────────────────────────────
+
+function lookupReasoningPluginRoute(role: AgentRole, cfg: RoleConfig): ModelRoute | null {
+  const plugin = aiPlugins.getBest("reasoning");
+  if (!plugin) return null;
+  const providerName = plugin.provider;
+  // ModelRoute.provider is the HTTP route hint; Anthropic plugins ship their own
+  // client, so we report "openrouter" as the closest neutral provider hint.
+  const provider: ModelRoute["provider"] =
+    providerName === "groq"       ? "groq" :
+    providerName === "openrouter" ? "openrouter" :
+    providerName === "anthropic"  ? "openrouter" :
+    "openai";
+  return {
+    model: plugin.id,
+    provider,
+    temperature: cfg.temperature,
+    maxTokens: cfg.maxTokens,
+    reason: `${role}:plugin(${plugin.id})`,
+    pluginId: plugin.id,
   };
 }
 

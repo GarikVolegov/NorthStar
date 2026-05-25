@@ -9,14 +9,25 @@ import {
   usersTable,
 } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
+import { getRequestBody } from "../lib/request-context";
+import { asPlainRecord, isOneOf } from "../lib/type-guards";
 
 const router = Router();
-const VISIBILITIES = new Set(["public", "friends"]);
+const VISIBILITIES = ["public", "friends"] as const;
 
 router.use(requireAuth);
 
 function normalizeVisibility(value: unknown): "public" | "friends" {
-  return VISIBILITIES.has(String(value)) ? String(value) as "public" | "friends" : "public";
+  return isOneOf(value, VISIBILITIES) ? value : "public";
+}
+
+function readTrimmedString(value: unknown, fallback = "") {
+  return typeof value === "string" ? value.trim() : fallback;
+}
+
+function readOptionalTrimmedString(value: unknown) {
+  const trimmed = readTrimmedString(value);
+  return trimmed || null;
 }
 
 async function getFriendIds(userId: number): Promise<Set<number>> {
@@ -26,12 +37,21 @@ async function getFriendIds(userId: number): Promise<Set<number>> {
       receiverId: friendshipsTable.receiverId,
     })
     .from(friendshipsTable)
-    .where(and(
-      or(eq(friendshipsTable.requesterId, userId), eq(friendshipsTable.receiverId, userId)),
-      eq(friendshipsTable.status, "accepted"),
-    ));
+    .where(
+      and(
+        or(
+          eq(friendshipsTable.requesterId, userId),
+          eq(friendshipsTable.receiverId, userId),
+        ),
+        eq(friendshipsTable.status, "accepted"),
+      ),
+    );
 
-  return new Set(rows.map((row) => row.requesterId === userId ? row.receiverId : row.requesterId));
+  return new Set(
+    rows.map((row) =>
+      row.requesterId === userId ? row.receiverId : row.requesterId,
+    ),
+  );
 }
 
 function canSeeItem(
@@ -123,10 +143,18 @@ async function loadPostRows(limit: number, userId?: number) {
     })
     .from(socialPostsTable)
     .innerJoin(usersTable, eq(socialPostsTable.userId, usersTable.id))
-    .leftJoin(userProfileSettingsTable, eq(socialPostsTable.userId, userProfileSettingsTable.userId))
-    .where(userId
-      ? and(eq(socialPostsTable.userId, userId), isNull(socialPostsTable.deletedAt))
-      : isNull(socialPostsTable.deletedAt))
+    .leftJoin(
+      userProfileSettingsTable,
+      eq(socialPostsTable.userId, userProfileSettingsTable.userId),
+    )
+    .where(
+      userId
+        ? and(
+            eq(socialPostsTable.userId, userId),
+            isNull(socialPostsTable.deletedAt),
+          )
+        : isNull(socialPostsTable.deletedAt),
+    )
     .orderBy(desc(socialPostsTable.createdAt))
     .limit(limit);
 }
@@ -162,9 +190,12 @@ router.get("/users/:id/posts", async (req, res) => {
 });
 
 router.post("/posts", async (req, res) => {
-  const content = String(req.body?.content ?? "").trim();
+  const body = asPlainRecord(getRequestBody(req));
+  const content = readTrimmedString(body.content);
   if (content.length < 2 || content.length > 2000) {
-    res.status(400).json({ error: "Il post deve contenere tra 2 e 2000 caratteri" });
+    res
+      .status(400)
+      .json({ error: "Il post deve contenere tra 2 e 2000 caratteri" });
     return;
   }
 
@@ -173,7 +204,7 @@ router.post("/posts", async (req, res) => {
     .values({
       userId: req.user!.id,
       content,
-      visibility: normalizeVisibility(req.body?.visibility),
+      visibility: normalizeVisibility(body.visibility),
     })
     .returning();
 
@@ -182,15 +213,22 @@ router.post("/posts", async (req, res) => {
 
 router.patch("/posts/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const [existing] = await db.select().from(socialPostsTable).where(eq(socialPostsTable.id, id)).limit(1);
+  const [existing] = await db
+    .select()
+    .from(socialPostsTable)
+    .where(eq(socialPostsTable.id, id))
+    .limit(1);
   if (!existing || existing.deletedAt || existing.userId !== req.user!.id) {
     res.status(404).json({ error: "Post non trovato" });
     return;
   }
 
-  const content = String(req.body?.content ?? existing.content).trim();
+  const body = asPlainRecord(getRequestBody(req));
+  const content = readTrimmedString(body.content, existing.content);
   if (content.length < 2 || content.length > 2000) {
-    res.status(400).json({ error: "Il post deve contenere tra 2 e 2000 caratteri" });
+    res
+      .status(400)
+      .json({ error: "Il post deve contenere tra 2 e 2000 caratteri" });
     return;
   }
 
@@ -198,7 +236,7 @@ router.patch("/posts/:id", async (req, res) => {
     .update(socialPostsTable)
     .set({
       content,
-      visibility: normalizeVisibility(req.body?.visibility ?? existing.visibility),
+      visibility: normalizeVisibility(body.visibility ?? existing.visibility),
       updatedAt: new Date(),
     })
     .where(eq(socialPostsTable.id, id))
@@ -209,7 +247,11 @@ router.patch("/posts/:id", async (req, res) => {
 
 router.delete("/posts/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const [existing] = await db.select().from(socialPostsTable).where(eq(socialPostsTable.id, id)).limit(1);
+  const [existing] = await db
+    .select()
+    .from(socialPostsTable)
+    .where(eq(socialPostsTable.id, id))
+    .limit(1);
   if (!existing || existing.userId !== req.user!.id) {
     res.status(404).json({ error: "Post non trovato" });
     return;
@@ -241,11 +283,16 @@ router.get("/stories", async (req, res) => {
     })
     .from(socialStoriesTable)
     .innerJoin(usersTable, eq(socialStoriesTable.userId, usersTable.id))
-    .leftJoin(userProfileSettingsTable, eq(socialStoriesTable.userId, userProfileSettingsTable.userId))
-    .where(and(
-      isNull(socialStoriesTable.deletedAt),
-      gt(socialStoriesTable.expiresAt, new Date()),
-    ))
+    .leftJoin(
+      userProfileSettingsTable,
+      eq(socialStoriesTable.userId, userProfileSettingsTable.userId),
+    )
+    .where(
+      and(
+        isNull(socialStoriesTable.deletedAt),
+        gt(socialStoriesTable.expiresAt, new Date()),
+      ),
+    )
     .orderBy(desc(socialStoriesTable.createdAt))
     .limit(100);
 
@@ -257,8 +304,9 @@ router.get("/stories", async (req, res) => {
 });
 
 router.post("/stories", async (req, res) => {
-  const content = String(req.body?.content ?? "").trim();
-  const mediaUrl = req.body?.mediaUrl ? String(req.body.mediaUrl).trim() : null;
+  const body = asPlainRecord(getRequestBody(req));
+  const content = readTrimmedString(body.content);
+  const mediaUrl = readOptionalTrimmedString(body.mediaUrl);
   if (!content && !mediaUrl) {
     res.status(400).json({ error: "Aggiungi testo o media alla storia" });
     return;
@@ -275,7 +323,7 @@ router.post("/stories", async (req, res) => {
       userId: req.user!.id,
       content: content || null,
       mediaUrl,
-      visibility: normalizeVisibility(req.body?.visibility),
+      visibility: normalizeVisibility(body.visibility),
       expiresAt,
     })
     .returning();
@@ -285,7 +333,11 @@ router.post("/stories", async (req, res) => {
 
 router.delete("/stories/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const [existing] = await db.select().from(socialStoriesTable).where(eq(socialStoriesTable.id, id)).limit(1);
+  const [existing] = await db
+    .select()
+    .from(socialStoriesTable)
+    .where(eq(socialStoriesTable.id, id))
+    .limit(1);
   if (!existing || existing.userId !== req.user!.id) {
     res.status(404).json({ error: "Storia non trovata" });
     return;

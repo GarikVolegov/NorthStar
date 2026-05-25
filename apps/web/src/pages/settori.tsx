@@ -1,20 +1,27 @@
-import { useEffect, useState, useMemo } from "react";
-import { motion } from "framer-motion";
-import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
-import { usePageMeta } from "@/lib/seo";
-import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { Skeleton } from "@/components/ui/skeleton";
+import { AnimateOnScroll } from "@/components/motion";
 import { Input } from "@/components/ui/input";
-import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
-import { cn } from "@/lib/utils";
-import {
-  Search, TrendingUp, DollarSign, Bot, ArrowRight,
-  Zap, SlidersHorizontal, X, GitCompare,
-} from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { WorkModeBadge } from "@/components/WorkModeSelector";
-import type { Sector as ApiSector } from "@workspace/api-client-react";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
+import { getJson } from "@/lib/apiClient";
+import { RIASEC_LABELS, SectorIcon } from "@/lib/sector-icon";
+import { usePageMeta } from "@/lib/seo";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import type { Sector as ApiSector } from "@workspace/api-client-react";
+import {
+  ArrowRight,
+  Bot,
+  DollarSign,
+  GitCompare,
+  Search,
+  SlidersHorizontal,
+  TrendingUp,
+  X,
+  Zap,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
 
 import { useTranslation } from "react-i18next";
 
@@ -37,11 +44,7 @@ const RISK_COLOR: Record<string, string> = {
 function useAllSectors() {
   return useQuery<Sector[]>({
     queryKey: ["all-sectors"],
-    queryFn: async () => {
-      const res = await fetch(`${BASE}api/sectors`);
-      if (!res.ok) throw new Error("error loading sectors");
-      return res.json();
-    },
+    queryFn: () => getJson<Sector[]>(`${BASE}api/sectors`),
     staleTime: 300_000,
   });
 }
@@ -234,9 +237,9 @@ export default function Settori() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {filtered.map((sector) => {
-              const trendColor = TREND_COLOR[sector.trend] ?? TREND_COLOR["stable"];
+              const trendColor = TREND_COLOR[sector.trend] ?? TREND_COLOR.stable!;
               const trendLabel = t(`sectors.trend.${sector.trend}`, { defaultValue: sector.trend });
-              const riskColor  = RISK_COLOR[sector.automationRisk] ?? RISK_COLOR["medium"];
+              const riskColor  = RISK_COLOR[sector.automationRisk] ?? RISK_COLOR.medium!;
               const riskLabel  = t(`sectors.risk.${sector.automationRisk}`, { defaultValue: sector.automationRisk });
               return (
                 <div key={sector.id}>

@@ -5,7 +5,7 @@ echo "▶ [post-merge] Installazione dipendenze Node.js..."
 pnpm install --frozen-lockfile
 
 echo "▶ [post-merge] Installazione dipendenze Python (AI service)..."
-pip install -q -r artifacts/ai-agents/requirements.txt
+uv sync --frozen
 
 echo "▶ [post-merge] Applicazione schema database..."
 if [[ -z "${DATABASE_URL:-}" ]]; then

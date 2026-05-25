@@ -1,5 +1,5 @@
-import { CheckCheck, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CheckCheck, Lock } from "lucide-react";
 
 interface MessageBubbleProps {
   content: string;

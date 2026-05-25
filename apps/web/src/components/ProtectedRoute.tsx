@@ -13,11 +13,11 @@
  * Usa useAuth() (bridged su Clerk) per non rompere le pagine esistenti
  * che usano già useAuth() internamente.
  */
-import { type ComponentType } from "react";
-import { Redirect } from "wouter";
+import { PageLoader } from "@/components/PageLoader";
 import { useAuth } from "@/contexts/AuthContext";
 import { useClerk, useUser } from "@clerk/react";
-import { PageLoader } from "@/components/PageLoader";
+import { type ComponentType } from "react";
+import { Redirect } from "wouter";
 
 interface ProtectedRouteProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -1,11 +1,10 @@
-import { useEffect } from "react";
-import { useLocation, useParams } from "wouter";
 import { useWendy } from "@/contexts/WendyProvider";
+import { useEffect } from "react";
+import { useLocation } from "wouter";
 
 export default function Wiki() {
   const wendy = useWendy();
   const [, setLocation] = useLocation();
-  const params = useParams();
 
   useEffect(() => {
     wendy.open();

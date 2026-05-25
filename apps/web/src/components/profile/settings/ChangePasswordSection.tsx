@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { ApiClientError, postJson } from "@/lib/apiClient";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CheckCircle2, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -39,20 +40,19 @@ export function ChangePasswordSection({ userId }: { userId: number }) {
     setServerError(null);
     setSuccess(false);
     try {
-      const res = await fetch(`${BASE}api/profile/change-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, oldPassword: data.oldPassword, newPassword: data.newPassword }),
+      await postJson(`${BASE}api/profile/change-password`, {
+        userId,
+        oldPassword: data.oldPassword,
+        newPassword: data.newPassword,
       });
-      const json = await res.json();
-      if (!res.ok) {
-        setServerError(json.error || "Errore cambio password");
-      } else {
-        setSuccess(true);
-        reset();
-      }
-    } catch {
-      setServerError("Errore di rete. Riprova.");
+      setSuccess(true);
+      reset();
+    } catch (error) {
+      setServerError(
+        error instanceof ApiClientError
+          ? error.message
+          : "Errore di rete. Riprova.",
+      );
     }
   }
 
@@ -68,7 +68,11 @@ export function ChangePasswordSection({ userId }: { userId: number }) {
           autoComplete="current-password"
           className={errors.oldPassword ? "border-destructive" : ""}
         />
-        {errors.oldPassword && <p className="text-xs text-destructive mt-1">{errors.oldPassword.message}</p>}
+        {errors.oldPassword && (
+          <p className="text-xs text-destructive mt-1">
+            {errors.oldPassword.message}
+          </p>
+        )}
       </div>
       <div>
         <Label htmlFor="new-password">Nuova password</Label>
@@ -80,7 +84,11 @@ export function ChangePasswordSection({ userId }: { userId: number }) {
           autoComplete="new-password"
           className={errors.newPassword ? "border-destructive" : ""}
         />
-        {errors.newPassword && <p className="text-xs text-destructive mt-1">{errors.newPassword.message}</p>}
+        {errors.newPassword && (
+          <p className="text-xs text-destructive mt-1">
+            {errors.newPassword.message}
+          </p>
+        )}
       </div>
       <div>
         <Label htmlFor="confirm-password">Conferma nuova password</Label>
@@ -92,10 +100,16 @@ export function ChangePasswordSection({ userId }: { userId: number }) {
           autoComplete="new-password"
           className={errors.confirm ? "border-destructive" : ""}
         />
-        {errors.confirm && <p className="text-xs text-destructive mt-1">{errors.confirm.message}</p>}
+        {errors.confirm && (
+          <p className="text-xs text-destructive mt-1">
+            {errors.confirm.message}
+          </p>
+        )}
       </div>
       {serverError && (
-        <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">{serverError}</p>
+        <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">
+          {serverError}
+        </p>
       )}
       {success && (
         <p className="text-xs text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2 flex items-center gap-1.5">

@@ -1,7 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Bookmark, X } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useFavorites } from "@/hooks/useFavorites";
+import { Bookmark, X } from "lucide-react";
 
 export function SavedItems() {
   const { favorites, removeFavorite } = useFavorites();

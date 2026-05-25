@@ -1,6 +1,6 @@
-import { Volume2, VolumeX, Pause, Play } from "lucide-react";
 import { useTTS } from "@/hooks/useTTS";
 import { cn } from "@/lib/utils";
+import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 
 interface TTSButtonProps {
   text: string;

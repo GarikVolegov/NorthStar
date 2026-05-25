@@ -1,13 +1,13 @@
 import {
-  StickyNote,
-  Lightbulb,
-  FileText,
-  Target,
-  Briefcase,
-  Wrench,
   Award,
-  Network,
+  Briefcase,
+  FileText,
   Globe,
+  Lightbulb,
+  Network,
+  StickyNote,
+  Target,
+  Wrench,
 } from "lucide-react";
 
 export type NodeType =

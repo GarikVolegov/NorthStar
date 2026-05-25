@@ -75,7 +75,7 @@ router.post("/", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const userId = req.user!.id;
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id ?? "", 10);
     if (Number.isNaN(id)) {
       res.status(400).json({ error: "ID non valido" });
       return;

@@ -38,7 +38,7 @@ router.post("/", optionalAuth, async (req, res) => {
       query: q,
       userId: req.user?.id ?? null,
       limit,
-      types: types as GlobalSearchEntityType[] | undefined,
+      ...(types ? { types: types as GlobalSearchEntityType[] } : {}),
     });
 
     res.json(response);

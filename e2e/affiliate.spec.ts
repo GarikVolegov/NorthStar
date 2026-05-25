@@ -3,6 +3,9 @@
  */
 import { test, expect } from '@playwright/test';
 import { loginViaApi, loginAsAffiliate, waitForAuthReady } from './helpers/auth';
+import { responseJson } from './helpers/json';
+
+type LoginResponse = { token?: string };
 
 test.describe('Route /affiliate', () => {
   test('redirect a /login se non autenticato', async ({ page }) => {
@@ -20,13 +23,13 @@ test.describe('Route /affiliate', () => {
       await loginViaApi(page);
       await page.goto('/affiliate');
       await waitForAuthReady(page);
-      await page.waitForLoadState('networkidle', { timeout: 15_000 });
+      await expect(page).toHaveURL(/\/affiliate/, { timeout: 10_000 });
     });
 
     test('la pagina si carica senza errori JS critici', async ({ page }) => {
       const errors: string[] = [];
       page.on('pageerror', (err) => errors.push(err.message));
-      await page.waitForLoadState('networkidle', { timeout: 15_000 });
+      await expect(page.locator('header').or(page.locator('main'))).toBeVisible({ timeout: 10_000 });
       const critical = errors.filter(
         (e) => !e.includes('Warning:') && !e.includes('[Fast Refresh]'),
       );
@@ -140,7 +143,8 @@ test.describe('Route /affiliate', () => {
       test.skip(true, 'Utente di test non disponibile in questo ambiente');
       return;
     }
-    const { token } = await loginRes.json();
+    const { token } = await responseJson<LoginResponse>(loginRes);
+    expect(token).toBeTruthy();
 
     const dashRes = await page.request.get('/api/affiliate/dashboard', {
       headers: { Authorization: `Bearer ${token}` },

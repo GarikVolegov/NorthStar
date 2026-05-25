@@ -1,90 +1,31 @@
-import { useState, useRef, useEffect } from "react";
-import { useTranslation } from "react-i18next";
-import { useAuth } from "@/contexts/AuthContext";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/contexts/AuthContext";
+import { AppCard } from "@/features/applications/ApplicationCard";
+import { CoverLetterDialog } from "@/features/applications/CoverLetterDialog";
+import { StatsView } from "@/features/applications/StatsView";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Plus, ExternalLink, Trash2, Loader2, ChevronDown,
-  Building2, Briefcase, MapPin, DollarSign, FileText,
-  Link2, Star, Calendar, AlertCircle, Bell, X,
-  BarChart3, TrendingUp, ArrowRight, StickyNote, Send,
-  ChevronUp, Clock, Copy, Sparkles, GripVertical,
-} from "lucide-react";
-import { apiFetch } from "@/lib/api-fetch";
-import { Link } from "wouter";
+  COLUMNS,
+  EMPTY_FORM,
+  STATUS_META,
+  type Application,
+  type ApplicationForm,
+  type ApplicationsResponse,
+  type AppStatus,
+} from "@/features/applications/applicationTypes";
+import { deleteJson, getJson, patchJson, postJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertCircle, BarChart3, Bell, Briefcase, Building2, DollarSign, FileText, Link2, Loader2, MapPin, Plus, Star, X } from "lucide-react";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
-
-type AppStatus = "saved" | "applied" | "interview" | "offer" | "rejected";
-
-interface NoteEntry {
-  text: string;
-  createdAt: string;
-}
-
-interface Application {
-  id: number;
-  userId: number;
-  company: string;
-  role: string;
-  url: string | null;
-  status: AppStatus;
-  notes: string | null;
-  salary: string | null;
-  location: string | null;
-  appliedAt: string;
-  updatedAt: string;
-  notesLog: NoteEntry[] | null;
-}
-
-const STATUS_META: Record<AppStatus, { label: string; emoji: string; color: string; border: string; bg: string; badge: string }> = {
-  saved:     { label: "Salvata",    emoji: "💾", color: "text-slate-700",   border: "border-l-slate-400",  bg: "bg-slate-50",   badge: "bg-slate-100 text-slate-700 border-slate-200" },
-  applied:   { label: "Candidato",  emoji: "📤", color: "text-blue-700",    border: "border-l-blue-500",   bg: "bg-blue-50",    badge: "bg-blue-100 text-blue-700 border-blue-200" },
-  interview: { label: "Colloquio",  emoji: "🎤", color: "text-violet-700",  border: "border-l-violet-500", bg: "bg-violet-50",  badge: "bg-violet-100 text-violet-700 border-violet-200" },
-  offer:     { label: "Offerta",    emoji: "🎉", color: "text-emerald-700", border: "border-l-emerald-500",bg: "bg-emerald-50", badge: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-  rejected:  { label: "Rifiutato", emoji: "❌", color: "text-rose-700",    border: "border-l-rose-400",   bg: "bg-rose-50",    badge: "bg-rose-100 text-rose-700 border-rose-200" },
-};
-
-const COLUMNS: AppStatus[] = ["saved", "applied", "interview", "offer", "rejected"];
-const EMPTY_FORM = { company: "", role: "", url: "", status: "saved" as AppStatus, notes: "", salary: "", location: "" };
-
-function useFormatDate() {
-  const { i18n } = useTranslation();
-  return (iso: string) => new Date(iso).toLocaleDateString(i18n.language, { day: "numeric", month: "short" });
-}
-
-function useFormatNoteDate() {
-  const { t, i18n } = useTranslation();
-  return (iso: string): string => {
-    const date = new Date(iso);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-    if (diffMins < 1) return t("candidature.now");
-    if (diffMins < 60) return `${diffMins}m`;
-    if (diffHours < 24) return `${diffHours}h`;
-    if (diffDays === 1) return t("amici.yesterday");
-    if (diffDays < 7) return `${diffDays}d`;
-    return date.toLocaleDateString(i18n.language, { day: "numeric", month: "short" });
-  };
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   Main page component
-═══════════════════════════════════════════════════════════════════════ */
 export default function Candidature() {
   const { t } = useTranslation();
   const { user, isLoggedIn } = useAuth();
@@ -102,8 +43,7 @@ export default function Candidature() {
     queryKey: ["applications", user?.id],
     queryFn: async () => {
       if (!user?.id) return { applications: [] };
-      const res = await apiFetch(`${BASE}api/applications/${user.id}`);
-      return res.json() as Promise<{ applications: Application[] }>;
+      return getJson<ApplicationsResponse>(`${BASE}api/applications/${user.id}`);
     },
     enabled: !!user?.id,
   });
@@ -111,41 +51,27 @@ export default function Candidature() {
   const applications = data?.applications ?? [];
 
   const createMutation = useMutation({
-    mutationFn: async (payload: typeof EMPTY_FORM) => {
-      const res = await apiFetch(`${BASE}api/applications`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error("Errore nella creazione");
-      return res.json();
-    },
+    mutationFn: (payload: ApplicationForm) =>
+      postJson<Application>(`${BASE}api/applications`, { ...payload }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["applications", user?.id] });
       setAddOpen(false);
       setForm(EMPTY_FORM);
       setFormError(null);
     },
-    onError: (e: any) => setFormError(e.message),
+    onError: (error: Error) => setFormError(error.message),
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: Partial<Application> }) => {
-      const res = await apiFetch(`${BASE}api/applications/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      });
-      if (!res.ok) throw new Error("Errore nell'aggiornamento");
-      return res.json();
+      return patchJson<Application>(`${BASE}api/applications/${id}`, updates);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["applications", user?.id] }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiFetch(`${BASE}api/applications/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Errore nell'eliminazione");
+      await deleteJson(`${BASE}api/applications/${id}`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["applications", user?.id] }),
   });
@@ -357,7 +283,7 @@ export default function Candidature() {
                           onStatusChange={(s) => updateMutation.mutate({ id: app.id, updates: { status: s } })}
                           deleting={deleteMutation.isPending && deleteMutation.variables === app.id}
                           isDragging={draggingId === app.id}
-                          onDragStart={(e) => { (e as any).dataTransfer.setData("appId", String(app.id)); setDraggingId(app.id); }}
+                          onDragStart={(e) => { e.dataTransfer.setData("appId", String(app.id)); setDraggingId(app.id); }}
                           onDragEnd={() => setDraggingId(null)}
                           onCoverLetter={() => setCoverLetterApp(app)}
                         />
@@ -472,524 +398,4 @@ export default function Candidature() {
       )}
     </div>
   );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   AI Cover-letter dialog
-═══════════════════════════════════════════════════════════════════════ */
-function CoverLetterDialog({ app, onClose }: { app: Application; onClose: () => void }) {
-  const [jobDescription, setJobDescription] = useState("");
-  const [text, setText] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  async function generate() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await apiFetch(`${BASE}api/cover-letter/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company: app.company, role: app.role, jobDescription }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Errore generazione");
-      setText(data.text ?? "");
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function copyToClipboard() {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-base font-semibold flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-primary" /> Lettera di presentazione AI
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="flex items-center gap-2 text-sm">
-            <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="font-medium">{app.company}</span>
-            <span className="text-muted-foreground">·</span>
-            <span className="text-muted-foreground">{app.role}</span>
-          </div>
-          <div>
-            <Label className="text-xs font-semibold mb-1.5 block">
-              Descrizione posizione{" "}
-              <span className="font-normal text-muted-foreground">(facoltativo)</span>
-            </Label>
-            <Textarea
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-              placeholder="Incolla la descrizione dell'annuncio per una lettera più personalizzata…"
-              className="min-h-[80px] rounded-xl text-sm resize-none"
-            />
-          </div>
-          <Button onClick={generate} disabled={loading} className="w-full rounded-xl gap-2">
-            {loading
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Generazione in corso…</>
-              : <><Sparkles className="w-4 h-4" /> {text ? "Rigenera lettera" : "Genera lettera AI"}</>}
-          </Button>
-          {error && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
-              <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
-              <p className="text-xs text-destructive">{error}</p>
-            </div>
-          )}
-          {text && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold">Lettera generata</Label>
-                <button onClick={copyToClipboard} className="flex items-center gap-1 text-xs text-primary hover:underline">
-                  <Copy className="w-3 h-3" /> {copied ? "Copiato!" : "Copia"}
-                </button>
-              </div>
-              <Textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                className="min-h-[240px] rounded-xl text-sm"
-              />
-            </div>
-          )}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" className="rounded-xl" onClick={onClose}>Chiudi</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   Application card with inline notes diary
-═══════════════════════════════════════════════════════════════════════ */
-function AppCard({
-  app, userId, onEdit, onDelete, onStatusChange, deleting,
-  isDragging, onDragStart, onDragEnd, onCoverLetter,
-}: {
-  app: Application;
-  userId: number;
-  onEdit: () => void;
-  onDelete: () => void;
-  onStatusChange: (s: AppStatus) => void;
-  deleting: boolean;
-  isDragging: boolean;
-  onDragStart: (e: DragEvent) => void;
-  onDragEnd: () => void;
-  onCoverLetter: () => void;
-}) {
-  const { t } = useTranslation();
-  const formatDate = useFormatDate();
-  const formatNoteDate = useFormatNoteDate();
-  const queryClient = useQueryClient();
-  const meta = STATUS_META[app.status];
-  const otherStatuses = COLUMNS.filter((s) => s !== app.status);
-  const notesLog: NoteEntry[] = Array.isArray(app.notesLog) ? app.notesLog : [];
-
-  const [notesOpen, setNotesOpen] = useState(false);
-  const [noteInput, setNoteInput] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (notesOpen) inputRef.current?.focus();
-  }, [notesOpen]);
-
-  const addNoteMutation = useMutation({
-    mutationFn: async (text: string) => {
-      const res = await apiFetch(`${BASE}api/applications/${app.id}/notes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      if (!res.ok) throw new Error("Errore");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["applications", userId] });
-      setNoteInput("");
-    },
-  });
-
-  const deleteNoteMutation = useMutation({
-    mutationFn: async (index: number) => {
-      const res = await apiFetch(`${BASE}api/applications/${app.id}/notes/${index}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Errore");
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["applications", userId] }),
-  });
-
-  function submitNote() {
-    const text = noteInput.trim();
-    if (!text || addNoteMutation.isPending) return;
-    addNoteMutation.mutate(text);
-  }
-
-  return (
-    <div
-      draggable
-      onDragStart={onDragStart as any}
-      onDragEnd={onDragEnd}
-      className={cn(
-        "bg-background rounded-xl border border-l-4 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing",
-        meta.border,
-        isDragging && "opacity-50 scale-[0.97]",
-      )}
-    >
-      {/* ── Clickable card body ── */}
-      <div className="p-3 cursor-pointer" onClick={onEdit}>
-        {/* Company + Delete */}
-        <div className="flex items-start gap-1.5 mb-1">
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-foreground leading-tight truncate">{app.company}</p>
-            <p className="text-xs text-muted-foreground truncate">{app.role}</p>
-          </div>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all shrink-0 -mt-0.5 -mr-0.5 group"
-            disabled={deleting}
-          >
-            {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3 opacity-0 group-hover:opacity-100" />}
-          </button>
-        </div>
-
-        {/* Location / Salary */}
-        {(app.location || app.salary) && (
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
-            {app.location && (
-              <span className="text-[11px] flex items-center gap-1 text-muted-foreground">
-                <MapPin className="w-2.5 h-2.5" />{app.location}
-              </span>
-            )}
-            {app.salary && (
-              <span className="text-[11px] flex items-center gap-1 text-muted-foreground">
-                <DollarSign className="w-2.5 h-2.5" />{app.salary}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Notes preview */}
-        {app.notes && (
-          <p className="text-[11px] text-muted-foreground italic mt-1.5 line-clamp-2">{app.notes}</p>
-        )}
-
-        {/* Latest diary note teaser (when panel is closed) */}
-        {!notesOpen && notesLog.length > 0 && (
-          <div className="mt-2 flex items-start gap-1.5">
-            <Clock className="w-2.5 h-2.5 text-muted-foreground/60 mt-0.5 shrink-0" />
-            <p className="text-[10px] text-muted-foreground/70 line-clamp-1 italic">
-              {formatNoteDate(notesLog[0].createdAt)} · {notesLog[0].text}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* ── Footer: date, url, notes toggle, status ── */}
-      <div className="flex items-center gap-1.5 px-3 pb-2.5 pt-0">
-        <span className="text-[11px] text-muted-foreground flex items-center gap-1 mr-auto">
-          <Calendar className="w-2.5 h-2.5" />{formatDate(app.appliedAt)}
-        </span>
-
-        {app.url && (
-          <a href={app.url} target="_blank" rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-colors" title="Apri offerta">
-            <ExternalLink className="w-3 h-3" />
-          </a>
-        )}
-
-        <button
-          onClick={(e) => { e.stopPropagation(); onCoverLetter(); }}
-          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-violet-600 transition-colors"
-          title="Genera lettera di presentazione AI"
-        >
-          <Sparkles className="w-3 h-3" />
-        </button>
-
-        {/* Notes toggle */}
-        <button
-          onClick={(e) => { e.stopPropagation(); setNotesOpen((o) => !o); }}
-          className={cn(
-            "flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-md transition-colors",
-            notesOpen
-              ? "bg-primary/10 text-primary"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted",
-          )}
-          title={notesOpen ? "Chiudi diario" : "Apri diario note"}
-        >
-          <StickyNote className="w-3 h-3" />
-          {notesLog.length > 0 ? notesLog.length : ""}
-          {notesOpen ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
-        </button>
-
-        {/* Status dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button onClick={(e) => e.stopPropagation()}
-              className={cn("text-[11px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 hover:opacity-80 transition-opacity", meta.badge)}>
-              {meta.emoji} {meta.label} <ChevronDown className="w-2.5 h-2.5" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            {otherStatuses.map((s) => {
-              const m = STATUS_META[s];
-              return (
-                <DropdownMenuItem key={s} onClick={(e) => { e.stopPropagation(); onStatusChange(s); }}
-                  className="text-xs gap-2 cursor-pointer">
-                  <span>{m.emoji}</span> {t("candidature.moveTo", { status: t(`candidature.status.${s}`) })}
-                </DropdownMenuItem>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* ── Inline notes diary ── */}
-      {notesOpen && (
-        <div
-          className="border-t border-border/60 mx-3 pb-3 pt-2.5"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Existing notes */}
-          {notesLog.length > 0 && (
-            <div className="space-y-1.5 mb-2.5 max-h-40 overflow-y-auto pr-1">
-              {notesLog.map((entry, i) => (
-                <div key={i} className="flex items-start gap-2 group/note">
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap pt-0.5 shrink-0 tabular-nums">
-                    {formatNoteDate(entry.createdAt)}
-                  </span>
-                  <p className="text-[11px] text-foreground leading-relaxed flex-1 min-w-0">{entry.text}</p>
-                  <button
-                    onClick={() => deleteNoteMutation.mutate(i)}
-                    disabled={deleteNoteMutation.isPending}
-                    className="opacity-0 group-hover/note:opacity-100 p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all shrink-0"
-                  >
-                    <X className="w-2.5 h-2.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {notesLog.length === 0 && (
-            <p className="text-[11px] text-muted-foreground italic mb-2.5">
-              {t("candidature.noNotesYet")}
-            </p>
-          )}
-
-          {/* Add note input */}
-          <div className="flex items-center gap-1.5">
-            <input
-              ref={inputRef}
-              value={noteInput}
-              onChange={(e) => setNoteInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitNote(); }
-              }}
-              placeholder={t("candidature.addNotePlaceholder")}
-              className="flex-1 min-w-0 text-xs bg-muted/60 border border-input rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/50 transition-shadow"
-            />
-            <button
-              onClick={submitNote}
-              disabled={!noteInput.trim() || addNoteMutation.isPending}
-              className="p-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
-              title="Aggiungi nota (Invio)"
-            >
-              {addNoteMutation.isPending
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : <Send className="w-3.5 h-3.5" />}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   Statistics view
-═══════════════════════════════════════════════════════════════════════ */
-function StatsView({ applications }: { applications: Application[] }) {
-  const { t } = useTranslation();
-  const total = applications.length;
-
-  const counts = {
-    saved:     applications.filter((a) => a.status === "saved").length,
-    applied:   applications.filter((a) => a.status === "applied").length,
-    interview: applications.filter((a) => a.status === "interview").length,
-    offer:     applications.filter((a) => a.status === "offer").length,
-    rejected:  applications.filter((a) => a.status === "rejected").length,
-  };
-
-  const active = counts.applied + counts.interview;
-  const sentApplications = counts.applied + counts.interview + counts.offer + counts.rejected;
-  const responseRate = sentApplications > 0
-    ? Math.round(((counts.interview + counts.offer) / sentApplications) * 100) : 0;
-  const offerRate = (counts.interview + counts.offer) > 0
-    ? Math.round((counts.offer / (counts.interview + counts.offer)) * 100) : 0;
-
-  const funnelStages: { status: AppStatus; count: number }[] = [
-    { status: "saved", count: counts.saved },
-    { status: "applied", count: counts.applied },
-    { status: "interview", count: counts.interview },
-    { status: "offer", count: counts.offer },
-  ];
-  const maxFunnelCount = Math.max(...funnelStages.map((s) => s.count), 1);
-
-  const monthlyData = groupByMonth(applications);
-  const maxMonthly = Math.max(...monthlyData.map((d) => d.count), 1);
-
-  const totalNotes = applications.reduce((sum, a) => sum + (Array.isArray(a.notesLog) ? a.notesLog.length : 0), 0);
-
-  if (total === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <BarChart3 className="w-12 h-12 text-muted-foreground/30 mb-4" />
-        <p className="text-muted-foreground">{t("candidature.addStatNote")}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-5 max-w-3xl">
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard emoji="📊" label={t("candidature.totalLabel")} value={total} sub={t("candidature.tracked")} valueColor="text-foreground" />
-        <KpiCard emoji="💌" label={t("candidature.responseRate")} value={`${responseRate}%`} sub={t("candidature.responseRateDesc")} valueColor="text-blue-600" />
-        <KpiCard emoji="⏳" label={t("candidature.inProgress")} value={active} sub={t("candidature.inProgressDesc")} valueColor="text-violet-600" />
-        <KpiCard emoji="📝" label={t("candidature.totalNotes")} value={totalNotes} sub={`${(totalNotes / total).toFixed(1)} ${t("candidature.perApp")}`} valueColor="text-amber-600" />
-      </div>
-
-      {/* Funnel */}
-      <div className="bg-background rounded-2xl border p-5">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-sm font-semibold flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-primary" /> {t("candidature.funnelTitle")}
-          </h3>
-          {offerRate > 0 && (
-            <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full border", STATUS_META.offer.badge)}>
-              🎉 {t("candidature.successRate", { rate: offerRate })}
-            </span>
-          )}
-        </div>
-        <div className="space-y-2">
-          {funnelStages.map((stage, i) => {
-            const m = STATUS_META[stage.status];
-            const pct = maxFunnelCount > 0 ? (stage.count / maxFunnelCount) * 100 : 0;
-            const prevCount = i > 0 ? funnelStages[i - 1].count : null;
-            const convPct = prevCount !== null && prevCount > 0
-              ? Math.round((stage.count / prevCount) * 100) : null;
-            return (
-              <div key={stage.status}>
-                {convPct !== null && (
-                  <div className="flex items-center gap-2 py-1 pl-[108px]">
-                    <ArrowRight className="w-3 h-3 text-muted-foreground/40 shrink-0" />
-                    <span className="text-[11px] text-muted-foreground font-medium">{t("candidature.conversionPct", { pct: convPct })}</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-3">
-                  <div className="w-24 shrink-0 text-right">
-                    <span className={cn("text-xs font-semibold", m.color)}>{m.emoji} {t(`candidature.status.${stage.status}`)}</span>
-                  </div>
-                  <div className="flex-1 bg-muted rounded-full h-8 overflow-hidden">
-                    <div className={cn("h-full rounded-full transition-all duration-700 ease-out", m.bg)}
-                      style={{ width: `${Math.max(pct, stage.count > 0 ? 6 : 0)}%` }} />
-                  </div>
-                  <div className="w-20 shrink-0 text-right">
-                    <span className="text-base font-bold tabular-nums">{stage.count}</span>
-                    <span className="text-[11px] text-muted-foreground ml-1">
-                      ({total > 0 ? Math.round((stage.count / total) * 100) : 0}%)
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        {counts.rejected > 0 && (
-          <div className="mt-5 pt-4 border-t flex items-center gap-3 text-sm">
-            <span className="text-base">❌</span>
-            <span className="text-muted-foreground">
-              <strong className="text-foreground font-semibold">{counts.rejected}</strong> {t(`candidature.status.rejected`).toLowerCase()}
-            </span>
-            <span className={cn("text-xs px-2 py-0.5 rounded-full border font-medium", STATUS_META.rejected.badge)}>
-              {Math.round((counts.rejected / total) * 100)}% {t("candidature.ofTotal")}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Monthly chart */}
-      {monthlyData.length > 0 && (
-        <div className="bg-background rounded-2xl border p-5">
-          <h3 className="text-sm font-semibold mb-5 flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-primary" /> {t("candidature.overTime")}
-          </h3>
-          <div className="flex items-end gap-2" style={{ height: 120 }}>
-            {monthlyData.map(({ month, count }) => {
-              const barH = Math.max(Math.round((count / maxMonthly) * 100), 4);
-              return (
-                <div key={month} className="flex-1 flex flex-col items-center gap-1 min-w-0 group">
-                  <span className="text-xs font-bold text-foreground tabular-nums opacity-0 group-hover:opacity-100 transition-opacity">{count}</span>
-                  <div className="w-full relative" style={{ height: `${barH}%` }}>
-                    <div className="w-full h-full bg-primary/20 hover:bg-primary/40 rounded-t-md transition-colors cursor-default" />
-                    {monthlyData.length <= 6 && (
-                      <span className="absolute -top-5 left-0 right-0 text-center text-xs font-semibold tabular-nums">{count}</span>
-                    )}
-                  </div>
-                  <span className="text-[10px] text-muted-foreground truncate w-full text-center leading-tight">{formatMonth(month)}</span>
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-xs text-muted-foreground mt-3 text-right">
-            {t("candidature.avgPerMonth", { avg: (total / Math.max(monthlyData.length, 1)).toFixed(1) })}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── KPI card ─────────────────────────────────────────────────────────── */
-function KpiCard({ emoji, label, value, sub, valueColor }: {
-  emoji: string; label: string; value: string | number; sub: string; valueColor: string;
-}) {
-  return (
-    <div className="bg-background rounded-2xl border p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-lg leading-none">{emoji}</span>
-        <span className="text-xs text-muted-foreground font-medium">{label}</span>
-      </div>
-      <p className={cn("text-2xl font-bold tabular-nums leading-none mb-1", valueColor)}>{value}</p>
-      <p className="text-[11px] text-muted-foreground leading-tight">{sub}</p>
-    </div>
-  );
-}
-
-/* ── Helpers ──────────────────────────────────────────────────────────── */
-function groupByMonth(apps: Application[]): { month: string; count: number }[] {
-  const map = new Map<string, number>();
-  apps.forEach((app) => {
-    const d = new Date(app.appliedAt);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    map.set(key, (map.get(key) ?? 0) + 1);
-  });
-  return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([month, count]) => ({ month, count }));
-}
-
-function formatMonth(ym: string): string {
-  const [y, m] = ym.split("-");
-  return new Date(parseInt(y), parseInt(m) - 1).toLocaleDateString("it-IT", { month: "short", year: "2-digit" });
 }

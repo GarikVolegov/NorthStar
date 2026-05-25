@@ -1,28 +1,28 @@
-import { useState, useEffect, useRef } from "react";
-import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/contexts/AuthContext";
+import { LinkedInImportWizard } from "@/components/LinkedInImportWizard";
+import { OpenHumanAgentCard } from "@/components/profile/OpenHumanAgentCard";
+import { JourneySectionRenderer, type JourneyType } from "@/components/profile/profile-sections";
+import { ProfileSettings } from "@/components/profile/ProfileSettings";
+import { BadgesAchievements } from "@/components/profile/sections/BadgesAchievements";
 import { Button } from "@/components/ui/button";
-import { useTranslation } from "react-i18next";
+import type { AuthUser } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePageModule } from "@/hooks/usePageModule";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
+import { deleteJson, getJson, patchJson } from "@/lib/apiClient";
+import { useQuery } from "@tanstack/react-query";
 import {
   Calendar,
   Camera,
-  Loader2,
   Linkedin,
+  Loader2,
   Mail,
   ShieldCheck,
   Trash2,
-  TrendingUp,
-  User,
+  TrendingUp
 } from "lucide-react";
-import { apiFetch } from "@/lib/api-fetch";
-import { usePageModule } from "@/hooks/usePageModule";
-import { useWendyPageContext } from "@/hooks/useWendyPageContext";
-import { ProfileSettings } from "@/components/profile/ProfileSettings";
-import { BadgesAchievements } from "@/components/profile/sections/BadgesAchievements";
-import { JourneySectionRenderer, type JourneyType } from "@/components/profile/profile-sections";
-import { LinkedInImportWizard } from "@/components/LinkedInImportWizard";
-import type { AuthUser } from "@/contexts/AuthContext";
+import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -39,11 +39,7 @@ interface ProfileData {
 function useProfile(userId: number) {
   return useQuery<ProfileData>({
     queryKey: ["profile", userId],
-    queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/profile/${userId}`);
-      if (!res.ok) throw new Error("Errore caricamento profilo");
-      return res.json();
-    },
+    queryFn: () => getJson<ProfileData>(`${BASE}api/profile/${userId}`),
     enabled: !!userId,
   });
 }
@@ -125,24 +121,14 @@ function ProfileHero({
       const maxSize = kind === "avatar" ? 2_000_000 : 1_500_000;
       const maxLabel = kind === "avatar" ? "2 MB" : "1.5 MB";
       const dataUrl = await readImageAsDataUrl(file, maxSize, maxLabel);
-      const res = await apiFetch(`${BASE}api/profile/${user.id}/${kind}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
+      const json = await patchJson<{ avatarUrl?: string | null; bannerUrl?: string | null }>(
+        `${BASE}api/profile/${user.id}/${kind}`,
           kind === "avatar"
             ? { avatarDataUrl: dataUrl }
             : { bannerDataUrl: dataUrl },
-        ),
-      });
-
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.error ?? "Errore upload");
-      }
-
-      const json = await res.json();
-      if (kind === "avatar") onAvatarUpdate(json.avatarUrl);
-      else onBannerUpdate(json.bannerUrl);
+      );
+      if (kind === "avatar") onAvatarUpdate(json.avatarUrl ?? null);
+      else onBannerUpdate(json.bannerUrl ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Errore upload");
     } finally {
@@ -156,7 +142,7 @@ function ProfileHero({
     setError(null);
     setUploading(kind);
     try {
-      await apiFetch(`${BASE}api/profile/${user.id}/${kind}`, { method: "DELETE" });
+      await deleteJson(`${BASE}api/profile/${user.id}/${kind}`);
       if (kind === "avatar") onAvatarUpdate(null);
       else onBannerUpdate(null);
     } catch {
@@ -383,12 +369,14 @@ export default function Profilo() {
     }
   }, [profile?.avatarUrl]);
 
-  const { data: completionData } = useQuery<CompletionResponse>({
+  const { data: completionData } = useQuery<CompletionResponse | null>({
     queryKey: ["completion-me"],
     queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/completion/me`);
-      if (!res.ok) return null;
-      return res.json();
+      try {
+        return await getJson<CompletionResponse>(`${BASE}api/completion/me`);
+      } catch {
+        return null;
+      }
     },
     enabled: !!user?.id,
     staleTime: 60_000,
@@ -411,10 +399,10 @@ export default function Profilo() {
     <div className="pb-10">
       <ProfileHero
         user={user}
-        avatarUrl={avatarUrl}
-        bannerUrl={bannerUrl}
-        createdAt={profile?.createdAt}
-        emailVerified={profile?.emailVerified}
+        {...(avatarUrl !== undefined ? { avatarUrl } : {})}
+        {...(bannerUrl !== undefined ? { bannerUrl } : {})}
+        {...(profile?.createdAt !== undefined ? { createdAt: profile.createdAt } : {})}
+        {...(profile?.emailVerified !== undefined ? { emailVerified: profile.emailVerified } : {})}
         showLinkedInImport={showLinkedInImport}
         onAvatarUpdate={(url) => {
           setAvatarUrl(url);
@@ -428,9 +416,13 @@ export default function Profilo() {
       <div className="container mx-auto grid max-w-5xl grid-cols-1 gap-6 px-4 md:grid-cols-3">
         <div className="space-y-5 md:col-span-1">
           <div id="impostazioni" className="scroll-mt-20">
-            <ProfileSettings user={user} createdAt={profile?.createdAt} />
+            <ProfileSettings
+              user={user}
+              {...(profile?.createdAt !== undefined ? { createdAt: profile.createdAt } : {})}
+            />
           </div>
           <BadgesAchievements completionData={completionData ?? null} />
+          <OpenHumanAgentCard />
         </div>
 
         <div className="space-y-5 md:col-span-2">

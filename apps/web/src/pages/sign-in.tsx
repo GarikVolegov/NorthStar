@@ -9,8 +9,8 @@
  * Il tema deep-navy è già configurato nel ClerkProvider (main.tsx).
  */
 import { SignIn } from "@clerk/react";
-import { Link } from "wouter";
 import { Compass } from "lucide-react";
+import { Link } from "wouter";
 
 export default function SignInPage() {
   return (

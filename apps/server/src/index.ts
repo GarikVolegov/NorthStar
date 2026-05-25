@@ -1,9 +1,13 @@
-import app from "./app";
+import { otelReady } from "./tracing";
+import "./sentry";
 import http from "node:http";
 import { rootLogger } from "./middleware/logger";
 import { pool } from "@workspace/db";
 
 const PORT = process.env.PORT || 3001;
+
+await otelReady;
+const { default: app } = await import("./app");
 
 const httpServer = http.createServer(app);
 const { createWsServer } = await import("@workspace/ws-server");
@@ -16,6 +20,17 @@ startAlertChecker();
 
 const { startCronJobs } = await import("./jobs/cron");
 startCronJobs();
+
+const { agentRegistry } = await import("./lib/agent-registry");
+agentRegistry.start();
+void agentRegistry.refresh().catch((err) => {
+  rootLogger.warn({ err }, "Initial agent registry refresh failed");
+});
+
+const { initAIPlugins } = await import("@workspace/ai-server");
+void initAIPlugins().catch((err) => {
+  rootLogger.warn({ err }, "AI plugin bootstrap failed");
+});
 
 httpServer.listen(PORT, () => {
   rootLogger.info({ port: PORT, wsPath: "/ws" }, "NorthStar API Server started");
@@ -35,6 +50,14 @@ async function gracefulShutdown(signal: string): Promise<void> {
     rootLogger.info("WebSocket server closed");
   } catch (err) {
     rootLogger.warn({ err }, "Error closing WebSocket server");
+  }
+
+  try {
+    const { agentRegistry } = await import("./lib/agent-registry");
+    agentRegistry.stop();
+    rootLogger.info("Agent registry stopped");
+  } catch (err) {
+    rootLogger.warn({ err }, "Error stopping agent registry");
   }
 
   try {

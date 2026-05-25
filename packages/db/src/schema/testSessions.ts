@@ -6,7 +6,7 @@
  * - Added index on userId for fast per-user queries
  */
 import {
-  pgTable, serial, timestamp, integer, real, jsonb, text, index,
+  pgTable, serial, timestamp, integer, jsonb, text, index,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";

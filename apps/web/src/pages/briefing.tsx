@@ -4,15 +4,15 @@
  * Mostra la lista dei briefing ricevuti, con anteprima e opzione
  * di generare un briefing on-demand (1 ogni 6 ore per tutti i piani).
  */
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api-fetch";
-import { API_ENDPOINTS, withParams } from "@/lib/constants";
-import { useAuth } from "@/contexts/AuthContext";
-import { usePageMeta } from "@/lib/seo";
-import { Sparkles, Calendar, Loader2, RefreshCw, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { getJson, patchJson, postJson } from "@/lib/apiClient";
+import { API_ENDPOINTS, withParams } from "@/lib/constants";
+import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { BookOpen, Calendar, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { useState } from "react";
 
 interface Briefing {
   id:        number;
@@ -24,22 +24,19 @@ interface Briefing {
 }
 
 async function fetchBriefings(): Promise<{ briefings: Briefing[] }> {
-  const res = await apiFetch(API_ENDPOINTS.briefings.list);
-  if (!res.ok) return { briefings: [] };
-  return res.json();
+  try {
+    return await getJson<{ briefings: Briefing[] }>(API_ENDPOINTS.briefings.list);
+  } catch {
+    return { briefings: [] };
+  }
 }
 
 async function generateBriefing(): Promise<{ content: string; briefingId: number }> {
-  const res = await apiFetch(API_ENDPOINTS.briefings.generate, { method: "POST" });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error ?? "Generazione fallita");
-  }
-  return res.json();
+  return postJson<{ content: string; briefingId: number }>(API_ENDPOINTS.briefings.generate);
 }
 
 async function markRead(id: number) {
-  await apiFetch(withParams(API_ENDPOINTS.briefings.markRead, { id }), { method: "PATCH" });
+  await patchJson(withParams(API_ENDPOINTS.briefings.markRead, { id }));
 }
 
 const TYPE_LABELS: Record<string, string> = {

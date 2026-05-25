@@ -31,10 +31,10 @@ export interface ResolvedWendyRoute {
 
 export function resolveWendyRoute(opts: {
   userMessage:       string;
-  pageContext?:      WendyPageContext;
-  compressedHistory?: CompressedHistory;
-  isPremium?:        boolean;
-  hasFileAttached?:  boolean;
+  pageContext?:      WendyPageContext | undefined;
+  compressedHistory?: CompressedHistory | undefined;
+  isPremium?:        boolean | undefined;
+  hasFileAttached?:  boolean | undefined;
 }): ResolvedWendyRoute {
   const { userMessage, pageContext, compressedHistory, isPremium = false, hasFileAttached = false } = opts;
 

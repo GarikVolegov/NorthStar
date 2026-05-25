@@ -4,10 +4,10 @@
  * role checks.
  */
 
+import { PageLoader } from "@/components/PageLoader";
+import { useAuth } from "@/contexts/AuthContext";
 import { type ReactNode } from "react";
 import { Redirect } from "wouter";
-import { useAuth } from "@/contexts/AuthContext";
-import { PageLoader } from "@/components/PageLoader";
 
 interface Props {
   children: ReactNode;

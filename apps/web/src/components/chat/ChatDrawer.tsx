@@ -1,10 +1,14 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { X, Loader2, Lock, MessageCircle, ChevronDown } from "lucide-react";
-import { MessageBubble } from "./MessageBubble";
+import {
+  decryptMessage,
+  encryptMessage,
+  fetchEncryptedKey,
+  unwrapAesKey,
+} from "@/hooks/useChatEncryption";
+import { getJson, postJson } from "@/lib/apiClient";
+import { Loader2, Lock, MessageCircle, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChatInput } from "./ChatInput";
-import { decryptMessage, encryptMessage, fetchEncryptedKey, unwrapAesKey } from "@/hooks/useChatEncryption";
-import { cn } from "@/lib/utils";
-import { apiFetch } from "@/lib/api-fetch";
+import { MessageBubble } from "./MessageBubble";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -28,11 +32,82 @@ interface ChatDrawerProps {
   friend: FriendInfo;
   userId: number;
   wssSend?: (data: Record<string, unknown>) => void;
-  wssOn?: (eventType: string, handler: (payload: any) => void) => () => void;
+  wssOn?: (
+    eventType: string,
+    handler: (payload: unknown) => void,
+  ) => () => void;
   onClose: () => void;
 }
 
-export function ChatDrawer({ friend, userId, wssSend, wssOn, onClose }: ChatDrawerProps) {
+interface MessagesResponse {
+  messages?: ChatMessage[];
+}
+
+interface PublicKeyResponse {
+  publicKey?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function readNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function readString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function isChatMessage(value: unknown): value is ChatMessage {
+  if (!isRecord(value)) return false;
+  return (
+    readNumber(value.id) !== null &&
+    readNumber(value.senderId) !== null &&
+    readString(value.encryptedContent) !== null &&
+    readString(value.iv) !== null &&
+    readString(value.createdAt) !== null
+  );
+}
+
+function readMessages(value: unknown): ChatMessage[] {
+  return Array.isArray(value) ? value.filter(isChatMessage) : [];
+}
+
+function readFriendMessagePayload(payload: unknown) {
+  if (!isRecord(payload) || !isChatMessage(payload.message)) return null;
+  const friendshipId = readNumber(payload.friendshipId);
+  return friendshipId === null
+    ? null
+    : { friendshipId, message: payload.message };
+}
+
+function readReadReceiptPayload(payload: unknown) {
+  if (!isRecord(payload)) return null;
+  const friendshipId = readNumber(payload.friendshipId);
+  const messageId = readNumber(payload.messageId);
+  const readAt = readString(payload.readAt);
+  return friendshipId === null || messageId === null || readAt === null
+    ? null
+    : { friendshipId, messageId, readAt };
+}
+
+function readTypingPayload(payload: unknown) {
+  if (!isRecord(payload)) return null;
+  const friendshipId = readNumber(payload.friendshipId);
+  const typingUserId = readNumber(payload.userId);
+  return friendshipId === null || typingUserId === null
+    ? null
+    : { friendshipId, userId: typingUserId };
+}
+
+export function ChatDrawer({
+  friend,
+  userId,
+  wssSend,
+  wssOn,
+  onClose,
+}: ChatDrawerProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -40,7 +115,9 @@ export function ChatDrawer({ friend, userId, wssSend, wssOn, onClose }: ChatDraw
   const [keyLoading, setKeyLoading] = useState(true);
   const [typing, setTyping] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const typingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
   // Carica la chiave di conversazione
   useEffect(() => {
@@ -57,16 +134,19 @@ export function ChatDrawer({ friend, userId, wssSend, wssOn, onClose }: ChatDraw
       }
     }
     loadKey();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [friend.friendshipId, userId]);
 
   // Carica storico messaggi
   const loadMessages = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch(`${BASE}api/friends/messages/${friend.friendshipId}`);
-      const data = await res.json();
-      setMessages(data.messages ?? []);
+      const data = await getJson<MessagesResponse>(
+        `${BASE}api/friends/messages/${friend.friendshipId}`,
+      );
+      setMessages(readMessages(data.messages));
     } finally {
       setLoading(false);
     }
@@ -79,11 +159,12 @@ export function ChatDrawer({ friend, userId, wssSend, wssOn, onClose }: ChatDraw
   // WebSocket: nuovi messaggi
   useEffect(() => {
     if (!wssOn) return;
-    const unsub = wssOn("friend:message", (payload: any) => {
-      if (payload.friendshipId !== friend.friendshipId) return;
+    const unsub = wssOn("friend:message", (payload) => {
+      const event = readFriendMessagePayload(payload);
+      if (!event || event.friendshipId !== friend.friendshipId) return;
       setMessages((prev) => {
-        if (prev.some((m) => m.id === payload.message.id)) return prev;
-        return [...prev, payload.message];
+        if (prev.some((m) => m.id === event.message.id)) return prev;
+        return [...prev, event.message];
       });
     });
     return unsub;
@@ -92,11 +173,12 @@ export function ChatDrawer({ friend, userId, wssSend, wssOn, onClose }: ChatDraw
   // WebSocket: read receipt
   useEffect(() => {
     if (!wssOn) return;
-    const unsub = wssOn("friend:message:read", (payload: any) => {
-      if (payload.friendshipId !== friend.friendshipId) return;
+    const unsub = wssOn("friend:message:read", (payload) => {
+      const event = readReadReceiptPayload(payload);
+      if (!event || event.friendshipId !== friend.friendshipId) return;
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === payload.messageId ? { ...m, readAt: payload.readAt } : m,
+          m.id === event.messageId ? { ...m, readAt: event.readAt } : m,
         ),
       );
     });
@@ -106,9 +188,10 @@ export function ChatDrawer({ friend, userId, wssSend, wssOn, onClose }: ChatDraw
   // WebSocket: typing indicator
   useEffect(() => {
     if (!wssOn) return;
-    const unsub = wssOn("friend:typing", (payload: any) => {
-      if (payload.friendshipId !== friend.friendshipId) return;
-      setTyping(payload.userId);
+    const unsub = wssOn("friend:typing", (payload) => {
+      const event = readTypingPayload(payload);
+      if (!event || event.friendshipId !== friend.friendshipId) return;
+      setTyping(event.userId);
       clearTimeout(typingTimer.current);
       typingTimer.current = setTimeout(() => setTyping(null), 3000);
     });
@@ -123,45 +206,50 @@ export function ChatDrawer({ friend, userId, wssSend, wssOn, onClose }: ChatDraw
   }, [messages]);
 
   // Invia messaggio
-  const handleSend = useCallback(async (text: string) => {
-    setSending(true);
-    try {
-      // Se non abbiamo ancora una chiave AES, ne generiamo una e la scambiamo
-      let key = aesKey;
-      if (!key) {
-        key = await ensureKeyExchange();
-        setAesKey(key);
-      }
+  const handleSend = useCallback(
+    async (text: string) => {
+      setSending(true);
+      try {
+        // Se non abbiamo ancora una chiave AES, ne generiamo una e la scambiamo
+        let key = aesKey;
+        if (!key) {
+          key = await ensureKeyExchange();
+          setAesKey(key);
+        }
 
-      const { encryptedContent, iv } = await encryptMessage(key, text);
-      await apiFetch(`${BASE}api/friends/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        const { encryptedContent, iv } = await encryptMessage(key, text);
+        await postJson<ChatMessage>(`${BASE}api/friends/messages`, {
           friendshipId: friend.friendshipId,
           encryptedContent,
           iv,
-        }),
-      });
-    } finally {
-      setSending(false);
-    }
-  }, [aesKey, friend.friendshipId]);
+        });
+      } finally {
+        setSending(false);
+      }
+    },
+    [aesKey, friend.friendshipId],
+  );
 
   const ensureKeyExchange = useCallback(async (): Promise<CryptoKey> => {
-    const { generateConversationKey, wrapAesKey, fetchPublicKey, exchangeKeys } = await import(
-      "@/hooks/useChatEncryption"
-    );
+    const {
+      generateConversationKey,
+      wrapAesKey,
+      fetchPublicKey,
+      exchangeKeys,
+    } = await import("@/hooks/useChatEncryption");
     const aesKeyB64 = await generateConversationKey();
 
     // Ottieni le chiavi pubbliche di entrambi gli utenti
     const receiverId = friend.id;
-    const [myPubKeyRes, theirPubKey] = await Promise.all([
-      apiFetch(`${BASE}api/friends/keys/${userId}`).then((r) => r.json()),
+    const [myPubKey, theirPubKey] = await Promise.all([
+      getJson<PublicKeyResponse>(`${BASE}api/friends/keys/${userId}`).then(
+        (data) => data.publicKey,
+      ),
       fetchPublicKey(receiverId),
     ]);
+    if (!myPubKey) throw new Error("Chiave pubblica utente non trovata");
 
-    const keyForRequester = await wrapAesKey(aesKeyB64, myPubKeyRes.publicKey);
+    const keyForRequester = await wrapAesKey(aesKeyB64, myPubKey);
     const keyForReceiver = await wrapAesKey(aesKeyB64, theirPubKey);
     await exchangeKeys(friend.friendshipId, keyForRequester, keyForReceiver);
 
@@ -172,7 +260,10 @@ export function ChatDrawer({ friend, userId, wssSend, wssOn, onClose }: ChatDraw
 
   // Typing indicator
   const handleTyping = useCallback(() => {
-    wssSend?.({ type: "friend:typing", payload: { friendshipId: friend.friendshipId } });
+    wssSend?.({
+      type: "friend:typing",
+      payload: { friendshipId: friend.friendshipId },
+    });
   }, [wssSend, friend.friendshipId]);
 
   // Decripta i messaggi in arrivo
@@ -190,17 +281,27 @@ export function ChatDrawer({ friend, userId, wssSend, wssOn, onClose }: ChatDraw
         if (msg.decrypted !== undefined) continue;
         if (!aesKey) continue;
         try {
-          const plain = await decryptMessage(aesKey, msg.encryptedContent, msg.iv);
+          const plain = await decryptMessage(
+            aesKey,
+            msg.encryptedContent,
+            msg.iv,
+          );
           if (!cancelled) {
             setMessages((prev) =>
-              prev.map((m) => (m.id === msg.id ? { ...m, decrypted: plain } : m)),
+              prev.map((m) =>
+                m.id === msg.id ? { ...m, decrypted: plain } : m,
+              ),
             );
           }
-        } catch { }
+        } catch {
+          return;
+        }
       }
     }
     decryptAll();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [aesKey, messages]);
 
   const isEncrypted = aesKey !== null;
@@ -209,7 +310,10 @@ export function ChatDrawer({ friend, userId, wssSend, wssOn, onClose }: ChatDraw
     <div className="fixed inset-y-0 right-0 w-full sm:w-96 bg-background border-l shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b shrink-0">
-        <button onClick={onClose} className="p-1 rounded-full hover:bg-muted transition-colors">
+        <button
+          onClick={onClose}
+          className="p-1 rounded-full hover:bg-muted transition-colors"
+        >
           <X className="w-5 h-5 text-muted-foreground" />
         </button>
         <div className="flex-1 min-w-0">
@@ -220,7 +324,9 @@ export function ChatDrawer({ friend, userId, wssSend, wssOn, onClose }: ChatDraw
             </p>
           )}
         </div>
-        {keyLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+        {keyLoading && (
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+        )}
       </div>
 
       {/* Messaggi */}

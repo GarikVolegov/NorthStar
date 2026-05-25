@@ -19,7 +19,7 @@ vi.mock("@workspace/db", () => ({
 
 vi.mock("../growth-agent/embedder", () => ({
   embedText: vi.fn(async (text: string) => {
-    const fake = new Array(1536).fill(0);
+    const fake: number[] = new Array<number>(1536).fill(0);
     const hash = text.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
     fake[0] = hash / 1000;
     fake[1] = 0.5;
@@ -28,17 +28,56 @@ vi.mock("../growth-agent/embedder", () => ({
   EMBEDDING_DIMS: 1536,
 }));
 
-import { retrieve, type RetrievedChunk, type SourceType } from "../growth-agent/retriever";
+import {
+  cosine,
+  retrieve,
+  retrieverWithTimeout,
+  validateQueryEmbedding,
+} from "../growth-agent/retriever";
 import { embedText } from "../growth-agent/embedder";
-
-function makeChunk(text: string, score: number): RetrievedChunk {
-  return { id: 1, content: text, source: "test", sourceType: "document", score, metadata: {} };
-}
 
 describe("Retriever", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // pgvector is default, but pool.query returns undefined → falls through to JS retriever
+    mockPoolQuery.mockResolvedValue({ rows: [] });
+  });
+
+  describe("cosine", () => {
+    it("scores identical vectors close to 1", () => {
+      expect(cosine([1, 2, 3], [1, 2, 3])).toBeCloseTo(1);
+    });
+
+    it("does not return NaN for zero vectors", () => {
+      expect(Number.isFinite(cosine([0, 0], [0, 0]))).toBe(true);
+    });
+  });
+
+  describe("validation", () => {
+    it("rejects non-finite embedding values", () => {
+      expect(() => validateQueryEmbedding([1, Number.NaN], 2)).toThrow(/non-finite/);
+      expect(() => validateQueryEmbedding([1, Number.POSITIVE_INFINITY], 2)).toThrow(/non-finite/);
+    });
+
+    it("rejects wrong embedding dimensions", () => {
+      expect(() => validateQueryEmbedding([1, 2, 3], 2)).toThrow(/expected 2 dims/);
+    });
+
+    it("does not query pgvector when the query embedding is invalid", async () => {
+      const invalid: number[] = new Array<number>(1536).fill(0);
+      invalid[10] = Number.NaN;
+      vi.mocked(embedText).mockResolvedValueOnce(invalid);
+
+      await expect(retrieve("bad embedding", 1)).rejects.toThrow(/non-finite/);
+      expect(mockPoolQuery).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("timeout", () => {
+    it("rejects when the operation is too slow", async () => {
+      await expect(
+        retrieverWithTimeout(new Promise((resolve) => setTimeout(resolve, 25)), 1),
+      ).rejects.toThrow(/timeout/);
+    });
   });
 
   describe("embedding", () => {
@@ -64,7 +103,9 @@ describe("Retriever", () => {
       const query = "similar text";
       const result = await retrieve(query, 1, { topK: 5, minScore: 0.0 });
       for (let i = 1; i < result.length; i++) {
-        expect(result[i].score).toBeLessThanOrEqual(result[i - 1].score);
+        const current = result[i];
+        const previous = result[i - 1];
+        expect(current?.score).toBeLessThanOrEqual(previous?.score ?? 0);
       }
     });
 
@@ -95,7 +136,7 @@ describe("Retriever", () => {
         minScore: 0.30,
         sourceTypes: ["platform_content", "document"],
       });
-      const sqlText = mockPoolQuery.mock.calls[0][0] as string;
+      const sqlText = String(mockPoolQuery.mock.calls[0]?.[0] ?? "");
       expect(sqlText).toContain("user_id = $2 OR user_id = $5");
     });
 
@@ -106,7 +147,7 @@ describe("Retriever", () => {
         minScore: 0.30,
         sourceTypes: ["document"],
       });
-      const sqlText = mockPoolQuery.mock.calls[0][0] as string;
+      const sqlText = String(mockPoolQuery.mock.calls[0]?.[0] ?? "");
       expect(sqlText).not.toContain("user_id = $2 OR user_id = $5");
     });
 

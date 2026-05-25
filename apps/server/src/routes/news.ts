@@ -117,7 +117,8 @@ router.get("/", async (req, res) => {
 
       const news = results.flatMap((r) => r.articles).map(mapNewsItem);
       const anyMore = results.some((r) => r.hasMore);
-      res.json({ news, nextCursor: anyMore && news.length > 0 ? encodeCursor(news[news.length - 1].publishedAt, parseInt(news[news.length - 1].id)) : null });
+      const lastNews = news.at(-1);
+      res.json({ news, nextCursor: anyMore && lastNews ? encodeCursor(lastNews.publishedAt, parseInt(lastNews.id, 10)) : null });
       return;
     }
 
@@ -172,7 +173,7 @@ router.get("/", async (req, res) => {
 
 router.get("/article/:id", async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id ?? "", 10);
     if (!Number.isFinite(id) || id <= 0) {
       res.status(400).json({ error: "Invalid news id" });
       return;

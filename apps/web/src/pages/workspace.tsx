@@ -4,18 +4,18 @@
  * Mostra i workspace dell'utente con link a dettaglio.
  * Creazione nuovo workspace (richiede piano Team).
  */
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api-fetch";
-import { API_ENDPOINTS } from "@/lib/constants";
-import { useAuth } from "@/contexts/AuthContext";
-import { usePageMeta } from "@/lib/seo";
-import { Users, Plus, Crown, ArrowRight, Loader2, Building2, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UpgradeGate } from "@/components/ui/UpgradeGate";
+import { useAuth } from "@/contexts/AuthContext";
+import { getJson, postJson } from "@/lib/apiClient";
+import { API_ENDPOINTS } from "@/lib/constants";
+import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, Building2, Heart, Loader2, Plus, Users } from "lucide-react";
+import { useState } from "react";
+import { Link } from "wouter";
 
 interface WorkspaceItem {
   workspaceId: number;
@@ -31,19 +31,15 @@ const TYPE_META = {
 };
 
 async function fetchWorkspaces(): Promise<{ workspaces: WorkspaceItem[] }> {
-  const res = await apiFetch(API_ENDPOINTS.workspaces.list);
-  if (!res.ok) return { workspaces: [] };
-  return res.json();
+  try {
+    return await getJson<{ workspaces: WorkspaceItem[] }>(API_ENDPOINTS.workspaces.list);
+  } catch {
+    return { workspaces: [] };
+  }
 }
 
 async function createWorkspace(data: { name: string; type: string; description?: string }) {
-  const res = await apiFetch(API_ENDPOINTS.workspaces.create, {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return postJson<unknown>(API_ENDPOINTS.workspaces.create, data);
 }
 
 export default function WorkspacePage() {

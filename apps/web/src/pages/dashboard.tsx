@@ -1,36 +1,44 @@
-import { useAuth } from "@/contexts/AuthContext";
-import { useLocation } from "wouter";
-import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api-fetch";
-import { usePageModule } from "@/hooks/usePageModule";
-import { useDashboardData } from "@/hooks/useDashboardData";
-import { useAgentAnalysis } from "@/hooks/useAgentAnalysis";
-import { useWendyPageContext } from "@/hooks/useWendyPageContext";
-import type { ProfessionResult, EducationResult, WorkModeResult } from "@/hooks/useAgentAnalysis";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAgentAnalysis } from "@/hooks/useAgentAnalysis";
+import { useDashboardData } from "@/hooks/useDashboardData";
+import { usePageModule } from "@/hooks/usePageModule";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
+import { apiFetch } from "@/lib/api-fetch";
+import { deleteJson, getJson, patchJson, postJson } from "@/lib/apiClient";
 import { usePageMeta } from "@/lib/seo";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Bot, Crown, ArrowRight, AlertTriangle,
-  HelpCircle, Rocket, Building2, BarChart3, TrendingUp,
-  LayoutGrid, Sparkles, MapPin, ChevronRight,
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
+  Bot,
+  Building2,
+  ChevronRight,
+  HelpCircle,
+  LayoutGrid,
+  MapPin,
+  Rocket,
+  Sparkles,
+  TrendingUp
 } from "lucide-react";
+import { useEffect } from "react";
+import { Link, useLocation } from "wouter";
 
+import { DashboardCalendar } from "@/components/dashboard/DashboardCalendar";
 import { DashboardHero } from "@/components/dashboard/DashboardHero";
+import { DashboardKpiStrip } from "@/components/dashboard/DashboardKpiStrip";
 import { DashboardObjectives } from "@/components/dashboard/DashboardObjectives";
 import { DashboardPersonality } from "@/components/dashboard/DashboardPersonality";
-import { DashboardCalendar } from "@/components/dashboard/DashboardCalendar";
-import { DashboardKpiStrip } from "@/components/dashboard/DashboardKpiStrip";
 import { ProactiveInsightCard } from "@/components/wendy/ProactiveInsightCard";
-import { useProactiveInsights } from "@/hooks/useProactiveInsights";
+import { useProactiveInsights, type ProactiveInsight } from "@/hooks/useProactiveInsights";
 
+import { AgentLoadingSkeleton } from "@/components/dashboard/AgentLoadingSkeleton";
+import type { JourneyId } from "@/components/dashboard/dashboard-sections";
 import { JourneyToolsSection } from "@/components/dashboard/JourneyToolsSection";
 import { ProfessionCard } from "@/components/dashboard/ProfessionCard";
 import { WorkModePanel } from "@/components/dashboard/WorkModePanel";
-import { AgentLoadingSkeleton } from "@/components/dashboard/AgentLoadingSkeleton";
-import type { JourneyId } from "@/components/dashboard/dashboard-sections";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -62,11 +70,7 @@ const JOURNEY_META: Record<JourneyId, {
 function useLatestSession() {
   return useQuery<{ sessionId: number; recommendations: Array<{ sectorId: number; sectorName: string }> }>({
     queryKey: ["latest-session-dashboard"],
-    queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/test-sessions/latest`);
-      if (!res.ok) throw new Error("No session");
-      return res.json();
-    },
+    queryFn: () => getJson<{ sessionId: number; recommendations: Array<{ sectorId: number; sectorName: string }> }>(`${BASE}api/test-sessions/latest`),
     retry: false,
     staleTime: 120_000,
   });
@@ -77,11 +81,7 @@ function useSessionDetail(sessionId: number | null) {
     queryKey: ["session-detail-dashboard", sessionId],
     enabled: !!sessionId,
     staleTime: 600_000,
-    queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/test-sessions/${sessionId}`);
-      if (!res.ok) throw new Error("Errore sessione");
-      return res.json() as Promise<SessionDetail>;
-    },
+    queryFn: () => getJson<SessionDetail>(`${BASE}api/test-sessions/${sessionId}`),
   });
 }
 
@@ -139,31 +139,29 @@ export default function Dashboard() {
 
   const toggleObjective = async (id: number, current: boolean) => {
     try {
-      await apiFetch(`${BASE}api/objectives/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ completed: !current }),
-      });
+      await patchJson(`${BASE}api/objectives/${id}`, { completed: !current });
       queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
-    } catch {}
+    } catch {
+      return;
+    }
   };
 
   const deleteObjective = async (id: number) => {
     try {
-      await apiFetch(`${BASE}api/objectives/${id}`, { method: "DELETE" });
+      await deleteJson(`${BASE}api/objectives/${id}`);
       queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
-    } catch {}
+    } catch {
+      return;
+    }
   };
 
   const createObjective = async (text: string) => {
     try {
-      await apiFetch(`${BASE}api/objectives`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
+      await postJson(`${BASE}api/objectives`, { text });
       queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
-    } catch {}
+    } catch {
+      return;
+    }
   };
 
   useEffect(() => {
@@ -263,16 +261,16 @@ export default function Dashboard() {
         {/* Colonna destra */}
         <div className="space-y-4">
           <DashboardPersonality
-            riasecScores={sessionDetail?.riasecScores}
-            spiritScores={sessionDetail?.spiritScores}
-            primaryTypes={sessionDetail?.primaryTypes}
+            {...(sessionDetail?.riasecScores ? { riasecScores: sessionDetail.riasecScores } : {})}
+            {...(sessionDetail?.spiritScores ? { spiritScores: sessionDetail.spiritScores } : {})}
+            {...(sessionDetail?.primaryTypes ? { primaryTypes: sessionDetail.primaryTypes } : {})}
           />
           {insights.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
                 Insight da Wendy
               </p>
-              {insights.slice(0, 2).map((insight: import("@/hooks/useProactiveInsights").ProactiveInsight) => (
+              {insights.slice(0, 2).map((insight: ProactiveInsight) => (
                 <ProactiveInsightCard
                   key={insight.id}
                   insight={insight}
@@ -298,7 +296,10 @@ export default function Dashboard() {
             <span className="text-xs text-muted-foreground">— {journeyMeta.label}</span>
           )}
         </div>
-        <JourneyToolsSection journeyType={journeyType} sectorId={topSectorId} />
+        <JourneyToolsSection
+          journeyType={journeyType}
+          {...(topSectorId !== undefined ? { sectorId: topSectorId } : {})}
+        />
       </section>
 
       {/* ZONA 5 — Analisi AI (max 3 professioni + modalità lavoro) */}

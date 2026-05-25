@@ -3,10 +3,10 @@
  * FRONTEND_RULES.md: hook TanStack Query, nessun fetch diretto nei componenti.
  * API_RULES.md: token da AuthContext, endpoint /api/affiliate/*
  */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiFetch } from '@/lib/api-fetch';
+import { useToast } from '@/hooks/use-toast';
+import { ApiClientError, getJson, postJson } from '@/lib/apiClient';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 const BASE = import.meta.env.BASE_URL || '/';
 
@@ -59,6 +59,12 @@ function formatCents(cents: number): string {
 
 export { formatCents };
 
+function affiliateErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiClientError) return error.message;
+  if (error instanceof Error) return error.message;
+  return fallback;
+}
+
 // ─── Hook principale ─────────────────────────────────────────────────────────
 
 export function useAffiliateDashboard() {
@@ -67,12 +73,7 @@ export function useAffiliateDashboard() {
   return useQuery<AffiliateDashboardData>({
     queryKey: affiliateKeys.dashboard,
     queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/affiliate/dashboard`);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message ?? err?.error ?? `Errore ${res.status}`);
-      }
-      return res.json();
+      return getJson<AffiliateDashboardData>(`${BASE}api/affiliate/dashboard`);
     },
     enabled: !!token,
     staleTime: 60_000,          // 1 min — dati finanziari non troppo aggressivi
@@ -89,13 +90,12 @@ export function useAffiliateWithdraw() {
 
   return useMutation<void, Error, WithdrawRequest>({
     mutationFn: async ({ amount }) => {
-      const res = await apiFetch(`${BASE}api/affiliate/withdraw`, {
-        method: 'POST',
-        body: JSON.stringify({ amount }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message ?? `Errore ${res.status}`);
+      try {
+        await postJson(`${BASE}api/affiliate/withdraw`, { amount });
+      } catch (error) {
+        throw new Error(affiliateErrorMessage(error, 'Ritiro non riuscito'), {
+          cause: error,
+        });
       }
     },
     onSuccess: () => {

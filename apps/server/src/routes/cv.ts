@@ -2,23 +2,47 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { db, userProfileSettingsTable } from "@workspace/db";
-import { sendOptionalReadFallback, sendPersistenceWriteError } from "../lib/persistence";
+import {
+  sendOptionalReadFallback,
+  sendPersistenceWriteError,
+} from "../lib/persistence";
+import { getRequestBody } from "../lib/request-context";
+import { asPlainRecord } from "../lib/type-guards";
 
 const router = Router();
 
-function makeCvMeta(profile: typeof userProfileSettingsTable.$inferSelect | null, source: "upload" | "generated") {
+type CvProfileRow = Pick<
+  typeof userProfileSettingsTable.$inferSelect,
+  "cvText" | "cvJson" | "userId" | "updatedAt"
+>;
+
+function readString(value: unknown, fallback = "") {
+  return typeof value === "string" ? value.trim() : fallback;
+}
+
+function makeCvMeta(
+  profile: CvProfileRow | null,
+  source: "upload" | "generated",
+) {
   if (!profile?.cvText && !profile?.cvJson) return null;
+  const cvJson = asPlainRecord(profile.cvJson);
+  const template =
+    typeof cvJson.template === "string" ? cvJson.template : undefined;
+
   return {
-    id:         `cv-${profile.userId}`,
-    filename:   source === "generated" ? "CV Generato.pdf" : "CV Caricato",
+    id: `cv-${profile.userId}`,
+    filename: source === "generated" ? "CV Generato.pdf" : "CV Caricato",
     uploadedAt: profile.updatedAt?.toISOString() ?? new Date().toISOString(),
     source,
-    hasPdf:     false,
-    template:   (profile.cvJson as Record<string, unknown>)?.template as string | undefined,
+    hasPdf: false,
+    template,
   };
 }
 
-async function upsertProfileSettings(userId: number, values: Partial<typeof userProfileSettingsTable.$inferInsert>) {
+async function upsertProfileSettings(
+  userId: number,
+  values: Partial<typeof userProfileSettingsTable.$inferInsert>,
+) {
   const now = new Date();
   await db
     .insert(userProfileSettingsTable)
@@ -33,14 +57,19 @@ async function upsertProfileSettings(userId: number, values: Partial<typeof user
 router.get("/mine", requireAuth, async (req, res) => {
   try {
     const [profile] = await db
-      .select({ cvText: userProfileSettingsTable.cvText, cvJson: userProfileSettingsTable.cvJson, userId: userProfileSettingsTable.userId, updatedAt: userProfileSettingsTable.updatedAt })
+      .select({
+        cvText: userProfileSettingsTable.cvText,
+        cvJson: userProfileSettingsTable.cvJson,
+        userId: userProfileSettingsTable.userId,
+        updatedAt: userProfileSettingsTable.updatedAt,
+      })
       .from(userProfileSettingsTable)
       .where(eq(userProfileSettingsTable.userId, req.user!.id))
       .limit(1);
 
     const cvs = [];
-    if (profile?.cvJson) cvs.push(makeCvMeta(profile as unknown as typeof userProfileSettingsTable.$inferSelect, "generated"));
-    else if (profile?.cvText) cvs.push(makeCvMeta(profile as unknown as typeof userProfileSettingsTable.$inferSelect, "upload"));
+    if (profile?.cvJson) cvs.push(makeCvMeta(profile, "generated"));
+    else if (profile?.cvText) cvs.push(makeCvMeta(profile, "upload"));
 
     res.json({ cvs: cvs.filter(Boolean) });
   } catch (err) {
@@ -53,12 +82,18 @@ router.get("/mine", requireAuth, async (req, res) => {
 /* ─── POST /api/cv/mine/upload ─── */
 router.post("/mine/upload", requireAuth, async (req, res) => {
   try {
-    const { fileDataUrl, filename, mimeType } = req.body;
-    if (!fileDataUrl || typeof fileDataUrl !== "string") {
-      res.status(400).json({ error: "fileDataUrl richiesto" }); return;
+    const body = asPlainRecord(getRequestBody(req));
+    const fileDataUrl = readString(body.fileDataUrl);
+    const filename = readString(body.filename, "CV");
+    const mimeType = readString(body.mimeType);
+
+    if (!fileDataUrl) {
+      res.status(400).json({ error: "fileDataUrl richiesto" });
+      return;
     }
     if (fileDataUrl.length > 3_000_000) {
-      res.status(400).json({ error: "File troppo grande (max ~2 MB)" }); return;
+      res.status(400).json({ error: "File troppo grande (max ~2 MB)" });
+      return;
     }
 
     let cvText = "";
@@ -66,12 +101,23 @@ router.post("/mine/upload", requireAuth, async (req, res) => {
       const base64 = fileDataUrl.split(",")[1] ?? fileDataUrl;
       cvText = Buffer.from(base64, "base64").toString("utf-8");
     } else {
-      cvText = `[PDF caricato: ${filename ?? "CV"}]`;
+      cvText = `[PDF caricato: ${filename}]`;
     }
 
     await upsertProfileSettings(req.user!.id, { cvText, cvJson: null });
 
-    res.json({ success: true, cvs: [{ id: `cv-${req.user!.id}`, filename: filename ?? "CV", uploadedAt: new Date().toISOString(), source: "upload", hasPdf: false }] });
+    res.json({
+      success: true,
+      cvs: [
+        {
+          id: `cv-${req.user!.id}`,
+          filename,
+          uploadedAt: new Date().toISOString(),
+          source: "upload",
+          hasPdf: false,
+        },
+      ],
+    });
   } catch (err) {
     req.log?.error?.({ err }, "cv upload error");
     if (sendPersistenceWriteError(req, res, err, "cv.upload")) return;
@@ -82,11 +128,12 @@ router.post("/mine/upload", requireAuth, async (req, res) => {
 /* ─── POST /api/cv/mine/generate ─── */
 router.post("/mine/generate", requireAuth, async (req, res) => {
   try {
-    const { template } = req.body;
+    const body = asPlainRecord(getRequestBody(req));
+    const template = readString(body.template, "classic");
     const userId = req.user!.id;
 
-    const generated = {
-      template: template ?? "classic",
+    const generated: Record<string, unknown> = {
+      template,
       generatedAt: new Date().toISOString(),
       sections: { summary: "", experience: [], education: [], skills: [] },
     };
@@ -96,7 +143,16 @@ router.post("/mine/generate", requireAuth, async (req, res) => {
     res.json({
       success: true,
       generated,
-      cvs: [{ id: `cv-${userId}`, filename: "CV Generato.pdf", uploadedAt: new Date().toISOString(), source: "generated", hasPdf: false, template }],
+      cvs: [
+        {
+          id: `cv-${userId}`,
+          filename: "CV Generato.pdf",
+          uploadedAt: new Date().toISOString(),
+          source: "generated",
+          hasPdf: false,
+          template,
+        },
+      ],
     });
   } catch (err) {
     req.log?.error?.({ err }, "cv generate error");
@@ -108,8 +164,17 @@ router.post("/mine/generate", requireAuth, async (req, res) => {
 /* ─── PATCH /api/cv/mine/generated ─── */
 router.patch("/mine/generated", requireAuth, async (req, res) => {
   try {
-    const { generated } = req.body;
-    if (!generated) { res.status(400).json({ error: "generated richiesto" }); return; }
+    const body = asPlainRecord(getRequestBody(req));
+    const generatedInput = body.generated;
+    const generated = asPlainRecord(generatedInput);
+    if (
+      !generatedInput ||
+      typeof generatedInput !== "object" ||
+      Array.isArray(generatedInput)
+    ) {
+      res.status(400).json({ error: "generated richiesto" });
+      return;
+    }
 
     await upsertProfileSettings(req.user!.id, { cvJson: generated });
 

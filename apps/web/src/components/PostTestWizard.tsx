@@ -1,13 +1,21 @@
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { postJson } from "@/lib/apiClient";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  X, ChevronRight, ChevronLeft, CheckCircle2, Target,
-  Calendar, Briefcase, Loader2, Sparkles, Laptop, Users, TrendingUp,
+  Briefcase,
+  Calendar,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Laptop,
+  Loader2,
+  Target,
+  TrendingUp,
+  X,
 } from "lucide-react";
+import { useState } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -18,13 +26,38 @@ interface Objective {
 }
 
 const WORK_MODES = [
-  { value: "dipendente", label: "Dipendente", icon: <Briefcase size={18} />, desc: "Lavoro in un'azienda con contratto stabile" },
-  { value: "autonomo", label: "Autonomo", icon: <Laptop size={18} />, desc: "Libero professionista o imprenditore" },
-  { value: "ibrido", label: "Ibrido", icon: <TrendingUp size={18} />, desc: "Mix tra lavoro dipendente e freelance" },
+  {
+    value: "dipendente",
+    label: "Dipendente",
+    icon: <Briefcase size={18} />,
+    desc: "Lavoro in un'azienda con contratto stabile",
+  },
+  {
+    value: "autonomo",
+    label: "Autonomo",
+    icon: <Laptop size={18} />,
+    desc: "Libero professionista o imprenditore",
+  },
+  {
+    value: "ibrido",
+    label: "Ibrido",
+    icon: <TrendingUp size={18} />,
+    desc: "Mix tra lavoro dipendente e freelance",
+  },
 ];
 
-const OBJ_CATEGORIES = ["formazione", "networking", "candidatura", "skill", "altro"];
-const STEP_LABELS = ["Modalità di lavoro", "I tuoi obiettivi", "Calendario automatico"];
+const OBJ_CATEGORIES = [
+  "formazione",
+  "networking",
+  "candidatura",
+  "skill",
+  "altro",
+];
+const STEP_LABELS = [
+  "Modalità di lavoro",
+  "I tuoi obiettivi",
+  "Calendario automatico",
+];
 
 interface PostTestWizardProps {
   userId: number;
@@ -34,7 +67,13 @@ interface PostTestWizardProps {
   onComplete: () => void;
 }
 
-export function PostTestWizard({ userId, sessionId, topSectorName, onClose, onComplete }: PostTestWizardProps) {
+export function PostTestWizard({
+  userId,
+  sessionId: _sessionId,
+  topSectorName,
+  onClose,
+  onComplete,
+}: PostTestWizardProps) {
   const [step, setStep] = useState(0);
   const [workMode, setWorkMode] = useState("dipendente");
   const [objectives, setObjectives] = useState<Objective[]>([
@@ -43,10 +82,14 @@ export function PostTestWizard({ userId, sessionId, topSectorName, onClose, onCo
     { text: "", category: "skill", dueDate: "" },
   ]);
   const [saving, setSaving] = useState(false);
-  const [created, setCreated] = useState<Array<{ text: string; dueDate: string }>>([]);
+  const [created, setCreated] = useState<
+    Array<{ text: string; dueDate: string }>
+  >([]);
 
   function updateObj(idx: number, field: keyof Objective, val: string) {
-    setObjectives((prev) => prev.map((o, i) => i === idx ? { ...o, [field]: val } : o));
+    setObjectives((prev) =>
+      prev.map((o, i) => (i === idx ? { ...o, [field]: val } : o)),
+    );
   }
 
   const validObjectives = objectives.filter((o) => o.text.trim());
@@ -57,19 +100,17 @@ export function PostTestWizard({ userId, sessionId, topSectorName, onClose, onCo
     try {
       const results = await Promise.allSettled(
         validObjectives.map((obj) =>
-          fetch(`${BASE}api/objectives`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userId,
-              text: obj.text.trim(),
-              category: obj.category,
-              dueDate: obj.dueDate || null,
-            }),
-          })
-        )
+          postJson(`${BASE}api/objectives`, {
+            userId,
+            text: obj.text.trim(),
+            category: obj.category,
+            dueDate: obj.dueDate || null,
+          }),
+        ),
       );
-      const saved = validObjectives.filter((_, i) => results[i].status === "fulfilled");
+      const saved = validObjectives.filter(
+        (_, i) => results[i]?.status === "fulfilled",
+      );
       setCreated(saved.map((o) => ({ text: o.text, dueDate: o.dueDate })));
       setStep(2);
     } catch {
@@ -96,9 +137,14 @@ export function PostTestWizard({ userId, sessionId, topSectorName, onClose, onCo
                 <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
                   Passo {step + 1} di 3
                 </p>
-                <h2 className="text-lg font-bold mt-0.5">{STEP_LABELS[step]}</h2>
+                <h2 className="text-lg font-bold mt-0.5">
+                  {STEP_LABELS[step]}
+                </h2>
               </div>
-              <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+              <button
+                onClick={onClose}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
                 <X size={18} />
               </button>
             </div>
@@ -126,8 +172,8 @@ export function PostTestWizard({ userId, sessionId, topSectorName, onClose, onCo
                   className="space-y-3"
                 >
                   <p className="text-sm text-muted-foreground">
-                    Hai scoperto che il tuo settore ideale è <strong>{topSectorName}</strong>.
-                    Come preferisci lavorare?
+                    Hai scoperto che il tuo settore ideale è{" "}
+                    <strong>{topSectorName}</strong>. Come preferisci lavorare?
                   </p>
                   {WORK_MODES.map((m) => (
                     <button
@@ -139,17 +185,26 @@ export function PostTestWizard({ userId, sessionId, topSectorName, onClose, onCo
                           : "border-border hover:border-primary/40"
                       }`}
                     >
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                        workMode === m.value ? "bg-primary text-white" : "bg-muted text-muted-foreground"
-                      }`}>
+                      <div
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                          workMode === m.value
+                            ? "bg-primary text-white"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
                         {m.icon}
                       </div>
                       <div>
                         <p className="font-semibold text-sm">{m.label}</p>
-                        <p className="text-xs text-muted-foreground">{m.desc}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {m.desc}
+                        </p>
                       </div>
                       {workMode === m.value && (
-                        <CheckCircle2 size={16} className="text-primary ml-auto" />
+                        <CheckCircle2
+                          size={16}
+                          className="text-primary ml-auto"
+                        />
                       )}
                     </button>
                   ))}
@@ -171,22 +226,34 @@ export function PostTestWizard({ userId, sessionId, topSectorName, onClose, onCo
                   className="space-y-4"
                 >
                   <p className="text-sm text-muted-foreground">
-                    Definisci fino a 3 obiettivi concreti. Saranno sincronizzati automaticamente nel tuo calendario.
+                    Definisci fino a 3 obiettivi concreti. Saranno sincronizzati
+                    automaticamente nel tuo calendario.
                   </p>
                   {objectives.map((obj, idx) => (
-                    <div key={idx} className="space-y-2 p-3.5 rounded-xl border bg-muted/30">
+                    <div
+                      key={idx}
+                      className="space-y-2 p-3.5 rounded-xl border bg-muted/30"
+                    >
                       <div className="flex items-center gap-2 mb-1">
                         <div className="w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold shrink-0">
                           {idx + 1}
                         </div>
-                        <span className="text-xs font-medium text-muted-foreground">Obiettivo {idx + 1}</span>
-                        {idx > 0 && <span className="text-xs text-muted-foreground ml-auto">(opzionale)</span>}
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Obiettivo {idx + 1}
+                        </span>
+                        {idx > 0 && (
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            (opzionale)
+                          </span>
+                        )}
                       </div>
                       <Input
                         placeholder={
-                          idx === 0 ? "es. Completare un corso online in 3 settimane" :
-                          idx === 1 ? "es. Inviare 5 candidature entro fine mese" :
-                          "es. Aggiornarsi su Python e machine learning"
+                          idx === 0
+                            ? "es. Completare un corso online in 3 settimane"
+                            : idx === 1
+                              ? "es. Inviare 5 candidature entro fine mese"
+                              : "es. Aggiornarsi su Python e machine learning"
                         }
                         value={obj.text}
                         onChange={(e) => updateObj(idx, "text", e.target.value)}
@@ -194,17 +261,23 @@ export function PostTestWizard({ userId, sessionId, topSectorName, onClose, onCo
                       <div className="grid grid-cols-2 gap-2">
                         <select
                           value={obj.category}
-                          onChange={(e) => updateObj(idx, "category", e.target.value)}
+                          onChange={(e) =>
+                            updateObj(idx, "category", e.target.value)
+                          }
                           className="text-xs border rounded-md px-2 py-1.5 bg-background"
                         >
                           {OBJ_CATEGORIES.map((c) => (
-                            <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                            <option key={c} value={c}>
+                              {c.charAt(0).toUpperCase() + c.slice(1)}
+                            </option>
                           ))}
                         </select>
                         <Input
                           type="date"
                           value={obj.dueDate}
-                          onChange={(e) => updateObj(idx, "dueDate", e.target.value)}
+                          onChange={(e) =>
+                            updateObj(idx, "dueDate", e.target.value)
+                          }
                           className="text-xs"
                         />
                       </div>
@@ -218,10 +291,17 @@ export function PostTestWizard({ userId, sessionId, topSectorName, onClose, onCo
                       onClick={handleFinish}
                       disabled={saving || validObjectives.length === 0}
                     >
-                      {saving
-                        ? <><Loader2 size={14} className="animate-spin mr-1" /> Salvando…</>
-                        : <><Target size={14} className="mr-1" /> Salva e vai al calendario</>
-                      }
+                      {saving ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin mr-1" />{" "}
+                          Salvando…
+                        </>
+                      ) : (
+                        <>
+                          <Target size={14} className="mr-1" /> Salva e vai al
+                          calendario
+                        </>
+                      )}
                     </Button>
                   </div>
                 </motion.div>
@@ -251,13 +331,22 @@ export function PostTestWizard({ userId, sessionId, topSectorName, onClose, onCo
                   {created.length > 0 && (
                     <div className="space-y-2">
                       {created.map((o, i) => (
-                        <div key={i} className="flex items-start gap-2 text-sm p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900">
-                          <Calendar size={14} className="text-emerald-500 mt-0.5 shrink-0" />
+                        <div
+                          key={i}
+                          className="flex items-start gap-2 text-sm p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900"
+                        >
+                          <Calendar
+                            size={14}
+                            className="text-emerald-500 mt-0.5 shrink-0"
+                          />
                           <div>
                             <p className="font-medium">{o.text}</p>
                             {o.dueDate && (
                               <p className="text-xs text-muted-foreground">
-                                Scadenza: {new Date(o.dueDate).toLocaleDateString("it-IT")}
+                                Scadenza:{" "}
+                                {new Date(o.dueDate).toLocaleDateString(
+                                  "it-IT",
+                                )}
                               </p>
                             )}
                           </div>
@@ -267,10 +356,20 @@ export function PostTestWizard({ userId, sessionId, topSectorName, onClose, onCo
                   )}
 
                   <div className="flex flex-col gap-2 pt-2">
-                    <Button className="w-full" onClick={() => { window.location.href = `${BASE}calendario`; }}>
-                      <Calendar size={14} className="mr-1.5" /> Vai al Calendario
+                    <Button
+                      className="w-full"
+                      onClick={() => {
+                        window.location.href = `${BASE}calendario`;
+                      }}
+                    >
+                      <Calendar size={14} className="mr-1.5" /> Vai al
+                      Calendario
                     </Button>
-                    <Button variant="outline" className="w-full" onClick={onComplete}>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={onComplete}
+                    >
                       Torna ai risultati
                     </Button>
                   </div>

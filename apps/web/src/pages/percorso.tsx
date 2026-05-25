@@ -1,14 +1,20 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
-import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWendy } from "@/contexts/WendyProvider";
-import { apiFetch } from "@/lib/api-fetch";
 import { toast } from "@/hooks/use-toast";
+import { apiFetch } from "@/lib/api-fetch";
+import { motion } from "framer-motion";
 import {
-  HelpCircle, TrendingUp, Rocket, Building2, BarChart3,
-  ArrowRight, CheckCircle2, Star,
+  ArrowRight,
+  BarChart3,
+  Building2,
+  CheckCircle2,
+  HelpCircle,
+  Rocket,
+  Star,
+  TrendingUp,
 } from "lucide-react";
+import { useState } from "react";
+import { useLocation } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -112,7 +118,7 @@ export default function Percorso() {
     if (user && token) {
       setSaving(true);
       try {
-        await apiFetch(`${BASE}api/profile/${user.id}/journey-type`, {
+        await apiFetch(`${BASE}api/journey-type/${user.id}/journey-type`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ journeyType: selected }),

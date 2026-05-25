@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback } from "react";
-import { Send, Lock, Loader2 } from "lucide-react";
+import { Loader2, Lock, Send } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
 
 interface ChatInputProps {
-  onSend: (text: string) => void;
+  onSend: (text: string) => void | Promise<void>;
   onTyping?: () => void;
   disabled?: boolean;
   isEncrypted?: boolean;

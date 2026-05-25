@@ -96,13 +96,24 @@ describe("Wendy human voice layer", () => {
     expect(checklist).toContain("Dubbi personali");
   });
 
-  it("routes small talk to an instant local simple answer", () => {
+  it("routes small talk through the LLM fast path, not an instant canned answer", () => {
     for (const message of ["come stai?", "hru", "grazie", "ok", "come va?"]) {
       expect(classifyIntent({ userMessage: message })).toBe("simple_qa");
-      expect(getLocalWendyReply(message)?.text).toBeTruthy();
+      expect(getLocalWendyReply(message)).toBeNull();
     }
 
     expect(classifyIntent({ userMessage: "portami al calendario" })).toBe("navigation");
     expect(classifyIntent({ userMessage: "creami un obiettivo" })).toBe("planning");
+  });
+
+  it("tells the model to vary natural small-talk instead of using fixed replies", () => {
+    const prompt = buildLightPrompt({
+      locale: "italiano",
+      intent: "simple_qa",
+    });
+
+    expect(prompt).toContain("saluti, small talk");
+    expect(prompt).toContain("varia");
+    expect(prompt).toContain("Mai due risposte uguali");
   });
 });

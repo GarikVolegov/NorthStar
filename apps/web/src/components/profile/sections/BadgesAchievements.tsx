@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trophy, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Flame, Trophy } from "lucide-react";
 
 type CompletionResponse = {
   hasTestSession: boolean;

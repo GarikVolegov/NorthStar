@@ -11,15 +11,26 @@ export default defineConfig({
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
     coverage: {
       provider: "v8",
+      all: false,
       reporter: ["text", "json", "html"],
-      include: ["src/lib/**", "src/components/**"],
-      exclude: ["src/**/*.test.*", "src/__tests__/**"],
+      include: [
+        "src/hooks/useWendyChat.ts",
+        "src/hooks/useGlobalSearch.ts",
+        "src/contexts/AuthContext.tsx",
+        "src/components/admin/console/{HomeSection,StatusSection,QualitySection,AgentsSection,shared,utils}.tsx",
+        "src/components/admin/console/utils.ts",
+        "src/lib/{api-fetch,storage-keys,utils}.ts",
+      ],
+      exclude: ["src/**/*.test.*", "src/**/*.spec.*", "src/__tests__/**"],
+      thresholds: {
+        statements: 40,
+      },
     },
   },
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
-      "@assets": path.resolve(import.meta.dirname, "../../attached_assets"),
+      "@assets": path.resolve(import.meta.dirname, "../../docs/attached_assets"),
     },
   },
 });

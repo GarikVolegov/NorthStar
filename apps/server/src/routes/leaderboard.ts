@@ -1,13 +1,10 @@
 import { Router } from "express";
-import { sql, desc, eq, and, gte, lt, gt } from "drizzle-orm";
+import { sql, desc, eq, and, gte, lt } from "drizzle-orm";
 import { db, usersTable, weeklyLeaderboardTable, voiceSessionsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { XP_PER_LEVEL } from "./xp-constants";
-import { cacheGet, cacheSet } from "../lib/redis";
 
 const router = Router();
-
-const CACHE_TTL = 60; // seconds
 
 function getWeekBounds(): { start: Date; end: Date } {
   const now = new Date();
@@ -92,6 +89,7 @@ router.get("/", requireAuth, async (req, res) => {
 
         for (let i = 0; i < capped.length; i++) {
           const score = capped[i];
+          if (!score) continue;
           const rank = i + 1;
           await db.insert(weeklyLeaderboardTable).values({
             userId: score.userId,

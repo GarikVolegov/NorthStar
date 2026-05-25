@@ -1,10 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
-import { format, parseISO, isToday, isTomorrow } from "date-fns";
-import { it } from "date-fns/locale";
-import { Calendar, Clock, ChevronRight, Loader2 } from "lucide-react";
-import { Link } from "wouter";
+import { getJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
-import { apiFetch } from "@/lib/api-fetch";
+import { useQuery } from "@tanstack/react-query";
+import { format, isToday, isTomorrow, parseISO } from "date-fns";
+import { it } from "date-fns/locale";
+import { Calendar, ChevronRight, Clock, Loader2 } from "lucide-react";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -50,12 +50,12 @@ interface Props {
 }
 
 export function ProssimiEventi({ userId, limit = 5, className }: Props) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<UpcomingEvent[] | { events: UpcomingEvent[] }>({
     queryKey: ["calendar-upcoming", userId, limit],
     queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/calendar/upcoming?limit=${limit}`);
-      if (!res.ok) throw new Error("Errore caricamento eventi");
-      return res.json();
+      return getJson<UpcomingEvent[] | { events: UpcomingEvent[] }>(
+        `${BASE}api/calendar/upcoming?limit=${limit}`,
+      );
     },
     enabled: !!userId,
     refetchInterval: 5 * 60_000,

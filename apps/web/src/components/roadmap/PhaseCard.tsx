@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronUp, Target, Zap, BookOpen, Award, BookMarked, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 import { ROADMAP_TEXT } from "@/lib/constants";
+import { cn } from "@/lib/utils";
+import { Award, BookMarked, BookOpen, CheckCircle2, ChevronDown, ChevronUp, Target, Users, Zap } from "lucide-react";
+import { useState } from "react";
 
 interface RoadmapResource {
   type: string;
@@ -27,7 +27,7 @@ interface PhaseCardProps {
   phase: RoadmapPhase;
   index: number;
   isEditMode: boolean;
-  onUpdate: (phaseId: number, updates: Partial<RoadmapPhase>) => void;
+  onUpdate: (phaseId: number, updates: Partial<RoadmapPhase>) => void | Promise<void>;
   onCancel: () => void;
 }
 

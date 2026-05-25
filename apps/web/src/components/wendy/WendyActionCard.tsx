@@ -1,3 +1,5 @@
+import type { WendyAction } from "@/hooks/useWendyActionExecutor";
+import { cn } from "@/lib/utils";
 import {
   Check,
   CheckCircle2,
@@ -8,8 +10,6 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { WendyAction } from "@/hooks/useWendyActionExecutor";
 
 interface WendyActionCardProps {
   action: WendyAction;
@@ -24,7 +24,7 @@ function actionIcon(type: string) {
 }
 
 function statusCopy(action: WendyAction) {
-  if (action.status === "done") return "Completata";
+  if (action.status === "executed" || action.status === "done") return "Completata";
   if (action.status === "running") return "Eseguo...";
   if (action.status === "failed") return "Non riuscita";
   if (action.status === "cancelled") return "Annullata";
@@ -33,7 +33,7 @@ function statusCopy(action: WendyAction) {
 }
 
 export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCardProps) {
-  const Icon = action.status === "done"
+  const Icon = action.status === "executed" || action.status === "done"
     ? CheckCircle2
     : action.status === "failed" || action.status === "cancelled"
       ? XCircle
@@ -50,7 +50,7 @@ export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCard
         "mt-2 w-full rounded-2xl border bg-background/75 p-3 text-left shadow-sm backdrop-blur",
         action.status === "failed"
           ? "border-destructive/30"
-          : action.status === "done"
+          : action.status === "executed" || action.status === "done"
             ? "border-emerald-500/25"
             : "border-primary/20",
       )}
@@ -61,7 +61,7 @@ export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCard
             "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
             action.status === "failed" || action.status === "cancelled"
               ? "bg-destructive/10 text-destructive"
-              : action.status === "done"
+              : action.status === "executed" || action.status === "done"
                 ? "bg-emerald-500/10 text-emerald-500"
                 : "bg-primary/10 text-primary",
           )}

@@ -35,11 +35,11 @@ on:
   workflow_dispatch:
     inputs:
       commit_sha:
-        description: 'SHA del commit a cui tornare (es. abc1234f)'
+        description: "SHA del commit a cui tornare (es. abc1234f)"
         required: true
         type: string
       environment:
-        description: 'Ambiente target'
+        description: "Ambiente target"
         required: true
         type: choice
         options:
@@ -47,18 +47,18 @@ on:
           - staging
         default: production
       confirm:
-        description: 'Scrivi ROLLBACK per confermare'
+        description: "Scrivi ROLLBACK per confermare"
         required: true
         type: string
       reason:
-        description: 'Motivo del rollback (audit trail, opzionale)'
+        description: "Motivo del rollback (audit trail, opzionale)"
         required: false
         type: string
-        default: ''
+        default: ""
 
 env:
-  NODE_VERSION: '20'
-  PNPM_VERSION: '9'
+  NODE_VERSION: "20.10.x"
+  PNPM_VERSION: "11.0.9"
 
 jobs:
   # ─── 1. Validate ────────────────────────────────────────────────────────────────
@@ -126,8 +126,8 @@ jobs:
           echo "## 🗃 DB Schema Safety Check" >> $GITHUB_STEP_SUMMARY
 
           # Confronta la directory schema tra HEAD e target
-          SCHEMA_CURRENT="current/lib/db/src/schema"
-          SCHEMA_TARGET="target/lib/db/src/schema"
+          SCHEMA_CURRENT="current/packages/db/src/schema"
+          SCHEMA_TARGET="target/packages/db/src/schema"
 
           if [ ! -d "$SCHEMA_CURRENT" ] || [ ! -d "$SCHEMA_TARGET" ]; then
             echo "⚠️ Directory schema non trovata — skip check" >> $GITHUB_STEP_SUMMARY
@@ -186,25 +186,10 @@ jobs:
           ref: ${{ inputs.commit_sha }}
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Get pnpm store path
-        id: pnpm-cache
-        run: echo "store=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.store }}
-          key: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: pnpm-store-${{ runner.os }}-${{ env.PNPM_VERSION }}-
-
-      - run: pnpm install --frozen-lockfile
+          pnpm-version: ${{ env.PNPM_VERSION }}
 
       - name: Set rollback env vars
         run: |
@@ -296,7 +281,7 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
-        continue-on-error: true   # Non bloccare il rollback se Sentry fallisce
+        continue-on-error: true # Non bloccare il rollback se Sentry fallisce
 
       # ── Slack: alert rollback ──────────────────────────────────────────────────
       - name: Notify Slack — rollback OK

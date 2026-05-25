@@ -1,10 +1,10 @@
-import type { ReactNode } from "react";
-import { JourneyScoreWidget } from "@/components/JourneyScoreWidget";
-import { CvSection } from "@/components/CvSection";
 import { CertificationsSection } from "@/components/CertificationsSection";
-import { TestHistoryCard } from "@/components/TestHistoryCard";
+import { CvSection } from "@/components/CvSection";
+import { JourneyScoreWidget } from "@/components/JourneyScoreWidget";
 import { NftCertificateGallery } from "@/components/NftCertificateGallery";
 import { SavedItems } from "@/components/profile/sections/SavedItems";
+import { TestHistoryCard } from "@/components/TestHistoryCard";
+import type { ReactNode } from "react";
 
 export type JourneyType = "indeciso" | "dipendente" | "autonomo" | "azienda" | "investitore";
 

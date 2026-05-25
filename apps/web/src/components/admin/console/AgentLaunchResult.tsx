@@ -19,10 +19,10 @@ export function AgentLaunchResult({
   const topics = stringList(data.topics);
   const hasWarnings = warnings.length > 0;
   const tone = !result.ok
-    ? "border-red-200 bg-red-50 text-red-800"
+    ? "border-danger-muted bg-danger-surface text-danger"
     : hasWarnings
-      ? "border-amber-200 bg-amber-50 text-amber-800"
-      : "border-emerald-200 bg-emerald-50 text-emerald-800";
+      ? "border-warning-muted bg-warning-surface text-warning"
+      : "border-success-muted bg-success-surface text-success";
 
   const headline = !result.ok
     ? "Run fallita"
@@ -52,8 +52,19 @@ export function AgentLaunchResult({
         : [
             ["Run ID", data.runId],
             ["Processati", data.processed],
-            ["Creati", data.created ?? data.added ?? data.sectorsDone ?? data.professionsDone],
-            ["Durata", typeof data.durationMs === "number" ? fmtDuration(data.durationMs) : null],
+            [
+              "Creati",
+              data.created ??
+                data.added ??
+                data.sectorsDone ??
+                data.professionsDone,
+            ],
+            [
+              "Durata",
+              typeof data.durationMs === "number"
+                ? fmtDuration(data.durationMs)
+                : null,
+            ],
           ];
 
   return (
@@ -71,7 +82,10 @@ export function AgentLaunchResult({
         {metrics
           .filter(([, value]) => value != null && value !== "")
           .map(([label, value]) => (
-            <div key={String(label)} className="rounded-md bg-background/60 p-2">
+            <div
+              key={String(label)}
+              className="rounded-md bg-background/60 p-2"
+            >
               <p className="text-[11px] opacity-75">{String(label)}</p>
               <p className="font-semibold">{String(value)}</p>
             </div>
@@ -97,7 +111,9 @@ export function AgentLaunchResult({
           <div className="mt-1 space-y-1">
             {created.slice(0, 3).map((article, index) => (
               <p key={String(article.id ?? index)} className="text-xs">
-                {String(article.title ?? `Articolo #${article.id ?? index + 1}`)}
+                {String(
+                  article.title ?? `Articolo #${article.id ?? index + 1}`,
+                )}
               </p>
             ))}
           </div>
@@ -106,12 +122,17 @@ export function AgentLaunchResult({
 
       {agentKey === "news-research" && missingCoverage.length > 0 && (
         <div className="mt-3">
-          <p className="text-xs font-semibold">Settori senza abbastanza news reali</p>
+          <p className="text-xs font-semibold">
+            Settori senza abbastanza news reali
+          </p>
           <div className="mt-1 space-y-1">
             {missingCoverage.slice(0, 5).map((item, index) => (
               <p key={String(item.sectorId ?? index)} className="text-xs">
-                {String(item.sectorName ?? `Settore #${item.sectorId ?? index + 1}`)}:{" "}
-                {String(item.realArticles ?? 0)} reali, ne mancano {String(item.needed ?? 0)}
+                {String(
+                  item.sectorName ?? `Settore #${item.sectorId ?? index + 1}`,
+                )}
+                : {String(item.realArticles ?? 0)} reali, ne mancano{" "}
+                {String(item.needed ?? 0)}
               </p>
             ))}
           </div>
@@ -119,7 +140,7 @@ export function AgentLaunchResult({
       )}
 
       {warnings.length > 0 && (
-        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-800">
+        <div className="mt-3 rounded-md border border-warning-muted bg-warning-surface p-2 text-warning">
           <p className="text-xs font-semibold">Warning</p>
           <ul className="mt-1 list-disc pl-4 text-xs">
             {warnings.slice(0, 4).map((warning) => (
@@ -130,11 +151,15 @@ export function AgentLaunchResult({
       )}
 
       {!result.ok && data.error != null && (
-        <p className="mt-3 break-words text-xs font-medium">{String(data.error)}</p>
+        <p className="mt-3 break-words text-xs font-medium">
+          {String(data.error)}
+        </p>
       )}
 
       <details className="mt-3">
-        <summary className="cursor-pointer text-xs font-medium">Dati tecnici</summary>
+        <summary className="cursor-pointer text-xs font-medium">
+          Dati tecnici
+        </summary>
         <pre className="mt-2 max-h-56 overflow-auto rounded-md bg-background/70 p-2 text-[11px]">
           {JSON.stringify(data, null, 2)}
         </pre>
@@ -142,4 +167,3 @@ export function AgentLaunchResult({
     </div>
   );
 }
-

@@ -1,10 +1,8 @@
-import React from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Loader2, Brain, Lightbulb, AlertCircle, TrendingUp } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePersonalityInsight } from "@/hooks/useAIAgents";
-import { cn } from "@/lib/utils";
+import { AnimatePresence, motion } from "framer-motion";
+import { AlertCircle, Brain, Lightbulb, Loader2, Sparkles, TrendingUp } from "lucide-react";
 
 interface Props {
   riasecScores: Record<string, number> | null | undefined;

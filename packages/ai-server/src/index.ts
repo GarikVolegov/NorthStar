@@ -42,7 +42,7 @@ export type { SupervisorResult, SupervisorDimensions } from "./growth-agent/supe
 
 // Observability
 export { logger, type LoggerFields } from "./logger";
-export { wendyRequestsTotal, wendyLatencySeconds, wendySupervisorRewritesTotal, wendyLlmTokensTotal, wendyErrorsTotal, wendyToolCallsTotal, wendyToolCallDuration, recordRequest, recordError, recordSupervisorRewrite, recordLlmTokens, recordToolCall, getMetricsContentType, getMetrics, register } from "./metrics";
+export { wendyRequestsTotal, wendyLatencySeconds, wendySupervisorRewritesTotal, wendyLlmTokensTotal, wendyErrorsTotal, wendyToolCallsTotal, wendyToolCallDuration, recordRequest, recordError, recordSupervisorRewrite, recordLlmTokens, recordToolCall, getMetricsContentType, getMetrics, getRagMetricsSummary, register } from "./metrics";
 
 // Feature flags
 export { FF } from "./feature-flags";
@@ -68,6 +68,8 @@ export { getPersonalizedFeed, invalidateUserFeedCache } from "./discovery-agent/
 
 // Embeddings
 export { generateEmbedding, generateEmbeddingsBatch, buildEmbeddingText } from "./embeddings/generate";
+export { embedText as probeEmbedding, getEmbedderHealthSnapshot } from "./growth-agent/embedder";
+export type { EmbedderHealthSnapshot } from "./growth-agent/embedder";
 
 // Search Orchestrator
 export { runSearchOrchestrator } from "./search-agent/orchestrator";
@@ -89,7 +91,7 @@ export { classifyIntent }    from "./wendy-router/intent-classifier";
 export { getToolsForIntent, toolsToOpenAIFormat } from "./wendy-router/tool-registry";
 export { resolveWendyRoute } from "./wendy-router/router";
 export { buildLightPrompt }  from "./wendy-router/light-prompt";
-export { getLocalWendyReply, isLocalWendyReplyMessage } from "./wendy-router/local-reply";
+export { getLocalWendyReply, getLocalWendyFallbackReply, isLocalWendyReplyMessage } from "./wendy-router/local-reply";
 export type { WendyIntent, WendyPageContext, CompressedHistory, WendyRouterDecision, ToolDefinition } from "./wendy-router/types";
 
 // AI Request Log
@@ -107,6 +109,68 @@ export type { SectorDataResult } from "./sector-data-agent/agent";
 // LLM client (per uso diretto in route server)
 export { getLLM, getLLMForRoute, resetLLM } from "./llm/client";
 export type { LLMProvider, LLMMessage, LLMConfig, ToolCall, ChatWithToolsResult, ToolDefinitionOpenAI } from "./llm/client";
+
+// AI Plugin Protocol
+export { aiPlugins } from "./plugins/registry";
+export { initAIPlugins } from "./plugins/bootstrap";
+export type { AIPlugin, AICapability, AIPluginHealth, AIPluginSnapshot } from "./plugins/types";
+export { createMemoryMem0Plugin, isMemoryMem0Available, memoryMem0Plugin } from "./plugins/builtin/memory-mem0";
+export type { MemoryMem0Input, MemoryMem0Output, SemanticMemoryResult, SemanticMemoryTurn } from "./plugins/builtin/memory-mem0";
+export { createVoiceElevenLabsPlugin, isVoiceElevenLabsAvailable, voiceElevenLabsPlugin } from "./plugins/builtin/voice-elevenlabs";
+export type { ElevenLabsVoiceInput, ElevenLabsVoiceOutput } from "./plugins/builtin/voice-elevenlabs";
+export { createVisionGpt4oPlugin, isVisionGpt4oAvailable, visionGpt4oPlugin } from "./plugins/builtin/vision-gpt4o";
+export type { VisionGpt4oInput, VisionGpt4oOutput } from "./plugins/builtin/vision-gpt4o";
+
+// Feature Protocol
+export {
+  BUILTIN_FEATURE_MANIFESTS,
+  calendarFeatureManifest,
+  featureManifests,
+  getFeatureManifest,
+  listFeatureManifests,
+  listWendyToolsFromFeatures,
+  objectivesFeatureManifest,
+  profileFeatureManifest,
+  registerFeatureManifest,
+  resetFeatureManifests,
+  sectorsFeatureManifest,
+  validateFeatureManifest,
+  validateWendyToolContract,
+} from "./feature-protocol";
+export type {
+  FeatureApiRoute,
+  FeatureAuth,
+  FeatureHttpMethod,
+  FeatureManifest,
+  FeatureOwner,
+  FeatureProtocolCoverage,
+  FeatureStatus,
+  FeatureValidationResult,
+  FeatureWebRoute,
+  FeatureWendyTool,
+  RegisteredWendyTool,
+  WendyToolPolicy,
+  WendyToolRisk,
+} from "./feature-protocol";
+
+// Model catalog (auto-update-ready, plugin-aware router companion)
+export {
+  getCatalog,
+  getAllCatalogEntries,
+  findModel,
+  findModelById,
+  applyCatalogPatch,
+  refreshCatalog,
+} from "./model-router/catalog";
+export type {
+  ModelEntry,
+  ModelTier,
+  ModelCapability,
+  CatalogPatch,
+  DiscoveryReport,
+  FindModelOptions,
+} from "./model-router/catalog";
+export { applyContextSignals } from "./model-router";
 
 // Utilities
 export { withTimeout, gracefulDegrade } from "./utils";

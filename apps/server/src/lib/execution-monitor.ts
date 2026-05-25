@@ -124,12 +124,12 @@ class ExecutionMonitor {
     const componentError: ComponentError = {
       file:        ctx.file,
       function:    ctx.function,
-      line:        ctx.line,
       message,
-      code,
       stackTrace:  stack.slice(0, 2000),
       capturedAt:  new Date().toISOString(),
       occurrences: 1,
+      ...(ctx.line === undefined ? {} : { line: ctx.line }),
+      ...(code === undefined ? {} : { code }),
     };
 
     this.buffer.push(componentError);
@@ -167,6 +167,7 @@ class ExecutionMonitor {
     if (this.buffer.length === 0) return "Nessun errore rilevato — sistema sano";
 
     const top = [...this.buffer].sort((a, b) => b.occurrences - a.occurrences)[0];
+    if (!top) return "Nessun errore rilevato";
     const totalUnique = this.buffer.length;
     const topPct = Math.round((top.occurrences / this.totalCaptured) * 100);
 

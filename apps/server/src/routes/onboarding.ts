@@ -32,12 +32,22 @@ const log = rootLogger.child({ module: "onboarding" });
 // ── Schema validazione ─────────────────────────────────────────────────────────
 
 const OnboardingCompleteSchema = z.object({
-  journeyType:  z.enum(["indeciso", "dipendente", "autonomo", "azienda", "investitore",
-                         "job_search", "career_pivot", "skill_up", "startup_ideation", "explorer"]),
-  sectorIds:    z.array(z.number().int().positive()).max(3).default([]),
-  skillGoals:   z.array(z.string().max(100)).max(5).default([]),
-  horizon:      z.enum(["short", "medium", "open"]).default("open"),
-  openNote:     z.string().max(200).optional(),  // testo libero Step 1 opzionale
+  journeyType: z.enum([
+    "indeciso",
+    "dipendente",
+    "autonomo",
+    "azienda",
+    "investitore",
+    "job_search",
+    "career_pivot",
+    "skill_up",
+    "startup_ideation",
+    "explorer",
+  ]),
+  sectorIds: z.array(z.number().int().positive()).max(3).default([]),
+  skillGoals: z.array(z.string().max(100)).max(5).default([]),
+  horizon: z.enum(["short", "medium", "open"]).default("open"),
+  openNote: z.string().max(200).optional(), // testo libero Step 1 opzionale
 });
 
 // ── GET /api/onboarding/status ─────────────────────────────────────────────────
@@ -80,7 +90,7 @@ router.post("/complete", requireAuth, async (req, res) => {
     // 2. Aggiorna horizon + onboardingStep su user_profile_settings
     await db
       .insert(userProfileSettingsTable)
-      .values({ userId, horizon, onboardingStep: 4 } as any)
+      .values({ userId, horizon, onboardingStep: 4 })
       .onConflictDoUpdate({
         target: userProfileSettingsTable.userId,
         set: { horizon, onboardingStep: 4, updatedAt: new Date() },
@@ -95,9 +105,15 @@ router.post("/complete", requireAuth, async (req, res) => {
       const existingIds = new Set(existing.map((e) => e.sectorId));
       const newSectorIds = sectorIds.filter((id) => !existingIds.has(id));
       if (newSectorIds.length > 0) {
-        await db.insert(userFavoritesTable).values(
-          newSectorIds.map((sectorId) => ({ userId, sectorId, type: "sector" as const })),
-        );
+        await db
+          .insert(userFavoritesTable)
+          .values(
+            newSectorIds.map((sectorId) => ({
+              userId,
+              sectorId,
+              type: "sector" as const,
+            })),
+          );
       }
     }
 
@@ -115,15 +131,40 @@ router.post("/complete", requireAuth, async (req, res) => {
     }
 
     // 5. Coach memory seed (non-PII, solo metadati onboarding)
-    const memoryFacts: Array<{ userId: number; key: string; value: string; source: string }> = [
-      { userId, key: "onboarding_journey", value: journeyType,       source: "onboarding" },
-      { userId, key: "onboarding_horizon", value: horizon,           source: "onboarding" },
+    const memoryFacts: Array<{
+      userId: number;
+      key: string;
+      value: string;
+      source: string;
+    }> = [
+      {
+        userId,
+        key: "onboarding_journey",
+        value: journeyType,
+        source: "onboarding",
+      },
+      {
+        userId,
+        key: "onboarding_horizon",
+        value: horizon,
+        source: "onboarding",
+      },
     ];
     if (sectorIds.length > 0) {
-      memoryFacts.push({ userId, key: "onboarding_sector_ids", value: sectorIds.join(","), source: "onboarding" });
+      memoryFacts.push({
+        userId,
+        key: "onboarding_sector_ids",
+        value: sectorIds.join(","),
+        source: "onboarding",
+      });
     }
     if (skillGoals.length > 0) {
-      memoryFacts.push({ userId, key: "onboarding_skill_goals", value: skillGoals.slice(0, 3).join("; "), source: "onboarding" });
+      memoryFacts.push({
+        userId,
+        key: "onboarding_skill_goals",
+        value: skillGoals.slice(0, 3).join("; "),
+        source: "onboarding",
+      });
     }
     if (openNote?.trim()) {
       // Testo libero: sanitizziamo rimuovendo potenziali PII pattern (email, tel)
@@ -131,17 +172,24 @@ router.post("/complete", requireAuth, async (req, res) => {
         .replace(/[\w.-]+@[\w.-]+\.\w+/g, "[email]")
         .replace(/\+?\d[\d\s\-().]{7,}/g, "[tel]")
         .trim();
-      memoryFacts.push({ userId, key: "onboarding_note", value: sanitized, source: "onboarding_text" });
+      memoryFacts.push({
+        userId,
+        key: "onboarding_note",
+        value: sanitized,
+        source: "onboarding_text",
+      });
     }
 
     await db
       .insert(coachMemoryFactsTable)
-      .values(memoryFacts as any)
+      .values(memoryFacts)
       .onConflictDoNothing();
 
-    log.info({ userId, journeyType, horizon, sectorIds }, "[onboarding] completed");
+    log.info(
+      { userId, journeyType, horizon, sectorIds },
+      "[onboarding] completed",
+    );
     res.json({ ok: true, journeyType, horizon });
-
   } catch (e) {
     log.error({ e, userId }, "[onboarding] complete error");
     res.status(500).json({ error: "Errore nel completamento onboarding" });

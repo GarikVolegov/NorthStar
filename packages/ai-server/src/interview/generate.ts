@@ -9,6 +9,16 @@ export interface InterviewQuestion {
   focus: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readDifficulty(value: unknown): InterviewQuestion["difficulty"] {
+  return value === "base" || value === "media" || value === "avanzata"
+    ? value
+    : "media";
+}
+
 export async function generateQuestions(
   sectorName: string,
   cvText?: string,
@@ -38,15 +48,16 @@ Rispondi SOLO con un array JSON nel formato:
       "interview-generate",
     );
 
-    const parsed = JSON.parse(response);
+    const parsed = JSON.parse(response) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.slice(0, count).map((item: { question?: string; difficulty?: string; focus?: string }) => ({
-      question: item.question ?? "Parlami della tua esperienza.",
-      difficulty: ["base", "media", "avanzata"].includes(item.difficulty ?? "")
-        ? (item.difficulty as "base" | "media" | "avanzata")
-        : "media",
-      focus: item.focus ?? "Esperienza generale",
-    }));
+    return parsed.slice(0, count).map((item) => {
+      const record = isRecord(item) ? item : {};
+      return {
+        question: typeof record.question === "string" ? record.question : "Parlami della tua esperienza.",
+        difficulty: readDifficulty(record.difficulty),
+        focus: typeof record.focus === "string" ? record.focus : "Esperienza generale",
+      };
+    });
   } catch (err) {
     logger.warn({ err }, "interview-generate failed");
     return generateFallbackQuestions(sectorName, count);

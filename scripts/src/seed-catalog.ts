@@ -158,6 +158,10 @@ async function upsertSector(s: typeof SECTORS[number]): Promise<number> {
     stabilityScore: s.stabilityScore,
   }).returning({ id: sectorsTable.id });
 
+  if (!inserted) {
+    throw new Error(`Failed to insert sector: ${s.name}`);
+  }
+
   return inserted.id;
 }
 
