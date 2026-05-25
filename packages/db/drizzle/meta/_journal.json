@@ -239,6 +239,13 @@
       "when": 1779739100000,
       "tag": "0033_user_background_appearance",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1779742600000,
+      "tag": "0034_rag_routing_keys",
+      "breakpoints": true
     }
   ]
 }

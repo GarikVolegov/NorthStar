@@ -13,6 +13,13 @@ function intEnv(name: string, fallback: number): number {
 
 export interface RagConfig {
   embeddingDims: number;
+  sparseRetriever: {
+    enabled:         boolean;
+    topSources:      number;  // fonti selezionate al livello routing
+    multiHopEnabled: boolean;
+    maxHops:         number;
+    expansionTerms:  number;  // termini estratti per hop di espansione
+  };
   retriever: {
     defaultTopK: number;
     defaultMinScore: number;
@@ -54,6 +61,13 @@ export interface RagConfig {
 
 export const ragConfig: RagConfig = {
   embeddingDims: intEnv("RAG_EMBEDDING_DIMS", EMBEDDING_DIMS),
+  sparseRetriever: {
+    enabled:         process.env.RAG_SPARSE_RETRIEVER_ENABLED !== "false",
+    topSources:      intEnv("RAG_SPARSE_TOP_SOURCES", 5),
+    multiHopEnabled: process.env.RAG_MULTI_HOP_ENABLED !== "false",
+    maxHops:         intEnv("RAG_MULTI_HOP_MAX_HOPS", 2),
+    expansionTerms:  intEnv("RAG_MULTI_HOP_EXPANSION_TERMS", 3),
+  },
   retriever: {
     defaultTopK: intEnv("RAG_RETRIEVER_TOP_K", 6),
     defaultMinScore: numberEnv("RAG_RETRIEVER_MIN_SCORE", 0.35),

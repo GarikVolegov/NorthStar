@@ -87,6 +87,7 @@ export * from "./wendyBriefing";
 // ── Step 6: RAG, Weak Signals, Job Market Intelligence ─────────
 export * from "./ragSource";
 export * from "./ragChunk";
+export * from "./ragRoutingKey";
 export * from "./weakSignal";
 export * from "./jobPostingSnapshot";
 export * from "./skillCooccurrence";

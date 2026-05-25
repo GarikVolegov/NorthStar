@@ -4,6 +4,7 @@ import { searchMemoryGraph } from "../memory-graph";
 import { logger } from "../logger";
 import { readWeakSignalStatus } from "./tool-arg-utils";
 import { queryEmbedding, type ToolResult } from "./tool-handlers";
+import { multiHopSearchRag } from "../rag/sparse-retriever";
 
 function err(code: string, message: string): ToolResult {
   return { ok: false, code, message };
@@ -24,70 +25,39 @@ export async function handleSearchRag(
   if (!args.query?.trim()) return err("INVALID_INPUT", "Query RAG vuota");
 
   const topK = Math.min(args.topK ?? 5, 10);
-  const minTrust = args.filters?.minTrustScore ?? 0.55;
-  const maxAgeMonths = args.filters?.maxAgeMonths ?? 24;
-  const cutoffDate = new Date();
-  cutoffDate.setMonth(cutoffDate.getMonth() - maxAgeMonths);
 
   try {
     const vec = await queryEmbedding(args.query).catch(() => null);
     if (!vec) return err("UNAVAILABLE", "Servizio embedding temporaneamente non disponibile");
 
-    const vectorLiteral = `[${vec.join(",")}]`;
+    const { chunks, hops } = await multiHopSearchRag(args.query, vec, {
+      topK,
+      filters: {
+        ...(args.filters?.geography      ? { geography:     args.filters.geography }      : {}),
+        ...(args.filters?.sourceTypes    ? { sourceTypes:   args.filters.sourceTypes }    : {}),
+        ...(args.filters?.minTrustScore  ? { minTrustScore: args.filters.minTrustScore }  : {}),
+        ...(args.filters?.maxAgeMonths   ? { maxAgeMonths:  args.filters.maxAgeMonths }   : {}),
+      },
+      embedFn: queryEmbedding,
+    });
 
-    // Costruisci filtri geografici come condizione SQL
-    const geoFilter = args.filters?.geography?.length
-      ? sql`AND rc.geography && ${args.filters.geography}::text[]`
-      : sql``;
-
-    const sourceTypeFilter = args.filters?.sourceTypes?.length
-      ? sql`AND rs.source_type = ANY(${args.filters.sourceTypes}::text[])`
-      : sql``;
-
-    const rows = await db.execute<{
-      id:          number;
-      content:     string;
-      source_name: string;
-      published_at: string | null;
-      geography:   string[];
-      trust_score: number;
-      similarity:  number;
-    }>(sql`
-      SELECT
-        rc.id,
-        rc.content,
-        rs.name AS source_name,
-        rc.published_at,
-        rc.geography,
-        rc.trust_score,
-        1 - (rc.embedding <=> ${vectorLiteral}::vector) AS similarity
-      FROM rag_chunks rc
-      JOIN rag_sources rs ON rc.source_id = rs.id
-      WHERE rc.embedding IS NOT NULL
-        AND rc.trust_score >= ${minTrust}
-        AND (rc.published_at IS NULL OR rc.published_at >= ${cutoffDate.toISOString()}::timestamptz)
-        ${geoFilter}
-        ${sourceTypeFilter}
-      ORDER BY rc.embedding <=> ${vectorLiteral}::vector
-      LIMIT ${topK}
-    `);
-
-    if (rows.rows.length === 0) {
-      return { ok: true, data: { chunks: [], totalFound: 0 } };
+    if (chunks.length === 0) {
+      return { ok: true, data: { chunks: [], totalFound: 0, hops } };
     }
 
     return {
       ok: true,
       data: {
-        chunks: rows.rows.map((r) => ({
-          content:     r.content,
-          sourceName:  r.source_name,
-          publishedAt: r.published_at ?? "",
-          geography:   r.geography,
-          similarity:  Math.round(r.similarity * 1000) / 1000,
-          trustScore:  r.trust_score,
+        chunks: chunks.map((c) => ({
+          content:     c.content,
+          sourceName:  c.sourceName,
+          publishedAt: c.publishedAt,
+          geography:   c.geography,
+          similarity:  c.similarity,
+          trustScore:  c.trustScore,
         })),
-        totalFound: rows.rows.length,
+        totalFound: chunks.length,
+        hops,
       },
     };
   } catch (e) {
