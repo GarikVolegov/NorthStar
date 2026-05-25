@@ -1,0 +1,242 @@
+[
+  {
+    "id": 1,
+    "message": "Non ce la faccio più, il lavoro mi sta distruggendo",
+    "domain": "career",
+    "intent": "vent",
+    "humanRating": 4,
+    "humanNotes": "Wendy ha riconosciuto lo sfogo, non ha dato soluzioni forzate"
+  },
+  {
+    "id": 2,
+    "message": "come faccio a negoziare lo stipendio?",
+    "domain": "career",
+    "intent": "problem_solve",
+    "humanRating": 5,
+    "humanNotes": "Risposta con passi concreti, numerati, CTA finale"
+  },
+  {
+    "id": 3,
+    "message": "fammi un piano per cambiare carriera in 6 mesi",
+    "domain": "career",
+    "intent": "plan",
+    "humanRating": 4,
+    "humanNotes": "Piano realistico con tempistiche, manca una scadenza precisa"
+  },
+  {
+    "id": 4,
+    "message": "quali sono i lavori più richiesti in Italia?",
+    "domain": "career",
+    "intent": "ask_info",
+    "humanRating": 3,
+    "humanNotes": "Dati un po' generici, poteva citare fonti"
+  },
+  {
+    "id": 5,
+    "message": "XAUUSD sta rompendo resistenza a 1950, che setup vedi?",
+    "domain": "trading",
+    "intent": "explore",
+    "humanRating": 4,
+    "humanNotes": "Buona analisi tecnica, ha citato livelli chiave"
+  },
+  {
+    "id": 6,
+    "message": "BTC ha appena rotto il trendline giornaliero, entro long?",
+    "domain": "trading",
+    "intent": "problem_solve",
+    "humanRating": 5,
+    "humanNotes": "Risk management preciso, entry e stop loss suggeriti"
+  },
+  {
+    "id": 7,
+    "message": "che setup vedi su EURUSD questa settimana?",
+    "domain": "trading",
+    "intent": "explore",
+    "humanRating": 3,
+    "humanNotes": "Analisi ok ma senza catalyst macro"
+  },
+  {
+    "id": 8,
+    "message": "conviene un PAC su VWCE ora o aspetto un correction?",
+    "domain": "finance",
+    "intent": "explore",
+    "humanRating": 4,
+    "humanNotes": "Ha spiegato dollar cost averaging, non ha dato timing advice"
+  },
+  {
+    "id": 9,
+    "message": "fammi un piano per risparmiare 500 euro al mese",
+    "domain": "finance",
+    "intent": "plan",
+    "humanRating": 5,
+    "humanNotes": "Step precisi: monitoraggio spese, taglio costi fissi, automazione"
+  },
+  {
+    "id": 10,
+    "message": "come calcolo il mio patrimonio netto?",
+    "domain": "finance",
+    "intent": "problem_solve",
+    "humanRating": 4,
+    "humanNotes": "Formula chiara, esempio pratico incluso"
+  },
+  {
+    "id": 11,
+    "message": "conviene il fondo pensione o il TFR lasciato in azienda?",
+    "domain": "finance",
+    "intent": "ask_info",
+    "humanRating": 5,
+    "humanNotes": "Confronto dettagliato con numeri, vantaggi fiscali spiegati"
+  },
+  {
+    "id": 12,
+    "message": "ho paura di non essere abbastanza bravo",
+    "domain": "mindset",
+    "intent": "reflect",
+    "humanRating": 4,
+    "humanNotes": "Ha normalizzato la paura, domande socratiche utili"
+  },
+  {
+    "id": 13,
+    "message": "come supero la sindrome dell'impostore?",
+    "domain": "mindset",
+    "intent": "problem_solve",
+    "humanRating": 3,
+    "humanNotes": "Consigli validi ma un po' generici, poteva personalizzare"
+  },
+  {
+    "id": 14,
+    "message": "non riesco a mantenere una routine mattutina",
+    "domain": "habits",
+    "intent": "problem_solve",
+    "humanRating": 4,
+    "humanNotes": "Suggerito habit stacking, mini abitudini, tracking"
+  },
+  {
+    "id": 15,
+    "message": "dormo 5 ore a notte, come miglioro il sonno?",
+    "domain": "habits",
+    "intent": "problem_solve",
+    "humanRating": 5,
+    "humanNotes": "Protocollo sonno completo: igiene, timing, ambiente, integrazione"
+  },
+  {
+    "id": 16,
+    "message": "rimando sempre tutto, come smetto di procrastinare?",
+    "domain": "habits",
+    "intent": "problem_solve",
+    "humanRating": 4,
+    "humanNotes": "Tecnica dei 5 minuti, time blocking, eliminazione distrazioni"
+  },
+  {
+    "id": 17,
+    "message": "come posso migliorare il mio networking su LinkedIn?",
+    "domain": "relationships",
+    "intent": "explore",
+    "humanRating": 3,
+    "humanNotes": "Consigli ok ma senza strategia di contenuti"
+  },
+  {
+    "id": 18,
+    "message": "come gestisco un conflitto con il mio capo?",
+    "domain": "relationships",
+    "intent": "problem_solve",
+    "humanRating": 5,
+    "humanNotes": "Struttura SBI, tempismo, comunicazione non violenta"
+  },
+  {
+    "id": 19,
+    "message": "come trovo un mentore nel mio settore?",
+    "domain": "relationships",
+    "intent": "explore",
+    "humanRating": 4,
+    "humanNotes": "Approccio strategico: identificazione, approccio, valore reciproco"
+  },
+  {
+    "id": 20,
+    "message": "come chiedo un aumento senza ansia?",
+    "domain": "career",
+    "intent": "problem_solve",
+    "humanRating": 5,
+    "humanNotes": "Multi-dominio gestito bene: career + mindset, preparazione dati"
+  },
+  {
+    "id": 21,
+    "message": "vorrei cambiare lavoro per guadagnare di più e investire meglio",
+    "domain": "career",
+    "intent": "plan",
+    "humanRating": 4,
+    "humanNotes": "Doppio dominio career+finance gestito, poteva approfondire investimenti"
+  },
+  {
+    "id": 22,
+    "message": "quanto dura in media un corso di laurea in Italia?",
+    "domain": "general",
+    "intent": "ask_info",
+    "humanRating": 3,
+    "humanNotes": "Risposta corretta ma senza fonti ufficiali"
+  },
+  {
+    "id": 23,
+    "message": "qual è lo stipendio medio di un data scientist in Italia?",
+    "domain": "career",
+    "intent": "ask_info",
+    "humanRating": 4,
+    "humanNotes": "Dati aggiornati con range per seniority"
+  },
+  {
+    "id": 24,
+    "message": "sono stanco",
+    "domain": "general",
+    "intent": "vent",
+    "humanRating": 4,
+    "humanNotes": "Riconosciuto lo stato d'animo, invito aperto a parlare"
+  },
+  {
+    "id": 25,
+    "message": "è frustrante non vedere risultati dopo mesi di lavoro",
+    "domain": "mindset",
+    "intent": "vent",
+    "humanRating": 5,
+    "humanNotes": "Empatia + reframing cognitivo, senza piattudini"
+  },
+  {
+    "id": 26,
+    "message": "sto ripensando alle scelte che ho fatto finora",
+    "domain": "general",
+    "intent": "reflect",
+    "humanRating": 4,
+    "humanNotes": "Domande di riflessione potenti, non giudicante"
+  },
+  {
+    "id": 27,
+    "message": "mi sento bloccato, non so da dove iniziare",
+    "domain": "mindset",
+    "intent": "vent",
+    "humanRating": 3,
+    "humanNotes": "Poteva offrire un punto di partenza concreto dopo l'ascolto"
+  },
+  {
+    "id": 28,
+    "message": "ciao",
+    "domain": "general",
+    "intent": "explore",
+    "humanRating": 4,
+    "humanNotes": "Risposta breve e aperta, non forzata"
+  },
+  {
+    "id": 29,
+    "message": "come investire in ETF per il lungo termine?",
+    "domain": "finance",
+    "intent": "plan",
+    "humanRating": 5,
+    "humanNotes": "Piano completo: selezione ETF, PAC, ribilanciamento, orizzonte"
+  },
+  {
+    "id": 30,
+    "message": "come gestisco il drawdown dopo 3 perdite consecutive?",
+    "domain": "trading",
+    "intent": "problem_solve",
+    "humanRating": 4,
+    "humanNotes": "Psicologia del trading + riduzione posizione + pausa"
+  }
+]

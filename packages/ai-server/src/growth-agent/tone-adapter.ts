@@ -26,6 +26,7 @@
  *   azienda     → "Cerco il profilo giusto" (team building)
  *   investitore → "Valuto opportunità di mercato"
  */
+import { buildWendyToneInheritanceNote } from "../wendy-voice";
 
 export interface ToneProfile {
   journeyType: string;
@@ -98,7 +99,7 @@ const TONE_PROFILES: Record<string, ToneProfile> = {
 };
 
 /** Default fallback if journeyType is unknown */
-const DEFAULT_PROFILE = TONE_PROFILES["dipendente"];
+const DEFAULT_PROFILE = TONE_PROFILES["dipendente"]!;
 
 /**
  * Returns the ToneProfile for the given journeyType.
@@ -118,6 +119,8 @@ export function buildToneSection(journeyType: string | undefined | null): string
   return `
 ## Come parlare con questo utente (tono adattivo)
 Percorso: **${profile.journeyType}**
+
+${buildWendyToneInheritanceNote()}
 
 - **Voce:** ${profile.voice}
 - **Ritmo:** ${profile.pace}

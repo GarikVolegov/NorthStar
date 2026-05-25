@@ -1,0 +1,122 @@
+import { ChangePasswordSection } from "@/components/profile/settings/ChangePasswordSection";
+import { BackgroundPicker } from "@/components/user-background/BackgroundPicker";
+import { Button } from "@/components/ui/button";
+import { PrivacyCard } from "@/components/profile/settings/PrivacyCard";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import type { AuthUser } from "@/contexts/AuthContext";
+import { useLefty } from "@/hooks/useLefty";
+import { Calendar, Globe, Hand, KeyRound, Mail, Palette, ShieldCheck, User } from "lucide-react";
+import { useState } from "react";
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("it-IT", {
+    day: "numeric", month: "long", year: "numeric",
+  });
+}
+
+interface ProfileSettingsProps {
+  user: AuthUser;
+  createdAt?: string;
+}
+
+export function ProfileSettings({ user, createdAt }: ProfileSettingsProps) {
+  const { isLefty, setIsLefty } = useLefty();
+  const [backgroundPickerOpen, setBackgroundPickerOpen] = useState(false);
+
+  return (
+    <Card className="rounded-2xl">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <User className="w-4 h-4 text-primary" /> Account
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Nome</p>
+          <p className="font-semibold text-foreground">{user.name}</p>
+        </div>
+
+        <div>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Email</p>
+          <div className="flex items-center gap-1.5">
+            <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+            <p className="text-sm truncate">{user.email}</p>
+          </div>
+        </div>
+
+        {createdAt && (
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Membro dal</p>
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+              <p className="text-sm">{formatDate(createdAt)}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-1.5 pt-1">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+          <span className="text-xs text-emerald-700 font-medium">Email verificata</span>
+        </div>
+
+        <details className="group">
+          <summary className="flex items-center gap-2 text-sm font-medium text-primary cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+            <KeyRound className="w-4 h-4" />
+            <span>Cambia password</span>
+            <span className="ml-auto text-xs text-muted-foreground group-open:rotate-180 transition-transform">▾</span>
+          </summary>
+          <div className="mt-3 pt-3 border-t border-border">
+            <ChangePasswordSection userId={user.id} />
+          </div>
+        </details>
+
+        <details className="group">
+          <summary className="flex items-center gap-2 text-sm font-medium text-primary cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+            <Globe className="w-4 h-4" />
+            <span>Visibilità profilo</span>
+            <span className="ml-auto text-xs text-muted-foreground group-open:rotate-180 transition-transform">▾</span>
+          </summary>
+          <div className="mt-3 pt-3 border-t border-border">
+            <PrivacyCard userId={user.id} />
+          </div>
+        </details>
+
+        <div className="pt-1 border-t border-border">
+          <div className="flex items-center gap-2 mb-2">
+            <Palette className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">Tema</span>
+          </div>
+          <ThemeToggle />
+        </div>
+
+        <div className="flex items-center justify-between gap-3 pt-1 border-t border-border">
+          <div className="flex items-center gap-2">
+            <Palette className="w-4 h-4 text-primary" />
+            <div>
+              <span className="text-sm font-medium">Sfondo app</span>
+              <p className="text-xs text-muted-foreground">Personalizza l'atmosfera della tua area NorthStar.</p>
+            </div>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => setBackgroundPickerOpen(true)}>
+            Personalizza sfondo
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-between pt-1 border-t border-border">
+          <div className="flex items-center gap-2">
+            <Hand className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">Modalità mancino</span>
+          </div>
+          <Switch checked={isLefty} onCheckedChange={setIsLefty} />
+        </div>
+      </CardContent>
+      <BackgroundPicker
+        userId={user.id}
+        open={backgroundPickerOpen}
+        onOpenChange={setBackgroundPickerOpen}
+      />
+    </Card>
+  );
+}

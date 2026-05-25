@@ -43,6 +43,7 @@ export const affiliateAccountsTable = pgTable(
 
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => ({
     userIdIdx:       index("affiliate_accounts_user_id_idx").on(t.userId),

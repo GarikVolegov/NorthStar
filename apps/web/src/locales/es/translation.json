@@ -4,7 +4,7 @@
     "sectors": "Sectores",
     "growth": "Crecimiento",
     "news": "Noticias",
-    "premium": "Premium",
+    "premium": "Pro",
     "login": "Iniciar sesión",
     "startJourney": "Empieza tu camino",
     "back": "Atrás",
@@ -55,6 +55,7 @@
     "seeAll": "Ver todos",
     "goBack": "Volver",
     "search": "Buscar",
+    "searching": "Buscando...",
     "filter": "Filtrar",
     "clearFilters": "Eliminar todos los filtros",
     "results": "resultados",
@@ -88,7 +89,8 @@
       "exploreAll": "Explorar los 21 sectores",
       "topThisWeek": "Más solicitado esta semana",
       "deepen": "Saber más",
-      "compareWith": "Comparar con otro sector"
+      "compareWith": "Comparar con otro sector",
+      "heading": "Áreas en crecimiento"
     },
     "personalized": {
       "badge": "Recomendaciones personalizadas",
@@ -110,7 +112,210 @@
       "step2Desc": "El sistema procesa tus respuestas y te muestra los sectores más compatibles con tu personalidad.",
       "step3Title": "Construye tu camino",
       "step3Desc": "Explora los sectores recomendados, compáralos y elige el que realmente resuene contigo.",
-      "startNow": "Empezar ahora"
+      "startNow": "Empezar ahora",
+      "heading": "El camino adecuado para",
+      "headingHighlight": "ti",
+      "subtitle": "Tres pasos simples para entender dónde estás, a dónde quieres llegar y cómo llegar allí.",
+      "step1": {
+        "title": "Elige tu perfil",
+        "desc": "Selecciona el camino que te representa: indeciso, empleado, autónomo, empresa o inversor.",
+        "label": "Elige tu camino"
+      },
+      "step2": {
+        "title": "Completa el test",
+        "desc": "17 preguntas RIASEC para mapear tu personalidad profesional y preferencias laborales.",
+        "label": "Empieza el test gratuito"
+      },
+      "step3": {
+        "title": "Herramientas con IA",
+        "desc": "Planes personalizados, análisis de competencias, simulación de entrevistas y guía con IA.",
+        "label": "Descubre las herramientas"
+      },
+      "stepLabel": "Paso"
+    },
+    "personas": {
+      "indeciso": {
+        "label": "Indeciso",
+        "tagline": "Aún no sé qué hacer",
+        "ctaLabel": "Haz el test gratuito",
+        "tools": [
+          "Test de personalidad",
+          "Explorar áreas",
+          "Coach IA"
+        ]
+      },
+      "dipendente": {
+        "label": "Empleado",
+        "tagline": "Tengo un trabajo y quiero crecer",
+        "ctaLabel": "Analiza mis habilidades",
+        "tools": [
+          "Competencias",
+          "Simulador de entrevistas",
+          "Plan de crecimiento"
+        ]
+      },
+      "autonomo": {
+        "label": "Autónomo",
+        "tagline": "Trabajo por cuenta propia y quiero escalar",
+        "ctaLabel": "Valida mi idea",
+        "tools": [
+          "Análisis de idea",
+          "Plan de negocio",
+          "Coach IA"
+        ]
+      },
+      "azienda": {
+        "label": "Empresa",
+        "tagline": "Busco el perfil adecuado",
+        "ctaLabel": "Explora perfiles",
+        "tools": [
+          "Perfiles de personalidad",
+          "Áreas en crecimiento",
+          "Partner"
+        ]
+      },
+      "investitore": {
+        "label": "Inversor",
+        "tagline": "Evalúo oportunidades de mercado",
+        "ctaLabel": "Ver tendencias",
+        "tools": [
+          "Áreas en crecimiento",
+          "Análisis de tendencias",
+          "Mapa de conocimiento"
+        ]
+      }
+    },
+    "journeyLabels": {
+      "indeciso": "Indeciso",
+      "dipendente": "Empleado",
+      "autonomo": "Autónomo",
+      "azienda": "Empresa",
+      "investitore": "Inversor"
+    },
+    "nextStep": {
+      "indeciso": {
+        "label": "Haz el test",
+        "desc": "Descubre tu personalidad profesional"
+      },
+      "dipendente": {
+        "label": "Analiza competencias",
+        "desc": "Identifica las habilidades que te faltan"
+      },
+      "autonomo": {
+        "label": "Valida tu idea",
+        "desc": "Recibe una evaluación de tu negocio"
+      },
+      "azienda": {
+        "label": "Explora perfiles",
+        "desc": "Encuentra los perfiles ideales para tu equipo"
+      },
+      "investitore": {
+        "label": "Ver áreas en crecimiento",
+        "desc": "Analiza tendencias y oportunidades del mercado italiano"
+      }
+    },
+    "tools": {
+      "indeciso": [
+        {
+          "title": "Test de personalidad",
+          "desc": "17 preguntas para mapear tu personalidad"
+        },
+        {
+          "title": "Explorar áreas",
+          "desc": "28 áreas con salarios y crecimiento"
+        },
+        {
+          "title": "Coach IA",
+          "desc": "Sesiones de asesoramiento personalizadas"
+        },
+        {
+          "title": "Noticias laborales",
+          "desc": "Últimas noticias del mercado"
+        }
+      ],
+      "dipendente": [
+        {
+          "title": "Habilidades a desarrollar",
+          "desc": "Identifica lo que te falta"
+        },
+        {
+          "title": "Simulador de Entrevistas",
+          "desc": "Practica con preguntas reales"
+        },
+        {
+          "title": "Coach de Carrera",
+          "desc": "Plan de crecimiento personalizado"
+        },
+        {
+          "title": "Mis candidaturas",
+          "desc": "Gestiona tus solicitudes de empleo"
+        }
+      ],
+      "autonomo": [
+        {
+          "title": "Análisis de idea",
+          "desc": "Evaluación detallada con IA"
+        },
+        {
+          "title": "Coach de Negocio",
+          "desc": "Consejos estratégicos"
+        },
+        {
+          "title": "Mercados en crecimiento",
+          "desc": "Encuentra el sector más adecuado"
+        },
+        {
+          "title": "Noticias de negocio",
+          "desc": "Últimas novedades"
+        }
+      ],
+      "azienda": [
+        {
+          "title": "Perfiles de personalidad",
+          "desc": "Encuentra el perfil psicológico ideal"
+        },
+        {
+          "title": "Partner",
+          "desc": "Publica tu oportunidad"
+        },
+        {
+          "title": "Noticias RRHH",
+          "desc": "Tendencias del mercado laboral"
+        },
+        {
+          "title": "Crecimiento empresarial",
+          "desc": "Artículos sobre cultura y equipo"
+        }
+      ],
+      "investitore": [
+        {
+          "title": "Áreas en crecimiento",
+          "desc": "Análisis de tendencias del mercado italiano"
+        },
+        {
+          "title": "Noticias de mercado",
+          "desc": "Últimas noticias de economía y finanzas"
+        },
+        {
+          "title": "Crecimiento de sectores",
+          "desc": "Datos y análisis para invertir"
+        },
+        {
+          "title": "Mapa de conocimiento",
+          "desc": "Conexiones entre sectores"
+        }
+      ]
+    },
+    "quickTools": {
+      "heading": "Tus herramientas",
+      "subheading": "Seleccionadas para tu camino",
+      "dashboardLink": "Dashboard completo"
+    },
+    "hero": {
+      "badge": "Orientación profesional personalizada",
+      "heading": "¿Cuál es tu",
+      "headingHighlight": "objetivo?",
+      "subtitle": "NorthStar se adapta a tu camino. Elige el perfil que te represente y recibe herramientas y consejos a tu medida."
     }
   },
   "test": {
@@ -762,8 +967,8 @@
     "wikiAI": "Wiki IA",
     "wikiDesc": "Haz preguntas específicas sobre el sector y recibe respuestas personalizadas de la IA.",
     "openChat": "Abrir el chat",
-    "roadmap": "Hoja de ruta detallada",
-    "roadmapDesc": "Plan paso a paso generado por la IA para entrar en el sector con recursos concretos.",
+    "roadmap": "Plan de crecimiento",
+    "roadmapDesc": "Plan detallado generado por IA para entrar en el sector con recursos concretos.",
     "generatePlan": "Generar el plan",
     "knowledgeGraph": "Gráfico del conocimiento",
     "graphDesc": "Visualiza roles, competencias y herramientas del sector en un gráfico interactivo.",
@@ -825,7 +1030,7 @@
         "desc": "Accede a una base de conocimiento inteligente que responde a tus preguntas específicas sobre el sector elegido."
       },
       "graph": {
-        "title": "Gráfico del conocimiento",
+        "title": "Mapa de conocimientos",
         "desc": "Visualiza rutas de formación, competencias y conexiones entre roles profesionales de forma interactiva."
       },
       "roadmap": {
@@ -1038,7 +1243,12 @@
     },
     "read": "Leer",
     "save": "Guardar",
-    "saved": "Guardado"
+    "saved": "Guardado",
+    "myCategories": "Mis categorías",
+    "subscribe": "Seguir",
+    "subscribed": "Siguiendo",
+    "active": "activas",
+    "subscribeHint": "Haz clic en una categoría para recibir actualizaciones personalizadas."
   },
   "profilo": {
     "title": "Tu perfil",
@@ -1523,7 +1733,7 @@
       "Todo el plan Free",
       "Wiki IA para cada sector",
       "Hoja de ruta profesional personalizada",
-      "Grafo de conocimiento interactivo",
+      "Mapa de conocimiento interactivo",
       "Chat RAG con el grafo",
       "Objetivos profesionales ilimitados",
       "Contenido premium exclusivo"
@@ -1596,7 +1806,7 @@
       "sectorPages": "Sectores profesionales",
       "wiki": "Wiki por sector",
       "roadmap": "Hoja de ruta profesional",
-      "grafo": "Grafo de conocimiento"
+      "grafo": "Mapa de conocimiento"
     },
     "items": {
       "home": {
@@ -1612,7 +1822,7 @@
         "desc": "Articulos actualizados por sector"
       },
       "premium": {
-        "label": "Premium",
+        "label": "Pro",
         "desc": "Planes y funciones avanzadas"
       },
       "profilo": {
@@ -1680,8 +1890,8 @@
     ]
   },
   "roadmap": {
-    "title": "Hoja de ruta",
-    "subtitle": "Tu plan paso a paso para entrar en el sector.",
+    "title": "Plan de crecimiento",
+    "subtitle": "Tu plan detallado para entrar en el sector.",
     "generate": "Generar hoja de ruta",
     "generating": "Generando…",
     "premiumRequired": "Función Premium",
@@ -1710,7 +1920,7 @@
     "detailed": "Hoja de ruta Detallada"
   },
   "grafo": {
-    "title": "Gráfico del conocimiento",
+    "title": "Mapa de conocimientos",
     "subtitle": "Visualiza roles, competencias y herramientas del sector.",
     "generating": "Generando gráfico…",
     "premiumRequired": "Función Premium",
@@ -2146,7 +2356,7 @@
     "confirmed": "Confirmado",
     "compatibility": "{{score}}% de compatibilidad",
     "sectorRoadmap": "Hoja de ruta del sector",
-    "competenceGraph": "Grafo de competencias",
+    "competenceGraph": "Mapa de competencias",
     "yourProgress": "Tu progreso",
     "objectivesLoading": "Objetivos",
     "objectivesCompleted": "{{done}} / {{total}} objetivos completados",
@@ -2186,11 +2396,11 @@
     "education": "Formación",
     "certifications": "Certificaciones",
     "languages": "Idiomas",
-    "addToGraph": "Añadir al Grafo de Conocimiento",
+    "addToGraph": "Añadir al Mapa de Conocimiento",
     "suggestedNodes": "{{count}} nodos sugeridos de tu CV",
     "clickToAdd": "Haz clic para añadir nodos al grafo del sector.",
     "openGraph": "Abrir grafo →",
-    "uploadDesc": "Sube tu CV para integrarlo con el Grafo de Conocimiento y generar una versión optimizada.",
+    "uploadDesc": "Sube tu CV para integrarlo con el Mapa de Conocimiento y generar una versión optimizada.",
     "uploadFile": "Subir archivo",
     "pasteText": "Pegar texto",
     "dragHere": "Arrastra tu CV aquí o haz clic para seleccionarlo",
@@ -2202,7 +2412,7 @@
     "invalidFormat": "Formato no compatible. Usa PDF o TXT.",
     "uploadError": "Error al subir",
     "addPlaceholder": "Añadir...",
-    "featureGraph": "Integración de Grafo",
+    "featureGraph": "Integración de Mapa",
     "featureGraphDesc": "Sugiere nodos de habilidades/herramientas para añadir al grafo",
     "featureCv": "CV Optimizado",
     "featureCvDesc": "Genera un CV profesional basado en el grafo y el perfil RIASEC",
@@ -2478,5 +2688,32 @@
     "noRoles": "No hay roles disponibles para este sector.",
     "rolesTab": "Roles",
     "viewRole": "Saber más"
+  },
+  "search": {
+    "placeholder": "Buscar sectores, roles, artículos...",
+    "noResults": "Sin resultados para \"{{query}}\"",
+    "sectors": "Sectores",
+    "roles": "Roles",
+    "articles": "Artículos",
+    "news": "Noticias",
+    "hint": "Buscar en toda la plataforma",
+    "suggestions": "Sugerencias",
+    "askWendy": "Pregunta a Wendy: \"{{query}}\"",
+    "askWendyDesc": "Habla con la asistente AI para saber más"
+  },
+  "wendy": {
+    "placeholder": "Escribe a Wendy...",
+    "send": "Enviar",
+    "stop": "Detener",
+    "voice": "Voz",
+    "clear": "Nueva chat",
+    "status": {
+      "thinking": "Procesando...",
+      "searching": "Buscando...",
+      "writing": "Escribiendo...",
+      "analyzing": "Analizando...",
+      "loading": "Cargando perfil...",
+      "web": "Buscando en la web..."
+    }
   }
 }

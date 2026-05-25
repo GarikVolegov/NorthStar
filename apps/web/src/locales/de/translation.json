@@ -4,7 +4,7 @@
     "sectors": "Branchen",
     "growth": "Wachstum",
     "news": "Nachrichten",
-    "premium": "Premium",
+    "premium": "Pro",
     "login": "Anmelden",
     "startJourney": "Reise beginnen",
     "back": "Zurück",
@@ -55,6 +55,7 @@
     "seeAll": "Alle anzeigen",
     "goBack": "Zurück",
     "search": "Suchen",
+    "searching": "Suche...",
     "filter": "Filtern",
     "clearFilters": "Alle Filter entfernen",
     "results": "Ergebnisse",
@@ -88,7 +89,8 @@
       "exploreAll": "Alle 21 Branchen erkunden",
       "topThisWeek": "Diese Woche am meisten gefragt",
       "deepen": "Mehr erfahren",
-      "compareWith": "Mit einer anderen Branche vergleichen"
+      "compareWith": "Mit einer anderen Branche vergleichen",
+      "heading": "Wachsende Bereiche"
     },
     "personalized": {
       "badge": "Personalisierte Empfehlungen",
@@ -110,7 +112,210 @@
       "step2Desc": "Das System verarbeitet deine Antworten und zeigt dir die Branchen, die am besten zu deiner Persönlichkeit passen.",
       "step3Title": "Weg aufbauen",
       "step3Desc": "Erkunde empfohlene Branchen, vergleiche sie und wähle die, die wirklich mit dir resoniert.",
-      "startNow": "Jetzt starten"
+      "startNow": "Jetzt starten",
+      "heading": "Der richtige Weg für",
+      "headingHighlight": "dich",
+      "subtitle": "Drei einfache Schritte, um zu verstehen, wo du stehst, wo du hin willst und wie du dorthin kommst.",
+      "step1": {
+        "title": "Wähle dein Profil",
+        "desc": "Wähle den Weg, der dich repräsentiert: unentschlossen, angestellt, selbstständig, Unternehmen oder Investor.",
+        "label": "Wähle deinen Weg"
+      },
+      "step2": {
+        "title": "Schließe den Test ab",
+        "desc": "17 RIASEC-Fragen, um deine berufliche Persönlichkeit und Arbeitspräferenzen zu kartieren.",
+        "label": "Starte den kostenlosen Test"
+      },
+      "step3": {
+        "title": "KI-Tools",
+        "desc": "Personalisierte Pläne, Kompetenzanalyse, Vorstellungsgespräch-Simulation und KI-Begleitung.",
+        "label": "Entdecke die Tools"
+      },
+      "stepLabel": "Schritt"
+    },
+    "personas": {
+      "indeciso": {
+        "label": "Unentschlossen",
+        "tagline": "Ich weiß noch nicht, was ich tun soll",
+        "ctaLabel": "Mach den kostenlosen Test",
+        "tools": [
+          "Persönlichkeitstest",
+          "Bereiche erkunden",
+          "KI-Coach"
+        ]
+      },
+      "dipendente": {
+        "label": "Angestellt",
+        "tagline": "Ich habe einen Job und möchte wachsen",
+        "ctaLabel": "Analysiere meine Fähigkeiten",
+        "tools": [
+          "Kompetenzen",
+          "Vorstellungsgespräch-Simulator",
+          "Wachstumsplan"
+        ]
+      },
+      "autonomo": {
+        "label": "Selbstständig",
+        "tagline": "Ich arbeite für mich selbst und möchte skalieren",
+        "ctaLabel": "Validiere meine Idee",
+        "tools": [
+          "Ideenanalyse",
+          "Geschäftsplan",
+          "KI-Coach"
+        ]
+      },
+      "azienda": {
+        "label": "Unternehmen",
+        "tagline": "Ich suche das richtige Profil",
+        "ctaLabel": "Profile erkunden",
+        "tools": [
+          "Persönlichkeitsprofile",
+          "Wachsende Bereiche",
+          "Partner"
+        ]
+      },
+      "investitore": {
+        "label": "Investor",
+        "tagline": "Ich bewerte Marktchancen",
+        "ctaLabel": "Trends ansehen",
+        "tools": [
+          "Wachsende Bereiche",
+          "Trendanalyse",
+          "Wissenskarte"
+        ]
+      }
+    },
+    "journeyLabels": {
+      "indeciso": "Unentschlossen",
+      "dipendente": "Angestellt",
+      "autonomo": "Selbstständig",
+      "azienda": "Unternehmen",
+      "investitore": "Investor"
+    },
+    "nextStep": {
+      "indeciso": {
+        "label": "Mach den Test",
+        "desc": "Entdecke deine berufliche Persönlichkeit"
+      },
+      "dipendente": {
+        "label": "Analysiere Fähigkeiten",
+        "desc": "Finde heraus, welche Fähigkeiten dir fehlen"
+      },
+      "autonomo": {
+        "label": "Validiere deine Idee",
+        "desc": "Erhalte eine Bewertung deines Geschäfts"
+      },
+      "azienda": {
+        "label": "Profile erkunden",
+        "desc": "Finde die besten Profile für dein Team"
+      },
+      "investitore": {
+        "label": "Wachsende Bereiche ansehen",
+        "desc": "Analysiere Trends und Chancen des italienischen Marktes"
+      }
+    },
+    "tools": {
+      "indeciso": [
+        {
+          "title": "Persönlichkeitstest",
+          "desc": "17 Fragen, um deine Persönlichkeit zu kartieren"
+        },
+        {
+          "title": "Bereiche erkunden",
+          "desc": "28 Bereiche mit Gehältern und Wachstum"
+        },
+        {
+          "title": "KI-Coach",
+          "desc": "Personalisierte Beratungssitzungen"
+        },
+        {
+          "title": "Job-Nachrichten",
+          "desc": "Aktuelle Marktnachrichten"
+        }
+      ],
+      "dipendente": [
+        {
+          "title": "Zu entwickelnde Fähigkeiten",
+          "desc": "Finde heraus, was dir fehlt"
+        },
+        {
+          "title": "Vorstellungsgespräch-Simulator",
+          "desc": "Übe mit echten Fragen"
+        },
+        {
+          "title": "Karriere-Coach",
+          "desc": "Personalisierter Wachstumsplan"
+        },
+        {
+          "title": "Meine Bewerbungen",
+          "desc": "Verwalte deine Bewerbungen"
+        }
+      ],
+      "autonomo": [
+        {
+          "title": "Ideenanalyse",
+          "desc": "Detaillierte KI-Bewertung"
+        },
+        {
+          "title": "Geschäfts-Coach",
+          "desc": "Strategische Beratung"
+        },
+        {
+          "title": "Wachsende Märkte",
+          "desc": "Finde den passendsten Sektor"
+        },
+        {
+          "title": "Geschäftsnachrichten",
+          "desc": "Aktuelle Neuigkeiten"
+        }
+      ],
+      "azienda": [
+        {
+          "title": "Persönlichkeitsprofile",
+          "desc": "Finde das ideale psychologische Profil"
+        },
+        {
+          "title": "Partner",
+          "desc": "Veröffentliche deine Gelegenheit"
+        },
+        {
+          "title": "HR-Nachrichten",
+          "desc": "Arbeitsmarkttrends"
+        },
+        {
+          "title": "Unternehmenswachstum",
+          "desc": "Artikel über Kultur und Team"
+        }
+      ],
+      "investitore": [
+        {
+          "title": "Wachsende Bereiche",
+          "desc": "Trendanalyse des italienischen Marktes"
+        },
+        {
+          "title": "Marktnachrichten",
+          "desc": "Aktuelle Wirtschafts- und Finanznachrichten"
+        },
+        {
+          "title": "Sektorwachstum",
+          "desc": "Daten und Analysen für Investitionen"
+        },
+        {
+          "title": "Wissenskarte",
+          "desc": "Verbindungen zwischen Sektoren"
+        }
+      ]
+    },
+    "quickTools": {
+      "heading": "Deine Tools",
+      "subheading": "Ausgewählt für deinen Weg",
+      "dashboardLink": "Vollständiges Dashboard"
+    },
+    "hero": {
+      "badge": "Personalisierte Berufsberatung",
+      "heading": "Was ist Ihr",
+      "headingHighlight": "Ziel?",
+      "subtitle": "NorthStar passt sich Ihrem Weg an. Wählen Sie das Profil, das Sie repräsentiert, und erhalten Sie maßgeschneiderte Werkzeuge und Ratschläge."
     }
   },
   "test": {
@@ -762,8 +967,8 @@
     "wikiAI": "KI-Wiki",
     "wikiDesc": "Stelle spezifische Fragen zur Branche und erhalte personalisierte Antworten von der KI.",
     "openChat": "Chat öffnen",
-    "roadmap": "Detaillierte Roadmap",
-    "roadmapDesc": "Ein schrittweiser Plan, der von der KI generiert wurde, um mit konkreten Ressourcen in die Branche einzusteigen.",
+    "roadmap": "Wachstumsplan",
+    "roadmapDesc": "Detaillierter KI-generierter Plan für den Einstieg in die Branche mit konkreten Ressourcen.",
     "generatePlan": "Plan generieren",
     "knowledgeGraph": "Wissensgraph",
     "graphDesc": "Visualisiere Rollen, Kompetenzen und Tools der Branche in einem interaktiven Graphen.",
@@ -825,7 +1030,7 @@
         "desc": "Greife auf eine intelligente Wissensdatenbank zu, die deine spezifischen Fragen zur gewählten Branche beantwortet."
       },
       "graph": {
-        "title": "Wissensgraph",
+        "title": "Wissenskarte",
         "desc": "Visualisiere Ausbildungswege, Kompetenzen und Verbindungen zwischen Berufsrollen interaktiv."
       },
       "roadmap": {
@@ -1038,7 +1243,12 @@
     },
     "read": "Lesen",
     "save": "Speichern",
-    "saved": "Gespeichert"
+    "saved": "Gespeichert",
+    "myCategories": "Meine Kategorien",
+    "subscribe": "Folgen",
+    "subscribed": "Folge ich",
+    "active": "aktiv",
+    "subscribeHint": "Klicke auf eine Kategorie, um personalisierte Updates zu erhalten."
   },
   "profilo": {
     "title": "Dein Profil",
@@ -1612,7 +1822,7 @@
         "desc": "Aktualisierte Artikel nach Sektor"
       },
       "premium": {
-        "label": "Premium",
+        "label": "Pro",
         "desc": "Plane und erweiterte Funktionen"
       },
       "profilo": {
@@ -1680,8 +1890,8 @@
     ]
   },
   "roadmap": {
-    "title": "Roadmap",
-    "subtitle": "Dein schrittweiser Plan, um in die Branche einzusteigen.",
+    "title": "Wachstumsplan",
+    "subtitle": "Dein detaillierter Plan, um in die Branche einzusteigen.",
     "generate": "Roadmap generieren",
     "generating": "Generierung…",
     "premiumRequired": "Premium-Funktion",
@@ -1710,7 +1920,7 @@
     "detailed": "Detaillierte Roadmap"
   },
   "grafo": {
-    "title": "Wissensgraph",
+    "title": "Wissenskarte",
     "subtitle": "Visualisiere Rollen, Kompetenzen und Tools der Branche.",
     "generating": "Graphen wird generiert…",
     "premiumRequired": "Premium-Funktion",
@@ -2478,5 +2688,32 @@
     "noRoles": "Keine Rollen für diese Branche verfügbar.",
     "rolesTab": "Rollen",
     "viewRole": "Mehr erfahren"
+  },
+  "search": {
+    "placeholder": "Branchen, Rollen, Artikel durchsuchen...",
+    "noResults": "Keine Ergebnisse für \"{{query}}\"",
+    "sectors": "Branchen",
+    "roles": "Rollen",
+    "articles": "Artikel",
+    "news": "Nachrichten",
+    "hint": "Suche in der gesamten Plattform",
+    "suggestions": "Empfehlungen",
+    "askWendy": "Frag Wendy: \"{{query}}\"",
+    "askWendyDesc": "Chatte mit der KI-Assistentin"
+  },
+  "wendy": {
+    "placeholder": "Schreib an Wendy...",
+    "send": "Senden",
+    "stop": "Stopp",
+    "voice": "Stimme",
+    "clear": "Neuer Chat",
+    "status": {
+      "thinking": "Verarbeite...",
+      "searching": "Suche...",
+      "writing": "Schreibe...",
+      "analyzing": "Analysiere...",
+      "loading": "Lade Profil...",
+      "web": "Suche im Web..."
+    }
   }
 }

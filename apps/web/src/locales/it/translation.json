@@ -1,10 +1,10 @@
 {
   "nav": {
     "test": "Il Test",
-    "sectors": "Settori",
+    "sectors": "Aree",
     "growth": "Crescita",
-    "news": "News",
-    "premium": "Premium",
+    "news": "Notizie",
+    "premium": "Pro",
     "login": "Accedi",
     "startJourney": "Inizia il percorso",
     "back": "Indietro",
@@ -21,15 +21,15 @@
     "resources": "Risorse",
     "product": "Prodotto",
     "links": {
-      "test": "Il Test RIASEC",
+      "test": "Il Test di Personalità",
       "sectors": "Esplora settori",
       "growth": "Crescita Personale",
-      "news": "News settoriali",
-      "premium": "Piano Premium",
+      "news": "Notizie settoriali",
+      "premium": "Piano Pro",
       "contact": "Contatti",
       "about": "Chi siamo",
       "howItWorks": "Come funziona",
-      "affiliation": "Affiliazione",
+      "affiliation": "Partner",
       "privacy": "Privacy Policy",
       "terms": "Termini di servizio",
       "sitemap": "Mappa del sito"
@@ -55,6 +55,7 @@
     "seeAll": "Vedi tutti",
     "goBack": "Torna indietro",
     "search": "Cerca",
+    "searching": "Cerco...",
     "filter": "Filtra",
     "clearFilters": "Rimuovi tutti i filtri",
     "results": "risultati",
@@ -63,8 +64,8 @@
     "compare": "Confronta",
     "salary": "Stipendio",
     "growth": "Crescita",
-    "aiRisk": "Rischio AI",
-    "trend": "Trend mercato",
+    "aiRisk": "Rischio automazione",
+    "trend": "Andamento mercato",
     "min": "min"
   },
   "home": {
@@ -88,13 +89,14 @@
       "exploreAll": "Esplora tutti i 21 settori",
       "topThisWeek": "Più richiesto questa settimana",
       "deepen": "Approfondisci",
-      "compareWith": "Confronta con un altro settore"
+      "compareWith": "Confronta con un altro settore",
+      "heading": "Aree in crescita"
     },
     "personalized": {
       "badge": "Raccomandazioni personalizzate",
       "title": "I settori più adatti al tuo profilo",
       "sortedBy": "Ordinate per la tua preferenza:",
-      "fullDetail": "Dettaglio completo",
+      "fullDetail": "Vedi dettaglio",
       "chosen": "✓ Scelto"
     },
     "news": {
@@ -105,19 +107,222 @@
       "badge": "Come funziona",
       "title": "Tre passi verso la tua direzione",
       "step1Title": "Fai il test",
-      "step1Desc": "17 domande rapide per mappare le tue inclinazioni RIASEC e la tua Bussola Interiore.",
+      "step1Desc": "17 domande rapide per mappare le tue inclinazioni professionali e la tua Bussola Interiore.",
       "step2Title": "Scopri il tuo profilo",
       "step2Desc": "Il sistema elabora le tue risposte e ti mostra i settori più compatibili con la tua personalità.",
       "step3Title": "Costruisci il percorso",
       "step3Desc": "Esplora i settori consigliati, confrontali e scegli quello che risuona davvero con te.",
-      "startNow": "Inizia ora"
+      "startNow": "Inizia ora",
+      "heading": "Il percorso giusto per",
+      "headingHighlight": "te",
+      "subtitle": "Tre semplici passi per capire dove sei, dove vuoi arrivare e come arrivarci.",
+      "step1": {
+        "title": "Scegli il tuo profilo",
+        "desc": "Seleziona il percorso che ti rappresenta: indeciso, dipendente, autonomo, azienda o investitore.",
+        "label": "Scegli il percorso"
+      },
+      "step2": {
+        "title": "Completa il test",
+        "desc": "17 domande RIASEC per mappare la tua personalità professionale e preferenze di lavoro.",
+        "label": "Inizia il test gratuito"
+      },
+      "step3": {
+        "title": "Strumenti con AI",
+        "desc": "Piani personalizzati, analisi competenze, simulazione colloqui e guida AI.",
+        "label": "Scopri gli strumenti"
+      },
+      "stepLabel": "Passo"
+    },
+    "personas": {
+      "indeciso": {
+        "label": "Indeciso",
+        "tagline": "Non so ancora cosa fare",
+        "ctaLabel": "Fai il test gratuito",
+        "tools": [
+          "Test di personalità",
+          "Esplora aree",
+          "Coach AI"
+        ]
+      },
+      "dipendente": {
+        "label": "Dipendente",
+        "tagline": "Ho un lavoro e voglio crescere",
+        "ctaLabel": "Analizza le mie skill",
+        "tools": [
+          "Competenze",
+          "Simulatore colloquio",
+          "Piano di crescita"
+        ]
+      },
+      "autonomo": {
+        "label": "Autonomo",
+        "tagline": "Lavoro in proprio e voglio scalare",
+        "ctaLabel": "Valida la mia idea",
+        "tools": [
+          "Analisi idea",
+          "Piano attività",
+          "Coach AI"
+        ]
+      },
+      "azienda": {
+        "label": "Azienda",
+        "tagline": "Cerco il profilo giusto",
+        "ctaLabel": "Esplora i profili",
+        "tools": [
+          "Profili personalità",
+          "Aree in crescita",
+          "Partner"
+        ]
+      },
+      "investitore": {
+        "label": "Investitore",
+        "tagline": "Valuto opportunità di mercato",
+        "ctaLabel": "Vedi i trend",
+        "tools": [
+          "Aree in crescita",
+          "Analisi andamento",
+          "Mappa conoscenze"
+        ]
+      }
+    },
+    "journeyLabels": {
+      "indeciso": "Indeciso",
+      "dipendente": "Dipendente",
+      "autonomo": "Autonomo",
+      "azienda": "Azienda",
+      "investitore": "Investitore"
+    },
+    "nextStep": {
+      "indeciso": {
+        "label": "Fai il test",
+        "desc": "Scopri la tua personalità professionale"
+      },
+      "dipendente": {
+        "label": "Analizza le competenze",
+        "desc": "Identifica le competenze che ti mancano"
+      },
+      "autonomo": {
+        "label": "Valida la tua idea",
+        "desc": "Ricevi una valutazione della tua attività"
+      },
+      "azienda": {
+        "label": "Esplora i profili",
+        "desc": "Trova i profili più adatti al tuo team"
+      },
+      "investitore": {
+        "label": "Vedi i settori in crescita",
+        "desc": "Analizza andamento e opportunità del mercato italiano"
+      }
+    },
+    "tools": {
+      "indeciso": [
+        {
+          "title": "Test di personalità",
+          "desc": "17 domande per mappare la tua personalità"
+        },
+        {
+          "title": "Esplora aree",
+          "desc": "28 aree con stipendi e crescita"
+        },
+        {
+          "title": "Coach AI",
+          "desc": "Sessioni di consulenza personalizzate"
+        },
+        {
+          "title": "Notizie lavoro",
+          "desc": "Ultime notizie dal mercato"
+        }
+      ],
+      "dipendente": [
+        {
+          "title": "Competenze da sviluppare",
+          "desc": "Identifica cosa ti manca"
+        },
+        {
+          "title": "Simulatore Colloquio",
+          "desc": "Allenati con domande reali"
+        },
+        {
+          "title": "Consulente di carriera",
+          "desc": "Piano di crescita personalizzato"
+        },
+        {
+          "title": "Le mie candidature",
+          "desc": "Gestisci le tue richieste di lavoro"
+        }
+      ],
+      "autonomo": [
+        {
+          "title": "Analisi idea",
+          "desc": "Valutazione con AI dettagliata"
+        },
+        {
+          "title": "Consulente per la tua attività",
+          "desc": "Consigli strategici"
+        },
+        {
+          "title": "Mercati in crescita",
+          "desc": "Trova il settore più adatto"
+        },
+        {
+          "title": "Notizie imprese",
+          "desc": "Ultime novità"
+        }
+      ],
+      "azienda": [
+        {
+          "title": "Profili personalità",
+          "desc": "Trova il profilo psicologico ideale"
+        },
+        {
+          "title": "Partner",
+          "desc": "Pubblica la tua opportunità"
+        },
+        {
+          "title": "Notizie HR",
+          "desc": "Tendenze del mercato del lavoro"
+        },
+        {
+          "title": "Crescita aziendale",
+          "desc": "Articoli su cultura e team"
+        }
+      ],
+      "investitore": [
+        {
+          "title": "Aree in crescita",
+          "desc": "Analisi andamento del mercato italiano"
+        },
+        {
+          "title": "Notizie mercati",
+          "desc": "Ultime notizie economia e finanza"
+        },
+        {
+          "title": "Crescita settori",
+          "desc": "Dati e analisi per investire"
+        },
+        {
+          "title": "Mappa delle conoscenze",
+          "desc": "Collegamenti tra settori"
+        }
+      ]
+    },
+    "quickTools": {
+      "heading": "I tuoi strumenti",
+      "subheading": "Selezionati per il tuo percorso",
+      "dashboardLink": "Dashboard completa"
+    },
+    "hero": {
+      "badge": "Orientamento professionale personalizzato",
+      "heading": "Qual è il tuo",
+      "headingHighlight": "obiettivo?",
+      "subtitle": "NorthStar si adatta al tuo percorso. Scegli il profilo che ti rappresenta e ricevi strumenti e consigli su misura per te."
     }
   },
   "test": {
     "back": "Indietro",
     "questionOf": "Domanda {{current}} di {{total}}",
-    "innerCompass": "Bussola Interiore",
-    "innerCompassCount": "Bussola Interiore · {{current}} di {{total}}",
+    "innerCompass": "Dimensioni Motivazionali",
+    "innerCompassCount": "Dimensioni Motivazionali · {{current}} di {{total}}",
     "options": {
       "1": "Per niente",
       "2": "Poco",
@@ -126,104 +331,122 @@
       "5": "Moltissimo"
     },
     "ctxCount": "Calibrazione · {{current}} di {{total}}",
-    "ctxBadge": "Il tuo obiettivo · {{current}} di {{total}}",
+    "ctxBadge": "Contesto e Obiettivi · {{current}} di {{total}}",
     "transition": {
-      "badge": "Bussola Interiore",
-      "title": "Seconda parte: i Cinque Spiriti",
-      "intro": "Ottima analisi delle tue inclinazioni esterne. Ora esploriamo la tua energia interiore attraverso i",
-      "fiveSpirits": "Cinque Spiriti",
-      "tradition": "della tradizione cinese.",
-      "details": "Risponderai a <strong>15 domande</strong> — 3 per ciascuno spirito — per mappare con precisione il tuo equilibrio tra presenza, visione, istinto, analisi e volontà. Non ci sono risposte giuste o sbagliate: segui sempre il primo istinto.",
-      "startCompass": "Inizia la Bussola Interiore",
+      "badge": "Dimensioni Motivazionali",
+      "title": "Seconda parte: il tuo profilo motivazionale",
+      "intro": "Ottima analisi delle tue attitudini professionali. Ora esploriamo le cinque",
+      "fiveSpirits": "Dimensioni Motivazionali",
+      "tradition": "che determinano il tuo modo di lavorare, decidere e affrontare le sfide.",
+      "details": "Risponderai a <strong>15 domande</strong> — 3 per ciascuna dimensione — per mappare il tuo profilo psicologico professionale. Non ci sono risposte giuste o sbagliate: descrivi come sei realmente, non come vorresti essere.",
+      "startCompass": "Inizia l'analisi motivazionale",
       "spirits": {
         "presence": {
-          "name": "Presenza",
-          "desc": "Coscienza"
+          "name": "Intelligenza Emotiva",
+          "desc": "Autoconsapevolezza"
         },
         "vision": {
-          "name": "Visione",
-          "desc": "Direzione"
+          "name": "Orientamento Strategico",
+          "desc": "Visione a lungo termine"
         },
         "instinct": {
-          "name": "Istinto",
-          "desc": "Energia"
+          "name": "Motivazione e Impulso",
+          "desc": "Energia e iniziativa"
         },
         "focus": {
-          "name": "Focus",
-          "desc": "Analisi"
+          "name": "Pensiero Analitico",
+          "desc": "Precisione e metodo"
         },
         "tenacity": {
-          "name": "Tenacia",
-          "desc": "Volontà"
+          "name": "Resilienza",
+          "desc": "Perseveranza"
         }
       }
     },
     "transition2": {
       "badge": "Calibrazione finale",
-      "title": "Quasi alla fine — due ultime domande",
-      "subtitle": "Per affinare i tuoi risultati, rispondi a queste due domande sul tuo obiettivo concreto. Le tue risposte personalizzeranno ulteriormente i settori consigliati.",
+      "title": "Quasi alla fine — ultime domande",
+      "subtitle": "Per affinare i risultati in base al tuo percorso, rispondi a queste domande finali. Le tue risposte personalizzeranno i settori e i ruoli consigliati.",
       "card1Title": "Stile lavorativo",
       "card1Desc": "Autonomo, dipendente o ibrido?",
       "card2Title": "Direzione di carriera",
-      "card2Desc": "Nuovo percorso o sviluppare quello già desiderato?",
+      "card2Desc": "Nuovo percorso o sviluppare quello già intrapreso?",
       "start": "Continua"
     },
     "complete": {
       "title": "Analisi completata!",
-      "subtitle": "Abbiamo analizzato il tuo profilo RIASEC, la tua Bussola Interiore e i tuoi obiettivi. Siamo pronti a svelarti i settori più adatti a te.",
+      "subtitle": "Abbiamo elaborato il tuo profilo professionale e le tue dimensioni motivazionali. Siamo pronti a mostrarti i settori più compatibili con te.",
       "savedAccount": "I risultati verranno salvati automaticamente sul tuo account.",
       "discoverResults": "Scopri i tuoi risultati",
-      "processing": "Elaborazione…",
+      "processing": "Elaborazione in corso…",
       "submitError": "Errore nell'invio. Riprova."
     },
     "questions": {
       "ctx": {
-        "ctx_1": "Quando immagino il mio percorso lavorativo ideale, mi vedo come libero professionista o imprenditore — piuttosto che come dipendente di un'organizzazione.",
-        "ctx_2": "Sto cercando un percorso professionale nuovo e diverso da quello che avevo già in mente — più che rafforzare o scalare una direzione già chiara."
+        "ctx_1": "Quando immagino il mio percorso lavorativo ideale, mi vedo come libero professionista o imprenditore, piuttosto che come dipendente di un'organizzazione.",
+        "ctx_2": "Sto cercando un percorso professionale nuovo e diverso da quello che avevo già in mente, più che rafforzare o scalare una direzione già chiara.",
+        "ctx_dipendente_1": "Cerco un ruolo in cui la stabilità economica e un ambiente lavorativo solido e strutturato siano garantiti.",
+        "ctx_dipendente_2": "Sono disposto a costruire la mia carriera gradualmente all'interno di un'organizzazione, anche se richiede tempo e pazienza.",
+        "ctx_autonomo_1": "La libertà di scegliere i miei clienti, i miei orari e le mie modalità di lavoro vale per me più della sicurezza di un contratto fisso.",
+        "ctx_autonomo_2": "Sono pronto ad accettare l'incertezza economica tipica della libera professione pur di avere piena autonomia professionale.",
+        "ctx_azienda_1": "Ho l'ambizione concreta di costruire o scalare un'azienda, consapevole delle responsabilità e dei rischi che questo comporta.",
+        "ctx_azienda_2": "Sono disposto ad assumere rischi significativi e a rinunciare a stabilità immediata in cambio di un impatto più grande sul mercato.",
+        "ctx_investitore_1": "Il mio obiettivo principale è costruire asset e fonti di reddito che generino valore nel tempo, non solo un reddito da lavoro attivo.",
+        "ctx_investitore_2": "Preferisco analizzare e selezionare opportunità di investimento piuttosto che eseguire direttamente il lavoro operativo.",
+        "ctx_indeciso_1": "In questo momento sto esplorando attivamente diverse possibilità: non ho ancora una direzione professionale definita.",
+        "ctx_indeciso_2": "Sono aperto a scoprire settori e modalità di lavoro che non avevo ancora preso in considerazione."
       },
       "riasec": {
-        "q1": "Mi piace costruire, riparare e lavorare con strumenti concreti.",
-        "q2": "Mi piace analizzare dati, risolvere problemi logici e fare ricerca.",
-        "q3": "Mi piace esprimermi attraverso l'arte, il design, la scrittura o la musica.",
-        "q4": "Mi piace aiutare, insegnare e prendermi cura degli altri.",
-        "q5": "Mi piace guidare progetti, prendere decisioni e avviare nuove iniziative.",
-        "q6": "Mi piace organizzare, pianificare e seguire procedure ben definite.",
-        "q7": "Mi piace lavorare all'aperto o con strumenti fisici, più che in ufficio.",
-        "q8": "Mi affascina capire come funzionano le cose a livello profondo.",
-        "q9": "Mi piace avere libertà creativa e lavorare in ambienti flessibili e non rigidamente strutturati.",
-        "q10": "Mi importa che il mio lavoro abbia un impatto positivo sulle persone.",
-        "q11": "Mi viene naturale convincere gli altri, negoziare e guidare un gruppo.",
-        "q12": "Mi piace lavorare con precisione e curare ogni dettaglio."
+        "q1": "Costruire, riparare o lavorare con strumenti fisici mi viene naturale e mi dà soddisfazione concreta.",
+        "q2": "Analizzare dati, ragionare su problemi complessi e fare ricerca mi coinvolge e mi stimola profondamente.",
+        "q3": "Esprimermi attraverso forme creative — arte, design, scrittura o musica — è parte integrante di chi sono.",
+        "q4": "Aiutare le persone, insegnare e prendermi cura degli altri è qualcosa che trovo profondamente significativo.",
+        "q5": "Prendere l'iniziativa, guidare un gruppo verso un obiettivo e avviare nuovi progetti mi dà energia.",
+        "q6": "Organizzare, pianificare con metodo e seguire procedure strutturate mi fa sentire efficace e in controllo.",
+        "q7": "Preferisco ambienti di lavoro pratici e concreti — con spazio fisico e strumenti reali — rispetto a un ufficio sedentario.",
+        "q8": "Capire il perché delle cose — andare in profondità, oltre la superficie — è qualcosa che mi affascina.",
+        "q9": "Lavorare con libertà creativa, in ambienti flessibili dove posso portare la mia visione, è il mio contesto ideale.",
+        "q10": "Sapere che il mio lavoro ha un impatto concreto e positivo sulla vita delle persone è per me fondamentale.",
+        "q11": "Negoziare, persuadere e portare le persone verso una direzione condivisa mi riesce con naturalezza.",
+        "q12": "Lavorare con metodo, curare ogni dettaglio e garantire accuratezza è qualcosa che applico con piena soddisfazione.",
+        "q5_dipendente": "Contribuire efficacemente a un team, supportare chi coordina il lavoro e portare a termine i compiti assegnati mi soddisfa.",
+        "q11_dipendente": "Collaborare con i colleghi, condividere idee e trovare soluzioni insieme mi viene naturale e mi piace.",
+        "q5_autonomo": "Gestire in completa autonomia i miei progetti, senza dover rispondere a una gerarchia esterna, è ciò che cerco.",
+        "q6_autonomo": "Organizzare da solo il mio tempo, stabilire le mie priorità e lavorare senza routine imposte dall'esterno mi dà energia.",
+        "q5_azienda": "Definire la strategia, delegare le responsabilità e guidare un team verso obiettivi ambiziosi mi motiva profondamente.",
+        "q11_azienda": "Ispirare, motivare e sviluppare le competenze delle persone nel mio team è qualcosa che mi dà senso e soddisfazione.",
+        "q2_investitore": "Valutare rischi e opportunità attraverso l'analisi approfondita di dati, trend e scenari è il mio punto di forza naturale.",
+        "q8_investitore": "Comprendere i meccanismi economici, finanziari e di mercato è qualcosa che mi appassiona e che coltivo attivamente."
       },
       "spirits": {
-        "shen_1": "Mi sento spesso chiaro e centrato nelle mie emozioni, anche nei momenti difficili.",
-        "shen_2": "Mi accorgo facilmente quando il mio umore cambia e so come ritrovare l'equilibrio.",
-        "shen_3": "Mi riesce naturale essere presente e attento alle emozioni di chi mi sta vicino.",
-        "hun_1": "Mi è facile immaginare il mio futuro ideale e sentirlo concretamente possibile.",
-        "hun_2": "Mi entusiasmano spesso idee originali che mi spingono a esplorare strade nuove.",
-        "hun_3": "Mi sento guidato da un senso chiaro di direzione, anche quando il percorso non è ancora del tutto definito.",
-        "po_1": "Mi sento pieno di energia quando mi dedico a qualcosa che mi appassiona davvero.",
-        "po_2": "Mi fido delle mie sensazioni fisiche e istintive per capire se una situazione è giusta per me.",
-        "po_3": "Mi accorgo subito nel corpo — ancora prima che la mente lo elabori — se un ambiente mi piace o no.",
-        "yi_1": "Mi riesce facile mantenere la concentrazione a lungo su studio, analisi o risoluzione di problemi.",
-        "yi_2": "Mi soddisfa scomporre un problema complesso in parti più semplici e risolverlo passo dopo passo.",
-        "yi_3": "Mi riesce bene ricordare dettagli importanti e tenere in mente molte informazioni contemporaneamente.",
-        "zhi_1": "Mi impegno a portare avanti le mie decisioni anche quando diventano difficili o richiedono sacrifici.",
-        "zhi_2": "Mi viene naturale cercare una via per andare avanti, anche di fronte agli ostacoli.",
-        "zhi_3": "Mi mantengo costante verso i miei obiettivi anche nei momenti di stanchezza o scoraggiamento."
+        "shen_1": "Riconosco con chiarezza le mie emozioni e riesco a gestirle in modo costruttivo, anche nei momenti di maggiore pressione.",
+        "shen_2": "Mi accorgo facilmente quando il mio stato d'animo sta cambiando e so come ritrovare equilibrio e lucidità.",
+        "shen_3": "Essere presente e attento alle dinamiche emotive di chi mi sta vicino mi riesce in modo naturale e mi arricchisce.",
+        "hun_1": "Mi è facile costruire nella mente un'immagine chiara del mio futuro professionale e sentirla concretamente raggiungibile.",
+        "hun_2": "Le idee originali mi entusiasmano e mi spingono spesso a esplorare strade nuove, anche quando comportano incertezza.",
+        "hun_3": "Ho un senso chiaro della direzione che voglio prendere, anche quando il percorso per arrivarci non è ancora del tutto definito.",
+        "po_1": "Quando mi dedico a qualcosa che mi appassiona davvero, l'energia che sento è tangibile e difficile da ignorare.",
+        "po_2": "Mi fido delle mie sensazioni istintive per valutare se una situazione, un progetto o un ambiente sono giusti per me.",
+        "po_3": "Percepisco quasi fisicamente — prima ancora che la mente lo elabori — se un contesto di lavoro mi appartiene o meno.",
+        "yi_1": "Riesco a mantenere la concentrazione a lungo su attività complesse: studio, analisi, risoluzione di problemi tecnici.",
+        "yi_2": "Mi soddisfa scomporre un problema articolato in componenti più semplici e affrontarlo in modo metodico, passo dopo passo.",
+        "yi_3": "Tenere in mente molte informazioni contemporaneamente e ricordare i dettagli rilevanti è qualcosa che mi riesce con facilità.",
+        "zhi_1": "Porto avanti le mie decisioni e i miei impegni anche quando diventano difficili, richiedono sacrifici o incontrano resistenze.",
+        "zhi_2": "Di fronte agli ostacoli, la mia risposta naturale è cercare un modo per superarli, non fermarmi.",
+        "zhi_3": "Riesco a mantenere la rotta verso i miei obiettivi anche nei momenti di stanchezza o quando i risultati tardano ad arrivare."
       }
     }
   },
   "results": {
     "savedBanner": "Risultati salvati sul tuo account — li ritrovi sempre nel tuo profilo, {{name}}.",
-    "riasecProfile": "Il tuo profilo RIASEC",
-    "innerCompass": "Bussola Interiore",
-    "fiveSpirits": "I tuoi Cinque Spiriti · 15 domande, 3 per spirito",
-    "dominantSpirit": "Spirito dominante",
+    "riasecProfile": "Il tuo profilo professionale",
+    "innerCompass": "Dimensioni Motivazionali",
+    "fiveSpirits": "Le tue Dimensioni Motivazionali · 15 domande, 3 per dimensione",
+    "dominantSpirit": "Dimensione dominante",
     "yourSectors": "I tuoi settori consigliati",
     "sectorCount": "{{count}} settori compatibili con il tuo profilo",
     "workModeTitle": "Modalità di lavoro preferita",
-    "workModeSuggested": "Basata sul tuo profilo RIASEC, ti suggeriamo:",
+    "workModeSuggested": "Basata sul tuo profilo, ti suggeriamo:",
     "workModeQuestion": "Come preferisci lavorare?",
     "workModeConfirmed": "Preferenza salvata",
     "confirmSector": "Scelgo questo settore",
@@ -239,18 +462,18 @@
     "vs": "vs",
     "maxSalary": "Stipendio max",
     "annualGrowth": "Crescita annua",
-    "marketTrend": "Trend mercato",
+    "marketTrend": "Andamento mercato",
     "spirits": {
-      "shen": "Presenza",
-      "hun": "Visione",
-      "po": "Istinto",
-      "yi": "Focus",
-      "zhi": "Tenacia",
-      "shen_desc": "Coscienza & Presenza",
-      "hun_desc": "Visione & Direzione",
-      "po_desc": "Istinto & Energia",
-      "yi_desc": "Concentrazione & Analisi",
-      "zhi_desc": "Volontà & Resilienza"
+      "shen": "Intelligenza Emotiva",
+      "hun": "Orientamento Strategico",
+      "po": "Motivazione e Impulso",
+      "yi": "Pensiero Analitico",
+      "zhi": "Resilienza",
+      "shen_desc": "Riconoscere e gestire le proprie emozioni",
+      "hun_desc": "Capacità di visione e pianificazione a lungo termine",
+      "po_desc": "Energia, iniziativa e fiducia nelle proprie scelte",
+      "yi_desc": "Analisi, focus e gestione della complessità",
+      "zhi_desc": "Perseveranza e capacità di superare gli ostacoli"
     },
     "workModes": {
       "dipendente": "Dipendente",
@@ -278,11 +501,11 @@
       "misaligned": "⚠ Non allineato"
     },
     "aiSection": {
-      "title": "Analisi AI Approfondita",
+      "title": "Analisi approfondita",
       "loginDesc": "Accedi per sbloccare l'analisi AI personalizzata",
       "loadingDesc": "L'orchestratore AI sta elaborando il tuo profilo…",
       "planFree": "Piano gratuito · {{count}} professioni analizzate",
-      "planPremium": "Piano Premium · {{count}} professioni analizzate",
+      "planPremium": "Piano Pro · {{count}} professioni analizzate",
       "genericDesc": "Analisi personalizzata del tuo profilo RIASEC",
       "loginTitle": "Analisi AI Personalizzata",
       "loginBody": "Accedi per sbloccare l'analisi AI: professioni, percorsi formativi e modalità di lavoro consigliati per il tuo profilo.",
@@ -292,12 +515,12 @@
       "professionsTitle": "Professioni consigliate",
       "freeLabel": "Piano gratuito · 3 professioni",
       "workModeTitle": "Modalità lavorativa ottimale",
-      "premiumBadge": "Analisi Premium",
+      "premiumBadge": "Analisi Pro",
       "upsellTitle": "Sblocca l'analisi completa",
-      "upsellDesc": "Con Premium: 6 professioni, modalità lavorativa ottimale, percorsi formativi personalizzati e calendario azioni.",
+      "upsellDesc": "Con Pro: 6 professioni, modalità lavorativa ottimale, percorsi formativi personalizzati e calendario azioni.",
       "upsellBtn": "Sblocca",
       "educationTitle": "Percorsi formativi",
-      "dashboardLink": "Vai alla Dashboard AI completa"
+      "dashboardLink": "Vai al Pannello di controllo"
     },
     "statsFooterTitle": "Lo sapevi?",
     "statsFooterDesc": "{{count}} persone hanno già completato il test su NorthStar. I settori più scelti:"
@@ -757,20 +980,20 @@
     "compareNotSure": "Non sei sicuro? Metti a confronto",
     "compareDesc": "Confronta {{name}} con un altro settore affiancato",
     "compare": "Confronta",
-    "premiumTools": "Strumenti Premium",
-    "deepenWithAI": "Approfondisci con l'AI",
-    "wikiAI": "Wiki AI",
+    "premiumTools": "Strumenti Pro",
+    "deepenWithAI": "Approfondisci",
+    "wikiAI": "Guida AI",
     "wikiDesc": "Fai domande specifiche sul settore e ricevi risposte personalizzate dall'AI.",
     "openChat": "Apri la chat",
-    "roadmap": "Roadmap Dettagliata",
-    "roadmapDesc": "Piano step-by-step generato dall'AI per entrare nel settore con risorse concrete.",
+    "roadmap": "Piano di crescita",
+    "roadmapDesc": "Piano dettagliato generato dall'AI per entrare nel settore con risorse concrete.",
     "generatePlan": "Genera il piano",
-    "knowledgeGraph": "Grafo della Conoscenza",
+    "knowledgeGraph": "Mappa della Conoscenza",
     "graphDesc": "Visualizza ruoli, competenze e strumenti del settore in un grafo interattivo.",
     "exploreGraph": "Esplora il grafo",
     "tabs": {
       "overview": "Panoramica",
-      "career": "Percorso di Carriera",
+      "career": "Piano di Carriera",
       "skills": "Competenze",
       "data": "Dati & Trend"
     },
@@ -779,7 +1002,7 @@
     "opportunities": "Opportunità Future",
     "keySkills": "Competenze Chiave",
     "skillsDesc": "Per eccellere in questo settore, dovrai sviluppare questo set di competenze. Non preoccuparti se non le possiedi tutte ora, {{time}} è il tempo stimato per acquisirle.",
-    "careerPath": "Percorso di Carriera",
+    "careerPath": "Piano di Carriera",
     "employed": "Dipendente",
     "freelance": "Autonomo / Freelance",
     "employedDesc": "Percorso tipico per chi vuole lavorare come <strong>dipendente</strong> nel settore {{name}}. Stabile, strutturato, con progressione chiara.",
@@ -816,21 +1039,21 @@
     "italianMarketNote": "Mercato italiano"
   },
   "premium": {
-    "badge": "NorthStar Premium",
+    "badge": "NorthStar Pro",
     "title": "Sblocca il tuo pieno potenziale",
     "subtitle": "Vai oltre il test gratuito. Con Premium ottieni strumenti avanzati per trasformare le tue inclinazioni in un percorso professionale concreto.",
     "features": {
       "wiki": {
-        "title": "Wiki Personalizzata con AI",
+        "title": "Guida personalizzata",
         "desc": "Accedi a una knowledge base intelligente che risponde alle tue domande specifiche sul settore scelto."
       },
       "graph": {
-        "title": "Grafo della Conoscenza",
+        "title": "Mappa delle conoscenze",
         "desc": "Visualizza percorsi formativi, competenze e connessioni tra ruoli professionali in modo interattivo."
       },
       "roadmap": {
-        "title": "Roadmap Dettagliata",
-        "desc": "Ricevi un piano step-by-step personalizzato per entrare nel tuo settore ideale nei tempi stimati."
+        "title": "Piano di crescita",
+        "desc": "Ricevi un piano dettagliato personalizzato per entrare nel tuo settore ideale nei tempi stimati."
       },
       "updates": {
         "title": "Aggiornamenti in Tempo Reale",
@@ -840,15 +1063,15 @@
     "monthly": "Mensile",
     "yearly": "Annuale",
     "mostPopular": "Più Popolare",
-    "planName": "Piano Premium",
+    "planName": "Piano Pro",
     "planAccess": "Accesso completo a tutte le funzionalità",
     "perMonth": "/mese",
     "perYear": "/anno",
     "savingsMsg": "Equivale a €{{price}}/mese · Risparmi il 17%",
     "includes": {
-      "wiki": "Wiki AI personalizzata",
-      "graph": "Grafo della conoscenza",
-      "roadmap": "Roadmap step-by-step",
+      "wiki": "Guida AI personalizzata",
+      "graph": "Mappa delle conoscenze",
+      "roadmap": "Piano di crescita",
       "liveData": "Dati di mercato live",
       "support": "Supporto prioritario",
       "goals": "Obiettivi illimitati"
@@ -985,7 +1208,7 @@
     "reads": "letture"
   },
   "news": {
-    "title": "News dal mondo del lavoro",
+    "title": "Notizie dal mondo del lavoro",
     "badge": "Aggiornamenti dal mondo del lavoro",
     "subtitle": "Notizie aggiornate dai settori professionali che contano.",
     "allNews": "Tutte le notizie",
@@ -1017,13 +1240,13 @@
       "sectionTitle": "News per il tuo settore",
       "title": "Sblocca le News del tuo Settore",
       "desc": "Completa il test e conferma il tuo settore per ricevere notizie mirate: trend, opportunità di lavoro, aziende e certificazioni.",
-      "discoverPremium": "Scopri Premium",
+      "discoverPremium": "Scopri Pro",
       "takeTest": "Fai il test"
     },
     "categories": {
       "general": "Panoramica",
       "technology": "Tecnologia",
-      "business": "Business",
+      "business": "Economia",
       "science": "Scienza",
       "health": "Salute",
       "finance": "Finanza",
@@ -1038,7 +1261,12 @@
     },
     "read": "Leggi",
     "save": "Salva",
-    "saved": "Salvato"
+    "saved": "Salvato",
+    "myCategories": "Le mie categorie",
+    "subscribe": "Segui",
+    "subscribed": "Seguito",
+    "active": "attive",
+    "subscribeHint": "Clicca su una categoria per ricevere aggiornamenti personalizzati."
   },
   "profilo": {
     "title": "Il tuo profilo",
@@ -1063,7 +1291,7 @@
     "workMode": "Preferenza di lavoro",
     "workModeDesc": "Come preferisci lavorare? Questo influenza le raccomandazioni.",
     "favorites": "Preferiti",
-    "savedSectors": "Settori salvati",
+    "savedSectors": "Aree salvate",
     "savedNews": "Notizie salvate",
     "noSavedSectors": "Nessun settore salvato",
     "noSavedNews": "Nessuna notizia salvata",
@@ -1207,7 +1435,7 @@
         "title": "Rispondi al test",
         "subtitle": "12 domande, meno di 3 minuti",
         "description": "Il test NorthStar combina il modello RIASEC — validato scientificamente da oltre 60 anni di ricerca — con la Bussola Interiore dei Cinque Spiriti. Non ci sono risposte giuste o sbagliate: il sistema misura le tue inclinazioni naturali, non le tue conoscenze.",
-        "detail": "Le domande coprono 6 dimensioni di personalità professionale (Realistico, Investigativo, Artistico, Sociale, Imprenditivo, Convenzionale) e 5 qualità interiori (Presenza, Visione, Istinto, Focus, Tenacia)."
+        "detail": "Le domande coprono 6 dimensioni di personalità professionale (Realistico, Investigativo, Artistico, Sociale, Imprenditivo, Convenzionale) e 5 qualità interiori (Presenza, Visione, Istinto, Concentrazione, Tenacia)."
       },
       {
         "title": "Scopri il tuo profilo",
@@ -1262,7 +1490,7 @@
         "desc": "Energia intuitiva, velocità decisionale, fiducia nelle proprie sensazioni."
       },
       {
-        "key": "Focus",
+        "key": "Concentrazione",
         "desc": "Concentrazione profonda, analisi accurata, capacità di entrare nel dettaglio."
       },
       {
@@ -1273,7 +1501,7 @@
     "faq": [
       {
         "q": "Il test è gratuito?",
-        "a": "Sì, il test RIASEC + Bussola Interiore e le 3 raccomandazioni settoriali sono completamente gratuiti. Non è richiesta registrazione per completare il test. Le funzionalità premium (Wiki personalizzata, Roadmap dettagliata, Grafo della Conoscenza) richiedono un abbonamento."
+        "a": "Sì, il test + Bussola Interiore e le 3 raccomandazioni settoriali sono completamente gratuiti. Non è richiesta registrazione per completare il test. Le funzionalità Pro (Guida personalizzata, Piano di crescita, Mappa delle conoscenze) richiedono un abbonamento."
       },
       {
         "q": "Quanto tempo ci vuole per completare il test?",
@@ -1281,7 +1509,7 @@
       },
       {
         "q": "Il modello RIASEC è scientificamente valido?",
-        "a": "Sì. Il modello RIASEC (detto anche teoria di Holland) è stato sviluppato dallo psicologo John L. Holland negli anni '50 ed è uno dei modelli di orientamento professionale più studiati e validati al mondo, con oltre 500 ricerche peer-reviewed. È usato da università, aziende Fortune 500, centri per l'impiego e psicologi del lavoro in tutto il mondo."
+        "a": "Sì. Il modello di personalità (detto anche teoria di Holland) è stato sviluppato dallo psicologo John L. Holland negli anni '50 ed è uno dei modelli di orientamento professionale più studiati e validati al mondo, con oltre 500 ricerche scientifiche. È usato da università, aziende, centri per l'impiego e psicologi del lavoro in tutto il mondo."
       },
       {
         "q": "Cosa sono i Cinque Spiriti?",
@@ -1297,7 +1525,7 @@
       },
       {
         "q": "I dati di stipendio e crescita sono aggiornati?",
-        "a": "I dati di mercato (stipendi medi, tasso di crescita, rischio AI) si basano su fonti italiane aggiornate annualmente (ISTAT, EUROSTAT, rapporti settoriali). I range salariali rappresentano la forbice tipica per ruoli entry/mid/senior nel mercato italiano."
+        "a": "I dati di mercato (stipendi medi, tasso di crescita, rischio automazione) si basano su fonti italiane aggiornate annualmente (ISTAT, EUROSTAT, rapporti settoriali). I range salariali rappresentano la forbice tipica per ruoli iniziali/intermedi/senior nel mercato italiano."
       }
     ],
     "privacyBadge": "I tuoi dati sono al sicuro",
@@ -1346,7 +1574,7 @@
       },
       {
         "value": "feedback",
-        "label": "Feedback e suggerimenti"
+        "label": "Opinioni e suggerimenti"
       },
       {
         "value": "altro",
@@ -1587,16 +1815,16 @@
     "startTest": "Inizia il test gratuito",
     "sectorDesc": "Panoramica, dati e match",
     "wikiDesc": "Contenuti AI approfonditi",
-    "roadmapDesc": "Percorso step-by-step",
+    "roadmapDesc": "Piano step-by-step",
     "grafoDesc": "Visualizzazione AI interattiva",
     "groups": {
       "main": "Principale",
       "sectors": "Esplora settori",
       "brand": "Prodotto e brand",
-      "sectorPages": "Settori professionali",
-      "wiki": "Wiki per settore",
-      "roadmap": "Roadmap di carriera",
-      "grafo": "Grafo della conoscenza"
+      "sectorPages": "Aree professionali",
+      "wiki": "Guide per settore",
+      "roadmap": "Piano di carriera",
+      "grafo": "Mappa delle conoscenze"
     },
     "items": {
       "home": {
@@ -1680,13 +1908,13 @@
     ]
   },
   "roadmap": {
-    "title": "Roadmap",
-    "subtitle": "Il tuo piano step-by-step per entrare nel settore.",
-    "generate": "Genera roadmap",
+    "title": "Piano di crescita",
+    "subtitle": "Il tuo piano dettagliato per entrare nel settore.",
+    "generate": "Genera piano",
     "generating": "Generazione in corso…",
-    "premiumRequired": "Funzione Premium",
-    "premiumDesc": "Accedi a Premium per generare la tua roadmap personalizzata.",
-    "upgrade": "Passa a Premium",
+    "premiumRequired": "Funzione Pro",
+    "premiumDesc": "Accedi a Pro per generare il tuo piano personalizzato.",
+    "upgrade": "Passa a Pro",
     "accessRequired": "Accesso richiesto",
     "accessRequiredDesc": "Registrati gratuitamente per generare la tua roadmap personalizzata.",
     "registerFree": "Registrati gratis",
@@ -1696,25 +1924,25 @@
     "milestone": "Traguardo",
     "pathToward": "Il tuo percorso verso {{name}}",
     "generateDesc": "Genera un piano step-by-step personalizzato con fasi, azioni concrete, risorse consigliate e traguardi misurabili per entrare nel settore.",
-    "generateCta": "Genera la mia Roadmap",
-    "building": "Costruendo la tua roadmap…",
-    "buildingDesc": "L'AI sta analizzando il settore e costruendo un piano su misura per te",
+    "generateCta": "Genera il mio piano",
+    "building": "Creazione del piano…",
+    "buildingDesc": "Analisi del settore e costruzione di un piano su misura per te",
     "totalDuration": "Durata totale",
     "phasesCount": "Fasi del percorso",
     "concreteActionsCount": "Azioni concrete",
-    "phasesTimeline": "Le Fasi del Percorso",
+    "phasesTimeline": "Le Fasi del Piano",
     "salaryEvolution": "Evoluzione Salariale",
-    "topRoles": "Ruoli a cui puoi aspirare",
+    "topRoles": "Lavori a cui puoi aspirare",
     "keyTip": "Consiglio chiave",
-    "regenerate": "Rigenera la roadmap",
-    "detailed": "Roadmap Dettagliata"
+    "regenerate": "Rigenera",
+    "detailed": "Piano di crescita"
   },
   "grafo": {
-    "title": "Grafo della Conoscenza",
+    "title": "Mappa della Conoscenza",
     "subtitle": "Visualizza ruoli, competenze e strumenti del settore.",
     "generating": "Generazione grafo…",
-    "premiumRequired": "Funzione Premium",
-    "upgrade": "Passa a Premium",
+    "premiumRequired": "Funzione Pro",
+    "upgrade": "Passa a Pro",
     "accessRequired": "Accesso richiesto",
     "accessRequiredDesc": "Registrati gratuitamente per esplorare il grafo della conoscenza.",
     "registerFree": "Registrati gratis",
@@ -1730,10 +1958,10 @@
     "nodeDescription": "Descrizione (opzionale)",
     "nodeDescPlaceholder": "Breve descrizione...",
     "errorResponse": "Errore nella generazione della risposta. Riprova.",
-    "tabGraph": "Grafo",
-    "tabChat": "Chiedi al Grafo",
-    "chatTitle": "Chiedi al Grafo",
-    "chatDesc": "L'AI risponde usando i nodi del grafo come base di conoscenza. Puoi chiedere di ruoli, competenze, connessioni o percorsi.",
+    "tabGraph": "Mappa",
+    "tabChat": "Chiedi alla Mappa",
+    "chatTitle": "Chiedi alla Mappa",
+    "chatDesc": "L'intelligenza artificiale risponde usando i nodi della mappa come base di conoscenza. Puoi chiedere di ruoli, competenze, connessioni o percorsi.",
     "chatQuestion1": "Quali competenze devo sviluppare per diventare un ruolo chiave?",
     "chatQuestion2": "Quali strumenti devo imparare come priorità?",
     "chatQuestion3": "Quali certificazioni sono più utili per entrare nel settore?",
@@ -1765,8 +1993,8 @@
     "metrics": {
       "salary": "Stipendio",
       "growth": "Crescita",
-      "risk": "Rischio AI",
-      "trend": "Trend"
+      "risk": "Rischio automazione",
+      "trend": "Andamento"
     },
     "badgeLabel": "Confronto settori",
     "headline": "Metti a confronto",
@@ -1789,7 +2017,7 @@
     "maximum": "Massimo: €{{amount}}k/anno",
     "annualGrowth": "Crescita annua",
     "automationRisk": "Rischio automazione",
-    "marketTrend": "Trend di mercato",
+    "marketTrend": "Andamento di mercato",
     "timeToAutonomy": "Tempo per lavorare autonomamente",
     "riasecType": "Tipo di personalità adatto (RIASEC)",
     "requiredSkills": "Competenze richieste",
@@ -1797,7 +2025,7 @@
     "commonSkillsHint": "evidenziate in verde",
     "advantages": "Vantaggi",
     "considerations": "Da considerare",
-    "futureOpportunities": "Ruoli e opportunità future",
+    "futureOpportunities": "Lavori e opportunità future",
     "deepen": "Approfondisci",
     "notSure": "Non sei sicuro?",
     "takeFreeTest": "Fai il test gratuito",
@@ -1819,7 +2047,7 @@
     }
   },
   "affiliazione": {
-    "title": "Affiliazione",
+    "title": "Partner",
     "subtitle": "Porta NorthStar nella tua organizzazione.",
     "schools": "Scuole",
     "universities": "Universita'",
@@ -2065,19 +2293,19 @@
     "resetting": "Reimpostazione…"
   },
   "premiumSuccess": {
-    "title": "Benvenuto in Premium!",
+    "title": "Benvenuto in Pro!",
     "subtitle": "Il tuo account è ora aggiornato. Hai accesso a tutte le funzionalità.",
-    "goHome": "Vai alla dashboard",
-    "badge": "Benvenuto in Premium",
+    "goHome": "Vai al pannello di controllo",
+    "badge": "Benvenuto in Pro",
     "activated": "Abbonamento attivato!",
-    "desc": "Il tuo accesso Premium è ora attivo. Puoi iniziare subito ad esplorare la Wiki AI, il grafo della conoscenza e la tua roadmap personalizzata.",
+    "desc": "Il tuo accesso Pro è ora attivo. Puoi iniziare subito ad esplorare la guida AI, la mappa delle conoscenze e il tuo piano di crescita personalizzato.",
     "exploreNow": "Esplora ora",
     "retakeTest": "Rifai il test"
   },
   "utente": {
     "notFound": "Utente non trovato",
     "profile": "Profilo",
-    "sectors": "Settori esplorati",
+    "sectors": "Aree esplorate",
     "noPublicInfo": "Questo profilo è privato.",
     "notFoundDesc": "Questo profilo non esiste o non è accessibile.",
     "backToFriends": "Torna agli amici",
@@ -2099,13 +2327,13 @@
   },
   "workMode": {
     "dipendente": "Dipendente",
-    "autonomo": "Autonomo/Freelance",
+    "autonomo": "Libero professionista",
     "ibrido": "Ibrido"
   },
   "seo": {
     "home": {
       "title": "NorthStar — Scopri la tua direzione professionale",
-      "description": "Fai il test RIASEC gratuito e scopri i settori professionali più adatti alla tua personalità. Dati reali su salari, crescita e rischio AI."
+      "description": "Fai il test gratuito e scopri i settori professionali più adatti alla tua personalità. Dati reali su salari, crescita e rischio automazione."
     },
     "test": {
       "title": "Il Test di Orientamento — NorthStar",
@@ -2113,11 +2341,11 @@
     },
     "sectors": {
       "title": "Esplora i 21 settori professionali",
-      "description": "Sfoglia tutti i settori professionali italiani. Filtra per tipo RIASEC, rischio automazione AI e trend di mercato."
+      "description": "Sfoglia tutti i settori professionali italiani. Filtra per tipo, rischio automazione e andamento di mercato."
     },
     "premium": {
-      "title": "NorthStar Premium — Strumenti avanzati di orientamento",
-      "description": "Wiki AI personalizzata, roadmap dettagliate, grafo della conoscenza e dati di mercato live."
+      "title": "NorthStar Pro — Strumenti avanzati di orientamento",
+      "description": "Guide AI personalizzate, piani di crescita, mappa delle conoscenze e dati di mercato live."
     },
     "growth": {
       "title": "Crescita Personale — NorthStar",
@@ -2125,7 +2353,7 @@
     },
     "news": {
       "title": "News dal mondo del lavoro — NorthStar",
-      "description": "Le ultime notizie sui settori professionali: tecnologia, business, finanza, salute e molto altro."
+      "description": "Le ultime notizie sui settori professionali: tecnologia, economia, finanza, salute e molto altro."
     },
     "sectorTitle": "{{name}} — Settore professionale",
     "sectorDescSuffix": "Stipendio medio €{{min}}k–{{max}}k, crescita annua +{{rate}}%, {{trend}}, {{risk}}.",
@@ -2145,8 +2373,8 @@
     "confirmedPath": "Il tuo percorso confermato",
     "confirmed": "Confermato",
     "compatibility": "{{score}}% di compatibilità",
-    "sectorRoadmap": "Roadmap del settore",
-    "competenceGraph": "Grafo delle competenze",
+    "sectorRoadmap": "Piano di crescita",
+    "competenceGraph": "Mappa delle competenze",
     "yourProgress": "Il tuo progresso",
     "objectivesLoading": "Obiettivi",
     "objectivesCompleted": "{{done}} / {{total}} obiettivi completati",
@@ -2159,7 +2387,7 @@
     "yourResults": "I tuoi risultati",
     "fullDetail": "Dettaglio completo",
     "chosen": "✓ Scelto",
-    "matchScore": "{{score}}% match",
+    "matchScore": "{{score}}% compatibilità",
     "recommendedGrowth": "Crescita consigliata",
     "articlesForProfile": "Articoli per il tuo profilo",
     "articlesComingSoon": "Gli articoli personalizzati saranno disponibili a breve.",
@@ -2176,7 +2404,7 @@
     "myResume": "Il mio Curriculum",
     "uploadedAt": "Caricato {{date}}. Usalo per generare il tuo CV ottimizzato con il grafo.",
     "uploadedRecently": "Caricato recentemente. Usalo per generare il tuo CV ottimizzato con il grafo.",
-    "generateCv": "Genera CV",
+    "generateCv": "Genera curriculum",
     "generateWithout": "Genera senza CV",
     "skillsDetected": "Competenze rilevate ({{count}})",
     "toolsCount": "Strumenti ({{count}})",
@@ -2186,7 +2414,7 @@
     "education": "Formazione",
     "certifications": "Certificazioni",
     "languages": "Lingue",
-    "addToGraph": "Aggiungi al Grafo delle Conoscenze",
+    "addToGraph": "Aggiungi alla Mappa delle Conoscenze",
     "suggestedNodes": "{{count}} nodi suggeriti dal tuo CV",
     "clickToAdd": "Clicca per aggiungere i nodi al grafo del settore.",
     "openGraph": "Apri il grafo →",
@@ -2204,7 +2432,7 @@
     "addPlaceholder": "Aggiungi...",
     "featureGraph": "Integrazione Grafo",
     "featureGraphDesc": "Suggerisce nodi skill/tool da aggiungere al grafo del tuo settore",
-    "featureCv": "CV Ottimizzato",
+    "featureCv": "Curriculum ottimizzato",
     "featureCvDesc": "Genera un CV professionale basato sul grafo e il profilo RIASEC",
     "featurePrint": "Stampa & Scarica",
     "featurePrintDesc": "Esporta il CV generato in PDF con un click dal browser",
@@ -2262,7 +2490,7 @@
     "generatingDescWithCv": " e il tuo CV",
     "errorGenerating": "Errore nella generazione",
     "retry": "Riprova",
-    "livePreview": "Preview live →",
+    "livePreview": "Anteprima →",
     "noTabMobile": "Modifica",
     "previewTabMobile": "Anteprima",
     "editCv": "Modifica il CV",
@@ -2274,10 +2502,10 @@
     "adaptCvTitle": "Adatta CV all'Offerta",
     "howItWorks": "Come funziona",
     "tailorSteps": [
-      "L'AI analizza il testo dell'offerta di lavoro",
+      "L'intelligenza artificiale analizza il testo dell'offerta di lavoro",
       "Riscrive il profilo e le descrizioni per evidenziare le competenze richieste",
-      "Riordina skills e strumenti per massimizzare il match ATS",
-      "NON inventa esperienze: lavora solo su ciò che hai già nel CV"
+      "Riordina competenze e strumenti per massimizzare la compatibilità ATS",
+      "NON inventa esperienze: lavora solo su ciò che hai già nel curriculum"
     ],
     "jobPostingLabel": "Testo dell'offerta di lavoro",
     "jobPostingPlaceholder": "Incolla qui il testo completo dell'offerta...\n\nEs.:\nStiamo cercando un Software Engineer...\nRequisiti: React, TypeScript, Node.js...\nResponsabilità: sviluppo frontend...",
@@ -2411,10 +2639,10 @@
     "linkedSector": "Settore di riferimento",
     "noSector": "Nessun settore",
     "suggestedContent": "Contenuti suggeriti per {{name}}",
-    "wikiLabel": "Articoli Wiki",
-    "roadmapLabel": "Roadmap di settore",
+    "wikiLabel": "Guide",
+    "roadmapLabel": "Piano di settore",
     "growthLabel": "Percorsi di crescita",
-    "premiumNote": "Passa a Premium per vedere wiki, roadmap e percorsi collegati a {{name}}.",
+    "premiumNote": "Passa a Pro per vedere guide, piani e percorsi collegati a {{name}}.",
     "linkedGoal": "Obiettivo collegato",
     "linkedGoalPlaceholder": "Collega a un obiettivo...",
     "noGoal": "Nessun obiettivo",
@@ -2422,13 +2650,13 @@
     "linkedGoalInput": "Es. Trovare lavoro nel settore tech...",
     "reminders": "Promemoria",
     "premiumReminders": "I promemoria a 10 min e 24h sono disponibili per gli utenti Premium.",
-    "upgradePremium": "Passa a Premium →",
+    "upgradePremium": "Passa a Pro →",
     "delete": "Elimina",
     "cancel": "Annulla",
     "saveChanges": "Salva modifiche",
     "createEvent": "Crea evento",
     "freeLimitTitle": "Limite raggiunto",
-    "premiumFeatureTitle": "Funzione Premium",
+    "premiumFeatureTitle": "Funzione Pro",
     "premiumFeatureDesc": "Passa a Premium per usare questi promemoria.",
     "errorTitle": "Errore",
     "networkError": "Errore di rete",
@@ -2441,7 +2669,7 @@
       "interview": "Colloquio",
       "deadline": "Scadenza",
       "task": "Attività",
-      "follow-up": "Follow-up"
+      "follow-up": "Verifica"
     },
     "priorities": {
       "low": "Bassa",
@@ -2476,7 +2704,34 @@
     "exploreSector": "Esplora il Settore",
     "exploreSectorDesc": "Scopri tutte le opportunità nel settore {{sector}}",
     "noRoles": "Nessun ruolo disponibile per questo settore.",
-    "rolesTab": "Ruoli",
+    "rolesTab": "Lavori",
     "viewRole": "Scopri di più"
+  },
+  "search": {
+    "placeholder": "Cerca settori, ruoli, articoli...",
+    "noResults": "Nessun risultato per \"{{query}}\"",
+    "sectors": "Aree",
+    "roles": "Lavori",
+    "articles": "Articoli",
+    "news": "News",
+    "hint": "Cerca in tutta la piattaforma",
+    "suggestions": "Consigliati",
+    "askWendy": "Chiedi a Wendy: \"{{query}}\"",
+    "askWendyDesc": "Parla con l'assistente AI per approfondire"
+  },
+  "wendy": {
+    "placeholder": "Scrivi a Wendy...",
+    "send": "Invia",
+    "stop": "Ferma",
+    "voice": "Voce",
+    "clear": "Nuova chat",
+    "status": {
+      "thinking": "Sto elaborando...",
+      "searching": "Cerco nella knowledge base...",
+      "writing": "Scrivo la risposta...",
+      "analyzing": "Analizzo il contesto...",
+      "loading": "Carico il tuo profilo...",
+      "web": "Cerco sul web..."
+    }
   }
 }

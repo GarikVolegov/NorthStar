@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-05-14T16:23:05.8982913Z",
+  "printing_press_version": "4.6.1",
+  "api_name": "northstar",
+  "display_name": "Northstar",
+  "cli_name": "northstar-pp-cli",
+  "owner": "garik-v",
+  "printer_name": "Garik V.",
+  "spec_path": "C:\\Users\\osman\\Documents\\GitHub\\NorthStar\\packages\\api-spec\\openapi.yaml",
+  "spec_format": "openapi3",
+  "spec_checksum": "sha256:35730974eb268ef0acc88050e368ea849fd03d0995a0ddf5dcbea25f22d8056f",
+  "mcp_binary": "northstar-pp-mcp",
+  "mcp_tool_count": 26,
+  "mcp_ready": "full",
+  "api_version": "0.1.0",
+  "auth_type": "bearer_token",
+  "auth_env_vars": [
+    "API_BEARER_AUTH"
+  ]
+}

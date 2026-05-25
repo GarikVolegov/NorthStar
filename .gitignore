@@ -27,6 +27,7 @@ node_modules
 
 # ── Database ───────────────────────────────────────────────────────────────
 *.sql
+!packages/db/drizzle/*.sql
 *.db
 *.sqlite
 *.sqlite3
@@ -45,6 +46,9 @@ test-results/
 playwright-report/
 coverage/
 /typings
+graphify-out/
+apps/graphify-out/
+packages/graphify-out/
 
 # ── Temporary & backup files ───────────────────────────────────────────────
 *.tmp
@@ -75,7 +79,20 @@ Thumbs.db
 # ── Replit-specific ────────────────────────────────────────────────────────
 .cache/
 .local/
-attached_assets/
+.vercel/
+apps/server/api/index.js
+apps/server/api/index.cjs
+
+# Go CLI binaries (build artifacts)
+.tools/printed-clis/*/bin/
+.tools/printed-clis/*/northstar-pp-*.exe
+cli-printing-press/printing-press.exe
+
+# Go local installations
+go-install/
+go123-install/
+
+docs/attached_assets/
 skills-lock.json
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md

@@ -1,8 +1,8 @@
-// FIX #7: single in-memory token ref — avoids stale localStorage reads
+import { AUTH_EXPIRED_EVENT, TOKEN_STORAGE_KEY } from "@/lib/storage-keys";
+
+// FIX #7: single in-memory token ref — avoids stale sessionStorage reads
 // when apiFetch is called in the same frame as login/logout
 let _tokenRef: string | null = null;
-
-export const AUTH_EXPIRED_EVENT = "northstar:auth-expired";
 
 /**
  * Call this whenever the auth token changes (login/logout).
@@ -20,9 +20,8 @@ export function setInMemoryToken(token: string | null) {
  * 3. Dispatches AUTH_EXPIRED_EVENT on 401 (only when a token was sent)
  */
 export function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
-  // In-memory ref is authoritative; localStorage is the fallback for page refresh
-  const TOKEN_STORAGE_KEY = "northstar_token";
-  const token = _tokenRef ?? localStorage.getItem(TOKEN_STORAGE_KEY);
+  // In-memory ref is authoritative; sessionStorage is the fallback for page refresh
+  const token = _tokenRef ?? sessionStorage.getItem(TOKEN_STORAGE_KEY);
 
   const headers = new Headers(init.headers);
   const hasAuthHeader = headers.has("Authorization");

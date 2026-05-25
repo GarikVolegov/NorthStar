@@ -1,39 +1,55 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
-import { apiFetch } from "@/lib/api-fetch";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, GitCompare, Trophy } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
-
-const BASE = import.meta.env.BASE_URL || "/";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, GitCompare, Trophy } from "lucide-react";
+import { Link } from "wouter";
 
 interface TestSession {
   id: number;
   primaryTypes: string[];
   riasecScores: Record<string, number>;
-  recommendations: Array<{ sectorId: number; sectorName: string; matchScore: number }>;
+  recommendations: Array<{
+    sectorId: number;
+    sectorName: string;
+    matchScore: number;
+  }>;
   createdAt: string;
   confirmedSectorId: number | null;
 }
 
 const RIASEC_META: Record<string, { label: string; color: string }> = {
-  R: { label: "Realista",        color: "bg-amber-50  text-amber-700  border-amber-200" },
-  I: { label: "Investigativo",   color: "bg-blue-50   text-blue-700   border-blue-200" },
-  A: { label: "Artistico",       color: "bg-violet-50 text-violet-700 border-violet-200" },
-  S: { label: "Sociale",         color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  E: { label: "Intraprendente",  color: "bg-orange-50 text-orange-700 border-orange-200" },
-  C: { label: "Convenzionale",   color: "bg-slate-50  text-slate-700  border-slate-200" },
+  R: {
+    label: "Realista",
+    color: "bg-amber-50  text-amber-700  border-amber-200",
+  },
+  I: {
+    label: "Investigativo",
+    color: "bg-blue-50   text-blue-700   border-blue-200",
+  },
+  A: {
+    label: "Artistico",
+    color: "bg-violet-50 text-violet-700 border-violet-200",
+  },
+  S: {
+    label: "Sociale",
+    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
+  E: {
+    label: "Intraprendente",
+    color: "bg-orange-50 text-orange-700 border-orange-200",
+  },
+  C: {
+    label: "Convenzionale",
+    color: "bg-slate-50  text-slate-700  border-slate-200",
+  },
 };
 
 export function TestHistoryCard() {
   const { data: sessions = [], isLoading } = useQuery<TestSession[]>({
     queryKey: ["test-history"],
-    queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/test-sessions/history`);
-      if (!res.ok) throw new Error("Errore");
-      return res.json();
-    },
+    queryFn: () => getJson<TestSession[]>("/api/test-sessions/history"),
     staleTime: 60_000,
     retry: false,
   });
@@ -45,7 +61,8 @@ export function TestHistoryCard() {
           <Trophy className="w-4 h-4 text-primary" /> Cronologia test
           {sessions.length > 0 && (
             <span className="ml-auto text-xs font-normal text-muted-foreground">
-              {sessions.length} {sessions.length === 1 ? "sessione" : "sessioni"}
+              {sessions.length}{" "}
+              {sessions.length === 1 ? "sessione" : "sessioni"}
             </span>
           )}
         </CardTitle>
@@ -54,7 +71,10 @@ export function TestHistoryCard() {
         {isLoading ? (
           <div className="space-y-2">
             {[1, 2].map((i) => (
-              <div key={i} className="h-[72px] bg-muted rounded-xl animate-pulse" />
+              <div
+                key={i}
+                className="h-[72px] bg-muted rounded-xl animate-pulse"
+              />
             ))}
           </div>
         ) : sessions.length === 0 ? (
@@ -103,7 +123,12 @@ export function TestHistoryCard() {
                           </span>
                         )}
                         {meta && (
-                          <span className={cn("text-xs border rounded-full px-2 py-0.5", meta.color)}>
+                          <span
+                            className={cn(
+                              "text-xs border rounded-full px-2 py-0.5",
+                              meta.color,
+                            )}
+                          >
                             {meta.label}
                           </span>
                         )}
@@ -139,7 +164,8 @@ export function TestHistoryCard() {
                   size="sm"
                   className="w-full rounded-xl gap-2 mt-1"
                 >
-                  <GitCompare className="w-3.5 h-3.5" /> Confronta ultime due sessioni
+                  <GitCompare className="w-3.5 h-3.5" /> Confronta ultime due
+                  sessioni
                 </Button>
               </Link>
             )}

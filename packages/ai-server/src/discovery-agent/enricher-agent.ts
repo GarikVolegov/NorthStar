@@ -42,11 +42,13 @@
  *   Chiamato ogni 2h dal cron (jobs/cron.ts).
  *   Può essere triggerato manualmente via POST /api/admin/discovery/enrich.
  */
+import { logger } from "../logger";
 import { openai } from "../client";
 import { db }     from "@workspace/db";
 import { discoveryItemsTable } from "@workspace/db";
-import { eq, and, lt, isNull, or, asc, desc, sql } from "drizzle-orm";
+import { eq, and, lt, desc } from "drizzle-orm";
 import type { DiscoveryItem } from "@workspace/db";
+import { selectModelFor } from "../model-router";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -150,7 +152,7 @@ async function pLimit<T>(
   tasks:       Array<() => Promise<T>>,
   concurrency: number,
 ): Promise<Array<T | Error>> {
-  const results: Array<T | Error> = new Array(tasks.length);
+  const results: Array<T | Error> = new Array<T | Error>(tasks.length);
   let index = 0;
 
   async function worker() {
@@ -179,9 +181,10 @@ async function callGPT(item: DiscoveryItem): Promise<EnrichmentResult> {
     `Settori: ${(item.sectorNames ?? []).join(", ")}`,
   ].join("\n");
 
+  const route = selectModelFor("discovery-enrich");
   const res = await withRetry(() =>
     openai.chat.completions.create({
-      model:           "gpt-4o-mini",
+      model:           route.model,
       messages: [
         { role: "system", content: ENRICHER_SYSTEM },
         { role: "user",   content: userPrompt },
@@ -192,8 +195,13 @@ async function callGPT(item: DiscoveryItem): Promise<EnrichmentResult> {
     })
   );
 
-  const raw    = res.choices[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(raw) as Partial<EnrichmentResult>;
+  const raw = res.choices[0]?.message?.content ?? "{}";
+  let parsed: Partial<EnrichmentResult> = {};
+  try {
+    parsed = JSON.parse(raw) as Partial<EnrichmentResult>;
+  } catch {
+    logger.warn({ raw: raw.slice(0, 200) }, "[enricher] JSON parse failed, using defaults");
+  }
 
   return {
     relevanceScore: typeof parsed.relevanceScore === "number"
@@ -208,7 +216,7 @@ async function callGPT(item: DiscoveryItem): Promise<EnrichmentResult> {
     journeyTypes: Array.isArray(parsed.journeyTypes)
       ? parsed.journeyTypes.map(String)
       : ["general"],
-    difficulty: (["easy", "medium", "advanced"] as const).includes(parsed.difficulty as string)
+    difficulty: (["easy", "medium", "advanced"] as const).includes(parsed.difficulty!)
       ? (parsed.difficulty as "easy" | "medium" | "advanced")
       : null,
   };
@@ -337,6 +345,6 @@ export async function runEnricher(
     errors,
   };
 
-  console.log(`[enricher] run complete:`, result);
+  logger.info({ processed: result.processed, enriched: result.enriched, skipped: result.skipped, filtered: result.filtered, durationMs: result.durationMs }, "[enricher] run complete");
   return result;
 }

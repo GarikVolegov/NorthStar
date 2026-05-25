@@ -1,16 +1,22 @@
-import { useState, useMemo } from "react";
-import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { usePageMeta } from "@/lib/seo";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
+import { getJson } from "@/lib/apiClient";
+import { RIASEC_LABELS, SectorIcon } from "@/lib/sector-icon";
+import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 import {
-  Search, Briefcase, TrendingUp, DollarSign,
-  ArrowRight, SlidersHorizontal, X, Zap,
+  ArrowRight,
+  Briefcase,
+  DollarSign,
+  Search,
+  SlidersHorizontal,
+  TrendingUp,
+  X, Zap,
 } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -104,7 +110,7 @@ function RoleCard({ role }: { role: Role }) {
         </div>
 
         <div className="mt-2.5 flex items-center text-primary text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-          Scopri il ruolo <ArrowRight className="w-3 h-3 ml-1" />
+          Scopri il lavoro <ArrowRight className="w-3 h-3 ml-1" />
         </div>
       </div>
     </Link>
@@ -112,33 +118,28 @@ function RoleCard({ role }: { role: Role }) {
 }
 
 export default function Ruoli() {
-  const { t } = useTranslation();
-
   usePageMeta({
-    title: "Ruoli Professionali — NorthStar",
-    description: "Esplora tutti i ruoli e le professioni disponibili per settore. Scopri competenze, stipendi e prospettive di crescita per ogni professione.",
+    title: "Lavori Professionali — NorthStar",
+    description: "Esplora tutti i lavori e le professioni disponibili per settore. Scopri competenze, stipendi e prospettive di crescita per ogni professione.",
     path: "/ruoli",
+  });
+  useWendyPageContext({
+    page: "ruoli",
+    title: "Ruoli",
+    capabilities: ["navigate", "set_filters"],
+    fields: ["search", "sectorId", "riasecTypes"],
+    actions: ["Filtra ruoli", "Apri ruolo", "Confronta professioni"],
   });
 
   const { data: roles = [], isLoading } = useQuery<Role[]>({
     queryKey: ["all-roles"],
-    queryFn: async () => {
-      const res = await fetch(`${BASE}api/roles`);
-      if (!res.ok) throw new Error("Errore caricamento ruoli");
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
-    },
+    queryFn: () => getJson<Role[]>(`${BASE}api/roles`),
     staleTime: 300_000,
   });
 
   const { data: sectors = [] } = useQuery<{ id: number; name: string }[]>({
     queryKey: ["all-sectors"],
-    queryFn: async () => {
-      const res = await fetch(`${BASE}api/sectors`);
-      if (!res.ok) return [];
-      const data = await res.json();
-      return Array.isArray(data) ? data.map((s: { id: number; name: string }) => ({ id: s.id, name: s.name })) : [];
-    },
+    queryFn: () => getJson<{ id: number; name: string }[]>(`${BASE}api/sectors`),
     staleTime: 300_000,
   });
 
@@ -146,6 +147,22 @@ export default function Ruoli() {
   const [activeSector, setActiveSector] = useState<number | null>(null);
   const [activeRiasec, setActiveRiasec] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const keyword = params.get("keyword") ?? params.get("query") ?? params.get("q") ?? "";
+    const riasec = params.get("riasecTypes") ?? params.get("riasec") ?? "";
+    const sectorId = Number(params.get("sectorId") ?? "");
+    if (keyword) setSearch(keyword);
+    if (riasec) {
+      setActiveRiasec(riasec.split(",").map((item) => item.trim().toUpperCase()).filter(Boolean));
+      setShowFilters(true);
+    }
+    if (Number.isFinite(sectorId) && sectorId > 0) {
+      setActiveSector(sectorId);
+      setShowFilters(true);
+    }
+  }, []);
 
   const hasFilters = !!search.trim() || activeSector !== null || activeRiasec.length > 0;
 
@@ -177,10 +194,10 @@ export default function Ruoli() {
         <div className="container mx-auto px-4 max-w-5xl text-center">
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium mb-5">
             <Briefcase className="w-4 h-4" />
-            {isLoading ? "Ruoli professionali" : `${roles.length} ruoli professionali`}
+            {isLoading ? "Lavori" : `${roles.length} lavori`}
           </div>
           <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground mb-4">
-            Esplora i <span className="text-primary">Ruoli</span>
+            Esplora i <span className="text-primary">Lavori</span>
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">
             Scopri tutte le professioni disponibili per settore, con competenze richieste, fasce salariali e prospettive di crescita.
@@ -195,7 +212,7 @@ export default function Ruoli() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <SlidersHorizontal className="w-4 h-4" />
-              Filtra i ruoli
+              Filtra i lavori
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -209,7 +226,7 @@ export default function Ruoli() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Cerca ruolo, competenza…"
+              placeholder="Cerca lavoro, competenza…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 rounded-xl"
@@ -292,8 +309,8 @@ export default function Ruoli() {
             {isLoading
               ? "Caricamento…"
               : filtered.length === roles.length
-                ? `${roles.length} ruoli disponibili`
-                : `${filtered.length} di ${roles.length} ruoli`}
+                ? `${roles.length} lavori disponibili`
+                : `${filtered.length} di ${roles.length} lavori`}
           </p>
           {!isLoading && filtered.length === 0 && (
             <button onClick={clearAll} className="text-sm text-primary hover:underline">
@@ -312,7 +329,7 @@ export default function Ruoli() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-20 text-muted-foreground">
             <Search className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p className="font-medium">Nessun ruolo trovato</p>
+            <p className="font-medium">Nessun lavoro trovato</p>
             <p className="text-sm mt-1">Prova a modificare i filtri o la ricerca</p>
           </div>
         ) : (
@@ -328,7 +345,7 @@ export default function Ruoli() {
           <div className="mt-12 text-center rounded-3xl border border-primary/20 bg-primary/5 p-10">
             <Zap className="w-8 h-8 text-primary mx-auto mb-3" />
             <h2 className="text-2xl font-serif font-bold text-foreground mb-3">
-              Trova il ruolo giusto per te
+              Trova il lavoro giusto per te
             </h2>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               Fai il test RIASEC per scoprire quali ruoli sono più compatibili con la tua personalità e i tuoi punti di forza.

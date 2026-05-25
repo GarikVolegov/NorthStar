@@ -4,13 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { VitePWA } from "vite-plugin-pwa";
 
-const rawPort = process.env.PORT;
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
+const rawPort = process.env.VITE_PORT || process.env.PORT || "5173";
 
 const port = Number(rawPort);
 
@@ -19,11 +13,34 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 const basePath = process.env.BASE_PATH || "/";
+const commitSha = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA;
+const releaseEnvironment =
+  process.env.VERCEL_ENV === "production"
+    ? "production"
+    : process.env.VERCEL_ENV === "preview"
+      ? "staging"
+      : process.env.SENTRY_ENVIRONMENT;
+const sentryRelease =
+  process.env.SENTRY_RELEASE ??
+  process.env.VITE_SENTRY_RELEASE ??
+  (commitSha && releaseEnvironment
+    ? `${releaseEnvironment}@${commitSha.slice(0, 7)}`
+    : commitSha);
+const shouldUploadSourcemaps = Boolean(
+  process.env.SENTRY_AUTH_TOKEN &&
+    process.env.SENTRY_ORG &&
+    process.env.SENTRY_PROJECT &&
+    sentryRelease,
+);
 
-export default defineConfig({
+export default defineConfig(async () => ({
   base: basePath,
   define: {
     __GOOGLE_CLIENT_ID__: JSON.stringify(process.env.GOOGLE_CLIENT_ID ?? ""),
+    "import.meta.env.VITE_SENTRY_RELEASE": JSON.stringify(sentryRelease ?? ""),
+    "import.meta.env.VITE_COMMIT_SHA": JSON.stringify(
+      process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA ?? "",
+    ),
   },
   plugins: [
     react(),
@@ -34,18 +51,25 @@ export default defineConfig({
       manifest: {
         name: "NorthStar — Orientamento e Crescita Personale",
         short_name: "NorthStar",
-        description: "Scopri la tua via. Test RIASEC + Cinque Spiriti, matching con settori professionali e strumenti per la tua carriera.",
+        description:
+          "Scopri la tua via. Test RIASEC + Cinque Spiriti, matching con settori professionali e strumenti per la tua carriera.",
         theme_color: "#0d1520",
         background_color: "#0d1520",
         display: "standalone",
         lang: "it",
         start_url: "/",
         icons: [
-          { src: "/favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" },
+          {
+            src: "/favicon.svg",
+            sizes: "any",
+            type: "image/svg+xml",
+            purpose: "any maskable",
+          },
         ],
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,jpg,woff2}"],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
         // Aumentato staleWhileRevalidate a 7 giorni per asset statici
         runtimeCaching: [
           {
@@ -76,11 +100,28 @@ export default defineConfig({
         ],
       },
     }),
+    shouldUploadSourcemaps &&
+      (await import("@sentry/vite-plugin")).sentryVitePlugin({
+        org: process.env.SENTRY_ORG!,
+        project: process.env.SENTRY_PROJECT!,
+        authToken: process.env.SENTRY_AUTH_TOKEN!,
+        release: { name: sentryRelease! },
+        sourcemaps: {
+          assets: "./dist/public/assets/**",
+          filesToDeleteAfterUpload: ["./dist/public/assets/**/*.map"],
+        },
+      }),
   ],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
-      "@assets": path.resolve(import.meta.dirname, "..", "..", "attached_assets"),
+      "@assets": path.resolve(
+        import.meta.dirname,
+        "..",
+        "..",
+        "docs",
+        "attached_assets",
+      ),
     },
     dedupe: ["react", "react-dom"],
   },
@@ -96,13 +137,18 @@ export default defineConfig({
     chunkSizeWarningLimit: 800,
     // Minifica con esbuild (molto più veloce di terser, output quasi identico)
     minify: "esbuild",
+    sourcemap: shouldUploadSourcemaps ? "hidden" : false,
     rollupOptions: {
       output: {
         // Hash brevi per URL più corti
         hashCharacters: "base36",
         manualChunks: (id) => {
           // React core
-          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/") || id.includes("node_modules/wouter/")) {
+          if (
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/react-dom/") ||
+            id.includes("node_modules/wouter/")
+          ) {
             return "vendor-react";
           }
           // Animazioni — chunk separato: non serve su tutte le pagine
@@ -110,7 +156,10 @@ export default defineConfig({
             return "vendor-motion";
           }
           // Charts — pesante, lazy separato
-          if (id.includes("node_modules/recharts/") || id.includes("node_modules/d3")) {
+          if (
+            id.includes("node_modules/recharts/") ||
+            id.includes("node_modules/d3")
+          ) {
             return "vendor-charts";
           }
           // Radix UI
@@ -122,7 +171,11 @@ export default defineConfig({
             return "vendor-query";
           }
           // Forms
-          if (id.includes("node_modules/react-hook-form/") || id.includes("node_modules/@hookform/") || id.includes("node_modules/zod/")) {
+          if (
+            id.includes("node_modules/react-hook-form/") ||
+            id.includes("node_modules/@hookform/") ||
+            id.includes("node_modules/zod/")
+          ) {
             return "vendor-forms";
           }
           // Icone
@@ -130,7 +183,10 @@ export default defineConfig({
             return "vendor-ui";
           }
           // i18n
-          if (id.includes("node_modules/i18next") || id.includes("node_modules/react-i18next")) {
+          if (
+            id.includes("node_modules/i18next") ||
+            id.includes("node_modules/react-i18next")
+          ) {
             return "vendor-i18n";
           }
         },
@@ -139,9 +195,14 @@ export default defineConfig({
   },
   server: {
     port,
-    strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
+    proxy: {
+      "/api": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+    },
     fs: {
       strict: true,
     },
@@ -173,8 +234,7 @@ export default defineConfig({
       "@tanstack/react-query",
       "framer-motion",
       "lucide-react",
+      "recharts",
     ],
-    // Esclude dipendenze grandi che non servono in dev
-    exclude: ["recharts"],
   },
-});
+}));

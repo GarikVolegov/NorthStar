@@ -70,47 +70,11 @@ Prima di rispondere a qualsiasi richiesta, ogni endpoint esegue **in questo ordi
 ### Mappa Completa delle Route per Area
 
 ```
-artifacts/api-server/src/routes/
-│
-├── auth.ts
-│   ├── POST /api/auth/register          [PUBLIC]
-│   ├── POST /api/auth/login             [PUBLIC]
-│   ├── GET  /api/auth/me                [AUTH]
-│   └── POST /api/auth/logout            [AUTH]
+apps/server/src/routes/
 │
 ├── users.ts
-│   ├── GET  /api/users/:id              [AUTH + OWNER]
 │   ├── PATCH /api/users/:id             [AUTH + OWNER]
-│   └── DELETE /api/users/:id           [AUTH + OWNER + CRITICAL]
-│
-├── test.ts
-│   ├── POST /api/test/start             [AUTH]
-│   ├── POST /api/test/answer            [AUTH]
-│   ├── GET  /api/test/sessions/:id      [AUTH + OWNER]
-│   └── GET  /api/test/sessions/latest   [AUTH]
-│
-├── sectors.ts
-│   ├── GET  /api/sectors                [PUBLIC — contenuto statico]
-│   ├── GET  /api/sectors/:id            [PUBLIC]
-│   ├── GET  /api/sectors/:id/stats      [PUBLIC]
-│   └── GET  /api/sectors/:id/roles      [PUBLIC]
-│
-├── roadmap.ts
-│   ├── GET  /api/roadmap/:sectorId      [AUTH + PREMIUM?]
-│   └── GET  /api/roadmap/:sectorId/stream  [AUTH + PREMIUM — SSE]
-│
-├── wiki.ts
-│   ├── POST /api/wiki/:sectorId/ask     [AUTH + PREMIUM — SSE]
-│   └── GET  /api/wiki/:sectorId/summary [AUTH]
-│
-├── knowledge.ts
-│   ├── GET  /api/knowledge/graph        [AUTH + OWNER]
-│   ├── POST /api/knowledge/nodes        [AUTH + OWNER]
-│   ├── PATCH /api/knowledge/nodes/:id   [AUTH + OWNER]
-│   ├── DELETE /api/knowledge/nodes/:id  [AUTH + OWNER]
-│   ├── POST /api/knowledge/edges        [AUTH + OWNER]
-│   ├── DELETE /api/knowledge/edges/:id  [AUTH + OWNER]
-│   └── POST /api/knowledge/chat         [AUTH + OWNER — SSE]
+│   ├── POST /api/users/complete-onboarding [AUTH]
 │
 ├── objectives.ts
 │   ├── GET  /api/objectives             [AUTH + OWNER]
@@ -118,20 +82,60 @@ artifacts/api-server/src/routes/
 │   ├── PATCH /api/objectives/:id        [AUTH + OWNER]
 │   └── DELETE /api/objectives/:id      [AUTH + OWNER]
 │
-├── stripe.ts
-│   ├── POST /api/stripe/create-checkout [AUTH]
-│   ├── POST /api/stripe/portal          [AUTH]
-│   └── POST /api/stripe/webhook         [STRIPE_SIGNATURE — NO JWT]
+├── calendar.ts
+│   ├── GET  /api/calendar/upcoming      [AUTH + OWNER]
 │
-├── news.ts
-│   ├── GET  /api/news                   [AUTH]
-│   └── GET  /api/news/premium           [AUTH + PREMIUM]
+├── dashboard.ts
+│   ├── GET  /api/dashboard              [AUTH + OWNER]  — dati aggregati
 │
-└── admin.ts
-    ├── GET  /api/admin/review-queue     [AUTH + ADMIN]
-    ├── POST /api/admin/approve/:id      [AUTH + ADMIN]
-    ├── POST /api/admin/reject/:id       [AUTH + ADMIN]
-    └── GET  /api/admin/audit-logs       [AUTH + ADMIN]
+├── coach.ts
+│   ├── POST /api/coach/session          [AUTH]  — crea sessione
+│   ├── GET  /api/coach/sessions         [AUTH + OWNER]  — lista sessioni
+│   ├── GET  /api/coach/sessions/:id     [AUTH + OWNER]
+│   ├── POST /api/coach/chat             [AUTH + OWNER — SSE]  — streaming chat
+│
+├── wendy.ts
+│   ├── POST /api/wendy/ask              [AUTH — SSE]  — chat RAG con streaming
+│   ├── POST /api/wendy/voice            [AUTH]  — OpenAI TTS
+│   └── POST /api/wendy/vision           [AUTH]  — vision/image analysis
+│
+├── admin.ts
+│   ├── GET  /api/admin/quality-metrics  [AUTH + ADMIN]
+│   ├── GET  /api/admin/wendy-metrics    [ADMIN_KEY]
+│   └── POST /api/admin/run-eval         [AUTH + ADMIN]
+│
+├── health (inline)
+│   ├── GET  /api/health                 [PUBLIC — liveness]
+│   ├── GET  /api/health/ready           [PUBLIC — readiness]
+│   └── GET  /api/health/db              [PUBLIC — DB pool status]
+│
+└── metrics (inline)
+    └── GET  /api/metrics                [PUBLIC — Prometheus]
+```
+
+### WebSocket Server (`packages/ws-server/`)
+
+```
+WebSocket /ws  [AUTH — JWT via primo messaggio o header]
+
+Eventi:
+  server → client:
+    ├── notification              — notifiche push
+    ├── agent_run                 — aggiornamenti run AI
+    ├── objectives_updated        — obiettivi modificati
+    ├── calendar_reminder         — promemoria calendario
+    ├── knowledge_graph_update    — aggiornamenti grafo
+    └── ping                      — keepalive
+
+  client → server:
+    └── pong                      — keepalive response
+
+API:
+  emit(userId, event)     — invia evento a utente specifico
+  isOnline(userId)        — verifica se utente è connesso
+  connectionCount()       — numero connessioni attive
+
+Reminder Dispatcher: polling ogni 60s, invia reminder calendario via WS
 ```
 
 ### Legenda Livelli di Accesso
@@ -641,7 +645,7 @@ console.info('[AUDIT]', {
 
 // ❌ PROIBITO — log che espongono dati sensibili
 console.log('User data:', dbUser);       // potrebbe loggare passwordHash
-console.log('Stripe key:', process.env.STRIPE_SECRET_KEY);
+// console.log('Stripe key:', process.env.STRIPE_SECRET_KEY); // PROIBITO - mai loggare chiavi secret
 console.log('JWT payload:', decodedToken);
 ```
 
@@ -876,36 +880,43 @@ router.post('/wiki/:sectorId/ask', requireAuth, requirePremium, async (req, res)
 
 ## 10. REGOLE DI RATE LIMITING
 
-### 10.1 Limiti per Tipo di Endpoint
+### 10.1 Limiti per Tipo di Endpoint (Redis-backed)
 
 ```typescript
 import rateLimit from 'express-rate-limit';
+import RedisStore from 'rate-limit-redis';
 
-// ✅ Rate limiter per endpoint AI (costosi)
-export const aiRateLimit = rateLimit({
-  windowMs:         60 * 1000,     // 1 minuto
-  max:              10,             // 10 richieste AI al minuto
+// ✅ Rate limiter globale
+export const generalRateLimit = rateLimit({
+  windowMs:    60 * 1000,   // 1 minuto
+  max:         100,          // 100 request al minuto
+  keyGenerator: (req) => String(req.user?.id ?? req.ip),
+  message:     { error: 'Troppe richieste' },
+});
+
+// ✅ Rate limiter per Wendy AI (costoso)
+export const wendyRateLimit = rateLimit({
+  windowMs:         60 * 1000,
+  max:              30,              // 30 richieste Wendy/minuto
   keyGenerator:     (req) => String(req.user?.id ?? req.ip),
-  message:          { error: 'Troppe richieste AI, attendi un momento', code: 'AI_RATE_LIMIT' },
+  message:          { error: 'Troppe richieste AI, attendi', code: 'AI_RATE_LIMIT' },
   standardHeaders:  true,
   legacyHeaders:    false,
 });
 
-// ✅ Rate limiter per auth (prevenire brute force)
+// ✅ Rate limiter auth (prevenire brute force)
 export const authRateLimit = rateLimit({
-  windowMs:         15 * 60 * 1000,  // 15 minuti
-  max:              10,               // 10 tentativi di login per IP
+  windowMs:         15 * 60 * 1000,
+  max:              10,
   keyGenerator:     (req) => req.ip ?? 'unknown',
   message:          { error: 'Troppi tentativi, riprova tra 15 minuti' },
-  skipSuccessfulRequests: true,       // non contare i login riusciti
+  skipSuccessfulRequests: true,
 });
 
-// ✅ Rate limiter generico per tutte le API
-export const generalRateLimit = rateLimit({
-  windowMs:    60 * 1000,   // 1 minuto
-  max:         100,          // 100 request al minuto per utente/IP
-  keyGenerator: (req) => String(req.user?.id ?? req.ip),
-  message:     { error: 'Troppe richieste' },
+// ✅ Rate limiter admin
+export const adminRateLimit = rateLimit({
+  windowMs:    60 * 1000,
+  max:         200,
 });
 ```
 
@@ -915,14 +926,11 @@ export const generalRateLimit = rateLimit({
 // app.ts — rate limiter globale
 app.use('/api', generalRateLimit);
 
-// routes/auth.ts — rate limiter specifico per login
-router.post('/login', authRateLimit, loginHandler);
-router.post('/register', authRateLimit, registerHandler);
+// routes/wendy.ts — rate limiter specifico per Wendy
+router.post('/ask', requireAuth, wendyRateLimit, wendyAskHandler);
 
-// routes/wiki.ts, roadmap.ts, knowledge.ts — rate limiter AI
-router.post('/wiki/:sectorId/ask', requireAuth, requirePremium, aiRateLimit, wikiHandler);
-router.get('/roadmap/:sectorId/stream', requireAuth, aiRateLimit, roadmapHandler);
-router.post('/knowledge/chat', requireAuth, aiRateLimit, ragChatHandler);
+// routes/coach.ts — rate limiter per coach AI
+router.post('/chat', requireAuth, aiRateLimit, coachChatHandler);
 ```
 
 -----
@@ -995,35 +1003,35 @@ router.get('/admin/users', requireAuth, requireAdmin, async (req, res) => {
 
 ## 12. REGOLE SUI MIDDLEWARE
 
-### 12.1 Ordine Obbligatorio in app.ts
+### 12.1 Middleware Disponibili
 
 ```typescript
-// app.ts — ordine dei middleware CRITICO
+// apps/server/src/middleware/
 
-// 1. Security headers (primo di tutto)
-app.use(helmet());
+// auth.ts       — JWT Bearer verification (requireAuth)
+// rate-limit.ts — Rate limiter configurazioni (Redis-backed)
+// audit.ts      — Audit logging (scrittura immutabile su auditLog)
+// request-id.ts — UUID univoco per ogni richiesta
+// logger.ts     — Pino structured logger
+```
 
-// 2. CORS (prima del body parsing)
-app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(',') }));
+### 12.1a Middleware Audit Logging
 
-// 3. Rate limiter globale
-app.use('/api', generalRateLimit);
+```typescript
+// middleware/audit.ts
+// Scrive log immutabile su tabella auditLog per ogni richiesta.
+// Conforme GDPR: IP hashato con IP_HASH_SALT.
+// Fire-and-forget: non blocca la response.
 
-// 4. Stripe webhook PRIMA del json parser (raw body necessario)
-app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
-
-// 5. Body parsing
-app.use(express.json({ limit: '1mb' }));  // limite esplicito
-
-// 6. Route handlers
-app.use('/api/auth', authRouter);
-app.use('/api/sectors', sectorsRouter);
-// ... altre route
-
-// 7. 404 handler
+// Configurazione in app.ts:
+app.use(requestIdMiddleware);   // assegna UUID a ogni richiesta (prima di tutto)
+app.use(helmet());              // security headers
+app.use(cors());                // CORS
+app.use('/api', generalRateLimit);  // rate limiter globale
+app.use(auditLogMiddleware);    // audit logging
+app.use(express.json({ limit: '1mb' }));
+// ... route handlers
 app.use((req, res) => res.status(404).json({ error: 'Route non trovata' }));
-
-// 8. Error handler SEMPRE ULTIMO
 app.use(globalErrorHandler);
 ```
 

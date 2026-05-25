@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { Bell, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api-fetch";
+import { Bell, Loader2, X } from "lucide-react";
+import { useState } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 

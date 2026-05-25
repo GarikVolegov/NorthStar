@@ -6,13 +6,41 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "seed-products": "tsx ./src/seed-products.ts"
-  },
-  "devDependencies": {
-    "@types/node": "catalog:",
-    "tsx": "catalog:"
+    "seed-products": "tsx ./src/seed-products.ts",
+    "seed:e2e": "tsx ./src/seed-e2e.ts",
+    "seed:e2e-affiliate": "tsx ./src/seed-e2e-affiliate.ts",
+    "seed:catalog": "tsx ./src/seed-catalog.ts",
+    "backfill:embeddings": "tsx ./src/backfill-embeddings.ts",
+    "security:scan": "tsx ./src/security-agent.ts",
+    "security:scan:all": "tsx ./src/security-agent.ts -- --all",
+    "test:wendy-tools": "tsx ./src/test-wendy-tools.ts",
+    "seed:rag": "tsx ./src/seed-rag.ts",
+    "rag:weak-signals": "tsx ./src/run-weak-signal-detector.ts",
+    "admin:promote": "tsx ./src/admin-promote.ts",
+    "cleanup:news-placeholders": "tsx ./src/cleanup-news-placeholders.ts",
+    "diagnostic:db:schema": "node ./src/diagnostics/check-schema.mjs",
+    "diagnostic:db:users": "node ./src/diagnostics/check-all-cols.cjs",
+    "diagnostic:db:verify": "node ./src/diagnostics/verify-db.cjs",
+    "diagnostic:auth:direct": "node ./src/diagnostics/test-auth-direct.cjs",
+    "maintenance:db:apply-indexes": "node ./src/maintenance/apply-migration.cjs",
+    "maintenance:db:fix-roles": "node ./src/maintenance/fix-db.cjs",
+    "maintenance:db:test-connection": "node ./src/maintenance/test-connection.cjs",
+    "maintenance:db:test-schema": "node ./src/maintenance/test-schema.mjs"
   },
   "dependencies": {
+    "@workspace/db": "workspace:*",
+    "@workspace/ai-server": "workspace:*",
+    "@neondatabase/serverless": "catalog:",
+    "bcryptjs": "^2.4.3",
+    "drizzle-orm": "catalog:",
+    "openai": "catalog:",
+    "pg": "^8.20.0",
     "stripe": "^22.1.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "catalog:",
+    "@types/pg": "^8.18.0",
+    "tsx": "catalog:"
   }
 }

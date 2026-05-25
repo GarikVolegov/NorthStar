@@ -1,27 +1,28 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
-import { useTranslation } from "react-i18next";
-import { usePageMeta } from "@/lib/seo";
-import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
+import { RIASEC_LABELS, SectorIcon } from "@/lib/sector-icon";
+import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import {
-  TrendingUp, DollarSign, Bot, Clock, ArrowRight,
-  GitCompare, ChevronDown, X, Check, Minus, Plus,
-  Sparkles, BarChart2, Link2, Copy, CheckCheck,
+  ArrowRight,
+  BarChart2,
+  Bot,
+  Check,
+  CheckCheck,
+  ChevronDown,
+  Clock,
+  DollarSign,
+  GitCompare,
+  Link2,
+  Minus, Plus,
+  Sparkles,
+  TrendingUp,
+  X
 } from "lucide-react";
-
-const BASE = import.meta.env.BASE_URL || "/";
-
-type Sector = {
-  id: number; name: string; icon: string; description: string;
-  riasecTypes: string[]; skills: string[]; avgSalaryMin: number;
-  avgSalaryMax: number; growthRate: number; automationRisk: string;
-  scalability: string; trend: string; timeToAutonomy: string;
-  advantages: string[]; disadvantages: string[]; opportunities: string[];
-  color: string;
-};
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
+import { SalaryBar, WinnerBadge } from "./confronta-components";
+import { useAllSectors, type Sector } from "./confronta-data";
 
 const TREND_META: Record<string, { label: string; color: string; score: number }> = {
   booming:  { label: "In forte crescita", color: "text-emerald-700 bg-emerald-50 border-emerald-200", score: 4 },
@@ -34,24 +35,6 @@ const RISK_META: Record<string, { label: string; color: string; score: number }>
   medium: { label: "Medio",  color: "text-amber-700 bg-amber-50 border-amber-200",       score: 2 },
   high:   { label: "Alto",   color: "text-rose-700 bg-rose-50 border-rose-200",           score: 1 },
 };
-const SCALE_META: Record<string, { label: string }> = {
-  high:   { label: "Alta" },
-  medium: { label: "Media" },
-  low:    { label: "Bassa" },
-};
-
-function useAllSectors() {
-  return useQuery<Sector[]>({
-    queryKey: ["all-sectors-compare"],
-    queryFn: async () => {
-      const res = await fetch(`${BASE}api/sectors`);
-      if (!res.ok) throw new Error("Errore");
-      return res.json();
-    },
-    staleTime: 300_000,
-  });
-}
-
 function SectorPicker({
   sectors, value, onChange, label, otherValue,
 }: {
@@ -141,28 +124,6 @@ function SectorPicker({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function WinnerBadge({ side }: { side: "left" | "right" | "tie" }) {
-  const { t } = useTranslation();
-  if (side === "tie") return <span className="text-xs text-muted-foreground font-medium px-2 py-0.5 rounded-full bg-muted">{t("confronta.tie")}</span>;
-  return (
-    <span className={cn(
-      "text-xs font-bold px-2 py-0.5 rounded-full",
-      side === "left" ? "bg-primary/15 text-primary" : "bg-violet-100 text-violet-700"
-    )}>
-      {t("confronta.best")}
-    </span>
-  );
-}
-
-function SalaryBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
-  return (
-    <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: color }} />
     </div>
   );
 }
@@ -345,7 +306,7 @@ export default function Confronta() {
               <div className="grid grid-cols-2 gap-8">
                 {[
                   { s: left, color: "hsl(var(--primary))", side: "left" as const },
-                  { s: right, color: "#7c3aed", side: "right" as const },
+                  { s: right, color: "hsl(var(--chart-4))", side: "right" as const },
                 ].map(({ s, color, side }) => (
                   <div key={side}>
                     <div className="flex items-baseline justify-between mb-2">
@@ -393,7 +354,7 @@ export default function Confronta() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {[left, right].map((s, i) => {
-                    const meta = RISK_META[s.automationRisk] ?? RISK_META["medium"];
+                    const meta = RISK_META[s.automationRisk] ?? RISK_META.medium!;
                     return (
                       <div key={i} className="text-center p-3 rounded-xl bg-muted/40">
                         <span className={cn("text-sm font-bold px-2 py-1 rounded-lg border", meta.color)}>
@@ -415,7 +376,7 @@ export default function Confronta() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {[left, right].map((s, i) => {
-                    const meta = TREND_META[s.trend] ?? TREND_META["stable"];
+                    const meta = TREND_META[s.trend] ?? TREND_META.stable!;
                     return (
                       <div key={i} className="text-center p-3 rounded-xl bg-muted/40">
                         <span className={cn("text-xs font-semibold px-2 py-1 rounded-lg border", meta.color)}>
@@ -522,7 +483,7 @@ export default function Confronta() {
               {[
                 { s: left,  accent: "emerald", icon: Plus },
                 { s: right, accent: "violet",  icon: Plus },
-              ].map(({ s, accent }, i) => (
+              ].map(({ s }, i) => (
                 <div key={i} className="rounded-2xl border bg-card p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className={cn(

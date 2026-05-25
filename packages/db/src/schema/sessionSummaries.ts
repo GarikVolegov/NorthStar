@@ -45,6 +45,7 @@ export const sessionSummariesTable = pgTable(
     keyThemes: jsonb("key_themes").$type<string[]>().default([]),
     mood:      moodEnum("mood").default("neutral"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
 );
 

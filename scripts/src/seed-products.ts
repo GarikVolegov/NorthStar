@@ -11,10 +11,14 @@ async function createProducts() {
     });
 
     if (existing.data.length > 0) {
+      const existingProduct = existing.data[0];
+      if (!existingProduct) {
+        throw new Error('Stripe returned an empty product result');
+      }
       console.log('Orientamento Premium already exists. Skipping creation.');
-      console.log(`Product ID: ${existing.data[0].id}`);
+      console.log(`Product ID: ${existingProduct.id}`);
 
-      const prices = await stripe.prices.list({ product: existing.data[0].id, active: true });
+      const prices = await stripe.prices.list({ product: existingProduct.id, active: true });
       for (const p of prices.data) {
         console.log(`  Price: ${p.id} — ${p.unit_amount! / 100} ${p.currency.toUpperCase()}/${p.recurring?.interval}`);
       }

@@ -1,0 +1,397 @@
+/**
+ * model-router.ts — Centralized model selection for every agent / task.
+ * GOAL: each agent picks the cheapest model that still delivers the required
+ * quality for its task. Free-first strategy:
+ *
+ *   - NANO     →  Groq llama-3.1-8b-instant      (≈ free, 14k tok/s)
+ *                 routing, classification, gating, micro-extraction
+ *   - MICRO    →  Groq llama-3.3-70b-versatile   (free tier)
+ *                 summarization, evaluation, supervisor, memory
+ *   - STANDARD →  OpenRouter deepseek-chat-v3:free OR Groq llama-3.3-70b
+ *                 user-facing chat, specialists, growth agent
+ *   - REASONING → OpenRouter deepseek-r1:free
+ *                 chain-of-thought, deep step-by-step
+ *   - PREMIUM   → OpenAI gpt-4o (opt-in, only for paid users + deep complexity)
+ *
+ * Every default is overridable via env (MODEL_<ROLE>). Set AI_PROVIDER to
+ * route the actual HTTP call (openrouter | groq | openai). See README of
+ * packages/ai-server.
+ */
+
+import { aiPlugins } from "./plugins/registry";
+
+export type RequestComplexity = "simple" | "standard" | "deep";
+
+/**
+ * Logical role of the caller. Every agent / task that hits an LLM declares its
+ * role here, and the router picks the matching model.
+ */
+export type AgentRole =
+  // chat user-facing
+  | "growth-agent-chat"
+  | "growth-agent-voice"
+  | "specialist-chat"
+  // routing & gating
+  | "router-classify"
+  | "parallel-handoff-gate"
+  | "parallel-handoff-extract"
+  | "search-router"
+  | "interview-adapt"
+  | "knowledge-categorize"
+  // medium reasoning
+  | "supervisor-rewrite"
+  | "supervisor-pattern"
+  | "memory-extract"
+  | "session-summarize"
+  | "discovery-enrich"
+  | "interview-evaluate"
+  | "interview-generate"
+  | "knowledge-link"
+  | "knowledge-suggest"
+  | "wiki-chat"
+  | "wiki-suggest"
+  // deep reasoning
+  | "chain-of-thought"
+  // Security agent
+  | "security-scan"
+  | "security-fix"
+  // Search orchestrator
+  | "search-orchestrate";
+
+export interface RouterOptions {
+  isPremium?: boolean;
+  complexity?: RequestComplexity;
+  /** Force a provider preference — overrides defaults below. */
+  preferGroq?: boolean;
+  // Context-aware signals (all optional, backward-compatible)
+  /** Approximate prompt size in tokens; used to escalate tier when above thresholds. */
+  messageTokens?: number;
+  /** True if the prompt includes file/image attachments. */
+  hasFile?: boolean;
+  /** True if multimodal input requires a vision-capable model. */
+  requiresVision?: boolean;
+  /** True if effective context (system + history + RAG) is expected to be very long. */
+  requiresLongContext?: boolean;
+  /** Number of prior retries for this turn; >0 escalates the tier. */
+  retryCount?: number;
+  /** Page or feature surfacing the call; used for optional context-based overrides. */
+  pageContext?: string;
+}
+
+export interface ModelRoute {
+  model: string;
+  provider: "openai" | "groq" | "openrouter";
+  temperature: number;
+  maxTokens: number;
+  reason: string;
+  /** Set when the route is fulfilled by a registered AIPlugin; consumer should dispatch via the plugin. */
+  pluginId?: string;
+}
+
+// ── Default model catalogue (env-overridable) ─────────────────────────────────
+
+/**
+ * Defaults aim at "free + good enough". Override per role via env, e.g.:
+ *   MODEL_ROUTER_CLASSIFY=llama-3.1-8b-instant
+ *   MODEL_SPECIALIST_CHAT=deepseek/deepseek-chat-v3-0324:free
+ *   MODEL_CHAIN_OF_THOUGHT=deepseek/deepseek-r1:free
+ */
+const env = (k: string, fallback: string): string => process.env[k] ?? fallback;
+
+// Tier presets — env-overridable. Keep names short for cost-tracking pricing table.
+const NANO_GROQ      = env("MODEL_NANO_GROQ",           "llama-3.1-8b-instant");
+const MICRO_GROQ     = env("MODEL_MICRO_GROQ",          "llama-3.3-70b-versatile");
+const OPENROUTER_FREE_ROUTER = env("MODEL_OPENROUTER_FREE_ROUTER", "openrouter/free");
+const NANO_OR        = env("MODEL_NANO_OPENROUTER",     "openrouter/free");
+const MICRO_OR       = env("MODEL_MICRO_OPENROUTER",    "openrouter/free");
+const STANDARD_OR    = env("MODEL_STANDARD_OPENROUTER", "openrouter/free");
+const STANDARD_GROQ  = env("MODEL_STANDARD_GROQ",       "llama-3.3-70b-versatile");
+const REASONING_OR   = env("MODEL_REASONING_OPENROUTER","openrouter/free");
+const PREMIUM_OPENAI = env("MODEL_PREMIUM_OPENAI",      "gpt-4o");
+const CHEAP_OPENAI   = env("MODEL_CHEAP_OPENAI",        "gpt-4o-mini");
+const ALLOW_PAID_MODELS = process.env.ALLOW_PAID_AI_MODELS === "true";
+const MODEL_PROVIDERS = ["openai", "groq", "openrouter"] as const;
+type ModelProvider = (typeof MODEL_PROVIDERS)[number];
+
+function readModelProvider(value: string | undefined): ModelProvider {
+  const normalized = value?.toLowerCase();
+  return MODEL_PROVIDERS.find((provider) => provider === normalized) ?? "openai";
+}
+
+/**
+ * Active backend. If AI_PROVIDER=openrouter we prefer OpenRouter free-tier models
+ * for STANDARD/REASONING and fall back to OpenAI naming only when OpenRouter
+ * isn't configured. The actual HTTP call goes through llm/client.ts.
+ */
+const ACTIVE_PROVIDER: "openai" | "groq" | "openrouter" =
+  readModelProvider(process.env.AI_PROVIDER);
+
+function enforceFreeOpenRouterModel(model: string) {
+  if (ALLOW_PAID_MODELS) return model;
+  if (model === OPENROUTER_FREE_ROUTER || model.endsWith(":free")) return model;
+  return OPENROUTER_FREE_ROUTER;
+}
+
+function standardModel(): { model: string; provider: ModelRoute["provider"] } {
+  if (ACTIVE_PROVIDER === "openrouter") return { model: enforceFreeOpenRouterModel(STANDARD_OR), provider: "openrouter" };
+  if (ACTIVE_PROVIDER === "groq") return { model: STANDARD_GROQ, provider: "groq" };
+  return { model: CHEAP_OPENAI, provider: "openai" };
+}
+
+function reasoningModel(): { model: string; provider: ModelRoute["provider"] } {
+  if (ACTIVE_PROVIDER === "openrouter") return { model: enforceFreeOpenRouterModel(REASONING_OR), provider: "openrouter" };
+  if (ACTIVE_PROVIDER === "groq") return { model: MICRO_GROQ, provider: "groq" };
+  return { model: PREMIUM_OPENAI, provider: "openai" }; // fallback if only OpenAI
+}
+
+function nanoModel(): { model: string; provider: ModelRoute["provider"] } {
+  if (ACTIVE_PROVIDER === "groq")       return { model: NANO_GROQ, provider: "groq" };
+  if (ACTIVE_PROVIDER === "openrouter") return { model: enforceFreeOpenRouterModel(NANO_OR),   provider: "openrouter" };
+  return { model: CHEAP_OPENAI, provider: "openai" };
+}
+
+function microModel(): { model: string; provider: ModelRoute["provider"] } {
+  if (ACTIVE_PROVIDER === "groq")       return { model: MICRO_GROQ, provider: "groq" };
+  if (ACTIVE_PROVIDER === "openrouter") return { model: enforceFreeOpenRouterModel(MICRO_OR),   provider: "openrouter" };
+  return { model: CHEAP_OPENAI, provider: "openai" };
+}
+
+// ── Per-role configuration ────────────────────────────────────────────────────
+
+interface RoleConfig {
+  tier: "nano" | "micro" | "standard" | "reasoning";
+  temperature: number;
+  maxTokens: number;
+  /** If true, premium users with `complexity: "deep"` are upgraded to PREMIUM_OPENAI. */
+  upgradeOnPremiumDeep?: boolean;
+}
+
+const ROLE_CONFIG: Record<AgentRole, RoleConfig> = {
+  // User-facing chat — highest quality among free, optional premium upgrade
+  "growth-agent-chat":       { tier: "standard", temperature: 0.72, maxTokens: 1000, upgradeOnPremiumDeep: true },
+  "growth-agent-voice":      { tier: "nano",     temperature: 0.6,  maxTokens: 400 },
+  "specialist-chat":         { tier: "standard", temperature: 0.7,  maxTokens: 1000, upgradeOnPremiumDeep: true },
+
+  // Routing / micro-decisions — cheapest, fastest
+  "router-classify":         { tier: "nano",     temperature: 0.1,  maxTokens: 300 },
+  "parallel-handoff-gate":   { tier: "nano",     temperature: 0.3,  maxTokens: 200 },
+  "parallel-handoff-extract":{ tier: "nano",     temperature: 0.3,  maxTokens: 200 },
+  "search-router":           { tier: "nano",     temperature: 0.3,  maxTokens: 300 },
+  "interview-adapt":         { tier: "nano",     temperature: 0.2,  maxTokens: 10 },
+  "knowledge-categorize":    { tier: "nano",     temperature: 0.1,  maxTokens: 20 },
+
+  // Medium reasoning — quality matters but not user-facing live
+  "supervisor-rewrite":      { tier: "micro",    temperature: 0.5,  maxTokens: 700 },
+  "supervisor-pattern":      { tier: "micro",    temperature: 0.4,  maxTokens: 500 },
+  "memory-extract":          { tier: "micro",    temperature: 0.3,  maxTokens: 500 },
+  "session-summarize":       { tier: "micro",    temperature: 0.4,  maxTokens: 500 },
+  "discovery-enrich":        { tier: "micro",    temperature: 0.4,  maxTokens: 500 },
+  "interview-evaluate":      { tier: "micro",    temperature: 0.3,  maxTokens: 400 },
+  "interview-generate":      { tier: "micro",    temperature: 0.7,  maxTokens: 600 },
+  "knowledge-link":          { tier: "micro",    temperature: 0.3,  maxTokens: 500 },
+  "knowledge-suggest":       { tier: "micro",    temperature: 0.5,  maxTokens: 400 },
+  "wiki-chat":               { tier: "micro",    temperature: 0.6,  maxTokens: 600 },
+  "wiki-suggest":            { tier: "micro",    temperature: 0.6,  maxTokens: 300 },
+
+  // Deep reasoning — DeepSeek R1 free is excellent here
+  "chain-of-thought":        { tier: "reasoning", temperature: 0.2, maxTokens: 800, upgradeOnPremiumDeep: true },
+
+  // Security — deep analysis first, targeted fix generation second
+  "security-scan":           { tier: "reasoning", temperature: 0.1, maxTokens: 2000 },
+  "security-fix":            { tier: "standard",  temperature: 0.2, maxTokens: 1500 },
+
+  // Search orchestrator — solo routing, il LLM pesante è delegato al growth agent
+  "search-orchestrate":      { tier: "nano",      temperature: 0.1, maxTokens: 300 },
+};
+
+// ── Context-aware tier escalation ─────────────────────────────────────────────
+
+const TIER_ORDER: RoleConfig["tier"][] = ["nano", "micro", "standard", "reasoning"];
+
+function tierIndex(tier: RoleConfig["tier"]): number {
+  return TIER_ORDER.indexOf(tier);
+}
+
+function maxTier(a: RoleConfig["tier"], b: RoleConfig["tier"]): RoleConfig["tier"] {
+  return tierIndex(a) >= tierIndex(b) ? a : b;
+}
+
+interface ContextSignalsResult {
+  tier: RoleConfig["tier"];
+  reasons: string[];
+}
+
+/**
+ * Apply context-aware signals to upgrade the base tier of a role.
+ * Returns the (possibly upgraded) tier and the reasons that drove the change.
+ */
+export function applyContextSignals(
+  baseTier: RoleConfig["tier"],
+  opts: RouterOptions,
+): ContextSignalsResult {
+  let tier = baseTier;
+  const reasons: string[] = [];
+
+  if (opts.messageTokens && opts.messageTokens > 3000) {
+    const next = maxTier(tier, "standard");
+    if (next !== tier) reasons.push(`long-message(${opts.messageTokens})`);
+    tier = next;
+  }
+  if (opts.requiresLongContext) {
+    const next = maxTier(tier, "standard");
+    if (next !== tier) reasons.push("long-context");
+    tier = next;
+  }
+  if (opts.retryCount && opts.retryCount > 0) {
+    const next = maxTier(tier, "reasoning");
+    if (next !== tier) reasons.push(`retry(${opts.retryCount})`);
+    tier = next;
+  }
+  if (opts.hasFile || opts.requiresVision) {
+    const next = maxTier(tier, "standard");
+    if (next !== tier) reasons.push(opts.requiresVision ? "vision" : "file");
+    tier = next;
+  }
+  return { tier, reasons };
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+/**
+ * Pick the optimal model for a given agent role.
+ *
+ * Behaviour:
+ *   1. Looks up the role's tier (nano | micro | standard | reasoning).
+ *   2. Applies context signals (long message, retry, file, vision) which may
+ *      escalate the tier.
+ *   3. If a registered AIPlugin covers the chosen tier, returns the plugin route.
+ *   4. If the user is Premium AND complexity is "deep" AND the role opts in
+ *      to upgrades, returns the premium OpenAI model.
+ *   5. Otherwise returns the free/cheap default tier model, honouring the
+ *      active `AI_PROVIDER`.
+ */
+export function selectModelFor(role: AgentRole, opts: RouterOptions = {}): ModelRoute {
+  const cfg = ROLE_CONFIG[role];
+  const { isPremium = false, complexity = "standard", preferGroq } = opts;
+
+  // Hard override: explicit Groq preference (e.g. voice-mode low latency)
+  if (preferGroq) {
+    return {
+      model: MICRO_GROQ,
+      provider: "groq",
+      temperature: cfg.temperature,
+      maxTokens: cfg.maxTokens,
+      reason: `${role}:groq-preferred`,
+    };
+  }
+
+  // Context-aware tier upgrade (may stay same)
+  const signals = applyContextSignals(cfg.tier, opts);
+  const effectiveTier = signals.tier;
+  const signalSuffix = signals.reasons.length > 0 ? `+signals[${signals.reasons.join(",")}]` : "";
+
+  // Plugin-aware reasoning override
+  if (effectiveTier === "reasoning") {
+    const pluginRoute = lookupReasoningPluginRoute(role, cfg);
+    if (pluginRoute) {
+      return { ...pluginRoute, reason: `${pluginRoute.reason}${signalSuffix}` };
+    }
+  }
+
+  // Premium upgrade path (only when the role opts in)
+  if (cfg.upgradeOnPremiumDeep && isPremium && complexity === "deep") {
+    // Su OpenRouter: usa deepseek-r1:free (ottimo, gratuito) invece di gpt-4o a pagamento
+    if (ACTIVE_PROVIDER === "openrouter") {
+      const r = reasoningModel();
+      return { model: r.model, provider: r.provider, temperature: cfg.temperature, maxTokens: cfg.maxTokens, reason: `${role}:openrouter-premium-free` };
+    }
+    // Su Groq: usa il modello micro (llama-3.3-70b, gratuito)
+    if (ACTIVE_PROVIDER === "groq") {
+      return { model: MICRO_GROQ, provider: "groq", temperature: cfg.temperature, maxTokens: cfg.maxTokens, reason: `${role}:groq-premium` };
+    }
+    // Solo su OpenAI: upgrade reale a gpt-4o
+    return {
+      model: PREMIUM_OPENAI,
+      provider: "openai",
+      temperature: cfg.temperature,
+      maxTokens: cfg.maxTokens,
+      reason: `${role}:premium-deep`,
+    };
+  }
+
+  // Tier-based default (uses effectiveTier from context signals)
+  const pick =
+    effectiveTier === "nano"      ? nanoModel()      :
+    effectiveTier === "micro"     ? microModel()     :
+    effectiveTier === "reasoning" ? reasoningModel() :
+    /* standard */                  standardModel();
+
+  return {
+    model: pick.model,
+    provider: pick.provider,
+    temperature: cfg.temperature,
+    maxTokens: cfg.maxTokens,
+    reason: `${role}:${effectiveTier}${signalSuffix}`,
+  };
+}
+
+// ── Plugin-aware reasoning lookup ─────────────────────────────────────────────
+
+function lookupReasoningPluginRoute(role: AgentRole, cfg: RoleConfig): ModelRoute | null {
+  const plugin = aiPlugins.getBest("reasoning");
+  if (!plugin) return null;
+  const providerName = plugin.provider;
+  // ModelRoute.provider is the HTTP route hint; Anthropic plugins ship their own
+  // client, so we report "openrouter" as the closest neutral provider hint.
+  const provider: ModelRoute["provider"] =
+    providerName === "groq"       ? "groq" :
+    providerName === "openrouter" ? "openrouter" :
+    providerName === "anthropic"  ? "openrouter" :
+    "openai";
+  return {
+    model: plugin.id,
+    provider,
+    temperature: cfg.temperature,
+    maxTokens: cfg.maxTokens,
+    reason: `${role}:plugin(${plugin.id})`,
+    pluginId: plugin.id,
+  };
+}
+
+/**
+ * Convenience: returns just the model string. Useful at call sites that only
+ * need to pass `model` to a low-level SDK.
+ */
+export function modelFor(role: AgentRole, opts: RouterOptions = {}): string {
+  return selectModelFor(role, opts).model;
+}
+
+export function getModelRoutingPolicy() {
+  return {
+    activeProvider: ACTIVE_PROVIDER,
+    allowPaidModels: ALLOW_PAID_MODELS,
+    openRouterFreeRouter: OPENROUTER_FREE_ROUTER,
+    source: "env + role policy",
+    roles: Object.entries(ROLE_CONFIG).map(([role, config]) => ({
+      role: role as AgentRole,
+      tier: config.tier,
+      temperature: config.temperature,
+      maxTokens: config.maxTokens,
+      route: selectModelFor(role as AgentRole, { isPremium: false }),
+    })),
+  };
+}
+
+// ── Backward-compatible helper ────────────────────────────────────────────────
+
+/**
+ * @deprecated use `selectModelFor(role, opts)` instead. Kept so existing
+ * callers (and the `selectModel` export in `index.ts`) keep working.
+ */
+export function selectModel(opts: Required<Pick<RouterOptions, "isPremium" | "complexity">> & Pick<RouterOptions, "preferGroq">): ModelRoute {
+  const role: AgentRole =
+    opts.complexity === "deep"   ? "specialist-chat" :
+    opts.complexity === "simple" ? "router-classify" :
+    /* standard */                 "growth-agent-chat";
+  return selectModelFor(role, opts);
+}

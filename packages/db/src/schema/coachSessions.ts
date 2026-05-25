@@ -16,6 +16,7 @@ export const coachSessionsTable = pgTable("coach_sessions", {
     .default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
 export type CoachSession = typeof coachSessionsTable.$inferSelect;

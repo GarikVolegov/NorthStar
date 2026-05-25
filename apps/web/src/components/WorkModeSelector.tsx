@@ -1,16 +1,27 @@
-import React, { useState } from "react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ApiClientError, getJson, patchJson } from "@/lib/apiClient";
+import { cn } from "@/lib/utils";
 import {
-  Briefcase, Laptop, GitMerge, HelpCircle, ChevronDown, ChevronUp, ArrowRight, CheckCircle2,
+  ArrowRight,
+  Briefcase,
+  CheckCircle2,
+  ChevronDown, ChevronUp,
+  GitMerge, HelpCircle,
+  Laptop,
 } from "lucide-react";
-import { apiFetch } from "@/lib/api-fetch";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
 export type WorkPreference = "dipendente" | "autonomo" | "ibrido" | "unknown";
+
+const WORK_PREFERENCES = ["dipendente", "autonomo", "ibrido", "unknown"] as const;
+
+function isWorkPreference(value: unknown): value is WorkPreference {
+  return typeof value === "string" && WORK_PREFERENCES.includes(value as WorkPreference);
+}
 
 const WORK_MODE_STATIC: Array<{
   value: WorkPreference;
@@ -309,10 +320,11 @@ export function useWorkPreference(userId: number | undefined) {
 
   React.useEffect(() => {
     if (!userId) return;
-    apiFetch(`${BASE}api/users/me/work-preference`)
-      .then((r) => r.ok ? r.json() : null)
+    getJson<{ workPreference?: unknown }>(`${BASE}api/users/me/work-preference`, {
+      okStatuses: [404],
+    })
       .then((d) => {
-        if (d?.workPreference) setWorkPreference(d.workPreference as WorkPreference);
+        if (isWorkPreference(d?.workPreference)) setWorkPreference(d.workPreference);
       })
       .catch(() => {});
   }, [userId]);
@@ -320,11 +332,10 @@ export function useWorkPreference(userId: number | undefined) {
   const save = React.useCallback(async (mode: WorkPreference) => {
     setIsLoading(true);
     try {
-      const res = await apiFetch(`${BASE}api/users/me/work-preference`, {
-        method: "PATCH",
-        body: JSON.stringify({ workPreference: mode }),
-      });
-      if (res.ok) setWorkPreference(mode);
+      await patchJson<unknown>(`${BASE}api/users/me/work-preference`, { workPreference: mode });
+      setWorkPreference(mode);
+    } catch (error) {
+      if (!(error instanceof ApiClientError)) throw error;
     } finally {
       setIsLoading(false);
     }

@@ -1,11 +1,11 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Bot, Send, Loader2, User, Sparkles, X, MessageSquare } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 import { useCareerChat, type ChatMessage } from "@/hooks/useAIAgents";
+import { cn } from "@/lib/utils";
+import { AnimatePresence, motion } from "framer-motion";
+import { Bot, Loader2, MessageSquare, Send, Sparkles, User, X } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 interface Props {
   profile?: Record<string, unknown>;

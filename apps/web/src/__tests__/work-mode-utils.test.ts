@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
 import { getWorkModeAlignment } from "@/lib/work-mode-utils";
+import { describe, expect, it } from "vitest";
 
 describe("getWorkModeAlignment", () => {
   describe("missing / unknown inputs → aligned (no opinion)", () => {

@@ -1,0 +1,39 @@
+{
+  "manifest_version": "0.3",
+  "name": "northstar-pp-mcp",
+  "display_name": "Northstar",
+  "version": "4.6.1",
+  "description": "Northstar API surface as MCP tools.",
+  "author": {
+    "name": "CLI Printing Press"
+  },
+  "license": "Apache-2.0",
+  "server": {
+    "type": "binary",
+    "entry_point": "bin/northstar-pp-mcp.exe",
+    "mcp_config": {
+      "command": "${__dirname}/bin/northstar-pp-mcp.exe",
+      "args": [],
+      "env": {
+        "API_BEARER_AUTH": "${user_config.api_bearer_auth}"
+      }
+    }
+  },
+  "user_config": {
+    "api_bearer_auth": {
+      "type": "string",
+      "title": "API_BEARER_AUTH",
+      "description": "Sets API_BEARER_AUTH for the Northstar MCP server.",
+      "sensitive": true,
+      "required": true
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=1.0.0",
+    "platforms": [
+      "darwin",
+      "linux",
+      "win32"
+    ]
+  }
+}

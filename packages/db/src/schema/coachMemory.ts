@@ -29,8 +29,9 @@
  */
 import {
   pgTable, serial, integer, text, varchar,
-  timestamp, real, uniqueIndex, index,
+  timestamp, real, uniqueIndex, index, check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { usersTable } from "./users";
 
 // ── Table 1: Biographical facts ──────────────────────────────────────────────
@@ -51,6 +52,7 @@ export const coachMemoryFactsTable = pgTable(
     confirmedCount: integer("confirmed_count").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => ({
     userKeyUnique: uniqueIndex("coach_memory_facts_user_key").on(t.userId, t.key),
@@ -77,10 +79,12 @@ export const coachMemoryPatternsTable = pgTable(
     sessionIds: integer("session_ids").array().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => ({
     userIdx: index("coach_memory_patterns_user_idx").on(t.userId),
     typeIdx: index("coach_memory_patterns_type_idx").on(t.patternType),
+    confidenceCheck: check("confidence_range", sql`${t.confidence} >= 0 AND ${t.confidence} <= 1`),
   }),
 );
 

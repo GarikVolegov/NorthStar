@@ -1,12 +1,20 @@
-import { useEffect } from "react";
-import { Link } from "wouter";
+import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import {
-  Compass, Target, Lightbulb, Users, Heart, Sparkles,
-  BookOpen, BarChart3, Newspaper, ArrowRight, CheckCircle2,
+  ArrowRight,
+  BarChart3,
+  BookOpen,
+  CheckCircle2,
+  Compass,
+  Heart,
+  Lightbulb,
+  Newspaper,
+  Sparkles,
+  Target
 } from "lucide-react";
-import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 function useSeo(title: string, description: string) {
   useEffect(() => {
@@ -126,7 +134,7 @@ export default function ChiSiamo() {
           <AnimateOnScroll stagger>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {whatWeDoFeatures.map(({ label, desc }, i) => {
-              const Icon = WHAT_WE_DO_ICONS[i];
+              const Icon = WHAT_WE_DO_ICONS[i] ?? Target;
               return (
               <AnimateOnScrollItem key={label}>
               <div className="flex gap-4 p-5 rounded-2xl border bg-card h-full">

@@ -1,0 +1,63 @@
+import { getLLM } from "../llm/client";
+import { logger } from "../logger";
+import { withTimeout } from "../utils";
+import { selectModelFor } from "../model-router";
+
+export interface NodeSuggestion {
+  title: string;
+  type: string;
+  reason: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export async function suggestMissingNodes(
+  existingNodes: Array<{ title: string; type: string; content: string }>,
+  sectorName?: string,
+  journeyType?: string,
+  cvText?: string,
+): Promise<NodeSuggestion[]> {
+  try {
+    const contextParts: string[] = [];
+    if (sectorName) contextParts.push(`Settore di interesse: ${sectorName}`);
+    if (journeyType) contextParts.push(`Tipo di percorso: ${journeyType}`);
+    if (cvText) contextParts.push(`CV: ${cvText.slice(0, 500)}`);
+    const contextStr = contextParts.length > 0 ? `\nContesto utente:\n${contextParts.join("\n")}` : "";
+
+    const existingStr = existingNodes.length > 0
+      ? `\nNodi esistenti:\n${existingNodes.map((n) => `- "${n.title}" (${n.type})`).join("\n")}`
+      : "";
+
+    const prompt = `Sei un consulente AI che analizza un grafo della conoscenza personale.
+Dati i nodi esistenti e il profilo utente, suggerisci nuovi nodi che potrebbero essere utili.
+I nodi possono essere di tipo: document, user_note, web, platform_content.${contextStr}${existingStr}
+
+Suggerisci massimo 3 nodi mancanti, scegli quelli più importanti.
+Rispondi SOLO con un array JSON nel formato:
+[{ "title": "Titolo nodo", "type": "tipo", "reason": "Perché sarebbe utile" }]`;
+
+    const llm = getLLM();
+    const route = selectModelFor("knowledge-suggest");
+    const response = await withTimeout(
+      llm.chatOnce([{ role: "system", content: prompt }], { model: route.model, temperature: route.temperature, maxTokens: route.maxTokens }),
+      10000,
+      "suggest-nodes",
+    );
+
+    const parsed = JSON.parse(response) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(0, 3).map((item) => {
+      const record = isRecord(item) ? item : {};
+      return {
+        title: typeof record.title === "string" ? record.title : "Nuovo nodo",
+        type: typeof record.type === "string" ? record.type : "user_note",
+        reason: typeof record.reason === "string" ? record.reason : "",
+      };
+    });
+  } catch (err) {
+    logger.warn({ err }, "suggest-nodes failed");
+    return [];
+  }
+}

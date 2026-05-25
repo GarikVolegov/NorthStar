@@ -102,6 +102,7 @@ export async function batchProcessWithSSE<T, R>(
 
   for (let index = 0; index < items.length; index++) {
     const item = items[index];
+    if (item === undefined) continue;
     sendEvent({ type: "processing", index, item });
 
     try {

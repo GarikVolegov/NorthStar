@@ -1,13 +1,14 @@
-import { useEffect, useState } from "react";
-import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { postJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
-import { Mail, MessageCircle, CheckCircle2, Loader2, ArrowRight, Shield, Clock, Users } from "lucide-react";
-import { useTranslation } from "react-i18next";
-import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { ArrowRight, CheckCircle2, Clock, Loader2, Mail, MessageCircle, Shield, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 import { z } from "zod";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -54,15 +55,7 @@ export default function Contatti() {
     setStatus("sending");
     setErrorMsg("");
     try {
-      const res = await fetch(`${BASE}api/contact`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.error || "Errore invio messaggio");
-      }
+      await postJson(`${BASE}api/contact`, data);
       setStatus("sent");
       reset();
     } catch (err) {

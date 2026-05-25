@@ -1,16 +1,26 @@
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog, DialogContent,
+  DialogDescription,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { postJson } from "@/lib/apiClient";
+import { cn } from "@/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { apiFetch } from "@/lib/api-fetch";
-import {
-  Linkedin, Sparkles, CheckCircle2, Circle, ChevronRight,
-  Briefcase, GraduationCap, Award, Wrench, FileText,
-  Loader2, AlertCircle, Copy, ArrowLeft,
+  AlertCircle,
+  ArrowLeft,
+  Award,
+  Briefcase,
+  CheckCircle2,
+  ChevronRight,
+  GraduationCap,
+  Linkedin,
+  Loader2,
+  Sparkles,
+  Wrench
 } from "lucide-react";
+import { useState } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -32,6 +42,17 @@ interface ExtractedProfile {
   certifications: Cert[]; languages: string[];
   sector_suggestion: string; career_level: string;
   years_of_experience: number; north_star_notes: string;
+}
+
+interface ExtractLinkedInResponse {
+  data: ExtractedProfile;
+}
+
+interface ImportLinkedInResponse {
+  certsImported: number;
+  skillsFound: number;
+  experiencesFound: number;
+  educationFound: number;
 }
 
 const LINKEDIN_INSTRUCTIONS = [
@@ -73,10 +94,7 @@ export function LinkedInImportWizard({ open, onClose }: LinkedInImportWizardProp
   const [extracted, setExtracted] = useState<ExtractedProfile | null>(null);
   const [importCerts, setImportCerts] = useState(true);
   const [importSummary, setImportSummary] = useState(true);
-  const [importResult, setImportResult] = useState<{
-    certsImported: number; skillsFound: number;
-    experiencesFound: number; educationFound: number;
-  } | null>(null);
+  const [importResult, setImportResult] = useState<ImportLinkedInResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const qc = useQueryClient();
@@ -84,16 +102,9 @@ export function LinkedInImportWizard({ open, onClose }: LinkedInImportWizardProp
   const extractMut = useMutation({
     mutationFn: async () => {
       setError(null);
-      const r = await apiFetch(`${BASE}api/linkedin/extract`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileText: pastedText }),
+      return postJson<ExtractLinkedInResponse>(`${BASE}api/linkedin/extract`, {
+        profileText: pastedText,
       });
-      if (!r.ok) {
-        const d = await r.json();
-        throw new Error(d.error ?? "Errore durante l'analisi");
-      }
-      return r.json() as Promise<{ data: ExtractedProfile }>;
     },
     onMutate: () => setStep("analyzing"),
     onSuccess: (result) => {
@@ -108,21 +119,12 @@ export function LinkedInImportWizard({ open, onClose }: LinkedInImportWizardProp
 
   const importMut = useMutation({
     mutationFn: async () => {
-      const r = await apiFetch(`${BASE}api/linkedin/import`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profileText: pastedText,
-          extractedData: extracted,
-          importCertifications: importCerts,
-          importSummary,
-        }),
+      return postJson<ImportLinkedInResponse>(`${BASE}api/linkedin/import`, {
+        profileText: pastedText,
+        extractedData: extracted,
+        importCertifications: importCerts,
+        importSummary,
       });
-      if (!r.ok) {
-        const d = await r.json();
-        throw new Error(d.error ?? "Errore durante l'importazione");
-      }
-      return r.json();
     },
     onSuccess: (result) => {
       setImportResult(result);
@@ -150,7 +152,7 @@ export function LinkedInImportWizard({ open, onClose }: LinkedInImportWizardProp
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-background border-border">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-foreground">
-            <Linkedin className="h-5 w-5 text-[#0077B5]" />
+            <Linkedin className="h-5 w-5 text-[#0077B5]" /* LinkedIn brand blue */ />
             Importa da LinkedIn
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
@@ -238,7 +240,7 @@ export function LinkedInImportWizard({ open, onClose }: LinkedInImportWizardProp
             <div className="relative mx-auto w-16 h-16">
               <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
               <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-              <Linkedin className="absolute inset-0 m-auto h-7 w-7 text-[#0077B5]" />
+              <Linkedin className="absolute inset-0 m-auto h-7 w-7 text-[#0077B5]" /* LinkedIn brand blue */ />
             </div>
             <div>
               <p className="font-semibold text-foreground">Analisi in corso…</p>

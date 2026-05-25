@@ -42,13 +42,13 @@
  */
 import type { RetrievedChunk } from "./retriever";
 import type { CoTResult } from "./chain-of-thought";
-import { openai } from "../client";
 
 export type ConfidenceLevel = "high" | "medium" | "low";
 
 export interface EvalResult {
   score: number;           // 0-1 composite
   level: ConfidenceLevel;
+  needsClarification: boolean; // true when level === "low"
   dimensions: {
     contextCoverage:  number;
     cotConfidence:    number;
@@ -180,7 +180,34 @@ export function evaluateSelf(input: EvaluatorInput): EvalResult {
   return {
     score: Math.round(score * 100) / 100,
     level,
+    needsClarification: level === "low",
     dimensions: dims,
     reasons: buildReasons(dims, level),
   };
+}
+
+/**
+ * Builds a targeted clarification message when the agent's confidence is "low".
+ * The questions address whichever dimension(s) caused the low score.
+ */
+export function buildClarification(evalResult: EvalResult, name?: string): string {
+  const greeting = name ? `${name}, ` : "";
+
+  if (evalResult.dimensions.questionClarity < 0.45) {
+    return `${greeting}la tua domanda è ancora un po' generica per poterti dare una risposta utile. Puoi dirmi più precisamente cosa ti preoccupa o cosa vorresti ottenere? Anche un esempio concreto mi aiuterebbe tantissimo.`;
+  }
+
+  if (evalResult.dimensions.cotConfidence < 0.50) {
+    return `${greeting}il tuo messaggio tocca diversi aspetti e non sono sicura di aver capito esattamente il tuo bisogno. Potresti aiutarmi a inquadrare meglio la situazione? Ad esempio: cosa sta succedendo, da quanto tempo, e cosa hai già provato a fare?`;
+  }
+
+  if (evalResult.dimensions.contextCoverage < 0.40) {
+    return `${greeting}non ho trovato nei tuoi documenti o nei miei contenuti informazioni specifiche su questo tema. Puoi darmi più contesto? Anche qualche riga per spiegarmi la tua situazione mi permetterebbe di aiutarti molto meglio.`;
+  }
+
+  if (evalResult.dimensions.memoryCoverage < 0.35) {
+    return `${greeting}è la prima volta che parliamo di questo argomento e non voglio darti una risposta troppo generica. Puoi raccontarmi un po' più di te e di cosa ti ha portato qui?`;
+  }
+
+  return `${greeting}non ho abbastanza elementi per darti una risposta utile. Puoi fornirmi più dettagli?`;
 }

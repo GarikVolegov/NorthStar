@@ -1,15 +1,12 @@
-/**
- * DB_RULES.md: modifiche additive only. Ogni nuova colonna ha DEFAULT
- * per garantire compatibilità con righe esistenti senza migration
- * distruttiva.
- */
 import {
   pgTable, text, serial, timestamp, integer, boolean, jsonb,
-  index, uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { relations } from "drizzle-orm";
+import { voiceSessionsTable } from "./voiceSessions";
+import { userProfileSettingsTable } from "./userProfiles";
 
 export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -17,91 +14,39 @@ export const usersTable = pgTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash"),
   googleId: text("google_id").unique(),
+  clerkId: text("clerk_id").unique(),
   avatarUrl: text("avatar_url"),
 
-  // ── Passo 4: username univoco per profilo pubblico ────────────────────
-  username: text("username").unique(),
+  role: text("role").notNull().default("user"),
 
-  // Soft link: points to the last completed test session
   testSessionId: integer("test_session_id"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   emailVerified: boolean("email_verified").notNull().default(false),
+  isPremium: boolean("is_premium").notNull().default(false),
+  isAdmin: boolean("is_admin").notNull().default(false),
   verificationCode: text("verification_code"),
   verificationCodeExpires: timestamp("verification_code_expires", { withTimezone: true }),
   resetToken: text("reset_token"),
   resetTokenExpires: timestamp("reset_token_expires", { withTimezone: true }),
-  cvText: text("cv_text"),
-  cvJson: jsonb("cv_json"),
-  isPublic: boolean("is_public").notNull().default(false),
-  timezone: text("timezone").default("Europe/Rome"),
-  workPreference: text("work_preference").default("unknown"),
-  autonomyPreference: integer("autonomy_preference").default(5),
-  stabilityPreference: integer("stability_preference").default(5),
+
   lastActiveAt: timestamp("last_active_at", { withTimezone: true }),
   streakDays: integer("streak_days").notNull().default(0),
-  userMode: text("user_mode").notNull().default("explorer"),
+
+  onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
   journeyType: text("journey_type").notNull().default("indeciso"),
+
+  voiceStreak: integer("voice_streak").default(0),
+  totalXp: integer("total_xp").default(0),
+  lastVoiceSessionAt: timestamp("last_voice_session_at", { withTimezone: true }),
+
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 
-  // ── Phase 3: Gamification Base ────────────────────────────────────
-  voiceStreak:        integer("voice_streak").default(0),
-  totalXp:            integer("total_xp").default(0),
-  lastVoiceSessionAt: timestamp("last_voice_session_at", { withTimezone: true }),
-
-  // ── Fase 1.2: Referral tracking completo ───────────────────────────
-  /**
-   * Codice raw inserito al signup (es. "NS-A-1234").
-   * Viene scritto subito alla registrazione, prima che affiliate_accounts
-   * venga cercato/creato. NULL se nessun referral è stato usato.
-   * Dopo il primo pagamento Stripe, referredByAffiliateId viene popolato
-   * da processPostPaymentReferral() e questo campo rimane come audit trail.
-   */
-  referredByCode: text("referred_by_code"),
-
-  /**
-   * FK verso affiliate_accounts.id — chi ha portato questo utente.
-   * Viene impostato da processPostPaymentReferral() dopo invoice.paid.
-   * NULL se l'utente non è ancora convertito o non ha usato un referral.
-   */
-  referredByAffiliateId: integer("referred_by_affiliate_id"),
-
-  /** Timestamp del primo pagamento: marca la conversione del referral. */
-  referralConvertedAt: timestamp("referral_converted_at", { withTimezone: true }),
-
-  // ── Fase 4: Accesso dashboard affiliazione ──────────────────────────
-  /**
-   * true = questo utente ha accesso alla dashboard affiliazione
-   * (/affiliazione/dashboard) e al menu navbar corrispondente.
-   */
-  isAffiliate: boolean("is_affiliate").notNull().default(false),
-
-  // ── Network Step 2: Posizione + Bio ────────────────────────────────
-  /**
-   * Città dell'utente — label human-readable (es. "Roma, Lazio, Italia").
-   * Impostata tramite CityAutocomplete su Nominatim (OpenStreetMap).
-   * DEFAULT null: tutti gli utenti esistenti non hanno città.
-   */
-  city:        text("city").default(null as unknown as string),
-
-  /**
-   * Place ID Nominatim (osm_id + osm_type, es. "R365331").
-   * Permette ricerche future per prossimità senza geocoding ripetuto.
-   */
-  cityPlaceId: text("city_place_id").default(null as unknown as string),
-
-  /**
-   * Bio breve — max 300 char. Mostrata nel profilo pubblico e nelle card
-   * della sezione Esplora del network.
-   */
-  bio: text("bio").default(null as unknown as string),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  purgedAt: timestamp("purged_at", { withTimezone: true }),
 }, (t) => ({
-  usernameIdx:        uniqueIndex("users_username_idx").on(t.username),
-  referredByIdx:      index("users_referred_by_idx").on(t.referredByAffiliateId),
-  referredByCodeIdx:  index("users_referred_by_code_idx").on(t.referredByCode),
-  isAffiliateIdx:     index("users_is_affiliate_idx").on(t.isAffiliate),
-  cityIdx:            index("users_city_idx").on(t.city),
+  testSessionIdIdx: index("users_test_session_id_idx").on(t.testSessionId),
 }));
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({
@@ -134,18 +79,23 @@ export const jobApplicationsTable = pgTable(
 
 export type JobApplication = typeof jobApplicationsTable.$inferSelect;
 
-export const usersRelations = relations(usersTable, ({ many }) => ({
+export const usersRelations = relations(usersTable, ({ many, one }) => ({
   jobApplications: many(jobApplicationsTable),
-  voiceSessions: many("voiceSessionsTable" as any),
+  voiceSessions: many(voiceSessionsTable),
+  profile: one(userProfileSettingsTable, {
+    fields: [usersTable.id],
+    references: [userProfileSettingsTable.userId],
+  }),
 }));
 
-/** Produce "mario-rossi-42" da name="Mario Rossi", id=42 */
 export function generateUsername(name: string, id: number): string {
   const slug = name
+    .normalize("NFKD")
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
+    .replace(/[^\w\s-]/g, "")
     .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-_]+|[-_]+$/g, "")
     .slice(0, 30)
     || "utente";
   return `${slug}-${id}`;

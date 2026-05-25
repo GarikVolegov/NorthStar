@@ -3,9 +3,12 @@
  * FRONTEND_RULES.md: hook TanStack Query, nessun fetch diretto nei componenti.
  * API_RULES.md: token da AuthContext, endpoint /api/affiliate/*
  */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { ApiClientError, getJson, postJson } from '@/lib/apiClient';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+const BASE = import.meta.env.BASE_URL || '/';
 
 // ─── Tipi ────────────────────────────────────────────────────────────────────
 
@@ -13,7 +16,7 @@ export interface AffiliateReferral {
   id: string;
   referredUserName: string;
   referredUserEmail: string;
-  status: 'pending' | 'confirmed' | 'paid';
+  status: 'pending' | 'confirmed' | 'paid' | 'cancelled';
   commissionAmount: number;   // in centesimi
   createdAt: string;          // ISO 8601
   paidAt?: string;
@@ -25,11 +28,12 @@ export interface AffiliateDashboardData {
   totalEarned: number;        // totale storico, in centesimi
   referralCode: string;       // es. "MARIO42"
   referralLink: string;       // URL completo con il codice
+  qrCodeUrl: string;          // endpoint interno autenticato per il QR
   referrals: AffiliateReferral[];
   subscription: {
     plan: string;
-    status: 'active' | 'trialing' | 'canceled' | 'past_due';
-    currentPeriodEnd: string;
+    status: 'active' | 'paused' | 'suspended' | 'trialing' | 'canceled' | 'past_due';
+    currentPeriodEnd: string | null;
   } | null;
   minWithdrawAmount: number;  // soglia minima ritiro, in centesimi
 }
@@ -55,6 +59,12 @@ function formatCents(cents: number): string {
 
 export { formatCents };
 
+function affiliateErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiClientError) return error.message;
+  if (error instanceof Error) return error.message;
+  return fallback;
+}
+
 // ─── Hook principale ─────────────────────────────────────────────────────────
 
 export function useAffiliateDashboard() {
@@ -63,14 +73,7 @@ export function useAffiliateDashboard() {
   return useQuery<AffiliateDashboardData>({
     queryKey: affiliateKeys.dashboard,
     queryFn: async () => {
-      const res = await fetch('/api/affiliate/dashboard', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message ?? `Errore ${res.status}`);
-      }
-      return res.json();
+      return getJson<AffiliateDashboardData>(`${BASE}api/affiliate/dashboard`);
     },
     enabled: !!token,
     staleTime: 60_000,          // 1 min — dati finanziari non troppo aggressivi
@@ -82,23 +85,17 @@ export function useAffiliateDashboard() {
 // ─── Mutation: ritiro ────────────────────────────────────────────────────────
 
 export function useAffiliateWithdraw() {
-  const { token } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation<void, Error, WithdrawRequest>({
     mutationFn: async ({ amount }) => {
-      const res = await fetch('/api/affiliate/withdraw', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ amount }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message ?? `Errore ${res.status}`);
+      try {
+        await postJson(`${BASE}api/affiliate/withdraw`, { amount });
+      } catch (error) {
+        throw new Error(affiliateErrorMessage(error, 'Ritiro non riuscito'), {
+          cause: error,
+        });
       }
     },
     onSuccess: () => {

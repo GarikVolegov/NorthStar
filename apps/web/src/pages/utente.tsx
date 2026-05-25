@@ -1,14 +1,25 @@
-import { useParams } from "wouter";
-import { Link } from "wouter";
-import { useAuth } from "@/contexts/AuthContext";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import {
-  Users, UserPlus, UserCheck, Lock, Globe, Clock,
-  Loader2, ArrowLeft, Check, X, UserMinus,
-} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { deleteJson, getJson, patchJson, postJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  Briefcase,
+  Check,
+  Clock,
+  Globe,
+  Loader2,
+  Lock,
+  MapPin,
+  Sparkles,
+  UserCheck,
+  UserMinus,
+  UserPlus,
+  X
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link, useParams } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -17,12 +28,20 @@ type FriendshipStatus = "pending" | "accepted" | "rejected";
 interface PublicProfile {
   id: number;
   name: string;
+  email?: string;
   isPublic: boolean;
   createdAt: string;
   canView: boolean;
   areFriends: boolean;
   friendshipStatus: FriendshipStatus | null;
   friendshipId: number | null;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
+  bio?: string | null;
+  city?: string | null;
+  workPreference?: string | null;
+  journeyType?: string | null;
+  userMode?: string | null;
 }
 
 const AVATAR_COLORS = [
@@ -33,6 +52,20 @@ const AVATAR_COLORS = [
   "bg-rose-100 text-rose-700",
   "bg-cyan-100 text-cyan-700",
 ];
+
+const JOURNEY_LABELS: Record<string, { label: string; color: string }> = {
+  indeciso:    { label: "Indeciso",    color: "bg-purple-100 text-purple-700 border-purple-200" },
+  dipendente:  { label: "Dipendente",  color: "bg-blue-100 text-blue-700 border-blue-200" },
+  autonomo:    { label: "Autonomo",    color: "bg-amber-100 text-amber-700 border-amber-200" },
+  azienda:     { label: "Azienda",     color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+  investitore: { label: "Investitore", color: "bg-rose-100 text-rose-700 border-rose-200" },
+};
+
+const WORK_LABELS: Record<string, string> = {
+  dipendente: "Dipendente",
+  autonomo: "Autonomo / Freelance",
+  ibrido: "Ibrido",
+};
 
 function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
 function initials(name: string) { return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2); }
@@ -52,9 +85,7 @@ export default function Utente() {
     queryKey: ["public-profile", targetId, user?.id],
     queryFn: async () => {
       const viewerParam = user?.id ? `?viewerId=${user.id}` : "";
-      const res = await fetch(`${BASE}api/users/${targetId}/public${viewerParam}`);
-      if (!res.ok) throw new Error("Profilo non trovato");
-      return res.json();
+      return getJson<PublicProfile>(`${BASE}api/users/${targetId}/public${viewerParam}`);
     },
     enabled: !isNaN(targetId),
   });
@@ -66,41 +97,35 @@ export default function Utente() {
 
   const sendRequestMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${BASE}api/friends/request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: user!.id, receiverId: targetId }),
-      });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Errore"); }
-      return res.json();
+      return postJson(`${BASE}api/friends/request`, { requesterId: user!.id, receiverId: targetId });
     },
     onSuccess: invalidate,
   });
 
   const cancelMutation = useMutation({
     mutationFn: async (friendshipId: number) => {
-      await fetch(`${BASE}api/friends/${friendshipId}`, { method: "DELETE" });
+      await deleteJson(`${BASE}api/friends/${friendshipId}`);
     },
     onSuccess: invalidate,
   });
 
   const acceptMutation = useMutation({
     mutationFn: async (friendshipId: number) => {
-      await fetch(`${BASE}api/friends/${friendshipId}/accept`, { method: "PATCH" });
+      await patchJson(`${BASE}api/friends/${friendshipId}/accept`);
     },
     onSuccess: invalidate,
   });
 
   const rejectMutation = useMutation({
     mutationFn: async (friendshipId: number) => {
-      await fetch(`${BASE}api/friends/${friendshipId}/reject`, { method: "PATCH" });
+      await patchJson(`${BASE}api/friends/${friendshipId}/reject`);
     },
     onSuccess: invalidate,
   });
 
   const removeMutation = useMutation({
     mutationFn: async (friendshipId: number) => {
-      await fetch(`${BASE}api/friends/${friendshipId}`, { method: "DELETE" });
+      await deleteJson(`${BASE}api/friends/${friendshipId}`);
     },
     onSuccess: invalidate,
   });
@@ -128,26 +153,97 @@ export default function Utente() {
 
   const isOwnProfile = user?.id === profile.id;
   const isFriend = profile.areFriends;
-  const isPending = profile.friendshipStatus === "pending";
+
+  /* ── Profilo privato / non visibile ── */
+  if (!profile.canView && !isOwnProfile) {
+    return (
+      <div className="min-h-screen bg-muted/30">
+        <div className="max-w-lg mx-auto px-4 py-10">
+          <Link href="/amici" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
+            <ArrowLeft className="w-3.5 h-3.5" /> {t("amici.title")}
+          </Link>
+
+          <div className="bg-background rounded-3xl border shadow-sm p-8 text-center">
+            <div className={cn("w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4", avatarColor(profile.id))}>
+              {initials(profile.name)}
+            </div>
+            <h1 className="text-2xl font-serif font-bold text-foreground mb-3">{profile.name}</h1>
+            <div className="flex items-center justify-center gap-1.5 mb-6">
+              <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">{t("utente.privateProfile")}</span>
+            </div>
+
+            {user ? (
+              <div className="flex justify-center gap-2">
+                {profile.friendshipStatus === "pending" && profile.friendshipId ? (
+                  <>
+                    <Button variant="outline" size="sm" className="rounded-full gap-1.5 text-amber-600 border-amber-200 bg-amber-50">
+                      <Clock className="w-3.5 h-3.5" /> {t("utente.requestSent")}
+                    </Button>
+                    <Button variant="ghost" size="sm" className="rounded-full gap-1.5 text-muted-foreground"
+                      onClick={() => cancelMutation.mutate(profile.friendshipId!)}
+                      disabled={cancelMutation.isPending}>
+                      {cancelMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                      {t("utente.cancelRequest")}
+                    </Button>
+                  </>
+                ) : (
+                  <Button className="rounded-full gap-2" onClick={() => sendRequestMutation.mutate()}
+                    disabled={sendRequestMutation.isPending}>
+                    {sendRequestMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                    {t("utente.addFriend")}
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t("utente.loginToAdd")}</p>
+            )}
+          </div>
+
+          <div className="mt-4 bg-background rounded-2xl border p-6 text-center">
+            <Lock className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-sm font-medium mb-1">{t("utente.privateContent")}</p>
+            <p className="text-xs text-muted-foreground">
+              {t("utente.privateContentDesc", { name: profile.name })}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Profilo pubblico / visibile ── */
+  const journeyMeta = profile.journeyType ? JOURNEY_LABELS[profile.journeyType] : null;
 
   return (
     <div className="min-h-screen bg-muted/30">
       <div className="max-w-lg mx-auto px-4 py-10">
 
-        {/* Back */}
         <Link href="/amici" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
           <ArrowLeft className="w-3.5 h-3.5" /> {t("amici.title")}
         </Link>
 
-        {/* Profile card */}
-        <div className="bg-background rounded-3xl border shadow-sm p-8 text-center">
+        {/* Profile header */}
+        <div className="bg-background rounded-3xl border shadow-sm text-center overflow-hidden">
+          {/* Banner */}
+          {profile.bannerUrl && (
+            <div className="h-32 bg-muted">
+              <img src={profile.bannerUrl} alt="" className="w-full h-full object-cover" />
+            </div>
+          )}
+          <div className="p-8">
           {/* Avatar */}
-          <div className={cn(
-            "w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4",
-            avatarColor(profile.id),
-          )}>
-            {initials(profile.name)}
-          </div>
+          {profile.avatarUrl ? (
+            <img
+              src={profile.avatarUrl}
+              alt={profile.name}
+              className="w-20 h-20 rounded-full object-cover mx-auto mb-4 border-2 border-border"
+            />
+          ) : (
+            <div className={cn("w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4", avatarColor(profile.id))}>
+              {initials(profile.name)}
+            </div>
+          )}
 
           <h1 className="text-2xl font-serif font-bold text-foreground mb-1">{profile.name}</h1>
 
@@ -157,6 +253,32 @@ export default function Utente() {
               ? <><Globe className="w-3.5 h-3.5 text-emerald-500" /><span className="text-sm text-emerald-600 font-medium">{t("utente.publicProfile")}</span></>
               : <><Lock className="w-3.5 h-3.5 text-muted-foreground" /><span className="text-sm text-muted-foreground">{t("utente.privateProfile")}</span></>}
           </div>
+
+          {/* City + Work preference badges */}
+          <div className="flex items-center justify-center gap-2 flex-wrap mb-3">
+            {profile.city && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium bg-muted text-muted-foreground rounded-full px-3 py-1">
+                <MapPin className="w-3 h-3" /> {profile.city}
+              </span>
+            )}
+            {profile.workPreference && profile.workPreference !== "unknown" && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium bg-muted text-muted-foreground rounded-full px-3 py-1">
+                <Briefcase className="w-3 h-3" /> {WORK_LABELS[profile.workPreference] ?? profile.workPreference}
+              </span>
+            )}
+            {journeyMeta && (
+              <span className={cn("inline-flex items-center text-xs font-semibold px-3 py-1 rounded-full border", journeyMeta.color)}>
+                <Sparkles className="w-3 h-3 mr-1" /> {journeyMeta.label}
+              </span>
+            )}
+          </div>
+
+          {/* Bio */}
+          {profile.bio && (
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-sm mx-auto mb-4 italic">
+              "{profile.bio}"
+            </p>
+          )}
 
           {/* Member since */}
           <p className="text-xs text-muted-foreground mb-6">
@@ -178,7 +300,7 @@ export default function Utente() {
                     {t("utente.removeFriend")}
                   </Button>
                 </>
-              ) : isPending && profile.friendshipId ? (
+              ) : profile.friendshipStatus === "pending" && profile.friendshipId ? (
                 <>
                   <Button variant="outline" size="sm" className="rounded-full gap-1.5 text-amber-600 border-amber-200 bg-amber-50">
                     <Clock className="w-3.5 h-3.5" /> {t("utente.requestSent")}
@@ -190,7 +312,7 @@ export default function Utente() {
                     {t("utente.cancelRequest")}
                   </Button>
                 </>
-              ) : profile.friendshipStatus === "pending" && profile.friendshipId ? (
+              ) : (
                 <div className="flex gap-2">
                   <Button size="sm" className="rounded-full gap-1.5"
                     onClick={() => acceptMutation.mutate(profile.friendshipId!)}
@@ -205,12 +327,6 @@ export default function Utente() {
                     {t("utente.rejectRequest")}
                   </Button>
                 </div>
-              ) : (
-                <Button className="rounded-full gap-2" onClick={() => sendRequestMutation.mutate()}
-                  disabled={sendRequestMutation.isPending}>
-                  {sendRequestMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                  {t("utente.addFriend")}
-                </Button>
               )}
             </div>
           )}
@@ -223,25 +339,32 @@ export default function Utente() {
             </Link>
           )}
         </div>
+        </div>
 
-        {/* Locked content */}
-        {!profile.canView && !isOwnProfile && (
-          <div className="mt-4 bg-background rounded-2xl border p-6 text-center">
-            <Lock className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-sm font-medium mb-1">{t("utente.privateContent")}</p>
-            <p className="text-xs text-muted-foreground">
-              {t("utente.privateContentDesc", { name: profile.name })}
-            </p>
-          </div>
-        )}
+        {/* Extra info cards only for friends/public */}
+        {profile.canView && (
+          <div className="mt-4 space-y-3">
+            {profile.email && (
+              <div className="bg-background rounded-2xl border p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Email</p>
+                <p className="text-sm font-medium">{profile.email}</p>
+              </div>
+            )}
 
-        {/* Friends CTA */}
-        {!user && (
-          <div className="mt-4 bg-background rounded-2xl border p-5 text-center">
-            <p className="text-sm text-muted-foreground mb-3">
-              {t("utente.loginToAdd")}
-            </p>
-            <Button asChild className="rounded-full"><Link href="/">{t("utente.goHome")}</Link></Button>
+            {profile.userMode && (
+              <div className="bg-background rounded-2xl border p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Modalità</p>
+                <p className="text-sm font-medium capitalize">{profile.userMode === "explorer" ? "Esploratore" : "Carriera"}</p>
+              </div>
+            )}
+
+            {/* Friends CTA */}
+            {!user && (
+              <div className="bg-background rounded-2xl border p-5 text-center">
+                <p className="text-sm text-muted-foreground mb-3">{t("utente.loginToAdd")}</p>
+                <Button asChild className="rounded-full"><Link href="/">{t("utente.goHome")}</Link></Button>
+              </div>
+            )}
           </div>
         )}
       </div>

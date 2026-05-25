@@ -1,16 +1,33 @@
-import { useState, useMemo } from "react";
-import { Link } from "wouter";
-import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ApiClientError, postJson } from "@/lib/apiClient";
 import { usePageMeta } from "@/lib/seo";
 import {
-  School, GraduationCap, Briefcase, BookOpen, Building2, Users,
-  CheckCircle2, ArrowRight, Star, BarChart3, Compass, Brain,
-  Handshake, Mail, Globe, Zap, Shield, TrendingUp, Award,
-  MessageSquare, ChevronRight,
+  ArrowRight,
+  Award,
+  BarChart3,
+  BookOpen,
+  Brain,
+  Briefcase,
+  Building2,
+  CheckCircle2,
+  ChevronRight,
+  Compass,
+  Globe,
+  GraduationCap,
+  Handshake, Mail,
+  MessageSquare,
+  School,
+  Shield,
+  Star,
+  TrendingUp,
+  Users,
+  Zap,
 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL ?? "/";
 
@@ -37,17 +54,15 @@ function LeadForm() {
     setStatus("sending");
     setErrMsg("");
     try {
-      const res = await fetch(`${BASE}api/affiliazione/lead`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (!res.ok) { setStatus("err"); setErrMsg(data.error ?? t("affiliazione.formErrorGeneric")); return; }
+      await postJson(`${BASE}api/affiliazione/lead`, form);
       setStatus("ok");
-    } catch {
+    } catch (error) {
       setStatus("err");
-      setErrMsg(t("affiliazione.formErrorNetwork"));
+      setErrMsg(
+        error instanceof ApiClientError
+          ? error.message
+          : t("affiliazione.formErrorNetwork"),
+      );
     }
   }
 
@@ -170,7 +185,7 @@ export default function Affiliazione() {
   const { t } = useTranslation();
 
   usePageMeta({
-    title: "Affiliazione e Partnership istituzionale",
+    title: "Partner e Partnership istituzionale",
     description: "Porta NorthStar nella tua scuola, università o agenzia. Programma di partnership B2B per istituzioni formative: referral, licenza istituzionale, white label e ambassador.",
     path: "/affiliazione",
   });
@@ -190,7 +205,7 @@ export default function Affiliazione() {
       href: "/affiliazione/scuole",
       color: "bg-emerald-50 text-emerald-700 border-emerald-200",
       iconBg: "bg-emerald-100 text-emerald-700",
-      uses: ["Orientamento post-diploma", "Supporto università / ITS / lavoro", "Test attitudinali", "Presentazione settori"],
+      uses: ["Orientamento post-diploma", "Supporto università / ITS / lavoro", "Test attitudinali", "Presentazione aree"],
     },
     {
       icon: Building2,
@@ -230,7 +245,7 @@ export default function Affiliazione() {
     { icon: Zap, title: "Servizio digitale innovativo", desc: "Offri ai tuoi utenti uno strumento moderno, basato su dati reali e psicologia validata." },
     { icon: BarChart3, title: "Dati e reportistica", desc: "Accedi a dashboard aggregate sull'utilizzo e sui profili dei tuoi utenti (nel rispetto della privacy)." },
     { icon: Brain, title: "Test personalizzati", desc: "Il test RIASEC + Bussola Interiore si adatta a ogni contesto: studenti, candidati, lavoratori." },
-    { icon: TrendingUp, title: "Contenuti sempre aggiornati", desc: "21 settori con dati aggiornati su stipendi, crescita e trend del mercato del lavoro italiano." },
+    { icon: TrendingUp, title: "Contenuti sempre aggiornati", desc: "21 aree con dati aggiornati su stipendi, crescita e trend del mercato del lavoro italiano." },
     { icon: Award, title: "Reputazione e qualità percepita", desc: "Associare il tuo brand a NorthStar aumenta la qualità percepita del servizio offerto." },
     { icon: Globe, title: "Scalabile e multi-utente", desc: "Gestisci decine, centinaia o migliaia di utenti da un'unica piattaforma condivisa." },
   ], []);
@@ -239,7 +254,7 @@ export default function Affiliazione() {
     { icon: Compass, title: "Chiarezza nella scelta", desc: "Trasforma il disorientamento in direzione concreta, senza promesse vuote." },
     { icon: Brain, title: "Conoscenza di sé", desc: "Scopre il proprio profilo RIASEC e la Bussola Interiore in meno di 3 minuti." },
     { icon: BarChart3, title: "Dati reali sul mercato", desc: "Stipendi, crescita, rischio AI: informazioni vere per decidere con consapevolezza." },
-    { icon: Star, title: "Percorso personalizzato", desc: "Wiki, Roadmap e Grafo della Conoscenza per costruire il proprio piano d'azione." },
+    { icon: Star, title: "Piano personalizzato", desc: "Wiki, Roadmap e Mappa della Conoscenza per costruire il proprio piano d'azione." },
   ], []);
 
   const MODELS = useMemo(() => [
@@ -284,24 +299,17 @@ export default function Affiliazione() {
     { q: "A chi si rivolge il programma di affiliazione?", a: "A scuole medie e superiori, università, agenzie per il lavoro, centri di formazione professionale, enti pubblici e privati, orientatori e consulenti individuali." },
     { q: "Come funziona la partnership concretamente?", a: "Dipende dal modello scelto. Per il referral: condividi un link dedicato e ricevi commissione sulle conversioni. Per la licenza: un contratto flat con accesso multiplo." },
     { q: "È possibile personalizzare la piattaforma?", a: "Il white label parziale prevede personalizzazione di logo, colori e URL. Per esigenze più avanzate, valutiamo soluzioni su misura." },
-    { q: "NorthStar è adatto all'orientamento scolastico?", a: "Sì. Il test RIASEC è usato in ambito accademico e scolastico da decenni. La nostra versione è pensata per il contesto italiano: 21 settori, dati aggiornati, linguaggio accessibile." },
+    { q: "NorthStar è adatto all'orientamento scolastico?", a: "Sì. Il test RIASEC è usato in ambito accademico e scolastico da decenni. La nostra versione è pensata per il contesto italiano: 21 aree, dati aggiornati, linguaggio accessibile." },
     { q: "Come viene gestita la privacy degli utenti?", a: "NorthStar è conforme al GDPR. I dati degli utenti sono cifrati, non venduti a terzi e non condivisi con le istituzioni partner senza il consenso esplicito dell'utente." },
     { q: "Esiste una demo gratuita?", a: "Sì. Compila il form in fondo a questa pagina e ti organizziamo una demo personalizzata gratuita di 30 minuti, senza impegno." },
     { q: "Qual è il costo per l'istituzione?", a: "Dipende dal modello. Il referral non ha costi iniziali. La licenza istituzionale è concordata su volume. Contattaci per un preventivo gratuito." },
   ], []);
 
-  const STATS = useMemo(() => [
-    { n: "21", label: t("affiliazione.schools") === "Schools" ? "Professional sectors" : "Settori professionali" },
-    { n: "RIASEC", label: t("affiliazione.schools") === "Schools" ? "Globally validated test" : "Test validato globalmente" },
-    { n: "100%", label: "GDPR" },
-    { n: "Free", label: t("affiliazione.contactFree").split(",")[0] },
-  ], [t]);
-
   const SOLUTION_FEATURES = [
     { icon: Brain, title: "Test di personalità", desc: "RIASEC + Bussola Interiore in meno di 3 minuti. Validato scientificamente, pensato per il contesto italiano." },
-    { icon: Compass, title: "Matching con 21 settori", desc: "L'algoritmo incrocia il profilo con dati reali di mercato: stipendi, crescita, rischio AI, trend." },
-    { icon: TrendingUp, title: "Percorsi formativi", desc: "Wiki, Roadmap e Grafo della Conoscenza per costruire un piano d'azione concreto e personalizzato." },
-    { icon: BarChart3, title: "Dati aggiornati", desc: "21 settori professionali con dati sul mercato del lavoro italiano costantemente aggiornati." },
+    { icon: Compass, title: "Matching con 21 aree", desc: "L'algoritmo incrocia il profilo con dati reali di mercato: stipendi, crescita, rischio AI, trend." },
+    { icon: TrendingUp, title: "Percorsi formativi", desc: "Wiki, Roadmap e Mappa della Conoscenza per costruire un piano d'azione concreto e personalizzato." },
+    { icon: BarChart3, title: "Dati aggiornati", desc: "21 aree professionali con dati sul mercato del lavoro italiano costantemente aggiornati." },
     { icon: Shield, title: "Privacy GDPR", desc: "Gestione dei dati conforme al regolamento europeo. DPA incluso in ogni partnership istituzionale." },
     { icon: Globe, title: "Multidevice e scalabile", desc: "Accessibile da qualsiasi dispositivo. Funziona con 10 utenti come con 10.000." },
   ];
@@ -337,7 +345,7 @@ export default function Affiliazione() {
         </div>
         <div className="mt-14 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto text-center">
           {[
-            { n: "21", label: "Settori" },
+            { n: "21", label: "Aree" },
             { n: "RIASEC", label: "Test validato" },
             { n: "100%", label: "GDPR" },
             { n: "Free", label: t("affiliazione.contactFree").split(",")[0] },
@@ -532,7 +540,7 @@ export default function Affiliazione() {
                 {[
                   { href: "/chi-siamo", label: "Chi siamo" },
                   { href: "/come-funziona", label: "Come funziona" },
-                  { href: "/settori", label: "Esplora settori" },
+                  { href: "/settori", label: "Esplora aree" },
                   { href: "/premium", label: "Piano Premium" },
                   { href: "/contatti", label: "Contatti generali" },
                 ].map(l => (

@@ -1,44 +1,10 @@
-/**
- * Memory Manager — persistent memory across coach sessions.
- *
- * ARCHITECTURE
- * ────────────
- * WRITE path (fires AFTER each conversation, non-blocking):
- *   conversation messages
- *       ↓
- *   extractMemory()  ← GPT-4o-mini analyzes the exchange
- *       ↓
- *   { facts: [...], patterns: [...] }
- *       ↓
- *   mergeMemory()    ← upserts facts, increments pattern confidence
- *       ↓
- *   coach_memory_facts + coach_memory_patterns tables
- *
- * READ path (fires BEFORE each response, parallel with RAG retrieval):
- *   loadMemory(userId)
- *       ↓
- *   { facts, patterns }  ← top patterns by confidence + all facts
- *       ↓
- *   buildMemorySection() ← injected into system prompt
- *
- * CONFIDENCE SCORING for patterns:
- *   1st observation  → 0.50
- *   2nd observation  → 0.65
- *   3rd observation  → 0.80
- *   4th+ observation → 0.90 (capped)
- *
- * This means the coach mentions a pattern with certainty only after
- * seeing it multiple times — avoids false positives from a single session.
- */
-import { db } from "@workspace/db";
-import {
-  coachMemoryFactsTable,
-  coachMemoryPatternsTable,
-  type CoachMemoryFact,
-  type CoachMemoryPattern,
-} from "@workspace/db";
+import { coachMemoryFactsTable, coachMemoryPatternsTable, db, type CoachMemoryFact, type CoachMemoryPattern } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { openai } from "../client";
+import { embedText } from "./embedder";
+import { logger } from "../logger";
+import { selectModelFor } from "../model-router";
+import { ragConfig } from "../config/rag";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,12 +14,7 @@ export interface MemoryFact {
 }
 
 export interface MemoryPattern {
-  patternType:
-    | "limiting_belief"
-    | "strength"
-    | "recurring_theme"
-    | "emotional_trigger"
-    | "growth_edge";
+  patternType: "limiting_belief" | "strength" | "recurring_theme" | "emotional_trigger" | "growth_edge";
   description: string;
 }
 
@@ -74,6 +35,42 @@ function computeConfidence(observedCount: number): number {
   if (observedCount === 3) return 0.80;
   if (observedCount === 2) return 0.65;
   return 0.50;
+}
+
+// ── Semantic similarity ─────────────────────────────────────────────────────
+
+interface CacheEntry {
+  embedding: number[];
+  expiresAt: number;
+}
+const patternEmbeddingCache = new Map<number, CacheEntry>();
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    const av = a[i] ?? 0;
+    const bv = b[i] ?? 0;
+    dot += av * bv;
+    na += av * av;
+    nb += bv * bv;
+  }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-10);
+}
+
+async function getPatternEmbedding(
+  id: number,
+  description: string,
+): Promise<number[]> {
+  const cached = patternEmbeddingCache.get(id);
+  if (cached && cached.expiresAt > Date.now()) return cached.embedding;
+  const emb = await embedText(description);
+  patternEmbeddingCache.set(id, { embedding: emb, expiresAt: Date.now() + ragConfig.memory.embeddingCacheTtlMs });
+  // Keep cache bounded
+  if (patternEmbeddingCache.size > ragConfig.memory.maxEmbeddingCacheEntries) {
+    const firstKey = patternEmbeddingCache.keys().next().value as number | undefined;
+    if (firstKey !== undefined) patternEmbeddingCache.delete(firstKey);
+  }
+  return emb;
 }
 
 // ── EXTRACT: GPT-4o-mini analyzes the conversation ───────────────────────────
@@ -131,8 +128,9 @@ export async function extractMemory(
     .join("\n");
 
   try {
+    const route = selectModelFor("memory-extract");
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: route.model,
       messages: [
         { role: "system", content: EXTRACT_SYSTEM },
         { role: "user",   content: transcript },
@@ -150,7 +148,7 @@ export async function extractMemory(
       patterns: Array.isArray(parsed.patterns) ? parsed.patterns : [],
     };
   } catch (err) {
-    console.warn("[memory] extraction failed:", err instanceof Error ? err.message : err);
+    logger.warn({ err }, "memory extraction failed");
     return null;
   }
 }
@@ -162,82 +160,129 @@ export async function extractMemory(
  * - Facts: UPSERT on (userId, key) — updates value + increments confirmedCount
  * - Patterns: match by description similarity (exact string for now),
  *   increment observedCount and recompute confidence
+ *
+ * OPTIMIZATION: loads all existing facts/patterns in 2 queries total,
+ * then batch processes in memory, then executes 2-3 writes.
  */
 export async function mergeMemory(
   userId: number,
   sessionId: number,
   extracted: ExtractedMemory,
 ): Promise<void> {
-  // ── Upsert facts ──────────────────────────────────────────────────────────
-  for (const fact of extracted.facts) {
-    if (!fact.key?.trim() || !fact.value?.trim()) continue;
-
-    const existing = await db
+  // ── Load existing data for this user (max 1000 rows each) ───────
+  const MAX_MEMORY_ROWS = ragConfig.memory.maxMemoryRows;
+  const [allExistingFacts, allExistingPatterns] = await Promise.all([
+    db
       .select()
       .from(coachMemoryFactsTable)
-      .where(
-        and(
-          eq(coachMemoryFactsTable.userId, userId),
-          eq(coachMemoryFactsTable.key, fact.key),
-        ),
-      )
-      .limit(1);
+      .where(eq(coachMemoryFactsTable.userId, userId))
+      .limit(MAX_MEMORY_ROWS),
+    db
+      .select()
+      .from(coachMemoryPatternsTable)
+      .where(eq(coachMemoryPatternsTable.userId, userId))
+      .limit(MAX_MEMORY_ROWS),
+  ]);
 
-    if (existing.length > 0) {
-      await db
+  if (allExistingFacts.length >= MAX_MEMORY_ROWS || allExistingPatterns.length >= MAX_MEMORY_ROWS) {
+    logger.warn({ userId, facts: allExistingFacts.length, patterns: allExistingPatterns.length },
+      "mergeMemory hit row limit — memory may be truncated");
+  }
+
+  const existingFactsMap = new Map(allExistingFacts.map((f) => [f.key, f]));
+
+  // ── Upsert facts ──────────────────────────────────────────────────
+  const factUpdates: Array<{ key: string; value: string }> = [];
+  const factInserts: Array<{
+    userId: number;
+    key: string;
+    value: string;
+    sourceSessionId: number;
+  }> = [];
+
+  for (const fact of extracted.facts) {
+    if (!fact.key?.trim() || !fact.value?.trim()) continue;
+    const existing = existingFactsMap.get(fact.key);
+    if (existing) {
+      existingFactsMap.set(fact.key, {
+        ...existing,
+        value: fact.value,
+        confirmedCount: existing.confirmedCount + 1,
+      });
+      factUpdates.push({ key: fact.key, value: fact.value });
+    } else {
+      factInserts.push({
+        userId,
+        key: fact.key,
+        value: fact.value,
+        sourceSessionId: sessionId,
+      });
+    }
+  }
+
+  await Promise.all([
+    ...factUpdates.map((f) => {
+      const existing = existingFactsMap.get(f.key)!;
+      return db
         .update(coachMemoryFactsTable)
         .set({
-          value: fact.value,
-          confirmedCount: existing[0].confirmedCount + 1,
+          value: f.value,
+          confirmedCount: existing.confirmedCount,
           updatedAt: new Date(),
         })
         .where(
           and(
             eq(coachMemoryFactsTable.userId, userId),
-            eq(coachMemoryFactsTable.key, fact.key),
+            eq(coachMemoryFactsTable.key, f.key),
           ),
         );
-    } else {
-      await db.insert(coachMemoryFactsTable).values({
-        userId,
-        key: fact.key,
-        value: fact.value,
-        sourceSessionId: sessionId,
-        confirmedCount: 1,
-      });
-    }
-  }
+    }),
+    factInserts.length > 0
+      ? db.insert(coachMemoryFactsTable).values(factInserts)
+      : Promise.resolve(),
+  ]);
 
-  // ── Upsert patterns ───────────────────────────────────────────────────────
+  // ── Upsert patterns ───────────────────────────────────────────────
+  const patternUpdates: Array<{
+    id: number;
+    observedCount: number;
+    sessionIds: number[];
+  }> = [];
+  const patternInserts: Array<{
+    userId: number;
+    patternType: string;
+    description: string;
+    confidence: number;
+    observedCount: number;
+    sessionIds: number[];
+  }> = [];
+
   for (const pattern of extracted.patterns) {
     if (!pattern.description?.trim()) continue;
 
-    // Match existing pattern by type + description (first 80 chars)
-    const descKey = pattern.description.slice(0, 80);
-    const existing = await db
-      .select()
-      .from(coachMemoryPatternsTable)
-      .where(eq(coachMemoryPatternsTable.userId, userId));
+    const newEmbedding = await embedText(pattern.description);
+    let bestMatch: (typeof allExistingPatterns)[0] | undefined;
+    let bestScore = 0;
 
-    const match = existing.find(
-      (p) =>
-        p.patternType === pattern.patternType &&
-        p.description.slice(0, 80) === descKey,
-    );
+    for (const existing of allExistingPatterns) {
+      if (existing.patternType !== pattern.patternType) continue;
+      const existingEmb = await getPatternEmbedding(existing.id, existing.description);
+      const score = cosineSimilarity(newEmbedding, existingEmb);
+      if (score > bestScore && score >= ragConfig.memory.similarityThreshold) {
+        bestMatch = existing;
+        bestScore = score;
+      }
+    }
 
-    if (match) {
-      const newCount = match.observedCount + 1;
-      await db
-        .update(coachMemoryPatternsTable)
-        .set({
-          observedCount: newCount,
-          confidence: computeConfidence(newCount),
-          sessionIds: [...(match.sessionIds ?? []), sessionId],
-          updatedAt: new Date(),
-        })
-        .where(eq(coachMemoryPatternsTable.id, match.id));
+    if (bestMatch) {
+      const newCount = bestMatch.observedCount + 1;
+      patternUpdates.push({
+        id: bestMatch.id,
+        observedCount: newCount,
+        sessionIds: [...(bestMatch.sessionIds ?? []), sessionId],
+      });
     } else {
-      await db.insert(coachMemoryPatternsTable).values({
+      patternInserts.push({
         userId,
         patternType: pattern.patternType,
         description: pattern.description,
@@ -247,6 +292,23 @@ export async function mergeMemory(
       });
     }
   }
+
+  await Promise.all([
+    ...patternUpdates.map((u) =>
+      db
+        .update(coachMemoryPatternsTable)
+        .set({
+          observedCount: u.observedCount,
+          confidence: computeConfidence(u.observedCount),
+          sessionIds: u.sessionIds,
+          updatedAt: new Date(),
+        })
+        .where(eq(coachMemoryPatternsTable.id, u.id)),
+    ),
+    patternInserts.length > 0
+      ? db.insert(coachMemoryPatternsTable).values(patternInserts)
+      : Promise.resolve(),
+  ]);
 }
 
 // ── LOAD: Read memory for prompt injection ───────────────────────────────────
@@ -268,9 +330,9 @@ export async function loadMemory(userId: number): Promise<UserMemory> {
   ]);
 
   const topPatterns = patterns
-    .filter((p) => p.confidence >= 0.50)
+    .filter((p) => p.confidence >= ragConfig.memory.minPatternConfidence)
     .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, 8); // max 8 patterns in prompt
+    .slice(0, ragConfig.memory.maxPromptPatterns);
 
   return { facts, patterns: topPatterns };
 }
@@ -282,12 +344,24 @@ export async function loadMemory(userId: number): Promise<UserMemory> {
  * Only included if there's actually something to say.
  */
 export function buildMemorySection(memory: UserMemory): string {
-  const hasFacts    = memory.facts.length > 0;
+  const hasFacts = memory.facts.length > 0;
   const hasPatterns = memory.patterns.length > 0;
 
   if (!hasFacts && !hasPatterns) return "";
 
   const lines: string[] = ["## Memoria persistente — quello che sai già di questo utente"];
+
+  // ── Session goals banner ──────────────────────────────────────────────
+  const mainGoal = memory.facts.find((f) => f.key === "goal_main");
+  const secondaryGoal = memory.facts.find((f) => f.key === "goal_secondary");
+  if (mainGoal) {
+    lines.push(
+      "",
+      `### Obiettivo principale di sessione: ${mainGoal.value}`,
+      secondaryGoal ? `Obiettivo secondario: ${secondaryGoal.value}` : "",
+      "Tieni la risposta allineata a questi obiettivi. Se l'utente si allontana, riconducilo gentilmente.",
+    );
+  }
 
   if (hasFacts) {
     lines.push("\n### Fatti biografici (dichiarati dall'utente in sessioni precedenti)");
@@ -310,7 +384,9 @@ export function buildMemorySection(memory: UserMemory): string {
 
   lines.push(
     "\nUSA questa memoria per personalizzare la risposta." ,
-    "Non citare mai esplicitamente 'ricordo che mi hai detto' — incorpora naturalmente.",
+    "Se pertinente e c'è una connessione chiara, cita 1-2 fatti della memoria dell'utente per mostrare che ricordi la sua storia.",
+    "Esempi di citazione naturale: 'So che stavi lavorando su X…', 'La scorsa sessione mi dicevi che…', 'Visto che il tuo obiettivo è Y…'",
+    "Non esagerare — basta 1 citazione per risposta, solo quando aggiunge valore.",
   );
 
   return lines.join("\n");

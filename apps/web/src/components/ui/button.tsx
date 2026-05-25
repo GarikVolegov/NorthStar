@@ -1,9 +1,9 @@
-import * as React from "react"
+import { useReducedMotion } from "@/lib/motion"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
-import { motion } from "framer-motion"
 import type { Transition } from "framer-motion"
-import { useReducedMotion } from "@/lib/motion"
+import { motion } from "framer-motion"
+import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -56,6 +56,8 @@ export interface ButtonProps
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
     const prefersReduced = useReducedMotion()
+    const hoverProps =
+      variant === "link" ? {} : { whileHover: { scale: 1.015, y: -1 } }
 
     if (asChild) {
       if (prefersReduced) {
@@ -67,14 +69,15 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           />
         )
       }
+      const motionSlotProps = props as unknown as React.ComponentPropsWithoutRef<typeof MotionSlot>
       return (
         <MotionSlot
           className={cn(buttonVariants({ variant, size, className }))}
           ref={ref as React.Ref<HTMLElement>}
-          whileHover={variant === "link" ? undefined : { scale: 1.015, y: -1 }}
+          {...hoverProps}
           whileTap={{ scale: 0.97 }}
           transition={springTransition}
-          {...(props as React.ComponentPropsWithoutRef<typeof MotionSlot>)}
+          {...motionSlotProps}
         />
       )
     }
@@ -89,14 +92,15 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       )
     }
 
+    const motionButtonProps = props as unknown as React.ComponentPropsWithoutRef<typeof motion.button>
     return (
       <motion.button
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
-        whileHover={variant === "link" ? undefined : { scale: 1.015, y: -1 }}
+        {...hoverProps}
         whileTap={{ scale: 0.97 }}
         transition={springTransition}
-        {...(props as React.ComponentPropsWithoutRef<typeof motion.button>)}
+        {...motionButtonProps}
       />
     )
   }

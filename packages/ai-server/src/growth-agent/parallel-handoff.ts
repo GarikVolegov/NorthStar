@@ -21,8 +21,10 @@
  * └──────────────────────────────────────────────────────────────────────────────┘
  */
 import { openai } from "../client";
+import { getLLM } from "../llm/client";
+import { selectModelFor } from "../model-router";
 import { getSpecialist } from "./specialist-agent";
-import type { SpecialistRunOptions, SpecialistEvent } from "./specialist-agent";
+import type { SpecialistRunOptions } from "./specialist-agent";
 import type { RouteDecision, Domain } from "./router-agent";
 import type { RetrievedChunk } from "./retriever";
 import type { CoTResult } from "./chain-of-thought";
@@ -30,6 +32,7 @@ import type { EvalResult } from "./self-evaluator";
 import type { SupervisorResult } from "./supervisor-agent";
 import type { ChatMessage } from "./agent";
 import type { UserContext } from "./prompt-builder";
+import { logger } from "../logger";
 
 // How long to wait (ms) after the first specialist finishes before giving up
 // on fusion and switching to sequential append mode.
@@ -39,32 +42,35 @@ const CHUNK_SIZE       = 4;
 // ── Types ────────────────────────────────────────────────────────────────────────
 
 export interface ParallelHandoffOptions {
-  userId:          number;
-  userContext:     UserContext & { memorySection?: string };
-  history:         ChatMessage[];
-  userMessage:     string;
-  primaryRoute:    RouteDecision;
-  secondaryRoute:  RouteDecision;
-  memoryFactCount: number;
-  maxHistory?:     number;
+  userId:                number;
+  userContext:           UserContext & { memorySection?: string | undefined };
+  history:               ChatMessage[];
+  userMessage:           string;
+  primaryRoute:          RouteDecision;
+  secondaryRoute:        RouteDecision;
+  memoryFactCount:       number;
+  maxHistory?:           number | undefined;
+  requestId?:            string | undefined;
+  behavioralPatterns?:   Array<{ patternType: string; description: string; confidence: number }> | undefined;
+  routingHistorySummary?: string | undefined;
 }
 
 export type ParallelHandoffEvent =
   | { type: "token";  value: string }
-  | { type: "status"; value: string; domain?: Domain }
-  | { type: "done";   sources: RetrievedChunk[]; cot?: CoTResult | null; evalResult?: EvalResult; routeDecision: RouteDecision; supervisorResult?: SupervisorResult }
+  | { type: "status"; value: string; domain?: Domain | undefined }
+  | { type: "done";   sources: RetrievedChunk[]; cot?: CoTResult | null | undefined; evalResult?: EvalResult | undefined; routeDecision: RouteDecision; supervisorResult?: SupervisorResult | undefined }
   | { type: "error";  message: string };
 
 interface SpecialistResult {
   domain:  Domain;
   text:    string;
   sources: RetrievedChunk[];
-  cot?:    CoTResult | null;
-  evalResult?: EvalResult;
-  supervisorResult?: SupervisorResult;
+  cot?:    CoTResult | null | undefined;
+  evalResult?: EvalResult | undefined;
+  supervisorResult?: SupervisorResult | undefined;
   statusEvents: Array<{ value: string; domain: Domain }>;
   finishedAt: number; // Date.now() when drain completed
-  error?:  string;
+  error?:  string | undefined;
 }
 
 // ── Drain a specialist generator ────────────────────────────────────────────────
@@ -139,8 +145,9 @@ ${secondary.text}
 Sintetizza le due bozze in una risposta unica, coerente e di alta qualità.
 `.trim();
 
+  const route = selectModelFor("parallel-handoff-extract");
   const res = await openai.chat.completions.create({
-    model:       "gpt-4o-mini",
+    model:       route.model,
     messages: [
       { role: "system", content: FUSION_SYSTEM },
       { role: "user",   content: prompt },
@@ -150,6 +157,45 @@ Sintetizza le due bozze in una risposta unica, coerente e di alta qualità.
   });
 
   return res.choices[0]?.message?.content ?? primary.text;
+}
+
+/**
+ * Micro-fusion for the large-delta case.
+ * Instead of appending the full loser text (which creates a disjointed UX),
+ * extracts 3-5 key points from the loser that aren't redundant with the winner.
+ */
+async function extractKeyDifferences(
+  primary: SpecialistResult,
+  secondary: SpecialistResult,
+  userMessage: string,
+): Promise<string> {
+  const prompt = `Messaggio utente: "${userMessage}"
+
+Bozza primaria (${primary.domain}):
+${primary.text}
+
+Bozza secondaria (${secondary.domain}):
+${secondary.text}
+
+Estrai 3-5 punti chiave dalla bozza secondaria che NON siano già coperti nella bozza primaria.
+Output: un bullet point per riga, massimo 15 parole ciascuno. Nessun preambolo.`;
+
+  try {
+    const route = selectModelFor("parallel-handoff-gate");
+    const res = await getLLM().chatOnce(
+      [
+        {
+          role: "system",
+          content: "Sei un assistente che estrae informazioni non ridondanti. Output solo bullet points, uno per riga.",
+        },
+        { role: "user", content: prompt },
+      ],
+      { model: route.model, temperature: 0.3, maxTokens: 200 },
+    );
+    return res.trim();
+  } catch {
+    return secondary.text.slice(0, 200);
+  }
 }
 
 // ── Helper: stream text token-by-token ────────────────────────────────────────────
@@ -168,6 +214,7 @@ export async function* runParallelHandoff(
   const {
     userId, userContext, history, userMessage,
     primaryRoute, secondaryRoute, memoryFactCount, maxHistory = 12,
+    behavioralPatterns, routingHistorySummary,
   } = opts;
 
   const primarySpecialist   = getSpecialist(primaryRoute.domain);
@@ -180,7 +227,7 @@ export async function* runParallelHandoff(
 
   yield { type: "status", value: `⚡ Attivo ${primaryRoute.domain} + ${secondaryRoute.domain} in parallelo...` };
 
-  const sharedOpts = { userId, userContext, history, memoryFactCount, maxHistory };
+  const sharedOpts: Omit<SpecialistRunOptions, 'routeDecision' | 'userMessage'> = { userId, userContext, history, memoryFactCount, maxHistory, behavioralPatterns, routingHistorySummary };
   const startedAt  = Date.now();
 
   // ── Phase 8: race both drains ───────────────────────────────────────────────────
@@ -245,16 +292,14 @@ export async function* runParallelHandoff(
       yield { type: "status", value: "🧩 Fusione delle prospettive in corso..." };
       finalText = await fuseResponses(pResult, sResult, userMessage).catch(() => pResult.text);
     } else {
-      // ── Large delta: stream winner first, append loser with separator ─────────
-      // This way user gets SOMETHING immediately instead of waiting for both.
+      // ── Large delta: stream winner + key differences extracted from loser ──
+      // Avoids appending the full raw loser text which creates a disjointed UX.
       const [first, second] = winner.domain === primaryRoute.domain
         ? [pResult, sResult]
         : [sResult, pResult];
-      finalText = (
-        first.text +
-        `\n\n---\n*Prospettiva aggiuntiva (${second.domain}):*\n\n` +
-        second.text
-      );
+      yield { type: "status", value: `💡 Estraendo insight da ${second.domain}...` };
+      const keyPoints = await extractKeyDifferences(first, second, userMessage);
+      finalText = `${first.text}\n\n---\n*💡 Punti chiave dal coach (${second.domain}):*\n${keyPoints}`;
     }
   } else if (primaryOk) {
     finalText = pResult.text;
@@ -276,7 +321,7 @@ export async function* runParallelHandoff(
     if (!seenSources.has(key)) { seenSources.add(key); mergedSources.push(s); }
   }
 
-  console.log(`[parallel-handoff v2] total latency: ${Date.now() - startedAt}ms | strategy: ${ primaryOk && secondaryOk ? (delta <= FUSION_WINDOW_MS ? "fuse" : "append") : "single" }`);
+  logger.info({ strategy: primaryOk && secondaryOk ? (delta <= FUSION_WINDOW_MS ? "fuse" : "append") : "single", latencyMs: Date.now() - startedAt }, "parallel handoff complete");
 
   yield {
     type:             "done",

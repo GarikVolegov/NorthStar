@@ -1,12 +1,12 @@
 import i18n from "i18next";
-import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
+import { initReactI18next } from "react-i18next";
 
-import it from "./locales/it/translation.json";
+import de from "./locales/de/translation.json";
 import en from "./locales/en/translation.json";
 import es from "./locales/es/translation.json";
 import fr from "./locales/fr/translation.json";
-import de from "./locales/de/translation.json";
+import it from "./locales/it/translation.json";
 
 const SUPPORTED_LANGUAGES = ["it", "en", "es", "fr", "de"];
 const STORAGE_KEY = "northstar_lang";
@@ -35,4 +35,4 @@ i18n
   });
 
 export default i18n;
-export { SUPPORTED_LANGUAGES, STORAGE_KEY };
+export { STORAGE_KEY, SUPPORTED_LANGUAGES };

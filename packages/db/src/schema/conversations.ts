@@ -14,6 +14,7 @@ export const conversations = pgTable("conversations", {
     .references(() => usersTable.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
 export const insertConversationSchema = createInsertSchema(conversations).omit({

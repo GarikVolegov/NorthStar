@@ -1,21 +1,22 @@
-import React, { useState, useEffect } from "react";
-import { usePageMeta } from "@/lib/seo";
 import { NewsGridSkeleton } from "@/components/skeletons/NewsCardSkeleton";
-import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { Newspaper, ExternalLink, Clock, Tag, Sparkles, RefreshCw, Bookmark, BookmarkCheck, Star } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Link } from "wouter";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
+import { deleteJson, getJson, postJson } from "@/lib/apiClient";
+import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bell, BellOff, Bookmark, BookmarkCheck, Clock, ExternalLink, Newspaper, RefreshCw, Sparkles, Tag } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link, useLocation } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
 interface NewsItem {
-  id: string; title: string; description: string;
-  source: string; url: string; publishedAt: string;
+  id: string; title: string; preview?: string; description: string;
+  source: string; sourceUrl?: string; url: string; detailUrl?: string; publishedAt: string;
   image: string | null; category: string; sector: string | null;
   tags: string[]; relevance: number; plan: "free" | "premium";
 }
@@ -24,17 +25,21 @@ interface ProfileData {
   exploredSectors: Array<{ sectorId: number; name: string; icon: string; confirmed: boolean }>;
 }
 
-const FREE_CATEGORIES = [
-  { id: "general",    emoji: "🌍" },
-  { id: "technology", emoji: "💻" },
-  { id: "business",   emoji: "📈" },
-  { id: "science",    emoji: "🔬" },
-  { id: "health",     emoji: "❤️" },
-  { id: "finance",    emoji: "💰" },
-  { id: "education",  emoji: "🎓" },
+interface NewsSubscriptionsResponse {
+  subscriptions?: string[];
+}
+
+const CATEGORY_CONFIG = [
+  { id: "general",    emoji: "🌍", gradient: "from-blue-500/20 to-blue-600/10" },
+  { id: "technology", emoji: "💻", gradient: "from-cyan-500/20 to-blue-600/10" },
+  { id: "business",   emoji: "📈", gradient: "from-emerald-500/20 to-green-600/10" },
+  { id: "science",    emoji: "🔬", gradient: "from-purple-500/20 to-violet-600/10" },
+  { id: "health",     emoji: "❤️", gradient: "from-rose-500/20 to-red-600/10" },
+  { id: "finance",    emoji: "💰", gradient: "from-amber-500/20 to-yellow-600/10" },
+  { id: "education",  emoji: "🎓", gradient: "from-indigo-500/20 to-blue-600/10" },
 ] as const;
 
-const NEWS_STALE_MS = 15 * 60_000; // 15 minutes
+const NEWS_STALE_MS = 15 * 60_000;
 
 function timeAgoLabel(dateStr: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -46,15 +51,51 @@ function timeAgoLabel(dateStr: string, t: (key: string, opts?: Record<string, un
   return d === 1 ? t("news.timeAgo.yesterday") : t("news.timeAgo.days", { d });
 }
 
+function CategoryFallbackImage({ category, emoji }: { category: string; emoji: string }) {
+  const config = CATEGORY_CONFIG.find((c) => c.id === category);
+  return (
+    <div className={`aspect-video bg-gradient-to-br ${config?.gradient ?? "from-muted to-muted/50"} flex items-center justify-center`}>
+      <span className="text-4xl opacity-60">{emoji}</span>
+    </div>
+  );
+}
+
+export function SubscribeToggle({ category, subscribed, onToggle }: { category: string; subscribed: boolean; onToggle: () => void }) {
+  const { t } = useTranslation();
+  const config = CATEGORY_CONFIG.find((c) => c.id === category);
+
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onToggle(); }}
+      className={cn(
+        "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all border whitespace-nowrap",
+        subscribed
+          ? "bg-primary/10 text-primary border-primary/20"
+          : "bg-transparent text-muted-foreground/50 border-border/40 hover:border-primary/30 hover:text-primary"
+      )}
+    >
+      {subscribed ? <Bell className="h-3 w-3" /> : <BellOff className="h-3 w-3" />}
+      <span className="hidden sm:inline">{config?.emoji}</span>
+      {subscribed ? t("news.subscribed") : t("news.subscribe")}
+    </button>
+  );
+}
+
 function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boolean }) {
   const { t } = useTranslation();
+  const [, navigate] = useLocation();
   const { user } = useAuth();
   const { isNewsFavorite, getNewsFavoriteId, addFavorite, removeFavorite, isLoading } = useFavorites();
   const saved = isNewsFavorite(item.url);
   const favId = getNewsFavoriteId(item.url);
+  const config = CATEGORY_CONFIG.find((c) => c.id === item.category);
+  const detailHref = item.detailUrl ?? `/news/${item.id}`;
+  const preview = item.preview ?? item.description;
+  const sourceHref = item.sourceUrl ?? item.url;
 
   function toggleSave(e: React.MouseEvent) {
     e.preventDefault();
+    e.stopPropagation();
     if (!user) return;
     if (saved && favId !== undefined) {
       removeFavorite(favId);
@@ -65,25 +106,41 @@ function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boole
         articleTitle: item.title,
         articleDescription: item.description,
         articleSource: item.source,
-        articleImage: item.image ?? undefined,
         articleCategory: item.category,
+        ...(item.image ? { articleImage: item.image } : {}),
       });
     }
   }
 
   const catLabel = t(`news.categories.${item.category}`, { defaultValue: item.category });
+  const tr = (key: string, opts?: Record<string, unknown>) => opts ? t(key, opts) : t(key);
 
   return (
-    <article className="bg-card border border-border rounded-2xl overflow-hidden hover:border-primary/30 transition-all group flex flex-col">
-      {item.image && (
+    <article
+      role="link"
+      tabIndex={0}
+      onClick={() => navigate(detailHref)}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          navigate(detailHref);
+        }
+      }}
+      className="bg-card border border-border rounded-2xl overflow-hidden hover:border-primary/30 transition-all group flex flex-col cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
+      {item.image ? (
         <div className="aspect-video overflow-hidden shrink-0">
           <img
             src={item.image}
             alt={item.title}
+            loading="lazy"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
           />
         </div>
+      ) : (
+        <CategoryFallbackImage category={item.category} emoji={config?.emoji ?? "📰"} />
       )}
       <div className="p-5 flex flex-col flex-1">
         <div className="flex items-center justify-between gap-2 mb-3">
@@ -91,7 +148,7 @@ function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boole
             <Badge variant="secondary" className="text-xs font-medium">{catLabel}</Badge>
             <span className="text-xs text-muted-foreground flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              {timeAgoLabel(item.publishedAt, t)}
+              {timeAgoLabel(item.publishedAt, tr)}
             </span>
           </div>
           {showSave && user && (
@@ -100,7 +157,7 @@ function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boole
               disabled={isLoading}
               title={saved ? t("news.removeFromSaved") : t("news.saveArticle")}
               className={cn(
-                "shrink-0 p-1.5 rounded-lg transition-colors",
+                "shrink-0 min-h-11 min-w-11 inline-flex items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                 saved ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary hover:bg-primary/5"
               )}
             >
@@ -112,24 +169,24 @@ function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boole
           {item.title}
         </h3>
         <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 mb-4 flex-1">
-          {item.description}
+          {preview}
         </p>
         <div className="flex items-center justify-between mt-auto">
           <span className="text-xs text-muted-foreground font-medium">{item.source}</span>
           <a
-            href={item.url}
+            href={sourceHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex min-h-11 items-center gap-1.5 text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md px-2"
           >
-            {t("common.readMore")} <ExternalLink className="h-3 w-3" />
+            Fonte <ExternalLink className="h-3 w-3" />
           </a>
         </div>
       </div>
     </article>
   );
 }
-
 
 function UpgradeCTA() {
   const { t } = useTranslation();
@@ -157,6 +214,7 @@ function UpgradeCTA() {
 export default function News() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   usePageMeta({
     title: t("seo.news.title"),
@@ -165,77 +223,87 @@ export default function News() {
     type: "article",
   });
 
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<string>("general");
 
   const { data: profile } = useQuery<ProfileData>({
     queryKey: ["profile", user?.id],
-    queryFn: async () => {
-      const res = await fetch(`${BASE}api/profile/${user!.id}`);
-      return res.json();
-    },
-    enabled: !!user,
+    queryFn: () => getJson<ProfileData>(`${BASE}api/profile/${user!.id}`),
+    enabled: !!user?.id && user.id > 0,
     staleTime: 5 * 60_000,
   });
 
   const confirmedSector = profile?.exploredSectors?.find((s) => s.confirmed) ?? null;
 
-  /**
-   * Prefetch all free categories in the background at page mount.
-   * This means every tab click after the first is instant — the data is
-   * already in the TanStack Query cache and keepPreviousData below ensures
-   * the current tab stays visible during any background revalidation.
-   */
+  // ── Subscriptions ──────────────────────────────────────────────
+  const { data: subsData } = useQuery<string[]>({
+    queryKey: ["news-subscriptions", user?.id],
+    queryFn: async () => {
+      try {
+        const json = await getJson<NewsSubscriptionsResponse>(`${BASE}api/news/subscriptions`);
+        return json.subscriptions ?? [];
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!user?.id && user.id > 0,
+    staleTime: 60_000,
+  });
+  const subscriptions = subsData ?? [];
+
+  const subMutation = useMutation({
+    mutationFn: async ({ category, subscribe }: { category: string; subscribe: boolean }) => {
+      if (subscribe) {
+        await postJson(`${BASE}api/news/subscriptions`, { category });
+      } else {
+        await deleteJson(`${BASE}api/news/subscriptions/${category}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["news-subscriptions"] });
+    },
+  });
+
+  function toggleSubscription(category: string) {
+    if (!user) return;
+    const isSubscribed = subscriptions.includes(category);
+    subMutation.mutate({ category, subscribe: !isSubscribed });
+  }
+
+  // ── Prefetch ──────────────────────────────────────────────────
   useEffect(() => {
-    FREE_CATEGORIES.forEach(({ id }) => {
+    CATEGORY_CONFIG.forEach(({ id }) => {
       queryClient.prefetchQuery({
         queryKey: ["news", id],
-        queryFn: async () => {
-          const res = await fetch(`${BASE}api/news?category=${id}&limit=6`);
-          if (!res.ok) throw new Error("error");
-          return res.json() as Promise<{ news: NewsItem[]; source: "live" | "static" }>;
-        },
+        queryFn: () => getJson<{ news: NewsItem[]; source: "live" | "static" }>(`${BASE}api/news?category=${id}&limit=12`),
         staleTime: NEWS_STALE_MS,
       });
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Prefetch sector news as soon as the confirmed sector is known
   useEffect(() => {
     if (!confirmedSector) return;
     queryClient.prefetchQuery({
       queryKey: ["news", "sector", confirmedSector.name],
-      queryFn: async () => {
-        const res = await fetch(`${BASE}api/news/sector/${encodeURIComponent(confirmedSector.name)}?limit=6`);
-        if (!res.ok) throw new Error();
-        return res.json() as Promise<{ news: NewsItem[]; source: "live" | "static" }>;
-      },
+      queryFn: () => getJson<{ news: NewsItem[]; source: "live" | "static" }>(
+        `${BASE}api/news/sector/${encodeURIComponent(confirmedSector.name)}?limit=12`,
+      ),
       staleTime: NEWS_STALE_MS,
     });
   }, [confirmedSector?.name, queryClient]);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["news", activeTab],
-    queryFn: async () => {
-      const res = await fetch(`${BASE}api/news?category=${activeTab}&limit=6`);
-      if (!res.ok) throw new Error("error");
-      return res.json() as Promise<{ news: NewsItem[]; source: "live" | "static" }>;
-    },
+    queryFn: () => getJson<{ news: NewsItem[]; source: "live" | "static" }>(`${BASE}api/news?category=${activeTab}&limit=12`),
     enabled: activeTab !== "__sector__",
     staleTime: NEWS_STALE_MS,
-    // keepPreviousData: the current category's articles stay visible
-    // while the next category's data loads — no skeleton flash on tab switch.
     placeholderData: keepPreviousData,
   });
 
   const { data: sectorNewsData, isLoading: sectorLoading } = useQuery({
     queryKey: ["news", "sector", confirmedSector?.name],
-    queryFn: async () => {
-      const res = await fetch(`${BASE}api/news/sector/${encodeURIComponent(confirmedSector!.name)}?limit=6`);
-      if (!res.ok) throw new Error();
-      return res.json() as Promise<{ news: NewsItem[]; source: "live" | "static" }>;
-    },
+    queryFn: () => getJson<{ news: NewsItem[]; source: "live" | "static" }>(
+      `${BASE}api/news/sector/${encodeURIComponent(confirmedSector!.name)}?limit=12`,
+    ),
     enabled: !!confirmedSector,
     staleTime: NEWS_STALE_MS,
     placeholderData: keepPreviousData,
@@ -245,11 +313,13 @@ export default function News() {
   const displaySource = activeTab === "__sector__" ? sectorNewsData?.source : data?.source;
   const displayLoading = activeTab === "__sector__" ? (sectorLoading && !!confirmedSector) : isLoading;
 
+  const subscribedCategories = CATEGORY_CONFIG.filter((c) => subscriptions.includes(c.id));
+
   return (
     <div className="min-h-screen bg-background">
       <div className="bg-card border-b border-border">
-        <div className="container mx-auto px-4 md:px-6 py-12">
-          <div className="max-w-2xl">
+        <div className="container mx-auto px-4 md:px-6 py-10">
+          <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wide mb-4">
               <Newspaper className="h-4 w-4" />
               {t("news.badge")}
@@ -262,6 +332,46 @@ export default function News() {
 
       <div className="container mx-auto px-4 md:px-6 py-8">
 
+        {/* Subscription bar */}
+        {user && (
+          <div className="mb-8 bg-card border border-border rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Bell className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold text-foreground">{t("news.myCategories")}</span>
+              {subscribedCategories.length > 0 && (
+                <Badge variant="secondary" className="text-xs ml-auto">
+                  {subscribedCategories.length} {t("news.active")}
+                </Badge>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORY_CONFIG.map((cat) => {
+                const isSubscribed = subscriptions.includes(cat.id);
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => toggleSubscription(cat.id)}
+                    disabled={subMutation.isPending}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border",
+                      isSubscribed
+                        ? "bg-primary/10 text-primary border-primary/20"
+                        : "bg-transparent text-muted-foreground border-border/40 hover:border-primary/30 hover:text-primary"
+                    )}
+                  >
+                    <span>{cat.emoji}</span>
+                    {t(`news.categories.${cat.id}`)}
+                    {isSubscribed ? <Bell className="h-3 w-3 ml-0.5" /> : <BellOff className="h-3 w-3 ml-0.5 opacity-40" />}
+                  </button>
+                );
+              })}
+            </div>
+            {subscribedCategories.length === 0 && (
+              <p className="text-xs text-muted-foreground mt-2">{t("news.subscribeHint")}</p>
+            )}
+          </div>
+        )}
+
         {/* Tab bar */}
         <div className="flex gap-2 overflow-x-auto pb-2 mb-8 scrollbar-hide">
           {confirmedSector && (
@@ -273,12 +383,12 @@ export default function News() {
                   : "bg-primary/8 border-primary/20 text-primary hover:bg-primary/15"
               }`}
             >
-              <Star className="h-3.5 w-3.5 fill-current" />
+              <StarIcon />
               {confirmedSector.icon} {confirmedSector.name}
             </button>
           )}
 
-          {FREE_CATEGORIES.map((cat) => (
+          {CATEGORY_CONFIG.map((cat) => (
             <button
               key={cat.id}
               onClick={() => setActiveTab(cat.id)}
@@ -290,6 +400,9 @@ export default function News() {
             >
               <span>{cat.emoji}</span>
               {t(`news.categories.${cat.id}`)}
+              {subscriptions.includes(cat.id) && (
+                <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+              )}
             </button>
           ))}
         </div>
@@ -321,11 +434,17 @@ export default function News() {
         <div className="mb-8">
           {displayLoading
             ? <NewsGridSkeleton count={6} />
-            : (
+            : displayNews.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {displayNews.map((item) => (
                   <NewsCard key={item.id} item={item} showSave={!!user} />
                 ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Newspaper className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+                <p className="text-muted-foreground">{t("news.noResults")}</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">{t("news.noResultsHint")}</p>
               </div>
             )}
         </div>
@@ -350,5 +469,13 @@ export default function News() {
         )}
       </div>
     </div>
+  );
+}
+
+function StarIcon() {
+  return (
+    <svg className="h-3.5 w-3.5 fill-current" viewBox="0 0 24 24">
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+    </svg>
   );
 }

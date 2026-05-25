@@ -3,8 +3,13 @@ packages:
   - packages/*
   - scripts
 allowBuilds:
-  better-sqlite3: set this to true or false
+  '@clerk/shared': true
+  '@sentry/cli': true
+  better-sqlite3: true
+  esbuild: true
+  protobufjs: true
 catalog:
+  "@neondatabase/serverless": ^1.1.0
   "@replit/vite-plugin-cartographer": ^0.5.1
   "@replit/vite-plugin-dev-banner": ^0.1.2
   "@replit/vite-plugin-runtime-error-modal": ^0.0.6
@@ -19,6 +24,7 @@ catalog:
   clsx: ^2.1.1
   drizzle-orm: ^0.45.2
   framer-motion: ^12.23.24
+  jsonwebtoken: ^9.0.2
   lucide-react: ^0.545.0
   openai: ^6.27.0
   p-limit: ^7.3.0
@@ -28,6 +34,7 @@ catalog:
   tailwind-merge: ^3.3.1
   tailwindcss: ^4.1.14
   tsx: ^4.21.0
+  typescript: ~5.9.2
   vite: ^7.3.2
   wouter: ^3.3.5
   zod: ^3.25.76

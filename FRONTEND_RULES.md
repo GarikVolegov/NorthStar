@@ -2,7 +2,7 @@
 
 ## NorthStar / Orientamento SaaS
 
-**Stack: React 19 · Vite · Tailwind CSS v4 · TanStack Query · Wouter · Radix UI**
+**Stack: React 19 · Vite 7 · Tailwind CSS v4 · TanStack Query · Wouter · Framer Motion · Radix UI · i18next**
 
 > ⚠️ **LEGGI QUESTO FILE INTEGRALMENTE** prima di aggiungere un componente, una pagina, un hook o un pattern UI. Queste regole esistono per garantire: **zero lag, zero flash, zero bug visivi, codice mantenibile.** Non esistono eccezioni stilistiche. La coerenza è una feature.
 
@@ -26,6 +26,7 @@
 14. [Operazioni Proibite](#14-operazioni-proibite)
 15. [Checklist Pre-Commit](#15-checklist-pre-commit)
 16. [Pattern di Riferimento](#16-pattern-di-riferimento)
+17. [SEO / GEO / SEM](#17-seo--geo--sem)
 
 ---
 
@@ -65,19 +66,30 @@ Prima di aggiungere qualsiasi codice UI chiediti:
 ### 2.1 Gerarchia Obbligatoria
 
 ```
-artifacts/orientamento/src/
-├── pages/          ← Una per route. Solo orchestrazione, zero logica business.
+apps/web/src/
+├── pages/          ← 57 pagine, una per route. Solo orchestrazione.
 ├── components/
-│   ├── ui/         ← Primitivi puri: Button, Input, Badge, Card, Spinner
-│   │               Nessuno stato interno oltre hover/focus
-│   │               Nessuna chiamata API
-│   ├── features/   ← Componenti con logica: AgentSection, SectorCard, RoadmapPath
-│   │               Possono avere useState locale
-│   │               Possono usare hook custom
-│   └── layout/     ← Navbar, Sidebar, PageLayout, ProtectedRoute
-├── hooks/          ← Tutta la logica riusabile: useSSEStream, useAgentAnalysis...
+│   ├── ui/         ← Primitivi puri: Button, Input, Badge, Card, Cta, FormGroup, Section
+│   ├── features/   ← Con logica: dashboard/, wendy/, home/, knowledge-graph/, admin/
+│   ├── layout/     ← Navbar, MobileBottomNav, footer, ProtectedRoute
+│   ├── ai/         ← Componenti AI analysis
+│   ├── auth/       ← Componenti autenticazione
+│   ├── admin/      ← Componenti pannello admin (metriche, stato, review)
+│   ├── affiliate/  ← Componenti sistema affiliazione
+│   ├── cv/         ← Componenti CV builder
+│   ├── dashboard/  ← 15+ componenti dashboard
+│   ├── calendario/ ← Componenti calendario
+│   ├── home/       ← Componenti home page (TrendingMobileStrip, SectorCard, ecc.)
+│   ├── knowledge-graph/ ← Grafo conoscenza SVG (GraphNode, Minimap)
+│   ├── objectives/ ← Componenti obiettivi
+│   ├── onboarding/ ← Componenti onboarding
+│   ├── sector/     ← Componenti settori
+│   ├── skeletons/  ← Scheletri loading
+│   ├── wendy/      ← Wendy AI chat flottante
+│   └── motion/     ← Framer Motion wrappers
+├── hooks/          ← 20 hook custom riusabili
 ├── lib/            ← Utility pure: formatDate, cn(), calcMatchScore
-└── stores/         ← Stato globale (se necessario, solo con Zustand o Context)
+└── stores/         ← Stato globale (WendyProvider context)
 ```
 
 ### 2.2 Regola della Responsabilità Singola
@@ -154,26 +166,49 @@ import GrafoConoscenza from './pages/grafo-conoscenza';
 
 // ✅ OBBLIGATORIO:
 import { lazy, Suspense } from 'react';
-const GrafoConoscenza = lazy(() => import('./pages/grafo-conoscenza'));
-const Roadmap         = lazy(() => import('./pages/roadmap'));
-const WikiAI          = lazy(() => import('./pages/wiki'));
-const AdminReview     = lazy(() => import('./pages/admin-review'));
+
+// Pagine pubbliche
+const Home            = lazy(() => import('./pages/home'));
+const Test            = lazy(() => import('./pages/test'));
+const Results         = lazy(() => import('./pages/results'));
+const Settori         = lazy(() => import('./pages/settori'));
+const Ruoli           = lazy(() => import('./pages/ruoli'));
+const Premium         = lazy(() => import('./pages/premium'));
+const NewsPage        = lazy(() => import('./pages/news'));
+const ChiSiamo        = lazy(() => import('./pages/chi-siamo'));
+const Contatti        = lazy(() => import('./pages/contatti'));
+
+// Pagine protette (auth)
 const Dashboard       = lazy(() => import('./pages/dashboard'));
-const GrafoSettore    = lazy(() => import('./pages/grafo'));
-const News            = lazy(() => import('./pages/news'));
+const Profilo         = lazy(() => import('./pages/profilo'));
+const Coach           = lazy(() => import('./pages/coach'));
+const Calendar        = lazy(() => import('./pages/calendar'));
+const Applicazioni    = lazy(() => import('./pages/applications'));
+const GrafoConoscenza = lazy(() => import('./pages/grafo-conoscenza'));
+const Amici           = lazy(() => import('./pages/amici'));
+const ValidatoreIdea  = lazy(() => import('./pages/validatore-idea'));
+const Percorso        = lazy(() => import('./pages/percorso'));
+const SkillsGap       = lazy(() => import('./pages/skills-gap'));
+const Roadmap         = lazy(() => import('./pages/roadmap'));
 
-// Unico PageLoader centralizzato — non creare spinner locali per il lazy loading
-function PageLoader() {
-  return (
-    <div className="fixed inset-0 flex items-center justify-center bg-background">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-    </div>
-  );
-}
+// Pagine admin (9 totali)
+const AdminHome       = lazy(() => import('./pages/admin-home'));
+const AdminMessaggi   = lazy(() => import('./pages/admin-messaggi'));
+const AdminReview     = lazy(() => import('./pages/admin-review'));
+const AdminQualita    = lazy(() => import('./pages/admin-qualita'));
+const AdminStatus     = lazy(() => import('./pages/admin-status'));
+const AdminAgenti     = lazy(() => import('./pages/admin-agenti'));
+const AdminCataloghi  = lazy(() => import('./pages/admin-cataloghi'));
+const AdminCrescita   = lazy(() => import('./pages/admin-crescita'));
+const AdminMetriche   = lazy(() => import('./pages/admin-metriche'));
 
+// Pagine affiliazione
+const AffiliazioneDashboard = lazy(() => import('./pages/affiliazione-dashboard'));
+
+// Unico PageLoader centralizzato importato da components/PageLoader.tsx
 // Ogni Route wrappata:
 <Suspense fallback={<PageLoader />}>
-  <Route path="/grafo" component={GrafoConoscenza} />
+  <Route path="/dashboard" component={Dashboard} />
 </Suspense>
 ```
 
@@ -427,7 +462,62 @@ function WikiPage({ sectorId }: { sectorId: string }) {
 }
 ```
 
-### 4.3 Componente StreamingContent — Centralizzato
+### 4.3 Pattern Wendy Chat — Hook useWendyChat
+
+```typescript
+// hooks/useWendyChat.ts
+// Hook dedicato per la chat Wendy (diverso da useSSEStream generico)
+// Include: contesto utente, memoria sessione, page context, vision, TTS
+
+interface UseWendyChatReturn {
+  messages: ChatMessage[];
+  isStreaming: boolean;
+  isPending: boolean;
+  error: Error | null;
+  send: (message: string, context?: PageContext) => void;
+  stop: () => void;
+  clear: () => void;
+}
+```
+
+### 4.4 Pattern Wendy Voice / TTS
+
+```typescript
+// hooks/useWendyOpenAITTS.ts — OpenAI TTS per Wendy
+// Usato per leggere ad alta voce le risposte di Wendy
+
+interface UseWendyOpenAITTSReturn {
+  isPlaying: boolean;
+  play: (text: string) => Promise<void>;
+  stop: () => void;
+}
+
+// hooks/useWendyVoice.ts — Riconoscimento vocale (STT)
+// hooks/useVoiceChat.ts — Chat vocale completa (STT + chat + TTS)
+// hooks/useSTT.ts — Speech-to-text base
+// hooks/useTTS.ts — Text-to-speech base
+
+// Componenti voice:
+// - WendyVoiceOverlay: overlay vocale
+// - WendyMuteButton: toggle muto
+// - wendy-voice.css: stili voice
+```
+
+### 4.5 Componente Wendy Chat
+
+```typescript
+// components/wendy/
+// ├── WendyChat.tsx          — Chat completa
+// ├── WendyFloatingButton.tsx — Pulsante flottante
+// ├── WendyPanel.tsx         — Pannello chat
+// ├── WendyThinkingIndicator.tsx — Indicatore "sta pensando"
+// ├── WendyAvatar.tsx        — Avatar animato
+// └── WendyMuteButton.tsx    — Toggle audio
+
+// Provider: WendyProvider (context per stato Wendy globale)
+```
+
+### 4.3 (original) Componente StreamingContent — Centralizzato
 
 ```typescript
 // components/features/StreamingContent.tsx
@@ -641,7 +731,36 @@ queryClient.prefetchQuery({
 });
 ```
 
-### 6.5 Invalidazione Mutations — Regola dell'Albero
+### 6.5 Hook Custom — Elenco Completo
+
+```
+apps/web/src/hooks/
+
+useSSEStream          — Streaming SSE AI generico
+useWendyChat          — Chat Wendy (contesto + memoria + streaming)
+useWendyOpenAITTS     — Text-to-speech OpenAI per Wendy
+useWendyVoice         — Riconoscimento vocale Wendy
+useWendyPageContext   — Contesto pagina corrente per AI
+useWendyVision        — Analisi immagini/visione
+useVoiceChat          — Chat vocale completa (STT + chat + TTS)
+useSTT                — Speech-to-text
+useTTS                — Text-to-speech generico
+
+useDashboardData      — Dati aggregati dashboard
+useObjectives         — CRUD obiettivi utente
+useFavorites          — Preferiti utente
+useSectorDetail       — Dettaglio settore
+useSessionDetail      — Dettaglio sessione test
+usePersonalizedArticles — Articoli personalizzati AI
+useAgentAnalysis      — Analisi AI agent
+useAIAgents           — Gestione agenti AI
+
+useAffiliateDashboard — Dashboard affiliazione
+useMobile             — Rilevamento mobile
+useToast              — Notifiche toast
+```
+
+### 6.6 Invalidazione Mutations — Regola dell'Albero
 
 ```typescript
 // ✅ CORRETTO — invalida solo ciò che è cambiato
@@ -852,7 +971,30 @@ Il dato serve a più componenti non-parent/child?
                 └─ NO → useState locale + useCallback se passato in basso
 ```
 
-### 9.2 Regole useState
+### 9.2 Admin Panel — Pagine e Pattern
+
+```
+apps/web/src/pages/admin-*.tsx (9 pagine)
+
+admin-home.tsx       — Home admin con riepilogo metriche
+admin-messaggi.tsx   — Gestione messaggi contatto
+admin-review.tsx     — Review queue contenuti
+admin-qualita.tsx    — Metriche qualità AI
+admin-status.tsx     — Stato servizi e monitoring
+admin-agenti.tsx     — Gestione agenti AI
+admin-cataloghi.tsx  — Gestione cataloghi (settori, professioni)
+admin-crescita.tsx   — Articoli crescita personale
+admin-metriche.tsx   — Metriche sistema (admin-metriche)
+```
+
+**Regole Admin:**
+- Tutte le route admin sono protette da `requireAuth` + `requireAdmin`
+- Audit logging obbligatorio per ogni operazione di scrittura
+- Paginazione obbligatoria su liste (max 100 item per pagina)
+- Metriche in tempo reale via WebSocket per admin-status
+- Componenti admin in `components/admin/` (badge, metric cards, status indicators)
+
+### 9.3 Regole useState
 
 ```typescript
 // ✅ Raggruppare stati correlati in un oggetto
@@ -867,7 +1009,23 @@ setUiState(prev => ({ ...prev, isModalOpen: true }));
 // ❌ NON creare 5+ useState separati che si aggiornano sempre insieme
 ```
 
-### 9.3 Regole useEffect
+### 9.4 Affiliate System — Pagine e Componenti
+
+```
+apps/web/src/pages/affiliazione-*.tsx (6 pagine)
+
+affiliazione.tsx             — Landing page affiliazione
+affiliazione-dashboard.tsx   — Dashboard affiliato (commissioni, referral, prelievi)
+affiliazione-scuole.tsx      — Info per scuole
+affiliazione-universita.tsx  — Info per università
+affiliazione-agenzie.tsx     — Info per agenzie
+affiliazione-formazione.tsx  — Info per enti di formazione
+
+Hook: useAffiliateDashboard (apps/web/src/hooks/useAffiliateDashboard.ts)
+Componenti: in components/affiliate/
+```
+
+### 9.5 Regole useEffect
 
 ```typescript
 // ✅ Un useEffect = una responsabilità
@@ -1164,6 +1322,10 @@ window.addEventListener('scroll', handler);
 // ❌ backdrop-filter: blur(>12px) su elementi in lista
 // ❌ will-change su elementi statici
 // ❌ Animare top/left invece di transform
+
+// ❌ Implementare SSE manualmente — usare sempre useSSEStream o useWendyChat
+// ❌ useState per streaming chat — usare useSSEStream che usa startTransition
+// ❌ Wendy chat implementata senza WendyProvider context
 ```
 
 ### 🚫 Codice — Proibiti Assoluti
@@ -1360,6 +1522,37 @@ In caso di dubbio, leggo prima di implementare.
 
 Data: ________________
 Feature in sviluppo: ________________
+```
+
+---
+
+## 17. SEO / GEO / SEM
+
+Vedi documentazione dedicata: [`docs/SEO-GEO-SEM.md`](../docs/SEO-GEO-SEM.md)
+
+### Regole Rapide
+
+```typescript
+// ✅ Ogni pagina DEVE chiamare usePageMeta() con title e description
+import { usePageMeta } from "@/lib/seo";
+
+function MyPage() {
+  usePageMeta({
+    title: "Titolo Pagina",
+    description: "Descrizione per SEO e social",
+    path: "/my-page",
+    type: "article",
+    noIndex: false,  // true per pagine private (admin, profilo, risultati)
+  });
+}
+
+// ✅ Per pagine settore, usare buildSectorMeta()
+const meta = buildSectorMeta(sector);
+usePageMeta(meta);
+
+// ✅ SEMPRE includere JSON-LD per dati strutturati
+// ❌ NO script di terze parti sincroni (GTM, pixel) — usare async/differito
+// ❌ NO hreflang dimenticato per pagine multilingua
 ```
 
 ---

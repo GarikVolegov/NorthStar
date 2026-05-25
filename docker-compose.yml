@@ -20,9 +20,9 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER:     northstar
-      POSTGRES_PASSWORD: northstar_dev
-      POSTGRES_DB:       northstar
+      POSTGRES_USER:     ${POSTGRES_USER:-northstar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB:       ${POSTGRES_DB:-northstar}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -37,10 +37,13 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
     ports:
       - "6379:6379"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     healthcheck:
-      test:     ["CMD", "redis-cli", "ping"]
+      test:     ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout:  5s
       retries:  5
@@ -75,7 +78,7 @@ services:
     environment:
       PORT:                   8080
       NODE_ENV:               development
-      DATABASE_URL:           postgresql://northstar:northstar_dev@postgres:5432/northstar
+      DATABASE_URL:           postgresql://${POSTGRES_USER:-northstar}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-northstar}
       AI_AGENTS_URL:          http://ai-agents:8000
       JWT_SECRET:             ${JWT_SECRET}
       ADMIN_KEY:              ${ADMIN_KEY}
@@ -110,8 +113,8 @@ services:
       PORT:                  3001
       # Step 5: NODE_ENV=development in dev, sovrascrivere in prod
       NODE_ENV:              ${NODE_ENV:-development}
-      DATABASE_URL:          postgresql://northstar:northstar_dev@postgres:5432/northstar
-      REDIS_URL:             ${REDIS_URL:-redis://redis:6379}
+      DATABASE_URL:          postgresql://${POSTGRES_USER:-northstar}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-northstar}
+      REDIS_URL:             redis://:${REDIS_PASSWORD}@redis:6379
       PROFILE_CACHE_TTL_SECONDS: ${PROFILE_CACHE_TTL_SECONDS:-300}
       JWT_SECRET:            ${JWT_SECRET}
       JWT_EXPIRES_IN:        ${JWT_EXPIRES_IN:-7d}

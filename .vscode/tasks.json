@@ -2,6 +2,25 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "kill-port",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/kill-port.ps1"
+      ],
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "dev:web",
       "type": "shell",
       "command": "pnpm",
@@ -17,7 +36,18 @@
         "panel": "shared"
       },
       "isBackground": true,
-      "problemMatcher": []
+      "dependsOn": ["kill-port"],
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^(.*)$",
+          "file": 1
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "VITE",
+          "endsPattern": "Local:.*http://localhost:5173"
+        }
+      }
     },
     {
       "label": "dev:orientamento",
@@ -32,7 +62,18 @@
         "panel": "shared"
       },
       "isBackground": true,
-      "problemMatcher": []
+      "dependsOn": ["kill-port"],
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^(.*)$",
+          "file": 1
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "VITE",
+          "endsPattern": "Local:.*http://localhost:5173"
+        }
+      }
     },
     {
       "label": "dev:server",

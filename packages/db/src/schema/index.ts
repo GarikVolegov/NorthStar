@@ -5,9 +5,15 @@
  * Qualsiasi aggiunta di tabella, colonna, indice o relazione
  * richiede la Pre-Flight Checklist presente in DB_RULES.md.
  * Non esistono modifiche "piccole" che non richiedano quel controllo.
+ *
+ * ⚠️  DUAL SERVER NOTA: api-server (8080) e northstar-server (3001) condividono
+ * lo stesso DB. Le migrazioni Drizzle devono essere eseguite da UN SOLO
+ * processo alla volta. Usa pg_advisory_lock() nel migration runner.
+ * Vedi packages/db/README.md per il codice di esempio.
  */
 
 export * from "./users";
+export * from "./userProfiles";
 export * from "./testSessions";
 export * from "./sectors";
 export * from "./professions";
@@ -19,7 +25,12 @@ export * from "./knowledge";
 export * from "./newsArticles";
 export * from "./growthArticles";
 export * from "./agentReview";
-export * from "./agentLogs";
+export * from "./agentPrompts";
+export * from "./adminCatalogDrafts";
+// agentLogs.ts removed — table merged into agentReview.ts as agentRunsTable.
+// Run the following SQL to backfill and drop the old table if it still exists:
+//   INSERT INTO agent_runs SELECT * FROM agent_logs;
+//   DROP TABLE agent_logs;
 // ── Affiliate system ──────────────────────────────────────────────────
 export * from "./affiliateAccounts";
 export * from "./affiliateCommissions";
@@ -47,3 +58,37 @@ export * from "./pageContextSnapshots";
 export * from "./responseFeedback";
 export * from "./sessionSummaries";
 export * from "./voiceSessions";
+export * from "./routingLogs";
+export * from "./qualityMetrics";
+export * from "./chatMessages";
+export * from "./social";
+// ── AI Cost tracking & request logging ──────────────────────────────
+export * from "./llmUsage";
+export * from "./aiRequestLog";
+export * from "./wendyFeedback";
+export * from "./userKeys";
+export * from "./userBadges";
+export * from "./weeklyLeaderboard";
+// ── Search ──────────────────────────────────────────────────────
+export * from "./search";
+export * from "./appSearchIndex";
+// ── News Subscriptions ─────────────────────────────────────────
+export * from "./newsSubscriptions";
+// ── Agenti AI dipendenti ──────────────────────────────────────────────────
+export * from "./agentEmployees";
+// ── Step 7: SaaS maturo — subscription, workspace, collab, briefing ─────
+export * from "./subscription";
+export * from "./workspace";
+export * from "./workspaceMember";
+export * from "./sharedPlan";
+export * from "./planComment";
+export * from "./mentorRelationship";
+export * from "./wendyBriefing";
+// ── Step 6: RAG, Weak Signals, Job Market Intelligence ─────────
+export * from "./ragSource";
+export * from "./ragChunk";
+export * from "./ragRoutingKey";
+export * from "./weakSignal";
+export * from "./jobPostingSnapshot";
+export * from "./skillCooccurrence";
+export * from "./proactiveInsight";

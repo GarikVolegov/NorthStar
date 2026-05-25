@@ -135,6 +135,48 @@ export const WsKnowledgeNodeDeletedEvent = z.object({
   payload: z.object({ id: z.number() }),
 });
 
+// ─── Friend / Chat events ─────────────────────────────────────────────────
+
+export const WsFriendMessageEvent = z.object({
+  type: z.literal("friend:message"),
+  payload: z.object({
+    friendshipId: z.number(),
+    message: z.object({
+      id: z.number(),
+      senderId: z.number(),
+      encryptedContent: z.string(),
+      iv: z.string(),
+      createdAt: z.string(),
+    }),
+  }),
+});
+
+export const WsFriendMessageReadEvent = z.object({
+  type: z.literal("friend:message:read"),
+  payload: z.object({
+    friendshipId: z.number(),
+    messageId: z.number(),
+    readAt: z.string(),
+  }),
+});
+
+export const WsFriendOnlineEvent = z.object({
+  type: z.literal("friend:online"),
+  payload: z.object({
+    userId: z.number(),
+    online: z.boolean(),
+  }),
+});
+
+// ─── Client → Server events ────────────────────────────────────────────────
+
+export const WsTypingEvent = z.object({
+  type: z.literal("friend:typing"),
+  payload: z.object({
+    friendshipId: z.number(),
+  }),
+});
+
 // ─── Ping / Pong (keep-alive) ─────────────────────────────────────────────
 
 export const WsPingEvent = z.object({ type: z.literal("ping") });
@@ -156,6 +198,9 @@ export const ServerWsEvent = z.discriminatedUnion("type", [
   WsObjectiveProgressEvent,
   WsKnowledgeNodeUpsertedEvent,
   WsKnowledgeNodeDeletedEvent,
+  WsFriendMessageEvent,
+  WsFriendMessageReadEvent,
+  WsFriendOnlineEvent,
   WsPongEvent,
 ]);
 
@@ -163,5 +208,8 @@ export type ServerWsEvent = z.infer<typeof ServerWsEvent>;
 
 // ─── Client → Server union ────────────────────────────────────────────────
 
-export const ClientWsEvent = z.discriminatedUnion("type", [WsPingEvent]);
+export const ClientWsEvent = z.discriminatedUnion("type", [
+  WsPingEvent,
+  WsTypingEvent,
+]);
 export type ClientWsEvent = z.infer<typeof ClientWsEvent>;

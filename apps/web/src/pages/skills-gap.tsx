@@ -1,11 +1,20 @@
-import React, { useState } from "react";
-import { useParams, Link, useLocation } from "wouter";
-import { useGetSector } from "@workspace/api-client-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Target, Plus, X, Loader2, ArrowRight, RefreshCw, ChevronDown } from "lucide-react";
+import { apiFetch } from "@/lib/api-fetch";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useGetSector } from "@workspace/api-client-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Target,
+  X,
+} from "lucide-react";
+import React, { useState } from "react";
+import { Link, useLocation, useParams } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -22,9 +31,7 @@ function formatLine(line: string, key: number) {
   const parts = line.split(/\*\*(.*?)\*\*/g);
   return (
     <span key={key}>
-      {parts.map((p, i) =>
-        i % 2 === 1 ? <strong key={i}>{p}</strong> : p
-      )}
+      {parts.map((p, i) => (i % 2 === 1 ? <strong key={i}>{p}</strong> : p))}
     </span>
   );
 }
@@ -34,30 +41,46 @@ function MarkdownContent({ content }: { content: string }) {
   const elements: React.ReactNode[] = [];
   let i = 0;
   while (i < lines.length) {
-    const line = lines[i];
+    const line = lines[i] ?? "";
     if (line === "") {
       elements.push(<div key={i} className="h-2" />);
     } else if (line.startsWith("## ")) {
-      elements.push(<h3 key={i} className="font-bold text-base mt-4 mb-1">{formatLine(line.slice(3), i)}</h3>);
+      elements.push(
+        <h3 key={i} className="font-bold text-base mt-4 mb-1">
+          {formatLine(line.slice(3), i)}
+        </h3>,
+      );
     } else if (line.startsWith("### ")) {
-      elements.push(<h4 key={i} className="font-semibold mt-3 mb-0.5">{formatLine(line.slice(4), i)}</h4>);
+      elements.push(
+        <h4 key={i} className="font-semibold mt-3 mb-0.5">
+          {formatLine(line.slice(4), i)}
+        </h4>,
+      );
     } else if (line.startsWith("- ") || line.startsWith("• ")) {
       elements.push(
         <div key={i} className="flex gap-2 items-start ml-2">
           <span className="shrink-0 mt-2 w-1.5 h-1.5 rounded-full bg-current opacity-40" />
           <span className="text-sm">{formatLine(line.slice(2), i)}</span>
-        </div>
+        </div>,
       );
     } else if (/^\d+\.\s/.test(line)) {
       const num = line.match(/^(\d+)\./)?.[1];
       elements.push(
         <div key={i} className="flex gap-2 items-start ml-2">
-          <span className="shrink-0 font-mono text-xs opacity-50 mt-0.5 w-4">{num}.</span>
-          <span className="text-sm">{formatLine(line.replace(/^\d+\.\s/, ""), i)}</span>
-        </div>
+          <span className="shrink-0 font-mono text-xs opacity-50 mt-0.5 w-4">
+            {num}.
+          </span>
+          <span className="text-sm">
+            {formatLine(line.replace(/^\d+\.\s/, ""), i)}
+          </span>
+        </div>,
       );
     } else {
-      elements.push(<p key={i} className="text-sm leading-relaxed">{formatLine(line, i)}</p>);
+      elements.push(
+        <p key={i} className="text-sm leading-relaxed">
+          {formatLine(line, i)}
+        </p>,
+      );
     }
     i++;
   }
@@ -66,7 +89,7 @@ function MarkdownContent({ content }: { content: string }) {
 
 function extractReadinessScore(text: string): number | null {
   const match = text.match(/Indice di Readiness[:\s]*(\d+)\s*\/\s*100/i);
-  return match ? parseInt(match[1]) : null;
+  return match?.[1] ? parseInt(match[1], 10) : null;
 }
 
 const PROGRESS_TEXTS = [
@@ -74,7 +97,7 @@ const PROGRESS_TEXTS = [
   "Confrontando con i requisiti del settore…",
   "Calcolando i gap prioritari…",
   "Elaborando il piano d'azione…",
-  "Generando il report finale…",
+  "Preparazione del rapporto finale…",
 ];
 
 export default function SkillsGap() {
@@ -88,7 +111,7 @@ export default function SkillsGap() {
   const [level, setLevel] = useState<Level>("junior");
   const [result, setResult] = useState("");
   const [progressIdx, setProgressIdx] = useState(0);
-  const [isStreaming, setIsStreaming] = useState(false);
+  const [, setIsStreaming] = useState(false);
 
   const { data: sector, isLoading: sectorLoading } = useGetSector(id, {
     query: { enabled: !!id, queryKey: ["sector", id] },
@@ -98,7 +121,7 @@ export default function SkillsGap() {
 
   function toggleSkill(skill: string) {
     setUserSkills((prev) =>
-      prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]
+      prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill],
     );
   }
 
@@ -117,16 +140,22 @@ export default function SkillsGap() {
     setIsStreaming(true);
 
     const interval = setInterval(() => {
-      setProgressIdx((prev) => (prev < PROGRESS_TEXTS.length - 1 ? prev + 1 : prev));
+      setProgressIdx((prev) =>
+        prev < PROGRESS_TEXTS.length - 1 ? prev + 1 : prev,
+      );
     }, 1800);
 
     let accumulated = "";
 
     try {
-      const res = await fetch(`${BASE}api/skills-gap/analyze`, {
+      const res = await apiFetch(`${BASE}api/skills-gap/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sectorId: id, userSkills, experienceLevel: level }),
+        body: JSON.stringify({
+          sectorId: id,
+          userSkills,
+          experienceLevel: level,
+        }),
         credentials: "include",
       });
 
@@ -145,12 +174,18 @@ export default function SkillsGap() {
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           try {
-            const data = JSON.parse(line.slice(6));
-            if (data.content) {
-              accumulated += data.content;
+            const data = JSON.parse(line.slice(6)) as unknown;
+            const content =
+              typeof data === "object" && data !== null && "content" in data && typeof data.content === "string"
+                ? data.content
+                : "";
+            if (content) {
+              accumulated += content;
               setResult(accumulated);
             }
-          } catch { /* skip */ }
+          } catch {
+            /* skip */
+          }
         }
       }
 
@@ -178,7 +213,12 @@ export default function SkillsGap() {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8 text-center">
         <p className="text-muted-foreground">Settore non trovato.</p>
-        <Link href="/settori"><Button variant="ghost" className="mt-4"><ArrowLeft className="w-4 h-4 mr-2" />Settori</Button></Link>
+        <Link href="/settori">
+          <Button variant="ghost" className="mt-4">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Aree
+          </Button>
+        </Link>
       </div>
     );
   }
@@ -199,7 +239,9 @@ export default function SkillsGap() {
             <h1 className="font-bold text-xl">Skills Gap Analysis</h1>
             <Badge variant="outline">{sector.name}</Badge>
           </div>
-          <p className="text-sm text-muted-foreground mt-0.5">Scopri cosa ti manca per entrare nel settore</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Scopri cosa ti manca per entrare nel settore
+          </p>
         </div>
       </div>
 
@@ -209,7 +251,9 @@ export default function SkillsGap() {
           {/* Level selector */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Livello esperienza</CardTitle>
+              <CardTitle className="text-sm font-semibold">
+                Livello esperienza
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-2">
@@ -249,7 +293,9 @@ export default function SkillsGap() {
                         : "hover:border-primary/40 hover:bg-muted/40"
                     }`}
                   >
-                    {userSkills.includes(skill) && <span className="mr-1">✓</span>}
+                    {userSkills.includes(skill) && (
+                      <span className="mr-1">✓</span>
+                    )}
                     {skill}
                   </button>
                 ))}
@@ -262,24 +308,38 @@ export default function SkillsGap() {
                   value={customSkill}
                   onChange={(e) => setCustomSkill(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addCustomSkill()}
-                  placeholder="Aggiungi skill personalizzata…"
+                  placeholder="Aggiungi competenza…"
                   className="flex-1 rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
-                <Button size="sm" variant="outline" onClick={addCustomSkill} disabled={!customSkill.trim()}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={addCustomSkill}
+                  disabled={!customSkill.trim()}
+                >
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
 
-              {userSkills.filter((s) => !sectorSkills.includes(s)).length > 0 && (
+              {userSkills.filter((s) => !sectorSkills.includes(s)).length >
+                0 && (
                 <div className="flex flex-wrap gap-2 mt-3">
-                  {userSkills.filter((s) => !sectorSkills.includes(s)).map((s) => (
-                    <span key={s} className="inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-xs font-medium">
-                      {s}
-                      <button onClick={() => toggleSkill(s)} className="hover:text-destructive">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
+                  {userSkills
+                    .filter((s) => !sectorSkills.includes(s))
+                    .map((s) => (
+                      <span
+                        key={s}
+                        className="inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-xs font-medium"
+                      >
+                        {s}
+                        <button
+                          onClick={() => toggleSkill(s)}
+                          className="hover:text-destructive"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
                 </div>
               )}
             </CardContent>
@@ -289,7 +349,10 @@ export default function SkillsGap() {
             <Target className="w-4 h-4 mr-2" />
             Analizza il mio gap
             {userSkills.length > 0 && (
-              <Badge variant="secondary" className="ml-2 bg-primary-foreground/20 text-primary-foreground">
+              <Badge
+                variant="secondary"
+                className="ml-2 bg-primary-foreground/20 text-primary-foreground"
+              >
                 {userSkills.length} skill
               </Badge>
             )}
@@ -310,7 +373,9 @@ export default function SkillsGap() {
           </div>
           <div>
             <h2 className="font-semibold text-lg mb-2">Analisi in corso…</h2>
-            <p className="text-sm text-muted-foreground animate-pulse">{PROGRESS_TEXTS[progressIdx]}</p>
+            <p className="text-sm text-muted-foreground animate-pulse">
+              {PROGRESS_TEXTS[progressIdx] ?? PROGRESS_TEXTS[0]}
+            </p>
           </div>
           <div className="flex gap-1">
             {PROGRESS_TEXTS.map((_, i) => (
@@ -332,19 +397,29 @@ export default function SkillsGap() {
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold">Indice di Readiness</span>
+                  <span className="text-sm font-semibold">
+                    Indice di Readiness
+                  </span>
                   <span className="font-bold text-lg">{readiness}/100</span>
                 </div>
                 <div className="h-3 rounded-full bg-muted overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-700 ${
-                      readiness >= 70 ? "bg-emerald-500" : readiness >= 40 ? "bg-amber-500" : "bg-rose-500"
+                      readiness >= 70
+                        ? "bg-emerald-500"
+                        : readiness >= 40
+                          ? "bg-amber-500"
+                          : "bg-rose-500"
                     }`}
                     style={{ width: `${readiness}%` }}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1.5">
-                  {readiness >= 70 ? "Ottima preparazione!" : readiness >= 40 ? "Buona base, con gap da colmare" : "Percorso di formazione necessario"}
+                  {readiness >= 70
+                    ? "Ottima preparazione!"
+                    : readiness >= 40
+                      ? "Buona base, con gap da colmare"
+                      : "Piano di formazione necessario"}
                 </p>
               </CardContent>
             </Card>
@@ -360,7 +435,10 @@ export default function SkillsGap() {
             <Button
               variant="outline"
               className="flex-1"
-              onClick={() => { setStep("select"); setResult(""); }}
+              onClick={() => {
+                setStep("select");
+                setResult("");
+              }}
             >
               <RefreshCw className="w-4 h-4 mr-2" />
               Rinizia analisi

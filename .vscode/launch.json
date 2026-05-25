@@ -5,18 +5,16 @@
       "type": "chrome",
       "request": "launch",
       "name": "Launch NorthStar (Chrome)",
+      "preLaunchTask": "dev:web",
       "url": "http://localhost:5173",
-      "webRoot": "${workspaceFolder}/apps/web",
-      "sourceMapPathOverrides": {
-        "webpack:///src/*": "${webRoot}/src/*"
-      }
+      "webRoot": "${workspaceFolder}/apps/web"
     },
     {
       "type": "node",
       "request": "launch",
       "name": "Debug Server (Node.js)",
       "program": "${workspaceFolder}/apps/server/src/index.ts",
-      "cwd": "${workspaceFolder}/apps/server",
+      "cwd": "${workspaceFolder}",
       "runtimeExecutable": "tsx",
       "skipFiles": ["<node_internals>/**"],
       "env": {

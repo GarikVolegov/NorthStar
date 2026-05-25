@@ -13,11 +13,13 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { vector } from "../custom-types";
 
 export const sectorsTable = pgTable("sectors", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description").notNull(),
+  embedding: vector("embedding", { dimensions: 1536 }),
   // FIXED: json → jsonb (enables GIN index, @> operator, faster reads)
   riasecTypes: jsonb("riasec_types").$type<string[]>().notNull().default([]),
   skills: jsonb("skills").$type<string[]>().notNull().default([]),
@@ -39,6 +41,7 @@ export const sectorsTable = pgTable("sectors", {
   opportunities: jsonb("opportunities").$type<string[]>().notNull().default([]),
   icon: text("icon").notNull().default("briefcase"),
   color: text("color").notNull().default("#6366f1"),
+  isActive: boolean("is_active").notNull().default(true),
   workMode: jsonb("work_mode")
     .$type<Array<"dipendente" | "autonomo" | "ibrido">>()
     .default(["dipendente", "ibrido"]),
@@ -61,6 +64,7 @@ export const sectorsTable = pgTable("sectors", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }),
 });
 
 export const insertSectorSchema = createInsertSchema(sectorsTable).omit({

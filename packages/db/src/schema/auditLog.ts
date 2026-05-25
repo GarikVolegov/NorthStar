@@ -24,7 +24,30 @@
  * Retention: 7 anni (requisito GDPR per dati finanziari).
  * Anonimizzazione: actorId/targetId impostati a null 90 giorni dopo
  * cancellazione account (gestito da cron job GDPR).
+ *
+ * ⚠️  GDPR: gli IP sono dati personali. Usa sempre hashIp() prima
+ * di salvare in ipAddress. Mai IP in chiaro in produzione.
  */
+
+import { createHash } from "node:crypto";
+
+/**
+ * Hash an IP address with SHA-256 + salt before storing in audit_log.
+ * Use this at every call site instead of passing req.ip directly.
+ *
+ *   await db.insert(auditLogTable).values({
+ *     ipAddress: hashIp(req.ip),
+ *     ...
+ *   });
+ *
+ * The salt comes from IP_HASH_SALT env var (generated with pnpm secrets).
+ * Returns null for falsy input (system actions, webhooks).
+ */
+export function hashIp(ip: string | null | undefined): string | null {
+  if (!ip) return null;
+  const salt = process.env.IP_HASH_SALT ?? "default-dev-salt-change-me";
+  return createHash("sha256").update(ip + salt).digest("hex");
+}
 import {
   pgTable,
   serial,
@@ -64,6 +87,16 @@ export const auditLogTable = pgTable(
     action: text('action').notNull(),
 
     /**
+     * Categoria per distinguere i tipi di audit.
+     *   financial    — commissioni, pagamenti, rimborsi
+     *   agent_action — esecuzioni AI agent
+     *   admin_action — azioni amministrative manuali
+     *   auth         — login, logout, refresh token
+     *   system       — cron job, webhook automatici
+     */
+    category: text('category'),
+
+    /**
      * Payload JSON con tutti i dettagli rilevanti.
      * Esempi:
      *   commission_applied: { affiliateId, referredUserId, month, amountCents, appliedTo }
@@ -75,7 +108,7 @@ export const auditLogTable = pgTable(
     /**
      * IP del richiedente — per correlazione con eventi di sicurezza.
      * null per azioni di sistema.
-     * NON loggare in chiaro in produzione — hasha con SHA-256 se necessario.
+     * Usa sempre hashIp() prima di salvare.
      */
     ipAddress: text('ip_address'),
 
@@ -92,6 +125,7 @@ export const auditLogTable = pgTable(
     actorIdx: index('audit_actor_idx').on(t.actorId),
     targetIdx: index('audit_target_idx').on(t.targetId),
     actionIdx: index('audit_action_idx').on(t.action),
+    categoryIdx: index('audit_category_idx').on(t.category),
     /** Indice su createdAt per query di range (es. ultimi 30 giorni) */
     createdIdx: index('audit_created_idx').on(t.createdAt),
   }),

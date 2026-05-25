@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { responseJson } from "./helpers/json";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:5000";
 const API_BASE = process.env.API_URL ?? "http://localhost:8080";
@@ -29,21 +30,14 @@ test.describe("Pagine principali accessibili", () => {
 
   test("pagina profilo reindirizza se non autenticato", async ({ page }) => {
     await page.goto(`${BASE}/profilo`);
-    await page.waitForTimeout(1500);
-    // Should either redirect to home or show a login prompt
-    const url = page.url();
-    const isHome = url === BASE || url === `${BASE}/` || url.endsWith("/");
-    const hasLoginPrompt = await page.locator("text=/accedi|login|registr/i").isVisible({ timeout: 3000 }).catch(() => false);
-    expect(isHome || hasLoginPrompt).toBeTruthy();
+    await expect(page).toHaveURL(/\/sign-in/, { timeout: 10_000 });
+    await expect(page.getByText(/accedi|sign in|login|registr/i).first()).toBeVisible();
   });
 
   test("dashboard reindirizza se non autenticato", async ({ page }) => {
     await page.goto(`${BASE}/dashboard`);
-    await page.waitForTimeout(1500);
-    const url = page.url();
-    const isHome = url === BASE || url === `${BASE}/` || url.endsWith("/");
-    const hasLoginPrompt = await page.locator("text=/accedi|login|registr/i").isVisible({ timeout: 3000 }).catch(() => false);
-    expect(isHome || hasLoginPrompt).toBeTruthy();
+    await expect(page).toHaveURL(/\/sign-in/, { timeout: 10_000 });
+    await expect(page.getByText(/accedi|sign in|login|registr/i).first()).toBeVisible();
   });
 });
 
@@ -51,7 +45,7 @@ test.describe("API Pubblica", () => {
   test("GET /api/sectors restituisce lista settori", async ({ request }) => {
     const response = await request.get(`${API_BASE}/api/sectors`);
     expect(response.status()).toBe(200);
-    const body = await response.json();
+    const body = await responseJson<unknown[]>(response);
     expect(Array.isArray(body)).toBeTruthy();
     if (body.length > 0) {
       expect(body[0]).toHaveProperty("id");
@@ -63,7 +57,7 @@ test.describe("API Pubblica", () => {
     const response = await request.get(`${API_BASE}/api/news`);
     expect([200, 404]).toContain(response.status());
     if (response.status() === 200) {
-      const body = await response.json();
+      const body = await responseJson<unknown>(response);
       expect(Array.isArray(body) || typeof body === "object").toBeTruthy();
     }
   });

@@ -1,9 +1,9 @@
-import { Link } from "wouter";
-import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/lib/seo";
-import { Briefcase, CheckCircle2, ArrowRight, Brain, Compass, BarChart3, TrendingUp, Users, Zap } from "lucide-react";
+import { ArrowRight, BarChart3, Brain, Briefcase, CheckCircle2, Compass, TrendingUp, Users, Zap } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 export default function AffiliazioneAgenzie() {
   const { t } = useTranslation();

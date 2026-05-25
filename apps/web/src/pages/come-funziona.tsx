@@ -1,19 +1,25 @@
-import { useEffect } from "react";
-import { Link } from "wouter";
-import { Button } from "@/components/ui/button";
+import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
 import {
-  ArrowRight, Compass, Users, MapPin, Brain, Shield,
-  Sparkles, BarChart3, Flame, Star, BookOpen, HelpCircle,
-  CheckCircle2, Zap, Heart,
+  ArrowRight,
+  Brain,
+  CheckCircle2,
+  Compass,
+  HelpCircle,
+  MapPin,
+  Shield,
+  Sparkles,
+  Users
 } from "lucide-react";
-import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 
 function useSeo(title: string, description: string) {
   useEffect(() => {

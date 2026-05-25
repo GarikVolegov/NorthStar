@@ -1,0 +1,31 @@
+# Local dependencies and package-manager caches
+node_modules/
+.pnpm-store/
+
+# Local and generated artifacts
+.git/
+.vercel/
+.claude/
+.opencode/
+.tmp/
+.tools/
+playwright-report/
+test-results/
+coverage/
+dist/
+build/
+
+# Graphify generated outputs are local artifacts, not deploy inputs
+graphify-out/
+apps/graphify-out/
+packages/graphify-out/
+
+# Local agent/tooling folders
+.agents/
+cli-printing-press/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+!.env.staging.example

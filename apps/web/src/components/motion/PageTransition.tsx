@@ -1,7 +1,7 @@
-import { motion, AnimatePresence } from "framer-motion";
-import { useLocation } from "wouter";
-import { useReducedMotion, easings, durations } from "@/lib/motion";
+import { durations, easings, useReducedMotion } from "@/lib/motion";
+import { AnimatePresence, motion } from "framer-motion";
 import type { ReactNode } from "react";
+import { useLocation } from "wouter";
 
 interface PageTransitionProps {
   children: ReactNode;

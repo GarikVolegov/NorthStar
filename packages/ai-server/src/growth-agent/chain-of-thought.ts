@@ -31,12 +31,44 @@
  * the CoT is skipped (returns null) to avoid wasting tokens.
  */
 import { openai } from "../client";
+import { logger } from "../logger";
+import { selectModelFor } from "../model-router";
+import { ragConfig } from "../config/rag";
 
 export interface CoTResult {
   limitingPattern: string;      // e.g. "all-or-nothing thinking"
   controllableActions: string[]; // what the user can do right now
   blindSpot: string;            // what they're not seeing
   confidence: number;           // 0-1
+}
+
+// ── In-session cache ──────────────────────────────────────────────────────────
+
+interface CachedCoT {
+  result: CoTResult;
+  userTokens: Set<string>;
+  timestamp: number;
+}
+
+const cotCache = new Map<number, CachedCoT>();
+
+function tokenizeForCoT(s: string): Set<string> {
+  return new Set(s.toLowerCase().match(/[a-z\u00e0-\u00fc]{4,}/g) ?? []);
+}
+
+function shouldReuseCached(userId: number, newTokens: Set<string>): CoTResult | null {
+  const cached = cotCache.get(userId);
+  if (!cached) return null;
+  if (Date.now() - cached.timestamp > ragConfig.chainOfThought.cacheTtlMs) {
+    cotCache.delete(userId);
+    return null;
+  }
+  if (cached.result.confidence < ragConfig.chainOfThought.reuseMinConfidence) return null;
+  if (newTokens.size === 0 || cached.userTokens.size === 0) return null;
+  const intersection = [...newTokens].filter((t) => cached.userTokens.has(t)).length;
+  const overlap = intersection / Math.max(newTokens.size, cached.userTokens.size);
+  if (overlap < ragConfig.chainOfThought.reuseMinTokenOverlap) return null;
+  return cached.result;
 }
 
 const COT_SYSTEM = `
@@ -69,53 +101,68 @@ Rispondi SOLO con JSON valido, nessun testo extra:
 
 /** Short messages / greetings don't need CoT */
 const SKIP_PATTERNS = [
-  /^(ciao|salve|hey|ok|grazie|perfetto|capito|sì|no|va bene)[\.!?]?$/i,
+  /^(ciao|salve|hey|ok|grazie|perfetto|capito|sì|no|va bene)[.!?]?$/i,
 ];
 
 function shouldSkipCoT(message: string): boolean {
   const wordCount = message.trim().split(/\s+/).length;
-  if (wordCount < 5) return true;
+  if (wordCount < ragConfig.chainOfThought.minWords) return true;
   return SKIP_PATTERNS.some((p) => p.test(message.trim()));
 }
 
 /**
  * Runs the hidden CoT reasoning pass.
  * Returns null if the message is too short/simple to warrant analysis.
+ * Uses an in-session cache: if the user's new message has ≥60% token overlap
+ * with the previous one and the cached confidence was ≥0.75, reuses the cached
+ * result to avoid an expensive GPT-4o call.
  */
 export async function runChainOfThought(
+  userId: number,
   userMessage: string,
   conversationSummary?: string, // optional: last 2-3 exchanges for context
 ): Promise<CoTResult | null> {
   if (shouldSkipCoT(userMessage)) return null;
+
+  const tokens = tokenizeForCoT(userMessage);
+  const cached = shouldReuseCached(userId, tokens);
+  if (cached) {
+    logger.debug({ userId }, "CoT cache hit");
+    return cached;
+  }
 
   const userContent = conversationSummary
     ? `Contesto recente:\n${conversationSummary}\n\nMessaggio attuale: ${userMessage}`
     : userMessage;
 
   try {
+    const route = selectModelFor("chain-of-thought");
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: route.model,
       messages: [
         { role: "system", content: COT_SYSTEM },
         { role: "user",   content: userContent },
       ],
-      temperature: 0.3,   // low temperature for analytical tasks
-      max_tokens: 300,
+      temperature: ragConfig.chainOfThought.temperature,
+      max_tokens: ragConfig.chainOfThought.maxTokens,
       response_format: { type: "json_object" },
     });
 
     const raw = response.choices[0]?.message?.content ?? "{}";
-    const parsed = JSON.parse(raw) as Partial<CoTResult>;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
 
-    return {
-      limitingPattern:    parsed.limiting_pattern     ?? "non identificato",
-      controllableActions: parsed.controllable_actions ?? [],
-      blindSpot:          parsed.blind_spot           ?? "non identificato",
-      confidence:         parsed.confidence           ?? 0.5,
-    } as unknown as CoTResult;
+    const result: CoTResult = {
+      limitingPattern:    (parsed.limiting_pattern as string)     ?? "non identificato",
+      controllableActions: (parsed.controllable_actions as string[]) ?? [],
+      blindSpot:          (parsed.blind_spot as string)           ?? "non identificato",
+      confidence:         (parsed.confidence as number)           ?? 0.5,
+    };
+
+    cotCache.set(userId, { result, userTokens: tokens, timestamp: Date.now() });
+    return result;
   } catch (err) {
     // CoT failure is non-fatal — the agent continues without it
-    console.warn("[CoT] failed:", err instanceof Error ? err.message : err);
+    logger.warn({ err }, "CoT failed");
     return null;
   }
 }
@@ -125,7 +172,7 @@ export async function runChainOfThought(
  * Only included if confidence >= 0.6 (below that, the analysis is too uncertain).
  */
 export function buildCoTSection(cot: CoTResult | null): string {
-  if (!cot || cot.confidence < 0.6) return "";
+  if (!cot || cot.confidence < ragConfig.chainOfThought.outputMinConfidence) return "";
 
   const actions = cot.controllableActions
     .map((a, i) => `   ${i + 1}. ${a}`)

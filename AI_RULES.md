@@ -12,8 +12,8 @@
 
 ```typescript
 // ❌ SBAGLIATO — API key in console.log
-console.log('Inizializzo OpenAI con key:', process.env.OPENAI_API_KEY);
-console.log('Config AI:', { apiKey: openai.apiKey, model: 'gpt-4o' });
+// console.log('Inizializzo OpenAI con key:', process.env.OPENAI_API_KEY); // PROIBITO - mai loggare chiavi API
+// console.log('Config AI:', { apiKey: openai.apiKey, model: 'gpt-4o' }); // PROIBITO - oggetto con API key
 
 // ❌ SBAGLIATO — API key loggata da Pino (automatico su oggetti)
 logger.info({ config: openai }, 'Client OpenAI inizializzato'); // openai include la key!
@@ -116,91 +116,153 @@ git diff --staged | grep -iE '(logger|console)\.(log|debug|info|error).*openai\|
 
 ---
 
-## AI Router — Regola fondamentale
+## Architettura AI — Growth Agent Multi-Agente
 
-> **OGNI chiamata AI passa da `ai.chat()` / `ai.agent()` / `ai.embed()`. Mai istanziare provider (OpenAI, Anthropic, Groq) direttamente nelle route.**
-
-```typescript
-// ❌ SBAGLIATO — provider diretto nella route
-import OpenAI from 'openai';
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-router.post('/chat', async (req, res) => {
-  const result = await openai.chat.completions.create({ ... });
-});
-
-// ✅ CORRETTO — sempre tramite il router AI
-import { ai } from '../lib/ai/index.js';
-router.post('/chat', requireAuth, aiLimiter, async (req, res) => {
-  const result = await ai.chat({ useCase: 'streaming_chat', messages: [...] });
-});
-```
-
-## Use Case — Provider mapping
-
-| Use Case | Provider default | Fallback | Quando usarlo |
-|---|---|---|---|
-| `streaming_chat` | Groq | OpenAI | Chat SSE, career coach, Wendy |
-| `agent_analysis` | Anthropic | OpenAI | Ragionamento strutturato, tool use |
-| `embedding` | OpenAI | — | RAG, similarity, discovery feed |
-| `research` | Groq | OpenAI | Background jobs, enrichment |
-| `json_extraction` | Groq | OpenAI | CV, ATS score, cover letter, onboarding |
-
-## Streaming
-
-```typescript
-// ✅ SSE corretto per chat streaming
-res.setHeader('Content-Type', 'text/event-stream');
-res.setHeader('Cache-Control', 'no-cache');
-res.setHeader('Connection', 'keep-alive');
-
-const stream = await ai.stream({ useCase: 'streaming_chat', messages });
-for await (const chunk of stream) {
-  res.write(`data: ${JSON.stringify({ delta: chunk })}\n\n`);
-}
-res.write('data: [DONE]\n\n');
-res.end();
-
-// ❌ Retry su streaming: withRetry solo su ai.chat() e ai.embed() — MAI su ai.stream()
-```
-
-## Circuit Breaker + Retry
+> Il codice AI risiede in `packages/ai-server/`. La struttura è modulare per sotto-sistemi.
 
 ```
-closed  → chiamata normale
-open    → fallback immediato (>5 fail)
-half-open → un tentativo → se ok torna closed
+packages/ai-server/src/
+├── growth-agent/       ← Sistema multi-agente principale (Growth Agent)
+│   ├── agent.ts                  — Orchestratore principale (runGrowthAgent)
+│   ├── router-agent.ts           — Classifica intento utente in domini
+│   ├── specialist-agent.ts       — Classe base per specialisti di dominio
+│   ├── specialists/              — Implementazioni specialistiche
+│   │   ├── career-agent.ts       — Carriera (CV, colloqui, job search)
+│   │   ├── mindset-agent.ts      — Mindset (credenze limitanti)
+│   │   ├── habits-agent.ts       — Abitudini (routine, produttività)
+│   │   └── trading-agent.ts      — Trading (psicologia, strategie)
+│   ├── supervisor-agent.ts       — Quality gate post-generazione
+│   ├── self-evaluator.ts         — Valutazione euristica pre-generazione
+│   ├── retriever.ts              — RAG retrieval (pgvector / JS fallback)
+│   ├── embedder.ts               — Generazione embedding
+│   ├── chain-of-thought.ts       — Ragionamento strutturato con caching
+│   ├── memory-manager.ts         — Memoria persistente utente (LLM-enhanced)
+│   ├── parallel-handoff.ts       — Dispatch multi-specialista parallelo
+│   ├── prompt-builder.ts         — Costruzione prompt di sistema
+│   ├── session-summarizer.ts     — Riassunto sessioni chat
+│   ├── socratic-engine.ts        — Domande socratiche
+│   ├── tone-adapter.ts           — Adattamento tono
+│   ├── ui-tools.ts               — Generazione UI tool definitions
+│   ├── web-search.ts             — Integrazione ricerca web (Tavily)
+│   ├── ingest.ts                 — Ingest documenti
+│   ├── platform-ingest.ts        — Ingest contenuti piattaforma
+│   ├── pdf-parser.ts             — Parsing PDF
+│   └── router-memory.ts          — Persistenza storico routing
+│
+├── audio/               ← OpenAI TTS (text-to-speech)
+├── batch/               ← Utilità batch processing
+├── image/               ← Generazione immagini (DALL-E)
+├── llm/                 ← Provider LLM astratto (OpenAI / Groq)
+├── discovery-agent/     ← Agente discovery content
+├── feature-flags.ts     ← Feature flags (FF_*)
+├── metrics.ts           ← Metriche Prometheus
+└── logger.ts            ← Pino logger strutturato
 ```
 
-- Retry: max 3 tentativi, backoff esponenziale 1s/2s/4s
-- Solo su errori retryable: 429, 503, timeout di rete
-- Mai retry su 400, 401, 403 (errori logici, non transitori)
+## LLM Provider — `packages/ai-server/src/llm/`
 
-## Wendy / Growth Agent — regole specifiche
+Supporto multi-provider con fallback automatico:
 
-- Il contesto utente (`userContext`) va sempre sanitizzato prima di passarlo al prompt
-- Mai includere `passwordHash`, `paymentMethod`, `cardLast4` nel contesto AI
-- Il `userId` numerico è accettabile nel log; email e nome sono PII — hash o ometti
-- Streaming Wendy: timeout client-side 30s — se scade, mostra messaggio di retry UI
+| Provider | Modelli | Casi d'uso |
+|---|---|---|
+| **OpenAI** | GPT-4o, GPT-4o-mini | Chat, analisi, embedding, TTS, vision |
+| **Groq** | LLaMA 3.3 70B (mapping da gpt-4o-mini) | Chat streaming veloce, fallback economico |
 
-```typescript
-// ✅ Sanitizza userContext prima del prompt
-function sanitizeForAi(user: UserRow): WendyUserContext {
-  return {
-    name:         user.name,          // OK: nome di battesimo per personalizzazione
-    journeyType:  user.journeyType,
-    userMode:     user.userMode,
-    sectorName:   user.sectorName,
-    // NON includere: email, passwordHash, stripeCustomerId, cardLast4
-  };
-}
+- Retry con backoff esponenziale (max 3 tentativi, 1s/2s/4s) su errori transitori (429, 503, timeout)
+- Nessun retry su 400, 401, 403 (errori logici)
+
+## Feature Flags
+
+Definiti in `packages/ai-server/src/feature-flags.ts`:
+
+| Flag | Default | Descrizione |
+|---|---|---|
+| `FF_PARALLEL_HANDOFF` | true | Dispatch multi-specialista parallelo |
+| `FF_GENERATIVE_UI` | true | Generazione UI tools (roadmap, grafi) |
+| `FF_CHAIN_OF_THOUGHT` | true | Ragionamento strutturato CoT |
+| `FF_SUPERVISOR` | true | Quality gate supervisor post-generazione |
+| `FF_MEMORY` | true | Memoria persistente utente |
+
+## Growth Agent Pipeline
+
 ```
+Input Utente → RouterAgent (classifica dominio)
+             → MemoryManager (carica contesto)
+             → SpecialistAgent (se confidenza ≥ 0.45)
+               ├─ Retriever (RAG knowledge base)
+               ├─ WebSearch (fallback)
+               ├─ ChainOfThought (ragionamento)
+               └─ SelfEvaluator (euristica, zero LLM cost)
+             → SupervisorAgent (quality gate, riscrive se score < 0.70)
+             → Memory Extraction (fire-and-forget)
+             → SSE Response
+```
+
+Documentazione dettagliata di ogni modulo in `docs/ai-modules/`:
+- `RETRIEVER.md` — Recupero knowledge base via pgvector/JS
+- `ROUTER.md` — Classificazione intento con soglia adattiva
+- `SELF-EVALUATOR.md` — Valutazione euristica (4 dimensioni pesate)
+- `SPECIALIST.md` — Specialisti di dominio con self-evaluator gate
+- `SUPERVISOR.md` — Quality gate con pesi dinamici per intento
+
+## Wendy AI — Regole Specifiche
+
+### Endpoint
+- `POST /api/wendy/ask` — Chat streaming con RAG (SSE, rate limit 30/min)
+- `POST /api/wendy/voice` — Text-to-speech via OpenAI TTS
+- `POST /api/wendy/vision` — Analisi immagini/vision
+
+### Sanitizzazione Contesto
+- Il contesto utente (`userContext`) va sempre sanitizzato prima del prompt
+- Mai includere `passwordHash`, `paymentMethod`, `cardLast4`
+- `userId` numerico OK nei log; email e nome sono PII — hash o ometti
+
+### TTS (Text-to-Speech)
+- Provider: OpenAI TTS
+- Endpoint: `POST /api/wendy/voice`
+- Frontend hook: `useWendyOpenAITTS`, `useWendyVoice`, `useVoiceChat`
+- Rate limiting: 30 richieste/minuto
+
+### Streaming Wendy
+- Timeout client-side 30s — se scade, mostra messaggio di retry UI
+- SSE pattern: `data: { delta: "testo" }\n\n` con `data: [DONE]\n\n` finale
+- Feature flag: `FF_GENERATIVE_UI` per UI tools nelle risposte
+
+## Eval Framework
+
+Suite di valutazione in `docs/eval-wendy/` per testare qualità e regressioni delle risposte AI:
+
+```bash
+pnpm eval    # esegue eval suite
+```
+
+```
+docs/eval-wendy/
+├── run-eval.ts       — Runner valutazione
+├── samples.json      — Campioni di test (domande + attese)
+├── history.json      — Storico valutazioni
+└── ...
+```
+
+## Metriche AI (Prometheus)
+
+Esposte su `GET /api/admin/wendy-metrics` e `GET /api/metrics`:
+
+| Metrica | Tipo | Labels |
+|---|---|---|
+| `wendy_requests_total` | Counter | domain, intent |
+| `wendy_latency_seconds` | Histogram | phase |
+| `wendy_supervisor_rewrites_total` | Counter | domain |
+| `wendy_llm_tokens_total` | Counter | model |
+| `wendy_router_confidence_histogram` | Histogram | domain, intent |
 
 ## Checklist nuova feature AI
 
-- [ ] Chiamata sempre tramite `ai.chat()` / `ai.stream()` / `ai.embed()` — mai provider diretti
-- [ ] `aiLimiter` sul router Express (20 req/min)
+- [ ] Feature flag in `feature-flags.ts` (se applicabile)
+- [ ] Metriche Prometheus (counter/histogram se rilevante)
+- [ ] Rate limiter appropriato (30/min Wendy, 10/min altre AI)
 - [ ] Nessuna API key nei log (vedi sezione sicurezza sopra)
 - [ ] `userContext` sanitizzato (no email, no passwordHash, no payment info)
 - [ ] Retry solo su errori transitori (429, 503, timeout)
 - [ ] Streaming: SSE corretto con `[DONE]` finale
-- [ ] Test mock: `vi.mock('../../lib/ai', () => ({ ai: { chat: mockAiChat } }))`
+- [ ] Test mock per LLM: `vi.mock('packages/ai-server/src/llm/client')`

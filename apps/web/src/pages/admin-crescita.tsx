@@ -1,14 +1,26 @@
-import { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { AdminAuthGate } from "@/components/AdminAuthGate";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { apiFetch } from "@/lib/api-fetch";
+import { getJson } from "@/lib/apiClient";
 import {
-  RefreshCw, Loader2, CheckCircle2, XCircle, Trash2, Edit3, X, Save,
-  Sparkles, Clock, TrendingUp,
+  CheckCircle2,
+  Clock,
+  Edit3,
+  Loader2,
+  RefreshCw,
+  Sparkles,
+  Trash2,
+  TrendingUp,
+  X,
+  XCircle,
 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -36,12 +48,23 @@ interface QueueData {
 }
 
 function difficultyBadge(d: string) {
-  if (d === "base") return <Badge className="bg-blue-100 text-blue-700 text-xs">Base</Badge>;
-  if (d === "intermedio") return <Badge className="bg-amber-100 text-amber-700 text-xs">Intermedio</Badge>;
-  return <Badge className="bg-purple-100 text-purple-700 text-xs">Avanzato</Badge>;
+  if (d === "base")
+    return <Badge className="bg-info-surface text-info text-xs">Base</Badge>;
+  if (d === "intermedio")
+    return (
+      <Badge className="bg-warning-surface text-warning text-xs">
+        Intermedio
+      </Badge>
+    );
+  return <Badge className="bg-info-surface text-info text-xs">Avanzato</Badge>;
 }
 
-function EditModal({ article, adminKey, onClose, onSaved }: {
+function EditModal({
+  article,
+  adminKey,
+  onClose,
+  onSaved,
+}: {
   article: GrowthArticle;
   adminKey: string;
   onClose: () => void;
@@ -55,13 +78,18 @@ function EditModal({ article, adminKey, onClose, onSaved }: {
   async function handleApprove() {
     setSaving(true);
     try {
-      await fetch(`${BASE}api/admin/growth-queue/${article.id}/approve`, {
+      await apiFetch(`${BASE}api/admin/growth-queue/${article.id}/approve`, {
         method: "POST",
-        headers: { "x-admin-key": adminKey, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${adminKey}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ title, description, content }),
       });
       onSaved();
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -69,27 +97,59 @@ function EditModal({ article, adminKey, onClose, onSaved }: {
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Modifica e Approva</CardTitle>
-          <button onClick={onClose}><X size={18} /></button>
+          <button onClick={onClose}>
+            <X size={18} />
+          </button>
         </CardHeader>
         <CardContent className="space-y-3">
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Titolo</label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1" />
+            <label className="text-xs font-medium text-muted-foreground">
+              Titolo
+            </label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="mt-1"
+            />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Descrizione</label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1" rows={2} />
+            <label className="text-xs font-medium text-muted-foreground">
+              Descrizione
+            </label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="mt-1"
+              rows={2}
+            />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Contenuto</label>
-            <Textarea value={content} onChange={(e) => setContent(e.target.value)} className="mt-1 font-mono text-xs" rows={10} />
+            <label className="text-xs font-medium text-muted-foreground">
+              Contenuto
+            </label>
+            <Textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="mt-1 font-mono text-xs"
+              rows={10}
+            />
           </div>
           <div className="flex gap-2 pt-2">
-            <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={handleApprove} disabled={saving}>
-              {saving ? <Loader2 size={14} className="animate-spin mr-1" /> : <CheckCircle2 size={14} className="mr-1" />}
+            <Button
+              className="flex-1 bg-success text-primary-foreground hover:bg-success/90"
+              onClick={handleApprove}
+              disabled={saving}
+            >
+              {saving ? (
+                <Loader2 size={14} className="animate-spin mr-1" />
+              ) : (
+                <CheckCircle2 size={14} className="mr-1" />
+              )}
               Approva e Pubblica
             </Button>
-            <Button variant="outline" onClick={onClose}>Annulla</Button>
+            <Button variant="outline" onClick={onClose}>
+              Annulla
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -97,7 +157,11 @@ function EditModal({ article, adminKey, onClose, onSaved }: {
   );
 }
 
-function ArticleCard({ article, adminKey, onRefresh }: {
+function ArticleCard({
+  article,
+  adminKey,
+  onRefresh,
+}: {
   article: GrowthArticle;
   adminKey: string;
   onRefresh: () => void;
@@ -108,36 +172,45 @@ function ArticleCard({ article, adminKey, onRefresh }: {
   async function approve() {
     setLoading(true);
     try {
-      await fetch(`${BASE}api/admin/growth-queue/${article.id}/approve`, {
+      await apiFetch(`${BASE}api/admin/growth-queue/${article.id}/approve`, {
         method: "POST",
-        headers: { "x-admin-key": adminKey, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${adminKey}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({}),
       });
       onRefresh();
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function reject() {
     setLoading(true);
     try {
-      await fetch(`${BASE}api/admin/growth-queue/${article.id}/reject`, {
+      await apiFetch(`${BASE}api/admin/growth-queue/${article.id}/reject`, {
         method: "POST",
-        headers: { "x-admin-key": adminKey },
+        headers: { Authorization: `Bearer ${adminKey}` },
       });
       onRefresh();
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function remove() {
     if (!confirm("Eliminare definitivamente?")) return;
     setLoading(true);
     try {
-      await fetch(`${BASE}api/admin/growth-queue/${article.id}`, {
+      await apiFetch(`${BASE}api/admin/growth-queue/${article.id}`, {
         method: "DELETE",
-        headers: { "x-admin-key": adminKey },
+        headers: { Authorization: `Bearer ${adminKey}` },
       });
       onRefresh();
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -147,21 +220,27 @@ function ArticleCard({ article, adminKey, onRefresh }: {
           article={article}
           adminKey={adminKey}
           onClose={() => setEditing(false)}
-          onSaved={() => { setEditing(false); onRefresh(); }}
+          onSaved={() => {
+            setEditing(false);
+            onRefresh();
+          }}
         />
       )}
       <Card className="border hover:shadow-sm transition-shadow">
         <CardContent className="pt-4">
           <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm leading-tight">{article.title}</h3>
+              <h3 className="font-semibold text-sm leading-tight">
+                {article.title}
+              </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {article.category}{article.subcategory ? ` / ${article.subcategory}` : ""}
-                {" · "}
+                {article.category}
+                {article.subcategory ? ` / ${article.subcategory}` : ""}
+                {" Â· "}
                 <span className="flex items-center gap-0.5 inline-flex">
                   <Clock size={10} /> {article.readTimeMinutes} min
                 </span>
-                {" · "}
+                {" Â· "}
                 {new Date(article.createdAt).toLocaleDateString("it-IT")}
               </p>
             </div>
@@ -170,27 +249,57 @@ function ArticleCard({ article, adminKey, onRefresh }: {
             </div>
           </div>
 
-          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{article.description}</p>
+          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+            {article.description}
+          </p>
 
           {article.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-3">
               {article.tags.slice(0, 5).map((t) => (
-                <span key={t} className="text-xs bg-muted px-2 py-0.5 rounded-full">{t}</span>
+                <span
+                  key={t}
+                  className="text-xs bg-muted px-2 py-0.5 rounded-full"
+                >
+                  {t}
+                </span>
               ))}
             </div>
           )}
 
           <div className="flex gap-2 flex-wrap">
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-7 text-xs" onClick={approve} disabled={loading}>
+            <Button
+              size="sm"
+              className="bg-success text-primary-foreground hover:bg-success/90 h-7 text-xs"
+              onClick={approve}
+              disabled={loading}
+            >
               <CheckCircle2 size={12} className="mr-1" /> Approva
             </Button>
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditing(true)} disabled={loading}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() => setEditing(true)}
+              disabled={loading}
+            >
               <Edit3 size={12} className="mr-1" /> Modifica
             </Button>
-            <Button size="sm" variant="outline" className="h-7 text-xs text-amber-600 border-amber-200" onClick={reject} disabled={loading}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs text-warning border-warning-muted"
+              onClick={reject}
+              disabled={loading}
+            >
               <XCircle size={12} className="mr-1" /> Scarta
             </Button>
-            <Button size="sm" variant="ghost" className="h-7 text-xs text-red-500 ml-auto" onClick={remove} disabled={loading}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs text-danger ml-auto"
+              onClick={remove}
+              disabled={loading}
+            >
               <Trash2 size={12} />
             </Button>
           </div>
@@ -201,111 +310,140 @@ function ArticleCard({ article, adminKey, onRefresh }: {
 }
 
 export default function AdminCrescita() {
-  const [adminKey, setAdminKey] = useState(() => localStorage.getItem("northstar_admin_key") ?? "");
-  const [keyInput, setKeyInput] = useState("");
+  const { key } = useAdminAuth();
   const [data, setData] = useState<QueueData | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const fetchData = useCallback(async (key: string) => {
+  const fetchData = useCallback(async (adminKey: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`${BASE}api/admin/growth-queue`, {
-        headers: { "x-admin-key": key },
+      const queueData = await getJson<QueueData>(`${BASE}api/admin/growth-queue`, {
+        headers: { Authorization: `Bearer ${adminKey}` },
       });
-      if (res.ok) setData(await res.json());
-    } finally { setLoading(false); }
+      setData(queueData);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (adminKey) fetchData(adminKey);
-  }, [adminKey, fetchData]);
-
-  if (!adminKey) {
-    return (
-      <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm">
-          <CardHeader><CardTitle className="text-center">Admin — NorthStar</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <Input type="password" placeholder="Chiave admin" value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") { localStorage.setItem("northstar_admin_key", keyInput.trim()); setAdminKey(keyInput.trim()); }
-              }} />
-            <Button className="w-full" onClick={() => {
-              localStorage.setItem("northstar_admin_key", keyInput.trim()); setAdminKey(keyInput.trim());
-            }}>Accedi</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+    if (key) fetchData(key);
+  }, [key, fetchData]);
 
   return (
-    <div className="min-h-screen bg-muted/20 p-4 md:p-8">
-      <div className="max-w-3xl mx-auto space-y-6">
-
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Sparkles size={22} className="text-primary" />
-              Coda Articoli Crescita
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Approva, modifica o scarta articoli generati dall'AI</p>
+    <AdminAuthGate
+      title="Coda Crescita"
+      description="Approva, modifica o scarta articoli generati dall'AI"
+    >
+      <div className="min-h-screen bg-muted/20 p-4 md:p-8">
+        <div className="max-w-3xl mx-auto space-y-6">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <Sparkles size={22} className="text-primary" />
+                Coda Articoli Crescita
+              </h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Approva, modifica o scarta articoli generati dall'AI
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fetchData(key)}
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader2 size={14} className="animate-spin mr-1" />
+              ) : (
+                <RefreshCw size={14} className="mr-1" />
+              )}
+              Aggiorna
+            </Button>
           </div>
-          <Button variant="outline" size="sm" onClick={() => fetchData(adminKey)} disabled={loading}>
-            {loading ? <Loader2 size={14} className="animate-spin mr-1" /> : <RefreshCw size={14} className="mr-1" />}
-            Aggiorna
-          </Button>
-        </div>
 
-        {/* Stats */}
-        {data && (
-          <div className="grid grid-cols-3 gap-3">
-            <Card><CardContent className="pt-4 text-center">
-              <p className="text-2xl font-bold text-amber-500">{data.stats.pending}</p>
-              <p className="text-xs text-muted-foreground mt-1">In coda</p>
-            </CardContent></Card>
-            <Card><CardContent className="pt-4 text-center">
-              <p className="text-2xl font-bold text-emerald-600">{data.stats.published}</p>
-              <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1"><TrendingUp size={10} /> Pubblicati</p>
-            </CardContent></Card>
-            <Card><CardContent className="pt-4 text-center">
-              <p className="text-2xl font-bold text-red-500">{data.stats.rejected}</p>
-              <p className="text-xs text-muted-foreground mt-1">Scartati</p>
-            </CardContent></Card>
-          </div>
-        )}
+          {/* Stats */}
+          {data && (
+            <div className="grid grid-cols-3 gap-3">
+              <Card>
+                <CardContent className="pt-4 text-center">
+                  <p className="text-2xl font-bold text-warning">
+                    {data.stats.pending}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">In coda</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4 text-center">
+                  <p className="text-2xl font-bold text-success">
+                    {data.stats.published}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
+                    <TrendingUp size={10} /> Pubblicati
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4 text-center">
+                  <p className="text-2xl font-bold text-danger">
+                    {data.stats.rejected}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Scartati</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
-        {loading && !data && (
+          {loading && !data && (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-32 rounded-xl" />
+              ))}
+            </div>
+          )}
+
+          {data && data.queue.length === 0 && (
+            <Card>
+              <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
+                <CheckCircle2
+                  size={32}
+                  className="mx-auto mb-3 text-success opacity-60"
+                />
+                <p className="font-medium">Nessun articolo in coda</p>
+                <p className="text-sm mt-1">
+                  Gli articoli generati dall'AI con status "pending" appariranno
+                  qui.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
+            {data?.queue.map((article) => (
+              <ArticleCard
+                key={article.id}
+                article={article}
+                adminKey={key}
+                onRefresh={() => fetchData(key)}
+              />
+            ))}
           </div>
-        )}
 
-        {data && data.queue.length === 0 && (
-          <Card>
-            <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
-              <CheckCircle2 size={32} className="mx-auto mb-3 text-emerald-500 opacity-60" />
-              <p className="font-medium">Nessun articolo in coda</p>
-              <p className="text-sm mt-1">Gli articoli generati dall'AI con status "pending" appariranno qui.</p>
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="space-y-3">
-          {data?.queue.map((article) => (
-            <ArticleCard key={article.id} article={article} adminKey={adminKey} onRefresh={() => fetchData(adminKey)} />
-          ))}
-        </div>
-
-        <div className="flex gap-2 text-xs text-muted-foreground pt-2">
-          <a href="/admin" className="hover:underline">← Admin Home</a>
-          <span>·</span>
-          <a href="/admin/cataloghi" className="hover:underline">Cataloghi</a>
-          <span>·</span>
-          <a href="/admin/agenti" className="hover:underline">Agent Health</a>
+          <div className="flex gap-2 text-xs text-muted-foreground pt-2">
+            <a href="/admin" className="hover:underline">
+              â† Admin Home
+            </a>
+            <span>Â·</span>
+            <a href="/admin/cataloghi" className="hover:underline">
+              Cataloghi
+            </a>
+            <span>Â·</span>
+            <a href="/admin/agenti" className="hover:underline">
+              Agent Health
+            </a>
+          </div>
         </div>
       </div>
-    </div>
+    </AdminAuthGate>
   );
 }

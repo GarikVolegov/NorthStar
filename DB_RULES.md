@@ -11,9 +11,9 @@
 ### Migrazioni Drizzle — Sì da committare
 
 ```
-✅ lib/db/drizzle/*.sql        → COMMITTARE sempre
-✅ lib/db/src/schema/index.ts  → COMMITTARE sempre
-✅ drizzle.config.ts           → COMMITTARE sempre
+✅ packages/db/drizzle/*.sql        → COMMITTARE sempre
+✅ packages/db/src/schema/          → COMMITTARE sempre (tutti i file)
+✅ packages/db/drizzle.config.ts    → COMMITTARE sempre
 ```
 
 Le migrazioni sono struttura DDL pura — non contengono dati utente. Fanno parte del codice.
@@ -60,6 +60,21 @@ await db.insert(users).values([
 - Il dominio `example.com` è riservato per test da RFC 2606 — nessuna email reale può usarlo
 - Mai usare `@gmail.com`, `@yahoo.it`, `@hotmail.com` o qualsiasi provider reale nel seed
 
+### Nuove Tabelle — Checklist
+
+```
+- [ ] Named in snake_case plurale
+- [ ] Colonna id (PK, serial/bigserial)
+- [ ] created_at timestamp con default now()
+- [ ] updated_at timestamp con default now() + trigger auto-update
+- [ ] Indici su tutte le FK e colonne usate in WHERE/JOIN
+- [ ] FK con ON DELETE esplicito (CASCADE o RESTRICT)
+- [ ] Drizzle schema in packages/db/src/schema/<table>.ts
+- [ ] Esportata in packages/db/src/schema/index.ts
+- [ ] Migration generata con pnpm db:generate
+- [ ] Migration testata con pnpm db:migrate
+```
+
 ### Dump di produzione
 
 ```bash
@@ -75,7 +90,7 @@ pg_dump northstar_prod | gzip > /mnt/backups/northstar_$(date +%Y%m%d).sql.gz
 ### Checklist pre-commit DB
 
 ```bash
-# Prima di committare qualsiasi file in lib/db/ o scripts/seed*:
+# Prima di committare qualsiasi file in packages/db/ o scripts/seed*:
 
 # 1. Controlla che il diff non contenga email reali
 git diff --staged | grep -iE '[a-zA-Z0-9._%+-]+@(gmail|yahoo|hotmail|outlook|libero|virgilio)\.'
@@ -108,10 +123,102 @@ git diff --staged --name-only | grep -iE '\.(sql|dump|bak)$'
 
 ### Naming conventions
 
-- Tabelle: `snake_case` plurale (`users`, `referral_codes`, `withdrawal_requests`)
+- Tabelle: `snake_case` plurale (`users`, `coach_memory`, `audit_log`)
 - Colonne: `snake_case` (`created_at`, `is_premium`, `referral_code`)
 - Indici: `idx_<tabella>_<colonna>` (`idx_users_email`)
 - FK: `<tabella>_id` (`user_id`, `referral_id`)
+- Vincoli CHECK: `ck_<tabella>_<descrizione>` (`ck_coach_memory_confidence_range`)
+
+### Schema Completo del Database (41 tabelle)
+
+Tutte le tabelle sono definite in `packages/db/src/schema/` e re-esportate da `index.ts`.
+
+#### Core / Auth
+| Tabella | File | Descrizione |
+|---------|------|-------------|
+| `users` | `users.ts` | Utenti: email, passwordHash, ruolo (user/admin), stripeSubscriptionId, journeyType, userMode, sectorName |
+| `testSessions` | `testSessions.ts` | Sessioni test RIASEC |
+| `test-results` | `test-results.ts` | Risultati test RIASEC |
+
+#### Professional Sectors & Education
+| Tabella | File | Descrizione |
+|---------|------|-------------|
+| `sectors` | `sectors.ts` | Settori professionali |
+| `professions` | `professions.ts` | Professioni / ruoli |
+| `educationPaths` | `educationPaths.ts` | Percorsi formativi |
+| `professionEducationPaths` | `professionEducationPaths.ts` | Join table professioni ↔ percorsi formativi |
+
+#### User Content
+| Tabella | File | Descrizione |
+|---------|------|-------------|
+| `userObjectives` | `userObjectives.ts` | Obiettivi/goals utente |
+| `userFavorites` | `userFavorites.ts` | Preferiti utente (sectors) |
+| `objectiveComments` | `objectiveComments.ts` | Commenti su obiettivi |
+| `businessIdeas` | `businessIdeas.ts` | Validazione idee imprenditoriali |
+| `certifications` | `certifications.ts` | Certificazioni utente |
+| `linkedinImports` | `linkedinImports.ts` | Import dati LinkedIn |
+| `job_applications` | `users.ts` | Candidature lavorative (definita nello stesso file di users) |
+
+#### Knowledge Graph
+| Tabella | File | Descrizione |
+|---------|------|-------------|
+| `knowledge` | `knowledge.ts` | Nodi del grafo della conoscenza |
+| `discoveryItems` | `discoveryItems.ts` | Item del feed discovery |
+| `discoverySourcesTable` | `discoverySourcesTable.ts` | Metadati fonti discovery |
+
+#### AI / Coach
+| Tabella | File | Descrizione |
+|---------|------|-------------|
+| `coachMemory` | `coachMemory.ts` | Memoria persistente del coach AI (con CHECK confidence range 0-1) |
+| `coachSessions` | `coachSessions.ts` | Sessioni chat coach AI |
+| `agentReview` | `agentReview.ts` | Log e review delle esecuzioni agenti AI (consolidato da agentLogs) |
+| `qualityMetrics` | `qualityMetrics.ts` | Metriche qualità AI |
+| `routingLogs` | `routingLogs.ts` | Log delle decisioni di routing AI |
+| `responseFeedback` | `responseFeedback.ts` | Feedback utente su risposte AI |
+| `sessionSummaries` | `sessionSummaries.ts` | Riassunti automatici delle sessioni |
+| `pageContextSnapshots` | `pageContextSnapshots.ts` | Snapshot contesto pagina per AI |
+
+#### Social / Communication
+| Tabella | File | Descrizione |
+|---------|------|-------------|
+| `friendships` | `friendships.ts` | Amicizie / connessioni social |
+| `conversations` | `conversations.ts` | Conversazioni |
+| `messages` | `messages.ts` | Messaggi |
+| `contactMessages` | `contactMessages.ts` | Messaggi form contatti |
+| `notifications` | (in conversations) | Notifiche |
+
+#### Calendar / Reminders
+| Tabella | File | Descrizione |
+|---------|------|-------------|
+| `calendar` | `calendar.ts` | Eventi calendario + reminder |
+| `voiceSessions` | `voiceSessions.ts` | Sessioni interazione vocale |
+
+#### Content / News
+| Tabella | File | Descrizione |
+|---------|------|-------------|
+| `newsArticles` | `newsArticles.ts` | Articoli news |
+| `growthArticles` | `growthArticles.ts` | Articoli crescita personale |
+| `nftCertificates` | `nftCertificates.ts` | Certificati NFT / gamification (con chainId) |
+
+#### Affiliate System
+| Tabella | File | Descrizione |
+|---------|------|-------------|
+| `affiliateAccounts` | `affiliateAccounts.ts` | Account affiliazione |
+| `affiliateCommissions` | `affiliateCommissions.ts` | Commissioni (con enum appliedTo) |
+| `affiliateReferrals` | `affiliateReferrals.ts` | Referral |
+| `affiliateWithdrawals` | `affiliateWithdrawals.ts` | Richieste prelievo |
+| `affiliationLeads` | `affiliationLeads.ts` | Lead affiliazione |
+
+#### Audit / Security
+| Tabella | File | Descrizione |
+|---------|------|-------------|
+| `auditLog` | `auditLog.ts` | Log audit immutabile (con IP hash per GDPR) |
+
+### Indici e Vincoli Speciali
+- `idx_users_email` — indice unico su email
+- `idx_test_session_user` — indice su testSessionId per performance
+- `ck_coach_memory_confidence_range` — CHECK confidence BETWEEN 0 AND 1
+- `updated_at` trigger — funzione SQL in `updatedAt-trigger.sql` per auto-aggiornamento automatico
 
 ### Migrazioni
 
@@ -119,27 +226,33 @@ git diff --staged --name-only | grep -iE '\.(sql|dump|bak)$'
 # Genera migration dopo aver modificato lo schema
 pnpm db:generate
 
-# Applica in dev locale
+# Applica in dev locale (push diretto, senza file migration)
 pnpm db:push
 
-# Applica via migration file (produzione)
+# Applica via migration file (produzione/staging)
 pnpm db:migrate
+
+# Esegui seed dati di sviluppo
+pnpm db:seed
 ```
 
+- La configurazione Drizzle è in `packages/db/drizzle.config.ts`
 - Una migration per feature/branch — mai accumulare modifiche non correlate in una migration
 - Le migration sono idempotenti: `CREATE TABLE IF NOT EXISTS`, `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
 - Mai cancellare file di migration già applicati in produzione
 - Mai modificare una migration già committata — crea una nuova
+- Le migration generano file SQL in `packages/db/drizzle/`
 
 ### Schema changes checklist
 
 - [ ] Nuova colonna con default o nullable (non breaking)
 - [ ] Indice su colonne usate in `WHERE` / `JOIN` frequenti
 - [ ] FK con `ON DELETE` esplicito (CASCADE o RESTRICT)
-- [ ] `created_at` e `updated_at` su ogni nuova tabella
-- [ ] Drizzle schema aggiornato in `lib/db/src/schema/index.ts`
+- [ ] `created_at` e `updated_at` su ogni nuova tabella (con trigger auto-update)
+- [ ] Drizzle schema file creato in `packages/db/src/schema/<tabella>.ts`
+- [ ] Tabella esportata in `packages/db/src/schema/index.ts`
 - [ ] Migration generata con `pnpm db:generate`
-- [ ] Migration testata in locale con `pnpm db:push`
+- [ ] Migration testata in locale con `pnpm db:migrate`
 - [ ] Nessun dato reale nel seed committato
 
 ### Query patterns
@@ -173,3 +286,6 @@ await db.transaction(async (tx) => {
 - **`db.delete()` senza `.where()`**: cancella tutta la tabella. Drizzle non blocca, fai attenzione.
 - **Enum Drizzle**: cambiarli richiede migration DDL — aggiungi solo valori, mai rimuovere quelli esistenti
 - **Backup**: mai su git. Su storage cifrato dedicato.
+- **`updated_at` automatico**: il trigger SQL è in `packages/db/src/schema/updatedAt-trigger.sql` — va applicato manualmente se si crea una nuova tabella che usa `updated_at`
+- **agentReview vs agentLogs**: `agentLogs` è stato consolidato in `agentReview` — usare sempre `agentReview` per i nuovi sviluppi
+- **Connessione pool**: il pool PostgreSQL è un singleton esportato da `packages/db/src/index.ts` — non creare nuove connessioni

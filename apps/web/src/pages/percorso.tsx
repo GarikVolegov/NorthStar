@@ -1,13 +1,20 @@
+import { useAuth } from "@/contexts/AuthContext";
+import { useWendy } from "@/contexts/WendyProvider";
+import { toast } from "@/hooks/use-toast";
+import { apiFetch } from "@/lib/api-fetch";
+import { motion } from "framer-motion";
+import {
+  ArrowRight,
+  BarChart3,
+  Building2,
+  CheckCircle2,
+  HelpCircle,
+  Rocket,
+  Star,
+  TrendingUp,
+} from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { motion } from "framer-motion";
-import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch } from "@/lib/api-fetch";
-import { toast } from "@/hooks/use-toast";
-import {
-  HelpCircle, TrendingUp, Rocket, Building2, BarChart3,
-  ArrowRight, CheckCircle2, Star,
-} from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -33,10 +40,10 @@ const PERSONAS: Persona[] = [
     tagline: "Non so ancora cosa fare",
     description:
       "Stai cercando la tua strada. Hai curiosità, idee confuse o semplicemente vuoi capire cosa ti appassiona davvero e dove potresti eccellere.",
-    tools: ["Test RIASEC", "Esplora settori", "Coach AI", "Confronta carriere"],
-    color: "from-[#1c1810] to-[#2a2418]",
-    accent: "text-[#D4AF37]",
-    border: "border-[#D4AF37]/40",
+    tools: ["Test di personalità", "Esplora settori", "Coach AI", "Confronta carriere"],
+    color: "from-[hsl(43 20% 9%)] to-[hsl(43 15% 13%)]",
+    accent: "text-primary",
+    border: "border-primary/40",
   },
   {
     id: "dipendente",
@@ -45,10 +52,10 @@ const PERSONAS: Persona[] = [
     tagline: "Ho un lavoro e voglio avanzare",
     description:
       "Sei impiegato e vuoi fare carriera, cambiare ruolo o passare a un settore migliore. Hai bisogno di strumenti concreti per crescere.",
-    tools: ["Analisi skill gap", "Simulatore colloquio", "Roadmap di carriera", "Candidature"],
-    color: "from-[#0f1f18] to-[#162914]",
-    accent: "text-[#A8D5BA]",
-    border: "border-[#A8D5BA]/40",
+    tools: ["Analisi competenze", "Simulatore colloquio", "Roadmap di carriera", "Candidature"],
+    color: "from-growth/5 to-growth/10",
+    accent: "text-growth",
+    border: "border-growth/40",
   },
   {
     id: "autonomo",
@@ -57,10 +64,10 @@ const PERSONAS: Persona[] = [
     tagline: "Lavoro in proprio e voglio crescere",
     description:
       "Sei freelance, imprenditore o professionista autonomo. Vuoi scalare il tuo business, trovare nuovi clienti o validare un'idea.",
-    tools: ["Validatore Idea", "Analisi mercato", "Roadmap business", "Coach AI"],
-    color: "from-[#1c1810] to-[#201c0f]",
-    accent: "text-[#D4AF37]",
-    border: "border-[#D4AF37]/40",
+    tools: ["Idea", "Analisi mercato", "Roadmap business", "Coach AI"],
+    color: "from-[hsl(43 20% 9%)] to-[hsl(43 18% 11%)]",
+    accent: "text-primary",
+    border: "border-primary/40",
   },
   {
     id: "azienda",
@@ -69,10 +76,10 @@ const PERSONAS: Persona[] = [
     tagline: "Cerco professionisti qualificati",
     description:
       "Sei HR, recruiter o manager. Stai cercando i profili giusti per il tuo team e vuoi capire il mercato dei talenti italiano.",
-    tools: ["Profili RIASEC", "Settori in crescita", "Analisi competenze", "Affilazione"],
-    color: "from-[#0f1f18] to-[#1c1810]",
-    accent: "text-[#A8D5BA]",
-    border: "border-[#A8D5BA]/40",
+    tools: ["Profili RIASEC", "Aree in crescita", "Analisi competenze", "Partner"],
+    color: "from-growth/5 to-[hsl(43 20% 9%)]",
+    accent: "text-growth",
+    border: "border-growth/40",
   },
   {
     id: "investitore",
@@ -80,18 +87,18 @@ const PERSONAS: Persona[] = [
     label: "Investitore",
     tagline: "Valuto opportunità di mercato",
     description:
-      "Sei un investitore, business angel o VC. Vuoi capire i settori in crescita, i trend del mercato del lavoro italiano e le opportunità.",
-    tools: ["Settori in crescita", "Analisi trend", "Report mercato", "Knowledge Graph"],
-    color: "from-[#201c0f] to-[#2a2418]",
-    accent: "text-[#D4AF37]",
-    border: "border-[#D4AF37]/40",
+      "Sei un investitore,           investitore o fondo. Vuoi capire i settori in crescita, i trend del mercato del lavoro italiano e le opportunità.",
+    tools: ["Aree in crescita", "Analisi trend", "Report mercato", "Mappa conoscenze"],
+    color: "from-[hsl(43 18% 11%)] to-[hsl(43 15% 13%)]",
+    accent: "text-primary",
+    border: "border-primary/40",
   },
 ];
 
 const JOURNEY_DESTINATION: Record<JourneyType, string> = {
   indeciso: "/test",
   dipendente: "/dashboard",
-  autonomo: "/validatore-idea",
+  autonomo: "#wendy",
   azienda: "/settori",
   investitore: "/settori",
 };
@@ -99,6 +106,7 @@ const JOURNEY_DESTINATION: Record<JourneyType, string> = {
 export default function Percorso() {
   const { user, login, token } = useAuth();
   const [, setLocation] = useLocation();
+  const wendy = useWendy();
   const [selected, setSelected] = useState<JourneyType | null>(
     (user?.journeyType as JourneyType) ?? null
   );
@@ -110,21 +118,26 @@ export default function Percorso() {
     if (user && token) {
       setSaving(true);
       try {
-        await apiFetch(`${BASE}api/profile/${user.id}/journey-type`, {
+        await apiFetch(`${BASE}api/journey-type/${user.id}/journey-type`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ journeyType: selected }),
         });
         login({ ...user, journeyType: selected }, token);
-        toast({ title: "Percorso salvato!", description: `Hai scelto: ${PERSONAS.find((p) => p.id === selected)?.label}` });
+        toast({ title: "Piano salvato!", description: `Hai scelto: ${PERSONAS.find((p) => p.id === selected)?.label}` });
       } catch {
-        toast({ title: "Errore", description: "Non è stato possibile salvare il percorso.", variant: "destructive" });
+        toast({ title: "Errore", description: "Non è stato possibile salvare il piano.", variant: "destructive" });
       } finally {
         setSaving(false);
       }
     }
 
-    setLocation(JOURNEY_DESTINATION[selected]);
+    const dest = JOURNEY_DESTINATION[selected];
+    if (dest === "#wendy") {
+      wendy.open();
+    } else {
+      setLocation(dest);
+    }
   }
 
   const selectedPersona = PERSONAS.find((p) => p.id === selected);
@@ -176,7 +189,7 @@ export default function Percorso() {
               >
                 {isSelected && (
                   <div className="absolute top-3 right-3">
-                    <CheckCircle2 className="w-5 h-5 text-[#D4AF37]" />
+                    <CheckCircle2 className="w-5 h-5 text-primary" />
                   </div>
                 )}
 

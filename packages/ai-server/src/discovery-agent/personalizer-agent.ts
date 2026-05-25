@@ -140,7 +140,7 @@ export async function getPersonalizedFeed(
         eq(discoveryItemsTable.isEnriched, true),
         gte(discoveryItemsTable.relevanceScore, 0.3),
         gte(discoveryItemsTable.createdAt, sevenDaysAgo),
-        ...(typeFilter ? [eq(discoveryItemsTable.type, typeFilter as any)] : []),
+        ...(typeFilter ? [eq(discoveryItemsTable.type, typeFilter)] : []),
       ),
     )
     .orderBy(desc(discoveryItemsTable.relevanceScore))

@@ -1,167 +1,43 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@workspace/design-tokens/northstar-theme.css";
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant lefty (&:is(.lefty *));
 
-@theme inline {
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
-
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
-  --color-card-border: hsl(var(--card-border));
-
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-  --color-popover-border: hsl(var(--popover-border));
-
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-  --color-primary-border: var(--primary-border);
-
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-  --color-secondary-border: var(--secondary-border);
-
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-muted-border: var(--muted-border);
-
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-accent-border: var(--accent-border);
-
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --color-destructive-border: var(--destructive-border);
-
-  --color-chart-1: hsl(var(--chart-1));
-  --color-chart-2: hsl(var(--chart-2));
-  --color-chart-3: hsl(var(--chart-3));
-  --color-chart-4: hsl(var(--chart-4));
-  --color-chart-5: hsl(var(--chart-5));
-
-  --font-sans: var(--app-font-sans);
-  --font-serif: var(--app-font-serif);
-  --font-mono: var(--app-font-mono);
-
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+html.lefty #root {
+  direction: rtl;
 }
 
-/* ── DEEP NAVY PREMIUM THEME ── */
-:root {
-  color-scheme: dark;
-
-  --button-outline: rgba(193,158,74, .13);
-  --badge-outline:  rgba(193,158,74, .06);
-
-  --opaque-button-border-intensity: 8;
-
-  --elevate-1: rgba(255,255,255, .022);
-  --elevate-2: rgba(255,255,255, .044);
-
-  /* Base — deep navy-slate */
-  --background: 224 24% 8%;
-  --foreground: 220 14% 93%;
-
-  --border: 224 18% 19%;
-
-  /* Cards — elevated navy */
-  --card: 224 22% 11%;
-  --card-foreground: 220 14% 93%;
-  --card-border: 224 18% 22%;
-
-  /* Popovers */
-  --popover: 224 22% 13%;
-  --popover-foreground: 220 14% 93%;
-  --popover-border: 224 18% 24%;
-
-  /* Primary — Champagne Gold (refined, desaturated) */
-  --primary: 43 44% 57%;
-  --primary-foreground: 224 24% 7%;
-
-  /* Secondary — muted navy surface */
-  --secondary: 224 18% 15%;
-  --secondary-foreground: 220 10% 72%;
-
-  /* Muted */
-  --muted: 224 18% 13%;
-  --muted-foreground: 220 8% 54%;
-
-  /* Accent */
-  --accent: 224 18% 16%;
-  --accent-foreground: 220 14% 93%;
-
-  /* Destructive */
-  --destructive: 4 62% 52%;
-  --destructive-foreground: 0 0% 100%;
-
-  /* Input / Ring */
-  --input: 224 18% 18%;
-  --ring: 43 44% 57%;
-
-  /* Charts — balanced, professional */
-  --chart-1: 43 44% 57%;
-  --chart-2: 152 28% 58%;
-  --chart-3: 210 55% 58%;
-  --chart-4: 268 38% 60%;
-  --chart-5: 4 52% 56%;
-
-  /* Fonts */
-  --app-font-sans: 'Inter', system-ui, sans-serif;
-  --app-font-serif: 'Playfair Display', Georgia, serif;
-  --app-font-mono: ui-monospace, monospace;
-
-  --radius: 0.75rem;
-
-  /* Shadows — navy depth */
-  --shadow-2xs: 0px 1px 2px 0px rgba(0,0,0,0.55);
-  --shadow-xs:  0px 1px 3px 0px rgba(0,0,0,0.62);
-  --shadow-sm:  0px 2px 6px 0px rgba(0,0,0,0.55), 0px 1px 2px -1px rgba(0,0,0,0.65);
-  --shadow:     0px 2px 8px 0px rgba(0,0,0,0.55), 0px 1px 3px -1px rgba(0,0,0,0.65);
-  --shadow-md:  0px 4px 16px 0px rgba(0,0,0,0.55), 0px 2px 6px -1px rgba(0,0,0,0.65);
-  --shadow-lg:  0px 8px 24px 0px rgba(0,0,0,0.55), 0px 4px 10px -2px rgba(0,0,0,0.7);
-  --shadow-xl:  0px 12px 36px 0px rgba(0,0,0,0.62), 0px 8px 16px -4px rgba(0,0,0,0.7);
-  --shadow-2xl: 0px 20px 48px 0px rgba(0,0,0,0.75);
-
-  --tracking-normal: 0em;
-  --spacing: 0.25rem;
-
-  --primary-border:     hsl(43 44% 42%);
-  --secondary-border:   hsl(224 18% 24%);
-  --muted-border:       hsl(224 18% 21%);
-  --accent-border:      hsl(224 18% 24%);
-  --destructive-border: hsl(4 62% 42%);
-
-  /* Brand / Champagne Gold token */
-  --brand:        hsl(43 44% 57%);
-  --brand-light:  hsl(43 44% 72%);
-  --brand-dark:   hsl(43 44% 38%);
-  --brand-border: hsl(43 44% 44%);
-  --brand-fg:     hsl(224 24% 7%);
-
-  /* Growth / Sage Green token */
-  --growth:        hsl(152 26% 62%);
-  --growth-light:  hsl(152 26% 78%);
-  --growth-dark:   hsl(152 26% 40%);
-  --growth-border: hsl(152 26% 36%);
-  --growth-fg:     hsl(224 24% 7%);
-
-  /* Hero dark surface — deep navy */
-  --hero-dark:   hsl(224 24% 9%);
-  --hero-dark-2: hsl(224 26% 6%);
-
-  /* Glow — subtler, more refined */
-  --glow-primary: 0 0 28px 0 hsl(43 44% 57% / 0.20);
-  --glow-growth:  0 0 20px 0 hsl(152 26% 62% / 0.16);
+#root:not(:has(*)) {
+  visibility: hidden;
 }
+
+/* Testo sempre LTR anche in modalità mancino */
+html.lefty #root p,
+html.lefty #root span,
+html.lefty #root h1,
+html.lefty #root h2,
+html.lefty #root h3,
+html.lefty #root h4,
+html.lefty #root h5,
+html.lefty #root h6,
+html.lefty #root a,
+html.lefty #root button,
+html.lefty #root input,
+html.lefty #root textarea,
+html.lefty #root label,
+html.lefty #root li,
+html.lefty #root td,
+html.lefty #root th {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: embed;
+}
+
+/* All design tokens (colors, fonts, radius, shadows) inherited from @workspace/design-tokens/northstar-theme.css
+   ─ If you need to override a token, do it here: */
 
 @layer base {
   * {
@@ -169,28 +45,39 @@
   }
   body {
     @apply font-sans antialiased bg-background text-foreground;
-    /* Subtle cool-warm ambient gradient */
-    background-image:
-      radial-gradient(ellipse at 15% 60%, hsl(43 44% 57% / 0.04) 0%, transparent 55%),
-      radial-gradient(ellipse at 85% 15%, hsl(210 55% 58% / 0.04) 0%, transparent 50%),
-      radial-gradient(ellipse at 50% 100%, hsl(224 24% 12% / 0.6) 0%, transparent 60%);
   }
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-sans tracking-tight text-foreground;
   }
-  h1 { @apply text-4xl font-bold leading-tight; }
-  h2 { @apply text-2xl font-semibold leading-snug; }
-  h3 { @apply text-xl font-semibold leading-snug; }
-  h4 { @apply text-base font-semibold leading-normal; }
+  h1 {
+    @apply text-4xl font-bold leading-tight;
+  }
+  h2 {
+    @apply text-2xl font-semibold leading-snug;
+  }
+  h3 {
+    @apply text-xl font-semibold leading-snug;
+  }
+  h4 {
+    @apply text-base font-semibold leading-normal;
+  }
 
   /* Prevent horizontal overflow on mobile */
-  html, body {
+  html,
+  body {
     overflow-x: hidden;
     max-width: 100vw;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    *, ::before, ::after {
+    *,
+    ::before,
+    ::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
@@ -200,140 +87,248 @@
 }
 
 @layer utilities {
-  /* ── Typography helpers ── */
-  .text-display {
-    font-family: var(--app-font-sans);
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-  .text-italic-serif {
-    font-family: var(--app-font-serif);
-    font-style: italic;
-    font-weight: 400;
-  }
-  .text-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+  :root {
+    --app-glass-alpha: 0.72;
+    --app-glass-blur: 18px;
+    --app-glass-saturation: 1.08;
+    --app-bg-overlay: 0.32;
   }
 
-  /* ── Glow effects ── */
-  .glow-primary {
-    box-shadow: var(--glow-primary);
-  }
-  .glow-text {
-    text-shadow: 0 0 24px hsl(46 65% 52% / 0.5);
-  }
-
-  /* ── Shimmer ── */
-  .shimmer {
-    background: linear-gradient(
-      90deg,
-      hsl(var(--muted)) 0%,
-      hsl(var(--muted-foreground) / 0.08) 50%,
-      hsl(var(--muted)) 100%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 1.5s linear infinite;
-  }
-  @keyframes shimmer {
-    0%   { background-position: -200% center; }
-    100% { background-position:  200% center; }
+  .liquid-card,
+  .liquid-panel,
+  .liquid-widget,
+  .liquid-nav {
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      backdrop-filter 180ms ease;
   }
 
-  /* ── Glass surface — deep navy ── */
-  /*
-   * Optimization: blur reduced from 16px → 8px (GPU cost ~75% lower).
-   * contain:layout paint prevents this element's compositing from
-   * triggering reflows in sibling elements.
-   * will-change intentionally omitted — it forces a new compositor layer
-   * even for static elements, wasting GPU memory.
-   */
-  .glass {
-    background: hsl(224 22% 11% / 0.82);
-    backdrop-filter: blur(8px);
-    border: 1px solid hsl(224 18% 22%);
-    contain: layout paint;
+  html[data-user-background="active"] .liquid-card,
+  html[data-user-background="active"] .liquid-panel,
+  html[data-user-background="active"] .liquid-widget,
+  html[data-user-background="active"] .liquid-nav {
+    background-color: hsl(var(--card) / var(--app-glass-alpha)) !important;
+    border-color: hsl(var(--card-border) / 0.62) !important;
+    box-shadow:
+      0 18px 50px hsl(220 30% 8% / 0.16),
+      inset 0 1px 0 hsl(0 0% 100% / 0.18);
+    backdrop-filter: blur(var(--app-glass-blur)) saturate(var(--app-glass-saturation));
+    -webkit-backdrop-filter: blur(var(--app-glass-blur)) saturate(var(--app-glass-saturation));
   }
 
-  /* Disable backdrop-filter on mobile — most mobile GPUs handle blur
-   * poorly; the opaque fallback preserves visual hierarchy without jank. */
-  @media (max-width: 768px) {
-    .glass {
-      backdrop-filter: none;
-      background: hsl(224 22% 11% / 0.96);
-      contain: strict;
-    }
+  html[data-user-background="active"] #root [class*="bg-card"] {
+    background-color: hsl(var(--card) / var(--app-glass-alpha)) !important;
+    backdrop-filter: blur(var(--app-glass-blur)) saturate(var(--app-glass-saturation));
+    -webkit-backdrop-filter: blur(var(--app-glass-blur)) saturate(var(--app-glass-saturation));
   }
 
-  /* ── Navbar pill — deep navy ── */
-  /*
-   * Optimization: blur reduced from 20px → 10px.
-   * The navbar is repainted on every scroll tick when backdrop-filter is
-   * active — keeping the blur value low significantly reduces paint time.
-   */
-  .pill-nav {
-    background: hsl(224 20% 15% / 0.97);
-    backdrop-filter: blur(10px);
-    border: 1px solid hsl(224 16% 26%);
-    border-radius: 9999px;
+  html[data-user-background="active"] body {
+    background: transparent;
   }
+}
 
-  @media (max-width: 768px) {
-    .pill-nav {
-      backdrop-filter: none;
-      background: hsl(224 20% 15% / 0.99);
-    }
-  }
+/* Utility classes inherited from @workspace/design-tokens/northstar-theme.css (glass, pill-nav, hero-navy, section-growth, shimmer, gold-line, badge-gold, glow effects, touch-scroll-x, typography helpers) */
 
-  /* ── Hero dark section ── */
-  .hero-navy {
-    background: linear-gradient(
-      160deg,
-      hsl(224 22% 10%) 0%,
-      hsl(224 24% 8%)  50%,
-      hsl(224 26% 6%)  100%
-    );
-    position: relative;
-  }
-  .hero-navy::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(ellipse at 25% 55%, hsl(43 44% 57% / 0.07) 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 25%, hsl(210 55% 58% / 0.05) 0%, transparent 45%);
-    pointer-events: none;
-  }
+/* ── Clerk Custom Theme Overrides ───────────────────────────────────────────
+   Stili aggiuntivi per i componenti Clerk che non sono coperti dall'API
+   `appearance`. Allineati al tema "Deep Navy Premium" di NorthStar.
+   ────────────────────────────────────────────────────────────────────────── */
 
-  /* ── Growth accent section ── */
-  .section-growth {
-    background: linear-gradient(135deg, hsl(152 26% 62%) 0%, hsl(152 26% 46%) 100%);
-  }
+/* Card container */
+.cl-card,
+.cl-signIn-start,
+.cl-signUp-start,
+.cl-verification-start,
+.cl-resetPassword-start {
+  background-color: #131621 !important;
+  border: 1px solid #1e2233 !important;
+  border-radius: 0.75rem !important;
+  box-shadow:
+    0px 12px 36px 0px rgba(0, 0, 0, 0.62),
+    0px 8px 16px -4px rgba(0, 0, 0, 0.7) !important;
+}
 
-  /* ── Section separator ── */
-  .section-divider {
-    border-top: 1px solid hsl(var(--border));
-  }
+/* Social buttons */
+.cl-socialButtonsBlockButton {
+  border: 1px solid #1e2233 !important;
+  border-radius: 0.75rem !important;
+  color: #e6e8ed !important;
+  transition: all 0.15s ease !important;
+}
 
-  /* ── Gold decorative line ── */
-  .gold-line {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, hsl(46 65% 52% / 0.5), transparent);
-  }
+.cl-socialButtonsBlockButton:hover {
+  background-color: #1c2133 !important;
+  border-color: #2a3050 !important;
+}
 
-  /* ── Mobile touch & scroll improvements ── */
-  .touch-scroll-x {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    scroll-snap-type: x mandatory;
+.cl-socialButtonsBlockButton__text {
+  color: #e6e8ed !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+/* Divider */
+.cl-dividerLine {
+  background-color: #1e2233 !important;
+}
+
+.cl-dividerText {
+  color: #7a7f96 !important;
+  font-size: 12px !important;
+}
+
+/* Footer links */
+.cl-footerActionLink {
+  color: #c19e4a !important;
+  font-weight: 600 !important;
+  transition: color 0.15s ease !important;
+}
+
+.cl-footerActionLink:hover {
+  color: #d4ba7c !important;
+}
+
+.cl-footerActionText {
+  color: #7a7f96 !important;
+}
+
+/* OTP inputs */
+.cl-otpCodeFieldInput {
+  background-color: #171b28 !important;
+  border: 2px solid #1e2233 !important;
+  border-radius: 0.75rem !important;
+  color: #e6e8ed !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+}
+
+.cl-otpCodeFieldInput:focus {
+  border-color: #c19e4a !important;
+}
+
+/* Alert / info text */
+.cl-alertText {
+  color: #7a7f96 !important;
+  font-size: 13px !important;
+}
+
+.cl-alertIcon {
+  color: #c19e4a !important;
+}
+
+/* Badge */
+.cl-badge {
+  background-color: rgba(193, 158, 74, 0.1) !important;
+  color: #c19e4a !important;
+  border: 1px solid rgba(193, 158, 74, 0.3) !important;
+  border-radius: 9999px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+/* User button popover */
+.cl-userButtonPopoverCard {
+  background-color: #131621 !important;
+  border: 1px solid #1e2233 !important;
+  border-radius: 0.75rem !important;
+}
+
+.cl-userButtonPopoverActionButton {
+  color: #e6e8ed !important;
+  border-radius: 0.5rem !important;
+}
+
+.cl-userButtonPopoverActionButton:hover {
+  background-color: #1c2133 !important;
+}
+
+.cl-userButtonPopoverActionButtonText {
+  color: #e6e8ed !important;
+}
+
+.cl-userButtonPopoverFooter {
+  border-top: 1px solid #1e2233 !important;
+}
+
+.cl-userButtonPopoverFooterText {
+  color: #7a7f96 !important;
+}
+
+.cl-userButtonPopoverFooterLink {
+  color: #c19e4a !important;
+}
+
+/* Form field error */
+.cl-formFieldErrorText {
+  color: #d94f45 !important;
+  font-size: 12px !important;
+}
+
+/* Form field hint */
+.cl-formFieldHintText {
+  color: #7a7f96 !important;
+  font-size: 12px !important;
+}
+
+/* Identity preview */
+.cl-identityPreviewText {
+  color: #e6e8ed !important;
+}
+
+.cl-identityPreviewEditButton {
+  color: #c19e4a !important;
+}
+
+/* Shimmer animation — gold instead of default gray */
+@keyframes clerk-shimmer {
+  0% {
+    background-position: -200% 0;
   }
-  .touch-scroll-x::-webkit-scrollbar {
-    display: none;
+  100% {
+    background-position: 200% 0;
   }
-  .touch-scroll-x > * {
-    scroll-snap-align: start;
+}
+
+.cl-formButtonPrimary::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(193, 158, 74, 0.15),
+    transparent
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: clerk-shimmer 2s infinite linear !important;
+}
+
+/* Resend code button */
+.cl-resendCodeLink {
+  color: #c19e4a !important;
+  font-weight: 600 !important;
+}
+
+/* Header title — serif font for brand */
+.cl-headerTitle {
+  font-family: "Playfair Display", Georgia, serif !important;
+}
+
+.cl-headerSubtitle {
+  color: #7a7f96 !important;
+}
+
+/* Footer */
+.cl-footer {
+  border-top: 1px solid #1e2233 !important;
+}
+
+/* Agent Room — ticker per il currentTask bubble (apps/web/src/components/admin-office/AgentDesk.tsx) */
+@layer utilities {
+  @keyframes office-ticker {
+    0%   { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+  }
+  .animate-office-ticker {
+    animation: office-ticker 12s linear infinite;
   }
 }

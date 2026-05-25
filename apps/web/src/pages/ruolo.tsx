@@ -1,24 +1,24 @@
-import { useParams, Link } from "wouter";
-import { useGetRoleDetail } from "@workspace/api-client-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { RIASEC_LABELS, SectorIcon } from "@/lib/sector-icon";
+import { useGetRoleDetail } from "@workspace/api-client-react";
 import {
   ArrowLeft,
   Briefcase,
-  DollarSign,
-  TrendingUp,
-  Zap,
-  GraduationCap,
+  ChevronRight,
   Clock,
   Coins,
-  ChevronRight,
-  ShieldCheck,
+  DollarSign,
   Gauge,
+  GraduationCap,
+  ShieldCheck,
+  TrendingUp,
+  Zap,
 } from "lucide-react";
-import { SectorIcon, RIASEC_LABELS } from "@/lib/sector-icon";
 import { useTranslation } from "react-i18next";
+import { Link, useParams } from "wouter";
 
 export default function Ruolo() {
   const { t } = useTranslation();

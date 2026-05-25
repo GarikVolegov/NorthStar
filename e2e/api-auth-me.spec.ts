@@ -11,11 +11,39 @@
  * Esecuzione:
  *   pnpm exec playwright test e2e/api-auth-me.spec.ts
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+import { responseJson } from "./helpers/json";
+
+type LoginResponse = { token?: string | null };
+
+type Objective = {
+  id: number;
+  text: string;
+  category: string;
+  progress: number;
+};
+
+type AuthMeResponse = {
+  id: number;
+  name: string;
+  email: string;
+  isPremium: boolean;
+  isAffiliate: boolean;
+  objectives: Objective[];
+  sectorName: string | null;
+  sectorId: number | null;
+  streakDays: number;
+  totalXp: number;
+  passwordHash?: unknown;
+  stripeCustomerId?: unknown;
+  stripeSubscriptionId?: unknown;
+  resetToken?: unknown;
+  verificationCode?: unknown;
+};
 
 // ── helpers locali ────────────────────────────────────────────────────────────
 
-async function getAuthToken(page: import('@playwright/test').Page): Promise<string | null> {
+async function getAuthToken(page: Page): Promise<string | null> {
   const email    = process.env.TEST_USER_EMAIL    ?? 'test@northstar.app';
   const password = process.env.TEST_USER_PASSWORD ?? 'testpassword';
 
@@ -23,7 +51,7 @@ async function getAuthToken(page: import('@playwright/test').Page): Promise<stri
     data: { email, password },
   });
   if (res.status() !== 200) return null;
-  const body = await res.json();
+  const body = await responseJson<LoginResponse>(res);
   return body.token ?? null;
 }
 
@@ -55,7 +83,7 @@ test.describe('API — GET /api/auth/me', () => {
     });
     expect(res.status()).toBe(200);
 
-    const body = await res.json();
+    const body = await responseJson<AuthMeResponse>(res);
 
     // Campi obbligatori sempre presenti
     expect(typeof body.id).toBe('number');
@@ -104,8 +132,8 @@ test.describe('API — GET /api/auth/me', () => {
     expect(r1.status()).toBe(200);
     expect(r2.status()).toBe(200);
 
-    const b1 = await r1.json();
-    const b2 = await r2.json();
+    const b1 = await responseJson<AuthMeResponse>(r1);
+    const b2 = await responseJson<AuthMeResponse>(r2);
 
     // I due endpoint devono restituire esattamente gli stessi dati
     // (stessa query, stessa logica — montati sullo stesso router)
@@ -123,7 +151,7 @@ test.describe('API — GET /api/auth/me', () => {
     const res = await page.request.get('/api/auth/me', {
       headers: { Authorization: `Bearer ${token}` },
     });
-    const { objectives } = await res.json();
+    const { objectives } = await responseJson<AuthMeResponse>(res);
 
     for (const obj of objectives) {
       expect(typeof obj.id).toBe('number');

@@ -1,24 +1,19 @@
-/**
- * AuthContext — gestione autenticazione globale.
- * FRONTEND_RULES.md: unico punto di verità per token + user.
- *
- * Changelog:
- *   - Fase 4: aggiunto isAffiliate?: boolean al tipo AuthUser.
- *     Viene popolato da GET /api/auth/me al mount; è poi usato
- *     in navbar.tsx per mostrare/nascondere il link dashboard affiliazione.
- */
+import { setInMemoryToken } from "@/lib/api-fetch";
+import { postJson } from "@/lib/apiClient";
+import { clientLogger } from "@/lib/clientLogger";
+import { AUTH_EXPIRED_EVENT, TOKEN_STORAGE_KEY } from "@/lib/storage-keys";
+import { useClerk, useAuth as useClerkAuth, useUser } from "@clerk/react";
+import { useQueryClient } from "@tanstack/react-query";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
 import {
   createContext,
-  useContext,
-  useState,
-  useEffect,
   useCallback,
+  useContext,
+  useEffect,
   useRef,
+  useState,
   type ReactNode,
 } from "react";
-import { setAuthTokenGetter } from "@workspace/api-client-react";
-import { AUTH_EXPIRED_EVENT } from "@/lib/api-fetch";
-import { useQueryClient } from "@tanstack/react-query";
 
 export interface AuthUser {
   id: number;
@@ -35,8 +30,9 @@ export interface AuthUser {
   journeyType?: string | null;
   avatarUrl?: string | null;
   isPublic?: boolean;
-  /** Fase 4: accesso dashboard affiliazione — viene da users.is_affiliate */
   isAffiliate?: boolean;
+  onboardingCompleted?: boolean;
+  role?: "user" | "admin";
 }
 
 interface AuthContextValue {
@@ -45,139 +41,216 @@ interface AuthContextValue {
   logout: () => void;
   updateUser: (updates: Partial<AuthUser>) => void;
   isLoggedIn: boolean;
+  isAffiliate: boolean;
   token: string | null;
   authReady: boolean;
+  authSyncFailed: boolean;
+  authSyncError: string | null;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const USER_STORAGE_KEY = "northstar_user";
-const TOKEN_STORAGE_KEY = "northstar_token";
-
 const BASE = import.meta.env.BASE_URL || "/";
+const REFERRAL_STORAGE_KEY = "referralCode";
+
+type ClerkUser = NonNullable<ReturnType<typeof useUser>["user"]>;
+
+function getClerkEmail(clerkUser: ClerkUser): string {
+  return clerkUser.primaryEmailAddress?.emailAddress ?? clerkUser.emailAddresses[0]?.emailAddress ?? "";
+}
+
+function clerkUserToAuthUser(clerkUser: ClerkUser): AuthUser {
+  const email = getClerkEmail(clerkUser);
+
+  return {
+    id: 0,
+    name: clerkUser.fullName ?? clerkUser.username ?? email,
+    email,
+    testSessionId: null,
+    emailVerified: clerkUser.primaryEmailAddress?.verification?.status === "verified",
+    avatarUrl: clerkUser.imageUrl ?? null,
+    role: "user",
+    journeyType: null,
+    isAffiliate: false,
+    onboardingCompleted: false,
+  };
+}
+
+function readReferralCode(): string | undefined {
+  return (
+    localStorage.getItem(REFERRAL_STORAGE_KEY) ??
+    sessionStorage.getItem(REFERRAL_STORAGE_KEY) ??
+    undefined
+  );
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+  const { getToken, isSignedIn } = useClerkAuth();
+  const clerk = useClerk();
 
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    try {
-      const raw = localStorage.getItem(USER_STORAGE_KEY);
-      return raw ? (JSON.parse(raw) as AuthUser) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  const [token, setToken] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem(TOKEN_STORAGE_KEY);
-    } catch {
-      return null;
-    }
-  });
-
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState<boolean>(false);
+  const [authSyncFailed, setAuthSyncFailed] = useState<boolean>(false);
+  const [authSyncError, setAuthSyncError] = useState<string | null>(null);
 
-  const logout = useCallback(() => {
+  const clearNorthStarSession = useCallback(() => {
     setUser(null);
     setToken(null);
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    setInMemoryToken(null);
+    setAuthTokenGetter(null);
+  }, []);
+
+  const logout = useCallback(() => {
+    clearNorthStarSession();
+    setAuthSyncFailed(false);
+    setAuthSyncError(null);
     queryClient.clear();
-  }, [queryClient]);
+    clerk.signOut().catch(() => {});
+  }, [clearNorthStarSession, queryClient, clerk]);
 
   const updateUser = useCallback((updates: Partial<AuthUser>) => {
-    setUser((prev) => {
-      if (!prev) return prev;
-      const next = { ...prev, ...updates };
-      try {
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(next));
-      } catch { /* storage full or private mode */ }
-      return next;
-    });
+    setUser((prev) => (prev ? { ...prev, ...updates } : prev));
+  }, []);
+
+  const login = useCallback((u: AuthUser, t: string) => {
+    setUser(u);
+    setToken(t);
+    setAuthSyncFailed(false);
+    setAuthSyncError(null);
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, t);
+    setInMemoryToken(t);
+    setAuthTokenGetter(() => t);
+    setAuthReady(true);
   }, []);
 
   useEffect(() => {
-    if (user && token) {
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    if (!clerkLoaded) return;
+
+    if (isSignedIn && clerkUser && token) {
+      setAuthTokenGetter(() => token);
     } else {
-      localStorage.removeItem(USER_STORAGE_KEY);
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      setAuthTokenGetter(null);
+      setInMemoryToken(null);
     }
-    setAuthTokenGetter(token ? () => token : null);
-  }, [user, token]);
+  }, [clerkLoaded, isSignedIn, clerkUser, token]);
 
   useEffect(() => {
     window.addEventListener(AUTH_EXPIRED_EVENT, logout);
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, logout);
   }, [logout]);
 
-  // Valida il token cached al mount e aggiorna i dati freschi (incluso isAffiliate)
-  const didMountValidate = useRef(false);
-  useEffect(() => {
-    if (didMountValidate.current) return;
-    didMountValidate.current = true;
+  const syncedClerkIdRef = useRef<string | null>(null);
 
-    const cachedToken = token;
-    if (!cachedToken) {
+  useEffect(() => {
+    if (!clerkLoaded) return;
+
+    if (!isSignedIn || !clerkUser) {
+      clearNorthStarSession();
+      setAuthSyncFailed(false);
+      setAuthSyncError(null);
       setAuthReady(true);
       return;
     }
 
+    if (syncedClerkIdRef.current === clerkUser.id) return;
+    syncedClerkIdRef.current = clerkUser.id;
+
+    const clerkOnlyUser = clerkUserToAuthUser(clerkUser);
+    const clerkEmail = getClerkEmail(clerkUser);
+
+    clearNorthStarSession();
+    setAuthSyncFailed(false);
+    setAuthSyncError(null);
+    setAuthReady(false);
+
     const ctrl = new AbortController();
-    fetch(`${BASE}api/auth/me`, {
-      headers: { Authorization: `Bearer ${cachedToken}` },
-      signal: ctrl.signal,
-    })
-      .then(async (res) => {
-        if (res.ok) {
-          // fresh include isAffiliate dal DB aggiornato
-          const fresh = (await res.json()) as AuthUser;
-          setUser((prev) => (prev ? { ...prev, ...fresh } : fresh));
-        } else if (res.status === 401) {
-          setUser(null);
-          setToken(null);
-          queryClient.clear();
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        setAuthReady(true);
-      });
 
-    return () => ctrl.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const login = useCallback(
-    (u: AuthUser, t: string) => {
+    const syncWithServer = async () => {
       try {
-        localStorage.setItem(TOKEN_STORAGE_KEY, t);
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(u));
-      } catch { /* ignore */ }
+        if (!clerkUser.id || !clerkEmail) {
+          setAuthSyncFailed(true);
+          setAuthSyncError("Clerk non ha ancora restituito un'email valida per completare l'accesso.");
+          setAuthReady(true);
+          return;
+        }
 
-      setAuthTokenGetter(() => t);
-      setUser(u);
-      setToken(t);
-      setAuthReady(true);
+        const clerkToken = await getToken().catch(() => null);
+        if (!clerkToken) {
+          setAuthSyncFailed(true);
+          setAuthSyncError("Token Clerk non disponibile. Esci e accedi di nuovo.");
+          setAuthReady(true);
+          return;
+        }
 
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (tz) {
-        fetch(`${BASE}api/me`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${t}`,
+        const data = await postJson<AuthUser & { northstar_token?: string }>(
+          `${BASE}api/auth/clerk-sync`,
+          {
+            clerkId: clerkUser.id,
+            email: clerkEmail,
+            name: clerkUser.fullName ?? clerkUser.username ?? clerkEmail ?? "Utente",
+            referralCode: readReferralCode(),
           },
-          body: JSON.stringify({ timezone: tz }),
-        }).catch(() => {});
+          {
+            headers: {
+              Authorization: `Bearer ${clerkToken}`,
+            },
+            signal: ctrl.signal,
+          },
+        );
+        const { northstar_token: nsToken, ...serverUser } = data;
+        if (!nsToken) {
+          clearNorthStarSession();
+          setAuthSyncFailed(true);
+          setAuthSyncError("Il server non ha restituito un token NorthStar valido.");
+          return;
+        }
+
+        sessionStorage.setItem(TOKEN_STORAGE_KEY, nsToken);
+        setInMemoryToken(nsToken);
+        setToken(nsToken);
+        setAuthSyncFailed(false);
+        setAuthSyncError(null);
+        setAuthTokenGetter(() => nsToken);
+        setUser({ ...clerkOnlyUser, ...serverUser });
+        localStorage.removeItem(REFERRAL_STORAGE_KEY);
+        sessionStorage.removeItem(REFERRAL_STORAGE_KEY);
+        queryClient.invalidateQueries();
+      } catch (err) {
+        if (ctrl.signal.aborted) return;
+        const message = err instanceof Error ? err.message : "Errore di rete durante la sincronizzazione.";
+        clientLogger.warn("[auth] clerk-sync request failed", { error: message });
+        clearNorthStarSession();
+        setAuthSyncFailed(true);
+        setAuthSyncError(message);
+      } finally {
+        if (!ctrl.signal.aborted) {
+          setAuthReady(true);
+        }
       }
-    },
-    [],
-  );
+    };
+
+    void syncWithServer();
+    return () => ctrl.abort();
+  }, [clearNorthStarSession, clerkLoaded, isSignedIn, clerkUser, getToken, queryClient]);
 
   return (
     <AuthContext.Provider
-      value={{ user, login, logout, updateUser, isLoggedIn: !!user, token, authReady }}
+      value={{
+        user,
+        login,
+        logout,
+        updateUser,
+        isLoggedIn: !!user && user.id > 0 && !!token,
+        isAffiliate: !!user?.isAffiliate,
+        token,
+        authReady,
+        authSyncFailed,
+        authSyncError,
+      }}
     >
       {children}
     </AuthContext.Provider>
