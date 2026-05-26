@@ -6,7 +6,7 @@ import { WendySources } from "./WendySources";
 
 interface WendyMessageBubbleProps {
   message: WendyMessage;
-  onConfirmAction: (messageId: string, actionId: string) => void;
+  onConfirmAction: (messageId: string, actionId: string, confirmationText?: string) => void;
   onCancelAction: (messageId: string, actionId: string) => void;
 }
 
@@ -68,7 +68,7 @@ export function WendyMessageBubble({
                 <WendyActionCard
                   key={action.id}
                   action={action}
-                  onConfirm={() => onConfirmAction(message.id, action.id)}
+                  onConfirm={(confirmationText) => onConfirmAction(message.id, action.id, confirmationText)}
                   onCancel={() => onCancelAction(message.id, action.id)}
                 />
               ))}

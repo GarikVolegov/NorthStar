@@ -87,6 +87,8 @@ export type { CollectorResult, RunCollectorOptions } from "./discovery-agent/col
 export { runEnricher } from "./discovery-agent/enricher-agent";
 export type { EnricherResult } from "./discovery-agent/enricher-agent";
 export { runNewsPublisher } from "./discovery-agent/news-publisher";
+export { PUBLIC_NEWS_SOURCES, isPublicNewsArticleSource, isPublishableDiscoveryNews } from "./discovery-agent/news-policy";
+export { getOpenAIFallbackConfig, shouldFallbackToOpenAI } from "./client";
 export type { NewsPublisherResult } from "./discovery-agent/news-publisher";
 export { runGrowthLibraryAgent } from "./discovery-agent/growth-library-agent";
 export type { GrowthLibraryResult, GrowthGap } from "./discovery-agent/growth-library-agent";
@@ -203,6 +205,17 @@ export type {
   FindModelOptions,
 } from "./model-router/catalog";
 export { applyContextSignals } from "./model-router";
+
+// Rabbit expert domain
+export { checkRabbitEmergency } from "./rabbit/emergency-triage";
+export type { TriageResult } from "./rabbit/emergency-triage";
+
+// Image generation
+export { generateImageBuffer, editImages } from "./image/client";
+
+// UI directives
+export { buildUiDirectives } from "./growth-agent/ui-directives";
+export type { UiDirectives } from "./growth-agent/ui-directives";
 
 // Utilities
 export { withTimeout, gracefulDegrade } from "./utils";

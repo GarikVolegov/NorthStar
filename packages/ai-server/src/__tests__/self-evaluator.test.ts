@@ -64,26 +64,43 @@ describe("SelfEvaluator", () => {
   });
 
   describe("scoreQuestionClarity", () => {
-    it("returns low score for single-word messages", () => {
+    it("bypasses clarification for greetings and short openings", () => {
       const result = evaluateSelf({
         userMessage: "ciao",
         documentChunks: [],
         webResults: [],
         cot: cot(0.8),
-        memoryFactCount: 5,
+        memoryFactCount: 0,
       });
-      expect(result.dimensions.questionClarity).toBeLessThan(0.2);
+      expect(result.score).toBe(0.6);
+      expect(result.level).toBe("medium");
+      expect(result.needsClarification).toBe(false);
     });
 
-    it("returns low score for generic help messages", () => {
+    it("bypasses clarification for typo greetings", () => {
       const result = evaluateSelf({
-        userMessage: "aiutami",
+        userMessage: "come stqi",
         documentChunks: [],
         webResults: [],
-        cot: cot(0.8),
-        memoryFactCount: 5,
+        cot: null,
+        memoryFactCount: 0,
       });
-      expect(result.dimensions.questionClarity).toBeLessThan(0.2);
+      expect(result.level).toBe("medium");
+      expect(result.needsClarification).toBe(false);
+    });
+
+    it("bypasses clarification for predefined suggestions", () => {
+      const result = evaluateSelf({
+        userMessage: "Fammi un piano carriera",
+        documentChunks: [],
+        webResults: [],
+        cot: null,
+        memoryFactCount: 0,
+        isPredefined: true,
+      });
+      expect(result.score).toBe(0.7);
+      expect(result.level).toBe("high");
+      expect(result.needsClarification).toBe(false);
     });
 
     it("returns medium score for short but specific messages", () => {
@@ -114,7 +131,7 @@ describe("SelfEvaluator", () => {
   describe("scoreMemoryCoverage", () => {
     it("returns low score for new users with no memory", () => {
       const result = evaluateSelf({
-        userMessage: "aiutami",
+        userMessage: "vorrei capire quale scelta professionale ha piu senso",
         documentChunks: [],
         webResults: [],
         cot: cot(0.8),
@@ -125,7 +142,7 @@ describe("SelfEvaluator", () => {
 
     it("returns high score for users with lots of memory", () => {
       const result = evaluateSelf({
-        userMessage: "consigliami",
+        userMessage: "vorrei capire quale scelta professionale ha piu senso",
         documentChunks: [],
         webResults: [],
         cot: cot(0.8),
@@ -163,9 +180,9 @@ describe("SelfEvaluator", () => {
       expect(result.reasons.length).toBeGreaterThan(0);
     });
 
-    it("returns low level for vague question with no context", () => {
+    it("returns low level for vague non-greeting question with no context", () => {
       const result = evaluateSelf({
-        userMessage: "aiuto",
+        userMessage: "non so cosa dovrei fare adesso nella mia situazione",
         documentChunks: [],
         webResults: [],
         cot: null,

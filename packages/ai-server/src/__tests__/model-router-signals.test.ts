@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { applyContextSignals, selectModelFor } from "../model-router";
 import { aiPlugins } from "../plugins/registry";
 
@@ -87,5 +87,42 @@ describe("router plugin-awareness", () => {
     });
     const route = selectModelFor("router-classify");
     expect(route.pluginId).toBeUndefined();
+  });
+
+  it("does not route OpenRouter nano traffic to the retired llama 3.1 free endpoint", () => {
+    const route = selectModelFor("growth-agent-voice", { complexity: "simple" });
+    expect(route.model).not.toBe("meta-llama/llama-3.1-8b-instruct:free");
+  });
+
+  it("uses the configured OpenRouter model for nano traffic when no nano override is set", async () => {
+    vi.resetModules();
+    vi.stubEnv("AI_PROVIDER", "openrouter");
+    vi.stubEnv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free");
+    vi.stubEnv("MODEL_NANO_OPENROUTER", "");
+
+    const freshRouter = await import("../model-router");
+    const route = freshRouter.selectModelFor("growth-agent-voice", { complexity: "simple" });
+
+    expect(route).toMatchObject({
+      provider: "openrouter",
+      model: "meta-llama/llama-3.3-70b-instruct:free",
+    });
+
+    vi.unstubAllEnvs();
+  });
+
+  it("does not fall back to the retired llama 3.1 OpenRouter endpoint without env overrides", async () => {
+    vi.resetModules();
+    vi.stubEnv("AI_PROVIDER", "openrouter");
+    vi.stubEnv("OPENROUTER_MODEL", "");
+    vi.stubEnv("MODEL_NANO_OPENROUTER", "");
+    vi.stubEnv("MODEL_OPENROUTER_FREE_ROUTER", "");
+
+    const freshRouter = await import("../model-router");
+    const route = freshRouter.selectModelFor("growth-agent-voice", { complexity: "simple" });
+
+    expect(route.model).not.toBe("meta-llama/llama-3.1-8b-instruct:free");
+
+    vi.unstubAllEnvs();
   });
 });

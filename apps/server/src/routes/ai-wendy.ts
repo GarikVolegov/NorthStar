@@ -34,7 +34,6 @@ import {
   getLLMForRoute,
   estimateTokens,
   estimateCost,
-  getLocalWendyFallbackReply,
   recordWendyCost,
   recordQualityScore,
   recordTtft,
@@ -49,15 +48,23 @@ import {
   WendyRequestSchema,
   type WendyToolMessage,
 } from "./ai-wendy-shared";
-import { buildPersonalIntelligenceContext } from "../lib/personal-intelligence-context";
+import { buildWikiLLMContext } from "../lib/wikillm-context-router";
 import { isHostTool, executeHostTool } from "../lib/wendy-host-tools";
 import { storeSemanticTurnInBackground } from "../lib/semantic-memory";
-import {
-  buildFastPathFallback,
-  withRouteTimeout,
-} from "../lib/wendy-fast-path";
+import { withRouteTimeout } from "../lib/wendy-fast-path";
 import { resolveWendyLocale } from "../lib/wendy-locale";
+import { checkRabbitEmergency } from "@workspace/ai-server";
 const router = Router();
+
+function wendyErrorMessage(status: string): string {
+  if (status === "error_ratelimit") {
+    return "Il provider AI ha raggiunto un limite temporaneo. Sto usando i fallback quando disponibili; riprova tra poco se il problema continua.";
+  }
+  if (status === "error_timeout") {
+    return "Wendy ci ha messo troppo a rispondere. Riprova con una richiesta piu breve o tra qualche secondo.";
+  }
+  return "Wendy non riesce a completare la risposta in questo momento. Riprova tra poco.";
+}
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
@@ -86,6 +93,7 @@ router.post(
       pageContext,
       locale: rawLocale,
       hasFileAttached,
+      isPredefined,
     } = parsed.data;
     const locale = resolveWendyLocale(rawLocale, message);
 
@@ -187,10 +195,13 @@ router.post(
       }
     }
 
-    const personalContext = await buildPersonalIntelligenceContext({
+    const personalContext = await buildWikiLLMContext({
       query: message,
       userId,
       userRole: req.user!.role,
+      includePersonalMemory: true,
+      includeWendyBrain: false,
+      graphifyProfile: "auto",
     });
 
     // ── SSE headers ───────────────────────────────────────────────────────────
@@ -293,6 +304,24 @@ router.post(
       ...extra,
     });
 
+    // ── Rabbit emergency triage (deterministic, pre-LLM) ─────────────────────
+    if (
+      pageContext?.journeyType === "rabbit" ||
+      /\b(coniglio|conigli|rabbit|bunny)\b/i.test(message)
+    ) {
+      const triage = checkRabbitEmergency(message);
+      if (triage.isEmergency) {
+        rootLogger.warn(
+          { userId, requestId, signals: triage.matchedSignals },
+          "[rabbit-triage] emergency detected",
+        );
+        send({ type: "token", value: triage.responseText });
+        send(donePayload({ rabbitTriage: { emergency: true, signals: triage.matchedSignals } }));
+        markIdle();
+        return;
+      }
+    }
+
     // Routing fuori dal try — serve nel finally per il logging
     const { intent, decision } = resolveWendyRoute({
       userMessage: message,
@@ -327,22 +356,12 @@ router.post(
         inputTokens = estimateTokens(systemPrompt + message);
         send({ type: "status", value: intent === "navigation" ? "⚡" : "💬" });
 
-        // Short-circuit for known conversational messages (greetings, wellbeing, etc.)
-        const localReply = getLocalWendyFallbackReply(message);
-        if (localReply) {
-          assistantResponseForMemory += localReply.text;
-          send({ type: "token", value: localReply.text });
-          send({
-            ...donePayload({
-              intent,
-              usage: { model: "local", inputTokens: 0, outputTokens: 0 },
-            }),
-          });
-          return;
-        }
-
         // Tool calling loop — max 3 turni per evitare loop infiniti
         const msgs: WendyToolMessage[] = [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: message },
+        ];
+        const textOnlyMsgs: WendyToolMessage[] = [
           { role: "system", content: systemPrompt },
           { role: "user", content: message },
         ];
@@ -352,15 +371,35 @@ router.post(
         let finalText = "";
 
         while (toolTurns < MAX_TOOL_TURNS) {
-          const result = await withRouteTimeout(
-            llm.chatWithTools(msgs, openAiTools, {
-              model: decision.model,
-              temperature: 0.1,
-              maxTokens: wendyConfig.fastPath.maxTokens,
-            }),
-            fastPathTimeoutMs,
-            "wendy fast path",
-          );
+          let result: Awaited<ReturnType<typeof llm.chatWithTools>>;
+          try {
+            result = await withRouteTimeout(
+              llm.chatWithTools(msgs, openAiTools, {
+                model: decision.model,
+                temperature: 0.1,
+                maxTokens: wendyConfig.fastPath.maxTokens,
+              }),
+              fastPathTimeoutMs,
+              "wendy fast path",
+            );
+          } catch (err) {
+            if (intent !== "simple_qa") throw err;
+            rootLogger.warn(
+              { err, userId, requestId },
+              "[ai/wendy] fast path tool call failed, retrying text-only",
+            );
+            finalText = await withRouteTimeout(
+              llm.chatOnce(textOnlyMsgs, {
+                model: decision.model,
+                temperature: 0.2,
+                maxTokens: wendyConfig.fastPath.maxTokens,
+              }),
+              fastPathTimeoutMs,
+              "wendy fast path text-only",
+            );
+            outputTokens += estimateTokens(finalText);
+            break;
+          }
           outputTokens += estimateTokens(result.content);
 
           if (result.toolCalls.length === 0 || result.finishReason === "stop") {
@@ -419,9 +458,16 @@ router.post(
         }
 
         if (!finalText && intent === "simple_qa") {
-          finalText = buildFastPathFallback(message);
-          status = "error_timeout";
-          responseCategory = "error_model";
+          finalText = await withRouteTimeout(
+            llm.chatOnce(textOnlyMsgs, {
+              model: decision.model,
+              temperature: 0.2,
+              maxTokens: wendyConfig.fastPath.maxTokens,
+            }),
+            fastPathTimeoutMs,
+            "wendy fast path text-only",
+          );
+          outputTokens += estimateTokens(finalText);
         }
 
         if (finalText) {
@@ -437,6 +483,16 @@ router.post(
         });
       } else {
         // ── 3. Full path: growth agent completo ──────────────────────────
+        const FULL_PATH_TIMEOUT_MS = parseInt(process.env.WENDY_FULL_PATH_TIMEOUT_MS ?? "30000");
+        let fullPathTimedOut = false;
+        const fullPathTimeout = setTimeout(() => {
+          fullPathTimedOut = true;
+          aborted = true;
+          status = "error_timeout";
+          responseCategory = "error_model";
+          send({ type: "error", message: wendyErrorMessage("error_timeout"), code: "error_timeout" });
+        }, FULL_PATH_TIMEOUT_MS);
+
         const userMemory = await loadMemory(userId);
         const memorySection =
           buildMemorySection(userMemory) + personalContext.contexts.semanticMemory + personalContext.contexts.openHuman;
@@ -458,91 +514,89 @@ router.post(
           memorySection + message + flatHistory.map((m) => m.content).join(" "),
         );
 
-        for await (const event of runGrowthAgent({
-          userId,
-          sessionId: threadId ? Number(threadId) : undefined,
-          userContext: {
-            isPremium,
-            memorySection,
-            codeGraphSection: personalContext.contexts.graphify,
-            locale,
-            journeyType: pageContext?.journeyType,
-          },
-          history: flatHistory,
-          userMessage: message,
-          requestId,
-          wendyIntent: intent, // abilita i Wendy domain tools nel full path
-        })) {
-          if (aborted) break;
-          if (event.type === "done") {
-            send(donePayload(event as Record<string, unknown>));
-          } else {
-            send(event);
-          }
-          if (event.type === "token") {
-            if (ttftMs === null) ttftMs = Date.now() - startedAt;
-            outputTokens += estimateTokens(event.value);
-            assistantResponseForMemory += event.value;
-          }
-          if (event.type === "done") {
-            domainForLog = event.routeDecision?.domain ?? null;
-            supervisorScoreForLog = event.supervisorResult?.score ?? null;
-            wasRewrittenForLog = event.supervisorResult?.rewritten ?? false;
-          }
-          if (event.type === "done" || event.type === "error") {
-            if (event.type === "error") {
-              status = "error_model";
-              errorCode = "GROWTH_AGENT_ERROR";
-              responseCategory = "error_model";
+        try {
+          for await (const event of runGrowthAgent({
+            userId,
+            sessionId: threadId ? Number(threadId) : undefined,
+            userContext: {
+              isPremium,
+              memorySection,
+              codeGraphSection: personalContext.contexts.graphify,
+              locale,
+              journeyType: pageContext?.journeyType,
+            },
+            history: flatHistory,
+            userMessage: message,
+            requestId,
+            wendyIntent: intent, // abilita i Wendy domain tools nel full path
+            isPredefined,
+          })) {
+            if (aborted) break;
+            if (event.type === "done") {
+              send(donePayload(event as Record<string, unknown>));
+            } else {
+              send(
+                event.type === "error"
+                  ? {
+                      type: "error",
+                      message: wendyErrorMessage("error_model"),
+                      code: "error_model",
+                    }
+                  : event,
+              );
             }
-            // Rileva insufficient_data dal done event dell'agente
-            if (isDoneWithLowEval(event)) {
-              responseCategory = "insufficient_data";
+            if (event.type === "token") {
+              if (ttftMs === null) ttftMs = Date.now() - startedAt;
+              outputTokens += estimateTokens(event.value);
+              assistantResponseForMemory += event.value;
             }
-            break;
+            if (event.type === "done") {
+              domainForLog = event.routeDecision?.domain ?? null;
+              supervisorScoreForLog = event.supervisorResult?.score ?? null;
+              wasRewrittenForLog = event.supervisorResult?.rewritten ?? false;
+            }
+            if (event.type === "done" || event.type === "error") {
+              if (event.type === "error") {
+                status = "error_model";
+                errorCode = "GROWTH_AGENT_ERROR";
+                responseCategory = "error_model";
+              }
+              // Rileva insufficient_data dal done event dell'agente
+              if (isDoneWithLowEval(event)) {
+                responseCategory = "insufficient_data";
+              }
+              break;
+            }
+          }
+        } finally {
+          clearTimeout(fullPathTimeout);
+          if (fullPathTimedOut) {
+            status = "error_timeout";
+            errorCode = "FULL_PATH_TIMEOUT";
           }
         }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      const isTimeout = msg.toLowerCase().includes("timeout");
-      const fallbackText =
-        intent === "simple_qa"
-          ? buildFastPathFallback(message)
-          : null;
       rootLogger.error(
         { err, userId, requestId },
         "[ai/wendy] unhandled error",
       );
-      if (fallbackText) {
-        status = isTimeout ? "error_timeout" : "error_model";
-        responseCategory = "error_model";
-        errorCode = isTimeout ? "FAST_PATH_TIMEOUT" : msg.slice(0, 50);
-        outputTokens += estimateTokens(fallbackText);
-        assistantResponseForMemory += fallbackText;
-        send({ type: "token", value: fallbackText });
-        send({
-          ...donePayload({
-            intent,
-            usage: { model: "local-wendy-fallback", inputTokens, outputTokens },
-          }),
-        });
-      } else {
-        status = msg.includes("timeout")
-          ? "error_timeout"
-          : msg.includes("rate")
-            ? "error_ratelimit"
-            : "error_internal";
-        errorCode = msg.slice(0, 50);
-        responseCategory = status.startsWith("error")
-          ? "error_model"
-          : responseCategory;
-        send({
-          type: "error",
-          message: "Qualcosa è andato storto. Riprova.",
-          code: status,
-        });
-      }
+      const lowerMsg = msg.toLowerCase();
+      status = lowerMsg.includes("timeout")
+        ? "error_timeout"
+        : lowerMsg.includes("rate")
+          ? "error_ratelimit"
+          : "error_internal";
+      errorCode = msg.slice(0, 50);
+      responseCategory = status.startsWith("error")
+        ? "error_model"
+        : responseCategory;
+      send({
+        type: "error",
+        message: wendyErrorMessage(status),
+        code: status,
+      });
     } finally {
       // Inferisci responseCategory da status se non già impostato
       if (responseCategory === "success" && status !== "success") {

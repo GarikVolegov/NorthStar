@@ -30,6 +30,7 @@ import { recordSupervisorRewrite } from "../metrics";
 import { selectModelFor } from "../model-router";
 import { withTimeout } from "../utils";
 import { wendyConfig } from "../config/wendy";
+import { embedText } from "./embedder";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -118,7 +119,7 @@ function scoreLengthOk(draft: string): number {
   return 0.50;
 }
 
-function scoreOnTopic(userMessage: string, draft: string): number {
+function scoreOnTopicByJaccard(userMessage: string, draft: string): number {
   const STOP = new Set(["il","la","lo","le","i","gli","un","una","uno","e","o","ma","che","di","a","in","con","su","per","tra","fra","da","del","della","dei","degli","delle","al","alla","ai","agli","alle","mi","ti","si","ci","vi","ho","hai","ha","sono","sei","\u00e8","siamo","siete","non","come","cosa","perch\u00e9","quando"]);
   const tokenize = (s: string) =>
     new Set(s.toLowerCase().match(/[a-z\u00e0-\u00fc]{4,}/g)?.filter((w) => !STOP.has(w)) ?? []);
@@ -134,17 +135,56 @@ function scoreOnTopic(userMessage: string, draft: string): number {
   return 0.20;
 }
 
+function cosine(a: number[], b: number[]): number {
+  const len = Math.min(a.length, b.length);
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < len; i++) {
+    const av = a[i] ?? 0;
+    const bv = b[i] ?? 0;
+    dot += av * bv;
+    normA += av * av;
+    normB += bv * bv;
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+function scoreOnTopicByCosine(similarity: number): number {
+  if (similarity >= 0.75) return 1.0;
+  if (similarity >= 0.60) return 0.75;
+  if (similarity >= 0.45) return 0.50;
+  return 0.20;
+}
+
+async function scoreOnTopic(userMessage: string, draft: string): Promise<number> {
+  if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+    return scoreOnTopicByJaccard(userMessage, draft);
+  }
+  try {
+    const [userEmb, draftEmb] = await Promise.all([
+      embedText(userMessage),
+      embedText(draft.slice(0, 500)),
+    ]);
+    return scoreOnTopicByCosine(cosine(userEmb, draftEmb));
+  } catch (err) {
+    logger.warn({ err }, "supervisor embedding topic check failed, falling back to token overlap");
+    return scoreOnTopicByJaccard(userMessage, draft);
+  }
+}
+
 // ── SupervisorAgent ──────────────────────────────────────────────────────────────────
 
 export class SupervisorAgent {
-  /** Pure heuristic evaluation. ~0ms, zero API calls. */
-  evaluate(input: SupervisorEvalInput): SupervisorResult {
+  /** Heuristic evaluation with semantic on-topic check. */
+  async evaluate(input: SupervisorEvalInput): Promise<SupervisorResult> {
     const { userMessage, draft } = input;
     const dimensions: SupervisorDimensions = {
       actionability: scoreActionability(draft),
       platitudeFree: scorePlatitudeFree(draft),
       lengthOk:      scoreLengthOk(draft),
-      onTopic:       scoreOnTopic(userMessage, draft),
+      onTopic:       await scoreOnTopic(userMessage, draft),
     };
     const weights = WEIGHTS_BY_INTENT[input.intent] ?? WEIGHTS_FALLBACK;
     let { onTopic: onTopicWeight } = weights;
@@ -222,7 +262,7 @@ REGOLE DI RISCRITTURA:
     }
 
     // ── Re-evaluate post-rewrite ─────────────────────────────────────
-    const rewrittenResult = this.evaluate({ ...input, draft: rewritten });
+    const rewrittenResult = await this.evaluate({ ...input, draft: rewritten });
     const degraded = rewrittenResult.score < failResult.score;
     const logFields: LoggerFields = { userId, sessionId, domain, intent, supervisorScore: rewrittenResult.score };
     if (degraded) {

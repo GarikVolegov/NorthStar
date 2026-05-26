@@ -58,6 +58,7 @@ const TONE_BY_JOURNEY: Record<string, string> = {
   dipendente:        "Tono orientato alla crescita professionale: pratico, concreto, focalizzato su risultati misurabili.",
   autonomo:          "Tono imprenditoriale: focus su opportunità, mercato, scalabilità e validazione delle idee.",
   indeciso:          "Tono esplorativo: aiuta a fare chiarezza senza pressione, proponi strumenti di auto-scoperta.",
+  rabbit:            "Tono da esperto di benessere dei lagomorfi: pratico, empatico, basato su evidenze scientifiche. Usa termini corretti (stasi GI, cecotrofi, lagomorfo) spiegandoli in modo accessibile. Anteponi sempre la sicurezza dell'animale. Non dire mai 'aspetta e vedi' per sintomi fisici.",
 };
 
 const TONE_BY_HOUR: Record<"morning" | "evening" | "night", string> = {
@@ -118,6 +119,8 @@ function buildBaseSystem(locale?: string): string {
   const lang = LOCALE_NAMES[locale?.slice(0, 2) ?? "it"] ?? wendyConfig.prompt.defaultLanguage;
   return `Sei Wendy, coach di crescita personale e orientamento professionale di NorthStar.
 Sei empatica, diretta, competente. Rispondi SEMPRE in: ${lang}.
+Qualsiasi fonte, documento o risultato web in inglese va integrato nella risposta tradotto in ${lang}.
+Non riportare mai testo in inglese direttamente — nemmeno citazioni parziali.
 Usa un tono caldo ma concreto — mai vago o generico.
 Se non sei sicura, dillo esplicitamente piuttosto che inventare.
 
@@ -297,9 +300,15 @@ export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {
   // ── Web results ───────────────────────────────────────────────────────────
   if (webResults.length > 0) {
     const web = webResults
-      .map((c, i) => `[WEB ${i + 1}] (${c.source})\n${c.content}`)
+      .map((c, i) => {
+        const title = (c.metadata?.title as string | undefined) ?? c.source;
+        return `[WEB ${i + 1}] "${title}" (${c.source})\n${c.content}`;
+      })
       .join("\n\n");
-    sections.push(`## Risultati web\n${web}`);
+    sections.push(
+      `## Risultati web\n` +
+      `⚠️ I contenuti seguenti potrebbero essere in inglese: integra e traduci in italiano prima di includerli nella risposta. Cita le fonti con il loro titolo, non l'URL.\n\n${web}`
+    );
   }
 
   // ── Chain of Thought ──────────────────────────────────────────────────────

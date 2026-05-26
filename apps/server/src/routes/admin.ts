@@ -7,6 +7,7 @@ import adminErrorReportRouter from "./admin/error-report";
 import adminGrowthQueueRouter from "./admin/growth-queue";
 import adminMemoryGraphRouter from "./admin/memory-graph";
 import adminOpsRouter from "./admin/ops";
+import adminPipelinesRouter from "./admin/pipelines";
 import adminPluginsRouter from "./admin/plugins";
 import adminPromptsRouter from "./admin/prompts";
 import adminQualityRouter from "./admin/quality";
@@ -14,12 +15,14 @@ import adminResearchRouter from "./admin/research";
 import adminReviewRouter from "./admin/review";
 import adminSubscriptionsRouter from "./admin/subscriptions";
 import adminWendyBrainRouter from "./admin/wendy-brain";
+import adminWendyRouter from "./admin/wendy";
 
 const router = Router();
 
 router.use(requireAdminAccess);
 router.use(adminReviewRouter);
 router.use(adminAgentsRouter);
+router.use(adminPipelinesRouter);
 router.use(adminSubscriptionsRouter);
 router.use(adminOpsRouter);
 router.use(adminBusinessRouter);
@@ -32,5 +35,6 @@ router.use(adminPluginsRouter);
 router.use(adminErrorReportRouter);
 router.use(adminResearchRouter);
 router.use(adminWendyBrainRouter);
+router.use(adminWendyRouter);
 
 export default router;

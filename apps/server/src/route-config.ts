@@ -62,6 +62,7 @@ import affiliateRouter from "./routes/affiliate";
 import openhumanRouter from "./routes/openhuman";
 import graphifyRouter from "./routes/graphify";
 import skillsGapRouter from "./routes/skills-gap";
+import aiImageRouter from "./routes/ai-image";
 import { getHealthPayload } from "./lib/health";
 
 export type RouteAuthLevel = "public" | "authenticated" | "admin";
@@ -157,6 +158,7 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/security", router: securityRouter, auth: "authenticated", description: "Security settings" },
   { path: "/api/ai/wendy", router: aiWendyRouter, auth: "authenticated", description: "Wendy AI streaming" },
   { path: "/api/ai/wendy/feedback", router: wendyFeedbackRouter, auth: "authenticated", description: "Wendy feedback" },
+  { path: "/api/ai/image", router: aiImageRouter, auth: "authenticated", description: "Wendy image generation (Pro)" },
   { path: "/api/users/me/proactive-insights", router: proactiveInsightsRouter, auth: "authenticated", description: "Proactive insights" },
   { path: "/api/onboarding", router: onboardingRouter, auth: "authenticated", description: "Onboarding" },
   { path: "/api/subscription", router: subscriptionRouter, auth: "public", description: "Subscription e Stripe webhook; endpoint utente protetti nel router" },

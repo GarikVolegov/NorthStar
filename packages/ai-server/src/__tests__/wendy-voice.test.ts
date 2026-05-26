@@ -3,7 +3,7 @@ import { buildSystemPrompt, buildVoiceSystemPrompt } from "../growth-agent/promp
 import type { BuildSystemPromptOptions } from "../growth-agent/prompt-builder";
 import { buildToneSection } from "../growth-agent/tone-adapter";
 import { classifyIntent } from "../wendy-router/intent-classifier";
-import { getLocalWendyReply } from "../wendy-router/local-reply";
+import { getLocalWendyFallbackReply, getLocalWendyReply } from "../wendy-router/local-reply";
 import { buildLightPrompt } from "../wendy-router/light-prompt";
 import {
   buildWendyVoiceContract,
@@ -97,9 +97,10 @@ describe("Wendy human voice layer", () => {
   });
 
   it("routes small talk through the LLM fast path, not an instant canned answer", () => {
-    for (const message of ["come stai?", "hru", "grazie", "ok", "come va?"]) {
+    for (const message of ["come stai?", "hru", "grazie", "ok", "come va?", "come funziona"]) {
       expect(classifyIntent({ userMessage: message })).toBe("simple_qa");
       expect(getLocalWendyReply(message)).toBeNull();
+      expect(getLocalWendyFallbackReply(message)).toBeNull();
     }
 
     expect(classifyIntent({ userMessage: "portami al calendario" })).toBe("navigation");

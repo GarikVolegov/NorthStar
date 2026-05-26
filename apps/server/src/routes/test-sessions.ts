@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import { db, testSessionsTable, sectorsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { and, desc, eq, isNull, or } from "drizzle-orm";
 
 // ── Mapping domande RIASEC (incluse varianti per percorso) ───────────────────
 const RIASEC_MAP: Record<string, string> = {
@@ -165,13 +165,27 @@ router.post("/", async (req, res) => {
 /* ─── GET /api/test-sessions/latest  —  ultima sessione utente ─── */
 router.get("/latest", requireAuth, async (req, res) => {
   try {
-    res.json({
-      sessionId: 1,
-      recommendations: [
-        { sectorId: 1, sectorName: "Tecnologia" },
-        { sectorId: 2, sectorName: "Marketing" }
-      ]
-    });
+    const userId = req.user!.id;
+    const [session] = await db
+      .select({
+        sessionId: testSessionsTable.id,
+        recommendations: testSessionsTable.recommendations,
+        riasecScores: testSessionsTable.riasecScores,
+        primaryTypes: testSessionsTable.primaryTypes,
+        spiritScores: testSessionsTable.spiritScores,
+        createdAt: testSessionsTable.createdAt,
+      })
+      .from(testSessionsTable)
+      .where(eq(testSessionsTable.userId, userId))
+      .orderBy(desc(testSessionsTable.createdAt))
+      .limit(1);
+
+    if (!session) {
+      res.status(404).json({ error: "Nessuna sessione trovata" });
+      return;
+    }
+
+    res.json(session);
   } catch (err) {
     req.log?.error?.({ err }, "test-sessions latest error");
     res.status(500).json({ error: "Errore nel caricamento dell'ultima sessione" });
@@ -202,7 +216,25 @@ router.get("/:sessionId", async (req, res) => {
 /* ─── POST /api/test-sessions/:sessionId/assign-user  —  assegna sessione ─── */
 router.post("/:sessionId/assign-user", requireAuth, async (req, res) => {
   try {
-    res.json({ success: true });
+    const sessionId = parseInt(req.params.sessionId ?? "", 10);
+    if (isNaN(sessionId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+    const userId = req.user!.id;
+    const [session] = await db
+      .update(testSessionsTable)
+      .set({ userId })
+      .where(and(
+        eq(testSessionsTable.id, sessionId),
+        or(isNull(testSessionsTable.userId), eq(testSessionsTable.userId, userId)),
+      ))
+      .returning({ id: testSessionsTable.id });
+
+    if (!session) {
+      res.status(404).json({ error: "Sessione non trovata o non assegnabile" });
+      return;
+    }
+
+    res.json({ success: true, sessionId: session.id });
   } catch (err) {
     req.log?.error?.({ err }, "test-sessions assign-user error");
     res.status(500).json({ error: "Errore nell'assegnazione della sessione" });

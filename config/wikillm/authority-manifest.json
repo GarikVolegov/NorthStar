@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "wikillm-router-core",
+      "match": "apps/server/src/lib/wikillm-context-router.ts",
+      "profiles": ["code", "process"],
+      "domains": ["wikillm", "routing", "context"],
+      "authority": "core",
+      "weight": 1,
+      "reason": "Router condiviso che coordina Graphify, Wendy Brain, RAG e memorie personali.",
+      "tags": ["router", "federated-context"]
+    },
+    {
+      "id": "graphify-client-core",
+      "match": "apps/server/src/lib/graphify-client.ts",
+      "profiles": ["code"],
+      "domains": ["wikillm", "graphify", "retrieval"],
+      "authority": "core",
+      "weight": 1,
+      "reason": "Adapter runtime che legge gli artifact Graphify e costruisce il contesto codice/processi/docs.",
+      "tags": ["graphify", "adapter", "ranking"]
+    },
+    {
+      "id": "wikillm-refresh-core",
+      "match": "scripts/src/refresh-wikillm-graphs.ts",
+      "profiles": ["process"],
+      "domains": ["wikillm", "pipeline", "graphify"],
+      "authority": "core",
+      "weight": 1,
+      "reason": "Pipeline autorevole per rigenerare i grafi federati puliti della WikiLLM.",
+      "tags": ["refresh", "pipeline", "audit"]
+    },
+    {
+      "id": "wiki-route-support",
+      "match": "apps/server/src/routes/wiki.ts",
+      "profiles": ["code"],
+      "domains": ["wiki", "rag", "context"],
+      "authority": "support",
+      "weight": 0.65,
+      "reason": "Entrypoint API Wiki che passa il contesto federato allo stream di risposta.",
+      "tags": ["wiki", "api", "streaming"]
+    },
+    {
+      "id": "wiki-chat-support",
+      "match": "packages/ai-server/src/wiki/chat.ts",
+      "profiles": ["code"],
+      "domains": ["wiki", "rag", "llm"],
+      "authority": "support",
+      "weight": 0.65,
+      "reason": "Costruzione prompt e streaming WikiLLM con sorgenti RAG, Graphify e Wendy Brain.",
+      "tags": ["wiki", "prompt", "streaming"]
+    },
+    {
+      "id": "wendy-entrypoint-support",
+      "match": "apps/server/src/routes/ai-wendy.ts",
+      "profiles": ["code"],
+      "domains": ["wendy", "orchestration", "context"],
+      "authority": "support",
+      "weight": 0.65,
+      "reason": "Entrypoint prodotto di Wendy, responsabile di orchestrazione, SSE, tool e contesto personale.",
+      "tags": ["wendy", "api", "orchestration"]
+    },
+    {
+      "id": "growth-agent-support",
+      "match": "packages/ai-server/src/growth-agent/",
+      "profiles": ["code"],
+      "domains": ["growth-agent", "wendy", "reasoning"],
+      "authority": "support",
+      "weight": 0.65,
+      "reason": "Motore profondo usato da Wendy per ragionamento specialistico, memoria e supervisione.",
+      "tags": ["growth-agent", "reasoning", "memory"]
+    },
+    {
+      "id": "wendy-brain-support",
+      "match": [
+        "packages/ai-server/src/wendy-brain.ts",
+        "packages/db/src/schema/wendyBrain.ts",
+        "apps/server/src/routes/admin/wendy-brain.ts"
+      ],
+      "profiles": ["code", "process"],
+      "domains": ["wendy-brain", "policy", "behavior"],
+      "authority": "support",
+      "weight": 0.65,
+      "reason": "Contratto e gestione della memoria comportamentale/di policy di Wendy.",
+      "tags": ["wendy-brain", "policy"]
+    },
+    {
+      "id": "architecture-docs-core",
+      "match": [
+        "ARCHITECTURE.md",
+        "docs/architecture/"
+      ],
+      "profiles": ["process", "docs"],
+      "domains": ["architecture", "northstar", "process"],
+      "authority": "core",
+      "weight": 1,
+      "reason": "Documentazione architetturale primaria per interpretare confini, moduli e flussi NorthStar.",
+      "tags": ["architecture", "docs"]
+    },
+    {
+      "id": "openhuman-docs-support",
+      "match": "docs/openhuman-integration.md",
+      "profiles": ["docs"],
+      "domains": ["openhuman", "memory", "context"],
+      "authority": "support",
+      "weight": 0.65,
+      "reason": "Documento di integrazione per memoria personale, OpenHuman e Graphify.",
+      "tags": ["openhuman", "memory"]
+    },
+    {
+      "id": "eval-wendy-peripheral",
+      "match": "docs/eval-wendy/",
+      "profiles": ["docs"],
+      "domains": ["wendy", "evaluation"],
+      "authority": "peripheral",
+      "weight": 0.35,
+      "reason": "Corpus utile per casi di valutazione, meno autorevole dei contratti runtime e architetturali.",
+      "tags": ["eval", "quality"]
+    }
+  ]
+}

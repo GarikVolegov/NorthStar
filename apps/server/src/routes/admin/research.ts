@@ -2,23 +2,16 @@ import { Router, type Request, type Response } from "express";
 import {
   agentRunsTable,
   db,
-  discoveryItemsTable,
-  growthArticlesTable,
 } from "@workspace/db";
-import { desc, eq, sql } from "drizzle-orm";
-import {
-  runCollector,
-  runEnricher,
-  runNewsPublisher,
-  searchWeb,
-} from "@workspace/ai-server";
+import { desc, sql } from "drizzle-orm";
 import { rootLogger } from "../../middleware/logger";
 import {
-  buildGrowthResearchArticle,
-  compactText,
   writeAgentRunSnapshot,
 } from "./shared/agents";
-import { asPlainRecord } from "../../lib/type-guards";
+import {
+  runGrowthResearchReviewPipeline,
+  runNewsPublishingPipeline,
+} from "./shared/pipelines";
 
 const router = Router();
 
@@ -59,60 +52,8 @@ router.get("/research/runs", async (req: Request, res: Response) => {
 router.post("/research/news/run", async (req: Request, res: Response) => {
   const startedAt = new Date();
   try {
-    const warnings: string[] = [];
-    const collector = await runCollector();
-
-    let enricher: Awaited<ReturnType<typeof runEnricher>> | null = null;
-    try {
-      enricher = await runEnricher(20);
-      if (enricher.errors.length) warnings.push(...enricher.errors.slice(0, 5));
-    } catch (err) {
-      warnings.push(`enricher: ${String(err).slice(0, 200)}`);
-    }
-
-    let publisher: Awaited<ReturnType<typeof runNewsPublisher>> | null = null;
-    try {
-      publisher = await runNewsPublisher();
-      if (publisher.missingCoverage.length) {
-        warnings.push(
-          `Mancano news reali per ${publisher.missingCoverage.length} settori.`,
-        );
-      }
-    } catch (err) {
-      warnings.push(`publisher: ${String(err).slice(0, 200)}`);
-    }
-
-    const output = {
-      collector,
-      enricher,
-      publisher,
-      warnings,
-    };
-    const run = await writeAgentRunSnapshot({
-      agentName: "news-research",
-      taskType: "manual_admin_run",
-      startedAt,
-      status:
-        warnings.length && !collector.totalInserted && !publisher?.transferred
-          ? "failed"
-          : "completed",
-      inputSummary: JSON.stringify(req.body ?? {}),
-      outputSummary: JSON.stringify(output).slice(0, 1000),
-      ...(warnings.length
-        ? { errorMessage: warnings.join(" | ").slice(0, 1000) }
-        : {}),
-    });
-
-    res.status(201).json({
-      ok: true,
-      runId: run.id,
-      checked: collector.totalCollected,
-      added: publisher?.transferred ?? 0,
-      collector,
-      enricher,
-      publisher,
-      warnings,
-    });
+    const result = await runNewsPublishingPipeline({ body: req.body ?? {}, startedAt });
+    res.status(result.ok ? 201 : 500).json(result);
   } catch (err) {
     const run = await writeAgentRunSnapshot({
       agentName: "news-research",
@@ -130,122 +71,8 @@ router.post("/research/news/run", async (req: Request, res: Response) => {
 router.post("/research/growth/run", async (req: Request, res: Response) => {
   const startedAt = new Date();
   try {
-    const body = (req.body ?? {}) as { topics?: unknown; limit?: unknown };
-    const topics =
-      Array.isArray(body.topics) && body.topics.length
-        ? body.topics
-            .map((topic) => compactText(topic, 120))
-            .filter(Boolean)
-            .slice(0, 5)
-        : [
-            "crescita personale lavoro focus produttivita abitudini",
-            "orientamento professionale competenze futuro del lavoro",
-            "benessere mentale burnout lavoro giovani professionisti",
-          ];
-    const perTopic = Math.max(1, Math.min(Number(body.limit) || 3, 5));
-
-    const webResults = (
-      await Promise.all(
-        topics.map(async (topic) => ({
-          topic,
-          results: await searchWeb(topic, perTopic),
-        })),
-      )
-    ).flatMap(({ topic, results }) =>
-      results.map((result) => ({
-        topic,
-        title: compactText(
-          asPlainRecord(result.metadata).title ?? result.source,
-          180,
-        ),
-        url: result.source,
-        source: "Tavily",
-        summary: result.content,
-      })),
-    );
-
-    const discoveryRows = await db
-      .select()
-      .from(discoveryItemsTable)
-      .where(sql`${discoveryItemsTable.type} in ('growth', 'formation')`)
-      .orderBy(desc(discoveryItemsTable.createdAt))
-      .limit(20);
-
-    const discoveryResults = discoveryRows.map((item) => ({
-      topic: item.category || item.type,
-      title: item.title,
-      url: item.url,
-      source: item.source || item.collectorSource || "Discovery Collector",
-      summary: item.insightText || item.summary,
-    }));
-
-    const candidates = [...webResults, ...discoveryResults]
-      .filter((item) => item.title || item.summary)
-      .slice(0, 25);
-
-    const created: Array<{
-      id: number;
-      title: string;
-      slug: string;
-      source: string;
-    }> = [];
-    const skipped: string[] = [];
-
-    for (const [index, candidate] of candidates.entries()) {
-      const payload = buildGrowthResearchArticle({ ...candidate, index });
-      const [existing] = await db
-        .select({ id: growthArticlesTable.id })
-        .from(growthArticlesTable)
-        .where(eq(growthArticlesTable.slug, payload.slug))
-        .limit(1);
-      if (existing) {
-        skipped.push(payload.slug);
-        continue;
-      }
-      const [article] = await db
-        .insert(growthArticlesTable)
-        .values(payload)
-        .returning({
-          id: growthArticlesTable.id,
-          title: growthArticlesTable.title,
-          slug: growthArticlesTable.slug,
-        });
-      if (article) created.push({ ...article, source: candidate.source });
-    }
-
-    const warnings = candidates.length
-      ? []
-      : [
-          "Nessuna fonte trovata: configura TAVILY_API_KEY o avvia il collector discovery.",
-        ];
-    const output = {
-      topics,
-      attempted: candidates.length,
-      created: created.length,
-      skipped: skipped.length,
-      webSources: webResults.length,
-      discoverySources: discoveryResults.length,
-      warnings,
-    };
-    const run = await writeAgentRunSnapshot({
-      agentName: "growth-research",
-      taskType: "manual_admin_run",
-      startedAt,
-      status: "completed",
-      inputSummary: JSON.stringify({ topics, perTopic }),
-      outputSummary: JSON.stringify(output).slice(0, 1000),
-      ...(warnings.length ? { errorMessage: warnings.join(" | ") } : {}),
-    });
-
-    res.status(201).json({
-      ok: true,
-      runId: run.id,
-      added: created.length,
-      attempted: candidates.length,
-      topics,
-      created,
-      warnings,
-    });
+    const result = await runGrowthResearchReviewPipeline({ body: req.body ?? {}, startedAt });
+    res.status(201).json(result);
   } catch (err) {
     const run = await writeAgentRunSnapshot({
       agentName: "growth-research",

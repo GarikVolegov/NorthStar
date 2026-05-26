@@ -63,4 +63,48 @@ describe("recordAiCall cost telemetry", () => {
       }),
     );
   });
+
+  it("allows non-Wendy callers to identify their role and phase", () => {
+    recordAiCall({
+      requestId: "wiki-1",
+      userId: 9,
+      intent: "wiki_chat",
+      tier: "micro",
+      role: "wiki",
+      phase: "chat",
+      model: "llama-3.3-70b-versatile",
+      inputTokens: 240,
+      outputTokens: 160,
+      costUsdEst: 0.00027,
+      latencyMs: 900,
+      totalTurns: 1,
+      status: "success",
+      ragChunksRetrieved: 2,
+      ragTopSimilarity: 0.91,
+      ragSourcesUsed: ["settori", "web"],
+    });
+
+    expect(mockValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: "wiki-1",
+        role: "wiki",
+        phase: "chat",
+        intent: "wiki_chat",
+        tier: "micro",
+        model: "llama-3.3-70b-versatile",
+        inputTokens: 240,
+        outputTokens: 160,
+        costUsdEstimate: "0.000270",
+        status: "success",
+      }),
+    );
+    expect(mockValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: "wiki-1",
+        ragChunksRetrieved: 2,
+        ragTopSimilarity: 0.91,
+        ragSourcesUsed: ["settori", "web"],
+      }),
+    );
+  });
 });

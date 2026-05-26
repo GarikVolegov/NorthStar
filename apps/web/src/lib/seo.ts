@@ -67,7 +67,7 @@ export function usePageMeta({
   noIndex = false,
 }: PageMetaOptions) {
   useEffect(() => {
-    const fullTitle = `${title} | NorthStar`;
+    const fullTitle = title.toLowerCase().includes("northstar") ? title : `${title} | NorthStar`;
     const resolvedPath = canonicalPath ?? path;
     const fullUrl = resolvedPath ? `${SITE_URL}${resolvedPath}` : SITE_URL;
     const imgUrl = image ?? DEFAULT_IMAGE;

@@ -16,6 +16,7 @@ export type WendyContextSource =
   | "rag"
   | "openhuman"
   | "graphify"
+  | "wendy-brain"
   | "semantic-memory";
 
 const APP_DATA_TOOLS = new Set([
@@ -33,7 +34,7 @@ const APP_DATA_TOOLS = new Set([
 ]);
 
 export function buildWendyContextSources(input: {
-  personalSources: Array<"openhuman" | "graphify" | "semantic-memory">;
+  personalSources: Array<"openhuman" | "graphify" | "semantic-memory" | "wendy-brain" | "rag">;
   toolsUsed: string[];
   ragChunksRetrieved: number;
 }): WendyContextSource[] {
@@ -107,6 +108,7 @@ export const WendyRequestSchema = z.object({
   pageContext: WendyPageContextSchema.optional(),
   locale: z.string().max(5).default("it"),
   hasFileAttached: z.boolean().optional().default(false),
+  isPredefined: z.boolean().optional().default(false),
   localHour: z.number().int().min(0).max(23).optional(),
   localDayOfWeek: z.number().int().min(0).max(6).optional(),
   focusMode: z.boolean().optional().default(false),

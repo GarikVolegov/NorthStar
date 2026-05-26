@@ -7,12 +7,7 @@ let _openai: OpenAI | null = null;
 function getOpenAI(): OpenAI {
   if (_openai) return _openai;
 
-  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-  if (!baseURL) {
-    throw new Error(
-      "AI_INTEGRATIONS_OPENAI_BASE_URL must be set. Did you forget to provision the OpenAI AI integration?",
-    );
-  }
+  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1";
 
   const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
   if (!apiKey) {

@@ -11,6 +11,7 @@ const router = Router();
 
 const SearchQuerySchema = z.object({
   q: z.string().min(1).max(500),
+  profile: z.enum(["code", "process", "docs", "all"]).optional(),
 });
 
 const ExplainQuerySchema = z.object({
@@ -35,7 +36,9 @@ router.get("/search", async (req: Request, res: Response) => {
     return;
   }
 
-  const results = await searchGraphify(parsed.data.q);
+  const results = parsed.data.profile
+    ? await searchGraphify(parsed.data.q, { profile: parsed.data.profile })
+    : await searchGraphify(parsed.data.q);
   res.json({ results });
 });
 

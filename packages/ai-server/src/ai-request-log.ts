@@ -29,6 +29,8 @@ export interface RecordAiCallInput {
   threadId?:        string;
   intent:           string;
   tier:             string;
+  role?:            string;
+  phase?:           string;
   model:            string;
   inputTokens:      number;
   outputTokens:     number;
@@ -67,8 +69,8 @@ export function recordAiCall(input: RecordAiCallInput): void {
     intent:           input.intent,
     domain:           input.domain ?? null,
     tier:             input.tier,
-    role:             "wendy",
-    phase:            "specialist",
+    role:             input.role ?? "wendy",
+    phase:            input.phase ?? "specialist",
     model:            input.model,
     provider:         input.model.startsWith("gpt-") ? "openai" : null,
     inputTokens:      input.inputTokens,

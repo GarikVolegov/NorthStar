@@ -17,6 +17,7 @@
  * Memory wiring from v3 is preserved unchanged.
  */
 import type OpenAI from "openai";
+import pRetry from "p-retry";
 import { openai } from "../client";
 import { retrieve } from "./retriever";
 import { searchWeb, MIN_LOCAL_CHUNKS } from "./web-search";
@@ -66,9 +67,11 @@ const DOMAIN_LABELS: Record<Domain, string> = {
 
 export interface SpecialistRunOptions {
   userId:                number;
+  sessionId?:            number | undefined;
   userContext:           UserContext & { memorySection?: string | undefined };
   history:               ChatMessage[];
   userMessage:           string;
+  normalizedMessage?:    string | undefined;
   routeDecision:         RouteDecision;
   memoryFactCount?:      number | undefined;
   maxHistory?:           number | undefined;
@@ -105,6 +108,7 @@ export abstract class SpecialistAgent {
       userId, userContext, history, userMessage,
       routeDecision, maxHistory = 12,
     } = opts;
+    const analysisMessage = opts.normalizedMessage ?? userMessage;
 
     const icon  = DOMAIN_STATUS_ICONS[this.DOMAIN] ?? "✨";
     const label = DOMAIN_LABELS[this.DOMAIN] ?? "profilo";
@@ -136,31 +140,31 @@ export abstract class SpecialistAgent {
 
     const sc = wendyConfig.specialist;
     const [personaExamples, documentChunks, cot] = await Promise.all([
-      retrieve(userMessage, userId, { topK: 3, minScore: sc.personaMinScore, sourceTypes: ["persona_example"] }).catch((err) => {
+      retrieve(analysisMessage, userId, { topK: 3, minScore: sc.personaMinScore, sourceTypes: ["persona_example"] }).catch((err) => {
         logger.warn({ err, domain: this.DOMAIN }, "specialist persona retrieval failed");
         return [] as RetrievedChunk[];
       }),
-      retrieve(userMessage, userId, { topK: sc.documentTopK, minScore: sc.documentMinScore, sourceTypes: ["document", "user_note"] }).catch((err) => {
+      retrieve(analysisMessage, userId, { topK: sc.documentTopK, minScore: sc.documentMinScore, sourceTypes: ["document", "user_note"] }).catch((err) => {
         logger.warn({ err, domain: this.DOMAIN }, "specialist document retrieval failed");
         return [] as RetrievedChunk[];
       }),
-      runChainOfThought(userId, userMessage, conversationSummary),
+      runChainOfThought(userId, analysisMessage, conversationSummary, opts.sessionId),
     ]);
 
     // ── 2. Web fallback ───────────────────────────────────────────────────────
     let webResults: RetrievedChunk[] = [];
     if (documentChunks.length < MIN_LOCAL_CHUNKS) {
       yield { type: "status", value: "🌐 Cerco fonti aggiornate sul web..." };
-      webResults = await searchWeb(this.domainWebQuery(userMessage), 4);
+      webResults = await searchWeb(this.domainWebQuery(analysisMessage), 4);
     }
 
     // ── 3. Self-eval + CoT result ───────────────────────────────────────────────
     yield { type: "status", value: "🧠 Analizzando la situazione..." };
 
-    const evalResult = evaluateSelf({ userMessage, documentChunks, webResults, cot, memoryFactCount });
+    const evalResult = evaluateSelf({ userMessage: analysisMessage, documentChunks, webResults, cot, memoryFactCount });
 
     // ── 4. System prompt ──────────────────────────────────────────────────────
-    const domainSection = this.buildDomainSection(userMessage, cot, routeDecision);
+    const domainSection = this.buildDomainSection(analysisMessage, cot, routeDecision);
     const domainHeader  = [
       `## Specialista: ${this.DOMAIN.toUpperCase()}`,
       `**Persona**: ${this.PERSONA_CORE}`,
@@ -192,7 +196,7 @@ export abstract class SpecialistAgent {
 
     const systemPrompt = buildSystemPrompt({
       userContext: enrichedContext, personaExamples, documentChunks,
-      webResults, cot, userMessage, evalResult,
+      webResults, cot, userMessage: analysisMessage, evalResult,
     });
 
     // ── 5. Stream + BUFFER ────────────────────────────────────────────────────
@@ -213,10 +217,20 @@ export abstract class SpecialistAgent {
         complexity: evalResult.level === "high" ? "deep" : "standard",
       });
 
-      const stream = await openai.chat.completions.create({
-        model: route.model, messages, stream: true, temperature,
-        max_tokens: evalResult.level === "low" ? sc.maxTokensLow : sc.maxTokensHigh,
-      });
+      const stream = await pRetry(
+        () => openai.chat.completions.create({
+          model: route.model, messages, stream: true, temperature,
+          max_tokens: evalResult.level === "low" ? sc.maxTokensLow : sc.maxTokensHigh,
+        }),
+        {
+          retries: 2,
+          minTimeout: 1000,
+          maxTimeout: 3000,
+          onFailedAttempt: (err) => {
+            logger.warn({ err, attempt: err.attemptNumber, domain: this.DOMAIN }, "specialist LLM call failed, retrying");
+          },
+        },
+      );
 
       const tokenBuffer: string[] = [];
       for await (const chunk of stream) {
@@ -227,8 +241,8 @@ export abstract class SpecialistAgent {
       const draft = tokenBuffer.join("");
 
       // ── 6. Supervisor gate ──────────────────────────────────────────────────
-      const supervisorInput = { userMessage, draft, domain: routeDecision.domain, intent: routeDecision.intent };
-      let supervisorResult  = supervisorAgent.evaluate(supervisorInput);
+      const supervisorInput = { userMessage: analysisMessage, draft, domain: routeDecision.domain, intent: routeDecision.intent };
+      let supervisorResult  = await supervisorAgent.evaluate(supervisorInput);
       let finalText         = draft;
 
       if (!supervisorResult.pass) {

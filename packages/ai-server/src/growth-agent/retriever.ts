@@ -24,7 +24,8 @@ export type SourceType =
   | "persona_example"
   | "web"
   | "user_note"
-  | "platform_content";
+  | "platform_content"
+  | "rabbit_kb";
 
 export interface RetrievedChunk {
   id: number;

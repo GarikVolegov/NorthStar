@@ -94,12 +94,12 @@ export default function Results() {
   };
 
   // useAgentAnalysis deve stare prima di tutti i return condizionali (Rules of Hooks)
-  const sessionWithSpirit = session as { spiritScores?: Record<string, number> | undefined };
+  const sessionWithSpirit = session as { spiritScores?: Record<string, number> | undefined } | undefined;
   const { data: agentData, isLoading: agentLoading, isError: agentError } = useAgentAnalysis({
     sessionId: Number(id),
     riasecScores: session?.riasecScores as Record<string, number> | undefined,
     primaryTypes: session?.primaryTypes as string[] | undefined,
-    spiritScores: sessionWithSpirit.spiritScores,
+    spiritScores: sessionWithSpirit?.spiritScores,
     topSectors: ((session?.recommendations as Rec[] | undefined) ?? [])
       .map((r: Rec) => ({ sectorName: r.sector?.name ?? "" }))
       .filter((r: { sectorName: string }) => r.sectorName),

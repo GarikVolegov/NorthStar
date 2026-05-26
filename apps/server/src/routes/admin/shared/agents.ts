@@ -1,5 +1,60 @@
-import { agentRunsTable, db } from "@workspace/db";
 import type { growthArticlesTable } from "@workspace/db";
+export { writeAgentRunSnapshot } from "../../../lib/agent-runs";
+
+export type PipelineRisk = "low" | "medium" | "high";
+export type PipelineReviewPolicy = "auto_publish" | "requires_review" | "data_refresh";
+
+export type AdminRunnablePipeline = {
+  key: string;
+  label: string;
+  description: string;
+  endpoint: string;
+  method: "POST";
+  risk: PipelineRisk;
+  steps: string[];
+  outputs: string[];
+  requiredConfigKeys: string[];
+  reviewPolicy: PipelineReviewPolicy;
+};
+
+export const RUNNABLE_PIPELINES = [
+  {
+    key: "news-publishing",
+    label: "Ricerca e pubblica notizie",
+    description: "Raccoglie fonti news, arricchisce i discovery item e pubblica articoli editoriali reali.",
+    endpoint: "/admin/pipelines/news-publishing/run",
+    method: "POST",
+    risk: "low",
+    steps: ["Collector", "Enricher", "News publisher"],
+    outputs: ["News pubblicate", "Coverage settori", "Warning editoriali"],
+    requiredConfigKeys: ["OPENAI_API_KEY"],
+    reviewPolicy: "auto_publish",
+  },
+  {
+    key: "growth-research-review",
+    label: "Ricerca crescita personale",
+    description: "Cerca fonti web e discovery per creare bozze pending nella Coda Crescita.",
+    endpoint: "/admin/pipelines/growth-research-review/run",
+    method: "POST",
+    risk: "low",
+    steps: ["Web research", "Discovery", "Coda Crescita"],
+    outputs: ["Bozze create", "Topic coperti", "Fonti candidate"],
+    requiredConfigKeys: ["TAVILY_API_KEY"],
+    reviewPolicy: "requires_review",
+  },
+  {
+    key: "market-refresh",
+    label: "Aggiorna lavori e settori",
+    description: "Aggiorna snapshot offerte lavoro e dati mercato per settori e professioni.",
+    endpoint: "/admin/pipelines/market-refresh/run",
+    method: "POST",
+    risk: "medium",
+    steps: ["Job postings", "Sector data"],
+    outputs: ["Snapshot aggiornati", "Settori aggiornati", "Professioni aggiornate"],
+    requiredConfigKeys: ["ADZUNA_APP_ID", "ADZUNA_API_KEY"],
+    reviewPolicy: "data_refresh",
+  },
+] as const satisfies readonly AdminRunnablePipeline[];
 
 export const RUNNABLE_AGENTS = [
   {
@@ -32,10 +87,46 @@ export const RUNNABLE_AGENTS = [
     requiresInput: false,
   },
   {
+    key: "fast-collector",
+    label: "Fast Collector",
+    description: "Raccoglie solo fonti prioritarie per aggiornare le news entro 1-2 ore.",
+    endpoint: "/admin/agents/fast-collect",
+    method: "POST",
+    risk: "low",
+    requiresInput: false,
+  },
+  {
     key: "enricher",
     label: "Enricher LLM",
     description: "Arricchisce batch di contenuti tramite LLM.",
     endpoint: "/admin/agents/enrich",
+    method: "POST",
+    risk: "medium",
+    requiresInput: false,
+  },
+  {
+    key: "news-publisher",
+    label: "News Publisher",
+    description: "Pubblica in /news solo discovery item arricchiti da fonti editoriali reali.",
+    endpoint: "/admin/agents/publish-news",
+    method: "POST",
+    risk: "low",
+    requiresInput: false,
+  },
+  {
+    key: "growth-library",
+    label: "Growth Library",
+    description: "Cura e genera articoli di crescita personale quando la configurazione AI lo consente.",
+    endpoint: "/admin/agents/growth-library",
+    method: "POST",
+    risk: "medium",
+    requiresInput: false,
+  },
+  {
+    key: "job-postings",
+    label: "Job Postings",
+    description: "Popola snapshot aggregati offerte lavoro da provider configurati.",
+    endpoint: "/admin/agents/job-postings",
     method: "POST",
     risk: "medium",
     requiresInput: false,
@@ -60,6 +151,42 @@ export const RUNNABLE_AGENTS = [
   },
 ] as const;
 
+export async function optionalAdminRead<T>(
+  read: () => Promise<T>,
+  fallback: T,
+): Promise<{ value: T; unavailable: boolean; error?: string }> {
+  try {
+    return { value: await read(), unavailable: false };
+  } catch (err) {
+    return {
+      value: fallback,
+      unavailable: true,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export type RecentAgentRunBase = {
+  id: number;
+  agentName: string;
+  taskType: string | null;
+  inputSummary: string | null;
+  outputSummary: string | null;
+  status: string;
+  startedAt: Date;
+  finishedAt: Date | null;
+  durationMs: number | null;
+  errorMessage: string | null;
+};
+
+export function formatRecentAgentRuns(rows: RecentAgentRunBase[]) {
+  return rows.map((row) => ({
+    ...row,
+    userId: null,
+    createdAt: row.startedAt,
+  }));
+}
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -68,36 +195,6 @@ function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 96);
-}
-
-export async function writeAgentRunSnapshot(params: {
-  agentName: string;
-  taskType: string;
-  startedAt: Date;
-  status: "completed" | "failed";
-  inputSummary?: string;
-  outputSummary?: string;
-  errorMessage?: string;
-}) {
-  const finishedAt = new Date();
-  const [run] = await db
-    .insert(agentRunsTable)
-    .values({
-      agentName: params.agentName,
-      taskType: params.taskType,
-      inputSummary: params.inputSummary,
-      outputSummary: params.outputSummary,
-      status: params.status,
-      startedAt: params.startedAt,
-      finishedAt,
-      durationMs: finishedAt.getTime() - params.startedAt.getTime(),
-      errorMessage: params.errorMessage,
-    })
-    .returning();
-  if (!run) {
-    throw new Error("Agent run snapshot insert failed");
-  }
-  return run;
 }
 
 export function compactText(value: unknown, max = 700) {
@@ -176,6 +273,10 @@ export function buildGrowthResearchArticle(input: {
 }
 
 export function emptyAgentsOverview(days: number, reason?: string) {
+  const fallbackKey = process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY || "";
+  const fallbackLooksUsable =
+    Boolean(fallbackKey) &&
+    !/placeholder|inactive|changeme/i.test(fallbackKey);
   return {
     generatedAt: new Date().toISOString(),
     days,
@@ -212,6 +313,25 @@ export function emptyAgentsOverview(days: number, reason?: string) {
       aiErrorCount: 0,
       byProvider: [],
     },
+    runnablePipelines: RUNNABLE_PIPELINES,
+    advancedRunnableAgents: RUNNABLE_AGENTS,
     runnableAgents: RUNNABLE_AGENTS,
+    controlRoom: {
+      ai: {
+        activeProvider: process.env.AI_PROVIDER ?? "openai",
+        openRouterConfigured: Boolean(process.env.OPENROUTER_API_KEY),
+        openAiFallbackConfigured: fallbackLooksUsable,
+        model: process.env.OPENROUTER_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+        status: "unknown",
+      },
+      configBlockers: [],
+      readyOutputs: {
+        realNews: { count: 0, status: "empty", latest: [] },
+        pendingDiscovery: { count: 0, status: "ready" },
+        growthArticles: { count: 0, status: "empty", latest: [] },
+        jobSnapshots: { count: 0, status: "blocked_or_empty" },
+      },
+      latestRuns: [],
+    },
   };
 }

@@ -20,6 +20,7 @@ export async function loadResponseContext(
   userMessage: string,
   history: ChatMessage[],
   requestId?: string,
+  conversationId?: string | number | undefined,
 ): Promise<ResponseContext> {
   const conversationSummary = history
     .slice(-4)
@@ -39,7 +40,7 @@ export async function loadResponseContext(
       logger.warn({ err, requestId }, "platform context retrieval failed");
       return [];
     }),
-    FF.chainOfThought ? runChainOfThought(userId, userMessage, conversationSummary).catch((err) => {
+    FF.chainOfThought ? runChainOfThought(userId, userMessage, conversationSummary, conversationId).catch((err) => {
       logger.warn({ err, requestId }, "chain-of-thought context failed");
       return null;
     }) : Promise.resolve(null),

@@ -260,6 +260,40 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
       { name: "id",    type: "string", description: "ID nodo Graphify da spiegare", required: true },
     ],
   },
+
+  // ── Rabbit expert domain ──────────────────────────────────────────────────────
+  get_rabbit_care_guide: {
+    name:        "get_rabbit_care_guide",
+    description: "Restituisce linee guida certificate sul benessere del coniglio: spazio, alimentazione, socializzazione, salute, arricchimento ambientale, grooming. Usare per domande generali sulla cura. NON usare per emergenze mediche (per quelle interrompi e indirizza al vet).",
+    parameters: [
+      { name: "topic",     type: "string", description: "housing | feeding | socialization | health | enrichment | grooming", required: true },
+      { name: "rabbitAge", type: "string", description: "baby | junior | adult | senior (opzionale)" },
+      { name: "breed",     type: "string", description: "Razza del coniglio se rilevante (opzionale)" },
+    ],
+  },
+  check_food_safety: {
+    name:        "check_food_safety",
+    description: "Verifica se un alimento è sicuro, tossico o da somministrare con cautela per i conigli. USARE OBBLIGATORIAMENTE quando l'utente chiede se può dare un cibo specifico al coniglio.",
+    parameters: [
+      { name: "foodName", type: "string", description: "Nome dell'alimento da verificare (es. 'carota', 'ciclamino', 'mela', 'prezzemolo')", required: true },
+      { name: "quantity", type: "string", description: "Quantità menzionata dall'utente per contestualizzare (opzionale)" },
+    ],
+  },
+  get_breed_info: {
+    name:        "get_breed_info",
+    description: "Restituisce caratteristiche di una razza di coniglio: temperamento, dimensioni, esigenze specifiche, predisposizioni sanitarie. Usare quando l'utente menziona una razza o chiede quale razza adottare.",
+    parameters: [
+      { name: "breedName", type: "string", description: "Nome della razza (es. 'Nano Olandese', 'Lop', 'Rex', 'Angora', 'Lionhead', 'Ariete')", required: true },
+    ],
+  },
+  search_rabbit_kb: {
+    name:        "search_rabbit_kb",
+    description: "Cerca nel knowledge base specializzato sui conigli (veterinaria, comportamento, benessere, legislazione italiana). Usare per domande specifiche non coperte dagli altri tool rabbit.",
+    parameters: [
+      { name: "query", type: "string", description: "Query semantica in italiano sulla cura o salute dei conigli", required: true },
+      { name: "topK",  type: "number", description: "Numero di chunk (default 4, max 8)" },
+    ],
+  },
 };
 
 // ── Matrice intent → tool abilitati ──────────────────────────────────────────
@@ -281,6 +315,10 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "ask_openhuman_memory",       // Personal Intelligence: memoria utente
     "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
     "search_code_graph",
+    "get_rabbit_care_guide",      // Rabbit: guide cura
+    "check_food_safety",          // Rabbit: sicurezza alimenti
+    "get_breed_info",             // Rabbit: info razze
+    "search_rabbit_kb",           // Rabbit: knowledge base
   ],
   conversation: [
     "open_view",
@@ -303,6 +341,10 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "ask_openhuman_memory",       // Personal Intelligence: memoria utente
     "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
     "search_code_graph",
+    "get_rabbit_care_guide",      // Rabbit: guide cura
+    "check_food_safety",          // Rabbit: sicurezza alimenti
+    "get_breed_info",             // Rabbit: info razze
+    "search_rabbit_kb",           // Rabbit: knowledge base
   ],
   planning: [
     "get_sector_detail",
@@ -325,6 +367,8 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_job_posting_trend",     // Step 6: trend domanda per il ruolo target
     "get_skill_cooccurrences",   // Step 6: skill complementari per il piano
     "recall_semantic_memory",    // Plugin memory: recall conversazionale
+    "get_rabbit_care_guide",     // Rabbit: guide cura per pianificazione setup
+    "search_rabbit_kb",          // Rabbit: knowledge base approfondito
   ],
   deep_analysis: [
     "get_sector_detail",
@@ -346,6 +390,10 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
     "search_code_graph",
     "explain_code_node",
+    "get_rabbit_care_guide",      // Rabbit: guide cura
+    "check_food_safety",          // Rabbit: sicurezza alimenti
+    "get_breed_info",             // Rabbit: info razze
+    "search_rabbit_kb",           // Rabbit: knowledge base
   ],
 };
 

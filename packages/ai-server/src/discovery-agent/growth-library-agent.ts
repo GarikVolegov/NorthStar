@@ -196,7 +196,7 @@ async function generateOriginalArticle(gap: GrowthGap): Promise<NewGrowthArticle
     const content = String(parsed.content ?? "").trim();
     if (!title || !description || content.split(/\s+/).length < 350) return null;
 
-    const quality = supervisorAgent.evaluate({
+    const quality = await supervisorAgent.evaluate({
       userMessage: gap.suggestedTopic,
       draft: content,
       domain: gap.category === "carriera" ? "career" : gap.category === "salute" ? "health" : gap.category === "finanza" ? "finance" : "mindset",

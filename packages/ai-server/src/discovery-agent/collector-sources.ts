@@ -180,12 +180,16 @@ async function collectStaticRssSources(priorityOnly = false): Promise<RawItem[]>
     { url: "https://www.ilsole24ore.com/rss/notizie/lavoro-carriere.xml", type: "opportunity", source: "Il Sole 24 Ore", sector: "Mercato del Lavoro", category: "lavoro_carriere", collectorSource: "sole24ore_rss", limit: 6 },
     { url: "https://www.ilsole24ore.com/rss/tecnologia.xml", type: "sector_trend", source: "Il Sole 24 Ore", sector: "Technology", category: "tech_news", collectorSource: "sole24ore_rss", limit: 6 },
     { url: "https://www.ilsole24ore.com/rss/finanza.xml", type: "news", source: "Il Sole 24 Ore", sector: "Finanza", category: "finanza", collectorSource: "sole24ore_rss", limit: 6 },
-    { url: "https://www.ninjamarketing.it/feed/", type: "sector_trend", source: "Ninja Marketing", sector: "Digital Marketing", category: "marketing_trend", collectorSource: "ninja_marketing_rss", limit: 5 },
+    { url: "https://www.ansa.it/sito/notizie/economia/economia_rss.xml", type: "news", source: "ANSA", sector: "Economia Italia", category: "economia", collectorSource: "ansa_rss", limit: 6 },
+    { url: "https://www.ansa.it/sito/notizie/tecnologia/tecnologia_rss.xml", type: "news", source: "ANSA", sector: "Technology", category: "tech_news", collectorSource: "ansa_rss", limit: 6 },
+    { url: "https://www.wired.it/feed/", type: "news", source: "Wired Italia", sector: "Technology", category: "tech_news", collectorSource: "wired_it_rss", limit: 6 },
+    { url: "https://www.repubblica.it/rss/economia/rss2.0.xml", type: "news", source: "La Repubblica", sector: "Economia Italia", category: "economia", collectorSource: "repubblica_rss", limit: 6 },
+    { url: "https://www.ninjamarketing.it/feed/", type: "news", source: "Ninja Marketing", sector: "Digital Marketing", category: "marketing_trend", collectorSource: "ninja_marketing_rss", limit: 5 },
     { url: "https://www.ninjamarketing.it/category/startup-innovazione/feed/", type: "opportunity", source: "Ninja Marketing", sector: "Startup", category: "startup_italia", collectorSource: "ninja_marketing_rss", limit: 5 },
     { url: "https://www.ninjamarketing.it/category/social-media/feed/", type: "sector_trend", source: "Ninja Marketing", sector: "Social Media", category: "social_media", collectorSource: "ninja_marketing_rss", limit: 5 },
   ];
   const selectedFeeds = priorityOnly
-    ? feeds.filter((feed) => feed.collectorSource === "sole24ore_rss" || feed.collectorSource === "ninja_marketing_rss")
+    ? feeds.filter((feed) => ["sole24ore_rss", "ninja_marketing_rss", "ansa_rss", "wired_it_rss", "repubblica_rss"].includes(feed.collectorSource))
     : feeds;
   const results: RawItem[] = [];
   await Promise.allSettled(selectedFeeds.map(async (feed) => {

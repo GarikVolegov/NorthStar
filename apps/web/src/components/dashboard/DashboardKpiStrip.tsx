@@ -1,12 +1,7 @@
 import type { DashboardEvent, DashboardObjective } from "@/hooks/useDashboardData";
 import { cn } from "@/lib/utils";
-import { Briefcase, CalendarDays, Target, User } from "lucide-react";
+import { Briefcase, User } from "lucide-react";
 import { Link } from "wouter";
-
-function formatEventDate(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("it-IT", { day: "numeric", month: "short" });
-}
 
 function ProfileRing({ percent }: { percent: number }) {
   const r = 16;
@@ -28,19 +23,18 @@ function ProfileRing({ percent }: { percent: number }) {
 export function DashboardKpiStrip({
   profilePercent,
   objectives: _objectives,
-  objectivesProgress,
-  upcomingEvents,
+  objectivesProgress: _objectivesProgress,
   confirmedSectorName,
   sessionId,
 }: {
   profilePercent: number;
   objectives: DashboardObjective[];
   objectivesProgress: { done: number; total: number; percent: number };
-  upcomingEvents: DashboardEvent[];
+  upcomingEvents?: DashboardEvent[];
   confirmedSectorName?: string | null;
   sessionId?: number | null;
 }) {
-  const nextEvent = upcomingEvents[0] ?? null;
+  const profileComplete = profilePercent >= 100;
 
   const cards = [
     {
@@ -52,26 +46,7 @@ export function DashboardKpiStrip({
       href: "/profilo",
       highlight: profilePercent >= 100,
       ring: true,
-    },
-    {
-      id: "objectives",
-      icon: Target,
-      label: "Obiettivi",
-      value: objectivesProgress.total > 0 ? `${objectivesProgress.done}/${objectivesProgress.total}` : "0",
-      sub: objectivesProgress.total > 0 ? "completati" : "nessun obiettivo",
-      href: null,
-      highlight: false,
-      ring: false,
-    },
-    {
-      id: "calendar",
-      icon: CalendarDays,
-      label: "Prossimo evento",
-      value: nextEvent ? nextEvent.title : "Nessun evento",
-      sub: nextEvent ? formatEventDate(nextEvent.startAt) : "Calendario vuoto",
-      href: "/calendario",
-      highlight: false,
-      ring: false,
+      hideWhenComplete: true,
     },
     {
       id: "sector",
@@ -82,11 +57,15 @@ export function DashboardKpiStrip({
       href: sessionId ? `/risultati/${sessionId}` : "/test",
       highlight: !!confirmedSectorName,
       ring: false,
+      hideWhenComplete: true,
     },
-  ];
+  ].filter((card) => !(profileComplete && card.hideWhenComplete));
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className={cn(
+      "grid grid-cols-1 sm:grid-cols-2 gap-3",
+      cards.length >= 4 ? "lg:grid-cols-4" : "lg:grid-cols-2"
+    )}>
       {cards.map((card) => {
         const inner = (
           <div

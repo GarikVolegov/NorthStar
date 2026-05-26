@@ -1,11 +1,13 @@
 import { Router, type Request, type Response } from "express";
 import { agentEmployeesTable, agentRunsTable, aiRequestLogTable, db, llmUsageTable, professionsTable, sectorsTable } from "@workspace/db";
 import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
-import { buildEmbeddingText, generateEmbeddingsBatch, runCollector, runEnricher, runSectorDataAgent } from "@workspace/ai-server";
+import { buildEmbeddingText, generateEmbeddingsBatch, runCollector, runEnricher, runGrowthLibraryAgent, runJobPostingsAgent, runNewsPublisher, runSectorDataAgent } from "@workspace/ai-server";
 import { AgentPatchSchema, type RegistrySnapshot } from "@workspace/api-zod/agent-registry";
 import { rootLogger } from "../../middleware/logger";
 import { agentRegistry } from "../../lib/agent-registry";
-import { emptyAgentsOverview, RUNNABLE_AGENTS, writeAgentRunSnapshot } from "./shared/agents";
+import { emptyAgentsOverview, formatRecentAgentRuns, optionalAdminRead, RUNNABLE_AGENTS, RUNNABLE_PIPELINES, writeAgentRunSnapshot } from "./shared/agents";
+import { buildAgentControlRoom } from "../../lib/admin-agent-control-room";
+import { runFastCollector } from "../../jobs/fast-collector";
 
 const router = Router();
 
@@ -59,13 +61,26 @@ router.get("/agents/overview", async (req: Request, res: Response) => {
     const limit = getLimit(req, 100, 200);
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
+    const fallbackOverview = emptyAgentsOverview(days);
+    const fallbackControlRoom = fallbackOverview.controlRoom as Awaited<ReturnType<typeof buildAgentControlRoom>>;
+    const fallbackLlmCostRows = [{
+      estimatedCostUsd: 0,
+      totalTokens: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      requestCount: 0,
+    }];
+    const fallbackAiRequestRows = [{
+      aiRequestCostUsd: 0,
+      aiRequestTokens: 0,
+      aiRequests: 0,
+      aiErrors: 0,
+    }];
+
     const [
       agentRows,
-      recentRuns,
+      recentRunRows,
       recentErrors,
-      llmCostRows,
-      llmProviderRows,
-      aiRequestRows,
     ] = await Promise.all([
       db
         .select({
@@ -86,7 +101,6 @@ router.get("/agents/overview", async (req: Request, res: Response) => {
         .select({
           id: agentRunsTable.id,
           agentName: agentRunsTable.agentName,
-          userId: agentRunsTable.userId,
           taskType: agentRunsTable.taskType,
           inputSummary: agentRunsTable.inputSummary,
           outputSummary: agentRunsTable.outputSummary,
@@ -95,7 +109,6 @@ router.get("/agents/overview", async (req: Request, res: Response) => {
           finishedAt: agentRunsTable.finishedAt,
           durationMs: agentRunsTable.durationMs,
           errorMessage: agentRunsTable.errorMessage,
-          createdAt: agentRunsTable.createdAt,
         })
         .from(agentRunsTable)
         .where(gte(agentRunsTable.startedAt, since))
@@ -115,37 +128,77 @@ router.get("/agents/overview", async (req: Request, res: Response) => {
         .where(and(gte(agentRunsTable.startedAt, since), sql`${agentRunsTable.status} in ('failed', 'cancelled')`))
         .orderBy(desc(agentRunsTable.startedAt))
         .limit(Math.min(limit, 50)),
-      db
-        .select({
-          estimatedCostUsd: sql<number>`coalesce(sum(${llmUsageTable.estimatedCostUsd}), 0)`,
-          totalTokens: sql<number>`coalesce(sum(${llmUsageTable.totalTokens}), 0)::int`,
-          promptTokens: sql<number>`coalesce(sum(${llmUsageTable.promptTokens}), 0)::int`,
-          completionTokens: sql<number>`coalesce(sum(${llmUsageTable.completionTokens}), 0)::int`,
-          requestCount: sql<number>`count(*)::int`,
-        })
-        .from(llmUsageTable)
-        .where(gte(llmUsageTable.createdAt, since)),
-      db
-        .select({
-          provider: llmUsageTable.provider,
-          costUsd: sql<number>`coalesce(sum(${llmUsageTable.estimatedCostUsd}), 0)`,
-          tokens: sql<number>`coalesce(sum(${llmUsageTable.totalTokens}), 0)::int`,
-          requests: sql<number>`count(*)::int`,
-        })
-        .from(llmUsageTable)
-        .where(gte(llmUsageTable.createdAt, since))
-        .groupBy(llmUsageTable.provider)
-        .orderBy(sql`coalesce(sum(${llmUsageTable.estimatedCostUsd}), 0) desc`),
-      db
-        .select({
-          aiRequestCostUsd: sql<number>`coalesce(sum(${aiRequestLogTable.costUsdEst}), 0)`,
-          aiRequestTokens: sql<number>`coalesce(sum(${aiRequestLogTable.inputTokens} + ${aiRequestLogTable.outputTokens}), 0)::int`,
-          aiRequests: sql<number>`count(*)::int`,
-          aiErrors: sql<number>`count(*) filter (where ${aiRequestLogTable.status} <> 'success')::int`,
-        })
-        .from(aiRequestLogTable)
-        .where(gte(aiRequestLogTable.createdAt, since)),
     ]);
+
+    const [
+      llmCostRead,
+      llmProviderRead,
+      aiRequestRead,
+      controlRoomRead,
+    ] = await Promise.all([
+      optionalAdminRead(
+        () => db
+          .select({
+            estimatedCostUsd: sql<number>`coalesce(sum(${llmUsageTable.estimatedCostUsd}), 0)`,
+            totalTokens: sql<number>`coalesce(sum(${llmUsageTable.totalTokens}), 0)::int`,
+            promptTokens: sql<number>`coalesce(sum(${llmUsageTable.promptTokens}), 0)::int`,
+            completionTokens: sql<number>`coalesce(sum(${llmUsageTable.completionTokens}), 0)::int`,
+            requestCount: sql<number>`count(*)::int`,
+          })
+          .from(llmUsageTable)
+          .where(gte(llmUsageTable.createdAt, since)),
+        fallbackLlmCostRows,
+      ),
+      optionalAdminRead(
+        () => db
+          .select({
+            provider: llmUsageTable.provider,
+            costUsd: sql<number>`coalesce(sum(${llmUsageTable.estimatedCostUsd}), 0)`,
+            tokens: sql<number>`coalesce(sum(${llmUsageTable.totalTokens}), 0)::int`,
+            requests: sql<number>`count(*)::int`,
+          })
+          .from(llmUsageTable)
+          .where(gte(llmUsageTable.createdAt, since))
+          .groupBy(llmUsageTable.provider)
+          .orderBy(sql`coalesce(sum(${llmUsageTable.estimatedCostUsd}), 0) desc`),
+        [],
+      ),
+      optionalAdminRead(
+        () => db
+          .select({
+            aiRequestCostUsd: sql<number>`coalesce(sum(${aiRequestLogTable.costUsdEst}), 0)`,
+            aiRequestTokens: sql<number>`coalesce(sum(${aiRequestLogTable.inputTokens} + ${aiRequestLogTable.outputTokens}), 0)::int`,
+            aiRequests: sql<number>`count(*)::int`,
+            aiErrors: sql<number>`count(*) filter (where ${aiRequestLogTable.status} <> 'success')::int`,
+          })
+          .from(aiRequestLogTable)
+          .where(gte(aiRequestLogTable.createdAt, since)),
+        fallbackAiRequestRows,
+      ),
+      optionalAdminRead(
+        () => buildAgentControlRoom(),
+        fallbackControlRoom,
+      ),
+    ]);
+
+    const optionalFailures: Array<{ label: string; error?: string }> = [];
+    const pushOptionalFailure = (label: string, error?: string) => {
+      optionalFailures.push(error ? { label, error } : { label });
+    };
+    if (llmCostRead.unavailable) pushOptionalFailure("llm_costs", llmCostRead.error);
+    if (llmProviderRead.unavailable) pushOptionalFailure("llm_providers", llmProviderRead.error);
+    if (aiRequestRead.unavailable) pushOptionalFailure("ai_request_log", aiRequestRead.error);
+    if (controlRoomRead.unavailable) pushOptionalFailure("control_room", controlRoomRead.error);
+    if (optionalFailures.length > 0) {
+      rootLogger.warn({
+        failures: optionalFailures,
+      }, "[admin/agents/overview] optional reads unavailable");
+    }
+
+    const llmCostRows = llmCostRead.value;
+    const llmProviderRows = llmProviderRead.value;
+    const aiRequestRows = aiRequestRead.value;
+    const controlRoom = controlRoomRead.value;
 
     const agents = agentRows.map((row) => {
       const total = Number(row.totalCalls) || 0;
@@ -167,6 +220,7 @@ router.get("/agents/overview", async (req: Request, res: Response) => {
         status,
       };
     });
+    const recentRuns = formatRecentAgentRuns(recentRunRows);
 
     const totalRuns = agents.reduce((sum, agent) => sum + agent.totalCalls30d, 0);
     const failedRuns = agents.reduce((sum, agent) => sum + agent.errorCount30d, 0);
@@ -231,11 +285,118 @@ router.get("/agents/overview", async (req: Request, res: Response) => {
           requests: Number(row.requests) || 0,
         })),
       },
+      runnablePipelines: RUNNABLE_PIPELINES,
+      advancedRunnableAgents: RUNNABLE_AGENTS,
       runnableAgents: RUNNABLE_AGENTS,
+      controlRoom,
     });
   } catch (err) {
     rootLogger.warn({ err }, "[admin/agents/overview] returning empty overview after read failure");
     res.json(emptyAgentsOverview(days, "agents_overview_unavailable"));
+  }
+});
+
+router.post("/agents/fast-collect", async (_req: Request, res: Response) => {
+  const startedAt = new Date();
+  try {
+    const result = await runFastCollector();
+    const run = await writeAgentRunSnapshot({
+      agentName: "fast-collector",
+      taskType: "manual_admin_run",
+      startedAt,
+      status: "completed",
+      outputSummary: JSON.stringify(result).slice(0, 1000),
+    });
+    res.json({ ok: true, runId: run.id, ...result });
+  } catch (err) {
+    const run = await writeAgentRunSnapshot({
+      agentName: "fast-collector",
+      taskType: "manual_admin_run",
+      startedAt,
+      status: "failed",
+      errorMessage: String(err),
+    }).catch(() => null);
+    rootLogger.error({ err }, "[admin/agents/fast-collect] error");
+    res.status(500).json({ ok: false, runId: run?.id, error: String(err) });
+  }
+});
+
+router.post("/agents/publish-news", async (_req: Request, res: Response) => {
+  const startedAt = new Date();
+  try {
+    const result = await runNewsPublisher();
+    const warnings = result.missingCoverage.length
+      ? [`Mancano news reali per ${result.missingCoverage.length} settori.`]
+      : [];
+    const run = await writeAgentRunSnapshot({
+      agentName: "news-publisher",
+      taskType: "manual_admin_run",
+      startedAt,
+      status: "completed",
+      outputSummary: JSON.stringify(result).slice(0, 1000),
+      ...(warnings.length ? { errorMessage: warnings.join(" | ") } : {}),
+    });
+    res.json({ ok: true, runId: run.id, ...result, warnings });
+  } catch (err) {
+    const run = await writeAgentRunSnapshot({
+      agentName: "news-publisher",
+      taskType: "manual_admin_run",
+      startedAt,
+      status: "failed",
+      errorMessage: String(err),
+    }).catch(() => null);
+    rootLogger.error({ err }, "[admin/agents/publish-news] error");
+    res.status(500).json({ ok: false, runId: run?.id, error: String(err) });
+  }
+});
+
+router.post("/agents/growth-library", async (_req: Request, res: Response) => {
+  const startedAt = new Date();
+  try {
+    const result = await runGrowthLibraryAgent();
+    const run = await writeAgentRunSnapshot({
+      agentName: "growth-library",
+      taskType: "manual_admin_run",
+      startedAt,
+      status: "completed",
+      outputSummary: JSON.stringify({ ...result, gaps: result.gaps.length }).slice(0, 1000),
+    });
+    res.json({ ok: true, runId: run.id, ...result });
+  } catch (err) {
+    const run = await writeAgentRunSnapshot({
+      agentName: "growth-library",
+      taskType: "manual_admin_run",
+      startedAt,
+      status: "failed",
+      errorMessage: String(err),
+    }).catch(() => null);
+    rootLogger.error({ err }, "[admin/agents/growth-library] error");
+    res.status(500).json({ ok: false, runId: run?.id, error: String(err) });
+  }
+});
+
+router.post("/agents/job-postings", async (_req: Request, res: Response) => {
+  const startedAt = new Date();
+  try {
+    const result = await runJobPostingsAgent();
+    const run = await writeAgentRunSnapshot({
+      agentName: "job-postings",
+      taskType: "manual_admin_run",
+      startedAt,
+      status: "completed",
+      outputSummary: JSON.stringify(result).slice(0, 1000),
+    });
+    res.json({ ok: true, runId: run.id, ...result });
+  } catch (err) {
+    const run = await writeAgentRunSnapshot({
+      agentName: "job-postings",
+      taskType: "manual_admin_run",
+      startedAt,
+      status: "failed",
+      errorMessage: String(err),
+    }).catch(() => null);
+    rootLogger.error({ err }, "[admin/agents/job-postings] error");
+    res.status(500).json({ ok: false, runId: run?.id, error: String(err) });
   }
 });
 
