@@ -36,6 +36,10 @@ export const discoverySourcesTable = pgTable("discovery_sources", {
 
   // Configurazione
   enabled:     boolean("enabled").notNull().default(true),
+  priority:    boolean("priority").notNull().default(false),
+  sourceType:  text("source_type").notNull().default("rss"),
+  scrapingUrl: text("scraping_url"),
+  scrapingSelector: text("scraping_selector"),
   itemsPerRun: integer("items_per_run").notNull().default(6),
 
   // Metadata operativo

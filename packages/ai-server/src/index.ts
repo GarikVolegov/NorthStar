@@ -20,6 +20,7 @@ export type { DifficultyLevel } from "./interview/adapt";
 
 export { runGrowthAgent } from "./growth-agent/agent";
 export { loadMemory, buildMemorySection } from "./growth-agent/memory-manager";
+export { recordQualityEvent, recordUserFeedback } from "./growth-agent/quality-tracker";
 export { ingestText, ingestPersonaExample, ingestUrl } from "./growth-agent/ingest";
 export { retrieve } from "./growth-agent/retriever";
 export { ingestUserMemoryGraph, searchMemoryGraph, getMemoryGraphHealth } from "./memory-graph";
@@ -44,13 +45,14 @@ export type { SupervisorResult, SupervisorDimensions } from "./growth-agent/supe
 export { logger, type LoggerFields } from "./logger";
 // Memory 2.0
 export { extractMemoryIncremental } from "./growth-agent/memory-manager";
+export type { QualityEvent } from "./growth-agent/quality-tracker";
 export { searchMemory, buildContextualMemorySection } from "./growth-agent/memory-search";
 export type { MemoryHit, MemoryHitType } from "./growth-agent/memory-search";
 export { runMemoryDecayJob, computeDecayScore } from "./jobs/memory-decay";
-export { runQualityOptimizerJob } from "./jobs/quality-optimizer";
+export { runQualityOptimizer, runQualityOptimizerJob } from "./jobs/quality-optimizer";
 // Phase 5: Plugin Tool Registry
 export { toolRegistry } from "./tools/registry";
-export type { PluginToolDefinition, PluginParam, PluginToolContext } from "./tools/types";
+export type { Domain as ToolDomain, PluginToolDefinition, PluginParam, PluginToolContext, ToolDefinition as PluginToolDefinitionStrict } from "./tools/types";
 export { toOpenAITool } from "./tools/types";
 
 export { wendyRequestsTotal, wendyLatencySeconds, wendySupervisorRewritesTotal, wendyLlmTokensTotal, wendyErrorsTotal, wendyToolCallsTotal, wendyToolCallDuration, wendyCostUsdTotal, wendyQualityScore, wendyTtftSeconds, wendyFeedbackTotal, wendyModelEffectiveness, recordRequest, recordError, recordSupervisorRewrite, recordLlmTokens, recordToolCall, recordWendyCost, recordQualityScore, recordTtft, recordFeedback, recordModelEffectiveness, getMetricsContentType, getMetrics, getRagMetricsSummary, register } from "./metrics";
@@ -70,11 +72,15 @@ export type { RouterInput, RouterOutput } from "./search-router/router";
 
 // Discovery Agents
 export { runCollector } from "./discovery-agent/collector-agent";
-export type { CollectorResult } from "./discovery-agent/collector-agent";
+export type { CollectorResult, RunCollectorOptions } from "./discovery-agent/collector-agent";
 export { runEnricher } from "./discovery-agent/enricher-agent";
 export type { EnricherResult } from "./discovery-agent/enricher-agent";
 export { runNewsPublisher } from "./discovery-agent/news-publisher";
 export type { NewsPublisherResult } from "./discovery-agent/news-publisher";
+export { runGrowthLibraryAgent } from "./discovery-agent/growth-library-agent";
+export type { GrowthLibraryResult, GrowthGap } from "./discovery-agent/growth-library-agent";
+export { runJobPostingsAgent } from "./discovery-agent/job-postings-agent";
+export type { JobPostingsAgentResult } from "./discovery-agent/job-postings-agent";
 export { getPersonalizedFeed, invalidateUserFeedCache } from "./discovery-agent/personalizer-agent";
 
 // Embeddings
@@ -107,7 +113,7 @@ export type { WendyIntent, WendyPageContext, CompressedHistory, WendyRouterDecis
 
 // Config
 export { ensureWendyConfigFresh, getWendyConfig, loadConfig, refreshWendyConfig, wendyConfig } from "./config/wendy";
-export type { WendyConfig, WendyRouterConfig, WendySpecialistConfig, WendySupervisorConfig, WendyMemoryConfig, WendyAgentConfig, WendyFastPathConfig, WendyPromptConfig } from "./config/wendy";
+export type { WendyConfig, WendyRouterConfig, WendySpecialistConfig, WendySupervisorConfig, WendyMemoryConfig, WendyAgentConfig, WendyFastPathConfig, WendyPromptConfig, WendyJobPostingsConfig } from "./config/wendy";
 
 // AI Request Log
 export { recordAiCall }      from "./ai-request-log";

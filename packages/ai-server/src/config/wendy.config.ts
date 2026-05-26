@@ -106,6 +106,13 @@ export const WendyConfigSchema = z.object({
     ragCitationMinScore: z.number().default(0.70),
     defaultLanguage: z.string().default("italiano"),
   }),
+  jobPostings: z.object({
+    adzunaAppId: z.string().default(""),
+    adzunaApiKey: z.string().default(""),
+    adzunaCountry: z.string().default("it"),
+    joobleApiKey: z.string().default(""),
+    maxProfessionsPerRun: z.number().int().default(50),
+  }),
 });
 
 function baseConfig(env: WendyEnvSource): WendyConfig {
@@ -234,6 +241,13 @@ function baseConfig(env: WendyEnvSource): WendyConfig {
       nightHourEnd: intEnv(env, "WENDY_PROMPT_NIGHT_END", 5),
       ragCitationMinScore: numberEnv(env, "WENDY_PROMPT_RAG_CITATION_MIN", 0.70),
       defaultLanguage: env.WENDY_PROMPT_DEFAULT_LANGUAGE ?? "italiano",
+    },
+    jobPostings: {
+      adzunaAppId: env.ADZUNA_APP_ID ?? "",
+      adzunaApiKey: env.ADZUNA_API_KEY ?? "",
+      adzunaCountry: env.ADZUNA_COUNTRY ?? "it",
+      joobleApiKey: env.JOOBLE_API_KEY ?? "",
+      maxProfessionsPerRun: intEnv(env, "JOB_POSTINGS_MAX_PROFESSIONS", 50),
     },
   };
 }

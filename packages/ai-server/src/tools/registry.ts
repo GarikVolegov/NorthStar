@@ -1,4 +1,5 @@
 import type { WendyIntent } from "../wendy-router/types";
+import type { Domain } from "../growth-agent/router-agent";
 import type { PluginToolDefinition } from "./types";
 import { toOpenAITool } from "./types";
 import type OpenAI from "openai";
@@ -14,9 +15,9 @@ class ToolRegistry {
     return this.tools.get(name);
   }
 
-  getForIntent(intent: WendyIntent): PluginToolDefinition[] {
+  getForIntent(intent: WendyIntent, domain?: Domain): PluginToolDefinition[] {
     return Array.from(this.tools.values()).filter((t) =>
-      t.intents.includes(intent),
+      t.intents.includes(intent) && (!domain || !t.domains || t.domains.includes(domain)),
     );
   }
 

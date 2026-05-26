@@ -24,7 +24,7 @@
  * status='pending'. An admin must approve before any change takes effect.
  * autoApprove is intentionally false — changes to AI behaviour need human sign-off.
  */
-import { db, supervisorLogs, wendyFeedbackTable, wendyOptimizerProposalsTable, aiRequestLogTable } from "@workspace/db";
+import { aiCostLogTable, db, supervisorLogs, wendyOptimizerProposalsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { openai } from "../client";
 import { selectModelFor } from "../model-router";
@@ -125,18 +125,18 @@ Se non trovi pattern nuovi, rispondi: { "patterns": [] }`,
 async function analyseRoutingThresholds(since: Date): Promise<void> {
   const stats = await db
     .select({
-      domain:   aiRequestLogTable.domain,
-      intent:   aiRequestLogTable.intent,
+      domain:   aiCostLogTable.domain,
+      intent:   aiCostLogTable.intent,
       count:    sql<number>`count(*)::int`,
-      avgScore: sql<number>`avg(${aiRequestLogTable.supervisorScore})`,
+      avgScore: sql<number>`avg(${aiCostLogTable.supervisorScore})`,
     })
-    .from(aiRequestLogTable)
+    .from(aiCostLogTable)
     .where(
-      sql`${aiRequestLogTable.createdAt} >= ${since}
-        AND ${aiRequestLogTable.domain} IS NOT NULL
-        AND ${aiRequestLogTable.supervisorScore} IS NOT NULL`,
+      sql`${aiCostLogTable.createdAt} >= ${since}
+        AND ${aiCostLogTable.domain} IS NOT NULL
+        AND ${aiCostLogTable.supervisorScore} IS NOT NULL`,
     )
-    .groupBy(aiRequestLogTable.domain, aiRequestLogTable.intent)
+    .groupBy(aiCostLogTable.domain, aiCostLogTable.intent)
     .having(sql`count(*) >= 20`);
 
   if (stats.length === 0) return;
@@ -186,22 +186,22 @@ const TIER_ESCALATION: Record<string, string> = {
 };
 
 async function analyseModelEscalation(since: Date): Promise<void> {
-  // Join feedback on request_id to get per-domain down-vote rates
+  // Use ai_cost_log.user_feedback to get per-domain down-vote rates.
   const feedbackStats = await db
     .select({
-      domain:    aiRequestLogTable.domain,
-      intent:    aiRequestLogTable.intent,
-      tier:      aiRequestLogTable.tier,
+      domain:    aiCostLogTable.domain,
+      intent:    aiCostLogTable.intent,
+      tier:      aiCostLogTable.tier,
       total:     sql<number>`count(*)::int`,
-      downVotes: sql<number>`count(*) filter (where ${wendyFeedbackTable.rating} = 'down')::int`,
+      downVotes: sql<number>`count(*) filter (where ${aiCostLogTable.userFeedback} = 'down')::int`,
     })
-    .from(aiRequestLogTable)
-    .innerJoin(wendyFeedbackTable, sql`${wendyFeedbackTable.requestId} = ${aiRequestLogTable.requestId}`)
+    .from(aiCostLogTable)
     .where(
-      sql`${aiRequestLogTable.createdAt} >= ${since}
-        AND ${aiRequestLogTable.domain} IS NOT NULL`,
+      sql`${aiCostLogTable.createdAt} >= ${since}
+        AND ${aiCostLogTable.domain} IS NOT NULL
+        AND ${aiCostLogTable.userFeedback} IS NOT NULL`,
     )
-    .groupBy(aiRequestLogTable.domain, aiRequestLogTable.intent, aiRequestLogTable.tier)
+    .groupBy(aiCostLogTable.domain, aiCostLogTable.intent, aiCostLogTable.tier)
     .having(sql`count(*) >= 10`);
 
   if (feedbackStats.length === 0) return;
@@ -257,3 +257,5 @@ export async function runQualityOptimizerJob(): Promise<{ proposed: number }> {
   logger.info({ proposed }, "[quality-optimizer] job completed");
   return { proposed };
 }
+
+export const runQualityOptimizer = runQualityOptimizerJob;

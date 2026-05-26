@@ -99,6 +99,14 @@ export interface WendyPromptConfig {
   defaultLanguage: string;
 }
 
+export interface WendyJobPostingsConfig {
+  adzunaAppId: string;
+  adzunaApiKey: string;
+  adzunaCountry: string;
+  joobleApiKey: string;
+  maxProfessionsPerRun: number;
+}
+
 export interface WendyConfig {
   router: WendyRouterConfig;
   specialist: WendySpecialistConfig;
@@ -107,6 +115,7 @@ export interface WendyConfig {
   agent: WendyAgentConfig;
   fastPath: WendyFastPathConfig;
   prompt: WendyPromptConfig;
+  jobPostings: WendyJobPostingsConfig;
 }
 
 export interface WendyConfigOverride {

@@ -18,6 +18,7 @@ export type {
   WendyConfig,
   WendyConfigOverride,
   WendyFastPathConfig,
+  WendyJobPostingsConfig,
   WendyMemoryConfig,
   WendyPromptConfig,
   WendyRouterConfig,
