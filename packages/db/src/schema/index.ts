@@ -65,7 +65,9 @@ export * from "./social";
 // ── AI Cost tracking & request logging ──────────────────────────────
 export * from "./llmUsage";
 export * from "./aiRequestLog";
+export * from "./aiCostLog";
 export * from "./wendyFeedback";
+export * from "./wendyConfigOverrides";
 export * from "./userKeys";
 export * from "./userBadges";
 export * from "./weeklyLeaderboard";
@@ -84,6 +86,8 @@ export * from "./sharedPlan";
 export * from "./planComment";
 export * from "./mentorRelationship";
 export * from "./wendyBriefing";
+// ── Phase 4: Feedback Loop / Optimizer ───────────────────────────
+export * from "./wendyOptimizerProposals";
 // ── Step 6: RAG, Weak Signals, Job Market Intelligence ─────────
 export * from "./ragSource";
 export * from "./ragChunk";

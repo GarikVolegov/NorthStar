@@ -34,7 +34,13 @@ vi.mock("./embedder", () => ({
   }),
 }));
 
-import { extractMemory, mergeMemory, loadMemory, buildMemorySection } from "../growth-agent/memory-manager";
+import {
+  extractMemory,
+  extractMemoryIncremental,
+  mergeMemory,
+  loadMemory,
+  buildMemorySection,
+} from "../growth-agent/memory-manager";
 
 describe("extractMemory", () => {
   it("returns null when fewer than 2 user messages", async () => {
@@ -83,6 +89,38 @@ describe("extractMemory", () => {
   });
 });
 
+describe("extractMemoryIncremental", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("extracts from a single user/assistant delta when supervisor score is acceptable", async () => {
+    mockChatCreate.mockResolvedValueOnce({
+      choices: [{ message: { content: JSON.stringify({
+        facts: [{ key: "goal_main", value: "cambiare carriera entro 12 mesi" }],
+        patterns: [{ patternType: "growth_edge", description: "tende a rimandare decisioni grandi" }],
+      }) } }],
+    });
+
+    const result = await extractMemoryIncremental(
+      "Il mio obiettivo e cambiare carriera entro un anno, ma rimando sempre le decisioni grandi.",
+      "Partiamo da una decisione piccola questa settimana.",
+      0.8,
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.facts[0]?.key).toBe("goal_main");
+    expect(result?.patterns[0]?.patternType).toBe("growth_edge");
+  });
+
+  it("skips incremental extraction when supervisor score is too low", async () => {
+    const result = await extractMemoryIncremental("Ciao", "Risposta mediocre", 0.2);
+
+    expect(result).toBeNull();
+    expect(mockChatCreate).not.toHaveBeenCalled();
+  });
+});
+
 describe("loadMemory", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -127,7 +165,7 @@ describe("buildMemorySection", () => {
 
   it("includes facts section", () => {
     const result = buildMemorySection({
-      facts: [{ id: 1, userId: 1, key: "job", value: "dev", confirmedCount: 1, sourceSessionId: 1, createdAt: new Date(), updatedAt: new Date(), deletedAt: null }],
+      facts: [{ id: 1, userId: 1, key: "job", value: "dev", confirmedCount: 1, sourceSessionId: 1, lastMentionedAt: new Date(), embedding: null, createdAt: new Date(), updatedAt: new Date(), deletedAt: null }],
       patterns: [],
     });
     expect(result).toContain("Fatti biografici");
@@ -137,7 +175,7 @@ describe("buildMemorySection", () => {
   it("includes patterns section with confidence labels", () => {
     const result = buildMemorySection({
       facts: [],
-      patterns: [{ id: 1, userId: 1, patternType: "strength", description: "analitico", confidence: 0.7, observedCount: 2, sessionIds: [1], createdAt: new Date(), updatedAt: new Date(), deletedAt: null }],
+      patterns: [{ id: 1, userId: 1, patternType: "strength", description: "analitico", confidence: 0.7, observedCount: 2, sessionIds: [1], lastReinforcedAt: new Date(), decayScore: 1.0, embedding: null, createdAt: new Date(), updatedAt: new Date(), deletedAt: null }],
     });
     expect(result).toContain("Pattern comportamentali");
     expect(result).toContain("media confidence");

@@ -33,6 +33,7 @@ import type { CoTResult } from "./chain-of-thought";
 import type { EvalResult } from "./self-evaluator";
 import type { Domain, RouteDecision } from "./router-agent";
 import { selectModelFor, modelFor } from "../model-router";
+import { wendyConfig } from "../config/wendy";
 
 /**
  * @deprecated reflects the *baseline* (non-premium) model. The actual model is
@@ -124,17 +125,25 @@ export abstract class SpecialistAgent {
       }
     }
 
+    const { cotHistorySlice, cotMessageTruncate } = wendyConfig.specialist;
     const conversationSummary = history
-      .slice(-4)
-      .map((m) => `${m.role === "user" ? "Utente" : "Coach"}: ${m.content.slice(0, 200)}`)
+      .slice(-cotHistorySlice)
+      .map((m) => `${m.role === "user" ? "Utente" : "Coach"}: ${m.content.slice(0, cotMessageTruncate)}`)
       .join("\n");
 
     // ── 1. RAG ────────────────────────────────────────────────────────────────
     yield { type: "status", value: "🔍 Cerco nella knowledge base..." };
 
+    const sc = wendyConfig.specialist;
     const [personaExamples, documentChunks, cot] = await Promise.all([
-      retrieve(userMessage, userId, { topK: 3, minScore: 0.30, sourceTypes: ["persona_example"] }),
-      retrieve(userMessage, userId, { topK: 6, minScore: 0.35, sourceTypes: ["document", "user_note"] }),
+      retrieve(userMessage, userId, { topK: 3, minScore: sc.personaMinScore, sourceTypes: ["persona_example"] }).catch((err) => {
+        logger.warn({ err, domain: this.DOMAIN }, "specialist persona retrieval failed");
+        return [] as RetrievedChunk[];
+      }),
+      retrieve(userMessage, userId, { topK: sc.documentTopK, minScore: sc.documentMinScore, sourceTypes: ["document", "user_note"] }).catch((err) => {
+        logger.warn({ err, domain: this.DOMAIN }, "specialist document retrieval failed");
+        return [] as RetrievedChunk[];
+      }),
       runChainOfThought(userId, userMessage, conversationSummary),
     ]);
 
@@ -194,7 +203,7 @@ export abstract class SpecialistAgent {
       { role: "user",      content: userMessage },
     ];
 
-    const temperature = evalResult.level === "low" ? 0.45 : 0.72;
+    const temperature = evalResult.level === "low" ? sc.temperatureLow : sc.temperatureHigh;
 
     try {
       yield { type: "status", value: "✨ Sto scrivendo la risposta..." };
@@ -206,7 +215,7 @@ export abstract class SpecialistAgent {
 
       const stream = await openai.chat.completions.create({
         model: route.model, messages, stream: true, temperature,
-        max_tokens: evalResult.level === "low" ? 300 : 700,
+        max_tokens: evalResult.level === "low" ? sc.maxTokensLow : sc.maxTokensHigh,
       });
 
       const tokenBuffer: string[] = [];
@@ -232,7 +241,7 @@ export abstract class SpecialistAgent {
       }
 
       // ── 7. Stream final text ────────────────────────────────────────────────
-      const CHUNK_SIZE = 4;
+      const CHUNK_SIZE = wendyConfig.agent.chunkSize;
       for (let i = 0; i < finalText.length; i += CHUNK_SIZE) {
         yield { type: "token", value: finalText.slice(i, i + CHUNK_SIZE) };
       }

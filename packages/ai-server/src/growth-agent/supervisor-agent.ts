@@ -29,6 +29,7 @@ import { logger, type LoggerFields } from "../logger";
 import { recordSupervisorRewrite } from "../metrics";
 import { selectModelFor } from "../model-router";
 import { withTimeout } from "../utils";
+import { wendyConfig } from "../config/wendy";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -57,28 +58,11 @@ export interface SupervisorEvalInput {
   sessionId?:  number | undefined;
 }
 
-// ── Constants ──────────────────────────────────────────────────────────────────
+// ── Constants (now sourced from wendyConfig) ────────────────────────────────────
 
-const PASS_THRESHOLD = 0.70;
-const WEIGHTS_FALLBACK = {
-  actionability: 0.35, platitudeFree: 0.25, lengthOk: 0.20, onTopic: 0.20,
-};
-
-interface SupervisorWeights {
-  actionability: number;
-  platitudeFree: number;
-  lengthOk: number;
-  onTopic: number;
-}
-
-const WEIGHTS_BY_INTENT: Record<string, SupervisorWeights> = {
-  plan:          { actionability: 0.45, platitudeFree: 0.25, lengthOk: 0.15, onTopic: 0.15 },
-  problem_solve: { actionability: 0.40, platitudeFree: 0.25, lengthOk: 0.20, onTopic: 0.15 },
-  explore:       { actionability: 0.20, platitudeFree: 0.30, lengthOk: 0.25, onTopic: 0.25 },
-  reflect:       { actionability: 0.05, platitudeFree: 0.35, lengthOk: 0.30, onTopic: 0.30 },
-  vent:          { actionability: 0.00, platitudeFree: 0.40, lengthOk: 0.30, onTopic: 0.30 },
-  ask_info:      { actionability: 0.10, platitudeFree: 0.20, lengthOk: 0.25, onTopic: 0.45 },
-};
+const PASS_THRESHOLD   = wendyConfig.supervisor.passThreshold;
+const WEIGHTS_FALLBACK = wendyConfig.supervisor.weightsFallback;
+const WEIGHTS_BY_INTENT = wendyConfig.supervisor.intentWeights;
 
 // Learned from DB + hard-coded initial set.
 // The weekly job (supervisor-pattern-analyzer.ts) proposes additions here.
@@ -110,25 +94,27 @@ const ACTION_PATTERNS = [
 
 function scoreActionability(draft: string): number {
   const matches = ACTION_PATTERNS.filter((p) => p.test(draft)).length;
-  if (matches >= 3) return 1.0;
-  if (matches === 2) return 0.80;
-  if (matches === 1) return 0.50;
+  const brackets = wendyConfig.supervisor.actionScoreBrackets;
+  for (const b of brackets) {
+    if (matches >= b.minMatches) return b.score;
+  }
   return 0.10;
 }
 
 function scorePlatitudeFree(draft: string): number {
   const hits = PLATITUDE_PATTERNS.filter((p) => p.test(draft)).length;
-  if (hits === 0) return 1.0;
-  if (hits === 1) return 0.60;
-  if (hits === 2) return 0.30;
+  const brackets = wendyConfig.supervisor.platitudeScoreBrackets;
+  for (const b of brackets) {
+    if (hits <= b.maxHits) return b.score;
+  }
   return 0.0;
 }
 
 function scoreLengthOk(draft: string): number {
   const words = draft.trim().split(/\s+/).length;
-  if (words >= 80 && words <= 280) return 1.0;
-  if (words >= 60 && words <= 380) return 0.75;
-  if (words < 60)                   return 0.30;
+  for (const b of wendyConfig.supervisor.lengthBrackets) {
+    if (words >= b.min && words <= b.max) return b.score;
+  }
   return 0.50;
 }
 
@@ -138,12 +124,13 @@ function scoreOnTopic(userMessage: string, draft: string): number {
     new Set(s.toLowerCase().match(/[a-z\u00e0-\u00fc]{4,}/g)?.filter((w) => !STOP.has(w)) ?? []);
   const uTokens = tokenize(userMessage);
   const dTokens = tokenize(draft);
-  if (uTokens.size < 3) return 0.85;
+  const jt = wendyConfig.supervisor.jaccardThresholds;
+  if (uTokens.size < 3) return wendyConfig.supervisor.shortTokenOnTopicScore;
   const intersection = [...uTokens].filter((w) => dTokens.has(w)).length;
   const jaccard = intersection / (uTokens.size + dTokens.size - intersection);
-  if (jaccard >= 0.12) return 1.0;
-  if (jaccard >= 0.07) return 0.75;
-  if (jaccard >= 0.04) return 0.50;
+  if (jaccard >= jt.high) return 1.0;
+  if (jaccard >= jt.mid)  return 0.75;
+  if (jaccard >= jt.low)  return 0.50;
   return 0.20;
 }
 
@@ -163,7 +150,7 @@ export class SupervisorAgent {
     let { onTopic: onTopicWeight } = weights;
 
     const words = input.userMessage.trim().split(/\s+/).length;
-    if (words < 8) {
+    if (words < wendyConfig.supervisor.shortMessageWords) {
       onTopicWeight *= 0.5;
     }
 
@@ -261,7 +248,7 @@ REGOLE DI RISCRITTURA:
         scoreAfter:  rewrittenResult.score,
         reasons:     JSON.stringify(failResult.reasons),
       });
-      withTimeout(logPromise, 3000, "supervisor DB log").catch((err: unknown) => {
+      withTimeout(logPromise, wendyConfig.supervisor.logTimeoutMs, "supervisor DB log").catch((err: unknown) => {
         logger.warn({ err, ...logFields }, "supervisor DB log failed/timed out");
       });
     }

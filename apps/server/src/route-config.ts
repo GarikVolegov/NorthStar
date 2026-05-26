@@ -61,6 +61,7 @@ import affiliazioneRouter from "./routes/affiliation-program";
 import affiliateRouter from "./routes/affiliate";
 import openhumanRouter from "./routes/openhuman";
 import graphifyRouter from "./routes/graphify";
+import skillsGapRouter from "./routes/skills-gap";
 import { getHealthPayload } from "./lib/health";
 
 export type RouteAuthLevel = "public" | "authenticated" | "admin";
@@ -173,6 +174,7 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/affiliate", router: affiliateRouter, auth: "authenticated", description: "Affiliate" },
   { path: "/api/openhuman", router: openhumanRouter, auth: "authenticated", description: "OpenHuman bridge" },
   { path: "/api/graphify", router: graphifyRouter, auth: "authenticated", description: "Graphify bridge" },
+  { path: "/api/skills-gap", router: skillsGapRouter, auth: "authenticated", description: "Skills gap analysis" },
 
   { path: "/api/admin", router: adminRouter, auth: "admin", description: "Pannello admin" },
   { path: "/api/admin/rag", router: ragAdminRouter, auth: "admin", description: "Admin RAG" },

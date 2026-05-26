@@ -68,7 +68,11 @@ export function useUserBackground(userId: number | null | undefined) {
   });
 
   const state = query.data ?? { activeBackgroundId: null, library: [] };
-  const appearance = normalizeBackgroundAppearance(state.appearance);
+  const appearance = useMemo(
+    () => normalizeBackgroundAppearance(state.appearance),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state.appearance],
+  );
 
   const setActiveMutation = useMutation({
     mutationFn: (id: string | null) =>

@@ -361,3 +361,37 @@ export function toolsToOpenAIFormat(tools: ToolDefinition[]): Array<{
     },
   }));
 }
+
+// ── Plugin Tool Registry bootstrap ───────────────────────────────────────────
+// Registers all data tools into the unified toolRegistry singleton so that
+// isUiTool(), getForIntent(), and all() work correctly across the codebase.
+
+import { toolRegistry } from "../tools/registry";
+
+const WRITE_TOOLS = new Set([
+  "save_objective",
+  "update_objective_progress",
+  "save_business_idea",
+  "save_memory_fact",
+  "add_calendar_event",
+]);
+
+(function bootstrapToolRegistry() {
+  // Invert INTENT_TOOLS matrix → per-tool intent list
+  const toolIntents = new Map<string, WendyIntent[]>();
+  for (const [intent, names] of Object.entries(INTENT_TOOLS) as [WendyIntent, string[]][]) {
+    for (const name of names) {
+      if (!toolIntents.has(name)) toolIntents.set(name, []);
+      toolIntents.get(name)!.push(intent);
+    }
+  }
+
+  for (const tool of Object.values(ALL_TOOLS)) {
+    toolRegistry.register({
+      ...tool,
+      intents:       toolIntents.get(tool.name) ?? [],
+      isUiTool:      false,
+      requiresWrite: WRITE_TOOLS.has(tool.name),
+    });
+  }
+})();

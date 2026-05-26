@@ -347,12 +347,14 @@ export function SearchDialog({
                       className={cn(showSideResults ? "w-3/5" : "w-full", "p-4 overflow-y-auto flex flex-col")}
                     >
                       {/* Wendy header */}
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-linear-to-r from-amber-400 to-amber-600">
-                          <span className="text-[10px] font-bold text-white">✦</span>
+                      <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-white/6">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-amber-600 shadow-sm">
+                          <span className="text-xs font-bold text-white">✦</span>
                         </div>
-                        <span className="text-xs font-semibold text-foreground">Wendy</span>
-                        <span className="text-[10px] text-muted-foreground">AI Coach</span>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground leading-none">Wendy</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">AI Career Coach</p>
+                        </div>
                       </div>
 
                       <div className="mb-3 flex items-center justify-end gap-1">
@@ -533,13 +535,15 @@ export function SearchDialog({
                 {/* Wendy AI streaming (mobile: panel singolo inline) */}
                 {isMobile && isAIActive && queryLong && (
                   <div ref={aiPanelRef} className="px-4 py-3 border-t border-white/10 overflow-y-auto" style={{ maxHeight: "40vh" }}>
-                    {/* Wendy header */}
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-linear-to-r from-amber-400 to-amber-600">
-                        <span className="text-[8px] font-bold text-white">✦</span>
+                    {/* Wendy header — mobile */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-amber-600 shadow-sm">
+                        <span className="text-[10px] font-bold text-white">✦</span>
                       </div>
-                      <span className="text-xs font-semibold text-foreground">Wendy</span>
-                      <span className="text-[10px] text-muted-foreground">AI Coach</span>
+                      <div>
+                        <p className="text-xs font-semibold text-foreground leading-none">Wendy</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">AI Career Coach</p>
+                      </div>
                     </div>
 
                     <div className="space-y-3">

@@ -5,8 +5,9 @@ import {
   db,
   qualityMetrics,
   supervisorLogs,
+  wendyOptimizerProposalsTable,
 } from "@workspace/db";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getRagMetricsSummary, register } from "@workspace/ai-server/metrics";
 import { registerQualityOverviewRoute } from "./quality-overview";
 import { getModelRoutingPolicy } from "@workspace/ai-server";
@@ -240,6 +241,79 @@ router.get("/wendy-metrics", async (_req: Request, res: Response) => {
     });
   } catch (err) {
     rootLogger.error({ err }, "[admin/wendy-metrics] error");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ── Optimizer Proposals ────────────────────────────────────────────
+
+router.get("/optimizer-proposals", async (req: Request, res: Response) => {
+  try {
+    const statusFilter = (req.query["status"] as string) ?? "pending";
+    const proposals = await db
+      .select()
+      .from(wendyOptimizerProposalsTable)
+      .where(sql`${wendyOptimizerProposalsTable.status} = ${statusFilter}`)
+      .orderBy(sql`${wendyOptimizerProposalsTable.proposedAt} DESC`)
+      .limit(100);
+    res.json({ proposals, total: proposals.length });
+  } catch (err) {
+    rootLogger.error({ err }, "[admin/optimizer-proposals] list failed");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.post("/optimizer-proposals/:id/approve", async (req: Request, res: Response) => {
+  const id = Number(req.params["id"]);
+  if (!id) { res.status(400).json({ error: "invalid id" }); return; }
+
+  try {
+    const adminId = (req as Request & { user?: { id: number } }).user?.id ?? null;
+    const [updated] = await db
+      .update(wendyOptimizerProposalsTable)
+      .set({ status: "approved", approvedAt: new Date(), approvedBy: adminId })
+      .where(eq(wendyOptimizerProposalsTable.id, id))
+      .returning();
+
+    if (!updated) { res.status(404).json({ error: "proposal not found" }); return; }
+
+    writeAuditLog(req, {
+      action: "optimizer_proposal_approve",
+      category: "admin_action",
+      metadata: { proposalId: id, type: updated.type },
+    });
+
+    res.json({ ok: true, proposal: updated });
+  } catch (err) {
+    rootLogger.error({ err, id }, "[admin/optimizer-proposals] approve failed");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.post("/optimizer-proposals/:id/reject", async (req: Request, res: Response) => {
+  const id = Number(req.params["id"]);
+  if (!id) { res.status(400).json({ error: "invalid id" }); return; }
+
+  const reason = (req.body as { reason?: string }).reason ?? null;
+
+  try {
+    const [updated] = await db
+      .update(wendyOptimizerProposalsTable)
+      .set({ status: "rejected", rejectionReason: reason })
+      .where(eq(wendyOptimizerProposalsTable.id, id))
+      .returning();
+
+    if (!updated) { res.status(404).json({ error: "proposal not found" }); return; }
+
+    writeAuditLog(req, {
+      action: "optimizer_proposal_reject",
+      category: "admin_action",
+      metadata: { proposalId: id, type: updated.type, reason },
+    });
+
+    res.json({ ok: true, proposal: updated });
+  } catch (err) {
+    rootLogger.error({ err, id }, "[admin/optimizer-proposals] reject failed");
     res.status(500).json({ error: String(err) });
   }
 });

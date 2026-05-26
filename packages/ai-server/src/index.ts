@@ -42,7 +42,18 @@ export type { SupervisorResult, SupervisorDimensions } from "./growth-agent/supe
 
 // Observability
 export { logger, type LoggerFields } from "./logger";
-export { wendyRequestsTotal, wendyLatencySeconds, wendySupervisorRewritesTotal, wendyLlmTokensTotal, wendyErrorsTotal, wendyToolCallsTotal, wendyToolCallDuration, recordRequest, recordError, recordSupervisorRewrite, recordLlmTokens, recordToolCall, getMetricsContentType, getMetrics, getRagMetricsSummary, register } from "./metrics";
+// Memory 2.0
+export { extractMemoryIncremental } from "./growth-agent/memory-manager";
+export { searchMemory, buildContextualMemorySection } from "./growth-agent/memory-search";
+export type { MemoryHit, MemoryHitType } from "./growth-agent/memory-search";
+export { runMemoryDecayJob, computeDecayScore } from "./jobs/memory-decay";
+export { runQualityOptimizerJob } from "./jobs/quality-optimizer";
+// Phase 5: Plugin Tool Registry
+export { toolRegistry } from "./tools/registry";
+export type { PluginToolDefinition, PluginParam, PluginToolContext } from "./tools/types";
+export { toOpenAITool } from "./tools/types";
+
+export { wendyRequestsTotal, wendyLatencySeconds, wendySupervisorRewritesTotal, wendyLlmTokensTotal, wendyErrorsTotal, wendyToolCallsTotal, wendyToolCallDuration, wendyCostUsdTotal, wendyQualityScore, wendyTtftSeconds, wendyFeedbackTotal, wendyModelEffectiveness, recordRequest, recordError, recordSupervisorRewrite, recordLlmTokens, recordToolCall, recordWendyCost, recordQualityScore, recordTtft, recordFeedback, recordModelEffectiveness, getMetricsContentType, getMetrics, getRagMetricsSummary, register } from "./metrics";
 
 // Feature flags
 export { FF } from "./feature-flags";
@@ -93,6 +104,10 @@ export { resolveWendyRoute } from "./wendy-router/router";
 export { buildLightPrompt }  from "./wendy-router/light-prompt";
 export { getLocalWendyReply, getLocalWendyFallbackReply, isLocalWendyReplyMessage } from "./wendy-router/local-reply";
 export type { WendyIntent, WendyPageContext, CompressedHistory, WendyRouterDecision, ToolDefinition } from "./wendy-router/types";
+
+// Config
+export { ensureWendyConfigFresh, getWendyConfig, loadConfig, refreshWendyConfig, wendyConfig } from "./config/wendy";
+export type { WendyConfig, WendyRouterConfig, WendySpecialistConfig, WendySupervisorConfig, WendyMemoryConfig, WendyAgentConfig, WendyFastPathConfig, WendyPromptConfig } from "./config/wendy";
 
 // AI Request Log
 export { recordAiCall }      from "./ai-request-log";

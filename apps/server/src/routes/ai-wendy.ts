@@ -34,6 +34,12 @@ import {
   getLLMForRoute,
   estimateTokens,
   estimateCost,
+  getLocalWendyFallbackReply,
+  recordWendyCost,
+  recordQualityScore,
+  recordTtft,
+  ensureWendyConfigFresh,
+  wendyConfig,
 } from "@workspace/ai-server";
 import type { CompressedHistory, WendyPageContext } from "@workspace/ai-server";
 import {
@@ -48,11 +54,9 @@ import { isHostTool, executeHostTool } from "../lib/wendy-host-tools";
 import { storeSemanticTurnInBackground } from "../lib/semantic-memory";
 import {
   buildFastPathFallback,
-  readPositiveInt,
   withRouteTimeout,
 } from "../lib/wendy-fast-path";
 import { resolveWendyLocale } from "../lib/wendy-locale";
-
 const router = Router();
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -72,6 +76,8 @@ router.post(
         });
       return;
     }
+
+    await ensureWendyConfigFresh();
 
     const {
       message,
@@ -253,10 +259,7 @@ router.post(
     let inputTokens = 0;
     let outputTokens = 0;
     let assistantResponseForMemory = "";
-    const fastPathTimeoutMs = readPositiveInt(
-      process.env.WENDY_FAST_PATH_TIMEOUT_MS,
-      8_000,
-    );
+    const fastPathTimeoutMs = wendyConfig.fastPath.timeoutMs;
 
     // Telemetria Step 5
     const toolsUsedInRequest: string[] = [];
@@ -272,6 +275,12 @@ router.post(
     let ragChunksRetrieved = 0;
     let ragTopSimilarity: number | null = null;
     const ragSourcesUsed: string[] = [];
+
+    // Telemetria Phase 2 — Quality + Domain
+    let domainForLog: string | null = null;
+    let supervisorScoreForLog: number | null = null;
+    let wasRewrittenForLog = false;
+    let ttftMs: number | null = null;
 
     const donePayload = (extra: Record<string, unknown> = {}) => ({
       type: "done",
@@ -318,13 +327,27 @@ router.post(
         inputTokens = estimateTokens(systemPrompt + message);
         send({ type: "status", value: intent === "navigation" ? "⚡" : "💬" });
 
+        // Short-circuit for known conversational messages (greetings, wellbeing, etc.)
+        const localReply = getLocalWendyFallbackReply(message);
+        if (localReply) {
+          assistantResponseForMemory += localReply.text;
+          send({ type: "token", value: localReply.text });
+          send({
+            ...donePayload({
+              intent,
+              usage: { model: "local", inputTokens: 0, outputTokens: 0 },
+            }),
+          });
+          return;
+        }
+
         // Tool calling loop — max 3 turni per evitare loop infiniti
         const msgs: WendyToolMessage[] = [
           { role: "system", content: systemPrompt },
           { role: "user", content: message },
         ];
 
-        const MAX_TOOL_TURNS = 3;
+        const MAX_TOOL_TURNS = wendyConfig.fastPath.maxToolTurns;
         let toolTurns = 0;
         let finalText = "";
 
@@ -333,7 +356,7 @@ router.post(
             llm.chatWithTools(msgs, openAiTools, {
               model: decision.model,
               temperature: 0.1,
-              maxTokens: 400,
+              maxTokens: wendyConfig.fastPath.maxTokens,
             }),
             fastPathTimeoutMs,
             "wendy fast path",
@@ -403,6 +426,7 @@ router.post(
 
         if (finalText) {
           assistantResponseForMemory += finalText;
+          if (ttftMs === null) ttftMs = Date.now() - startedAt;
           send({ type: "token", value: finalText });
         }
         send({
@@ -455,8 +479,14 @@ router.post(
             send(event);
           }
           if (event.type === "token") {
+            if (ttftMs === null) ttftMs = Date.now() - startedAt;
             outputTokens += estimateTokens(event.value);
             assistantResponseForMemory += event.value;
+          }
+          if (event.type === "done") {
+            domainForLog = event.routeDecision?.domain ?? null;
+            supervisorScoreForLog = event.supervisorResult?.score ?? null;
+            wasRewrittenForLog = event.supervisorResult?.rewritten ?? false;
           }
           if (event.type === "done" || event.type === "error") {
             if (event.type === "error") {
@@ -536,6 +566,7 @@ router.post(
           assistantResponse: assistantResponseForMemory,
         });
       }
+      const costUsdEst = estimateCost(decision.model, inputTokens, outputTokens);
       recordAiCall({
         requestId,
         userId,
@@ -545,7 +576,7 @@ router.post(
         model: decision.model,
         inputTokens,
         outputTokens,
-        costUsdEst: estimateCost(decision.model, inputTokens, outputTokens),
+        costUsdEst,
         latencyMs,
         totalTurns: compressedHistory?.totalTurns ?? 0,
         status,
@@ -558,7 +589,16 @@ router.post(
         ragChunksRetrieved,
         ragTopSimilarity,
         ragSourcesUsed: [...new Set(ragSourcesUsed)],
+        domain: domainForLog,
+        supervisorScore: supervisorScoreForLog,
+        wasRewritten: wasRewrittenForLog,
+        ttftMs,
       });
+      recordWendyCost(decision.model, costUsdEst);
+      if (supervisorScoreForLog !== null && domainForLog) {
+        recordQualityScore(domainForLog, intent, supervisorScoreForLog);
+      }
+      if (ttftMs !== null) recordTtft(ttftMs / 1000);
 
       if (!res.writableEnded) res.end();
       markIdle();

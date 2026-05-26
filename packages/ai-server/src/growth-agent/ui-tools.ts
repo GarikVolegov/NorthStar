@@ -87,7 +87,32 @@ export type UiToolArgs =
   | ResourceListArgs
   | ActionPlanArgs;
 
+// UI tools appear in all intents that may need rich rendering
+const UI_INTENTS = ["conversation", "planning", "deep_analysis"] as const;
+
+(function bootstrapUiTools() {
+  const UI_TOOL_META: Array<{ name: UiToolName; description: string }> = [
+    { name: "render_roadmap",      description: "Mostra una roadmap visuale step-by-step per piani di apprendimento o percorsi di carriera." },
+    { name: "render_career_match", description: "Mostra una career match card per confrontare il profilo RIASEC con una professione." },
+    { name: "render_quiz",         description: "Genera un mini-quiz interattivo per testare conoscenze o raccogliere preferenze." },
+    { name: "render_resource_list",description: "Mostra una lista di risorse (corsi, articoli) della piattaforma NorthStar." },
+    { name: "render_action_plan",  description: "Crea un piano d'azione settimanale concreto con attività giornaliere." },
+  ];
+  for (const { name, description } of UI_TOOL_META) {
+    toolRegistry.register({
+      name,
+      description,
+      parameters:    [],
+      intents:       [...UI_INTENTS],
+      isUiTool:      true,
+      requiresWrite: false,
+    });
+  }
+})();
+
 // ── OpenAI tool definitions ───────────────────────────────────────────────────
+
+import { toolRegistry } from "../tools/registry";
 
 export const UI_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
   {

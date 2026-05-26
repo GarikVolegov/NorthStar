@@ -81,14 +81,27 @@ export function getLocalWendyReply(message: string): LocalWendyReply | null {
   return null;
 }
 
+function hasCompactMatch(input: string, set: Set<string>): boolean {
+  const compact = input.replace(/\s/g, "");
+  for (const entry of set) {
+    if (entry.replace(/\s/g, "") === compact) return true;
+  }
+  return false;
+}
+
 export function getLocalWendyFallbackReply(message: string): LocalWendyReply | null {
   const normalized = normalizeLocalMessage(message);
 
-  if (GREETING_MESSAGES.has(normalized)) return { kind: "greeting", text: LOCAL_REPLIES.greeting };
-  if (WELLBEING_MESSAGES.has(normalized)) return { kind: "wellbeing", text: LOCAL_REPLIES.wellbeing };
-  if (THANKS_MESSAGES.has(normalized)) return { kind: "thanks", text: LOCAL_REPLIES.thanks };
-  if (ACK_MESSAGES.has(normalized)) return { kind: "ack", text: LOCAL_REPLIES.ack };
-  if (IDENTITY_MESSAGES.has(normalized)) return { kind: "identity", text: LOCAL_REPLIES.identity };
+  if (GREETING_MESSAGES.has(normalized) || hasCompactMatch(normalized, GREETING_MESSAGES))
+    return { kind: "greeting", text: LOCAL_REPLIES.greeting };
+  if (WELLBEING_MESSAGES.has(normalized) || hasCompactMatch(normalized, WELLBEING_MESSAGES))
+    return { kind: "wellbeing", text: LOCAL_REPLIES.wellbeing };
+  if (THANKS_MESSAGES.has(normalized) || hasCompactMatch(normalized, THANKS_MESSAGES))
+    return { kind: "thanks", text: LOCAL_REPLIES.thanks };
+  if (ACK_MESSAGES.has(normalized) || hasCompactMatch(normalized, ACK_MESSAGES))
+    return { kind: "ack", text: LOCAL_REPLIES.ack };
+  if (IDENTITY_MESSAGES.has(normalized) || hasCompactMatch(normalized, IDENTITY_MESSAGES))
+    return { kind: "identity", text: LOCAL_REPLIES.identity };
 
   return null;
 }

@@ -7,11 +7,13 @@ import { buildRoutingHistorySummary } from "./router-memory";
 import { getSpecialist } from "./specialist-agent";
 import { supervisorAgent } from "./supervisor-agent";
 import { loadMemory, buildMemorySection, type UserMemory } from "./memory-manager";
+import { buildContextualMemorySection, searchMemory } from "./memory-search";
 import { runParallelHandoff } from "./parallel-handoff";
 import { UI_TOOLS, type UiToolName, type UiToolArgs } from "./ui-tools";
 import { getToolsForIntent, toolsToOpenAIFormat } from "../wendy-router/tool-registry";
 import { executeToolCall } from "../wendy-router/tool-handlers";
 import { isClientSideToolData, parseToolArguments } from "./tool-args";
+import { toolRegistry } from "../tools/registry";
 import { scheduleMemorySave } from "./memory-save";
 import { loadResponseContext } from "./response-context";
 import { runVoiceFastPath } from "./voice-runner";
@@ -26,6 +28,7 @@ import { wendyLatencySeconds } from "../metrics";
 import { startSpan } from "../tracing";
 import { FF } from "../feature-flags";
 import { selectModelFor, modelFor } from "../model-router";
+import { wendyConfig } from "../config/wendy";
 import "./specialists/career-agent";
 import "./specialists/mindset-agent";
 import "./specialists/habits-agent";
@@ -39,9 +42,6 @@ export interface ChatMessage {
   content: string;
   domain?: RouteDecision["domain"] | undefined;
 }
-const UI_TOOL_NAMES = new Set<string>(
-  (UI_TOOLS as Array<{ function: { name: string } }>).map((t) => t.function.name),
-);
 export interface GrowthAgentOptions {
   userId:           number;
   sessionId?:       number | undefined;
@@ -115,7 +115,16 @@ export async function* runGrowthAgent(
     routeConfidence: routeDecision.confidence,
   });
 
-  const memorySection   = buildMemorySection(userMemory);
+  const contextualMemorySection = userId > 0
+    ? await searchMemory(userId, userMessage, 5).then(buildContextualMemorySection).catch((err) => {
+      logger.warn({ err, ...logFields }, "contextual memory search failed");
+      return "";
+    })
+    : "";
+  const memorySection = contextualMemorySection || buildMemorySection({
+    facts: userMemory.facts.filter((f) => f.key === "goal_main" || f.key === "pending_follow_up"),
+    patterns: [],
+  });
   const enrichedContext: UserContext & { memorySection?: string | undefined } = {
     ...userContext,
     memorySection: memorySection || userContext.memorySection,
@@ -128,8 +137,9 @@ export async function* runGrowthAgent(
   const fallbackInstruction = routeDecision.isFallback
     ? "Non hai abbastanza informazioni per classificare la richiesta dell'utente. Invece di rispondere direttamente, fai 1 domanda di chiarimento specifica per capire meglio di cosa ha bisogno. Non inventare risposte generiche."
     : undefined;
+  let lastSupervisorScore: number | undefined;
   const saveAssistantMemory = (assistantResponse: string, sid: number): void =>
-    scheduleMemorySave({ userId, sessionId: sid, history, userMessage, assistantResponse, routeDecision, logFields });
+    scheduleMemorySave({ userId, sessionId: sid, history, userMessage, assistantResponse, routeDecision, logFields, supervisorScore: lastSupervisorScore });
 
   const primaryConfident =
     routeDecision.confidence >= routeDecision.threshold &&
@@ -213,7 +223,7 @@ export async function* runGrowthAgent(
     { role: "user", content: userMessage },
   ];
 
-  const temperature = evalResult.level === "low" ? 0.45 : 0.72;
+  const temperature = evalResult.level === "low" ? wendyConfig.specialist.temperatureLow : wendyConfig.specialist.temperatureHigh;
 
   try {
     yield { type: "status", value: "✍️ Generando risposta..." };
@@ -240,7 +250,7 @@ export async function* runGrowthAgent(
       messages,
       stream: true,
       temperature,
-      max_tokens: evalResult.level === "low" ? 300 : 600,
+      max_tokens: evalResult.level === "low" ? wendyConfig.agent.maxTokensLow : wendyConfig.agent.maxTokensHigh,
       stream_options: { include_usage: false },
       ...(hasTools ? { tools: allTools, tool_choice: "auto" } : {}),
     };
@@ -282,7 +292,7 @@ export async function* runGrowthAgent(
       supervisorSpan.end();
       endSupervisorTimer();
 
-      if (!UI_TOOL_NAMES.has(toolCallName)) {
+      if (!toolRegistry.isUiTool(toolCallName)) {
         const parsedArgs = parseToolArguments(toolCallArgs);
 
         const toolResult = await executeToolCall(toolCallName, parsedArgs, userId);
@@ -309,7 +319,7 @@ export async function* runGrowthAgent(
 
         const followUpStream = await openai.chat.completions.create({
           model: route.model, messages: followUpMessages,
-          stream: true, temperature: 0.55, max_tokens: 700,
+          stream: true, temperature: 0.55, max_tokens: wendyConfig.agent.followUpMaxTokens,
         });
 
         const followUpBuffer: string[] = [];
@@ -357,6 +367,7 @@ export async function* runGrowthAgent(
     };
 
     let supervisorResult = supervisorAgent.evaluate(supervisorInput);
+    lastSupervisorScore  = supervisorResult.score;
     let finalText        = draft;
 
     if (!supervisorResult.pass && FF.supervisorEnabled) {
@@ -378,7 +389,7 @@ export async function* runGrowthAgent(
     supervisorSpan.end();
     endSupervisorTimer();
 
-    const CHUNK_SIZE = 4;
+    const CHUNK_SIZE = wendyConfig.agent.chunkSize;
     for (let i = 0; i < finalText.length; i += CHUNK_SIZE) {
       yield { type: "token", value: finalText.slice(i, i + CHUNK_SIZE) };
     }

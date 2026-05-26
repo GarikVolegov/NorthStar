@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["run", "dev:web"],
+      "port": 5173
+    },
+    {
+      "name": "graphify",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-l", "4200", "graphify-out"],
+      "port": 4200
+    }
+  ]
+}

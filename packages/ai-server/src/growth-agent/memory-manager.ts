@@ -4,7 +4,7 @@ import { openai } from "../client";
 import { embedText } from "./embedder";
 import { logger } from "../logger";
 import { selectModelFor } from "../model-router";
-import { ragConfig } from "../config/rag";
+import { wendyConfig } from "../config/wendy";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,9 +31,9 @@ export interface UserMemory {
 // ── Confidence ladder ────────────────────────────────────────────────────────
 
 function computeConfidence(observedCount: number): number {
-  if (observedCount >= 4) return 0.90;
-  if (observedCount === 3) return 0.80;
-  if (observedCount === 2) return 0.65;
+  for (const rung of wendyConfig.memory.confidenceLadder) {
+    if (observedCount >= rung.minObs) return rung.confidence;
+  }
   return 0.50;
 }
 
@@ -64,9 +64,9 @@ async function getPatternEmbedding(
   const cached = patternEmbeddingCache.get(id);
   if (cached && cached.expiresAt > Date.now()) return cached.embedding;
   const emb = await embedText(description);
-  patternEmbeddingCache.set(id, { embedding: emb, expiresAt: Date.now() + ragConfig.memory.embeddingCacheTtlMs });
+  patternEmbeddingCache.set(id, { embedding: emb, expiresAt: Date.now() + wendyConfig.memory.embeddingCacheTtlMs });
   // Keep cache bounded
-  if (patternEmbeddingCache.size > ragConfig.memory.maxEmbeddingCacheEntries) {
+  if (patternEmbeddingCache.size > wendyConfig.memory.maxEmbeddingCacheEntries) {
     const firstKey = patternEmbeddingCache.keys().next().value as number | undefined;
     if (firstKey !== undefined) patternEmbeddingCache.delete(firstKey);
   }
@@ -114,17 +114,19 @@ Se non hai abbastanza dati per estrarre qualcosa, restituisci array vuoti.
  * @param messages  The full conversation (user + assistant turns)
  * @returns         Extracted facts and patterns, or null on failure
  */
-export async function extractMemory(
+async function extractMemoryWithMinimumUserMessages(
   messages: Array<{ role: string; content: string }>,
+  minUserMessages: number,
 ): Promise<ExtractedMemory | null> {
   // Only extract if there's meaningful content (at least 2 user messages)
   const userMsgs = messages.filter((m) => m.role === "user");
-  if (userMsgs.length < 2) return null;
+  if (userMsgs.length < minUserMessages) return null;
 
   // Build a compact conversation transcript
+  const mc = wendyConfig.memory;
   const transcript = messages
-    .slice(-20) // last 20 messages max
-    .map((m) => `${m.role === "user" ? "Utente" : "Coach"}: ${m.content.slice(0, 300)}`)
+    .slice(-mc.extractionSliceMessages)
+    .map((m) => `${m.role === "user" ? "Utente" : "Coach"}: ${m.content.slice(0, mc.extractionTruncateChars)}`)
     .join("\n");
 
   try {
@@ -135,8 +137,8 @@ export async function extractMemory(
         { role: "system", content: EXTRACT_SYSTEM },
         { role: "user",   content: transcript },
       ],
-      temperature: 0.1,
-      max_tokens: 500,
+      temperature: mc.extractionTemperature,
+      max_tokens: mc.extractionMaxTokens,
       response_format: { type: "json_object" },
     });
 
@@ -151,6 +153,12 @@ export async function extractMemory(
     logger.warn({ err }, "memory extraction failed");
     return null;
   }
+}
+
+export async function extractMemory(
+  messages: Array<{ role: string; content: string }>,
+): Promise<ExtractedMemory | null> {
+  return extractMemoryWithMinimumUserMessages(messages, 2);
 }
 
 // ── MERGE: Upsert facts, increment pattern confidence ────────────────────────
@@ -170,7 +178,7 @@ export async function mergeMemory(
   extracted: ExtractedMemory,
 ): Promise<void> {
   // ── Load existing data for this user (max 1000 rows each) ───────
-  const MAX_MEMORY_ROWS = ragConfig.memory.maxMemoryRows;
+  const MAX_MEMORY_ROWS = wendyConfig.memory.maxMemoryRows;
   const [allExistingFacts, allExistingPatterns] = await Promise.all([
     db
       .select()
@@ -198,16 +206,19 @@ export async function mergeMemory(
     key: string;
     value: string;
     sourceSessionId: number;
+    embedding: number[];
   }> = [];
 
   for (const fact of extracted.facts) {
     if (!fact.key?.trim() || !fact.value?.trim()) continue;
     const existing = existingFactsMap.get(fact.key);
+    const embedding = await embedText(`${fact.key}: ${fact.value}`);
     if (existing) {
       existingFactsMap.set(fact.key, {
         ...existing,
         value: fact.value,
         confirmedCount: existing.confirmedCount + 1,
+        embedding,
       });
       factUpdates.push({ key: fact.key, value: fact.value });
     } else {
@@ -216,10 +227,12 @@ export async function mergeMemory(
         key: fact.key,
         value: fact.value,
         sourceSessionId: sessionId,
+        embedding,
       });
     }
   }
 
+  const now = new Date();
   await Promise.all([
     ...factUpdates.map((f) => {
       const existing = existingFactsMap.get(f.key)!;
@@ -228,7 +241,9 @@ export async function mergeMemory(
         .set({
           value: f.value,
           confirmedCount: existing.confirmedCount,
-          updatedAt: new Date(),
+          lastMentionedAt: now,
+          embedding: existing.embedding,
+          updatedAt: now,
         })
         .where(
           and(
@@ -255,6 +270,7 @@ export async function mergeMemory(
     confidence: number;
     observedCount: number;
     sessionIds: number[];
+    embedding: number[];
   }> = [];
 
   for (const pattern of extracted.patterns) {
@@ -266,9 +282,11 @@ export async function mergeMemory(
 
     for (const existing of allExistingPatterns) {
       if (existing.patternType !== pattern.patternType) continue;
-      const existingEmb = await getPatternEmbedding(existing.id, existing.description);
+      const existingEmb = existing.embedding && existing.embedding.length > 0
+        ? existing.embedding
+        : await getPatternEmbedding(existing.id, existing.description);
       const score = cosineSimilarity(newEmbedding, existingEmb);
-      if (score > bestScore && score >= ragConfig.memory.similarityThreshold) {
+      if (score > bestScore && score >= wendyConfig.memory.similarityThreshold) {
         bestMatch = existing;
         bestScore = score;
       }
@@ -289,6 +307,7 @@ export async function mergeMemory(
         confidence: 0.5,
         observedCount: 1,
         sessionIds: [sessionId],
+        embedding: newEmbedding,
       });
     }
   }
@@ -301,7 +320,9 @@ export async function mergeMemory(
           observedCount: u.observedCount,
           confidence: computeConfidence(u.observedCount),
           sessionIds: u.sessionIds,
-          updatedAt: new Date(),
+          lastReinforcedAt: now,
+          decayScore: 1.0,   // reset decay on every reinforcement
+          updatedAt: now,
         })
         .where(eq(coachMemoryPatternsTable.id, u.id)),
     ),
@@ -309,6 +330,29 @@ export async function mergeMemory(
       ? db.insert(coachMemoryPatternsTable).values(patternInserts)
       : Promise.resolve(),
   ]);
+}
+
+// ── INCREMENTAL EXTRACTION ────────────────────────────────────────────────────
+
+/**
+ * Lightweight extraction from the latest 2 messages only (delta, not full history).
+ * Call after each assistant turn. Guard: skips extraction if supervisor score < 0.5
+ * to avoid persisting low-quality data.
+ *
+ * Cost: ~$0.002 per call (gpt-4o-mini, ~200 input tokens).
+ */
+export async function extractMemoryIncremental(
+  userMessage: string,
+  assistantMessage: string,
+  supervisorScore?: number,
+): Promise<ExtractedMemory | null> {
+  if (supervisorScore !== undefined && supervisorScore < wendyConfig.memory.incrementalMinScore) {
+    return null;
+  }
+  return extractMemoryWithMinimumUserMessages([
+    { role: "user",      content: userMessage },
+    { role: "assistant", content: assistantMessage },
+  ], 1);
 }
 
 // ── LOAD: Read memory for prompt injection ───────────────────────────────────
@@ -329,10 +373,18 @@ export async function loadMemory(userId: number): Promise<UserMemory> {
       .where(eq(coachMemoryPatternsTable.userId, userId)),
   ]);
 
+  const mc = wendyConfig.memory;
   const topPatterns = patterns
-    .filter((p) => p.confidence >= ragConfig.memory.minPatternConfidence)
-    .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, ragConfig.memory.maxPromptPatterns);
+    .filter((p) => {
+      const effectiveConf = p.confidence * (p.decayScore ?? 1.0);
+      return effectiveConf >= mc.minPatternConfidence;
+    })
+    .sort((a, b) => {
+      const ea = a.confidence * (a.decayScore ?? 1.0);
+      const eb = b.confidence * (b.decayScore ?? 1.0);
+      return eb - ea;
+    })
+    .slice(0, mc.maxPromptPatterns);
 
   return { facts, patterns: topPatterns };
 }

@@ -33,6 +33,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { usersTable } from "./users";
+import { vector } from "../custom-types";
 
 // ── Table 1: Biographical facts ──────────────────────────────────────────────
 export const coachMemoryFactsTable = pgTable(
@@ -50,6 +51,9 @@ export const coachMemoryFactsTable = pgTable(
     sourceSessionId: integer("source_session_id"),
     /** How many times this fact has been confirmed / updated */
     confirmedCount: integer("confirmed_count").notNull().default(1),
+    /** Last time this fact was mentioned in a conversation (for decay tracking) */
+    lastMentionedAt: timestamp("last_mentioned_at", { withTimezone: true }).notNull().defaultNow(),
+    embedding: vector("embedding", { dimensions: 1536 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -77,13 +81,19 @@ export const coachMemoryPatternsTable = pgTable(
     observedCount: integer("observed_count").notNull().default(1),
     /** Session IDs where this pattern appeared (for traceability) */
     sessionIds: integer("session_ids").array().notNull().default([]),
+    /** Last time this pattern was reinforced in a conversation */
+    lastReinforcedAt: timestamp("last_reinforced_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Exponential decay score 0–1; multiplied with confidence for effective confidence */
+    decayScore: real("decay_score").notNull().default(1.0),
+    embedding: vector("embedding", { dimensions: 1536 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => ({
-    userIdx: index("coach_memory_patterns_user_idx").on(t.userId),
-    typeIdx: index("coach_memory_patterns_type_idx").on(t.patternType),
+    userIdx:     index("coach_memory_patterns_user_idx").on(t.userId),
+    typeIdx:     index("coach_memory_patterns_type_idx").on(t.patternType),
+    decayIdx:    index("coach_memory_patterns_decay_idx").on(t.userId, t.decayScore, t.updatedAt),
     confidenceCheck: check("confidence_range", sql`${t.confidence} >= 0 AND ${t.confidence} <= 1`),
   }),
 );
