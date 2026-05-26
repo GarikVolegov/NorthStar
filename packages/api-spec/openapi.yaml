@@ -22,6 +22,8 @@ tags:
     description: In-app notifications
   - name: push
     description: Browser push notification subscriptions
+  - name: wendy
+    description: Wendy AI coaching assistant
 
 components:
   securitySchemes:
@@ -1111,3 +1113,105 @@ paths:
                 properties:
                   success: { type: boolean }
                 required: [success]
+
+  /ai/wendy:
+    post:
+      operationId: wendyChat
+      tags: [wendy]
+      summary: Send a message to Wendy (AI coaching assistant) with SSE streaming response
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: User message to Wendy
+                sessionId:
+                  type: string
+                  description: Conversation session identifier
+                clerkId:
+                  type: string
+                  description: Clerk user identifier
+                context:
+                  type: object
+                  description: Optional additional context (page, sector, etc.)
+              required: [message]
+      responses:
+        "200":
+          description: SSE stream of Wendy response chunks
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /ai/wendy/feedback:
+    post:
+      operationId: wendyFeedback
+      tags: [wendy]
+      summary: Submit feedback (upvote/downvote) on a Wendy response
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                messageId:
+                  type: string
+                  description: ID of the Wendy message being rated
+                rating:
+                  type: string
+                  enum: [upvote, downvote]
+                sessionId:
+                  type: string
+              required: [messageId, rating]
+      responses:
+        "200":
+          description: Feedback recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                required: [success]
+
+  /wendy/voice:
+    post:
+      operationId: wendyVoice
+      tags: [wendy]
+      summary: Generate text-to-speech audio for a Wendy response
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                  description: Text to synthesize as audio
+              required: [text]
+      responses:
+        "200":
+          description: Audio stream (mp3)
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary

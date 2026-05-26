@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import basicSsl from "@vitejs/plugin-basic-ssl";
 import path from "path";
 import { VitePWA } from "vite-plugin-pwa";
 import { resolveWebPort } from "./src/lib/dev-port";
@@ -28,7 +29,7 @@ const shouldUploadSourcemaps = Boolean(
     sentryRelease,
 );
 
-export default defineConfig(async () => ({
+export default defineConfig(async ({ command }) => ({
   base: basePath,
   define: {
     __GOOGLE_CLIENT_ID__: JSON.stringify(process.env.GOOGLE_CLIENT_ID ?? ""),
@@ -40,6 +41,7 @@ export default defineConfig(async () => ({
   plugins: [
     react(),
     tailwindcss(),
+    command === "serve" && basicSsl(),
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "hero.png", "robots.txt"],

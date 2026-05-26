@@ -59,6 +59,7 @@
     "northstar": ".tools/printed-clis/northstar/bin/northstar-pp-cli.exe",
     "northstar:mcp": ".tools/printed-clis/northstar/bin/northstar-pp-mcp.exe",
     "northstar:regen": "cli-printing-press/printing-press.exe generate --spec packages/api-spec/openapi.yaml --name northstar --output .tools/printed-clis/northstar --force",
+    "wendy:regen": "cli-printing-press/printing-press.exe generate --spec packages/api-spec/openapi.yaml --name wendy --tags wendy --output .tools/printed-clis/wendy --force",
     "graphify:refresh": "tsx scripts/src/refresh-wikillm-graphs.ts",
     "// ── AUDIT ────────────────────────────────────────": "---",
     "audit:dead-code": "knip --reporter compact",
