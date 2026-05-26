@@ -83,10 +83,16 @@ Thumbs.db
 apps/server/api/index.js
 apps/server/api/index.cjs
 
-# Go CLI binaries (build artifacts)
+# Go CLI — source e binari (strumenti esterni, non codice NorthStar)
+cli-printing-press/
 .tools/printed-clis/*/bin/
+.tools/printed-clis/*/cmd/
+.tools/printed-clis/*/internal/
+.tools/printed-clis/*/go.mod
+.tools/printed-clis/*/go.sum
+.tools/printed-clis/*/.golangci.yml
+.tools/printed-clis/*/.goreleaser.yaml
 .tools/printed-clis/*/northstar-pp-*.exe
-cli-printing-press/printing-press.exe
 
 # Go local installations
 go-install/
