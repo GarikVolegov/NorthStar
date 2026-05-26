@@ -26,6 +26,17 @@ export { retrieve } from "./growth-agent/retriever";
 export { ingestUserMemoryGraph, searchMemoryGraph, getMemoryGraphHealth } from "./memory-graph";
 export type { MemoryGraphSearchResponse, MemoryGraphSearchResult } from "./memory-graph";
 export { searchWeb } from "./growth-agent/web-search";
+export {
+  buildWendyBrainContextSection,
+  buildWendyBrainSkillPrompt,
+  normalizeBrainTitle,
+  promoteWendyBrainCandidate,
+  recordWendyBrainEvent,
+  runWendyBrainOptimizer,
+  sanitizeBrainText,
+  searchWendyBrain,
+} from "./wendy-brain";
+export type { WendyBrainEventInput, WendyBrainHit, WendyBrainSearchOptions } from "./wendy-brain";
 export { buildSystemPrompt } from "./growth-agent/prompt-builder";
 export type { UserContext } from "./growth-agent/prompt-builder";
 export type { RetrievedChunk } from "./growth-agent/retriever";

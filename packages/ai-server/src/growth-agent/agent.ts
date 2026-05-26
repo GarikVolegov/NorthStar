@@ -8,6 +8,7 @@ import { getSpecialist } from "./specialist-agent";
 import { supervisorAgent } from "./supervisor-agent";
 import { loadMemory, buildMemorySection, type UserMemory } from "./memory-manager";
 import { buildContextualMemorySection, searchMemory } from "./memory-search";
+import { buildWendyBrainContextSection, searchWendyBrain } from "../wendy-brain";
 import { runParallelHandoff } from "./parallel-handoff";
 import { UI_TOOLS, type UiToolName, type UiToolArgs } from "./ui-tools";
 import { getToolsForIntent, toolsToOpenAIFormat } from "../wendy-router/tool-registry";
@@ -125,9 +126,17 @@ export async function* runGrowthAgent(
     facts: userMemory.facts.filter((f) => f.key === "goal_main" || f.key === "pending_follow_up"),
     patterns: [],
   });
+  const wendyBrainSection = await searchWendyBrain(userMessage, {
+    limit: wendyConfig.brain.maxContextNodes,
+    includeCandidates: false,
+  }).then(buildWendyBrainContextSection).catch((err) => {
+    logger.warn({ err, ...logFields }, "wendy brain search failed");
+    return "";
+  });
   const enrichedContext: UserContext & { memorySection?: string | undefined } = {
     ...userContext,
     memorySection: memorySection || userContext.memorySection,
+    wendyBrainSection: wendyBrainSection || userContext.wendyBrainSection,
   };
   let routingHistorySummary = "";
   if (userId > 0 && !routeDecision.isFallback) {

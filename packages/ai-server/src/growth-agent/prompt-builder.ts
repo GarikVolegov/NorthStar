@@ -14,6 +14,8 @@ export interface UserContext {
   sectorName?:   string | undefined;
   pageContext?:  Record<string, unknown> | undefined;
   memorySection?: string | undefined;
+  wendyBrainSection?: string | undefined;
+  codeGraphSection?: string | undefined;
   locale?:       string | undefined;
   isPremium?:    boolean | undefined;
   stripeSubscriptionId?: string | null | undefined;
@@ -193,6 +195,14 @@ export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {
   // ── Memory ───────────────────────────────────────────────────────────────
   if (userContext.memorySection) {
     sections.push(userContext.memorySection);
+  }
+
+  if (userContext.wendyBrainSection) {
+    sections.push(userContext.wendyBrainSection);
+  }
+
+  if (userContext.codeGraphSection) {
+    sections.push(userContext.codeGraphSection);
   }
 
   // ── Behavioral patterns + routing history ────────────────────────────────

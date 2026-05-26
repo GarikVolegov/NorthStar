@@ -107,6 +107,12 @@ export interface WendyJobPostingsConfig {
   maxProfessionsPerRun: number;
 }
 
+export interface WendyBrainConfig {
+  enabled: boolean;
+  autoPromote: boolean;
+  maxContextNodes: number;
+}
+
 export interface WendyConfig {
   router: WendyRouterConfig;
   specialist: WendySpecialistConfig;
@@ -116,6 +122,7 @@ export interface WendyConfig {
   fastPath: WendyFastPathConfig;
   prompt: WendyPromptConfig;
   jobPostings: WendyJobPostingsConfig;
+  brain: WendyBrainConfig;
 }
 
 export interface WendyConfigOverride {

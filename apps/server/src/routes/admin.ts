@@ -13,6 +13,7 @@ import adminQualityRouter from "./admin/quality";
 import adminResearchRouter from "./admin/research";
 import adminReviewRouter from "./admin/review";
 import adminSubscriptionsRouter from "./admin/subscriptions";
+import adminWendyBrainRouter from "./admin/wendy-brain";
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use(adminMemoryGraphRouter);
 router.use(adminPluginsRouter);
 router.use(adminErrorReportRouter);
 router.use(adminResearchRouter);
+router.use(adminWendyBrainRouter);
 
 export default router;

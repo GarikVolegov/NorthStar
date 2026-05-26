@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  getDefaultGraphifyGraphs,
   explainGraphifyNode,
   getGraphifyStatus,
   searchGraphify,
@@ -113,5 +114,11 @@ describe("graphify-client", () => {
         },
       ],
     });
+  });
+
+  it("includes the workspace root graph as the primary default graph", () => {
+    expect(getDefaultGraphifyGraphs()).toContain("root:graphify-out/graph.json");
+    expect(getDefaultGraphifyGraphs()).toContain("apps:apps/graphify-out/graph.json");
+    expect(getDefaultGraphifyGraphs()).toContain("packages:packages/graphify-out/graph.json");
   });
 });

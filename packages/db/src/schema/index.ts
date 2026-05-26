@@ -68,6 +68,7 @@ export * from "./aiRequestLog";
 export * from "./aiCostLog";
 export * from "./wendyFeedback";
 export * from "./wendyConfigOverrides";
+export * from "./wendyBrain";
 export * from "./userKeys";
 export * from "./userBadges";
 export * from "./weeklyLeaderboard";

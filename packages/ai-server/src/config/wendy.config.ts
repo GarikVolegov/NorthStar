@@ -113,6 +113,11 @@ export const WendyConfigSchema = z.object({
     joobleApiKey: z.string().default(""),
     maxProfessionsPerRun: z.number().int().default(50),
   }),
+  brain: z.object({
+    enabled: z.boolean().default(true),
+    autoPromote: z.boolean().default(false),
+    maxContextNodes: z.number().int().default(6),
+  }),
 });
 
 function baseConfig(env: WendyEnvSource): WendyConfig {
@@ -248,6 +253,11 @@ function baseConfig(env: WendyEnvSource): WendyConfig {
       adzunaCountry: env.ADZUNA_COUNTRY ?? "it",
       joobleApiKey: env.JOOBLE_API_KEY ?? "",
       maxProfessionsPerRun: intEnv(env, "JOB_POSTINGS_MAX_PROFESSIONS", 50),
+    },
+    brain: {
+      enabled: env.WENDY_BRAIN_ENABLED !== "false",
+      autoPromote: env.WENDY_BRAIN_AUTO_PROMOTE === "true",
+      maxContextNodes: intEnv(env, "WENDY_BRAIN_MAX_CONTEXT_NODES", 6),
     },
   };
 }

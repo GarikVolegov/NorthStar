@@ -15,6 +15,7 @@ export type {
   RouterIntentThreshold,
   SupervisorWeights,
   WendyAgentConfig,
+  WendyBrainConfig,
   WendyConfig,
   WendyConfigOverride,
   WendyFastPathConfig,

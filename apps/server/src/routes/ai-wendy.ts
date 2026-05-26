@@ -439,7 +439,7 @@ router.post(
         // ── 3. Full path: growth agent completo ──────────────────────────
         const userMemory = await loadMemory(userId);
         const memorySection =
-          buildMemorySection(userMemory) + personalContext.context;
+          buildMemorySection(userMemory) + personalContext.contexts.semanticMemory + personalContext.contexts.openHuman;
 
         // Flatten compressed history per il growth agent
         const flatHistory = [
@@ -464,6 +464,7 @@ router.post(
           userContext: {
             isPremium,
             memorySection,
+            codeGraphSection: personalContext.contexts.graphify,
             locale,
             journeyType: pageContext?.journeyType,
           },

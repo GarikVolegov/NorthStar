@@ -244,6 +244,22 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
       { name: "limit", type: "number", description: "Max nodi da recuperare (default 5)" },
     ],
   },
+  search_code_graph: {
+    name:        "search_code_graph",
+    description: "Interroga il grafo Graphify del codice NorthStar. Usare per trovare moduli, file, dipendenze e relazioni architetturali. Capability interna: non modifica codice.",
+    parameters: [
+      { name: "query", type: "string", description: "Domanda o keyword sul codice (es. 'Wendy routing', 'growth-agent', 'Graphify client')", required: true },
+      { name: "limit", type: "number", description: "Max nodi da recuperare (default 5)" },
+    ],
+  },
+  explain_code_node: {
+    name:        "explain_code_node",
+    description: "Spiega un nodo specifico del grafo codice Graphify tramite graph e id. Usare dopo search_code_graph quando serve dettaglio su un nodo.",
+    parameters: [
+      { name: "graph", type: "string", description: "Nome grafo Graphify, es. root | apps | packages", required: true },
+      { name: "id",    type: "string", description: "ID nodo Graphify da spiegare", required: true },
+    ],
+  },
 };
 
 // ── Matrice intent → tool abilitati ──────────────────────────────────────────
@@ -264,6 +280,7 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "recall_semantic_memory",     // Plugin memory: recall conversazionale
     "ask_openhuman_memory",       // Personal Intelligence: memoria utente
     "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
+    "search_code_graph",
   ],
   conversation: [
     "open_view",
@@ -285,6 +302,7 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "recall_semantic_memory",     // Plugin memory: recall conversazionale
     "ask_openhuman_memory",       // Personal Intelligence: memoria utente
     "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
+    "search_code_graph",
   ],
   planning: [
     "get_sector_detail",
@@ -326,6 +344,8 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "recall_semantic_memory",     // Plugin memory: recall conversazionale
     "ask_openhuman_memory",       // Personal Intelligence: memoria utente
     "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
+    "search_code_graph",
+    "explain_code_node",
   ],
 };
 

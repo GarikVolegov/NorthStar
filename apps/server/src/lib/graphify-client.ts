@@ -65,13 +65,17 @@ interface GraphIndex {
 }
 
 const DEFAULT_GRAPHS =
-  "apps:apps/graphify-out/graph.json,packages:packages/graphify-out/graph.json";
+  "root:graphify-out/graph.json,apps:apps/graphify-out/graph.json,packages:packages/graphify-out/graph.json";
 const DEFAULT_QUERY_LIMIT = 8;
 const DEFAULT_MAX_CONTEXT_CHARS = 4_000;
 const graphCache = new Map<string, GraphIndex>();
 
 export function isGraphifyEnabled(): boolean {
   return process.env.GRAPHIFY_ENABLED === "true";
+}
+
+export function getDefaultGraphifyGraphs(): string {
+  return DEFAULT_GRAPHS;
 }
 
 function queryLimit(): number {
