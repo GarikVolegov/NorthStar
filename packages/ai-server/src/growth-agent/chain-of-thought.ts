@@ -50,17 +50,17 @@ interface CachedCoT {
   timestamp: number;
 }
 
-const cotCache = new Map<number, CachedCoT>();
+const cotCache = new Map<string, CachedCoT>();
 
 function tokenizeForCoT(s: string): Set<string> {
   return new Set(s.toLowerCase().match(/[a-z\u00e0-\u00fc]{4,}/g) ?? []);
 }
 
-function shouldReuseCached(userId: number, newTokens: Set<string>): CoTResult | null {
-  const cached = cotCache.get(userId);
+function shouldReuseCached(cacheKey: string, newTokens: Set<string>): CoTResult | null {
+  const cached = cotCache.get(cacheKey);
   if (!cached) return null;
   if (Date.now() - cached.timestamp > ragConfig.chainOfThought.cacheTtlMs) {
-    cotCache.delete(userId);
+    cotCache.delete(cacheKey);
     return null;
   }
   if (cached.result.confidence < ragConfig.chainOfThought.reuseMinConfidence) return null;
@@ -121,13 +121,15 @@ export async function runChainOfThought(
   userId: number,
   userMessage: string,
   conversationSummary?: string, // optional: last 2-3 exchanges for context
+  conversationId?: string | number | undefined,
 ): Promise<CoTResult | null> {
   if (shouldSkipCoT(userMessage)) return null;
 
   const tokens = tokenizeForCoT(userMessage);
-  const cached = shouldReuseCached(userId, tokens);
+  const cacheKey = `${userId}:${conversationId ?? "default"}`;
+  const cached = shouldReuseCached(cacheKey, tokens);
   if (cached) {
-    logger.debug({ userId }, "CoT cache hit");
+    logger.debug({ userId, conversationId }, "CoT cache hit");
     return cached;
   }
 
@@ -158,7 +160,7 @@ export async function runChainOfThought(
       confidence:         (parsed.confidence as number)           ?? 0.5,
     };
 
-    cotCache.set(userId, { result, userTokens: tokens, timestamp: Date.now() });
+    cotCache.set(cacheKey, { result, userTokens: tokens, timestamp: Date.now() });
     return result;
   } catch (err) {
     // CoT failure is non-fatal — the agent continues without it

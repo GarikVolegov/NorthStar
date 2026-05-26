@@ -17,6 +17,7 @@ import { numberArg, stringArg, typedArgs } from "./tool-arg-utils";
 import { handleCompareSectors, handleGetGrowthArticles, handleGetLearningPaths, handleGetMarketTrend, handleGetNewsSummary, handleGetProfessionDetail, handleGetSectorDetail, handleGetUserObjectives, handleListSectors, handleSearchProfessions } from "./tool-handlers-data";
 import { handleGetUserContext } from "./tool-handlers-user";
 import { handleGetJobPostingTrend, handleGetSkillCooccurrences, handleGetWeakSignals, handleSearchMemoryGraph, handleSearchRag } from "./tool-handlers-market";
+import { handleCheckFoodSafety, handleGetBreedInfo, handleGetRabbitCareGuide, handleSearchRabbitKb } from "./tool-handlers-rabbit";
 
 // ── Cache embedding query (LRU semplice con TTL 5 min) ───────────────────────
 const _embCache = new Map<string, { vec: number[]; ts: number }>();
@@ -307,6 +308,12 @@ export async function executeToolCall(
     case "get_weak_signals":         result = await handleGetWeakSignals(typedArgs(args)); break;
     case "get_job_posting_trend":    result = await handleGetJobPostingTrend(typedArgs(args)); break;
     case "get_skill_cooccurrences":  result = await handleGetSkillCooccurrences(typedArgs(args)); break;
+
+    // ── Rabbit expert domain ──────────────────────────────────────────────────
+    case "get_rabbit_care_guide": result = await handleGetRabbitCareGuide(typedArgs(args)); break;
+    case "check_food_safety":     result = await handleCheckFoodSafety(typedArgs(args)); break;
+    case "get_breed_info":        result = await handleGetBreedInfo(typedArgs(args)); break;
+    case "search_rabbit_kb":      result = await handleSearchRabbitKb(typedArgs(args), userId); break;
 
     // Legacy aliases
     case "get_sector":    result = await handleGetSectorDetail({ sectorId: numberArg(args, "id") ?? 0 }); break;

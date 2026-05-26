@@ -204,10 +204,10 @@ export function BackgroundPicker({ userId, open, onOpenChange }: BackgroundPicke
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0">
               <TabsList className="grid w-full grid-cols-4 rounded-full">
-                <TabsTrigger value="presets" onClick={() => setActiveTab("presets")}>Preset</TabsTrigger>
-                <TabsTrigger value="photos" onClick={() => setActiveTab("photos")}>Foto</TabsTrigger>
-                <TabsTrigger value="recent" onClick={() => setActiveTab("recent")}>Recenti</TabsTrigger>
-                <TabsTrigger value="appearance" onClick={() => setActiveTab("appearance")}>Aspetto</TabsTrigger>
+                <TabsTrigger value="presets">Preset</TabsTrigger>
+                <TabsTrigger value="photos">Foto</TabsTrigger>
+                <TabsTrigger value="recent">Recenti</TabsTrigger>
+                <TabsTrigger value="appearance">Aspetto</TabsTrigger>
               </TabsList>
 
               <TabsContent value="presets" className="mt-4 grid gap-3 sm:grid-cols-2">

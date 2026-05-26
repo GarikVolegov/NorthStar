@@ -10,6 +10,11 @@ import { and, count, eq, gte, sql } from "drizzle-orm";
 import { logger } from "../logger";
 import { getLLMForRoute } from "../llm/client";
 import { selectModelFor } from "../model-router";
+import { hydrateMissingImages } from "./collector-preview";
+import type { RawItem } from "./collector-types";
+import { generateNewsImage } from "./news-image-generator";
+import { isPublishableDiscoveryNews, normalize } from "./news-policy";
+import { computeCorroboration } from "./news-verifier";
 
 const MIN_RELEVANCE = 0.25;
 const MIN_ARTICLES_PER_SECTOR = 3;
@@ -41,6 +46,12 @@ interface NewsRewriteInput {
 interface NewsRewriteOutput {
   preview: string;
   content: string;
+}
+
+interface PublishableItem extends RawItem {
+  urlHash: string;
+  insightText: string | null;
+  relevanceScore: number;
 }
 
 function cleanText(value: string | null | undefined): string {
@@ -161,11 +172,13 @@ export async function runNewsPublisher(): Promise<NewsPublisherResult> {
       url: discoveryItemsTable.url,
       urlHash: discoveryItemsTable.urlHash,
       source: discoveryItemsTable.source,
+      collectorSource: discoveryItemsTable.collectorSource,
       summary: discoveryItemsTable.summary,
       imageUrl: discoveryItemsTable.imageUrl,
       publishedAt: discoveryItemsTable.publishedAt,
       sectorNames: discoveryItemsTable.sectorNames,
       category: discoveryItemsTable.category,
+      type: discoveryItemsTable.type,
       relevanceScore: discoveryItemsTable.relevanceScore,
       searchQuery: discoveryItemsTable.searchQuery,
       insightText: discoveryItemsTable.insightText,
@@ -174,13 +187,45 @@ export async function runNewsPublisher(): Promise<NewsPublisherResult> {
     .where(
       and(
         eq(discoveryItemsTable.isEnriched, true),
+        eq(discoveryItemsTable.type, "news"),
         gte(discoveryItemsTable.relevanceScore, MIN_RELEVANCE),
       ),
     )
     .limit(500);
 
-  if (enrichedItems.length > 0) {
-    const rows = await mapWithConcurrency(enrichedItems, 3, async (item) => {
+  const publishableItems = enrichedItems.filter((item) => isPublishableDiscoveryNews(item));
+
+  if (publishableItems.length > 0) {
+    const rawPublishableItems: PublishableItem[] = publishableItems.map((item) => ({
+      type: "news",
+      title: item.title,
+      url: item.url,
+      urlHash: item.urlHash,
+      source: item.source,
+      summary: item.summary ?? "",
+      imageUrl: item.imageUrl ?? undefined,
+      publishedAt: item.publishedAt ?? undefined,
+      category: item.category ?? "general",
+      sectorNames: item.sectorNames ?? [],
+      collectorSource: item.collectorSource ?? "",
+      searchQuery: item.searchQuery ?? undefined,
+      insightText: item.insightText,
+      relevanceScore: item.relevanceScore,
+    }));
+
+    const hydratedItems = await hydrateMissingImages(rawPublishableItems);
+    const withImages = await generateNewsImage(hydratedItems);
+    const corrobMap = computeCorroboration(withImages);
+    const verifiedItems = withImages.filter((item) => {
+      const count = corrobMap.get(item.urlHash) ?? 1;
+      const isTrustedEditorial = ["sole24ore_rss", "ansa_rss", "ninja_marketing_rss"].includes(
+        normalize(item.collectorSource),
+      );
+      if (withImages.length < 5) return true;
+      return isTrustedEditorial ? count >= 1 : count >= 2;
+    });
+
+    const rows = await mapWithConcurrency(verifiedItems, 3, async (item) => {
       const rewrite = await rewriteNewsForNorthStar({
         title: item.title,
         source: item.source,
@@ -229,7 +274,7 @@ export async function runNewsPublisher(): Promise<NewsPublisherResult> {
       .where(
         and(
           sql`${sector.name} = ANY(${newsArticlesTable.sectorNames})`,
-          sql`${newsArticlesTable.url} not like 'https://northstar.internal/seed/%'`,
+          sql`lower(${newsArticlesTable.source}) in ('gnews', 'newsapi', 'il sole 24 ore', 'ninja marketing', 'ansa', 'wired italia', 'la repubblica')`,
         ),
       );
 

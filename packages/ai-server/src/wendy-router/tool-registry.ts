@@ -244,6 +244,56 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
       { name: "limit", type: "number", description: "Max nodi da recuperare (default 5)" },
     ],
   },
+  search_code_graph: {
+    name:        "search_code_graph",
+    description: "Interroga il grafo Graphify del codice NorthStar. Usare per trovare moduli, file, dipendenze e relazioni architetturali. Capability interna: non modifica codice.",
+    parameters: [
+      { name: "query", type: "string", description: "Domanda o keyword sul codice (es. 'Wendy routing', 'growth-agent', 'Graphify client')", required: true },
+      { name: "limit", type: "number", description: "Max nodi da recuperare (default 5)" },
+    ],
+  },
+  explain_code_node: {
+    name:        "explain_code_node",
+    description: "Spiega un nodo specifico del grafo codice Graphify tramite graph e id. Usare dopo search_code_graph quando serve dettaglio su un nodo.",
+    parameters: [
+      { name: "graph", type: "string", description: "Nome grafo Graphify, es. root | apps | packages", required: true },
+      { name: "id",    type: "string", description: "ID nodo Graphify da spiegare", required: true },
+    ],
+  },
+
+  // ── Rabbit expert domain ──────────────────────────────────────────────────────
+  get_rabbit_care_guide: {
+    name:        "get_rabbit_care_guide",
+    description: "Restituisce linee guida certificate sul benessere del coniglio: spazio, alimentazione, socializzazione, salute, arricchimento ambientale, grooming. Usare per domande generali sulla cura. NON usare per emergenze mediche (per quelle interrompi e indirizza al vet).",
+    parameters: [
+      { name: "topic",     type: "string", description: "housing | feeding | socialization | health | enrichment | grooming", required: true },
+      { name: "rabbitAge", type: "string", description: "baby | junior | adult | senior (opzionale)" },
+      { name: "breed",     type: "string", description: "Razza del coniglio se rilevante (opzionale)" },
+    ],
+  },
+  check_food_safety: {
+    name:        "check_food_safety",
+    description: "Verifica se un alimento è sicuro, tossico o da somministrare con cautela per i conigli. USARE OBBLIGATORIAMENTE quando l'utente chiede se può dare un cibo specifico al coniglio.",
+    parameters: [
+      { name: "foodName", type: "string", description: "Nome dell'alimento da verificare (es. 'carota', 'ciclamino', 'mela', 'prezzemolo')", required: true },
+      { name: "quantity", type: "string", description: "Quantità menzionata dall'utente per contestualizzare (opzionale)" },
+    ],
+  },
+  get_breed_info: {
+    name:        "get_breed_info",
+    description: "Restituisce caratteristiche di una razza di coniglio: temperamento, dimensioni, esigenze specifiche, predisposizioni sanitarie. Usare quando l'utente menziona una razza o chiede quale razza adottare.",
+    parameters: [
+      { name: "breedName", type: "string", description: "Nome della razza (es. 'Nano Olandese', 'Lop', 'Rex', 'Angora', 'Lionhead', 'Ariete')", required: true },
+    ],
+  },
+  search_rabbit_kb: {
+    name:        "search_rabbit_kb",
+    description: "Cerca nel knowledge base specializzato sui conigli (veterinaria, comportamento, benessere, legislazione italiana). Usare per domande specifiche non coperte dagli altri tool rabbit.",
+    parameters: [
+      { name: "query", type: "string", description: "Query semantica in italiano sulla cura o salute dei conigli", required: true },
+      { name: "topK",  type: "number", description: "Numero di chunk (default 4, max 8)" },
+    ],
+  },
 };
 
 // ── Matrice intent → tool abilitati ──────────────────────────────────────────
@@ -264,6 +314,11 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "recall_semantic_memory",     // Plugin memory: recall conversazionale
     "ask_openhuman_memory",       // Personal Intelligence: memoria utente
     "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
+    "search_code_graph",
+    "get_rabbit_care_guide",      // Rabbit: guide cura
+    "check_food_safety",          // Rabbit: sicurezza alimenti
+    "get_breed_info",             // Rabbit: info razze
+    "search_rabbit_kb",           // Rabbit: knowledge base
   ],
   conversation: [
     "open_view",
@@ -285,6 +340,11 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "recall_semantic_memory",     // Plugin memory: recall conversazionale
     "ask_openhuman_memory",       // Personal Intelligence: memoria utente
     "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
+    "search_code_graph",
+    "get_rabbit_care_guide",      // Rabbit: guide cura
+    "check_food_safety",          // Rabbit: sicurezza alimenti
+    "get_breed_info",             // Rabbit: info razze
+    "search_rabbit_kb",           // Rabbit: knowledge base
   ],
   planning: [
     "get_sector_detail",
@@ -307,6 +367,8 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_job_posting_trend",     // Step 6: trend domanda per il ruolo target
     "get_skill_cooccurrences",   // Step 6: skill complementari per il piano
     "recall_semantic_memory",    // Plugin memory: recall conversazionale
+    "get_rabbit_care_guide",     // Rabbit: guide cura per pianificazione setup
+    "search_rabbit_kb",          // Rabbit: knowledge base approfondito
   ],
   deep_analysis: [
     "get_sector_detail",
@@ -326,6 +388,12 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "recall_semantic_memory",     // Plugin memory: recall conversazionale
     "ask_openhuman_memory",       // Personal Intelligence: memoria utente
     "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
+    "search_code_graph",
+    "explain_code_node",
+    "get_rabbit_care_guide",      // Rabbit: guide cura
+    "check_food_safety",          // Rabbit: sicurezza alimenti
+    "get_breed_info",             // Rabbit: info razze
+    "search_rabbit_kb",           // Rabbit: knowledge base
   ],
 };
 
@@ -361,3 +429,37 @@ export function toolsToOpenAIFormat(tools: ToolDefinition[]): Array<{
     },
   }));
 }
+
+// ── Plugin Tool Registry bootstrap ───────────────────────────────────────────
+// Registers all data tools into the unified toolRegistry singleton so that
+// isUiTool(), getForIntent(), and all() work correctly across the codebase.
+
+import { toolRegistry } from "../tools/registry";
+
+const WRITE_TOOLS = new Set([
+  "save_objective",
+  "update_objective_progress",
+  "save_business_idea",
+  "save_memory_fact",
+  "add_calendar_event",
+]);
+
+(function bootstrapToolRegistry() {
+  // Invert INTENT_TOOLS matrix → per-tool intent list
+  const toolIntents = new Map<string, WendyIntent[]>();
+  for (const [intent, names] of Object.entries(INTENT_TOOLS) as [WendyIntent, string[]][]) {
+    for (const name of names) {
+      if (!toolIntents.has(name)) toolIntents.set(name, []);
+      toolIntents.get(name)!.push(intent);
+    }
+  }
+
+  for (const tool of Object.values(ALL_TOOLS)) {
+    toolRegistry.register({
+      ...tool,
+      intents:       toolIntents.get(tool.name) ?? [],
+      isUiTool:      false,
+      requiresWrite: WRITE_TOOLS.has(tool.name),
+    });
+  }
+})();

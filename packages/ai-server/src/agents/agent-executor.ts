@@ -22,6 +22,7 @@ const AGENT_TOOLS_BY_DOMAIN: Record<string, string[]> = {
   business: ["search_rag", "get_sector_detail"],
   learning: ["get_learning_paths", "get_growth_articles", "search_rag", "get_skill_cooccurrences"],
   mindset:  ["get_user_context", "get_user_objectives", "get_growth_articles"],
+  rabbit:   ["get_rabbit_care_guide", "check_food_safety", "get_breed_info", "search_rabbit_kb", "get_user_context"],
 };
 
 // ── Executor principale ────────────────────────────────────────────────────────

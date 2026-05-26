@@ -7,6 +7,9 @@
  *
  * userId è nullable con SET NULL: se l'utente si cancella, il log aggregato
  * rimane per analytics ma non è più riconducibile alla persona (GDPR Art. 17).
+ *
+ * Phase 2 additions: domain, supervisorScore, wasRewritten, ttftMs.
+ * cost-guard now reads costUsdEst from this table — llm_usage is deprecated.
  */
 import {
   pgTable,
@@ -14,6 +17,7 @@ import {
   integer,
   text,
   real,
+  boolean,
   timestamp,
   index,
 } from "drizzle-orm/pg-core";
@@ -24,59 +28,67 @@ export const aiRequestLogTable = pgTable(
   {
     id: serial("id").primaryKey(),
 
-    // ── Identità ──────────────────────────────────────────────────────────
-    requestId: text("request_id").notNull(),     // UUID end-to-end (dal frontend)
+    // Identity
+    requestId: text("request_id").notNull(),
     userId:    integer("user_id")
-      .references(() => usersTable.id, { onDelete: "set null" }), // nullable: GDPR-safe
-    threadId:  text("thread_id"),                // coach_sessions.id
+      .references(() => usersTable.id, { onDelete: "set null" }),
+    threadId:  text("thread_id"),
 
-    // ── Routing ───────────────────────────────────────────────────────────
-    intent: text("intent").notNull(),            // navigation|simple_qa|conversation|planning|deep_analysis
-    tier:   text("tier").notNull(),              // nano|micro|standard|reasoning
-    model:  text("model").notNull(),             // nome modello esatto (es. deepseek/deepseek-chat-v3-0324:free)
+    // Routing
+    intent: text("intent").notNull(),
+    tier:   text("tier").notNull(),
+    model:  text("model").notNull(),
+    domain: text("domain"),   // career|mindset|habits|... — null on fast path
 
-    // ── Token & costo ─────────────────────────────────────────────────────
+    // Tokens & cost
     inputTokens:  integer("input_tokens").notNull().default(0),
     outputTokens: integer("output_tokens").notNull().default(0),
     costUsdEst:   real("cost_usd_est").notNull().default(0),
     latencyMs:    integer("latency_ms").notNull().default(0),
-    totalTurns:   integer("total_turns").notNull().default(0), // turni storia portati nel prompt
+    ttftMs:       integer("ttft_ms"),          // ms to first streamed token
+    totalTurns:   integer("total_turns").notNull().default(0),
 
-    // ── Esito ─────────────────────────────────────────────────────────────
-    status:    text("status").notNull(),         // success | error_model | error_timeout | error_ratelimit | error_internal
-    errorCode: text("error_code"),               // nullable, solo su errore
+    // Quality (Phase 2)
+    supervisorScore: real("supervisor_score"),                // 0–1, null if not invoked
+    wasRewritten:    boolean("was_rewritten").default(false), // supervisor triggered rewrite
 
-    // ── Tool usage (non-PII, metadati routing) ────────────────────────────
+    // Outcome
+    status:    text("status").notNull(),
+    errorCode: text("error_code"),
+
+    // Tool usage
     toolCallsCount: integer("tool_calls_count").notNull().default(0),
     toolsUsed:      text("tools_used").array().notNull().default([]),
 
-    // ── Categoria risposta ────────────────────────────────────────────────
+    // Response category
     responseCategory: text("response_category", {
       enum: ["success", "insufficient_data", "refused", "error_tool", "error_model"],
     }),
 
-    // ── Modalità ricerca semantica ────────────────────────────────────────
+    // Search mode
     searchMode: text("search_mode", {
       enum: ["semantic", "keyword", "none"],
     }),
 
-    // ── RAG telemetria (Step 6) ────────────────────────────────────────────
+    // RAG telemetry (Step 6)
     ragChunksRetrieved: integer("rag_chunks_retrieved").notNull().default(0),
-    ragTopSimilarity:   real("rag_top_similarity"),          // 0–1, null = RAG non usato
-    ragSourcesUsed:     text("rag_sources_used").array().notNull().default([]), // nomi fonti
+    ragTopSimilarity:   real("rag_top_similarity"),
+    ragSourcesUsed:     text("rag_sources_used").array().notNull().default([]),
 
-    // ── Localizzazione ────────────────────────────────────────────────────
+    // Locale
     locale: text("locale").notNull().default("it"),
 
-    // ── Audit ─────────────────────────────────────────────────────────────
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     userIdx:    index("ai_log_user_idx").on(t.userId),
     intentIdx:  index("ai_log_intent_idx").on(t.intent),
     createdIdx: index("ai_log_created_idx").on(t.createdAt),
-    // Aggregazione costi mensili per utente
+    domainIdx:  index("ai_log_domain_idx").on(t.domain),
+    // Monthly cost aggregation per user — used by cost-guard
     userCostIdx: index("ai_log_user_cost_idx").on(t.userId, t.createdAt),
+    // Quality optimizer: domain x intent x model
+    qualityIdx: index("ai_log_quality_idx").on(t.domain, t.intent, t.model, t.createdAt),
   }),
 );
 

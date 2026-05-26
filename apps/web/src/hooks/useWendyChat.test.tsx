@@ -129,6 +129,26 @@ describe("useWendyChat", () => {
     });
   });
 
+  it("shows the server error message when Wendy reports a stream error", async () => {
+    sse.start.mockImplementation(async () => {
+      sse.options?.onRawChunk?.(JSON.stringify({
+        type: "error",
+        message: "Il provider AI ha raggiunto un limite temporaneo.",
+      }));
+      sse.options?.onComplete?.("");
+    });
+
+    const { result } = renderHook(() => useWendyChat({ ttsEnabled: false }));
+    await act(async () => {
+      await result.current.sendMessage("ciao");
+    });
+
+    expect(result.current.messages.at(-1)).toMatchObject({
+      role: "error",
+      content: "Il provider AI ha raggiunto un limite temporaneo.",
+    });
+  });
+
   it("retries non-fatal stream errors and can stop streaming", async () => {
     vi.useFakeTimers();
     sse.start.mockImplementation(async () => {
@@ -151,8 +171,53 @@ describe("useWendyChat", () => {
     expect(sse.stop).toHaveBeenCalled();
   });
 
+  it("reconnects when the stream closes without a done event", async () => {
+    vi.useFakeTimers();
+    sse.start.mockImplementation(async () => {
+      sse.options?.onRawChunk?.(JSON.stringify({ type: "token", value: "Parziale" }));
+      sse.options?.onComplete?.("Parziale");
+    });
+
+    const { result } = renderHook(() => useWendyChat({ ttsEnabled: false, maxRetries: 1 }));
+    await act(async () => {
+      await result.current.sendMessage("dopo reload");
+    });
+
+    expect(sse.start).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+    expect(sse.start).toHaveBeenCalledTimes(2);
+  });
+
+  it("marks contextual suggestion requests as predefined", async () => {
+    sse.start.mockImplementation(async () => {
+      sse.options?.onRawChunk?.(JSON.stringify({ type: "done", requestId: "req-2", contextSources: [] }));
+      sse.options?.onComplete?.("ok");
+    });
+
+    const { result } = renderHook(() => useWendyChat({ ttsEnabled: false }));
+    await act(async () => {
+      await result.current.sendContextualMessage({
+        id: "career-plan",
+        label: "Piano carriera",
+        prompt: "Fammi un piano carriera",
+      });
+    });
+
+    const [, request] = sse.start.mock.calls[0]!;
+    expect(JSON.parse(String(request?.body))).toMatchObject({
+      message: "Fammi un piano carriera",
+      isPredefined: true,
+    });
+  });
+
   it("keeps feedback local when a message has no requestId", async () => {
-    sse.start.mockImplementation(async () => sse.options?.onComplete?.("ok"));
+    sse.start.mockImplementation(async () => {
+      sse.options?.onRawChunk?.(JSON.stringify({ type: "done", contextSources: [] }));
+      sse.options?.onComplete?.("ok");
+    });
     const { result } = renderHook(() => useWendyChat({ ttsEnabled: false }));
     await act(async () => {
       await result.current.sendMessage("feedback");

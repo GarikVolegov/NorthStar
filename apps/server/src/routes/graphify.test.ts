@@ -114,6 +114,17 @@ describe("graphify routes", () => {
     expect(body.results[0]).toMatchObject({ source: "graphify" });
   });
 
+  it("passes an optional search profile to the graphify client", async () => {
+    searchMock.mockResolvedValue([]);
+
+    await request(app())
+      .get("/api/graphify/search?q=wiki&profile=code")
+      .set("Authorization", `Bearer ${token()}`)
+      .expect(200);
+
+    expect(searchMock).toHaveBeenCalledWith("wiki", { profile: "code" });
+  });
+
   it("explains a graph node", async () => {
     explainMock.mockResolvedValue({
       id: "auth",

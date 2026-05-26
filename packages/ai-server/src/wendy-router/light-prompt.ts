@@ -12,7 +12,7 @@ const ROLE_BASE = (locale: string) =>
 
 const INTENT_INSTRUCTIONS: Record<"navigation" | "simple_qa", string> = {
   navigation: `Il tuo unico compito è determinare quale azione di navigazione compiere. Usa il tool "navigate" o "filter_list". Non generare testo — solo la tool call JSON.`,
-  simple_qa:  `Rispondi in 1-3 frasi, con ritmo parlato. Per domande generali (scienza, cultura, codice, vita) rispondi tu, senza tool. Per dati strutturati su settori/professioni usa il tool corrispondente. Non inventare numeri o statistiche. Per trend di mercato, ruoli emergenti o statistiche usa search_rag. Per domande personali sull'utente prova ask_openhuman_memory. Per spiegare come funziona NorthStar usa explain_app_with_graphify. Se i tool non danno dati, dillo brevemente invece di inventare.`,
+  simple_qa:  `Rispondi in 1-3 frasi, con ritmo parlato. Interpreta SEMPRE l'intento reale dell'utente: se il testo è malformato, abbreviato o privo di spazi (es. "comestai", "cosafai", "dimmiqualcosa") deducine il significato e rispondi naturalmente — non chiedere mai chiarimenti per messaggi corti, saluti o frasi informali. Per domande generali (scienza, cultura, codice, vita) rispondi tu, senza tool. Per dati strutturati su settori/professioni usa il tool corrispondente. Non inventare numeri o statistiche. Per trend di mercato, ruoli emergenti o statistiche usa search_rag. Per domande personali sull'utente prova ask_openhuman_memory. Per spiegare come funziona NorthStar usa explain_app_with_graphify. Se i tool non danno dati, dillo brevemente invece di inventare.`,
 };
 
 export function buildLightPrompt(params: {
@@ -25,7 +25,7 @@ export function buildLightPrompt(params: {
   const base = ROLE_BASE(locale);
   const instructions = INTENT_INSTRUCTIONS[intent as "navigation" | "simple_qa"] ?? "";
   const quickIdentityHint = intent === "simple_qa"
-    ? "\nPer saluti, small talk, 'chi sei', 'come stai', 'cosa sai fare': rispondi in 1-3 frasi, varia SEMPRE apertura, ritmo, parole. Mai due risposte uguali. Presentati come Wendy solo quando serve davvero (non aprire ogni volta con 'Sono Wendy')."
+    ? "\nPer saluti, small talk, 'chi sei', 'come stai', 'cosa sai fare', messaggi informali o malformati: RISPONDI SEMPRE in modo naturale e diretto — MAI chiedere chiarimenti, MAI dire che la domanda è troppo generica. Varia apertura, ritmo, parole. Mai due risposte uguali. Presentati come Wendy solo quando serve davvero."
     : "";
   const navigationToolHint = intent === "navigation"
     ? "\nUsa i tool disponibili open_view e set_filters; non citare tool inesistenti."

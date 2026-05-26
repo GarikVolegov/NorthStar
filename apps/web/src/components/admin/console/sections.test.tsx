@@ -90,7 +90,46 @@ const agents: AgentsOverview = {
     aiErrorCount: 1,
     byProvider: [],
   },
-  runnableAgents: [{ key: "news-research", label: "News", description: "Run news", endpoint: "/api/news", method: "POST", risk: "low" }],
+  runnablePipelines: [
+    {
+      key: "news-publishing",
+      label: "Ricerca e pubblica notizie",
+      description: "Raccoglie, arricchisce e pubblica news reali.",
+      endpoint: "/admin/pipelines/news-publishing/run",
+      method: "POST",
+      risk: "low",
+      steps: ["Collector", "Enricher", "News publisher"],
+      outputs: ["News pubblicate"],
+      requiredConfigKeys: ["OPENAI_API_KEY"],
+      reviewPolicy: "auto_publish",
+    },
+    {
+      key: "growth-research-review",
+      label: "Ricerca crescita personale",
+      description: "Crea bozze growth pending review.",
+      endpoint: "/admin/pipelines/growth-research-review/run",
+      method: "POST",
+      risk: "low",
+      steps: ["Web research", "Discovery", "Coda Crescita"],
+      outputs: ["Bozze create"],
+      requiredConfigKeys: ["TAVILY_API_KEY"],
+      reviewPolicy: "requires_review",
+    },
+    {
+      key: "market-refresh",
+      label: "Aggiorna lavori e settori",
+      description: "Aggiorna offerte e dati settore.",
+      endpoint: "/admin/pipelines/market-refresh/run",
+      method: "POST",
+      risk: "medium",
+      steps: ["Job postings", "Sector data"],
+      outputs: ["Snapshot aggiornati"],
+      requiredConfigKeys: ["ADZUNA_APP_ID", "ADZUNA_API_KEY"],
+      reviewPolicy: "data_refresh",
+    },
+  ],
+  advancedRunnableAgents: [{ key: "collector", label: "Collector", description: "Atomic collector", endpoint: "/admin/agents/collect", method: "POST", risk: "medium" }],
+  runnableAgents: [{ key: "collector", label: "Collector", description: "Atomic collector", endpoint: "/admin/agents/collect", method: "POST", risk: "medium" }],
 };
 
 const ops: AdminOpsStatus = {
@@ -179,8 +218,76 @@ describe("admin console sections", () => {
 
     expect(screen.getAllByText(agentStatusLabel("degraded")).length).toBeGreaterThan(0);
     expect(screen.getAllByText(fmtDuration(agents.summary.avgDurationMs)).length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByText("Rilancia"));
+    fireEvent.click(screen.getByText("Pipeline"));
     expect(onTabChange).toHaveBeenCalledWith("launch");
+  });
+
+  it("renders pipeline launch cards without exposing atomic agents in the primary view", () => {
+    const onLaunch = vi.fn();
+    render(
+      <AgentsSection
+        data={agents}
+        loading={false}
+        tab="launch"
+        onTabChange={vi.fn()}
+        agentDays="30"
+        onAgentDaysChange={vi.fn()}
+        agentFilter="all"
+        onAgentFilterChange={vi.fn()}
+        agentStatusFilter="all"
+        onAgentStatusFilterChange={vi.fn()}
+        newsSectorInput=""
+        onNewsSectorInputChange={vi.fn()}
+        agentsRunning={new Set()}
+        agentsResult={{}}
+        onRefresh={vi.fn()}
+        onOpenStatus={vi.fn()}
+        onLaunch={onLaunch}
+      />,
+    );
+
+    expect(screen.getByText("Ricerca e pubblica notizie")).toBeInTheDocument();
+    expect(screen.getByText("Ricerca crescita personale")).toBeInTheDocument();
+    expect(screen.getByText("Aggiorna lavori e settori")).toBeInTheDocument();
+    expect(screen.queryByText("Atomic collector")).not.toBeInTheDocument();
+
+    const launchButton = screen.getAllByRole("button", { name: /Avvia pipeline/i })[0];
+    expect(launchButton).toBeDefined();
+    fireEvent.click(launchButton!);
+    expect(onLaunch).toHaveBeenCalledWith(
+      "news-publishing",
+      "/admin/pipelines/news-publishing/run",
+      {},
+    );
+  });
+
+  it("shows running pipeline results as in progress instead of failed", () => {
+    render(
+      <AgentsSection
+        data={agents}
+        loading={false}
+        tab="launch"
+        onTabChange={vi.fn()}
+        agentDays="30"
+        onAgentDaysChange={vi.fn()}
+        agentFilter="all"
+        onAgentFilterChange={vi.fn()}
+        agentStatusFilter="all"
+        onAgentStatusFilterChange={vi.fn()}
+        newsSectorInput=""
+        onNewsSectorInputChange={vi.fn()}
+        agentsRunning={new Set(["news-publishing"])}
+        agentsResult={{
+          "news-publishing": { ok: false, data: { status: "running..." } },
+        }}
+        onRefresh={vi.fn()}
+        onOpenStatus={vi.fn()}
+        onLaunch={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Pipeline in esecuzione")).toBeInTheDocument();
+    expect(screen.queryByText("Run fallita")).not.toBeInTheDocument();
   });
 
   it("renders StatusSection operational controls", () => {

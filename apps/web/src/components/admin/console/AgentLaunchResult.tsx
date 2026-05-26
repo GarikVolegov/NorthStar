@@ -4,12 +4,19 @@ import { arrayRecords, fmtDuration, recordValue, stringList } from "./utils";
 
 export function AgentLaunchResult({
   agentKey,
+  pipelineKey,
   result,
 }: {
-  agentKey: string;
+  agentKey?: string;
+  pipelineKey?: string;
   result: { ok: boolean; data: Record<string, unknown> };
 }) {
+  const key = pipelineKey ?? agentKey ?? "";
   const data = result.data;
+  const isRunning =
+    data.status === "running..." ||
+    data.status === "running" ||
+    data.status === "in_progress";
   const warnings = stringList(data.warnings);
   const collector = recordValue(data.collector);
   const enricher = recordValue(data.enricher);
@@ -18,37 +25,58 @@ export function AgentLaunchResult({
   const missingCoverage = arrayRecords(publisher.missingCoverage);
   const topics = stringList(data.topics);
   const hasWarnings = warnings.length > 0;
-  const tone = !result.ok
+  const tone = isRunning
+    ? "border-info-muted bg-info-surface text-info"
+    : !result.ok
     ? "border-danger-muted bg-danger-surface text-danger"
     : hasWarnings
       ? "border-warning-muted bg-warning-surface text-warning"
       : "border-success-muted bg-success-surface text-success";
 
-  const headline = !result.ok
+  const headline = isRunning
+    ? "Pipeline in esecuzione"
+    : !result.ok
     ? "Run fallita"
     : hasWarnings
       ? "Run completata con warning"
       : "Run completata";
 
+  if (isRunning) {
+    return (
+      <div className={cn("rounded-lg border p-3 text-sm", tone)}>
+        <p className="font-semibold">{headline}</p>
+        <p className="mt-1 text-xs opacity-80">
+          Sto aspettando il risultato finale della pipeline.
+        </p>
+      </div>
+    );
+  }
+
   const metrics =
-    agentKey === "news-research"
+    key === "news-publishing" || key === "news-research"
       ? [
           ["Run ID", data.runId],
           ["Controllati", data.checked],
-          ["Aggiunti", data.added],
+          ["News pubblicate", data.added],
           ["Collector raccolti", collector.totalCollected],
           ["Collector inseriti", collector.totalInserted],
           ["Enriched", enricher.enriched],
           ["Publisher trasferiti", publisher.transferred],
           ["Coverage mancante", missingCoverage.length],
         ]
-      : agentKey === "growth-research"
+      : key === "growth-research-review" || key === "growth-research"
         ? [
             ["Run ID", data.runId],
             ["Fonti tentate", data.attempted],
-            ["Articoli creati", data.added],
+            ["Bozze create", data.added],
             ["Topic", topics.length],
           ]
+        : key === "market-refresh"
+          ? [
+              ["Run ID", data.runId],
+              ["Snapshot creati", data.snapshotsInserted],
+              ["Snapshot aggiornati", data.snapshotsUpdated],
+            ]
         : [
             ["Run ID", data.runId],
             ["Processati", data.processed],
@@ -92,7 +120,7 @@ export function AgentLaunchResult({
           ))}
       </div>
 
-      {agentKey === "growth-research" && topics.length > 0 && (
+      {(key === "growth-research-review" || key === "growth-research") && topics.length > 0 && (
         <div className="mt-3">
           <p className="text-xs font-semibold">Topic ricercati</p>
           <div className="mt-1 flex flex-wrap gap-1.5">
@@ -105,7 +133,7 @@ export function AgentLaunchResult({
         </div>
       )}
 
-      {agentKey === "growth-research" && created.length > 0 && (
+      {(key === "growth-research-review" || key === "growth-research") && created.length > 0 && (
         <div className="mt-3">
           <p className="text-xs font-semibold">Articoli creati</p>
           <div className="mt-1 space-y-1">
@@ -120,7 +148,7 @@ export function AgentLaunchResult({
         </div>
       )}
 
-      {agentKey === "news-research" && missingCoverage.length > 0 && (
+      {(key === "news-publishing" || key === "news-research") && missingCoverage.length > 0 && (
         <div className="mt-3">
           <p className="text-xs font-semibold">
             Settori senza abbastanza news reali

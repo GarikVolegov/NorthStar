@@ -8,7 +8,7 @@
  * Non sincronizziamo i token in volo: ogni tab ha la propria SSE attiva
  * (più semplice, evita race condition di scrittura su localStorage).
  */
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 export type WendyTabEvent =
   | { kind: 'cleared'; ts: number }
@@ -58,10 +58,10 @@ export function useWendyTabSync({
     };
   }, [enabled]);
 
-  return {
-    broadcast: (event) => {
-      const payload: WendyTabEvent = { ...event, ts: Date.now() } as WendyTabEvent;
-      channelRef.current?.postMessage(payload);
-    },
-  };
+  const broadcast = useCallback((event: Omit<WendyTabEvent, 'ts'>) => {
+    const payload: WendyTabEvent = { ...event, ts: Date.now() } as WendyTabEvent;
+    channelRef.current?.postMessage(payload);
+  }, []);
+
+  return { broadcast };
 }

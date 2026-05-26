@@ -10,4 +10,15 @@ describe("frontend route config", () => {
     expect(paths.has("/admin-status")).toBe(true);
     expect(paths.has("/admin-rag")).toBe(true);
   });
+
+  it("exposes the dedicated objectives page as a protected route", () => {
+    const route = routes.find((item) => item.path === "/obiettivi");
+
+    expect(route).toMatchObject({
+      path: "/obiettivi",
+      guard: "protected",
+      layout: "default",
+      title: "Obiettivi",
+    });
+  });
 });

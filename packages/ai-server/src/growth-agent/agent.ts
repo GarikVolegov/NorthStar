@@ -1,4 +1,5 @@
 import type OpenAI from "openai";
+import pRetry from "p-retry";
 import { openai } from "../client";
 import { buildSystemPrompt, type UserContext } from "./prompt-builder";
 import { evaluateSelf, buildClarification, type EvalResult } from "./self-evaluator";
@@ -7,14 +8,19 @@ import { buildRoutingHistorySummary } from "./router-memory";
 import { getSpecialist } from "./specialist-agent";
 import { supervisorAgent } from "./supervisor-agent";
 import { loadMemory, buildMemorySection, type UserMemory } from "./memory-manager";
+import { buildContextualMemorySection, searchMemory } from "./memory-search";
+import { buildWendyBrainContextSection, searchWendyBrain } from "../wendy-brain";
 import { runParallelHandoff } from "./parallel-handoff";
 import { UI_TOOLS, type UiToolName, type UiToolArgs } from "./ui-tools";
 import { getToolsForIntent, toolsToOpenAIFormat } from "../wendy-router/tool-registry";
 import { executeToolCall } from "../wendy-router/tool-handlers";
 import { isClientSideToolData, parseToolArguments } from "./tool-args";
+import { toolRegistry } from "../tools/registry";
 import { scheduleMemorySave } from "./memory-save";
+import { buildUiDirectives, type UiDirectives } from "./ui-directives";
 import { loadResponseContext } from "./response-context";
 import { runVoiceFastPath } from "./voice-runner";
+import { normalizeInput } from "./input-normalizer";
 import type { WendyIntent } from "../wendy-router/types";
 import type { RetrievedChunk } from "./retriever";
 import type { CoTResult } from "./chain-of-thought";
@@ -26,6 +32,7 @@ import { wendyLatencySeconds } from "../metrics";
 import { startSpan } from "../tracing";
 import { FF } from "../feature-flags";
 import { selectModelFor, modelFor } from "../model-router";
+import { wendyConfig } from "../config/wendy";
 import "./specialists/career-agent";
 import "./specialists/mindset-agent";
 import "./specialists/habits-agent";
@@ -39,9 +46,6 @@ export interface ChatMessage {
   content: string;
   domain?: RouteDecision["domain"] | undefined;
 }
-const UI_TOOL_NAMES = new Set<string>(
-  (UI_TOOLS as Array<{ function: { name: string } }>).map((t) => t.function.name),
-);
 export interface GrowthAgentOptions {
   userId:           number;
   sessionId?:       number | undefined;
@@ -53,13 +57,14 @@ export interface GrowthAgentOptions {
   voiceMode?:       boolean | undefined;
   requestId?:       string | undefined;
   wendyIntent?:     WendyIntent | undefined;   // passato da ai-wendy.ts per scegliere i tool di dominio
+  isPredefined?:    boolean | undefined;
 }
 export type GrowthAgentEvent =
   | { type: "token"; value: string }
   | { type: "status"; value: string; domain?: RouteDecision["domain"] | undefined }
   | { type: "ui_tool"; name: UiToolName; args: UiToolArgs }
   | { type: "tool_call"; name: string; result: unknown }
-  | { type: "done"; sources: RetrievedChunk[]; cot?: CoTResult | null | undefined; evalResult?: EvalResult | undefined; routeDecision?: RouteDecision | undefined; supervisorResult?: SupervisorResult | undefined }
+  | { type: "done"; sources: RetrievedChunk[]; cot?: CoTResult | null | undefined; evalResult?: EvalResult | undefined; routeDecision?: RouteDecision | undefined; supervisorResult?: SupervisorResult | undefined; uiDirectives?: UiDirectives | undefined }
   | { type: "error"; message: string };
 export async function* runGrowthAgent(
   opts: GrowthAgentOptions,
@@ -68,7 +73,9 @@ export async function* runGrowthAgent(
     userId, sessionId, userContext, history, userMessage,
     maxHistory = 12, voiceMode = false, requestId,
     wendyIntent,
+    isPredefined = false,
   } = opts;
+  const normalizedMessage = normalizeInput(userMessage);
   const logFields: LoggerFields = { userId, sessionId, requestId };
   if (voiceMode) {
     yield* runVoiceFastPath({ userId, sessionId, name: userContext.name, history, userMessage, logFields });
@@ -80,7 +87,7 @@ export async function* runGrowthAgent(
       const endRouterTimer = wendyLatencySeconds.startTimer({ phase: "router" });
       const routerSpan = startSpan("router", { requestId });
       try {
-        const result = await routerAgent.route(userMessage, history, requestId);
+        const result = await routerAgent.route(normalizedMessage, history, requestId);
         return result;
       } finally {
         routerSpan.end();
@@ -115,21 +122,46 @@ export async function* runGrowthAgent(
     routeConfidence: routeDecision.confidence,
   });
 
-  const memorySection   = buildMemorySection(userMemory);
+  const [contextualMemorySection, wendyBrainSection] = await Promise.all([
+    userId > 0
+      ? searchMemory(userId, normalizedMessage, 5).then(buildContextualMemorySection).catch((err) => {
+          logger.warn({ err, ...logFields }, "contextual memory search failed");
+          return "";
+        })
+      : Promise.resolve(""),
+    searchWendyBrain(normalizedMessage, {
+      limit: wendyConfig.brain.maxContextNodes,
+      includeCandidates: false,
+    }).then(buildWendyBrainContextSection).catch((err) => {
+      logger.warn({ err, ...logFields }, "wendy brain search failed");
+      return "";
+    }),
+  ]);
+  const memorySection = contextualMemorySection || buildMemorySection({
+    facts: userMemory.facts.filter((f) => f.key === "goal_main" || f.key === "pending_follow_up"),
+    patterns: [],
+  });
   const enrichedContext: UserContext & { memorySection?: string | undefined } = {
     ...userContext,
     memorySection: memorySection || userContext.memorySection,
+    wendyBrainSection: wendyBrainSection || userContext.wendyBrainSection,
   };
   let routingHistorySummary = "";
-  if (userId > 0 && !routeDecision.isFallback) {
+  if (
+    userId > 0 &&
+    !routeDecision.isFallback &&
+    history.length >= 2 &&
+    (routeDecision.intent === "plan" || routeDecision.intent === "problem_solve")
+  ) {
     routingHistorySummary = await buildRoutingHistorySummary(userId).catch(() => "");
   }
 
   const fallbackInstruction = routeDecision.isFallback
     ? "Non hai abbastanza informazioni per classificare la richiesta dell'utente. Invece di rispondere direttamente, fai 1 domanda di chiarimento specifica per capire meglio di cosa ha bisogno. Non inventare risposte generiche."
     : undefined;
+  let lastSupervisorScore: number | undefined;
   const saveAssistantMemory = (assistantResponse: string, sid: number): void =>
-    scheduleMemorySave({ userId, sessionId: sid, history, userMessage, assistantResponse, routeDecision, logFields });
+    scheduleMemorySave({ userId, sessionId: sid, history, userMessage, assistantResponse, routeDecision, logFields, supervisorScore: lastSupervisorScore });
 
   const primaryConfident =
     routeDecision.confidence >= routeDecision.threshold &&
@@ -141,7 +173,7 @@ export async function* runGrowthAgent(
     } else {
       let fullResponse = "";
       for await (const event of runParallelHandoff({
-        userId, userContext: enrichedContext, history, userMessage,
+        userId, userContext: enrichedContext, history, userMessage: normalizedMessage,
         primaryRoute:   routeDecision,
         secondaryRoute: routeDecision.secondaryRoute,
         memoryFactCount, maxHistory, requestId,
@@ -159,34 +191,43 @@ export async function* runGrowthAgent(
     const specialist = getSpecialist(routeDecision.domain);
     if (specialist) {
       let fullResponse = "";
-      for await (const event of specialist.run({
-        userId, userContext: enrichedContext, history, userMessage,
-        routeDecision, memoryFactCount, maxHistory, requestId,
-      })) {
-        if (event.type === "token") fullResponse += event.value;
-        yield event;
-        if (event.type === "done") saveAssistantMemory(fullResponse, sessionId ?? Date.now());
+      try {
+        for await (const event of specialist.run({
+          userId, sessionId, userContext: enrichedContext, history, userMessage,
+          normalizedMessage,
+          routeDecision, memoryFactCount, maxHistory, requestId,
+        })) {
+          if (event.type === "error") {
+            throw new Error(event.message);
+          }
+          if (event.type === "token") fullResponse += event.value;
+          yield event;
+          if (event.type === "done") saveAssistantMemory(fullResponse, sessionId ?? Date.now());
+        }
+        endRagTimer();
+        return;
+      } catch (err) {
+        logger.warn({ err, ...logFields }, "specialist failed, falling back to generic growth agent");
+        yield { type: "status", value: "Cambio approccio..." };
       }
-      endRagTimer();
-      return;
     }
   }
 
   yield { type: "status", value: "🔍 Analizzando il tuo profilo..." };
 
   const { personaExamples, documentChunks, platformChunks, webResults, cot } =
-    await loadResponseContext(userId, userMessage, history, requestId);
+    await loadResponseContext(userId, normalizedMessage, history, requestId, sessionId);
   endRagTimer();
 
   yield { type: "status", value: "🧠 Ragionamento in corso..." };
 
-  const evalResult = evaluateSelf({ userMessage, documentChunks, webResults, cot, memoryFactCount });
+  const evalResult = evaluateSelf({ userMessage: normalizedMessage, documentChunks, webResults, cot, memoryFactCount, isPredefined });
 
   if (evalResult.needsClarification) {
     yield { type: "status", value: "Non ho ancora abbastanza elementi per darti una risposta utile." };
     const clarification = buildClarification(evalResult, userContext.name);
     yield { type: "token", value: clarification };
-    yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], cot, evalResult, routeDecision };
+    yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], cot, evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
     saveAssistantMemory(clarification, sessionId ?? Date.now());
     return;
   }
@@ -195,7 +236,7 @@ export async function* runGrowthAgent(
 
   const systemPrompt = buildSystemPrompt({
     userContext: enrichedContext, personaExamples, documentChunks,
-    webResults, cot, userMessage, evalResult,
+    webResults, cot, userMessage: normalizedMessage, evalResult,
     platformChunks,
     routeDecision,
     behaviorPatterns: userMemory.patterns,
@@ -213,7 +254,7 @@ export async function* runGrowthAgent(
     { role: "user", content: userMessage },
   ];
 
-  const temperature = evalResult.level === "low" ? 0.45 : 0.72;
+  const temperature = evalResult.level === "low" ? wendyConfig.specialist.temperatureLow : wendyConfig.specialist.temperatureHigh;
 
   try {
     yield { type: "status", value: "✍️ Generando risposta..." };
@@ -240,11 +281,21 @@ export async function* runGrowthAgent(
       messages,
       stream: true,
       temperature,
-      max_tokens: evalResult.level === "low" ? 300 : 600,
+      max_tokens: evalResult.level === "low" ? wendyConfig.agent.maxTokensLow : wendyConfig.agent.maxTokensHigh,
       stream_options: { include_usage: false },
       ...(hasTools ? { tools: allTools, tool_choice: "auto" } : {}),
     };
-    const stream = await openai.chat.completions.create(completionParams);
+    const stream = await pRetry(
+      () => openai.chat.completions.create(completionParams),
+      {
+        retries: 2,
+        minTimeout: 1000,
+        maxTimeout: 3000,
+        onFailedAttempt: (err) => {
+          logger.warn({ err, attempt: err.attemptNumber, ...logFields }, "LLM call failed, retrying");
+        },
+      },
+    );
 
     const tokenBuffer:   string[] = [];
     let   toolCallName:  string   = "";
@@ -282,7 +333,7 @@ export async function* runGrowthAgent(
       supervisorSpan.end();
       endSupervisorTimer();
 
-      if (!UI_TOOL_NAMES.has(toolCallName)) {
+      if (!toolRegistry.isUiTool(toolCallName)) {
         const parsedArgs = parseToolArguments(toolCallArgs);
 
         const toolResult = await executeToolCall(toolCallName, parsedArgs, userId);
@@ -290,7 +341,7 @@ export async function* runGrowthAgent(
 
         if (toolResult.ok && isClientSideToolData(toolData)) {
           yield { type: "tool_call", name: toolCallName, result: toolData };
-          yield { type: "done", sources: [], evalResult, routeDecision };
+          yield { type: "done", sources: [], evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
           saveAssistantMemory(`[tool: ${toolCallName}]`, sessionId ?? Date.now());
           return;
         }
@@ -307,10 +358,20 @@ export async function* runGrowthAgent(
 
         yield { type: "tool_call", name: toolCallName, result: toolData };
 
-        const followUpStream = await openai.chat.completions.create({
-          model: route.model, messages: followUpMessages,
-          stream: true, temperature: 0.55, max_tokens: 700,
-        });
+        const followUpStream = await pRetry(
+          () => openai.chat.completions.create({
+            model: route.model, messages: followUpMessages,
+            stream: true, temperature: 0.55, max_tokens: wendyConfig.agent.followUpMaxTokens,
+          }),
+          {
+            retries: 2,
+            minTimeout: 1000,
+            maxTimeout: 3000,
+            onFailedAttempt: (err) => {
+              logger.warn({ err, attempt: err.attemptNumber, ...logFields }, "LLM follow-up call failed, retrying");
+            },
+          },
+        );
 
         const followUpBuffer: string[] = [];
         for await (const chunk of followUpStream) {
@@ -332,7 +393,7 @@ export async function* runGrowthAgent(
         args = JSON.parse(toolCallArgs) as UiToolArgs;
       } catch {
         yield { type: "error", message: `UI tool args parse error: ${toolCallArgs}` };
-        yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], evalResult, routeDecision };
+        yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
         return;
       }
 
@@ -340,7 +401,7 @@ export async function* runGrowthAgent(
       yield {
         type: "done",
         sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults],
-        evalResult, routeDecision,
+        evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent),
       };
       saveAssistantMemory(`[UI: ${toolCallName}]`, sessionId ?? Date.now());
       return;
@@ -349,14 +410,15 @@ export async function* runGrowthAgent(
     const draft = tokenBuffer.join("");
 
     const supervisorInput = {
-      userMessage, draft,
+      userMessage: normalizedMessage, draft,
       domain:    routeDecision.domain,
       intent:    routeDecision.intent,
       userId:    String(userId),
       sessionId: sessionId,
     };
 
-    let supervisorResult = supervisorAgent.evaluate(supervisorInput);
+    let supervisorResult = await supervisorAgent.evaluate(supervisorInput);
+    lastSupervisorScore  = supervisorResult.score;
     let finalText        = draft;
 
     if (!supervisorResult.pass && FF.supervisorEnabled) {
@@ -378,7 +440,7 @@ export async function* runGrowthAgent(
     supervisorSpan.end();
     endSupervisorTimer();
 
-    const CHUNK_SIZE = 4;
+    const CHUNK_SIZE = wendyConfig.agent.chunkSize;
     for (let i = 0; i < finalText.length; i += CHUNK_SIZE) {
       yield { type: "token", value: finalText.slice(i, i + CHUNK_SIZE) };
     }
@@ -387,6 +449,7 @@ export async function* runGrowthAgent(
       type: "done",
       sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults],
       cot, evalResult, routeDecision, supervisorResult,
+      uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent),
     };
 
     saveAssistantMemory(finalText, sessionId ?? Date.now());

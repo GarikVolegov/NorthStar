@@ -1,7 +1,8 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, discoverySourcesTable } from "@workspace/db";
 import { logger } from "../logger";
 import { fetchRSS } from "./collector-rss";
+import { collectScrapingSources } from "./collector-scraping";
 import type { CollectorSource, ItemType, RawItem } from "./collector-types";
 
 interface HNHit {
@@ -165,7 +166,7 @@ async function collectGNews(): Promise<RawItem[]> {
   return results;
 }
 
-async function collectStaticRssSources(): Promise<RawItem[]> {
+async function collectStaticRssSources(priorityOnly = false): Promise<RawItem[]> {
   const feeds: Array<{ url: string; type: ItemType; source: string; sector: string; category: string; collectorSource: string; limit?: number }> = [
     { url: "https://blog.coursera.org/feed/", type: "formation", source: "Coursera Blog", sector: "Education", category: "course_announcement", collectorSource: "coursera_rss", limit: 6 },
     { url: "https://blog.coursera.org/career-development/feed/", type: "formation", source: "Coursera Blog", sector: "Career Development", category: "career_guide", collectorSource: "coursera_rss", limit: 6 },
@@ -179,12 +180,19 @@ async function collectStaticRssSources(): Promise<RawItem[]> {
     { url: "https://www.ilsole24ore.com/rss/notizie/lavoro-carriere.xml", type: "opportunity", source: "Il Sole 24 Ore", sector: "Mercato del Lavoro", category: "lavoro_carriere", collectorSource: "sole24ore_rss", limit: 6 },
     { url: "https://www.ilsole24ore.com/rss/tecnologia.xml", type: "sector_trend", source: "Il Sole 24 Ore", sector: "Technology", category: "tech_news", collectorSource: "sole24ore_rss", limit: 6 },
     { url: "https://www.ilsole24ore.com/rss/finanza.xml", type: "news", source: "Il Sole 24 Ore", sector: "Finanza", category: "finanza", collectorSource: "sole24ore_rss", limit: 6 },
-    { url: "https://www.ninjamarketing.it/feed/", type: "sector_trend", source: "Ninja Marketing", sector: "Digital Marketing", category: "marketing_trend", collectorSource: "ninja_marketing_rss", limit: 5 },
+    { url: "https://www.ansa.it/sito/notizie/economia/economia_rss.xml", type: "news", source: "ANSA", sector: "Economia Italia", category: "economia", collectorSource: "ansa_rss", limit: 6 },
+    { url: "https://www.ansa.it/sito/notizie/tecnologia/tecnologia_rss.xml", type: "news", source: "ANSA", sector: "Technology", category: "tech_news", collectorSource: "ansa_rss", limit: 6 },
+    { url: "https://www.wired.it/feed/", type: "news", source: "Wired Italia", sector: "Technology", category: "tech_news", collectorSource: "wired_it_rss", limit: 6 },
+    { url: "https://www.repubblica.it/rss/economia/rss2.0.xml", type: "news", source: "La Repubblica", sector: "Economia Italia", category: "economia", collectorSource: "repubblica_rss", limit: 6 },
+    { url: "https://www.ninjamarketing.it/feed/", type: "news", source: "Ninja Marketing", sector: "Digital Marketing", category: "marketing_trend", collectorSource: "ninja_marketing_rss", limit: 5 },
     { url: "https://www.ninjamarketing.it/category/startup-innovazione/feed/", type: "opportunity", source: "Ninja Marketing", sector: "Startup", category: "startup_italia", collectorSource: "ninja_marketing_rss", limit: 5 },
     { url: "https://www.ninjamarketing.it/category/social-media/feed/", type: "sector_trend", source: "Ninja Marketing", sector: "Social Media", category: "social_media", collectorSource: "ninja_marketing_rss", limit: 5 },
   ];
+  const selectedFeeds = priorityOnly
+    ? feeds.filter((feed) => ["sole24ore_rss", "ninja_marketing_rss", "ansa_rss", "wired_it_rss", "repubblica_rss"].includes(feed.collectorSource))
+    : feeds;
   const results: RawItem[] = [];
-  await Promise.allSettled(feeds.map(async (feed) => {
+  await Promise.allSettled(selectedFeeds.map(async (feed) => {
     try {
       const entries = await fetchRSS(feed.url, feed.limit);
       for (const entry of entries) {
@@ -222,10 +230,15 @@ async function collectYouTubeEDU(): Promise<RawItem[]> {
   return results;
 }
 
-async function collectDynamicSources(): Promise<RawItem[]> {
-  let sources: Array<{ id: number; name: string; feedUrl: string; itemType: string; sector: string; category: string; itemsPerRun: number }>;
+async function collectDynamicSources(priorityOnly = false): Promise<RawItem[]> {
+  let sources: Array<{ id: number; name: string; feedUrl: string; itemType: string; sector: string; category: string; itemsPerRun: number; priority?: boolean | null }>;
   try {
-    sources = await db.select().from(discoverySourcesTable).where(eq(discoverySourcesTable.enabled, true));
+    sources = await db
+      .select()
+      .from(discoverySourcesTable)
+      .where(priorityOnly
+        ? and(eq(discoverySourcesTable.enabled, true), eq(discoverySourcesTable.priority, true))
+        : eq(discoverySourcesTable.enabled, true));
   } catch (err) {
     logger.warn({ err }, "[collector] dynamic sources DB read failed");
     return [];
@@ -244,15 +257,30 @@ async function collectDynamicSources(): Promise<RawItem[]> {
   return results;
 }
 
-export function getCollectorSources(): CollectorSource[] {
+export interface CollectorSourceOptions {
+  priorityOnly?: boolean;
+}
+
+export function getCollectorSources(options: CollectorSourceOptions = {}): CollectorSource[] {
+  if (options.priorityOnly) {
+    return [
+      { name: "hackernews", fn: collectHackerNews },
+      { name: "newsapi", fn: collectNewsAPI },
+      { name: "gnews", fn: collectGNews },
+      { name: "static_priority_rss", fn: () => collectStaticRssSources(true) },
+      { name: "dynamic_priority_sources", fn: () => collectDynamicSources(true) },
+    ];
+  }
+
   return [
     { name: "hackernews", fn: collectHackerNews },
     { name: "devto", fn: collectDevTo },
     { name: "reddit", fn: collectReddit },
     { name: "newsapi", fn: collectNewsAPI },
     { name: "gnews", fn: collectGNews },
-    { name: "static_rss", fn: collectStaticRssSources },
+    { name: "static_rss", fn: () => collectStaticRssSources(false) },
     { name: "youtube_edu", fn: collectYouTubeEDU },
-    { name: "dynamic_sources", fn: collectDynamicSources },
+    { name: "dynamic_sources", fn: () => collectDynamicSources(false) },
+    { name: "scraping_sources", fn: collectScrapingSources },
   ];
 }

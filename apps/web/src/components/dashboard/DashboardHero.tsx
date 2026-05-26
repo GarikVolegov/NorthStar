@@ -1,6 +1,16 @@
 import type { DashboardSession } from "@/hooks/useDashboardData";
 import { cn } from "@/lib/utils";
-import { BarChart3, Building2, Crown, HelpCircle, MapPin, Rocket, TrendingUp, type LucideIcon } from "lucide-react";
+import {
+  BarChart3,
+  Briefcase,
+  Building2,
+  Crown,
+  HelpCircle,
+  MapPin,
+  Rocket,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
 import { Link } from "wouter";
 
 type JourneyId = "indeciso" | "dipendente" | "autonomo" | "azienda" | "investitore";
@@ -27,11 +37,17 @@ export function DashboardHero({
   session,
   isPremium,
   userName,
+  profilePercent,
+  confirmedSectorName,
+  sessionId,
 }: {
   journeyType: string | null | undefined;
   session: DashboardSession | null;
   isPremium: boolean;
   userName?: string | null;
+  profilePercent?: number;
+  confirmedSectorName?: string | null;
+  sessionId?: number | null;
 }) {
   const meta = journeyType ? JOURNEY_META[journeyType as JourneyId] : null;
   const Icon = meta?.icon ?? HelpCircle;
@@ -39,59 +55,77 @@ export function DashboardHero({
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Buongiorno" : hour < 18 ? "Buon pomeriggio" : "Buonasera";
   const firstName = userName?.split(" ")[0] ?? "";
+  const profileComplete = (profilePercent ?? 0) >= 100;
+  const sectorHref = sessionId ? `/risultati/${sessionId}` : "/test";
 
   return (
     <div className="rounded-2xl border overflow-hidden">
-      <div className="hero-navy px-6 py-5 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="hero-navy px-6 py-5 flex flex-col gap-4">
         {/* Greeting */}
-        <div className="flex-1">
-          <p className="text-xs text-white/50 font-medium mb-0.5">
-            {greeting}{firstName ? `, ${firstName}` : ""}
-          </p>
-          {meta ? (
-            <div className="flex items-center gap-2">
-              <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border", meta.bgColor, meta.borderColor)}>
-                <Icon className={cn("w-3.5 h-3.5", meta.color)} />
+        <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+          <div className="flex-1">
+            <p className="text-xs text-white/50 font-medium mb-0.5">
+              {greeting}{firstName ? `, ${firstName}` : ""}
+            </p>
+            {meta ? (
+              <div className="flex items-center gap-2">
+                <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border", meta.bgColor, meta.borderColor)}>
+                  <Icon className={cn("w-3.5 h-3.5", meta.color)} />
+                </div>
+                <div>
+                  <h2 className="font-bold text-white text-base leading-tight">{meta.headline}</h2>
+                  <p className="text-xs text-white/50 leading-tight">{meta.subline}</p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-bold text-white text-base leading-tight">{meta.headline}</h2>
-                <p className="text-xs text-white/50 leading-tight">{meta.subline}</p>
-              </div>
-            </div>
-          ) : (
-            <h2 className="font-bold text-white text-base">Il tuo pannello di controllo</h2>
-          )}
+            ) : (
+              <h2 className="font-bold text-white text-base">Il tuo pannello di controllo</h2>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {!journeyType ? (
+              <Link href="/percorso">
+                <div className="inline-flex min-h-9 items-center gap-1.5 bg-primary text-primary-foreground font-semibold text-xs rounded-full px-3 py-1.5 hover:bg-primary/90 transition-all">
+                  <MapPin className="w-3 h-3" /> Scegli il percorso
+                </div>
+              </Link>
+            ) : (
+              <Link href="/percorso">
+                <div className="inline-flex min-h-9 items-center gap-1.5 border border-white/20 text-white/60 text-xs rounded-full px-3 py-1.5 hover:border-white/30 hover:text-white/80 transition-all">
+                  <MapPin className="w-3 h-3" />
+                  <span className="capitalize">{journeyType}</span>
+                </div>
+              </Link>
+            )}
+            {!session && (
+              <Link href="/test">
+                <div className="inline-flex min-h-9 items-center gap-1.5 bg-primary/20 border border-primary/30 text-primary text-xs font-semibold rounded-full px-3 py-1.5 hover:bg-primary/30 transition-all">
+                  Fai il test
+                </div>
+              </Link>
+            )}
+            {isPremium && (
+              <span className="inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-primary bg-primary/15 border border-primary/30 rounded-full px-2.5 py-1">
+                <Crown className="w-3 h-3" /> Pro
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {!journeyType ? (
-            <Link href="/percorso">
-              <div className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground font-semibold text-xs rounded-full px-3 py-1.5 hover:bg-primary/90 transition-all">
-                <MapPin className="w-3 h-3" /> Scegli il percorso
-              </div>
-            </Link>
-          ) : (
-            <Link href="/percorso">
-              <div className="inline-flex items-center gap-1.5 border border-white/20 text-white/60 text-xs rounded-full px-3 py-1.5 hover:border-white/30 hover:text-white/80 transition-all">
-                <MapPin className="w-3 h-3" />
-                <span className="capitalize">{journeyType}</span>
-              </div>
-            </Link>
-          )}
-          {!session && (
-            <Link href="/test">
-              <div className="inline-flex items-center gap-1.5 bg-primary/20 border border-primary/30 text-primary text-xs font-semibold rounded-full px-3 py-1.5 hover:bg-primary/30 transition-all">
-                Fai il test
-              </div>
-            </Link>
-          )}
-          {isPremium && (
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary bg-primary/15 border border-primary/30 rounded-full px-2.5 py-1">
-              <Crown className="w-3 h-3" /> Pro
-            </span>
-          )}
-        </div>
+        {profileComplete && (
+          <div className="flex flex-wrap gap-2">
+            {confirmedSectorName && (
+              <Link href={sectorHref}>
+                <div className="inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:border-white/30 hover:text-white transition-all">
+                  <Briefcase className="w-3.5 h-3.5 shrink-0" />
+                  <span className="text-white/50">Settore</span>
+                  <span className="truncate">{confirmedSectorName}</span>
+                </div>
+              </Link>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -20,6 +20,7 @@ import type {
 } from "@/features/admin-review/adminReviewTypes";
 import { AdminReviewContent } from "@/features/admin-review/components/AdminReviewContent";
 import { AdminReviewSidebar } from "@/features/admin-review/components/AdminReviewSidebar";
+import { AdminWendyPanel } from "@/features/admin-review/components/AdminWendyPanel";
 import type { useAdminAffiliations } from "@/features/admin-review/hooks/useAdminAffiliations";
 import type { useAdminCatalogs } from "@/features/admin-review/hooks/useAdminCatalogs";
 import type { useAdminMessages } from "@/features/admin-review/hooks/useAdminMessages";
@@ -31,8 +32,8 @@ import type { useGrowthQueue } from "@/features/admin-review/hooks/useGrowthQueu
 import type { useMemoryGraph } from "@/features/admin-review/hooks/useMemoryGraph";
 import { cn } from "@/lib/utils";
 import { formatLastUpdated } from "@/components/admin/console";
-import { Menu, RefreshCw, ShieldAlert, XCircle } from "lucide-react";
-import type { Dispatch, SetStateAction } from "react";
+import { Bot, Menu, RefreshCw, ShieldAlert, XCircle } from "lucide-react";
+import { type Dispatch, type SetStateAction, useState } from "react";
 import { TITLE_BY_SECTION } from "../adminReviewConfig";
 
 type SectionSuggestionsView = {
@@ -175,6 +176,7 @@ export function AdminReviewShell(props: AdminReviewShellProps) {
     isRefreshing,
     actions,
   } = props;
+  const [adminWendyOpen, setAdminWendyOpen] = useState(false);
   const {
     handleLogout,
     navigateToSection,
@@ -255,18 +257,30 @@ export function AdminReviewShell(props: AdminReviewShellProps) {
               </p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="min-h-11"
-            onClick={refreshCurrentSection}
-            disabled={isRefreshing}
-          >
-            <RefreshCw
-              className={cn("w-4 h-4 sm:mr-2", isRefreshing && "animate-spin")}
-            />
-            <span className="hidden sm:inline">Aggiorna</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={adminWendyOpen ? "default" : "outline"}
+              size="sm"
+              className="min-h-11"
+              onClick={() => setAdminWendyOpen((open) => !open)}
+              aria-label={adminWendyOpen ? "Chiudi Wendy Admin" : "Apri Wendy Admin"}
+            >
+              <Bot className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Wendy</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-11"
+              onClick={refreshCurrentSection}
+              disabled={isRefreshing}
+            >
+              <RefreshCw
+                className={cn("w-4 h-4 sm:mr-2", isRefreshing && "animate-spin")}
+              />
+              <span className="hidden sm:inline">Aggiorna</span>
+            </Button>
+          </div>
         </header>
 
         {adminError && (
@@ -302,6 +316,11 @@ export function AdminReviewShell(props: AdminReviewShellProps) {
 
         <AdminReviewContent {...props} />
       </main>
+      <AdminWendyPanel
+        open={adminWendyOpen}
+        section={section}
+        onClose={() => setAdminWendyOpen(false)}
+      />
     </div>
   );
 }

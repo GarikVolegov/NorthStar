@@ -1,6 +1,10 @@
 import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import {
+  matchWikiLLMAuthority,
+  type WikiLLMAuthorityLevel,
+} from "./wikillm-authority-manifest";
 
 export type GraphifyState = "disabled" | "ready" | "degraded" | "empty";
 
@@ -37,7 +41,17 @@ export interface GraphifyResult {
   sourceLocation: string | null;
   community: string | null;
   score: number;
+  authority?: WikiLLMAuthorityLevel;
+  authorityReason?: string;
+  authorityWeight?: number;
   neighbors: GraphifyNeighbor[];
+}
+
+export type GraphifyProfile = "code" | "process" | "docs" | "all" | string;
+
+export interface GraphifySearchOptions {
+  limit?: number;
+  profile?: GraphifyProfile;
 }
 
 interface GraphNode {
@@ -65,13 +79,17 @@ interface GraphIndex {
 }
 
 const DEFAULT_GRAPHS =
-  "apps:apps/graphify-out/graph.json,packages:packages/graphify-out/graph.json";
+  "code:graphify-out/code/graph.json,process:graphify-out/process/graph.json,docs:graphify-out/docs/graph.json";
 const DEFAULT_QUERY_LIMIT = 8;
 const DEFAULT_MAX_CONTEXT_CHARS = 4_000;
 const graphCache = new Map<string, GraphIndex>();
 
 export function isGraphifyEnabled(): boolean {
   return process.env.GRAPHIFY_ENABLED === "true";
+}
+
+export function getDefaultGraphifyGraphs(): string {
+  return DEFAULT_GRAPHS;
 }
 
 function queryLimit(): number {
@@ -141,6 +159,8 @@ function normalizeNode(value: unknown): GraphNode | null {
   const label = readString(record.label) ?? readString(record.name) ?? id;
   const kind = readString(record.file_type) ?? readString(record.type);
   const sourceFile = readString(record.source_file) ?? readString(record.file);
+  const group = readString(record.group);
+  const description = readString(record.description);
   const sourceLocation =
     readString(record.source_location) ?? readString(record.location);
   const communityValue = record.community;
@@ -161,6 +181,8 @@ function normalizeNode(value: unknown): GraphNode | null {
       label,
       normLabel,
       kind,
+      group,
+      description,
       sourceFile,
       sourceLocation,
       community,
@@ -174,8 +196,8 @@ function normalizeNode(value: unknown): GraphNode | null {
 function normalizeLink(value: unknown): GraphLink | null {
   const record = asRecord(value);
   if (!record) return null;
-  const source = readId(record.source);
-  const target = readId(record.target);
+  const source = readId(record.source) ?? readId(record.from);
+  const target = readId(record.target) ?? readId(record.to);
   if (!source || !target) return null;
   return {
     source,
@@ -197,7 +219,11 @@ async function loadGraph(name: string, path: string): Promise<GraphIndex> {
   const payload = JSON.parse(await readFile(path, "utf8")) as unknown;
   const record = asRecord(payload);
   const rawNodes = Array.isArray(record?.nodes) ? record.nodes : [];
-  const rawLinks = Array.isArray(record?.links) ? record.links : [];
+  const rawLinks = Array.isArray(record?.links)
+    ? record.links
+    : Array.isArray(record?.edges)
+      ? record.edges
+      : [];
   const nodes = new Map<string, GraphNode>();
   for (const rawNode of rawNodes) {
     const node = normalizeNode(rawNode);
@@ -211,10 +237,11 @@ async function loadGraph(name: string, path: string): Promise<GraphIndex> {
   return index;
 }
 
-async function loadAvailableGraphs(): Promise<GraphIndex[]> {
+async function loadAvailableGraphs(profile: GraphifyProfile = "all"): Promise<GraphIndex[]> {
   if (!isGraphifyEnabled()) return [];
   const loaded: GraphIndex[] = [];
   for (const graph of configuredGraphs()) {
+    if (profile !== "all" && graph.name !== profile) continue;
     if (!existsSync(graph.path)) continue;
     try {
       loaded.push(await loadGraph(graph.name, graph.path));
@@ -240,18 +267,62 @@ function neighborsFor(index: GraphIndex, nodeId: string): GraphifyNeighbor[] {
     });
 }
 
-function scoreNode(node: GraphNode, terms: string[]): number {
-  return terms.reduce((score, term) => {
-    if (node.id.toLowerCase() === term) return score + 5;
-    if (node.label.toLowerCase().includes(term)) return score + 3;
-    if (node.sourceFile?.toLowerCase().includes(term)) return score + 2;
+function scoreNode(node: GraphNode, terms: string[], graph: string): number {
+  const lexicalScore = terms.reduce((score, term) => {
+    if (node.id.toLowerCase() === term) return score + 6;
+    if (node.label.toLowerCase() === term) return score + 5;
+    if (node.label.toLowerCase().includes(term)) return score + 4;
+    if (node.sourceFile?.toLowerCase().includes(term)) return score + 3;
     if (node.searchable.includes(term)) return score + 1;
     return score;
   }, 0);
+  if (lexicalScore === 0) return 0;
+  const authority = matchWikiLLMAuthority(node.sourceFile, graph);
+  return authority ? lexicalScore + authority.weight * 4 : lexicalScore;
+}
+
+const LOW_SIGNAL_LABELS = new Set([
+  "body",
+  "default",
+  "desc",
+  "description",
+  "label",
+  "name",
+  "primarykey",
+  "subtitle",
+  "title",
+  "type",
+  "version",
+]);
+
+const NOISY_SOURCE_PATTERNS = [
+  /(^|[/\\])\.tools[/\\]printed-clis[/\\]/,
+  /(^|[/\\])apps[/\\]server[/\\]api[/\\]index\.(js|cjs)$/,
+  /(^|[/\\])apps[/\\]web[/\\]src[/\\]locales[/\\]/,
+  /(^|[/\\])cli-printing-press[/\\]/,
+  /(^|[/\\])packages[/\\]api-client-react[/\\]src[/\\]generated[/\\]/,
+  /(^|[/\\])packages[/\\]api-zod[/\\]src[/\\]generated[/\\]/,
+  /(^|[/\\])packages[/\\]db[/\\]drizzle[/\\]meta[/\\]/,
+];
+
+function normalizedLabel(label: string): string {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function isNoisySourceFile(sourceFile: string | null): boolean {
+  if (!sourceFile) return false;
+  return NOISY_SOURCE_PATTERNS.some((pattern) => pattern.test(sourceFile));
+}
+
+function dedupeKey(result: GraphifyResult): string {
+  const label = normalizedLabel(result.label);
+  if (LOW_SIGNAL_LABELS.has(label)) return `low-signal:${label}`;
+  return `${result.graph}:${label}:${result.sourceFile ?? result.id}`;
 }
 
 function toResult(index: GraphIndex, node: GraphNode, score: number): GraphifyResult {
-  return {
+  const authority = matchWikiLLMAuthority(node.sourceFile, index.name);
+  const result: GraphifyResult = {
     id: node.id,
     graph: index.name,
     label: node.label,
@@ -263,6 +334,12 @@ function toResult(index: GraphIndex, node: GraphNode, score: number): GraphifyRe
     score,
     neighbors: neighborsFor(index, node.id),
   };
+  if (authority) {
+    result.authority = authority.authority;
+    result.authorityReason = authority.reason;
+    result.authorityWeight = authority.weight;
+  }
+  return result;
 }
 
 export async function getGraphifyStatus(): Promise<GraphifyStatus> {
@@ -315,8 +392,12 @@ export async function getGraphifyStatus(): Promise<GraphifyStatus> {
 
 export async function searchGraphify(
   query: string,
-  limit = queryLimit(),
+  options: number | GraphifySearchOptions = queryLimit(),
 ): Promise<GraphifyResult[]> {
+  const opts: GraphifySearchOptions =
+    typeof options === "number" ? { limit: options } : options;
+  const limit = opts.limit ?? queryLimit();
+  const profile = opts.profile ?? "all";
   const terms = query
     .toLowerCase()
     .split(/\s+/)
@@ -325,13 +406,19 @@ export async function searchGraphify(
   if (terms.length === 0) return [];
 
   const results: GraphifyResult[] = [];
-  for (const index of await loadAvailableGraphs()) {
+  for (const index of await loadAvailableGraphs(profile)) {
     for (const node of index.nodes.values()) {
-      const score = scoreNode(node, terms);
+      if (isNoisySourceFile(node.sourceFile)) continue;
+      const score = scoreNode(node, terms, index.name);
       if (score > 0) results.push(toResult(index, node, score));
     }
   }
-  return results
+  const deduped = new Map<string, GraphifyResult>();
+  for (const result of results.sort((a, b) => b.score - a.score)) {
+    const key = dedupeKey(result);
+    if (!deduped.has(key)) deduped.set(key, result);
+  }
+  return [...deduped.values()]
     .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label))
     .slice(0, limit);
 }
@@ -347,18 +434,25 @@ export async function explainGraphifyNode(
   return node ? toResult(index, node, 1) : null;
 }
 
-export async function buildGraphifyContext(query: string): Promise<string> {
+export async function buildGraphifyContext(
+  query: string,
+  options: GraphifySearchOptions = {},
+): Promise<string> {
   try {
-    const results = await searchGraphify(query, queryLimit());
+    const results = await searchGraphify(query, { limit: queryLimit(), ...options });
     if (results.length === 0) return "";
     const lines = results.map((item, index) => {
       const location = item.sourceLocation ?? item.sourceFile ?? item.graph;
+      const authority = item.authority
+        ? ` authority=${item.authority} weight=${item.authorityWeight ?? "n/a"}`
+        : "";
       const neighbors = item.neighbors
         .slice(0, 3)
         .map((neighbor) => neighbor.label)
         .join(", ");
       const suffix = neighbors ? `; collegato a: ${neighbors}` : "";
-      return `${index + 1}. [source: graphify graph=${item.graph} community=${item.community ?? "n/a"}] ${item.label} (${location})${suffix}`;
+      const reason = item.authorityReason ? `; authority reason: ${item.authorityReason}` : "";
+      return `${index + 1}. [source: graphify graph=${item.graph} community=${item.community ?? "n/a"}${authority}] ${item.label} (${location})${suffix}${reason}`;
     });
     const context = `\n\n## Contesto Graphify\n${lines.join("\n")}`;
     return context.length > maxContextChars()

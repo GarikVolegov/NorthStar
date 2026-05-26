@@ -145,6 +145,37 @@ export interface EvaluatorInput {
   webResults: RetrievedChunk[];
   cot: CoTResult | null;
   memoryFactCount: number;
+  isPredefined?: boolean | undefined;
+}
+
+const GREETING_PATTERNS = [
+  /^(ciao|salve|hey|buon(giorno|asera|anotte)|come\s+st(ai|qi|ia)|come\s+va)/i,
+  /^(aiuto|aiutami|help)$/i,
+];
+
+const TECHNICAL_SHORT_MESSAGE_HINTS =
+  /\b(lavoro|carriera|cv|colloquio|etf|btp|invest|finanza|trading|abitudin|salute|settore|profession|universit|startup|business|obiettivo|piano)\b/i;
+
+function isGreetingOrTooShort(message: string): boolean {
+  const trimmed = message.trim();
+  const words = trimmed ? trimmed.split(/\s+/) : [];
+  if (words.length <= 4 && !TECHNICAL_SHORT_MESSAGE_HINTS.test(trimmed)) return true;
+  return GREETING_PATTERNS.some((p) => p.test(trimmed));
+}
+
+function bypassResult(score: number, level: ConfidenceLevel): EvalResult {
+  return {
+    score,
+    level,
+    needsClarification: false,
+    dimensions: {
+      contextCoverage: score,
+      cotConfidence: score,
+      questionClarity: score,
+      memoryCoverage: score,
+    },
+    reasons: [],
+  };
 }
 
 /**
@@ -158,7 +189,11 @@ export function evaluateSelf(input: EvaluatorInput): EvalResult {
     webResults,
     cot,
     memoryFactCount,
+    isPredefined,
   } = input;
+
+  if (isPredefined) return bypassResult(0.70, "high");
+  if (isGreetingOrTooShort(userMessage)) return bypassResult(0.60, "medium");
 
   const dims: EvalResult["dimensions"] = {
     contextCoverage: scoreContextCoverage(documentChunks, webResults),

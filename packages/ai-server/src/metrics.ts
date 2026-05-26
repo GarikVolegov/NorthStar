@@ -159,6 +159,65 @@ export function recordRagFallback(reason: string): void {
   ragFallbackTotal.inc({ reason });
 }
 
+// ── Phase 2: Cost + Quality + TTFT metrics ────────────────────────────────────
+
+export const wendyCostUsdTotal = new promClient.Counter({
+  name: "wendy_cost_usd_total",
+  help: "Estimated LLM cost in USD by model",
+  labelNames: ["model"] as const,
+  registers: [register],
+});
+
+export const wendyQualityScore = new promClient.Histogram({
+  name: "wendy_quality_score",
+  help: "Supervisor quality score per domain and intent",
+  labelNames: ["domain", "intent"] as const,
+  buckets: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.65, 0.70, 0.75, 0.80, 0.90, 1.0],
+  registers: [register],
+});
+
+export const wendyTtftSeconds = new promClient.Histogram({
+  name: "wendy_ttft_seconds",
+  help: "Time to first token in seconds",
+  labelNames: [] as const,
+  buckets: [0.1, 0.25, 0.5, 1, 2, 3, 5, 10],
+  registers: [register],
+});
+
+export const wendyFeedbackTotal = new promClient.Counter({
+  name: "wendy_feedback_total",
+  help: "User feedback votes by domain",
+  labelNames: ["domain", "feedback"] as const,
+  registers: [register],
+});
+
+export const wendyModelEffectiveness = new promClient.Gauge({
+  name: "wendy_model_effectiveness",
+  help: "Daily average quality score by model and domain",
+  labelNames: ["model", "domain"] as const,
+  registers: [register],
+});
+
+export function recordWendyCost(model: string, costUsd: number): void {
+  if (costUsd > 0) wendyCostUsdTotal.inc({ model }, costUsd);
+}
+
+export function recordQualityScore(domain: string, intent: string, score: number): void {
+  wendyQualityScore.observe({ domain, intent }, score);
+}
+
+export function recordTtft(seconds: number): void {
+  wendyTtftSeconds.observe({}, seconds);
+}
+
+export function recordFeedback(domain: string, feedback: "up" | "down"): void {
+  wendyFeedbackTotal.inc({ domain, feedback });
+}
+
+export function recordModelEffectiveness(model: string, domain: string, score: number): void {
+  wendyModelEffectiveness.set({ model, domain }, score);
+}
+
 export function recordRagJsLimitHit(source = "knowledge_nodes"): void {
   ragJsLimitHitTotal.inc({ source });
 }

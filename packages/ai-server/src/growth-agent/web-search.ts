@@ -30,7 +30,7 @@ export async function searchWeb(
 ): Promise<RetrievedChunk[]> {
   const apiKey = process.env.TAVILY_API_KEY;
   if (!apiKey) {
-    logger.warn("TAVILY_API_KEY not set — skipping web search");
+    logger.warn({ query }, "TAVILY_API_KEY not set — web search skipped; set it in env to enable");
     return [];
   }
 
@@ -47,9 +47,10 @@ export async function searchWeb(
               search_depth: "advanced",
               max_results: maxResults,
               include_raw_content: false,
+              search_lang: "it",
             }),
           }),
-          10000,
+          15000,
           "Tavily",
         );
 
@@ -60,9 +61,9 @@ export async function searchWeb(
         return (await res.json()) as { results: WebSearchResult[] };
       },
       {
-        retries: 1,
+        retries: 2,
         onFailedAttempt: (err) => {
-          logger.warn({ err, attempt: err.attemptNumber }, "Tavily retry");
+          logger.warn({ err, attempt: err.attemptNumber, query }, "Tavily retry");
         },
       },
     );

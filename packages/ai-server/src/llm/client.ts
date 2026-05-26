@@ -16,6 +16,7 @@ import Groq from "groq-sdk";
 import pRetry from "p-retry";
 import { logger } from "../logger";
 import { readToolCalls } from "./tool-call-parser";
+import { getOpenAIFallbackConfig, shouldFallbackToOpenAI } from "../client";
 
 export interface LLMMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -73,14 +74,13 @@ const CHAT_ONCE_TIMEOUT = 15_000;
 // ── OpenAI Provider ────────────────────────────────────────────────
 
 function createOpenAIProvider(): LLMProvider {
-  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-  if (!baseURL || !apiKey) {
-    throw new Error("AI_INTEGRATIONS_OPENAI_BASE_URL and AI_INTEGRATIONS_OPENAI_API_KEY must be set");
+  const fallback = getOpenAIFallbackConfig();
+  if (!fallback) {
+    throw new Error("OPENAI_API_KEY or AI_INTEGRATIONS_OPENAI_API_KEY must be set");
   }
-  const client = new OpenAI({ apiKey, baseURL });
+  const client = new OpenAI({ apiKey: fallback.apiKey, baseURL: fallback.baseURL });
 
-  const DEFAULT_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+  const DEFAULT_MODEL = fallback.model;
 
   return {
     async chat(messages, config = {}) {
@@ -165,6 +165,19 @@ function createOpenAIProvider(): LLMProvider {
 
 // ── Groq Provider ──────────────────────────────────────────────────
 
+function shouldFallbackFromGroq(err: unknown): boolean {
+  const status = (err as { status?: number })?.status;
+  return status === 429 || (typeof status === "number" && status >= 500);
+}
+
+let _groqOrFallback: LLMProvider | null | undefined;
+function getGroqOpenRouterFallback(): LLMProvider | null {
+  if (_groqOrFallback !== undefined) return _groqOrFallback;
+  if (!process.env.OPENROUTER_API_KEY) { _groqOrFallback = null; return null; }
+  try { _groqOrFallback = createOpenRouterProvider(); return _groqOrFallback; }
+  catch { _groqOrFallback = null; return null; }
+}
+
 function createGroqProvider(): LLMProvider {
   const apiKey = process.env.AI_INTEGRATIONS_GROQ_API_KEY ?? process.env.GROQ_API_KEY;
   if (!apiKey) {
@@ -183,84 +196,104 @@ function createGroqProvider(): LLMProvider {
 
   return {
     async chat(messages, config = {}) {
-      const model = GROQ_MODEL_MAP[config.model ?? ""] ?? "llama-3.3-70b-versatile";
-      const stream = await pRetry(
-        () => withTimeout(
-          client.chat.completions.create({
-            model,
-            messages: messages as Groq.Chat.ChatCompletionMessageParam[],
-            stream: true,
-            temperature: config.temperature ?? 0.7,
-            max_tokens: config.maxTokens ?? 800,
-          }),
-          CHAT_TIMEOUT,
-          "groq chat stream",
-        ),
-        {
-          retries: 2,
-          onFailedAttempt: (err) => {
-            logger.warn({ err, attempt: err.attemptNumber }, "Groq chat retry");
+      const model = GROQ_MODEL_MAP[config.model ?? ""] ?? config.model ?? "llama-3.3-70b-versatile";
+      try {
+        const stream = await pRetry(
+          () => withTimeout(
+            client.chat.completions.create({
+              model,
+              messages: messages as Groq.Chat.ChatCompletionMessageParam[],
+              stream: true,
+              temperature: config.temperature ?? 0.7,
+              max_tokens: config.maxTokens ?? 800,
+            }),
+            CHAT_TIMEOUT,
+            "groq chat stream",
+          ),
+          {
+            retries: 2,
+            onFailedAttempt: (err) => {
+              logger.warn({ err, attempt: err.attemptNumber }, "Groq chat retry");
+            },
           },
-        },
-      );
-
-      return {
-        async *[Symbol.asyncIterator]() {
-          for await (const chunk of stream) {
-            const delta = chunk.choices[0]?.delta?.content;
-            if (delta) yield delta;
-          }
-        },
-      };
+        );
+        return {
+          async *[Symbol.asyncIterator]() {
+            for await (const chunk of stream) {
+              const delta = chunk.choices[0]?.delta?.content;
+              if (delta) yield delta;
+            }
+          },
+        };
+      } catch (err) {
+        const fallback = getGroqOpenRouterFallback();
+        if (!fallback || !shouldFallbackFromGroq(err)) throw err;
+        logger.warn({ err, model }, "Groq rate limited; falling back to OpenRouter");
+        return fallback.chat(messages, config);
+      }
     },
 
     async chatOnce(messages, config = {}) {
-      const model = GROQ_MODEL_MAP[config.model ?? ""] ?? "llama-3.3-70b-versatile";
-      const res = await pRetry(
-        () => withTimeout(
-          client.chat.completions.create({
-            model,
-            messages: messages as Groq.Chat.ChatCompletionMessageParam[],
-            temperature: config.temperature ?? 0.7,
-            max_tokens: config.maxTokens ?? 800,
-          }),
-          CHAT_ONCE_TIMEOUT,
-          "groq chatOnce",
-        ),
-        {
-          retries: 2,
-          onFailedAttempt: (err) => {
-            logger.warn({ err, attempt: err.attemptNumber }, "Groq chatOnce retry");
+      const model = GROQ_MODEL_MAP[config.model ?? ""] ?? config.model ?? "llama-3.3-70b-versatile";
+      try {
+        const res = await pRetry(
+          () => withTimeout(
+            client.chat.completions.create({
+              model,
+              messages: messages as Groq.Chat.ChatCompletionMessageParam[],
+              temperature: config.temperature ?? 0.7,
+              max_tokens: config.maxTokens ?? 800,
+            }),
+            CHAT_ONCE_TIMEOUT,
+            "groq chatOnce",
+          ),
+          {
+            retries: 2,
+            onFailedAttempt: (err) => {
+              logger.warn({ err, attempt: err.attemptNumber }, "Groq chatOnce retry");
+            },
           },
-        },
-      );
-      return res.choices[0]?.message?.content ?? "";
+        );
+        return res.choices[0]?.message?.content ?? "";
+      } catch (err) {
+        const fallback = getGroqOpenRouterFallback();
+        if (!fallback || !shouldFallbackFromGroq(err)) throw err;
+        logger.warn({ err, model }, "Groq rate limited; falling back to OpenRouter");
+        return fallback.chatOnce(messages, config);
+      }
     },
 
     async chatWithTools(messages, tools, config = {}) {
-      const model = GROQ_MODEL_MAP[config.model ?? ""] ?? "llama-3.3-70b-versatile";
-      const res = await pRetry(
-        () => withTimeout(
-          client.chat.completions.create({
-            model,
-            messages:    messages as Groq.Chat.ChatCompletionMessageParam[],
-            tools:       tools as Groq.Chat.ChatCompletionTool[],
-            tool_choice: "auto",
-            temperature: config.temperature ?? 0.1,
-            max_tokens:  config.maxTokens ?? 500,
-          }),
-          CHAT_ONCE_TIMEOUT,
-          "groq chatWithTools",
-        ),
-        { retries: 2, onFailedAttempt: (err) => logger.warn({ err, attempt: err.attemptNumber }, "Groq chatWithTools retry") },
-      );
-      const msg = res.choices[0]?.message;
-      const toolCalls = readToolCalls(msg?.tool_calls);
-      return {
-        content:      msg?.content ?? "",
-        toolCalls,
-        finishReason: (res.choices[0]?.finish_reason ?? "stop") as ChatWithToolsResult["finishReason"],
-      };
+      const model = GROQ_MODEL_MAP[config.model ?? ""] ?? config.model ?? "llama-3.3-70b-versatile";
+      try {
+        const res = await pRetry(
+          () => withTimeout(
+            client.chat.completions.create({
+              model,
+              messages:    messages as Groq.Chat.ChatCompletionMessageParam[],
+              tools:       tools as Groq.Chat.ChatCompletionTool[],
+              tool_choice: "auto",
+              temperature: config.temperature ?? 0.1,
+              max_tokens:  config.maxTokens ?? 500,
+            }),
+            CHAT_ONCE_TIMEOUT,
+            "groq chatWithTools",
+          ),
+          { retries: 2, onFailedAttempt: (err) => logger.warn({ err, attempt: err.attemptNumber }, "Groq chatWithTools retry") },
+        );
+        const msg = res.choices[0]?.message;
+        const toolCalls = readToolCalls(msg?.tool_calls);
+        return {
+          content:      msg?.content ?? "",
+          toolCalls,
+          finishReason: (res.choices[0]?.finish_reason ?? "stop") as ChatWithToolsResult["finishReason"],
+        };
+      } catch (err) {
+        const fallback = getGroqOpenRouterFallback();
+        if (!fallback || !shouldFallbackFromGroq(err)) throw err;
+        logger.warn({ err, model }, "Groq rate limited; falling back to OpenRouter");
+        return fallback.chatWithTools(messages, tools, config);
+      }
     },
   };
 }
@@ -274,18 +307,46 @@ function createOpenRouterProvider(): LLMProvider {
     throw new Error("OPENROUTER_API_KEY must be set when AI_PROVIDER=openrouter");
   }
   const client = new OpenAI({ apiKey, baseURL });
+  const fallbackConfig = getOpenAIFallbackConfig();
+  const fallbackClient = fallbackConfig
+    ? new OpenAI({ apiKey: fallbackConfig.apiKey, baseURL: fallbackConfig.baseURL })
+    : null;
+
+  async function callWithFallback<T>(
+    label: string,
+    primary: () => Promise<T>,
+    fallback: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await primary();
+    } catch (err) {
+      if (!fallbackClient || !shouldFallbackToOpenAI(err)) throw err;
+      logger.warn({ err, label }, "OpenRouter rate limited; falling back to OpenAI");
+      return await fallback();
+    }
+  }
 
   return {
     async chat(messages, config = {}) {
       const stream = await pRetry(
         () => withTimeout(
-          client.chat.completions.create({
-            model: config.model ?? process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free",
-            messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
-            stream: true,
-            temperature: config.temperature ?? 0.7,
-            max_tokens: config.maxTokens ?? 800,
-          }),
+          callWithFallback(
+            "openrouter chat stream",
+            () => client.chat.completions.create({
+              model: config.model ?? process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free",
+              messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+              stream: true,
+              temperature: config.temperature ?? 0.7,
+              max_tokens: config.maxTokens ?? 800,
+            }),
+            () => fallbackClient!.chat.completions.create({
+              model: fallbackConfig!.model,
+              messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+              stream: true,
+              temperature: config.temperature ?? 0.7,
+              max_tokens: config.maxTokens ?? 800,
+            }),
+          ),
           CHAT_TIMEOUT,
           "openrouter chat stream",
         ),
@@ -310,12 +371,21 @@ function createOpenRouterProvider(): LLMProvider {
     async chatOnce(messages, config = {}) {
       const res = await pRetry(
         () => withTimeout(
-          client.chat.completions.create({
-            model: config.model ?? process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free",
-            messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
-            temperature: config.temperature ?? 0.7,
-            max_tokens: config.maxTokens ?? 800,
-          }),
+          callWithFallback(
+            "openrouter chatOnce",
+            () => client.chat.completions.create({
+              model: config.model ?? process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free",
+              messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+              temperature: config.temperature ?? 0.7,
+              max_tokens: config.maxTokens ?? 800,
+            }),
+            () => fallbackClient!.chat.completions.create({
+              model: fallbackConfig!.model,
+              messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+              temperature: config.temperature ?? 0.7,
+              max_tokens: config.maxTokens ?? 800,
+            }),
+          ),
           CHAT_ONCE_TIMEOUT,
           "openrouter chatOnce",
         ),
@@ -332,14 +402,25 @@ function createOpenRouterProvider(): LLMProvider {
     async chatWithTools(messages, tools, config = {}) {
       const res = await pRetry(
         () => withTimeout(
-          client.chat.completions.create({
-            model:       config.model ?? process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free",
-            messages:    messages as OpenAI.Chat.ChatCompletionMessageParam[],
-            tools:       tools as OpenAI.Chat.ChatCompletionTool[],
-            tool_choice: "auto",
-            temperature: config.temperature ?? 0.1,
-            max_tokens:  config.maxTokens ?? 500,
-          }),
+          callWithFallback(
+            "openrouter chatWithTools",
+            () => client.chat.completions.create({
+              model:       config.model ?? process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free",
+              messages:    messages as OpenAI.Chat.ChatCompletionMessageParam[],
+              tools:       tools as OpenAI.Chat.ChatCompletionTool[],
+              tool_choice: "auto",
+              temperature: config.temperature ?? 0.1,
+              max_tokens:  config.maxTokens ?? 500,
+            }),
+            () => fallbackClient!.chat.completions.create({
+              model:       fallbackConfig!.model,
+              messages:    messages as OpenAI.Chat.ChatCompletionMessageParam[],
+              tools:       tools as OpenAI.Chat.ChatCompletionTool[],
+              tool_choice: "auto",
+              temperature: config.temperature ?? 0.1,
+              max_tokens:  config.maxTokens ?? 500,
+            }),
+          ),
           CHAT_ONCE_TIMEOUT,
           "openrouter chatWithTools",
         ),

@@ -154,7 +154,7 @@ export function useIdeaValidatorExperimentActions(options: ExperimentActionOptio
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: activeExperiment.title || "Esperimento idea",
-          category: "business",
+          category: "idea_validation",
           dueDate: experimentDueDate(),
         }),
       });

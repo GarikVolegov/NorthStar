@@ -3,14 +3,9 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { VitePWA } from "vite-plugin-pwa";
+import { resolveWebPort } from "./src/lib/dev-port";
 
-const rawPort = process.env.VITE_PORT || process.env.PORT || "5173";
-
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
+const port = resolveWebPort(process.env);
 
 const basePath = process.env.BASE_PATH || "/";
 const commitSha = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA;

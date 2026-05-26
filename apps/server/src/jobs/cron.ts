@@ -1,31 +1,88 @@
-import { runCollector, runEnricher, runSectorDataAgent, runNewsPublisher, refreshCatalog } from "@workspace/ai-server";
+import { runCollector, runEnricher, runSectorDataAgent, runNewsPublisher, refreshCatalog, runGrowthLibraryAgent, runJobPostingsAgent } from "@workspace/ai-server";
 import { rootLogger } from "../middleware/logger";
 import { runWeakSignalDetector } from "./weak-signal-detector";
 import { runProactiveInsightGenerator } from "./proactive-insight-generator";
 import { runBriefingGenerator } from "./briefing-generator";
+import { runFastCollector } from "./fast-collector";
+import { writeAgentRunSnapshot } from "../lib/agent-runs";
 
 const COLLECTOR_INTERVAL_MS        = Number(process.env.COLLECTOR_INTERVAL_MS) || 6 * 60 * 60 * 1000;       // 6 ore
+const FAST_COLLECTOR_INTERVAL_MS   = Number(process.env.FAST_COLLECTOR_INTERVAL_MS) || 90 * 60 * 1000;      // 90 min
 const ENRICHER_INTERVAL_MS         = Number(process.env.ENRICHER_INTERVAL_MS)  || 2 * 60 * 60 * 1000;       // 2 ore
 const STARTUP_DELAY_MS             = Number(process.env.CRON_STARTUP_DELAY_MS) || 30_000;                    // 30s
 const WEAK_SIGNAL_INTERVAL_MS       = Number(process.env.WEAK_SIGNAL_INTERVAL_MS)       || 7 * 24 * 60 * 60 * 1000; // 7 giorni
 const PROACTIVE_INSIGHT_INTERVAL_MS = Number(process.env.PROACTIVE_INSIGHT_INTERVAL_MS) || 24 * 60 * 60 * 1000; // 24 ore
 const BRIEFING_WEEKLY_INTERVAL_MS   = Number(process.env.BRIEFING_WEEKLY_INTERVAL_MS)   || 7 * 24 * 60 * 60 * 1000; // 7 giorni (lunedì)
 const BRIEFING_DAILY_INTERVAL_MS    = Number(process.env.BRIEFING_DAILY_INTERVAL_MS)    || 24 * 60 * 60 * 1000; // 24 ore
+const GROWTH_LIBRARY_INTERVAL_MS    = Number(process.env.GROWTH_LIBRARY_INTERVAL_MS)    || 24 * 60 * 60 * 1000; // 24 ore
+const JOB_POSTINGS_INTERVAL_MS      = Number(process.env.JOB_POSTINGS_INTERVAL_MS)      || 24 * 60 * 60 * 1000; // 24 ore
+
+async function recordCronRun<T>(
+  agentName: string,
+  taskType: string,
+  run: () => Promise<T>,
+  summarize: (result: T) => Record<string, unknown>,
+): Promise<T> {
+  const startedAt = new Date();
+  try {
+    const result = await run();
+    await writeAgentRunSnapshot({
+      agentName,
+      taskType,
+      startedAt,
+      status: "completed",
+      outputSummary: JSON.stringify(summarize(result)).slice(0, 1000),
+    }).catch((err) => rootLogger.warn({ err, agentName }, "[cron] agent run snapshot failed"));
+    return result;
+  } catch (err) {
+    await writeAgentRunSnapshot({
+      agentName,
+      taskType,
+      startedAt,
+      status: "failed",
+      errorMessage: String(err).slice(0, 1000),
+    }).catch((snapshotErr) => rootLogger.warn({ err: snapshotErr, agentName }, "[cron] agent run snapshot failed"));
+    throw err;
+  }
+}
 
 async function safeRunCollector(): Promise<void> {
   try {
     rootLogger.info("[cron] collector starting");
-    const result = await runCollector();
+    const result = await recordCronRun("collector", "cron", runCollector, (result) => ({
+      totalCollected: result.totalCollected,
+      totalInserted: result.totalInserted,
+      durationMs: result.durationMs,
+    }));
     rootLogger.info({ totalCollected: result.totalCollected, totalInserted: result.totalInserted, bySource: result.bySource, durationMs: result.durationMs }, "[cron] collector complete");
   } catch (err) {
     rootLogger.error({ err }, "[cron] collector failed");
   }
 }
 
+async function safeRunFastCollector(): Promise<void> {
+  try {
+    rootLogger.info("[cron] fast collector starting");
+    const result = await recordCronRun("fast-collector", "cron", runFastCollector, (result) => ({
+      totalCollected: result.totalCollected,
+      totalInserted: result.totalInserted,
+      durationMs: result.durationMs,
+    }));
+    rootLogger.info({ totalCollected: result.totalCollected, totalInserted: result.totalInserted, bySource: result.bySource, durationMs: result.durationMs }, "[cron] fast collector complete");
+  } catch (err) {
+    rootLogger.error({ err }, "[cron] fast collector failed");
+  }
+}
+
 async function safeRunEnricher(): Promise<void> {
   try {
     rootLogger.info("[cron] enricher starting");
-    const result = await runEnricher();
+    const result = await recordCronRun("enricher", "cron", runEnricher, (result) => ({
+      processed: result.processed,
+      enriched: result.enriched,
+      filtered: result.filtered,
+      durationMs: result.durationMs,
+    }));
     rootLogger.info({ processed: result.processed, enriched: result.enriched, filtered: result.filtered, durationMs: result.durationMs }, "[cron] enricher complete");
   } catch (err) {
     rootLogger.error({ err }, "[cron] enricher failed");
@@ -35,7 +92,11 @@ async function safeRunEnricher(): Promise<void> {
 async function safeRunNewsPublisher(): Promise<void> {
   try {
     rootLogger.info("[cron] news-publisher starting");
-    const result = await runNewsPublisher();
+    const result = await recordCronRun("news-publisher", "cron", runNewsPublisher, (result) => ({
+      transferred: result.transferred,
+      missingCoverage: result.missingCoverage.length,
+      durationMs: result.durationMs,
+    }));
     rootLogger.info(
       {
         transferred: result.transferred,
@@ -46,6 +107,31 @@ async function safeRunNewsPublisher(): Promise<void> {
     );
   } catch (err) {
     rootLogger.error({ err }, "[cron] news-publisher failed");
+  }
+}
+
+async function safeRunGrowthLibraryAgent(): Promise<void> {
+  try {
+    rootLogger.info("[cron] growth-library-agent starting");
+    const result = await recordCronRun("growth-library", "cron", runGrowthLibraryAgent, (result) => ({
+      curated: result.curated,
+      generated: result.generated,
+      gapCount: result.gaps.length,
+      durationMs: result.durationMs,
+    }));
+    rootLogger.info({ ...result, gapCount: result.gaps.length }, "[cron] growth-library-agent complete");
+  } catch (err) {
+    rootLogger.error({ err }, "[cron] growth-library-agent failed");
+  }
+}
+
+async function safeRunJobPostingsAgent(): Promise<void> {
+  try {
+    rootLogger.info("[cron] job-postings-agent starting");
+    const result = await recordCronRun("job-postings", "cron", runJobPostingsAgent, (result) => ({ ...result }));
+    rootLogger.info({ ...result }, "[cron] job-postings-agent complete");
+  } catch (err) {
+    rootLogger.error({ err }, "[cron] job-postings-agent failed");
   }
 }
 
@@ -98,10 +184,13 @@ async function safeRunProactiveInsightGenerator(): Promise<void> {
 export function startCronJobs(): void {
   rootLogger.info({
     collectorIntervalH:        COLLECTOR_INTERVAL_MS        / 3_600_000,
+    fastCollectorIntervalMin:  FAST_COLLECTOR_INTERVAL_MS   / 60_000,
     enricherIntervalH:         ENRICHER_INTERVAL_MS         / 3_600_000,
     sectorDataIntervalD:       SECTOR_DATA_INTERVAL_MS      / 86_400_000,
     weakSignalIntervalD:       WEAK_SIGNAL_INTERVAL_MS      / 86_400_000,
     proactiveInsightIntervalH: PROACTIVE_INSIGHT_INTERVAL_MS / 3_600_000,
+    growthLibraryIntervalH:    GROWTH_LIBRARY_INTERVAL_MS    / 3_600_000,
+    jobPostingsIntervalH:      JOB_POSTINGS_INTERVAL_MS      / 3_600_000,
     briefingWeeklyIntervalD:   BRIEFING_WEEKLY_INTERVAL_MS  / 86_400_000,
     briefingDailyIntervalH:    BRIEFING_DAILY_INTERVAL_MS   / 3_600_000,
   }, "[cron] starting scheduled jobs");
@@ -115,6 +204,12 @@ export function startCronJobs(): void {
 
   // Collector ogni 6 ore
   setInterval(() => { void safeRunCollector(); }, COLLECTOR_INTERVAL_MS);
+
+  // Fast lane news collector ogni 90 minuti, sfalsato rispetto allo startup.
+  setTimeout(() => {
+    void safeRunFastCollector();
+    setInterval(() => { void safeRunFastCollector(); }, FAST_COLLECTOR_INTERVAL_MS);
+  }, STARTUP_DELAY_MS + 45_000);
 
   // Enricher ogni 2 ore → poi publisher pubblica gli arricchiti
   setInterval(async () => {
@@ -138,6 +233,18 @@ export function startCronJobs(): void {
     void safeRunProactiveInsightGenerator();
     setInterval(() => { void safeRunProactiveInsightGenerator(); }, PROACTIVE_INSIGHT_INTERVAL_MS);
   }, 10 * 60 * 1000);
+
+  // Growth library agent giornaliero: cura contenuti growth e colma gap tematici.
+  setTimeout(() => {
+    void safeRunGrowthLibraryAgent();
+    setInterval(() => { void safeRunGrowthLibraryAgent(); }, GROWTH_LIBRARY_INTERVAL_MS);
+  }, 35 * 60 * 1000);
+
+  // Job postings ingester giornaliero: popola aggregati anonimi per weak signals.
+  setTimeout(() => {
+    void safeRunJobPostingsAgent();
+    setInterval(() => { void safeRunJobPostingsAgent(); }, JOB_POSTINGS_INTERVAL_MS);
+  }, 40 * 60 * 1000);
 
   // Briefing settimanale (lunedì mattina — Pro+)
   // Delay di 15 min per evitare sovrapposizione con altri job di startup

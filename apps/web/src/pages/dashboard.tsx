@@ -2,11 +2,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgentAnalysis } from "@/hooks/useAgentAnalysis";
-import { useDashboardData } from "@/hooks/useDashboardData";
+import { useDashboardData, type DashboardSession } from "@/hooks/useDashboardData";
 import { usePageModule } from "@/hooks/usePageModule";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { apiFetch } from "@/lib/api-fetch";
-import { deleteJson, getJson, patchJson, postJson } from "@/lib/apiClient";
+import { getJson } from "@/lib/apiClient";
 import { usePageMeta } from "@/lib/seo";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -26,11 +26,11 @@ import {
 import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
 
-import { DashboardCalendar } from "@/components/dashboard/DashboardCalendar";
 import { DashboardHero } from "@/components/dashboard/DashboardHero";
 import { DashboardKpiStrip } from "@/components/dashboard/DashboardKpiStrip";
-import { DashboardObjectives } from "@/components/dashboard/DashboardObjectives";
+import { DashboardObjectivesPathCard } from "@/components/dashboard/DashboardObjectives";
 import { DashboardPersonality } from "@/components/dashboard/DashboardPersonality";
+import { DashboardWeekTimeline } from "@/components/dashboard/DashboardWeekTimeline";
 import { ProactiveInsightCard } from "@/components/wendy/ProactiveInsightCard";
 import { useProactiveInsights, type ProactiveInsight } from "@/hooks/useProactiveInsights";
 
@@ -51,6 +51,15 @@ type SessionDetail = {
   createdAt: string;
 };
 
+type LatestSession = {
+  sessionId: number;
+  recommendations: Array<{ sectorId: number; sectorName: string; matchScore?: number; matchReason?: string }>;
+  riasecScores?: Record<string, number>;
+  primaryTypes?: string[];
+  spiritScores?: Record<string, number>;
+  createdAt?: string;
+};
+
 const JOURNEY_META: Record<JourneyId, {
   label: string;
   Icon: React.ElementType;
@@ -68,9 +77,9 @@ const JOURNEY_META: Record<JourneyId, {
 };
 
 function useLatestSession() {
-  return useQuery<{ sessionId: number; recommendations: Array<{ sectorId: number; sectorName: string }> }>({
+  return useQuery<LatestSession>({
     queryKey: ["latest-session-dashboard"],
-    queryFn: () => getJson<{ sessionId: number; recommendations: Array<{ sectorId: number; sectorName: string }> }>(`${BASE}api/test-sessions/latest`),
+    queryFn: () => getJson<LatestSession>(`${BASE}api/test-sessions/latest`),
     retry: false,
     staleTime: 120_000,
   });
@@ -87,7 +96,7 @@ function useSessionDetail(sessionId: number | null) {
 
 export default function Dashboard() {
   usePageMeta({
-    title: "Dashboard AI — NorthStar",
+    title: "Fondazione NorthStar",
     description: "La tua analisi AI personalizzata: professioni consigliate, percorsi formativi e modalità di lavoro ottimale per il tuo profilo RIASEC.",
   });
   useWendyPageContext({
@@ -109,19 +118,38 @@ export default function Dashboard() {
   const journeyType = (user?.journeyType ?? "indeciso") as JourneyId;
   const journeyMeta = JOURNEY_META[journeyType];
 
+  const { data: dashData, isLoading: dashLoading } = useDashboardData();
   const { data: latestSession, isLoading: sessionLoading } = useLatestSession();
-  const sessionId = latestSession?.sessionId ?? null;
+  const dashboardSession = dashData?.session ?? null;
+  const sessionId = latestSession?.sessionId ?? dashboardSession?.id ?? null;
   const { data: sessionDetail, isLoading: detailLoading } = useSessionDetail(sessionId);
-  const topSectorId = latestSession?.recommendations?.[0]?.sectorId;
-  const topSectors = (latestSession?.recommendations ?? []).map((r) => ({ sectorName: r.sectorName }));
+
+  const latestSessionProfile: DashboardSession | null = latestSession
+    ? {
+        id: latestSession.sessionId,
+        riasecScores: latestSession.riasecScores ?? {},
+        primaryTypes: latestSession.primaryTypes ?? [],
+        spiritScores: latestSession.spiritScores ?? {},
+        recommendations: (latestSession.recommendations ?? []).map((recommendation) => ({
+          sectorId: recommendation.sectorId,
+          sectorName: recommendation.sectorName,
+          matchScore: recommendation.matchScore ?? 0,
+        })),
+        createdAt: latestSession.createdAt ?? "",
+      }
+    : null;
+  const effectiveSession = (sessionDetail ?? latestSessionProfile ?? dashboardSession) as DashboardSession | null;
+  const recommendations = latestSession?.recommendations ?? effectiveSession?.recommendations ?? [];
+  const topSectorId = recommendations[0]?.sectorId;
+  const topSectors = recommendations.map((r) => ({ sectorName: r.sectorName }));
 
   const { data: agentData, isLoading: agentLoading, isError: agentError } = useAgentAnalysis({
     sessionId,
-    riasecScores: sessionDetail?.riasecScores,
-    primaryTypes: sessionDetail?.primaryTypes,
-    spiritScores: sessionDetail?.spiritScores,
+    riasecScores: effectiveSession?.riasecScores,
+    primaryTypes: effectiveSession?.primaryTypes,
+    spiritScores: effectiveSession?.spiritScores,
     topSectors,
-    enabled: !!sessionDetail,
+    enabled: !!effectiveSession,
   });
 
   const isPremium = agentData?.plan === "premium";
@@ -129,48 +157,21 @@ export default function Dashboard() {
   const professions = summary?.professions ?? [];
   const workMode = summary?.workMode;
 
-  const { data: dashData, isLoading: dashLoading } = useDashboardData();
   const { insights, markRead, dismiss } = useProactiveInsights();
   const objectives = dashData?.objectives ?? [];
+  const strategicObjectives = objectives.filter((objective) => objective.category !== "idea_validation");
   const objectivesProgress = dashData?.objectivesProgress ?? { done: 0, total: 0, percent: 0 };
   const upcomingEvents = dashData?.upcomingEvents ?? [];
 
   const queryClient = useQueryClient();
 
-  const toggleObjective = async (id: number, current: boolean) => {
-    try {
-      await patchJson(`${BASE}api/objectives/${id}`, { completed: !current });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
-    } catch {
-      return;
-    }
-  };
-
-  const deleteObjective = async (id: number) => {
-    try {
-      await deleteJson(`${BASE}api/objectives/${id}`);
-      queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
-    } catch {
-      return;
-    }
-  };
-
-  const createObjective = async (text: string) => {
-    try {
-      await postJson(`${BASE}api/objectives`, { text });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
-    } catch {
-      return;
-    }
-  };
-
   useEffect(() => {
-    if (dashData && objectives.length === 0 && journeyType) {
+    if (dashData && strategicObjectives.length === 0 && journeyType) {
       apiFetch(`${BASE}api/objectives/seed`, { method: "POST" })
         .then(() => queryClient.invalidateQueries({ queryKey: ["dashboard-data"] }))
         .catch(() => {});
     }
-  }, [dashData, objectives.length, journeyType]);
+  }, [dashData, strategicObjectives.length, journeyType]);
 
   if (!authReady || sessionLoading || dashLoading) {
     return (
@@ -220,7 +221,7 @@ export default function Dashboard() {
     (user?.avatarUrl                                  ? 25 : 0)
   ));
 
-  const confirmedSectorName = sessionDetail?.recommendations?.[0]?.sectorName ?? null;
+  const confirmedSectorName = effectiveSession?.recommendations?.[0]?.sectorName ?? null;
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 md:py-12 space-y-5">
@@ -228,9 +229,12 @@ export default function Dashboard() {
       {/* ZONA 1 — Hero */}
       <DashboardHero
         journeyType={journeyType}
-        session={sessionDetail ?? null}
+        session={effectiveSession}
         isPremium={isPremium}
         userName={user.name}
+        profilePercent={profilePercent}
+        confirmedSectorName={confirmedSectorName}
+        sessionId={sessionId}
       />
 
       {/* ZONA 2 — KPI Strip */}
@@ -238,7 +242,6 @@ export default function Dashboard() {
         profilePercent={profilePercent}
         objectives={objectives}
         objectivesProgress={objectivesProgress}
-        upcomingEvents={upcomingEvents}
         confirmedSectorName={confirmedSectorName}
         sessionId={sessionId}
       />
@@ -248,22 +251,18 @@ export default function Dashboard() {
 
         {/* Colonna sinistra */}
         <div className="lg:col-span-2 space-y-5">
-          <DashboardCalendar events={upcomingEvents} />
-          <DashboardObjectives
-            objectives={objectives}
-            progress={objectivesProgress}
-            onToggle={toggleObjective}
-            onDelete={deleteObjective}
-            onCreate={createObjective}
-          />
+          <DashboardWeekTimeline events={upcomingEvents} />
+          <DashboardObjectivesPathCard objectives={strategicObjectives} />
         </div>
 
         {/* Colonna destra */}
         <div className="space-y-4">
           <DashboardPersonality
-            {...(sessionDetail?.riasecScores ? { riasecScores: sessionDetail.riasecScores } : {})}
-            {...(sessionDetail?.spiritScores ? { spiritScores: sessionDetail.spiritScores } : {})}
-            {...(sessionDetail?.primaryTypes ? { primaryTypes: sessionDetail.primaryTypes } : {})}
+            {...(effectiveSession?.riasecScores ? { riasecScores: effectiveSession.riasecScores } : {})}
+            {...(effectiveSession?.spiritScores ? { spiritScores: effectiveSession.spiritScores } : {})}
+            {...(effectiveSession?.primaryTypes ? { primaryTypes: effectiveSession.primaryTypes } : {})}
+            agentSummary={summary}
+            objectivesProgress={objectivesProgress}
           />
           {insights.length > 0 && (
             <div className="space-y-2">

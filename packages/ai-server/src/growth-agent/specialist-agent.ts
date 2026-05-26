@@ -17,6 +17,7 @@
  * Memory wiring from v3 is preserved unchanged.
  */
 import type OpenAI from "openai";
+import pRetry from "p-retry";
 import { openai } from "../client";
 import { retrieve } from "./retriever";
 import { searchWeb, MIN_LOCAL_CHUNKS } from "./web-search";
@@ -33,6 +34,7 @@ import type { CoTResult } from "./chain-of-thought";
 import type { EvalResult } from "./self-evaluator";
 import type { Domain, RouteDecision } from "./router-agent";
 import { selectModelFor, modelFor } from "../model-router";
+import { wendyConfig } from "../config/wendy";
 
 /**
  * @deprecated reflects the *baseline* (non-premium) model. The actual model is
@@ -65,9 +67,11 @@ const DOMAIN_LABELS: Record<Domain, string> = {
 
 export interface SpecialistRunOptions {
   userId:                number;
+  sessionId?:            number | undefined;
   userContext:           UserContext & { memorySection?: string | undefined };
   history:               ChatMessage[];
   userMessage:           string;
+  normalizedMessage?:    string | undefined;
   routeDecision:         RouteDecision;
   memoryFactCount?:      number | undefined;
   maxHistory?:           number | undefined;
@@ -104,6 +108,7 @@ export abstract class SpecialistAgent {
       userId, userContext, history, userMessage,
       routeDecision, maxHistory = 12,
     } = opts;
+    const analysisMessage = opts.normalizedMessage ?? userMessage;
 
     const icon  = DOMAIN_STATUS_ICONS[this.DOMAIN] ?? "✨";
     const label = DOMAIN_LABELS[this.DOMAIN] ?? "profilo";
@@ -124,34 +129,42 @@ export abstract class SpecialistAgent {
       }
     }
 
+    const { cotHistorySlice, cotMessageTruncate } = wendyConfig.specialist;
     const conversationSummary = history
-      .slice(-4)
-      .map((m) => `${m.role === "user" ? "Utente" : "Coach"}: ${m.content.slice(0, 200)}`)
+      .slice(-cotHistorySlice)
+      .map((m) => `${m.role === "user" ? "Utente" : "Coach"}: ${m.content.slice(0, cotMessageTruncate)}`)
       .join("\n");
 
     // ── 1. RAG ────────────────────────────────────────────────────────────────
     yield { type: "status", value: "🔍 Cerco nella knowledge base..." };
 
+    const sc = wendyConfig.specialist;
     const [personaExamples, documentChunks, cot] = await Promise.all([
-      retrieve(userMessage, userId, { topK: 3, minScore: 0.30, sourceTypes: ["persona_example"] }),
-      retrieve(userMessage, userId, { topK: 6, minScore: 0.35, sourceTypes: ["document", "user_note"] }),
-      runChainOfThought(userId, userMessage, conversationSummary),
+      retrieve(analysisMessage, userId, { topK: 3, minScore: sc.personaMinScore, sourceTypes: ["persona_example"] }).catch((err) => {
+        logger.warn({ err, domain: this.DOMAIN }, "specialist persona retrieval failed");
+        return [] as RetrievedChunk[];
+      }),
+      retrieve(analysisMessage, userId, { topK: sc.documentTopK, minScore: sc.documentMinScore, sourceTypes: ["document", "user_note"] }).catch((err) => {
+        logger.warn({ err, domain: this.DOMAIN }, "specialist document retrieval failed");
+        return [] as RetrievedChunk[];
+      }),
+      runChainOfThought(userId, analysisMessage, conversationSummary, opts.sessionId),
     ]);
 
     // ── 2. Web fallback ───────────────────────────────────────────────────────
     let webResults: RetrievedChunk[] = [];
     if (documentChunks.length < MIN_LOCAL_CHUNKS) {
       yield { type: "status", value: "🌐 Cerco fonti aggiornate sul web..." };
-      webResults = await searchWeb(this.domainWebQuery(userMessage), 4);
+      webResults = await searchWeb(this.domainWebQuery(analysisMessage), 4);
     }
 
     // ── 3. Self-eval + CoT result ───────────────────────────────────────────────
     yield { type: "status", value: "🧠 Analizzando la situazione..." };
 
-    const evalResult = evaluateSelf({ userMessage, documentChunks, webResults, cot, memoryFactCount });
+    const evalResult = evaluateSelf({ userMessage: analysisMessage, documentChunks, webResults, cot, memoryFactCount });
 
     // ── 4. System prompt ──────────────────────────────────────────────────────
-    const domainSection = this.buildDomainSection(userMessage, cot, routeDecision);
+    const domainSection = this.buildDomainSection(analysisMessage, cot, routeDecision);
     const domainHeader  = [
       `## Specialista: ${this.DOMAIN.toUpperCase()}`,
       `**Persona**: ${this.PERSONA_CORE}`,
@@ -183,7 +196,7 @@ export abstract class SpecialistAgent {
 
     const systemPrompt = buildSystemPrompt({
       userContext: enrichedContext, personaExamples, documentChunks,
-      webResults, cot, userMessage, evalResult,
+      webResults, cot, userMessage: analysisMessage, evalResult,
     });
 
     // ── 5. Stream + BUFFER ────────────────────────────────────────────────────
@@ -194,7 +207,7 @@ export abstract class SpecialistAgent {
       { role: "user",      content: userMessage },
     ];
 
-    const temperature = evalResult.level === "low" ? 0.45 : 0.72;
+    const temperature = evalResult.level === "low" ? sc.temperatureLow : sc.temperatureHigh;
 
     try {
       yield { type: "status", value: "✨ Sto scrivendo la risposta..." };
@@ -204,10 +217,20 @@ export abstract class SpecialistAgent {
         complexity: evalResult.level === "high" ? "deep" : "standard",
       });
 
-      const stream = await openai.chat.completions.create({
-        model: route.model, messages, stream: true, temperature,
-        max_tokens: evalResult.level === "low" ? 300 : 700,
-      });
+      const stream = await pRetry(
+        () => openai.chat.completions.create({
+          model: route.model, messages, stream: true, temperature,
+          max_tokens: evalResult.level === "low" ? sc.maxTokensLow : sc.maxTokensHigh,
+        }),
+        {
+          retries: 2,
+          minTimeout: 1000,
+          maxTimeout: 3000,
+          onFailedAttempt: (err) => {
+            logger.warn({ err, attempt: err.attemptNumber, domain: this.DOMAIN }, "specialist LLM call failed, retrying");
+          },
+        },
+      );
 
       const tokenBuffer: string[] = [];
       for await (const chunk of stream) {
@@ -218,8 +241,8 @@ export abstract class SpecialistAgent {
       const draft = tokenBuffer.join("");
 
       // ── 6. Supervisor gate ──────────────────────────────────────────────────
-      const supervisorInput = { userMessage, draft, domain: routeDecision.domain, intent: routeDecision.intent };
-      let supervisorResult  = supervisorAgent.evaluate(supervisorInput);
+      const supervisorInput = { userMessage: analysisMessage, draft, domain: routeDecision.domain, intent: routeDecision.intent };
+      let supervisorResult  = await supervisorAgent.evaluate(supervisorInput);
       let finalText         = draft;
 
       if (!supervisorResult.pass) {
@@ -232,7 +255,7 @@ export abstract class SpecialistAgent {
       }
 
       // ── 7. Stream final text ────────────────────────────────────────────────
-      const CHUNK_SIZE = 4;
+      const CHUNK_SIZE = wendyConfig.agent.chunkSize;
       for (let i = 0; i < finalText.length; i += CHUNK_SIZE) {
         yield { type: "token", value: finalText.slice(i, i + CHUNK_SIZE) };
       }

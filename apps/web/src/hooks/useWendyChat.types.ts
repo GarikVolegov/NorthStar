@@ -42,6 +42,7 @@ export interface ContextualAction {
   label: string;
   prompt: string;
   prefillText?: string | undefined;
+  isPredefined?: boolean | undefined;
 }
 
 export interface UseWendyChatOptions {
@@ -53,6 +54,7 @@ export interface UseWendyChatOptions {
   streamTimeoutMs?: number | undefined;
   /** If false, skips loading any persisted thread from localStorage at mount. Default true. */
   restorePersisted?: boolean | undefined;
+  buildRequestBody?: ((body: Record<string, unknown>) => Record<string, unknown>) | undefined;
   onMessageComplete?: ((message: ChatMessage) => void) | undefined;
 }
 
@@ -81,7 +83,7 @@ export interface UseWendyChatReturn {
   stopStream: () => void;
   clearHistory: () => void;
   retryLast: () => Promise<void>;
-  confirmAction: (messageId: string, actionId: string) => Promise<void>;
+  confirmAction: (messageId: string, actionId: string, confirmationText?: string) => Promise<void>;
   cancelAction: (messageId: string, actionId: string) => void;
   tts: ReturnType<typeof useTTS>;
   ttsEnabled: boolean;

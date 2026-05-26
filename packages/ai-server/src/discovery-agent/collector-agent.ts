@@ -15,6 +15,10 @@ export interface CollectorResult {
   durationMs: number;
 }
 
+export interface RunCollectorOptions {
+  priorityOnly?: boolean;
+}
+
 async function acquireCollectorLock(): Promise<boolean> {
   try {
     const existing = await db.execute(sql`SELECT pg_try_advisory_lock(${COLLECTOR_LOCK_KEY}) AS locked`);
@@ -33,7 +37,7 @@ async function releaseCollectorLock(): Promise<void> {
   }
 }
 
-export async function runCollector(): Promise<CollectorResult> {
+export async function runCollector(options: RunCollectorOptions = {}): Promise<CollectorResult> {
   const startedAt = Date.now();
   const bySource: Record<string, number> = {};
   const errors: string[] = [];
@@ -46,7 +50,7 @@ export async function runCollector(): Promise<CollectorResult> {
   }
 
   await Promise.allSettled(
-    getCollectorSources().map(async ({ name, fn }) => {
+    getCollectorSources(options).map(async ({ name, fn }) => {
       try {
         const items = await fn();
         bySource[name] = items.length;

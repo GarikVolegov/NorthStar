@@ -4,6 +4,7 @@ import type { EvalResult }     from "./self-evaluator";
 import type { RouteDecision }  from "./router-agent";
 import { buildToneSection }    from "./tone-adapter";
 import { buildWendyVoiceContract } from "../wendy-voice";
+import { wendyConfig } from "../config/wendy";
 
 export interface UserContext {
   name?:         string | undefined;
@@ -13,6 +14,8 @@ export interface UserContext {
   sectorName?:   string | undefined;
   pageContext?:  Record<string, unknown> | undefined;
   memorySection?: string | undefined;
+  wendyBrainSection?: string | undefined;
+  codeGraphSection?: string | undefined;
   locale?:       string | undefined;
   isPremium?:    boolean | undefined;
   stripeSubscriptionId?: string | null | undefined;
@@ -55,6 +58,7 @@ const TONE_BY_JOURNEY: Record<string, string> = {
   dipendente:        "Tono orientato alla crescita professionale: pratico, concreto, focalizzato su risultati misurabili.",
   autonomo:          "Tono imprenditoriale: focus su opportunità, mercato, scalabilità e validazione delle idee.",
   indeciso:          "Tono esplorativo: aiuta a fare chiarezza senza pressione, proponi strumenti di auto-scoperta.",
+  rabbit:            "Tono da esperto di benessere dei lagomorfi: pratico, empatico, basato su evidenze scientifiche. Usa termini corretti (stasi GI, cecotrofi, lagomorfo) spiegandoli in modo accessibile. Anteponi sempre la sicurezza dell'animale. Non dire mai 'aspetta e vedi' per sintomi fisici.",
 };
 
 const TONE_BY_HOUR: Record<"morning" | "evening" | "night", string> = {
@@ -90,9 +94,10 @@ function buildAdaptiveTone(opts: {
   }
 
   if (typeof localHour === "number") {
-    if (localHour >= 6 && localHour < 10) parts.push(TONE_BY_HOUR.morning ?? "");
-    else if (localHour >= 20 && localHour < 23) parts.push(TONE_BY_HOUR.evening ?? "");
-    else if (localHour >= 23 || localHour < 5) parts.push(TONE_BY_HOUR.night ?? "");
+    const pc = wendyConfig.prompt;
+    if (localHour >= pc.morningHourStart && localHour < pc.morningHourEnd) parts.push(TONE_BY_HOUR.morning ?? "");
+    else if (localHour >= pc.eveningHourStart && localHour < pc.eveningHourEnd) parts.push(TONE_BY_HOUR.evening ?? "");
+    else if (localHour >= pc.nightHourStart || localHour < pc.nightHourEnd) parts.push(TONE_BY_HOUR.night ?? "");
   }
 
   if (typeof localDayOfWeek === "number") {
@@ -111,9 +116,11 @@ function buildAdaptiveTone(opts: {
 }
 
 function buildBaseSystem(locale?: string): string {
-  const lang = LOCALE_NAMES[locale?.slice(0, 2) ?? "it"] ?? "italiano";
+  const lang = LOCALE_NAMES[locale?.slice(0, 2) ?? "it"] ?? wendyConfig.prompt.defaultLanguage;
   return `Sei Wendy, coach di crescita personale e orientamento professionale di NorthStar.
 Sei empatica, diretta, competente. Rispondi SEMPRE in: ${lang}.
+Qualsiasi fonte, documento o risultato web in inglese va integrato nella risposta tradotto in ${lang}.
+Non riportare mai testo in inglese direttamente — nemmeno citazioni parziali.
 Usa un tono caldo ma concreto — mai vago o generico.
 Se non sei sicura, dillo esplicitamente piuttosto che inventare.
 
@@ -142,7 +149,7 @@ REGOLE RAG E DATI DI MERCATO (Step 6):
 - Per skill complementari o costruire un piano di studio: usa get_skill_cooccurrences.
 - Cita sempre la fonte RAG nella risposta con il formato:
   "Secondo [nome fonte], [anno/periodo]..." oppure "Dati [fonte] indicano che..."
-- Se search_rag non restituisce chunk con similarity > 0.70, rispondi:
+- Se search_rag non restituisce chunk con similarity > ${wendyConfig.prompt.ragCitationMinScore}, rispondi:
   "Non ho dati aggiornati sufficienti su questo argomento. Per informazioni recenti consulta
   direttamente il World Economic Forum (weforum.org) o LinkedIn Economic Graph."
 - I weak signals sono tendenze emergenti, non certezze — presentali come tali:
@@ -191,6 +198,14 @@ export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {
   // ── Memory ───────────────────────────────────────────────────────────────
   if (userContext.memorySection) {
     sections.push(userContext.memorySection);
+  }
+
+  if (userContext.wendyBrainSection) {
+    sections.push(userContext.wendyBrainSection);
+  }
+
+  if (userContext.codeGraphSection) {
+    sections.push(userContext.codeGraphSection);
   }
 
   // ── Behavioral patterns + routing history ────────────────────────────────
@@ -285,9 +300,15 @@ export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {
   // ── Web results ───────────────────────────────────────────────────────────
   if (webResults.length > 0) {
     const web = webResults
-      .map((c, i) => `[WEB ${i + 1}] (${c.source})\n${c.content}`)
+      .map((c, i) => {
+        const title = (c.metadata?.title as string | undefined) ?? c.source;
+        return `[WEB ${i + 1}] "${title}" (${c.source})\n${c.content}`;
+      })
       .join("\n\n");
-    sections.push(`## Risultati web\n${web}`);
+    sections.push(
+      `## Risultati web\n` +
+      `⚠️ I contenuti seguenti potrebbero essere in inglese: integra e traduci in italiano prima di includerli nella risposta. Cita le fonti con il loro titolo, non l'URL.\n\n${web}`
+    );
   }
 
   // ── Chain of Thought ──────────────────────────────────────────────────────

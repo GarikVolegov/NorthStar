@@ -20,11 +20,23 @@ export type { DifficultyLevel } from "./interview/adapt";
 
 export { runGrowthAgent } from "./growth-agent/agent";
 export { loadMemory, buildMemorySection } from "./growth-agent/memory-manager";
+export { recordQualityEvent, recordUserFeedback } from "./growth-agent/quality-tracker";
 export { ingestText, ingestPersonaExample, ingestUrl } from "./growth-agent/ingest";
 export { retrieve } from "./growth-agent/retriever";
 export { ingestUserMemoryGraph, searchMemoryGraph, getMemoryGraphHealth } from "./memory-graph";
 export type { MemoryGraphSearchResponse, MemoryGraphSearchResult } from "./memory-graph";
 export { searchWeb } from "./growth-agent/web-search";
+export {
+  buildWendyBrainContextSection,
+  buildWendyBrainSkillPrompt,
+  normalizeBrainTitle,
+  promoteWendyBrainCandidate,
+  recordWendyBrainEvent,
+  runWendyBrainOptimizer,
+  sanitizeBrainText,
+  searchWendyBrain,
+} from "./wendy-brain";
+export type { WendyBrainEventInput, WendyBrainHit, WendyBrainSearchOptions } from "./wendy-brain";
 export { buildSystemPrompt } from "./growth-agent/prompt-builder";
 export type { UserContext } from "./growth-agent/prompt-builder";
 export type { RetrievedChunk } from "./growth-agent/retriever";
@@ -42,7 +54,19 @@ export type { SupervisorResult, SupervisorDimensions } from "./growth-agent/supe
 
 // Observability
 export { logger, type LoggerFields } from "./logger";
-export { wendyRequestsTotal, wendyLatencySeconds, wendySupervisorRewritesTotal, wendyLlmTokensTotal, wendyErrorsTotal, wendyToolCallsTotal, wendyToolCallDuration, recordRequest, recordError, recordSupervisorRewrite, recordLlmTokens, recordToolCall, getMetricsContentType, getMetrics, getRagMetricsSummary, register } from "./metrics";
+// Memory 2.0
+export { extractMemoryIncremental } from "./growth-agent/memory-manager";
+export type { QualityEvent } from "./growth-agent/quality-tracker";
+export { searchMemory, buildContextualMemorySection } from "./growth-agent/memory-search";
+export type { MemoryHit, MemoryHitType } from "./growth-agent/memory-search";
+export { runMemoryDecayJob, computeDecayScore } from "./jobs/memory-decay";
+export { runQualityOptimizer, runQualityOptimizerJob } from "./jobs/quality-optimizer";
+// Phase 5: Plugin Tool Registry
+export { toolRegistry } from "./tools/registry";
+export type { Domain as ToolDomain, PluginToolDefinition, PluginParam, PluginToolContext, ToolDefinition as PluginToolDefinitionStrict } from "./tools/types";
+export { toOpenAITool } from "./tools/types";
+
+export { wendyRequestsTotal, wendyLatencySeconds, wendySupervisorRewritesTotal, wendyLlmTokensTotal, wendyErrorsTotal, wendyToolCallsTotal, wendyToolCallDuration, wendyCostUsdTotal, wendyQualityScore, wendyTtftSeconds, wendyFeedbackTotal, wendyModelEffectiveness, recordRequest, recordError, recordSupervisorRewrite, recordLlmTokens, recordToolCall, recordWendyCost, recordQualityScore, recordTtft, recordFeedback, recordModelEffectiveness, getMetricsContentType, getMetrics, getRagMetricsSummary, register } from "./metrics";
 
 // Feature flags
 export { FF } from "./feature-flags";
@@ -59,11 +83,17 @@ export type { RouterInput, RouterOutput } from "./search-router/router";
 
 // Discovery Agents
 export { runCollector } from "./discovery-agent/collector-agent";
-export type { CollectorResult } from "./discovery-agent/collector-agent";
+export type { CollectorResult, RunCollectorOptions } from "./discovery-agent/collector-agent";
 export { runEnricher } from "./discovery-agent/enricher-agent";
 export type { EnricherResult } from "./discovery-agent/enricher-agent";
 export { runNewsPublisher } from "./discovery-agent/news-publisher";
+export { PUBLIC_NEWS_SOURCES, isPublicNewsArticleSource, isPublishableDiscoveryNews } from "./discovery-agent/news-policy";
+export { getOpenAIFallbackConfig, shouldFallbackToOpenAI } from "./client";
 export type { NewsPublisherResult } from "./discovery-agent/news-publisher";
+export { runGrowthLibraryAgent } from "./discovery-agent/growth-library-agent";
+export type { GrowthLibraryResult, GrowthGap } from "./discovery-agent/growth-library-agent";
+export { runJobPostingsAgent } from "./discovery-agent/job-postings-agent";
+export type { JobPostingsAgentResult } from "./discovery-agent/job-postings-agent";
 export { getPersonalizedFeed, invalidateUserFeedCache } from "./discovery-agent/personalizer-agent";
 
 // Embeddings
@@ -93,6 +123,10 @@ export { resolveWendyRoute } from "./wendy-router/router";
 export { buildLightPrompt }  from "./wendy-router/light-prompt";
 export { getLocalWendyReply, getLocalWendyFallbackReply, isLocalWendyReplyMessage } from "./wendy-router/local-reply";
 export type { WendyIntent, WendyPageContext, CompressedHistory, WendyRouterDecision, ToolDefinition } from "./wendy-router/types";
+
+// Config
+export { ensureWendyConfigFresh, getWendyConfig, loadConfig, refreshWendyConfig, wendyConfig } from "./config/wendy";
+export type { WendyConfig, WendyRouterConfig, WendySpecialistConfig, WendySupervisorConfig, WendyMemoryConfig, WendyAgentConfig, WendyFastPathConfig, WendyPromptConfig, WendyJobPostingsConfig } from "./config/wendy";
 
 // AI Request Log
 export { recordAiCall }      from "./ai-request-log";
@@ -171,6 +205,17 @@ export type {
   FindModelOptions,
 } from "./model-router/catalog";
 export { applyContextSignals } from "./model-router";
+
+// Rabbit expert domain
+export { checkRabbitEmergency } from "./rabbit/emergency-triage";
+export type { TriageResult } from "./rabbit/emergency-triage";
+
+// Image generation
+export { generateImageBuffer, editImages } from "./image/client";
+
+// UI directives
+export { buildUiDirectives } from "./growth-agent/ui-directives";
+export type { UiDirectives } from "./growth-agent/ui-directives";
 
 // Utilities
 export { withTimeout, gracefulDegrade } from "./utils";

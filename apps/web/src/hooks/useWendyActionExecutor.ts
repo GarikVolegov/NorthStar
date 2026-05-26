@@ -42,6 +42,9 @@ export interface WendyAction {
   targetRoute?: string | undefined;
   preview?: Array<{ label: string; value: string }> | undefined;
   sourceTool?: string | undefined;
+  actionToken?: string | undefined;
+  requiresStrongConfirmation?: boolean | undefined;
+  confirmationText?: string | undefined;
   error?: string | undefined;
 }
 
@@ -152,6 +155,9 @@ export function normalizeWendyAction(event: ToolCallEvent): WendyAction | null {
       preview: Array.isArray(serverAction.preview)
         ? (serverAction.preview as Array<{ label: string; value: string }>)
         : undefined,
+      actionToken: typeof serverAction.actionToken === "string" ? serverAction.actionToken : undefined,
+      requiresStrongConfirmation: Boolean(serverAction.requiresStrongConfirmation),
+      confirmationText: typeof serverAction.confirmationText === "string" ? serverAction.confirmationText : undefined,
       sourceTool: event.name,
     };
   }
@@ -246,13 +252,32 @@ export function useWendyActionExecutor() {
     }
   }, [setLocation, toast]);
 
-  const confirm = useCallback(async (action: WendyAction): Promise<WendyAction> => {
+  const confirm = useCallback(async (action: WendyAction, strongConfirmationText?: string): Promise<WendyAction> => {
     if (!action.requiresConfirmation || action.status !== "needs_confirmation") {
       return executeImmediate(action);
     }
 
     const running: WendyAction = { ...action, status: "running", error: undefined };
     try {
+      if (String(action.type).startsWith("admin_")) {
+        if (!action.actionToken) throw new Error("Token azione admin mancante.");
+        const res = await apiFetch(`${BASE}api/admin/wendy/actions/confirm`, {
+          method: "POST",
+          body: JSON.stringify({
+            actionToken: action.actionToken,
+            confirmationText: strongConfirmationText,
+          }),
+        });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(body.error ?? "Azione admin rifiutata.");
+        }
+        invalidateOperationalData();
+        void queryClient.invalidateQueries({ queryKey: ["admin"] });
+        toast({ title: "Azione admin eseguita", description: action.label });
+        return { ...running, status: "executed" };
+      }
+
       if (action.type === "create_objective") {
         const payload = {
           text: String(action.payload.text ?? ""),

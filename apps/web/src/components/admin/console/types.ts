@@ -109,6 +109,64 @@ export type AgentsOverview = {
       requests: number;
     }>;
   };
+  controlRoom?: {
+    ai: {
+      activeProvider: string;
+      openRouterConfigured: boolean;
+      openAiFallbackConfigured: boolean;
+      model: string;
+      status: string;
+    };
+    configBlockers: Array<{
+      key: string;
+      label: string;
+      status: "configured" | "missing";
+      severity: "critical" | "warning";
+      message: string;
+    }>;
+    readyOutputs: {
+      realNews: {
+        count: number;
+        status: string;
+        latest?: Array<{ id: number; title: string; source: string; createdAt: string }>;
+      };
+      pendingDiscovery: { count: number; status: string };
+      growthArticles: {
+        count: number;
+        status: string;
+        latest?: Array<{ id: number; title: string; status: string; createdAt: string }>;
+      };
+      jobSnapshots: { count: number; status: string };
+    };
+    latestRuns: Array<{
+      id: number;
+      agentName: string;
+      status: string;
+      startedAt: string;
+      errorMessage: string | null;
+    }>;
+  };
+  runnablePipelines?: Array<{
+    key: string;
+    label: string;
+    description: string;
+    endpoint: string;
+    method: "POST";
+    risk: "low" | "medium" | "high";
+    steps: string[];
+    outputs: string[];
+    requiredConfigKeys: string[];
+    reviewPolicy: "auto_publish" | "requires_review" | "data_refresh";
+  }>;
+  advancedRunnableAgents?: Array<{
+    key: string;
+    label: string;
+    description: string;
+    endpoint: string;
+    method: "POST";
+    risk: "low" | "medium" | "high";
+    requiresInput?: boolean;
+  }>;
   runnableAgents: Array<{
     key: string;
     label: string;

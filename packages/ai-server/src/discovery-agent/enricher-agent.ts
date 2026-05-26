@@ -43,11 +43,11 @@
  *   Può essere triggerato manualmente via POST /api/admin/discovery/enrich.
  */
 import { logger } from "../logger";
-import { openai } from "../client";
 import { db }     from "@workspace/db";
 import { discoveryItemsTable } from "@workspace/db";
 import { eq, and, lt, desc } from "drizzle-orm";
 import type { DiscoveryItem } from "@workspace/db";
+import { getLLMForRoute } from "../llm/client";
 import { selectModelFor } from "../model-router";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -182,20 +182,18 @@ async function callGPT(item: DiscoveryItem): Promise<EnrichmentResult> {
   ].join("\n");
 
   const route = selectModelFor("discovery-enrich");
-  const res = await withRetry(() =>
-    openai.chat.completions.create({
-      model:           route.model,
-      messages: [
-        { role: "system", content: ENRICHER_SYSTEM },
-        { role: "user",   content: userPrompt },
-      ],
-      temperature:     0.1,
-      max_tokens:      300,
-      response_format: { type: "json_object" },
+  const llm = getLLMForRoute(route);
+  const raw = await withRetry(() =>
+    llm.chatOnce([
+      { role: "system", content: ENRICHER_SYSTEM },
+      { role: "user",   content: userPrompt },
+    ], {
+      model: route.model,
+      temperature: 0.1,
+      maxTokens: 300,
     })
   );
 
-  const raw = res.choices[0]?.message?.content ?? "{}";
   let parsed: Partial<EnrichmentResult> = {};
   try {
     parsed = JSON.parse(raw) as Partial<EnrichmentResult>;

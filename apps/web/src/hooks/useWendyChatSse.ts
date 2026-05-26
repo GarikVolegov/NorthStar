@@ -6,7 +6,15 @@ export interface WendySseRagCitation {
   url: string | null;
 }
 
-export type WendyContextSource = 'app-data' | 'rag' | 'openhuman' | 'graphify' | 'semantic-memory';
+export type WendyContextSource =
+  | 'app-data'
+  | 'rag'
+  | 'openhuman'
+  | 'graphify'
+  | 'wendy-brain'
+  | 'semantic-memory'
+  | 'admin'
+  | 'printing-press';
 
 export type WendySseEvent =
   | { type: 'status'; value: string }
@@ -64,6 +72,9 @@ function isWendyContextSource(value: unknown): value is WendyContextSource {
     || value === 'rag'
     || value === 'openhuman'
     || value === 'graphify'
+    || value === 'wendy-brain'
+    || value === 'admin'
+    || value === 'printing-press'
     || value === 'semantic-memory';
 }
 

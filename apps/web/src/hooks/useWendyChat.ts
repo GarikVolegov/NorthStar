@@ -37,6 +37,8 @@ import {
 import { useWendyTabRemoteSync } from './useWendyTabRemoteSync';
 import { FATAL_ERRORS, THINKING_LABELS } from './wendy.config';
 
+const RECONNECT_DELAY_MS = [1000, 2000, 4000] as const;
+
 export type {
   ChatMessage,
   ContextualAction,
@@ -56,6 +58,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     maxRetries = 2,
     streamTimeoutMs = 60_000,
     restorePersisted = true,
+    buildRequestBody,
     onMessageComplete,
   } = options;
 
@@ -82,6 +85,9 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
   const streamedContentRef      = useRef('');
   const hasNonTextOutputRef     = useRef(false);
   const hasTerminalErrorRef     = useRef(false);
+  const receivedDoneRef         = useRef(false);
+  const lastContextPromptRef    = useRef<string | undefined>(undefined);
+  const lastIsPredefinedRef     = useRef(false);
 
   const historyRef = useRef<WendyHistoryEntry[]>([]);
 
@@ -134,7 +140,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
           return true;
         }
         if (event.type === 'error') {
-          const message = 'Wendy si è interrotta. Riprova.';
+          const message = event.message || 'Wendy si è interrotta. Riprova.';
           hasNonTextOutputRef.current = true;
           hasTerminalErrorRef.current = true;
           setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
@@ -160,6 +166,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
           return true;
         }
         if (event.type === 'done') {
+          receivedDoneRef.current = true;
           if (event.requestId) lastRequestIdRef.current = event.requestId;
           contextSourcesRef.current = event.contextSources;
           setMessages((prev) =>
@@ -228,6 +235,31 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     },
 
     onComplete: (finalContent) => {
+      if (!receivedDoneRef.current && !hasTerminalErrorRef.current) {
+        if (retriesRef.current < maxRetries) {
+          retriesRef.current += 1;
+          setRetryState({ active: true, attempt: retriesRef.current, max: maxRetries });
+          const delay = RECONNECT_DELAY_MS[Math.min(retriesRef.current - 1, RECONNECT_DELAY_MS.length - 1)] ?? 4000;
+          setTimeout(() => {
+            void _doStream(lastUserMessageRef.current, lastContextPromptRef.current, lastIsPredefinedRef.current);
+          }, delay);
+          return;
+        }
+
+        const interrupted = new Error('SSE_CLOSED_WITHOUT_DONE');
+        setStreamError(interrupted);
+        setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsgIdRef.current
+              ? { ...m, role: 'error', content: _friendlyError(interrupted), isStreaming: false }
+              : m,
+          ),
+        );
+        setWendyPhase?.('idle');
+        return;
+      }
+
       const completedContent = finalContent || streamedContentRef.current;
       const hasNonTextOutput = hasNonTextOutputRef.current;
       const emptyWithoutOutput = !completedContent.trim() && !hasNonTextOutput;
@@ -286,6 +318,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       streamedContentRef.current = '';
       hasNonTextOutputRef.current = false;
       hasTerminalErrorRef.current = false;
+      receivedDoneRef.current = false;
       setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
       retriesRef.current = 0;
       setRetryState({ active: false, attempt: 0, max: maxRetries });
@@ -304,7 +337,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       if (!isFatal && retriesRef.current < maxRetries) {
         retriesRef.current += 1;
         setRetryState({ active: true, attempt: retriesRef.current, max: maxRetries });
-        setTimeout(() => _doStream(lastUserMessageRef.current), 1000 * retriesRef.current);
+        setTimeout(() => _doStream(lastUserMessageRef.current, lastContextPromptRef.current, lastIsPredefinedRef.current), 1000 * retriesRef.current);
         return;
       }
       setRetryState({ active: false, attempt: retriesRef.current, max: maxRetries });
@@ -376,7 +409,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     return 'Wendy si è interrotta. Riprova.';
   }
 
-  async function _doStream(text: string, contextPrompt?: string) {
+  async function _doStream(text: string, contextPrompt?: string, isPredefined = false) {
     const msgId = `assistant-${Date.now()}`;
     assistantMsgIdRef.current      = msgId;
     thinkingStartRef.current       = Date.now();
@@ -388,6 +421,9 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     streamedContentRef.current     = '';
     hasNonTextOutputRef.current    = false;
     hasTerminalErrorRef.current    = false;
+    receivedDoneRef.current        = false;
+    lastContextPromptRef.current   = contextPrompt;
+    lastIsPredefinedRef.current    = isPredefined;
 
     setMessages((prev) => [
       ...prev,
@@ -420,17 +456,20 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       data:       compactPageData(currentPage.data),
     } : undefined;
 
+    const requestBody = {
+      message:           contextPrompt ?? text,
+      compressedHistory: compressed,
+      pageContext,
+      locale:            navigator.language?.slice(0, 2) ?? 'it',
+      isPredefined,
+      // threadId opzionale - da passare se si gestiscono sessioni multiple
+    };
+
     await startStream(apiUrl, {
       method:      'POST',
       headers,
       credentials: 'include',
-      body: JSON.stringify({
-        message:           contextPrompt ?? text,
-        compressedHistory: compressed,
-        pageContext,
-        locale:            navigator.language?.slice(0, 2) ?? 'it',
-        // threadId opzionale - da passare se si gestiscono sessioni multiple
-      }),
+      body: JSON.stringify(buildRequestBody ? buildRequestBody(requestBody) : requestBody),
     });
   }
 
@@ -446,7 +485,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       ...prev,
       { id: `user-${Date.now()}`, role: 'user', content: trimmed, timestamp: Date.now() },
     ]);
-    await _doStream(trimmed);
+    await _doStream(trimmed, undefined, false);
   }, [isStreaming, tts, openaiTts]);
 
   const sendContextualMessage = useCallback(async (action: ContextualAction) => {
@@ -463,7 +502,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       { id: `user-${Date.now()}`, role: 'user', content: visibleText, timestamp: Date.now() },
     ]);
 
-    await _doStream(visibleText, action.prompt);
+    await _doStream(visibleText, action.prompt, action.isPredefined ?? true);
   }, [isStreaming, tts, openaiTts]);
 
   const sendFeedback = useCallback(async (
@@ -507,7 +546,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     if (!lastUserMessageRef.current || isStreaming) return;
     retriesRef.current = 0;
     setMessages((prev) => prev.filter((m) => m.role !== 'error').slice(0, -1));
-    await _doStream(lastUserMessageRef.current);
+    await _doStream(lastUserMessageRef.current, lastContextPromptRef.current, lastIsPredefinedRef.current);
   }, [isStreaming]);
 
   const updateMessageAction = useCallback((
@@ -529,13 +568,13 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     );
   }, []);
 
-  const confirmAction = useCallback(async (messageId: string, actionId: string) => {
+  const confirmAction = useCallback(async (messageId: string, actionId: string, confirmationText?: string) => {
     const action = messages
       .find((message) => message.id === messageId)
       ?.actions?.find((item) => item.id === actionId);
     if (!action) return;
     updateMessageAction(messageId, actionId, { ...action, status: 'running', error: undefined });
-    const confirmed = await actionExecutor.confirm(action);
+    const confirmed = await actionExecutor.confirm(action, confirmationText);
     updateMessageAction(messageId, actionId, confirmed);
   }, [actionExecutor, messages, updateMessageAction]);
 

@@ -2,6 +2,7 @@ import { getLLM } from "../llm/client";
 import { retrieve } from "../growth-agent/retriever";
 import { logger } from "../logger";
 import { selectModelFor } from "../model-router";
+import { estimateCost, estimateTokens } from "../cost-tracking";
 
 const WIKI_SYSTEM = `Sei un esperto del settore professionale. Rispondi in modo chiaro, dettagliato e aggiornato.
 Usa un tono professionale ma accessibile. Rispondi sempre in italiano.
@@ -16,6 +17,10 @@ export interface WikiContext {
   cvText?: string;
   message: string;
   history?: Array<{ role: string; content: string }>;
+  externalContext?: {
+    text: string;
+    sources: Array<"rag" | "graphify" | "wendy-brain">;
+  };
 }
 
 export interface WikiStreamEvent {
@@ -23,6 +28,27 @@ export interface WikiStreamEvent {
   value?: string;
   message?: string;
   chunks?: Array<{ content: string; source: string; score: number }>;
+  model?: string;
+  reason?: string;
+  contextSources?: Array<"rag" | "graphify" | "wendy-brain">;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    costUsdEst: number;
+  };
+  rag?: {
+    chunksRetrieved: number;
+    topSimilarity: number | null;
+    sourcesUsed: string[];
+  };
+}
+
+function buildRagMetadata(chunks: Array<{ source: string; score: number }>): NonNullable<WikiStreamEvent["rag"]> {
+  return {
+    chunksRetrieved: chunks.length,
+    topSimilarity: chunks.length > 0 ? Math.max(...chunks.map((chunk) => chunk.score)) : null,
+    sourcesUsed: [...new Set(chunks.map((chunk) => chunk.source))],
+  };
 }
 
 export async function* streamWikiResponse(ctx: WikiContext): AsyncGenerator<WikiStreamEvent> {
@@ -49,6 +75,7 @@ export async function* streamWikiResponse(ctx: WikiContext): AsyncGenerator<Wiki
           chunks.map((c, i) => `[FONTE ${i + 1}] (${c.source}, score: ${c.score.toFixed(2)})\n${c.content}`).join("\n\n")
         }`
       : "";
+    const externalContextSection = ctx.externalContext?.text ?? "";
 
     const userContextParts: string[] = [];
     if (ctx.journeyType) userContextParts.push(`Tipo percorso: ${ctx.journeyType}`);
@@ -58,7 +85,7 @@ export async function* streamWikiResponse(ctx: WikiContext): AsyncGenerator<Wiki
       ? `\n\n## Profilo utente\n${userContextParts.join("\n")}`
       : "";
 
-    const systemContent = `${WIKI_SYSTEM}\n\nSettore: ${ctx.sectorName}${contextSection}${userContextStr}`;
+    const systemContent = `${WIKI_SYSTEM}\n\nSettore: ${ctx.sectorName}${contextSection}${externalContextSection}${userContextStr}`;
 
     const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
       { role: "system", content: systemContent },
@@ -73,19 +100,39 @@ export async function* streamWikiResponse(ctx: WikiContext): AsyncGenerator<Wiki
 
     messages.push({ role: "user", content: ctx.message });
 
-    const llm = getLLM();
     const route = selectModelFor("wiki-chat");
+    const inputTokens = estimateTokens(messages.map((message) => message.content).join("\n\n"));
+    const llm = getLLM();
     const stream = await llm.chat(messages, {
       model: route.model,
-      temperature: 0.65,
-      maxTokens: 800,
+      temperature: route.temperature,
+      maxTokens: route.maxTokens,
     });
 
+    let fullResponse = "";
     for await (const delta of stream) {
+      fullResponse += delta;
       yield { type: "token", value: delta };
     }
 
-    yield { type: "done" };
+    const outputTokens = estimateTokens(fullResponse);
+    const contextSources = [
+      ...(chunks.length > 0 ? ["rag" as const] : []),
+      ...(ctx.externalContext?.sources ?? []),
+    ].filter((source, index, all) => all.indexOf(source) === index);
+
+    yield {
+      type: "done",
+      model: route.model,
+      reason: route.reason,
+      contextSources,
+      usage: {
+        inputTokens,
+        outputTokens,
+        costUsdEst: estimateCost(route.model, inputTokens, outputTokens),
+      },
+      rag: buildRagMetadata(chunks),
+    };
   } catch (err) {
     logger.error({ err }, "wiki chat error");
     yield { type: "error", message: "Errore durante la generazione della risposta" };

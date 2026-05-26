@@ -10,10 +10,11 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+import { useState } from "react";
 
 interface WendyActionCardProps {
   action: WendyAction;
-  onConfirm: () => void;
+  onConfirm: (confirmationText?: string) => void;
   onCancel: () => void;
 }
 
@@ -33,6 +34,7 @@ function statusCopy(action: WendyAction) {
 }
 
 export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCardProps) {
+  const [strongConfirmation, setStrongConfirmation] = useState("");
   const Icon = action.status === "executed" || action.status === "done"
     ? CheckCircle2
     : action.status === "failed" || action.status === "cancelled"
@@ -41,7 +43,15 @@ export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCard
         ? Loader2
         : actionIcon(action.type);
 
-  const canConfirm = action.requiresConfirmation && action.status === "needs_confirmation";
+  const strongConfirmationRequired = Boolean(
+    action.requiresStrongConfirmation && action.confirmationText,
+  );
+  const strongConfirmationMatches =
+    !strongConfirmationRequired || strongConfirmation === action.confirmationText;
+  const canConfirm =
+    action.requiresConfirmation &&
+    action.status === "needs_confirmation" &&
+    strongConfirmationMatches;
   const canCancel = action.requiresConfirmation && action.status === "needs_confirmation";
 
   return (
@@ -93,6 +103,22 @@ export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCard
               {action.error}
             </p>
           )}
+
+          {strongConfirmationRequired && action.status === "needs_confirmation" && (
+            <label className="mt-3 block text-xs text-muted-foreground">
+              <span className="mb-1 block font-medium text-foreground">
+                Testo di conferma
+              </span>
+              <input
+                type="text"
+                value={strongConfirmation}
+                onChange={(event) => setStrongConfirmation(event.target.value)}
+                placeholder={action.confirmationText}
+                className="h-10 w-full rounded-md border border-white/10 bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/45 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/30"
+                aria-label="Testo di conferma"
+              />
+            </label>
+          )}
         </div>
       </div>
 
@@ -108,11 +134,17 @@ export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCard
               Annulla
             </button>
           )}
-          {canConfirm && (
+          {action.requiresConfirmation && action.status === "needs_confirmation" && (
             <button
               type="button"
-              onClick={onConfirm}
-              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+              disabled={!canConfirm}
+              onClick={() => onConfirm(strongConfirmationRequired ? strongConfirmation : undefined)}
+              className={cn(
+                "inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
+                canConfirm
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "bg-muted text-muted-foreground",
+              )}
             >
               <Check className="h-3.5 w-3.5" />
               Conferma

@@ -60,7 +60,7 @@ async function fetchPagePreviewImage(pageUrl: string): Promise<string | undefine
   }
 }
 
-export async function hydrateMissingImages(items: RawItem[]): Promise<RawItem[]> {
+export async function hydrateMissingImages<T extends RawItem>(items: T[]): Promise<T[]> {
   const hydrated = [...items];
   const missingIndexes = hydrated
     .map((item, index) => ({ item, index }))

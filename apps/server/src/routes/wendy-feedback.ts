@@ -16,6 +16,7 @@ import { eq, and } from "drizzle-orm";
 import { optionalAuth } from "../middleware/auth";
 import { db, wendyFeedbackTable } from "@workspace/db";
 import { rootLogger } from "../middleware/logger";
+import { recordUserFeedback } from "@workspace/ai-server";
 
 const router = Router();
 
@@ -25,6 +26,7 @@ const FeedbackSchema = z.object({
   reason:    z.enum(["inaccurate", "irrelevant", "too_long", "too_slow", "harmful", "other"]).optional(),
   // Contesto snapshot (non-PII) — inviato dal frontend per arricchire l'analisi
   intent:    z.string().max(30).optional(),
+  domain:    z.string().max(32).optional(),
   toolsUsed: z.array(z.string().max(50)).max(10).optional(),
 });
 
@@ -35,7 +37,7 @@ router.post("/", optionalAuth, async (req: Request, res: Response) => {
     return;
   }
 
-  const { requestId, rating, reason, intent, toolsUsed } = parsed.data;
+  const { requestId, rating, reason, intent, domain, toolsUsed } = parsed.data;
   const userId = req.user?.id ?? null;
 
   try {
@@ -67,9 +69,11 @@ router.post("/", optionalAuth, async (req: Request, res: Response) => {
     }
 
     rootLogger.info(
-      { requestId, rating, reason, userId, intent },
+      { requestId, rating, reason, userId, intent, domain },
       "[wendy-feedback] recorded",
     );
+
+    await recordUserFeedback(requestId, rating, domain);
 
     res.json({ ok: true });
   } catch (err) {

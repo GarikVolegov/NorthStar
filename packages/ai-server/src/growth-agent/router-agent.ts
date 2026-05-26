@@ -5,6 +5,7 @@ import type { ChatMessage } from "./agent";
 import { logger, type LoggerFields } from "../logger";
 import { recordRouterConfidence } from "../metrics";
 import { selectModelFor } from "../model-router";
+import { wendyConfig } from "../config/wendy";
 
 // ── Types ─────────────────────────────────────────────────────────────────────────
 
@@ -95,15 +96,15 @@ I campi secondary* sono OPZIONALI. Omettili se il messaggio è chiaramente mono-
 // ── Intent-aware threshold config ──────────────────────────────────────────────────
 
 const INTENT_CONFIG: Record<Intent, { base: number; floor: number }> = {
-  vent:          { base: 0.50, floor: 0.28 },
-  reflect:       { base: 0.50, floor: 0.28 },
-  ask_info:      { base: 0.60, floor: 0.40 },
-  explore:       { base: 0.60, floor: 0.40 },
-  problem_solve: { base: 0.65, floor: 0.45 },
-  plan:          { base: 0.70, floor: 0.50 },
+  vent:          wendyConfig.router.intentThresholds.vent          ?? { base: 0.50, floor: 0.28 },
+  reflect:       wendyConfig.router.intentThresholds.reflect       ?? { base: 0.50, floor: 0.28 },
+  ask_info:      wendyConfig.router.intentThresholds.ask_info      ?? { base: 0.60, floor: 0.40 },
+  explore:       wendyConfig.router.intentThresholds.explore       ?? { base: 0.60, floor: 0.40 },
+  problem_solve: wendyConfig.router.intentThresholds.problem_solve ?? { base: 0.65, floor: 0.45 },
+  plan:          wendyConfig.router.intentThresholds.plan          ?? { base: 0.70, floor: 0.50 },
 };
 
-const SECONDARY_MIN_CONFIDENCE = 0.45;
+const SECONDARY_MIN_CONFIDENCE = wendyConfig.router.secondaryMinConfidence;
 
 const DOMAIN_KEYWORDS: Record<Domain, string[]> = {
   career:        ["lavoro", "cv", "colloquio", "stipendio", "carriera", "job", "work", "offerta", "contratto", "assunzione"],
@@ -118,37 +119,35 @@ const DOMAIN_KEYWORDS: Record<Domain, string[]> = {
 
 // ── Intent-aware adaptive threshold ────────────────────────────────────────────────
 
-const BASE_WORD_COUNT       = 8;
-const DOMAIN_HISTORY_BONUS  = 0.10;
 function computeAdaptiveThreshold(
   userMessage: string,
   domain: Domain,
   intent: Intent,
   history: ChatMessage[],
 ): number {
+  const cfg    = wendyConfig.router;
   const config = INTENT_CONFIG[intent] ?? INTENT_CONFIG.explore;
   let threshold = config.base;
 
   const wordCount = userMessage.trim().split(/\s+/).length;
-  if (wordCount < BASE_WORD_COUNT) threshold -= 0.08;
+  if (wordCount < cfg.shortMessageWords) threshold -= cfg.shortMessagePenalty;
 
-  const recentHistory = history.slice(-6);
+  const recentHistory    = history.slice(-cfg.historyWindowSize);
   const domainMatchCount = recentHistory.filter(
     (m) => m.role === "assistant" && (m as ChatMessage & { domain?: Domain }).domain === domain,
   ).length;
-  const keywords = DOMAIN_KEYWORDS[domain] ?? [];
+  const keywords       = DOMAIN_KEYWORDS[domain] ?? [];
   const recentUserText = recentHistory.filter((m) => m.role === "user").map((m) => m.content.toLowerCase()).join(" ");
   const keywordMatches = keywords.filter((kw) => recentUserText.includes(kw)).length;
 
-  if (domainMatchCount >= 2 || keywordMatches >= 2) {
-    threshold -= DOMAIN_HISTORY_BONUS;
+  if (domainMatchCount >= cfg.domainMatchThreshold || keywordMatches >= cfg.domainMatchThreshold) {
+    threshold -= cfg.domainHistoryBonus;
   }
 
   // Intent-specific: vent/reflect need very little signal
   if (intent === "vent" || intent === "reflect") {
-    const emotionalMarkers = ["non ce la faccio", "sono stanco", "frustrante", "esausto", "bloccato", "paura"];
-    const hasEmotional = emotionalMarkers.some((m) => userMessage.toLowerCase().includes(m));
-    if (hasEmotional) threshold -= 0.06;
+    const hasEmotional = cfg.emotionalMarkers.some((m) => userMessage.toLowerCase().includes(m));
+    if (hasEmotional) threshold -= cfg.emotionalMarkerPenalty;
   }
 
   const final = Math.max(config.floor, threshold);
@@ -199,19 +198,26 @@ export class RouterAgent {
       try {
         const userMemory = await loadMemory(userId);
         const highConfidence = userMemory.patterns.filter(
-          (p) => p.confidence >= 0.80,
+          (p) => p.confidence * (p.decayScore ?? 1.0) >= 0.80,
         );
+        const lines: string[] = [];
         if (highConfidence.length > 0) {
-          behaviorContext =
-            "## Pattern comportamentali noti dell'utente\n" +
-            highConfidence
-              .map(
-                (p) =>
-                  `- [${p.patternType}] ${p.description}`,
-              )
-              .join("\n") +
-            "\n\nUsa questi pattern per adattare la classificazione del dominio.";
+          lines.push(
+            "## Pattern comportamentali noti dell'utente",
+            ...highConfidence.map((p) => `- [${p.patternType}] ${p.description}`),
+            "\nUsa questi pattern per adattare la classificazione del dominio.",
+          );
         }
+        // Memory-guided routing: surface the user's declared main goal so the
+        // LLM router can align the domain to what the user is actively working toward.
+        const mainGoal = userMemory.facts.find((f) => f.key === "goal_main");
+        if (mainGoal) {
+          lines.push(
+            `\n## Obiettivo principale dichiarato dall'utente: "${mainGoal.value}"`,
+            "Se il messaggio attuale è ambiguo tra due domini, preferisci quello più allineato a questo obiettivo.",
+          );
+        }
+        behaviorContext = lines.join("\n");
       } catch {
         // Non-critical
       }

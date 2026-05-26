@@ -1,6 +1,6 @@
 import { type Request, type Response, type NextFunction } from "express";
 import { sql, and, gte, eq } from "drizzle-orm";
-import { db, llmUsageTable } from "@workspace/db";
+import { db, aiCostLogTable } from "@workspace/db";
 import { rootLogger } from "./logger";
 import { getEffectivePlan } from "./check-feature";
 
@@ -32,10 +32,8 @@ declare global {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-/** Determine the user's plan tier based on the effective internal entitlement. */
 async function getPlan(req: Request): Promise<CostGuardPlan> {
   if (process.env.LLM_COST_GUARD_DISABLED === "true") return "enterprise";
-  // Enterprise: manual flag or specific env
   if (req.user?.stripeSubscriptionId?.startsWith("enterprise_"))
     return "enterprise";
   if (!req.user?.id) return "free";
@@ -55,11 +53,8 @@ function currentMonthRange(): { start: Date; end: Date } {
 /**
  * LLM Cost Guard Middleware
  *
- * Checks cumulative monthly LLM spend before allowing the request through.
- * If the user's plan limit is exceeded, returns 403 with COST_LIMIT_EXCEEDED.
- *
- * Usage:
- *   router.post("/ask", requireAuth, costGuard, wendyLimiter, handler);
+ * Reads cumulative monthly spend from ai_request_log.cost_usd_est.
+ * llm_usage is deprecated — cost-guard no longer writes to or reads from it.
  */
 export async function costGuard(
   req: Request,
@@ -77,23 +72,21 @@ export async function costGuard(
     const monthlyLimit = MONTHLY_LIMITS[plan];
     const { start, end } = currentMonthRange();
 
-    // Skip check for enterprise (unlimited)
     if (plan === "enterprise") {
       next();
       return;
     }
 
-    // Aggregate monthly cost from llm_usage
     const [result] = await db
       .select({
-        totalCost: sql<number>`coalesce(sum(${llmUsageTable.estimatedCostUsd}), 0)`,
+        totalCost: sql<number>`coalesce(sum(${aiCostLogTable.costUsdEstimate}), 0)::float`,
       })
-      .from(llmUsageTable)
+      .from(aiCostLogTable)
       .where(
         and(
-          eq(llmUsageTable.userId, userId),
-          gte(llmUsageTable.createdAt, start),
-          sql`${llmUsageTable.createdAt} < ${end}`,
+          eq(aiCostLogTable.userId, userId),
+          gte(aiCostLogTable.createdAt, start),
+          sql`${aiCostLogTable.createdAt} < ${end}`,
         ),
       );
 
@@ -115,12 +108,9 @@ export async function costGuard(
       return;
     }
 
-    // Attach current usage info so downstream code can log it
     req.costGuard = { plan, monthlyLimit, currentCost };
     next();
   } catch (err) {
-    // If the guard itself fails (e.g. DB error), allow the request through
-    // but log the error. Better to serve slightly over budget than break.
     rootLogger.error({ err }, "[cost-guard] check failed — allowing request");
     next();
   }

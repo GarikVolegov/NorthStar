@@ -13,7 +13,7 @@ import { db } from "@workspace/db";
 import { knowledgeNodesTable } from "@workspace/db";
 import { chunkText, embedBatch } from "./embedder";
 
-export type SourceType = "document" | "persona_example" | "user_note" | "web";
+export type SourceType = "document" | "persona_example" | "user_note" | "web" | "rabbit_kb";
 
 export interface IngestOptions {
   userId: number;

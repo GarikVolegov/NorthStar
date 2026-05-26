@@ -10,6 +10,11 @@ interface BuildPersonalIntelligenceContextInput {
 
 export interface PersonalIntelligenceContext {
   context: string;
+  contexts: {
+    semanticMemory: string;
+    openHuman: string;
+    graphify: string;
+  };
   sources: Array<"openhuman" | "graphify" | "semantic-memory">;
 }
 
@@ -23,11 +28,13 @@ export async function buildPersonalIntelligenceContext({
   userRole,
 }: BuildPersonalIntelligenceContextInput): Promise<PersonalIntelligenceContext> {
   const chunks: string[] = [];
+  const contexts = { semanticMemory: "", openHuman: "", graphify: "" };
   const sources: Array<"openhuman" | "graphify" | "semantic-memory"> = [];
 
   try {
     const semanticMemory = await buildSemanticMemoryContext(query, userId);
     if (semanticMemory) {
+      contexts.semanticMemory = semanticMemory;
       chunks.push(semanticMemory);
       sources.push("semantic-memory");
     }
@@ -38,6 +45,7 @@ export async function buildPersonalIntelligenceContext({
   try {
     const openHuman = await buildOpenHumanContext(query, userId);
     if (openHuman) {
+      contexts.openHuman = openHuman;
       chunks.push(openHuman);
       sources.push("openhuman");
     }
@@ -49,6 +57,7 @@ export async function buildPersonalIntelligenceContext({
     try {
       const graphify = await buildGraphifyContext(query);
       if (graphify) {
+        contexts.graphify = graphify.replace("## Contesto Graphify", "## Graphify codice");
         chunks.push(graphify);
         sources.push("graphify");
       }
@@ -59,6 +68,7 @@ export async function buildPersonalIntelligenceContext({
 
   return {
     context: chunks.join(""),
+    contexts,
     sources,
   };
 }
