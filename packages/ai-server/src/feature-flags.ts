@@ -13,4 +13,6 @@ export const FF = {
   semanticMemoryEnabled: isEnabled("FF_SEMANTIC_MEMORY", false),
   voicePluginEnabled: isEnabled("FF_VOICE_PLUGIN", false),
   visionPluginEnabled: isEnabled("FF_VISION_PLUGIN", false),
+  ritualEngine: isEnabled("FF_RITUAL_ENGINE", true),
+  dashboardCustomization: isEnabled("FF_DASHBOARD_CUSTOMIZATION", true),
 };
