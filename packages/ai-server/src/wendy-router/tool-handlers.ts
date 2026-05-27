@@ -18,6 +18,10 @@ import { handleCompareSectors, handleGetGrowthArticles, handleGetLearningPaths, 
 import { handleGetUserContext } from "./tool-handlers-user";
 import { handleGetJobPostingTrend, handleGetSkillCooccurrences, handleGetWeakSignals, handleSearchMemoryGraph, handleSearchRag } from "./tool-handlers-market";
 import { handleCheckFoodSafety, handleGetBreedInfo, handleGetRabbitCareGuide, handleSearchRabbitKb } from "./tool-handlers-rabbit";
+import { handleGetPsychologicalProfile, handleUpdatePersonalityObservation } from "./tool-handlers-profile";
+import { db } from "@workspace/db";
+import { userRoutinesTable, ROUTINE_TYPES, ROUTINE_OUTPUT_CHANNELS } from "@workspace/db";
+import type { NewUserRoutine, RoutineType, RoutineOutputChannel } from "@workspace/db";
 
 // ── Cache embedding query (LRU semplice con TTL 5 min) ───────────────────────
 const _embCache = new Map<string, { vec: number[]; ts: number }>();
@@ -271,6 +275,152 @@ function proposeMemoryFact(args: { key?: string; value?: string }): ToolResult {
 
 // ── 15. save_business_idea ───────────────────────────────────────────────────
 
+// ── configure_routine ────────────────────────────────────────────────────────
+
+const ROUTINE_TYPE_LABEL: Record<string, string> = {
+  job_monitor:       "Monitor offerte di lavoro",
+  market_report:     "Report di mercato",
+  mindset_exercise:  "Esercizio mindset",
+  growth_briefing:   "Briefing crescita",
+  interview_prep:    "Preparazione colloquio",
+};
+
+const SCHEDULE_DISPLAY: Record<string, string> = {
+  daily:           "ogni giorno",
+  ogni_giorno:     "ogni giorno",
+  weekly:          "ogni settimana",
+  settimanale:     "ogni settimana",
+  every_2_days:    "ogni 2 giorni",
+  every_monday:    "ogni lunedì",
+  every_tuesday:   "ogni martedì",
+  every_wednesday: "ogni mercoledì",
+  every_thursday:  "ogni giovedì",
+  every_friday:    "ogni venerdì",
+  every_saturday:  "ogni sabato",
+  every_sunday:    "ogni domenica",
+};
+
+function scheduleToDisplay(schedule: string): string {
+  return SCHEDULE_DISPLAY[schedule] ?? schedule;
+}
+
+function autoRoutineName(type: RoutineType, schedule: string): string {
+  const typeLabel = ROUTINE_TYPE_LABEL[type] ?? type;
+  const schedLabel = scheduleToDisplay(schedule);
+  return `${typeLabel} — ${schedLabel}`;
+}
+
+export async function handleConfigureRoutine(
+  args: {
+    type?: string;
+    schedule?: string;
+    name?: string;
+    output_channel?: string;
+    parameters_json?: string;
+    confirmed?: string;
+  },
+  userId: number,
+): Promise<ToolResult> {
+  if (!checkWriteRateLimit(userId, "configure_routine")) {
+    return err("RATE_LIMIT", "Troppo veloce — riprova tra qualche minuto");
+  }
+
+  const rawType = args.type?.trim() ?? "";
+  if (!ROUTINE_TYPES.includes(rawType as RoutineType)) {
+    return err(
+      "INVALID_TYPE",
+      `Tipo routine non valido: "${rawType}". Valori ammessi: ${ROUTINE_TYPES.join(", ")}`,
+    );
+  }
+  const validatedType = rawType as RoutineType;
+
+  const schedule = args.schedule?.trim() ?? "";
+  if (!schedule) {
+    return err("INVALID_SCHEDULE", "Il campo schedule è obbligatorio");
+  }
+
+  const rawChannel = args.output_channel?.trim() ?? "in_app";
+  const validatedChannel: RoutineOutputChannel = ROUTINE_OUTPUT_CHANNELS.includes(
+    rawChannel as RoutineOutputChannel,
+  )
+    ? (rawChannel as RoutineOutputChannel)
+    : "in_app";
+
+  let parsedParameters: Record<string, unknown> = {};
+  if (args.parameters_json) {
+    try {
+      const parsed = JSON.parse(args.parameters_json);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        parsedParameters = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Non-fatal: default to empty object
+    }
+  }
+
+  const scheduleDisplay = scheduleToDisplay(schedule);
+  const name = args.name?.trim() || autoRoutineName(validatedType, schedule);
+
+  // Phase 1 — preview / confirmation card
+  if (args.confirmed !== "true") {
+    const previewItems: Array<{ label: string; value: string }> = [
+      { label: "Tipo", value: ROUTINE_TYPE_LABEL[validatedType] ?? validatedType },
+      { label: "Frequenza", value: scheduleDisplay },
+      { label: "Output", value: validatedChannel },
+    ];
+    for (const [k, v] of Object.entries(parsedParameters).slice(0, 4)) {
+      previewItems.push({ label: k, value: typeof v === "string" ? v : JSON.stringify(v) });
+    }
+    return wendyAction({
+      type: "configure_routine_preview",
+      status: "needs_confirmation",
+      risk: "low",
+      label: "Crea routine",
+      description: `Creare la routine "${name}" che si esegue ${scheduleDisplay}?`,
+      requiresConfirmation: true,
+      payload: { type: validatedType, schedule, name, outputChannel: validatedChannel, parameters: parsedParameters },
+      preview: previewItems,
+    });
+  }
+
+  // Phase 2 — actual DB insert
+  try {
+    const row: NewUserRoutine = {
+      userId,
+      type: validatedType,
+      name,
+      schedule,
+      parameters: parsedParameters,
+      outputChannel: validatedChannel,
+      active: true,
+      nextRunAt: new Date(Date.now() + 60_000),
+    };
+
+    const [created] = await db
+      .insert(userRoutinesTable)
+      .values(row)
+      .returning({ id: userRoutinesTable.id });
+
+    if (!created) {
+      return err("DB_ERROR", "Errore durante la creazione della routine");
+    }
+
+    return {
+      ok: true,
+      data: {
+        routineCreated: true,
+        routineId: created.id,
+        message: `Routine "${name}" creata! Si eseguirà ${scheduleDisplay}.`,
+        type: validatedType,
+        schedule,
+        nextRun: new Date(Date.now() + 60_000).toISOString(),
+      },
+    };
+  } catch (dbErr) {
+    logger.error({ dbErr, userId }, "[configure_routine] DB insert failed");
+    return err("DB_ERROR", "Errore durante il salvataggio della routine");
+  }
+}
 
 // ── Dispatcher centrale ───────────────────────────────────────────────────────
 
@@ -309,11 +459,18 @@ export async function executeToolCall(
     case "get_job_posting_trend":    result = await handleGetJobPostingTrend(typedArgs(args)); break;
     case "get_skill_cooccurrences":  result = await handleGetSkillCooccurrences(typedArgs(args)); break;
 
+    // ── AaaS: Autonomous Routines ────────────────────────────────────────────
+    case "configure_routine":        result = await handleConfigureRoutine(typedArgs(args), userId); break;
+
     // ── Rabbit expert domain ──────────────────────────────────────────────────
     case "get_rabbit_care_guide": result = await handleGetRabbitCareGuide(typedArgs(args)); break;
     case "check_food_safety":     result = await handleCheckFoodSafety(typedArgs(args)); break;
     case "get_breed_info":        result = await handleGetBreedInfo(typedArgs(args)); break;
     case "search_rabbit_kb":      result = await handleSearchRabbitKb(typedArgs(args), userId); break;
+
+    // 360° Profiling
+    case "get_psychological_profile":       result = await handleGetPsychologicalProfile({}, userId); break;
+    case "update_personality_observation": result = await handleUpdatePersonalityObservation(args, userId); break;
 
     // Legacy aliases
     case "get_sector":    result = await handleGetSectorDetail({ sectorId: numberArg(args, "id") ?? 0 }); break;

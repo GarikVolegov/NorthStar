@@ -38,6 +38,7 @@ import "./specialists/mindset-agent";
 import "./specialists/habits-agent";
 import "./specialists/trading-agent";
 import "./specialists/health-agent";
+import "../tools/configure-routine.js";
 
 export const GROWTH_AGENT_MODEL       = modelFor("growth-agent-chat");
 export const GROWTH_AGENT_VOICE_MODEL = modelFor("growth-agent-voice");
@@ -58,6 +59,9 @@ export interface GrowthAgentOptions {
   requestId?:       string | undefined;
   wendyIntent?:     WendyIntent | undefined;   // passato da ai-wendy.ts per scegliere i tool di dominio
   isPredefined?:    boolean | undefined;
+  localHour?:       number | undefined;
+  localDayOfWeek?:  number | undefined;
+  wendyTonePreference?: string | undefined;
 }
 export type GrowthAgentEvent =
   | { type: "token"; value: string }
@@ -74,6 +78,9 @@ export async function* runGrowthAgent(
     maxHistory = 12, voiceMode = false, requestId,
     wendyIntent,
     isPredefined = false,
+    localHour,
+    localDayOfWeek,
+    wendyTonePreference,
   } = opts;
   const normalizedMessage = normalizeInput(userMessage);
   const logFields: LoggerFields = { userId, sessionId, requestId };
@@ -177,6 +184,7 @@ export async function* runGrowthAgent(
         primaryRoute:   routeDecision,
         secondaryRoute: routeDecision.secondaryRoute,
         memoryFactCount, maxHistory, requestId,
+        localHour, localDayOfWeek, wendyTonePreference,
       })) {
         if (event.type === "token") fullResponse += event.value;
         yield event;
@@ -196,6 +204,7 @@ export async function* runGrowthAgent(
           userId, sessionId, userContext: enrichedContext, history, userMessage,
           normalizedMessage,
           routeDecision, memoryFactCount, maxHistory, requestId,
+          localHour, localDayOfWeek, wendyTonePreference,
         })) {
           if (event.type === "error") {
             throw new Error(event.message);
@@ -245,6 +254,9 @@ export async function* runGrowthAgent(
     sessionMessageCount,
     hasSessionGoal,
     pendingFollowUp,
+    localHour,
+    localDayOfWeek,
+    wendyTonePreference,
   });
 
   const recentHistory = history.slice(-maxHistory);
