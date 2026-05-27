@@ -23,18 +23,25 @@ import {
   Sparkles,
   TrendingUp
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 
 import { DashboardHero } from "@/components/dashboard/DashboardHero";
 import { DashboardKpiStrip } from "@/components/dashboard/DashboardKpiStrip";
-import { DashboardObjectivesPathCard } from "@/components/dashboard/DashboardObjectives";
+import { DashboardDiaryBookCard } from "@/components/dashboard/DashboardObjectives";
+import { MonthlyRitualBanner } from "@/components/dashboard/MonthlyRitualBanner";
 import { DashboardPersonality } from "@/components/dashboard/DashboardPersonality";
 import { DashboardWeekTimeline } from "@/components/dashboard/DashboardWeekTimeline";
 import { ProactiveInsightCard } from "@/components/wendy/ProactiveInsightCard";
 import { useProactiveInsights, type ProactiveInsight } from "@/hooks/useProactiveInsights";
+import { useMonthlyRitualCurrent } from "@/hooks/useMonthlyRitual";
 
 import { AgentLoadingSkeleton } from "@/components/dashboard/AgentLoadingSkeleton";
+import { DashboardPersonalisationPanel } from "@/components/dashboard/DashboardPersonalisationPanel";
+import { DashboardCareerComparison } from "@/components/dashboard/DashboardCareerComparison";
+import { DashboardClarityPath } from "@/components/dashboard/DashboardClarityPath";
+import { DashboardDiscoveryFeed, useSavedSectorsCount } from "@/components/dashboard/DashboardDiscoveryFeed";
+import { DashboardWendyPrompts } from "@/components/dashboard/DashboardWendyPrompts";
 import type { JourneyId } from "@/components/dashboard/dashboard-sections";
 import { JourneyToolsSection } from "@/components/dashboard/JourneyToolsSection";
 import { ProfessionCard } from "@/components/dashboard/ProfessionCard";
@@ -109,7 +116,12 @@ export default function Dashboard() {
   usePageModule({ pageId: "dashboard" });
 
   const { user, authReady } = useAuth();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+
+  // Track saved sectors count — initialized from localStorage, updated live via callback
+  const savedSectorsCountFromStorage = useSavedSectorsCount(user?.id);
+  const [savedSectorsCountOverride, setSavedSectorsCount] = useState<number | null>(null);
+  const savedSectorsCount = savedSectorsCountOverride ?? savedSectorsCountFromStorage;
 
   useEffect(() => {
     if (authReady && !user) navigate("/");
@@ -158,6 +170,8 @@ export default function Dashboard() {
   const workMode = summary?.workMode;
 
   const { insights, markRead, dismiss } = useProactiveInsights();
+  const { data: monthlyRitual } = useMonthlyRitualCurrent();
+  const ritualRequested = location.includes("ritual=notte-fondazione");
   const objectives = dashData?.objectives ?? [];
   const strategicObjectives = objectives.filter((objective) => objective.category !== "idea_validation");
   const objectivesProgress = dashData?.objectivesProgress ?? { done: 0, total: 0, percent: 0 };
@@ -223,6 +237,26 @@ export default function Dashboard() {
 
   const confirmedSectorName = effectiveSession?.recommendations?.[0]?.sectorName ?? null;
 
+  // ── Indeciso-specific state ──────────────────────────────────────────────
+  const clarityScore = journeyType === "indeciso"
+    ? Math.min(100, Math.round(
+        (sessionId               ? 30 : 0) +
+        (user?.onboardingCompleted ? 15 : 0) +
+        (savedSectorsCount >= 1  ? 15 : 0) +
+        (savedSectorsCount >= 3  ? 20 : 0) +
+        (savedSectorsCount >= 5  ? 20 : 0)
+      ))
+    : undefined;
+
+  // Top 2 recommendations for career comparison
+  const topTwoRecs = recommendations.slice(0, 2);
+  const compSectorA = topTwoRecs[0]
+    ? { sectorId: topTwoRecs[0].sectorId, sectorName: topTwoRecs[0].sectorName, matchScore: topTwoRecs[0].matchScore ?? 0 }
+    : null;
+  const compSectorB = topTwoRecs[1]
+    ? { sectorId: topTwoRecs[1].sectorId, sectorName: topTwoRecs[1].sectorName, matchScore: topTwoRecs[1].matchScore ?? 0 }
+    : null;
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 md:py-12 space-y-5">
 
@@ -235,52 +269,111 @@ export default function Dashboard() {
         profilePercent={profilePercent}
         confirmedSectorName={confirmedSectorName}
         sessionId={sessionId}
+        {...(clarityScore !== undefined ? { clarityScore } : {})}
       />
 
-      {/* ZONA 2 — KPI Strip */}
-      <DashboardKpiStrip
-        profilePercent={profilePercent}
-        objectives={objectives}
-        objectivesProgress={objectivesProgress}
-        confirmedSectorName={confirmedSectorName}
-        sessionId={sessionId}
-      />
+      <MonthlyRitualBanner ritual={monthlyRitual} forceExpanded={ritualRequested} />
 
-      {/* ZONA 3 — Grid: sinistra 2/3, destra 1/3 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      {/* ZONA 1b — Customizable widget grid */}
+      <DashboardPersonalisationPanel />
 
-        {/* Colonna sinistra */}
-        <div className="lg:col-span-2 space-y-5">
-          <DashboardWeekTimeline events={upcomingEvents} />
-          <DashboardObjectivesPathCard objectives={strategicObjectives} />
-        </div>
-
-        {/* Colonna destra */}
-        <div className="space-y-4">
-          <DashboardPersonality
-            {...(effectiveSession?.riasecScores ? { riasecScores: effectiveSession.riasecScores } : {})}
-            {...(effectiveSession?.spiritScores ? { spiritScores: effectiveSession.spiritScores } : {})}
-            {...(effectiveSession?.primaryTypes ? { primaryTypes: effectiveSession.primaryTypes } : {})}
-            agentSummary={summary}
-            objectivesProgress={objectivesProgress}
+      {/* ZONA 2 — Layout condizionale per percorso */}
+      {journeyType === "indeciso" ? (
+        /* ── INDECISO LAYOUT ──────────────────────────────────────── */
+        <div className="space-y-5">
+          {/* Mappa della chiarezza */}
+          <DashboardClarityPath
+            hasSession={!!sessionId}
+            savedSectorsCount={savedSectorsCount}
+            hasDecided={false}
           />
-          {insights.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
-                Insight da Wendy
-              </p>
-              {insights.slice(0, 2).map((insight: ProactiveInsight) => (
-                <ProactiveInsightCard
-                  key={insight.id}
-                  insight={insight}
-                  onRead={markRead}
-                  onDismiss={dismiss}
-                />
-              ))}
+
+          {/* Grid: Discovery Feed + Personalità */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Discovery feed — 2/3 */}
+            <div className="lg:col-span-2 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+                  <Sparkles className="w-3.5 h-3.5" />
+                </div>
+                <h2 className="font-bold text-sm text-foreground">Settori consigliati per te</h2>
+                <span className="text-xs text-muted-foreground">— salva quelli che ti interessano</span>
+              </div>
+              <DashboardDiscoveryFeed
+                sectors={recommendations.map((r) => ({
+                  sectorId: r.sectorId,
+                  sectorName: r.sectorName,
+                  matchScore: r.matchScore ?? 0,
+                  matchReason: (r as { matchReason?: string }).matchReason,
+                }))}
+                userId={user.id}
+                onSavedCountChange={setSavedSectorsCount}
+              />
             </div>
-          )}
+
+            {/* Personalità — 1/3 */}
+            <div className="space-y-4">
+              <DashboardPersonality
+                {...(effectiveSession?.riasecScores ? { riasecScores: effectiveSession.riasecScores } : {})}
+                {...(effectiveSession?.spiritScores ? { spiritScores: effectiveSession.spiritScores } : {})}
+                {...(effectiveSession?.primaryTypes ? { primaryTypes: effectiveSession.primaryTypes } : {})}
+                agentSummary={summary}
+                objectivesProgress={objectivesProgress}
+              />
+            </div>
+          </div>
+
+          {/* Confronto carriere */}
+          <DashboardCareerComparison sectorA={compSectorA} sectorB={compSectorB} />
+
+          {/* Wendy prompts */}
+          <DashboardWendyPrompts />
         </div>
-      </div>
+      ) : (
+        /* ── LAYOUT STANDARD (altri percorsi) ─────────────────────── */
+        <>
+          {/* KPI Strip */}
+          <DashboardKpiStrip
+            profilePercent={profilePercent}
+            objectives={objectives}
+            objectivesProgress={objectivesProgress}
+            confirmedSectorName={confirmedSectorName}
+            sessionId={sessionId}
+          />
+
+          {/* Grid: sinistra 2/3, destra 1/3 */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <div className="lg:col-span-2 space-y-5">
+              <DashboardWeekTimeline events={upcomingEvents} />
+              <DashboardDiaryBookCard objectives={strategicObjectives} />
+            </div>
+            <div className="space-y-4">
+              <DashboardPersonality
+                {...(effectiveSession?.riasecScores ? { riasecScores: effectiveSession.riasecScores } : {})}
+                {...(effectiveSession?.spiritScores ? { spiritScores: effectiveSession.spiritScores } : {})}
+                {...(effectiveSession?.primaryTypes ? { primaryTypes: effectiveSession.primaryTypes } : {})}
+                agentSummary={summary}
+                objectivesProgress={objectivesProgress}
+              />
+              {insights.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
+                    Insight da Wendy
+                  </p>
+                  {insights.slice(0, 2).map((insight: ProactiveInsight) => (
+                    <ProactiveInsightCard
+                      key={insight.id}
+                      insight={insight}
+                      onRead={markRead}
+                      onDismiss={dismiss}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ZONA 4 — Strumenti del percorso */}
       <section>
