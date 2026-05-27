@@ -236,12 +236,7 @@ export function Navbar() {
           <NavbarMobileProfileMenu {...profileMenuProps} />
         </m.div>
       )}
-      <m.header
-        className="fixed bottom-4 left-0 right-0 z-40 flex justify-center px-3 sm:px-4"
-        initial={prefersReduced ? {} : { y: 80, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      >
+      <header className="fixed bottom-0 left-0 right-0 z-40 flex justify-center px-3 sm:px-4 pb-2 pt-1 bg-background/60 backdrop-blur-md border-t border-white/[0.06]">
         <div className="pill-nav flex h-14 w-full max-w-5xl items-center gap-2 px-2">
           <Link
             href="/news"
@@ -427,7 +422,7 @@ export function Navbar() {
             )}
           </div>
         </div>
-      </m.header>
+      </header>
 
       <SearchDialog
         query={search.query}

@@ -11,7 +11,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
       <AnimatedBackdrop />
       {/* Top phase-based icon nav */}
       <MobileBottomNav />
-      <main className="flex-1 pt-12 md:pt-14 pb-16 md:pb-16">{children}</main>
+      <main className="flex-1 pt-12 md:pt-14 pb-20 md:pb-20">{children}</main>
       <div className="hidden md:block">
         <Footer />
       </div>
