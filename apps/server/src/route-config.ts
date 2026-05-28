@@ -42,6 +42,7 @@ import securityRouter from "./routes/security";
 import aiWendyRouter from "./routes/ai-wendy";
 import wendyFeedbackRouter from "./routes/wendy-feedback";
 import ragAdminRouter from "./routes/rag-admin";
+import firecrawlAdminRouter from "./routes/firecrawl-admin";
 import proactiveInsightsRouter from "./routes/proactive-insights";
 import onboardingRouter from "./routes/onboarding";
 import mlRouter from "./routes/ml";
@@ -180,5 +181,6 @@ export const routeConfig: RouteConfig[] = [
 
   { path: "/api/admin", router: adminRouter, auth: "admin", description: "Pannello admin" },
   { path: "/api/admin/rag", router: ragAdminRouter, auth: "admin", description: "Admin RAG" },
+  { path: "/api/admin/firecrawl", router: firecrawlAdminRouter, auth: "admin", description: "Admin Firecrawl ingestion" },
   { path: "/api/ml", router: mlRouter, auth: "admin", description: "ML service proxy" },
 ];

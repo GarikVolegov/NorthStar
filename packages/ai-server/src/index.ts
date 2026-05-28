@@ -233,3 +233,17 @@ export { ingestRssToRag } from "./rag/ingestors/rss-ingestor";
 export type { RssIngestOptions, RssIngestResult } from "./rag/ingestors/rss-ingestor";
 export { ingestJsonToRag } from "./rag/ingestors/json-ingestor";
 export type { JsonIngestOptions, JsonIngestResult } from "./rag/ingestors/json-ingestor";
+
+// Firecrawl: client + RAG ingestor
+export { FirecrawlClient, FirecrawlError, getFirecrawlClient, resetFirecrawlClient } from "./firecrawl";
+export type {
+  FirecrawlClientConfig,
+  FirecrawlFormat,
+  ScrapeOptions, ScrapeResult,
+  CrawlOptions, CrawlStatus,
+  MapOptions,
+  SearchOptions, SearchResultItem,
+  ExtractOptions, ExtractResult,
+} from "./firecrawl";
+export { ingestFirecrawlCrawl, ingestFirecrawlUrl } from "./rag/ingestors/firecrawl-ingestor";
+export type { FirecrawlIngestOptions, FirecrawlIngestResult } from "./rag/ingestors/firecrawl-ingestor";

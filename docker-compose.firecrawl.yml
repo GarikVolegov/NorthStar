@@ -1,0 +1,89 @@
+# NorthStar — Firecrawl self-hosted overlay
+#
+# Usage (combinato con il compose principale):
+#   docker compose -f docker-compose.yml -f docker-compose.firecrawl.yml up -d firecrawl-api firecrawl-worker firecrawl-playwright
+#
+# Espone Firecrawl SOLO sulla rete docker interna come `firecrawl-api:3002`.
+# Il northstar-server lo raggiunge via env FIRECRAWL_BASE_URL=http://firecrawl-api:3002.
+
+services:
+
+  firecrawl-playwright:
+    image: ghcr.io/mendableai/playwright-service:latest
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      PROXY_SERVER:   ${FIRECRAWL_PROXY_SERVER:-}
+      PROXY_USERNAME: ${FIRECRAWL_PROXY_USERNAME:-}
+      PROXY_PASSWORD: ${FIRECRAWL_PROXY_PASSWORD:-}
+      BLOCK_MEDIA:    ${FIRECRAWL_BLOCK_MEDIA:-true}
+    healthcheck:
+      test:     ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health/liveness"]
+      interval: 15s
+      timeout:  5s
+      retries:  5
+
+  firecrawl-api:
+    image: ghcr.io/mendableai/firecrawl:latest
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      HOST:                  0.0.0.0
+      PORT:                  3002
+      NUM_WORKERS_PER_QUEUE: ${FIRECRAWL_NUM_WORKERS:-8}
+      REDIS_URL:             redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_RATE_LIMIT_URL:  redis://:${REDIS_PASSWORD}@redis:6379
+      PLAYWRIGHT_MICROSERVICE_URL: http://firecrawl-playwright:3000/scrape
+      USE_DB_AUTHENTICATION: "false"
+      BULL_AUTH_KEY:         ${FIRECRAWL_BULL_AUTH_KEY:-}
+      TEST_API_KEY:          ${FIRECRAWL_API_KEY:-}
+      OPENAI_API_KEY:        ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL:       ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      MODEL_NAME:            ${FIRECRAWL_MODEL:-gpt-4o-mini}
+      MODEL_EMBEDDING_NAME:  ${FIRECRAWL_EMBEDDING_MODEL:-text-embedding-3-small}
+      LOGGING_LEVEL:         ${FIRECRAWL_LOG_LEVEL:-info}
+    depends_on:
+      redis:
+        condition: service_healthy
+      firecrawl-playwright:
+        condition: service_healthy
+    healthcheck:
+      test:         ["CMD", "wget", "--spider", "-q", "http://localhost:3002/v1/health"]
+      interval:     15s
+      timeout:      5s
+      retries:      5
+      start_period: 20s
+
+  firecrawl-worker:
+    image: ghcr.io/mendableai/firecrawl:latest
+    restart: unless-stopped
+    command: ["pnpm", "run", "workers"]
+    environment:
+      HOST:                  0.0.0.0
+      PORT:                  3002
+      NUM_WORKERS_PER_QUEUE: ${FIRECRAWL_NUM_WORKERS:-8}
+      REDIS_URL:             redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_RATE_LIMIT_URL:  redis://:${REDIS_PASSWORD}@redis:6379
+      PLAYWRIGHT_MICROSERVICE_URL: http://firecrawl-playwright:3000/scrape
+      USE_DB_AUTHENTICATION: "false"
+      BULL_AUTH_KEY:         ${FIRECRAWL_BULL_AUTH_KEY:-}
+      OPENAI_API_KEY:        ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL:       ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      MODEL_NAME:            ${FIRECRAWL_MODEL:-gpt-4o-mini}
+      LOGGING_LEVEL:         ${FIRECRAWL_LOG_LEVEL:-info}
+    depends_on:
+      redis:
+        condition: service_healthy
+      firecrawl-playwright:
+        condition: service_healthy
+      firecrawl-api:
+        condition: service_healthy
+
+  northstar-server:
+    environment:
+      FIRECRAWL_BASE_URL: ${FIRECRAWL_BASE_URL:-http://firecrawl-api:3002}
+      FIRECRAWL_API_KEY:  ${FIRECRAWL_API_KEY:-}
+    depends_on:
+      firecrawl-api:
+        condition: service_healthy

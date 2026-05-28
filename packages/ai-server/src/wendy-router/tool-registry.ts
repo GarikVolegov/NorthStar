@@ -219,6 +219,37 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
     ],
   },
 
+  // ── Firecrawl: web search / scrape / extract ───────────────────────────────
+  web_search: {
+    name:        "web_search",
+    description: "Ricerca live sul web (Firecrawl). Usare SOLO se search_rag non ha trovato risultati pertinenti o se la query richiede dati attualissimi (news, annunci recenti). Restituisce URL, titolo e snippet.",
+    parameters: [
+      { name: "query",   type: "string",  description: "Query in linguaggio naturale", required: true },
+      { name: "limit",   type: "number",  description: "Max risultati (default 5, max 8)" },
+      { name: "country", type: "string",  description: "Codice paese ISO (es. 'it', 'us')" },
+      { name: "lang",    type: "string",  description: "Codice lingua (es. 'it', 'en')" },
+      { name: "scrape",  type: "boolean", description: "Se true, scarica anche markdown delle pagine (più lento)" },
+    ],
+  },
+  web_scrape_url: {
+    name:        "web_scrape_url",
+    description: "Scrape di UN SINGOLO URL → markdown pulito (Firecrawl). Usare quando l'utente fornisce un link a un job posting, pagina aziendale o articolo e vuole capirne il contenuto. NON usare per query generiche (usare web_search).",
+    parameters: [
+      { name: "url",             type: "string",  description: "URL http(s) della pagina", required: true },
+      { name: "onlyMainContent", type: "boolean", description: "Estrai solo il contenuto principale (default true)" },
+      { name: "waitFor",         type: "number",  description: "Ms da attendere per pagine JS-heavy (max 8000)" },
+    ],
+  },
+  web_extract_structured: {
+    name:        "web_extract_structured",
+    description: "Estrae dati strutturati da una o più pagine (max 5) seguendo uno schema JSON o un prompt (Firecrawl /extract). Usare per ottenere campi tipizzati (es. lista job posting da una career page con title, location, skills).",
+    parameters: [
+      { name: "urls",   type: "string", description: "URL singolo o lista separata da virgole (max 5)", required: true },
+      { name: "schema", type: "string", description: "Schema JSON dei campi da estrarre (stringified)" },
+      { name: "prompt", type: "string", description: "Prompt testuale alternativo/integrativo allo schema" },
+    ],
+  },
+
   // ── Personal Intelligence: OpenHuman + Graphify ────────────────────────────
   ask_openhuman_memory: {
     name:        "ask_openhuman_memory",
@@ -311,6 +342,8 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_news_summary",
     "search_rag",          // Step 6: grounding RAG per domande su trend/ruoli
     "get_weak_signals",    // Step 6: segnali emergenti
+    "web_search",          // Firecrawl: fallback live se RAG vuoto
+    "web_scrape_url",      // Firecrawl: leggere un link fornito dall'utente
     "recall_semantic_memory",     // Plugin memory: recall conversazionale
     "ask_openhuman_memory",       // Personal Intelligence: memoria utente
     "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
@@ -337,6 +370,8 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "save_memory_fact",
     "search_rag",          // Step 6: grounding su domande di mercato
     "get_weak_signals",    // Step 6: anticipare trend nel settore utente
+    "web_search",          // Firecrawl: dati freschi se RAG insufficiente
+    "web_scrape_url",      // Firecrawl: lettura URL forniti dall'utente
     "recall_semantic_memory",     // Plugin memory: recall conversazionale
     "ask_openhuman_memory",       // Personal Intelligence: memoria utente
     "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
@@ -366,6 +401,9 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_weak_signals",          // Step 6: ruoli emergenti rilevanti per il piano
     "get_job_posting_trend",     // Step 6: trend domanda per il ruolo target
     "get_skill_cooccurrences",   // Step 6: skill complementari per il piano
+    "web_search",                // Firecrawl: ricerca live per piano formativo
+    "web_scrape_url",            // Firecrawl: leggere job posting forniti
+    "web_extract_structured",    // Firecrawl: estrarre dati job da career pages
     "recall_semantic_memory",    // Plugin memory: recall conversazionale
     "get_rabbit_care_guide",     // Rabbit: guide cura per pianificazione setup
     "search_rabbit_kb",          // Rabbit: knowledge base approfondito
@@ -385,6 +423,9 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_weak_signals",          // Step 6: segnali emergenti nel settore
     "get_job_posting_trend",     // Step 6: confronto periodi e crescita domanda
     "get_skill_cooccurrences",   // Step 6: mappa skill correlate
+    "web_search",                // Firecrawl: triangolazione con fonti live
+    "web_scrape_url",            // Firecrawl: lettura URL specifici
+    "web_extract_structured",    // Firecrawl: estrazione strutturata da fonti
     "recall_semantic_memory",     // Plugin memory: recall conversazionale
     "ask_openhuman_memory",       // Personal Intelligence: memoria utente
     "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app

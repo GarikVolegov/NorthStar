@@ -17,6 +17,7 @@ import { numberArg, stringArg, typedArgs } from "./tool-arg-utils";
 import { handleCompareSectors, handleGetGrowthArticles, handleGetLearningPaths, handleGetMarketTrend, handleGetNewsSummary, handleGetProfessionDetail, handleGetSectorDetail, handleGetUserObjectives, handleListSectors, handleSearchProfessions } from "./tool-handlers-data";
 import { handleGetUserContext } from "./tool-handlers-user";
 import { handleGetJobPostingTrend, handleGetSkillCooccurrences, handleGetWeakSignals, handleSearchMemoryGraph, handleSearchRag } from "./tool-handlers-market";
+import { handleWebSearch, handleWebScrapeUrl, handleWebExtractStructured } from "./tool-handlers-web";
 import { handleCheckFoodSafety, handleGetBreedInfo, handleGetRabbitCareGuide, handleSearchRabbitKb } from "./tool-handlers-rabbit";
 
 // ── Cache embedding query (LRU semplice con TTL 5 min) ───────────────────────
@@ -308,6 +309,11 @@ export async function executeToolCall(
     case "get_weak_signals":         result = await handleGetWeakSignals(typedArgs(args)); break;
     case "get_job_posting_trend":    result = await handleGetJobPostingTrend(typedArgs(args)); break;
     case "get_skill_cooccurrences":  result = await handleGetSkillCooccurrences(typedArgs(args)); break;
+
+    // Firecrawl: web search / scrape / extract
+    case "web_search":               result = await handleWebSearch(typedArgs(args)); break;
+    case "web_scrape_url":           result = await handleWebScrapeUrl(typedArgs(args)); break;
+    case "web_extract_structured":   result = await handleWebExtractStructured(typedArgs(args)); break;
 
     // ── Rabbit expert domain ──────────────────────────────────────────────────
     case "get_rabbit_care_guide": result = await handleGetRabbitCareGuide(typedArgs(args)); break;
