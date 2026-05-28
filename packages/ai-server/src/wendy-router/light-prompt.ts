@@ -19,8 +19,9 @@ export function buildLightPrompt(params: {
   locale:      string;
   intent:      WendyIntent;
   pageContext?: WendyPageContext;
+  neuralSection?: string | undefined;
 }): string {
-  const { locale, intent, pageContext } = params;
+  const { locale, intent, pageContext, neuralSection } = params;
 
   const base = ROLE_BASE(locale);
   const instructions = INTENT_INSTRUCTIONS[intent as "navigation" | "simple_qa"] ?? "";
@@ -39,5 +40,7 @@ export function buildLightPrompt(params: {
     contextHint = `\nContesto: l'utente è nella sezione "${pageContext.page}".`;
   }
 
-  return `${base}${contextHint}\n\n${instructions}${quickIdentityHint}${navigationToolHint}`.trim();
+  const neuralHint = neuralSection?.trim() ? `\n\n${neuralSection.trim()}` : "";
+
+  return `${base}${contextHint}${neuralHint}\n\n${instructions}${quickIdentityHint}${navigationToolHint}`.trim();
 }

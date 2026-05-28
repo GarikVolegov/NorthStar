@@ -53,6 +53,17 @@ describe("Wendy human voice layer", () => {
     expect(prompt).toContain("Niente entusiasmo automatico");
   });
 
+  it("includes neural activation context in simple answers when provided", () => {
+    const prompt = buildLightPrompt({
+      locale: "italiano",
+      intent: "simple_qa",
+      neuralSection: "## Attivazione neurale Wendy\n- [tool] search_brain",
+    });
+
+    expect(prompt).toContain("## Attivazione neurale Wendy");
+    expect(prompt).toContain("search_brain");
+  });
+
   it("keeps navigation operative and tool-only", () => {
     const prompt = buildLightPrompt({
       locale: "italiano",

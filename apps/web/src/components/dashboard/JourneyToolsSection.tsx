@@ -1,4 +1,4 @@
-import { ArrowRight, BarChart3, BrainCircuit, Briefcase, Building2, Mic2, Network, Newspaper, Rocket, Sparkles, Target, TrendingUp, Zap, type LucideIcon } from "lucide-react";
+import { ArrowRight, BarChart3, BookOpen, BrainCircuit, Briefcase, Building2, Compass, HeartHandshake, Mic2, Network, Newspaper, Rocket, Sparkles, Target, TrendingUp, Zap, type LucideIcon } from "lucide-react";
 import { Link } from "wouter";
 
 type JourneyId = "indeciso" | "dipendente" | "autonomo" | "azienda" | "investitore";
@@ -11,16 +11,45 @@ interface ToolItem {
   badge?: string;
 }
 
-export function JourneyToolsSection({ journeyType, sectorId }: { journeyType: string | null | undefined; sectorId?: number }) {
+/**
+ * `readinessBand` (opzionale, valido solo per journeyType="indeciso"):
+ *   - "low"  → mostra solo i 3 strumenti più leggeri (mood, diario indizi, coach socratico)
+ *   - "mid"  → 5 strumenti rotanti
+ *   - "high" → set completo + nudge a cambiare percorso
+ *
+ * Quando assente, mostra il set storico (4 tool).
+ */
+export function JourneyToolsSection({
+  journeyType,
+  sectorId,
+  readinessBand,
+}: {
+  journeyType: string | null | undefined;
+  sectorId?: number;
+  readinessBand?: "low" | "mid" | "high";
+}) {
   const base = import.meta.env.BASE_URL || "/";
 
+  // Set indeciso bandizzato (Ondata 1 — Discovery Engine adattivo).
+  // Ordine: dal meno impegnativo al più impegnativo.
+  const INDECISO_FULL: ToolItem[] = [
+    { href: "/mood",                  icon: HeartHandshake, title: "Mood check-in",          desc: "60s: dimmi come stai, ti suggerisco UNA cosa da fare", badge: "60s" },
+    { href: "/diario?mode=indizi",    icon: Compass,        title: "Diario degli Indizi",    desc: "Annota un momento di energia o curiosità",            badge: "Nuovo" },
+    { href: "/coach?mode=socratic",   icon: BrainCircuit,   title: "Sessione Socratica",     desc: "4 step strutturati per fare chiarezza con Wendy",     badge: "AI" },
+    { href: "/test",                  icon: Zap,            title: "Test di personalità",    desc: "Mappa la tua personalità professionale",              badge: "Gratuito" },
+    { href: "/settori",               icon: Target,         title: "Esplora settori",        desc: "28 settori — niente impegno, solo curiosità" },
+    { href: "/news",                  icon: Newspaper,      title: "Notizie lavoro",         desc: "Ultime notizie dal mercato del lavoro" },
+  ];
+
   const TOOLS_BY_JOURNEY: Record<JourneyId, ToolItem[]> = {
-    indeciso: [
-      { href: "/test",                          icon: Zap,         title: "Test di personalità",    desc: "Mappa la tua personalità professionale",               badge: "Gratuito" },
-      { href: "/settori",                       icon: Target,      title: "Esplora settori",        desc: "28 settori con stipendi, crescita e dati" },
-      { href: "/coach",                         icon: BrainCircuit, title: "Consulente di carriera",  desc: "Sessioni di consulenza personalizzate",                badge: "AI" },
-      { href: "/news",                          icon: Newspaper,   title: "Notizie lavoro",         desc: "Ultime notizie dal mercato del lavoro" },
-    ],
+    indeciso:
+      readinessBand === "low"
+        ? INDECISO_FULL.slice(0, 3)
+        : readinessBand === "mid"
+          ? INDECISO_FULL.slice(0, 5)
+          : readinessBand === "high"
+            ? INDECISO_FULL
+            : INDECISO_FULL.slice(0, 4),
     dipendente: [
       { href: sectorId ? `${base}skills-gap/${sectorId}` : "/dashboard", icon: Target,      title: "Competenze da sviluppare", desc: "Identifica cosa ti manca per salire di livello",      badge: "AI" },
       { href: sectorId ? `${base}colloquio/${sectorId}` : "/dashboard",  icon: Mic2,        title: "Simulatore Colloquio",    desc: "Allenati con domande reali del tuo settore",           badge: "AI" },
@@ -47,9 +76,13 @@ export function JourneyToolsSection({ journeyType, sectorId }: { journeyType: st
     ],
   };
 
-  const tools = (journeyType && TOOLS_BY_JOURNEY[journeyType as JourneyId])
+  const journeyTools = (journeyType && TOOLS_BY_JOURNEY[journeyType as JourneyId])
     ? TOOLS_BY_JOURNEY[journeyType as JourneyId]
     : TOOLS_BY_JOURNEY.indeciso;
+  const tools: ToolItem[] = [
+    { href: "/diario", icon: BookOpen, title: "Il mio Diario", desc: "Riflessioni, idee e crescita personale" },
+    ...journeyTools,
+  ];
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

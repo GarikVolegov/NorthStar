@@ -29,6 +29,10 @@ export interface AuthUser {
   userMode?: string | null;
   journeyType?: string | null;
   avatarUrl?: string | null;
+  bio?: string | null;
+  city?: string | null;
+  username?: string | null;
+  wendyTonePreference?: string | null;
   isPublic?: boolean;
   isAffiliate?: boolean;
   onboardingCompleted?: boolean;

@@ -106,6 +106,39 @@ async function send(opts: { to: string; subject: string; html: string; type: str
 
 // ── sendVerificationCode ─────────────────────────────────────────────────────
 
+export async function sendAppNotificationEmail(
+  email: string,
+  input: {
+    userName: string;
+    title: string;
+    body: string;
+    ctaLabel?: string;
+    ctaUrl?: string;
+  },
+): Promise<void> {
+  const ctaUrl = input.ctaUrl
+    ? input.ctaUrl.startsWith("http")
+      ? input.ctaUrl
+      : `${APP_URL}${input.ctaUrl}`
+    : null;
+
+  await send({
+    to: email,
+    subject: `${input.title} - NorthStar`,
+    type: "app-notification",
+    html: BASE_HTML(`
+      <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0e1018;">${input.title}</h2>
+      <p style="margin:0 0 4px;color:#374151;font-size:15px;">Ciao <strong>${input.userName}</strong>,</p>
+      <p style="margin:0 0 24px;color:#6b7280;font-size:15px;line-height:1.5;">${input.body}</p>
+      ${
+        ctaUrl && input.ctaLabel
+          ? `<p style="margin:24px 0 0;"><a href="${ctaUrl}" style="display:inline-block;background:#c19e4a;color:#0e1018;text-decoration:none;font-weight:700;border-radius:999px;padding:12px 18px;">${input.ctaLabel}</a></p>`
+          : ""
+      }
+    `),
+  });
+}
+
 export async function sendVerificationCode(email: string, name: string, code: string): Promise<void> {
   await send({
     to:      email,

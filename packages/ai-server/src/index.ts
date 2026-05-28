@@ -37,6 +37,24 @@ export {
   searchWendyBrain,
 } from "./wendy-brain";
 export type { WendyBrainEventInput, WendyBrainHit, WendyBrainSearchOptions } from "./wendy-brain";
+export {
+  applyNeuralEdgeDecay,
+  buildNeuralPromptSection,
+  buildWendyActivationContext,
+  hashNeuralMessage,
+  listNeuralActivationsByRequest,
+  listRecentNeuralActivations,
+  persistActivationTrace,
+  reinforceCoActivations,
+  scoreActivationCandidate,
+} from "./wendy-neural";
+export type {
+  ActivationCandidate,
+  BuildWendyActivationInput,
+  ReinforceCoActivationsInput,
+  ScoredActivationItem,
+  WendyActivationContext,
+} from "./wendy-neural";
 export { buildSystemPrompt } from "./growth-agent/prompt-builder";
 export type { UserContext } from "./growth-agent/prompt-builder";
 export type { RetrievedChunk } from "./growth-agent/retriever";

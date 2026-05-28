@@ -10,6 +10,7 @@ import { supervisorAgent } from "./supervisor-agent";
 import { loadMemory, buildMemorySection, type UserMemory } from "./memory-manager";
 import { buildContextualMemorySection, searchMemory } from "./memory-search";
 import { buildWendyBrainContextSection, searchWendyBrain } from "../wendy-brain";
+import { buildWendyActivationContext, type WendyActivationContext } from "../wendy-neural";
 import { runParallelHandoff } from "./parallel-handoff";
 import { UI_TOOLS, type UiToolName, type UiToolArgs } from "./ui-tools";
 import { getToolsForIntent, toolsToOpenAIFormat } from "../wendy-router/tool-registry";
@@ -58,6 +59,7 @@ export interface GrowthAgentOptions {
   requestId?:       string | undefined;
   wendyIntent?:     WendyIntent | undefined;   // passato da ai-wendy.ts per scegliere i tool di dominio
   isPredefined?:    boolean | undefined;
+  neuralContext?:   WendyActivationContext | undefined;
 }
 export type GrowthAgentEvent =
   | { type: "token"; value: string }
@@ -74,6 +76,7 @@ export async function* runGrowthAgent(
     maxHistory = 12, voiceMode = false, requestId,
     wendyIntent,
     isPredefined = false,
+    neuralContext: providedNeuralContext,
   } = opts;
   const normalizedMessage = normalizeInput(userMessage);
   const logFields: LoggerFields = { userId, sessionId, requestId };
@@ -122,21 +125,34 @@ export async function* runGrowthAgent(
     routeConfidence: routeDecision.confidence,
   });
 
-  const [contextualMemorySection, wendyBrainSection] = await Promise.all([
-    userId > 0
-      ? searchMemory(userId, normalizedMessage, 5).then(buildContextualMemorySection).catch((err) => {
-          logger.warn({ err, ...logFields }, "contextual memory search failed");
+  const neuralContext = providedNeuralContext ?? await buildWendyActivationContext({
+    requestId: requestId ?? `growth-${sessionId ?? Date.now()}`,
+    userId,
+    message: normalizedMessage,
+    intent: wendyIntent ?? "conversation",
+    domain: routeDecision.domain,
+  }).catch((err) => {
+    logger.warn({ err, ...logFields }, "neural activation failed");
+    return null;
+  });
+
+  const [contextualMemorySection, wendyBrainSection] = neuralContext
+    ? [neuralContext.memorySection ?? "", neuralContext.wendyBrainSection ?? ""]
+    : await Promise.all([
+        userId > 0
+          ? searchMemory(userId, normalizedMessage, 5).then(buildContextualMemorySection).catch((err) => {
+              logger.warn({ err, ...logFields }, "contextual memory search failed");
+              return "";
+            })
+          : Promise.resolve(""),
+        searchWendyBrain(normalizedMessage, {
+          limit: wendyConfig.brain.maxContextNodes,
+          includeCandidates: false,
+        }).then(buildWendyBrainContextSection).catch((err) => {
+          logger.warn({ err, ...logFields }, "wendy brain search failed");
           return "";
-        })
-      : Promise.resolve(""),
-    searchWendyBrain(normalizedMessage, {
-      limit: wendyConfig.brain.maxContextNodes,
-      includeCandidates: false,
-    }).then(buildWendyBrainContextSection).catch((err) => {
-      logger.warn({ err, ...logFields }, "wendy brain search failed");
-      return "";
-    }),
-  ]);
+        }),
+      ]);
   const memorySection = contextualMemorySection || buildMemorySection({
     facts: userMemory.facts.filter((f) => f.key === "goal_main" || f.key === "pending_follow_up"),
     patterns: [],
@@ -144,6 +160,7 @@ export async function* runGrowthAgent(
   const enrichedContext: UserContext & { memorySection?: string | undefined } = {
     ...userContext,
     memorySection: memorySection || userContext.memorySection,
+    neuralSection: neuralContext?.promptSection || userContext.neuralSection,
     wendyBrainSection: wendyBrainSection || userContext.wendyBrainSection,
   };
   let routingHistorySummary = "";

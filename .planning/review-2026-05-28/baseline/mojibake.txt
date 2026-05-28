@@ -1,0 +1,2 @@
+$ node scripts/check-mojibake.mjs
+Mojibake guard passed: 51/67 suspicious lines.

@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./ws-events": "./src/ws-events.ts",
-    "./agent-registry": "./src/agent-registry.ts"
+    "./agent-registry": "./src/agent-registry.ts",
+    "./logo-presets": "./src/logo-presets.ts"
   },
   "dependencies": {
     "zod": "catalog:"

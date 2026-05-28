@@ -39,8 +39,11 @@ import {
   recordTtft,
   ensureWendyConfigFresh,
   wendyConfig,
+  buildWendyActivationContext,
+  persistActivationTrace,
+  reinforceCoActivations,
 } from "@workspace/ai-server";
-import type { CompressedHistory, WendyPageContext } from "@workspace/ai-server";
+import type { CompressedHistory, WendyActivationContext, WendyPageContext } from "@workspace/ai-server";
 import {
   buildWendyContextSources,
   isClientSideToolData,
@@ -286,6 +289,7 @@ router.post(
     let ragChunksRetrieved = 0;
     let ragTopSimilarity: number | null = null;
     const ragSourcesUsed: string[] = [];
+    let neuralContext: WendyActivationContext | null = null;
 
     // Telemetria Phase 2 — Quality + Domain
     let domainForLog: string | null = null;
@@ -301,6 +305,7 @@ router.post(
         toolsUsed: toolsUsedInRequest,
         ragChunksRetrieved,
       }),
+      ...(neuralContext ? { activationSummary: neuralContext.activationSummary } : {}),
       ...extra,
     });
 
@@ -336,6 +341,21 @@ router.post(
       "[ai/wendy] routed",
     );
 
+    neuralContext = await buildWendyActivationContext({
+      requestId,
+      userId,
+      message,
+      intent,
+      domain: null,
+      pageContext: pageContext as WendyPageContext | undefined,
+    }).catch((err) => {
+      rootLogger.warn({ err, userId, requestId }, "[ai/wendy] neural activation failed");
+      return null;
+    });
+    if (neuralContext) {
+      await persistActivationTrace(neuralContext);
+    }
+
     try {
       // ── 2. Fast path: navigation / simple_qa ────────────────────────────
       if (decision.skipFullPipeline) {
@@ -345,6 +365,9 @@ router.post(
             intent,
             ...(pageContext
               ? { pageContext: pageContext as WendyPageContext }
+              : {}),
+            ...(neuralContext?.promptSection
+              ? { neuralSection: neuralContext.promptSection }
               : {}),
           }) + personalContext.context;
 
@@ -530,6 +553,7 @@ router.post(
             requestId,
             wendyIntent: intent, // abilita i Wendy domain tools nel full path
             isPredefined,
+            ...(neuralContext ? { neuralContext } : {}),
           })) {
             if (aborted) break;
             if (event.type === "done") {
@@ -620,6 +644,13 @@ router.post(
           userMessage: message,
           assistantResponse: assistantResponseForMemory,
         });
+        if (neuralContext) {
+          void reinforceCoActivations({
+            userId,
+            requestId,
+            items: neuralContext.activeItems,
+          });
+        }
       }
       const costUsdEst = estimateCost(decision.model, inputTokens, outputTokens);
       recordAiCall({

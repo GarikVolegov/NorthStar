@@ -8,3 +8,9 @@ export function resolveWebPort(env: Record<string, string | undefined>): number 
 
   return port;
 }
+
+export function resolveWebDevHttps(
+  env: Record<string, string | undefined>,
+): boolean {
+  return env.VITE_DEV_HTTPS === "true";
+}

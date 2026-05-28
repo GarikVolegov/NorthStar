@@ -3,6 +3,7 @@ import { UserBackgroundLayer } from "@/components/user-background/UserBackground
 import { WendyInsightToastRunner } from "@/components/wendy/WendyInsightToastRunner";
 import { AppStateProvider } from "@/contexts/AppStateContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { AppAudioProvider } from "@/contexts/AppAudioProvider";
 import { AdminAgentProvider } from "@/contexts/AdminAgentContext";
 import { WendyProvider } from "@/contexts/WendyProvider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -197,10 +198,11 @@ function App() {
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <AppStateProvider>
-            <TooltipProvider>
-              <WendyProvider>
-                <AdminAgentProvider>
+          <AppAudioProvider>
+            <AppStateProvider>
+              <TooltipProvider>
+                <WendyProvider>
+                  <AdminAgentProvider>
                   <UserBackgroundLayer />
                   <div className="relative z-10 min-h-screen">
                     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
@@ -209,10 +211,11 @@ function App() {
                   </div>
                   <WendyInsightToastRunner />
                   <Toaster />
-                </AdminAgentProvider>
-              </WendyProvider>
-            </TooltipProvider>
-          </AppStateProvider>
+                  </AdminAgentProvider>
+                </WendyProvider>
+              </TooltipProvider>
+            </AppStateProvider>
+          </AppAudioProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>

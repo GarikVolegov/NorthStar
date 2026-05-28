@@ -48,6 +48,7 @@ export const routes: RouteConfig[] = [
   { path: "/crescita/categoria/:cat", component: () => import("@/pages/crescita-categoria"), guard: "public", layout: "default", title: "Crescita" },
   { path: "/crescita/articolo/:slug", component: () => import("@/pages/crescita-articolo"), guard: "public", layout: "default", title: "Articolo" },
   { path: "/dashboard", component: () => import("@/pages/dashboard"), guard: "protected", layout: "default", title: "Dashboard" },
+  { path: "/diario", component: () => import("@/pages/diario"), guard: "protected", layout: "default", title: "Diario" },
   { path: "/obiettivi", component: () => import("@/pages/obiettivi"), guard: "protected", layout: "default", title: "Obiettivi" },
   { path: PATHS.AFFILIATION, component: () => import("@/pages/affiliazione"), guard: "public", layout: "default", title: "Affiliazione" },
   { path: "/affiliazione/scuole", component: () => import("@/pages/affiliazione-scuole"), guard: "public", layout: "default", title: "Affiliazione scuole" },
