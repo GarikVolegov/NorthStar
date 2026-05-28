@@ -180,6 +180,15 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
       { name: "topK",    type: "number", description: "Numero di chunk da recuperare (default 5, max 10)" },
     ],
   },
+  search_brain: {
+    name:        "search_brain",
+    description: "Cerca nel cervello interno di NorthStar: identity, domain, product e process. Usare per domande su NorthStar, architettura, prodotto, decisioni, valori, processi GSD o modello mentale del founder. Restituisce chunk con obsidianPath per citazione.",
+    parameters: [
+      { name: "query", type: "string", description: "Query semantica sul cervello interno NorthStar", required: true },
+      { name: "layer", type: "string", description: "Filtro opzionale: identity | domain | product | process" },
+      { name: "limit", type: "number", description: "Numero di chunk da recuperare (default 5, max 20)" },
+    ],
+  },
   search_memory_graph: {
     name:        "search_memory_graph",
     description: "Cerca nella memoria personale strutturata dell'utente: idee, obiettivi, calendario, profilo e ricordi Wendy. Restituisce nodi, fonti e relazioni con confidence. Usare per domande sul percorso personale o su cosa Wendy ricorda dell'utente.",
@@ -310,6 +319,7 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "search_professions",
     "get_news_summary",
     "search_rag",          // Step 6: grounding RAG per domande su trend/ruoli
+    "search_brain",        // Brain runtime: NorthStar identity/product/process
     "get_weak_signals",    // Step 6: segnali emergenti
     "recall_semantic_memory",     // Plugin memory: recall conversazionale
     "ask_openhuman_memory",       // Personal Intelligence: memoria utente
@@ -336,6 +346,7 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "add_calendar_event",
     "save_memory_fact",
     "search_rag",          // Step 6: grounding su domande di mercato
+    "search_brain",        // Brain runtime: NorthStar identity/product/process
     "get_weak_signals",    // Step 6: anticipare trend nel settore utente
     "recall_semantic_memory",     // Plugin memory: recall conversazionale
     "ask_openhuman_memory",       // Personal Intelligence: memoria utente
@@ -382,6 +393,7 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "search_memory_graph",
     "get_user_objectives",
     "search_rag",                // Step 6: analisi profonda con fonti autorevoli
+    "search_brain",              // Brain runtime: NorthStar identity/product/process
     "get_weak_signals",          // Step 6: segnali emergenti nel settore
     "get_job_posting_trend",     // Step 6: confronto periodi e crescita domanda
     "get_skill_cooccurrences",   // Step 6: mappa skill correlate

@@ -41,5 +41,7 @@ list from "" where status = "draft"
 
 ## Manutenzione
 - `graphify update .` rigenera `90_Code/` (zero costo API)
-- `/cartographer` propone diff agli L2/L3/L3.5 a fine fase GSD (skill globale in `~/.claude/skills/cartographer/`)
+- [[30_Process/Agent-Development-Kit]] descrive i 5 layer operativi in `.claude/`
+- [[30_Process/GSD-Phases/Fase-3-Wendy-Neural-Attention]] descrive il layer neurale persistente di Wendy
+- `/cartographer` propone diff agli L2/L3/L3.5 a fine fase GSD (skill progetto in `.claude/skills/cartographer.md`)
 - Verifica freshness: confronta `git rev-parse HEAD` con `manifest.json`

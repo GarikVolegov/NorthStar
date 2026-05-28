@@ -1,9 +1,10 @@
-import { runCollector, runEnricher, runSectorDataAgent, runNewsPublisher, refreshCatalog, runGrowthLibraryAgent, runJobPostingsAgent } from "@workspace/ai-server";
+import { applyNeuralEdgeDecay, runCollector, runEnricher, runSectorDataAgent, runNewsPublisher, refreshCatalog, runGrowthLibraryAgent, runJobPostingsAgent } from "@workspace/ai-server";
 import { rootLogger } from "../middleware/logger";
 import { runWeakSignalDetector } from "./weak-signal-detector";
 import { runProactiveInsightGenerator } from "./proactive-insight-generator";
 import { runBriefingGenerator } from "./briefing-generator";
 import { runFastCollector } from "./fast-collector";
+import { runVaultIngest } from "./vault-ingest";
 import { writeAgentRunSnapshot } from "../lib/agent-runs";
 
 const COLLECTOR_INTERVAL_MS        = Number(process.env.COLLECTOR_INTERVAL_MS) || 6 * 60 * 60 * 1000;       // 6 ore
@@ -16,6 +17,8 @@ const BRIEFING_WEEKLY_INTERVAL_MS   = Number(process.env.BRIEFING_WEEKLY_INTERVA
 const BRIEFING_DAILY_INTERVAL_MS    = Number(process.env.BRIEFING_DAILY_INTERVAL_MS)    || 24 * 60 * 60 * 1000; // 24 ore
 const GROWTH_LIBRARY_INTERVAL_MS    = Number(process.env.GROWTH_LIBRARY_INTERVAL_MS)    || 24 * 60 * 60 * 1000; // 24 ore
 const JOB_POSTINGS_INTERVAL_MS      = Number(process.env.JOB_POSTINGS_INTERVAL_MS)      || 24 * 60 * 60 * 1000; // 24 ore
+const VAULT_INGEST_INTERVAL_MS      = Number(process.env.VAULT_INGEST_INTERVAL_MS)      || 24 * 60 * 60 * 1000; // 24 ore
+const WENDY_NEURAL_DECAY_INTERVAL_MS = Number(process.env.WENDY_NEURAL_DECAY_INTERVAL_MS) || 24 * 60 * 60 * 1000; // 24 ore
 
 async function recordCronRun<T>(
   agentName: string,
@@ -181,6 +184,35 @@ async function safeRunProactiveInsightGenerator(): Promise<void> {
   }
 }
 
+async function safeRunVaultIngest(): Promise<void> {
+  try {
+    rootLogger.info("[cron] vault-ingest starting");
+    const result = await recordCronRun("vault-ingest", "cron", runVaultIngest, (result) => ({
+      scanned: result.scanned,
+      ingested: result.ingested,
+      skippedRuntimeFalse: result.skippedRuntimeFalse,
+      skippedUnchanged: result.skippedUnchanged,
+      errors: result.errors,
+      durationMs: result.durationMs,
+    }));
+    rootLogger.info({ ...result }, "[cron] vault-ingest complete");
+  } catch (err) {
+    rootLogger.error({ err }, "[cron] vault-ingest failed");
+  }
+}
+
+async function safeRunWendyNeuralDecay(): Promise<void> {
+  try {
+    rootLogger.info("[cron] wendy-neural-decay starting");
+    const result = await recordCronRun("wendy-neural-decay", "cron", applyNeuralEdgeDecay, (result) => ({
+      archivedBefore: result.archivedBefore,
+    }));
+    rootLogger.info({ ...result }, "[cron] wendy-neural-decay complete");
+  } catch (err) {
+    rootLogger.error({ err }, "[cron] wendy-neural-decay failed");
+  }
+}
+
 export function startCronJobs(): void {
   rootLogger.info({
     collectorIntervalH:        COLLECTOR_INTERVAL_MS        / 3_600_000,
@@ -191,6 +223,8 @@ export function startCronJobs(): void {
     proactiveInsightIntervalH: PROACTIVE_INSIGHT_INTERVAL_MS / 3_600_000,
     growthLibraryIntervalH:    GROWTH_LIBRARY_INTERVAL_MS    / 3_600_000,
     jobPostingsIntervalH:      JOB_POSTINGS_INTERVAL_MS      / 3_600_000,
+    vaultIngestIntervalH:      VAULT_INGEST_INTERVAL_MS      / 3_600_000,
+    wendyNeuralDecayIntervalH: WENDY_NEURAL_DECAY_INTERVAL_MS / 3_600_000,
     briefingWeeklyIntervalD:   BRIEFING_WEEKLY_INTERVAL_MS  / 86_400_000,
     briefingDailyIntervalH:    BRIEFING_DAILY_INTERVAL_MS   / 3_600_000,
   }, "[cron] starting scheduled jobs");
@@ -245,6 +279,18 @@ export function startCronJobs(): void {
     void safeRunJobPostingsAgent();
     setInterval(() => { void safeRunJobPostingsAgent(); }, JOB_POSTINGS_INTERVAL_MS);
   }, 40 * 60 * 1000);
+
+  // Brain vault ingest giornaliero: indicizza solo `.brain/**/*.md` con runtime:true.
+  setTimeout(() => {
+    void safeRunVaultIngest();
+    setInterval(() => { void safeRunVaultIngest(); }, VAULT_INGEST_INTERVAL_MS);
+  }, 50 * 60 * 1000);
+
+  // Wendy Neural decay giornaliero: indebolisce edge non rinforzati senza cancellare dati.
+  setTimeout(() => {
+    void safeRunWendyNeuralDecay();
+    setInterval(() => { void safeRunWendyNeuralDecay(); }, WENDY_NEURAL_DECAY_INTERVAL_MS);
+  }, 55 * 60 * 1000);
 
   // Briefing settimanale (lunedì mattina — Pro+)
   // Delay di 15 min per evitare sovrapposizione con altri job di startup

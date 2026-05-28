@@ -16,7 +16,7 @@ import { logger } from "../logger";
 import { numberArg, stringArg, typedArgs } from "./tool-arg-utils";
 import { handleCompareSectors, handleGetGrowthArticles, handleGetLearningPaths, handleGetMarketTrend, handleGetNewsSummary, handleGetProfessionDetail, handleGetSectorDetail, handleGetUserObjectives, handleListSectors, handleSearchProfessions } from "./tool-handlers-data";
 import { handleGetUserContext } from "./tool-handlers-user";
-import { handleGetJobPostingTrend, handleGetSkillCooccurrences, handleGetWeakSignals, handleSearchMemoryGraph, handleSearchRag } from "./tool-handlers-market";
+import { handleGetJobPostingTrend, handleGetSkillCooccurrences, handleGetWeakSignals, handleSearchBrain, handleSearchMemoryGraph, handleSearchRag } from "./tool-handlers-market";
 import { handleCheckFoodSafety, handleGetBreedInfo, handleGetRabbitCareGuide, handleSearchRabbitKb } from "./tool-handlers-rabbit";
 
 // ── Cache embedding query (LRU semplice con TTL 5 min) ───────────────────────
@@ -304,6 +304,7 @@ export async function executeToolCall(
 
     // Step 6: RAG + Job Market Intelligence
     case "search_rag":               result = await handleSearchRag(typedArgs(args)); break;
+    case "search_brain":             result = await handleSearchBrain(typedArgs(args)); break;
     case "search_memory_graph":      result = await handleSearchMemoryGraph(typedArgs(args), userId); break;
     case "get_weak_signals":         result = await handleGetWeakSignals(typedArgs(args)); break;
     case "get_job_posting_trend":    result = await handleGetJobPostingTrend(typedArgs(args)); break;
