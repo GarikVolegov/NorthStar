@@ -50,6 +50,10 @@ graphify-out/
 apps/graphify-out/
 packages/graphify-out/
 
+# .brain/90_Code is a Windows junction to graphify-out/obsidian-vault/90_Code/
+# (auto-generated graph nodes/communities, not versioned)
+.brain/90_Code/
+
 # ── Temporary & backup files ───────────────────────────────────────────────
 *.tmp
 *.bak
