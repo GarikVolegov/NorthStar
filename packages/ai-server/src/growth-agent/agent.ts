@@ -14,7 +14,7 @@ import { buildWendyActivationContext, type WendyActivationContext } from "../wen
 import { runParallelHandoff } from "./parallel-handoff";
 import { UI_TOOLS, type UiToolName, type UiToolArgs } from "./ui-tools";
 import { getToolsForIntent, toolsToOpenAIFormat } from "../wendy-router/tool-registry";
-import { executeToolCall } from "../wendy-router/tool-handlers";
+import { executeToolCall, type ToolResult } from "../wendy-router/tool-handlers";
 import { isClientSideToolData, parseToolArguments } from "./tool-args";
 import { toolRegistry } from "../tools/registry";
 import { scheduleMemorySave } from "./memory-save";
@@ -60,7 +60,13 @@ export interface GrowthAgentOptions {
   wendyIntent?:     WendyIntent | undefined;   // passato da ai-wendy.ts per scegliere i tool di dominio
   isPredefined?:    boolean | undefined;
   neuralContext?:   WendyActivationContext | undefined;
+  executeExternalTool?: GrowthAgentToolExecutor | undefined;
 }
+export type GrowthAgentToolExecutor = (
+  name: string,
+  args: Record<string, unknown>,
+  userId: number,
+) => Promise<ToolResult>;
 export type GrowthAgentEvent =
   | { type: "token"; value: string }
   | { type: "status"; value: string; domain?: RouteDecision["domain"] | undefined }
@@ -314,11 +320,9 @@ export async function* runGrowthAgent(
       },
     );
 
-    const tokenBuffer:   string[] = [];
-    let   toolCallName:  string   = "";
-    let   toolCallArgs:  string   = "";
-    let   toolCallId:    string   = "";
-    let   finishReason:  string   = "stop";
+    const tokenBuffer: string[] = [];
+    const toolCalls = new Map<number, { id: string; name: string; arguments: string }>();
+    let finishReason: string = "stop";
 
     for await (const chunk of stream) {
       const choice = chunk.choices[0];
@@ -331,9 +335,12 @@ export async function* runGrowthAgent(
 
       if (choice.delta?.tool_calls) {
         for (const tc of choice.delta.tool_calls) {
-          if (tc.id)              toolCallId   += tc.id;
-          if (tc.function?.name)  toolCallName += tc.function.name;
-          if (tc.function?.arguments) toolCallArgs += tc.function.arguments;
+          const index = typeof tc.index === "number" ? tc.index : toolCalls.size;
+          const current = toolCalls.get(index) ?? { id: "", name: "", arguments: "" };
+          if (tc.id) current.id += tc.id;
+          if (tc.function?.name) current.name += tc.function.name;
+          if (tc.function?.arguments) current.arguments += tc.function.arguments;
+          toolCalls.set(index, current);
         }
       }
     }
@@ -346,34 +353,56 @@ export async function* runGrowthAgent(
     const endSupervisorTimer = wendyLatencySeconds.startTimer({ phase: "supervisor" });
     const supervisorSpan = startSpan("supervisor_evaluation", { requestId, domain: routeDecision.domain, intent: routeDecision.intent });
 
-    if (finishReason === "tool_calls" && toolCallName) {
+    const orderedToolCalls = Array.from(toolCalls.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([, toolCall], index) => ({
+        id: toolCall.id || `tc_${index}`,
+        name: toolCall.name,
+        arguments: toolCall.arguments,
+      }))
+      .filter((toolCall) => toolCall.name);
+
+    if (finishReason === "tool_calls" && orderedToolCalls.length > 0) {
       supervisorSpan.end();
       endSupervisorTimer();
 
-      if (!toolRegistry.isUiTool(toolCallName)) {
-        const parsedArgs = parseToolArguments(toolCallArgs);
+      if (!orderedToolCalls.every((toolCall) => toolRegistry.isUiTool(toolCall.name))) {
+        const toolExecutor = opts.executeExternalTool ?? executeToolCall;
+        const toolResults: Array<{ toolCall: (typeof orderedToolCalls)[number]; toolData: unknown }> = [];
 
-        const toolResult = await executeToolCall(toolCallName, parsedArgs, userId);
-        const toolData = toolResult.ok ? toolResult.data : { error: toolResult.message };
+        for (const toolCall of orderedToolCalls) {
+          const parsedArgs = parseToolArguments(toolCall.arguments);
+          const toolResult = await toolExecutor(toolCall.name, parsedArgs, userId);
+          const toolData = toolResult.ok ? toolResult.data : { error: toolResult.message };
 
-        if (toolResult.ok && isClientSideToolData(toolData)) {
-          yield { type: "tool_call", name: toolCallName, result: toolData };
-          yield { type: "done", sources: [], evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
-          saveAssistantMemory(`[tool: ${toolCallName}]`, sessionId ?? Date.now());
-          return;
+          if (toolResult.ok && isClientSideToolData(toolData)) {
+            yield { type: "tool_call", name: toolCall.name, result: toolData };
+            yield { type: "done", sources: [], evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
+            saveAssistantMemory(`[tool: ${toolCall.name}]`, sessionId ?? Date.now());
+            return;
+          }
+
+          toolResults.push({ toolCall, toolData });
+          yield { type: "tool_call", name: toolCall.name, result: toolData };
         }
 
         const followUpMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
           ...messages,
           {
             role: "assistant",
-            content:    null,
-            tool_calls: [{ id: toolCallId || "tc_0", type: "function", function: { name: toolCallName, arguments: toolCallArgs } }],
+            content: null,
+            tool_calls: orderedToolCalls.map((toolCall) => ({
+              id: toolCall.id,
+              type: "function" as const,
+              function: { name: toolCall.name, arguments: toolCall.arguments },
+            })),
           },
-          { role: "tool", tool_call_id: toolCallId || "tc_0", content: JSON.stringify(toolData) },
+          ...toolResults.map(({ toolCall, toolData }) => ({
+            role: "tool" as const,
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(toolData),
+          })),
         ];
-
-        yield { type: "tool_call", name: toolCallName, result: toolData };
 
         const followUpStream = await pRetry(
           () => openai.chat.completions.create({
@@ -405,22 +434,25 @@ export async function* runGrowthAgent(
         return;
       }
 
-      let args: UiToolArgs;
-      try {
-        args = JSON.parse(toolCallArgs) as UiToolArgs;
-      } catch {
-        yield { type: "error", message: `UI tool args parse error: ${toolCallArgs}` };
-        yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
-        return;
+      for (const toolCall of orderedToolCalls) {
+        let args: UiToolArgs;
+        try {
+          args = JSON.parse(toolCall.arguments) as UiToolArgs;
+        } catch {
+          yield { type: "error", message: `UI tool args parse error: ${toolCall.arguments}` };
+          yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
+          return;
+        }
+
+        yield { type: "ui_tool" as const, name: toolCall.name as UiToolName, args };
       }
 
-      yield { type: "ui_tool" as const, name: toolCallName as UiToolName, args };
       yield {
         type: "done",
         sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults],
         evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent),
       };
-      saveAssistantMemory(`[UI: ${toolCallName}]`, sessionId ?? Date.now());
+      saveAssistantMemory(`[UI: ${orderedToolCalls.map((toolCall) => toolCall.name).join(", ")}]`, sessionId ?? Date.now());
       return;
     }
 

@@ -670,3 +670,40 @@ export const UnsubscribePushBody = zod.object({
 export const UnsubscribePushResponse = zod.object({
   success: zod.boolean(),
 });
+
+/**
+ * @summary Send a message to Wendy (AI coaching assistant) with SSE streaming response
+ */
+export const WendyChatBody = zod.object({
+  message: zod.string().describe("User message to Wendy"),
+  sessionId: zod
+    .string()
+    .optional()
+    .describe("Conversation session identifier"),
+  clerkId: zod.string().optional().describe("Clerk user identifier"),
+  context: zod
+    .object({})
+    .passthrough()
+    .optional()
+    .describe("Optional additional context (page, sector, etc.)"),
+});
+
+/**
+ * @summary Submit feedback (upvote/downvote) on a Wendy response
+ */
+export const WendyFeedbackBody = zod.object({
+  messageId: zod.string().describe("ID of the Wendy message being rated"),
+  rating: zod.enum(["upvote", "downvote"]),
+  sessionId: zod.string().optional(),
+});
+
+export const WendyFeedbackResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
+ * @summary Generate text-to-speech audio for a Wendy response
+ */
+export const WendyVoiceBody = zod.object({
+  text: zod.string().describe("Text to synthesize as audio"),
+});

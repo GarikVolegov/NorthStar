@@ -96,7 +96,7 @@ export function useRoutines() {
   const { user } = useAuth();
   const hasUser = user !== null && user !== undefined;
 
-  const { data, isLoading, refetch } = useQuery<RoutinesResponse>({
+  const { data, error, isError, isLoading, refetch } = useQuery<RoutinesResponse>({
     queryKey:  ["routines"],
     queryFn:   fetchRoutines,
     enabled:   hasUser,
@@ -106,6 +106,8 @@ export function useRoutines() {
   return {
     routines:  data?.routines ?? [],
     meta:      data?.meta,
+    error,
+    isError,
     isLoading,
     refetch,
   };

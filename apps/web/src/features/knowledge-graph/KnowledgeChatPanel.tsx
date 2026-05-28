@@ -33,7 +33,8 @@ type KnowledgeAskEvent =
   | { kind: "content"; content: string }
   | { kind: "status"; status: string }
   | { kind: "citations"; citations: Citation[]; neighbors?: Citation[] }
-  | { kind: "error"; error: string };
+  | { kind: "error"; error: string }
+  | { kind: "done" };
 
 function isNodeType(value: unknown): value is NodeType {
   return typeof value === "string" && value in TYPE_META;
@@ -69,6 +70,7 @@ function parseCitations(value: unknown): Citation[] {
 }
 
 function parseKnowledgeAskEvent(chunk: string): KnowledgeAskEvent | null {
+  if (chunk.trim() === "[DONE]") return { kind: "done" };
   try {
     const parsed = JSON.parse(chunk) as unknown;
     if (typeof parsed !== "object" || parsed === null) return null;
@@ -98,7 +100,10 @@ function parseKnowledgeAskEvent(chunk: string): KnowledgeAskEvent | null {
     }
     return null;
   } catch {
-    return null;
+    return {
+      kind: "error",
+      error: "Risposta interrotta: formato dello stream non valido.",
+    };
   }
 }
 
@@ -192,6 +197,12 @@ export function KnowledgeChatPanel({
               next[next.length - 1] = {
                 ...last,
                 error: data.error,
+                status: undefined,
+              };
+            else if (data.kind === "done")
+              next[next.length - 1] = {
+                ...last,
+                content: last.content || "Nessuna risposta ricevuta.",
                 status: undefined,
               };
             return next;

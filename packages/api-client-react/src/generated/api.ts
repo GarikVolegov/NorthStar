@@ -49,6 +49,10 @@ import type {
   UpdateCalendarEventBody,
   UpdateEventReminderBody,
   User,
+  WendyChatBody,
+  WendyFeedback200,
+  WendyFeedbackBody,
+  WendyVoiceBody,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -2278,4 +2282,262 @@ export const useUnsubscribePush = <
   TContext
 > => {
   return useMutation(getUnsubscribePushMutationOptions(options));
+};
+
+/**
+ * @summary Send a message to Wendy (AI coaching assistant) with SSE streaming response
+ */
+export const getWendyChatUrl = () => {
+  return `/api/ai/wendy`;
+};
+
+export const wendyChat = async (
+  wendyChatBody: WendyChatBody,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getWendyChatUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(wendyChatBody),
+  });
+};
+
+export const getWendyChatMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof wendyChat>>,
+    TError,
+    { data: BodyType<WendyChatBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof wendyChat>>,
+  TError,
+  { data: BodyType<WendyChatBody> },
+  TContext
+> => {
+  const mutationKey = ["wendyChat"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof wendyChat>>,
+    { data: BodyType<WendyChatBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return wendyChat(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WendyChatMutationResult = NonNullable<
+  Awaited<ReturnType<typeof wendyChat>>
+>;
+export type WendyChatMutationBody = BodyType<WendyChatBody>;
+export type WendyChatMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Send a message to Wendy (AI coaching assistant) with SSE streaming response
+ */
+export const useWendyChat = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof wendyChat>>,
+    TError,
+    { data: BodyType<WendyChatBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof wendyChat>>,
+  TError,
+  { data: BodyType<WendyChatBody> },
+  TContext
+> => {
+  return useMutation(getWendyChatMutationOptions(options));
+};
+
+/**
+ * @summary Submit feedback (upvote/downvote) on a Wendy response
+ */
+export const getWendyFeedbackUrl = () => {
+  return `/api/ai/wendy/feedback`;
+};
+
+export const wendyFeedback = async (
+  wendyFeedbackBody: WendyFeedbackBody,
+  options?: RequestInit,
+): Promise<WendyFeedback200> => {
+  return customFetch<WendyFeedback200>(getWendyFeedbackUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(wendyFeedbackBody),
+  });
+};
+
+export const getWendyFeedbackMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof wendyFeedback>>,
+    TError,
+    { data: BodyType<WendyFeedbackBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof wendyFeedback>>,
+  TError,
+  { data: BodyType<WendyFeedbackBody> },
+  TContext
+> => {
+  const mutationKey = ["wendyFeedback"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof wendyFeedback>>,
+    { data: BodyType<WendyFeedbackBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return wendyFeedback(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WendyFeedbackMutationResult = NonNullable<
+  Awaited<ReturnType<typeof wendyFeedback>>
+>;
+export type WendyFeedbackMutationBody = BodyType<WendyFeedbackBody>;
+export type WendyFeedbackMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit feedback (upvote/downvote) on a Wendy response
+ */
+export const useWendyFeedback = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof wendyFeedback>>,
+    TError,
+    { data: BodyType<WendyFeedbackBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof wendyFeedback>>,
+  TError,
+  { data: BodyType<WendyFeedbackBody> },
+  TContext
+> => {
+  return useMutation(getWendyFeedbackMutationOptions(options));
+};
+
+/**
+ * @summary Generate text-to-speech audio for a Wendy response
+ */
+export const getWendyVoiceUrl = () => {
+  return `/api/wendy/voice`;
+};
+
+export const wendyVoice = async (
+  wendyVoiceBody: WendyVoiceBody,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getWendyVoiceUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(wendyVoiceBody),
+  });
+};
+
+export const getWendyVoiceMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof wendyVoice>>,
+    TError,
+    { data: BodyType<WendyVoiceBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof wendyVoice>>,
+  TError,
+  { data: BodyType<WendyVoiceBody> },
+  TContext
+> => {
+  const mutationKey = ["wendyVoice"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof wendyVoice>>,
+    { data: BodyType<WendyVoiceBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return wendyVoice(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WendyVoiceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof wendyVoice>>
+>;
+export type WendyVoiceMutationBody = BodyType<WendyVoiceBody>;
+export type WendyVoiceMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Generate text-to-speech audio for a Wendy response
+ */
+export const useWendyVoice = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof wendyVoice>>,
+    TError,
+    { data: BodyType<WendyVoiceBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof wendyVoice>>,
+  TError,
+  { data: BodyType<WendyVoiceBody> },
+  TContext
+> => {
+  return useMutation(getWendyVoiceMutationOptions(options));
 };

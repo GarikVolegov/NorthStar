@@ -71,9 +71,11 @@ import affiliazioneRouter from "./routes/affiliation-program";
 import affiliateRouter from "./routes/affiliate";
 import openhumanRouter from "./routes/openhuman";
 import graphifyRouter from "./routes/graphify";
+import grafoRouter from "./routes/grafo";
 import skillsGapRouter from "./routes/skills-gap";
 import aiImageRouter from "./routes/ai-image";
 import monthlyRitualRouter from "./routes/monthly-ritual";
+import discoveryReadinessRouter from "./routes/discovery-readiness";
 import { getHealthPayload } from "./lib/health";
 
 export type RouteAuthLevel = "public" | "authenticated" | "admin";
@@ -87,46 +89,53 @@ export interface RouteConfig {
   description: string;
 }
 
-const healthRouter = Router();
+export function createHealthRouter(): ExpressRouter {
+  const healthRouter = Router();
 
-healthRouter.get("/live", (_req, res) => {
-  res.json({ status: "alive" });
-});
+  healthRouter.get("/live", (_req, res) => {
+    res.json({ status: "alive" });
+  });
 
-healthRouter.get("/ready", async (_req, res) => {
-  const payload = await getHealthPayload();
-  res.status(payload.status === "fail" ? 503 : 200).json(payload);
-});
+  healthRouter.get("/ready", async (_req, res) => {
+    const payload = await getHealthPayload();
+    res.status(payload.status === "fail" ? 503 : 200).json(payload);
+  });
 
-healthRouter.get("/", async (_req, res) => {
-  const payload = await getHealthPayload();
-  res.status(payload.status === "fail" ? 503 : 200).json(payload);
-});
+  healthRouter.get("/", async (_req, res) => {
+    const payload = await getHealthPayload();
+    res.status(payload.status === "fail" ? 503 : 200).json(payload);
+  });
 
-healthRouter.get("/db", async (_req, res) => {
-  try {
-    const { pool } = await import("@workspace/db");
-    res.json({
-      status: "ok",
-      pool: {
-        totalCount: pool.totalCount,
-        idleCount: pool.idleCount,
-        waitingCount: pool.waitingCount,
-      },
-    });
-  } catch (err) {
-    res.status(503).json({ status: "error", message: String(err) });
-  }
-});
+  healthRouter.get("/db", async (_req, res) => {
+    try {
+      const { pool } = await import("@workspace/db");
+      res.json({
+        status: "ok",
+        pool: {
+          totalCount: pool.totalCount,
+          idleCount: pool.idleCount,
+          waitingCount: pool.waitingCount,
+        },
+      });
+    } catch (err) {
+      res.status(503).json({ status: "error", message: String(err) });
+    }
+  });
 
-healthRouter.get("/alerts", async (_req, res) => {
-  const { getAlertHistory } = await import("./lib/alerts");
-  res.json({ alerts: getAlertHistory() });
-});
+  healthRouter.get("/alerts", async (_req, res) => {
+    const { getAlertHistory } = await import("./lib/alerts");
+    res.json({ alerts: getAlertHistory() });
+  });
+
+  return healthRouter;
+}
+
+const healthRouter = createHealthRouter();
 
 export const routeConfig: RouteConfig[] = [
   { path: "/api/auth", router: authRouter, auth: "public", description: "Autenticazione" },
   { path: "/api/health", router: healthRouter, auth: "public", rateLimit: "none", description: "Liveness e readiness" },
+  { path: "/api/healthz", router: healthRouter, auth: "public", rateLimit: "none", description: "Alias compat readiness" },
   { path: "/api/wiki", router: wikiRouter, auth: "public", description: "Wiki pubblico" },
   { path: "/api/news", router: newsRouter, auth: "public", description: "News pubbliche" },
   { path: "/api/news/subscriptions", router: newsSubsRouter, auth: "public", description: "News subscriptions" },
@@ -147,6 +156,7 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/social", router: socialRouter, auth: "authenticated", description: "Social feed" },
   { path: "/api/objectives", router: objectivesRouter, auth: "authenticated", description: "Obiettivi" },
   { path: "/api/calendar", router: calendarRouter, auth: "authenticated", description: "Calendario" },
+  { path: "/api/discovery", router: discoveryReadinessRouter, auth: "authenticated", description: "Discovery readiness" },
   { path: "/api/dashboard", router: dashboardRouter, auth: "authenticated", description: "Dashboard" },
   { path: "/api/dashboard/layout", router: dashboardLayoutRouter, auth: "authenticated", description: "Layout dashboard" },
   { path: "/api/diary", router: diaryRouter, auth: "authenticated", description: "Diario personale" },
@@ -197,6 +207,7 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/affiliate", router: affiliateRouter, auth: "authenticated", description: "Affiliate" },
   { path: "/api/openhuman", router: openhumanRouter, auth: "authenticated", description: "OpenHuman bridge" },
   { path: "/api/graphify", router: graphifyRouter, auth: "authenticated", description: "Graphify bridge" },
+  { path: "/api/grafo", router: grafoRouter, auth: "authenticated", description: "Grafo legacy compat" },
   { path: "/api/skills-gap", router: skillsGapRouter, auth: "authenticated", description: "Skills gap analysis" },
   { path: "/api/monthly-ritual", router: monthlyRitualRouter, auth: "authenticated", description: "Rituale mensile" },
 

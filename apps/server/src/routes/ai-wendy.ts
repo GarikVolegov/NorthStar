@@ -29,7 +29,6 @@ import {
   resolveWendyRoute,
   buildLightPrompt,
   toolsToOpenAIFormat,
-  executeToolCall,
   recordAiCall,
   getLLMForRoute,
   estimateTokens,
@@ -52,7 +51,7 @@ import {
   type WendyToolMessage,
 } from "./ai-wendy-shared";
 import { buildWikiLLMContext } from "../lib/wikillm-context-router";
-import { isHostTool, executeHostTool } from "../lib/wendy-host-tools";
+import { executeWendyToolCall } from "../lib/wendy-tool-executor";
 import { storeSemanticTurnInBackground } from "../lib/semantic-memory";
 import { withRouteTimeout } from "../lib/wendy-fast-path";
 import { resolveWendyLocale } from "../lib/wendy-locale";
@@ -446,9 +445,7 @@ router.post(
 
           // Esegui ogni tool call e aggiungi i risultati al thread
           for (const tc of result.toolCalls) {
-            const toolResult = isHostTool(tc.name)
-              ? await executeHostTool(tc.name, tc.arguments, userId)
-              : await executeToolCall(tc.name, tc.arguments, userId);
+            const toolResult = await executeWendyToolCall(tc.name, tc.arguments, userId);
             const toolData = toolResult.ok
               ? toolResult.data
               : { error: toolResult.message };
@@ -554,6 +551,7 @@ router.post(
             wendyIntent: intent, // abilita i Wendy domain tools nel full path
             isPredefined,
             ...(neuralContext ? { neuralContext } : {}),
+            executeExternalTool: executeWendyToolCall,
           })) {
             if (aborted) break;
             if (event.type === "done") {
