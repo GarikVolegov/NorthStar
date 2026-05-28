@@ -17,6 +17,9 @@ export interface WendyPageContextInput {
   capabilities?: string[] | undefined;
   fields?:       string[] | undefined;
   actions?:      string[] | undefined;
+  sector?: string | undefined;
+  roleTitle?: string | undefined;
+  currentTryADayScene?: string | null | undefined;
 }
 
 /**
@@ -48,9 +51,12 @@ export function useWendyPageContext(ctx: WendyPageContextInput): void {
         capabilities: ctx.capabilities,
         fields:       ctx.fields,
         actions:      ctx.actions,
+        sector:       ctx.sector,
+        roleTitle:    ctx.roleTitle,
+        currentTryADayScene: ctx.currentTryADayScene,
       },
     };
     setPageContext(pageCtx);
     return () => setPageContext({ page: 'default' });
-  }, [ctx.page, ctx.entityId, ctx.journeyType, setPageContext]);
+  }, [ctx.page, ctx.entityId, ctx.entityName, ctx.journeyType, ctx.currentTryADayScene, setPageContext]);
 }

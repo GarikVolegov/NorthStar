@@ -260,6 +260,27 @@
       "when": 1780059600000,
       "tag": "0044_wendy_neural_attention",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1780142400000,
+      "tag": "0045_diary_dashboard_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1780146000000,
+      "tag": "0046_simulated_days",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1780149600000,
+      "tag": "0047_pinned_sectors",
+      "breakpoints": true
     }
   ]
 }

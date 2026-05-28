@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { ApiClientError, deleteJson, getJson, patchJson } from "@/lib/apiClient";
+import { ApiClientError, deleteJson, getJson, patchJson, postJson } from "@/lib/apiClient";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const ROUTINE_TYPE_EMOJI: Record<string, string> = {
@@ -21,7 +21,7 @@ export const ROUTINE_TYPE_LABEL: Record<string, string> = {
 export interface UserRoutine {
   id:            number;
   userId:        number;
-  type:          "job_monitor" | "market_report" | "mindset_exercise" | "growth_briefing" | "interview_prep";
+  type:          "job_monitor" | "market_report" | "mindset_exercise" | "growth_briefing" | "interview_prep" | "discovery_nudge";
   name:          string | null;
   schedule:      string;
   parameters:    Record<string, unknown>;
@@ -31,6 +31,15 @@ export interface UserRoutine {
   nextRunAt:     string | null;
   createdAt:     string;
   updatedAt:     string;
+}
+
+export interface CreateRoutineInput extends Record<string, unknown> {
+  type:          UserRoutine["type"];
+  name?:         string;
+  schedule?:     string;
+  parameters?:   Record<string, unknown>;
+  outputChannel?: UserRoutine["outputChannel"];
+  active?:       boolean;
 }
 
 export interface RoutineExecution {
@@ -126,6 +135,16 @@ export function useUpdateRoutine() {
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<Pick<UserRoutine, "name" | "schedule" | "parameters" | "outputChannel" | "active">> }) =>
       patchJson<{ routine: UserRoutine }>(`/api/routines/${id}`, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["routines"] }),
+  });
+}
+
+export function useCreateRoutine() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: CreateRoutineInput) =>
+      postJson<{ routine: UserRoutine }>("/api/routines", data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["routines"] }),
   });
 }

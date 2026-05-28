@@ -55,6 +55,20 @@ export type {
   ScoredActivationItem,
   WendyActivationContext,
 } from "./wendy-neural";
+export {
+  buildTryADayScenes,
+  computeTryADayDebrief,
+  pickTryADaySuggestions,
+} from "./try-a-day";
+export type {
+  TryADayDebrief,
+  TryADayProfession,
+  TryADayResponses,
+  TryADayScene,
+  TryADaySuggestion,
+  TryADaySuggestions,
+  TryADayTimeBlock,
+} from "./try-a-day";
 export { buildSystemPrompt } from "./growth-agent/prompt-builder";
 export type { UserContext } from "./growth-agent/prompt-builder";
 export type { RetrievedChunk } from "./growth-agent/retriever";
@@ -114,6 +128,17 @@ export { runJobPostingsAgent } from "./discovery-agent/job-postings-agent";
 export type { JobPostingsAgentResult } from "./discovery-agent/job-postings-agent";
 export { getPersonalizedFeed, invalidateUserFeedCache } from "./discovery-agent/personalizer-agent";
 
+// Sector vital signs
+export { clearSectorVitalsCache, computeVitalSigns } from "./services/sector-vitals/sector-vitals.service";
+export type {
+  ComputeVitalSignsOptions,
+  SectorVitalsRepository,
+  VitalKey,
+  VitalSign,
+  VitalSigns,
+  VitalStatus,
+} from "./services/sector-vitals/types";
+
 // Embeddings
 export { generateEmbedding, generateEmbeddingsBatch, buildEmbeddingText } from "./embeddings/generate";
 export { embedText as probeEmbedding, getEmbedderHealthSnapshot } from "./growth-agent/embedder";
@@ -137,6 +162,9 @@ export type {
 export { executeToolCall }   from "./wendy-router/tool-handlers";
 export { classifyIntent }    from "./wendy-router/intent-classifier";
 export { getToolsForIntent, toolsToOpenAIFormat } from "./wendy-router/tool-registry";
+export { searchProfessionRows } from "./wendy-router/tool-handlers-data";
+export type { SearchProfessionRowsResult } from "./wendy-router/tool-handlers-data";
+export { getSkillCooccurrenceRows } from "./wendy-router/tool-handlers-market";
 export { resolveWendyRoute } from "./wendy-router/router";
 export { buildLightPrompt }  from "./wendy-router/light-prompt";
 export { getLocalWendyReply, getLocalWendyFallbackReply, isLocalWendyReplyMessage } from "./wendy-router/local-reply";

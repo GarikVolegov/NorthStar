@@ -2,6 +2,7 @@ import { CertificationsSection } from "@/components/CertificationsSection";
 import { CvSection } from "@/components/CvSection";
 import { JourneyScoreWidget } from "@/components/JourneyScoreWidget";
 import { NftCertificateGallery } from "@/components/NftCertificateGallery";
+import { SkillBridgeMap } from "@/components/profile/SkillBridgeMap";
 import { SavedItems } from "@/components/profile/sections/SavedItems";
 import { TestHistoryCard } from "@/components/TestHistoryCard";
 import {
@@ -16,6 +17,7 @@ import {
   Gem,
   HeartPulse,
   History,
+  Network,
   type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -27,18 +29,20 @@ interface SectionDef {
   title: string;
   description: string;
   Icon: LucideIcon;
-  render: (props: { userId: number }) => ReactNode;
+  render: (props: { userId: number; journeyType: JourneyType }) => ReactNode;
 }
 
 const SECTION_MAP: Record<JourneyType, SectionDef[]> = {
   indeciso: [
     { key: "test-history", title: "Storico test", description: "Sessioni e risultati completati.", Icon: History, render: () => <TestHistoryCard /> },
+    { key: "skill-bridge-map", title: "Skill Bridge Map", description: "Ruoli vicini e salti di competenze in tre anelli.", Icon: Network, render: () => <SkillBridgeMap lens="indeciso" /> },
     { key: "journey-score", title: "Salute del piano", description: "Completezza e progressi del tuo cammino.", Icon: HeartPulse, render: ({ userId }) => <JourneyScoreWidget userId={userId} /> },
     { key: "saved", title: "Elementi salvati", description: "Risorse e contenuti messi da parte.", Icon: BookMarked, render: () => <SavedItems /> },
     { key: "nft", title: "Corsi e certificati NFT", description: "Attestati emessi al completamento degli obiettivi.", Icon: Gem, render: ({ userId }) => <NftCertificateGallery userId={userId} /> },
   ],
   dipendente: [
     { key: "journey-score", title: "Salute del piano", description: "Completezza e progressi del tuo cammino.", Icon: HeartPulse, render: ({ userId }) => <JourneyScoreWidget userId={userId} /> },
+    { key: "skill-bridge-map", title: "Skill Bridge Map", description: "Ruoli vicini, gap skill e tempo di transizione.", Icon: Network, render: () => <SkillBridgeMap lens="dipendente" /> },
     { key: "cv", title: "Generazione curriculum", description: "Carica, genera, modifica e scarica il CV.", Icon: FileText, render: ({ userId }) => <CvSection userId={userId} /> },
     { key: "certifications", title: "Certificazioni", description: "Corsi, attestati e credenziali professionali.", Icon: Award, render: ({ userId }) => <CertificationsSection userId={userId} /> },
     { key: "test-history", title: "Storico test", description: "Sessioni e risultati completati.", Icon: History, render: () => <TestHistoryCard /> },
@@ -47,6 +51,7 @@ const SECTION_MAP: Record<JourneyType, SectionDef[]> = {
   ],
   autonomo: [
     { key: "journey-score", title: "Salute del piano", description: "Completezza e progressi del tuo cammino.", Icon: HeartPulse, render: ({ userId }) => <JourneyScoreWidget userId={userId} /> },
+    { key: "skill-bridge-map", title: "Skill Bridge Map", description: "Ruoli affini, remote e freelance in evidenza.", Icon: Network, render: () => <SkillBridgeMap lens="autonomo" /> },
     { key: "cv", title: "Generazione curriculum", description: "Carica, genera, modifica e scarica il CV.", Icon: FileText, render: ({ userId }) => <CvSection userId={userId} /> },
     { key: "certifications", title: "Certificazioni", description: "Corsi, attestati e credenziali professionali.", Icon: Award, render: ({ userId }) => <CertificationsSection userId={userId} /> },
     { key: "saved", title: "Elementi salvati", description: "Risorse e contenuti messi da parte.", Icon: BookMarked, render: () => <SavedItems /> },
@@ -54,6 +59,7 @@ const SECTION_MAP: Record<JourneyType, SectionDef[]> = {
   ],
   azienda: [
     { key: "journey-score", title: "Salute del piano", description: "Completezza e progressi del tuo cammino.", Icon: HeartPulse, render: ({ userId }) => <JourneyScoreWidget userId={userId} /> },
+    { key: "skill-bridge-map", title: "Skill Bridge Map", description: "Competenze, onboarding e crescita dei ruoli chiave.", Icon: Network, render: () => <SkillBridgeMap lens="azienda" /> },
     { key: "certifications", title: "Certificazioni", description: "Corsi, attestati e credenziali professionali.", Icon: Award, render: ({ userId }) => <CertificationsSection userId={userId} /> },
     { key: "saved", title: "Elementi salvati", description: "Risorse e contenuti messi da parte.", Icon: BookMarked, render: () => <SavedItems /> },
     { key: "nft", title: "Corsi e certificati NFT", description: "Attestati emessi al completamento degli obiettivi.", Icon: Gem, render: ({ userId }) => <NftCertificateGallery userId={userId} /> },
@@ -91,7 +97,7 @@ export function JourneySectionRenderer({
           </AccordionTrigger>
           <AccordionContent>
             <div className="pb-4">
-              {render({ userId })}
+              {render({ userId, journeyType })}
             </div>
           </AccordionContent>
         </AccordionItem>

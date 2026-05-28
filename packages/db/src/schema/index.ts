@@ -105,3 +105,5 @@ export * from "./appNotifications";
 export * from "./userNavigationPreferences";
 export * from "./userRoutines";
 export * from "./routineExecutions";
+export * from "./simulatedDays";
+export * from "./pinnedSectors";

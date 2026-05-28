@@ -344,24 +344,13 @@ export async function handleGetSkillCooccurrences(
   const limit = Math.min(args.limit ?? 8, 15);
 
   try {
-    const rows = await db
-      .select({
-        coSkillName:   skillCooccurrencesTable.coSkillName,
-        frequency:     skillCooccurrencesTable.frequency,
-        frequencyRate: skillCooccurrencesTable.frequencyRate,
-        period:        skillCooccurrencesTable.period,
-      })
-      .from(skillCooccurrencesTable)
-      .where(
-        and(
-          ilike(skillCooccurrencesTable.skillName, args.skillName),
-          args.professionId
-            ? eq(skillCooccurrencesTable.professionId, args.professionId)
-            : undefined,
-        ),
-      )
-      .orderBy(desc(skillCooccurrencesTable.frequencyRate))
-      .limit(limit);
+    const query = {
+      skillName: args.skillName,
+      limit,
+    };
+    const rows = await getSkillCooccurrenceRows(
+      args.professionId === undefined ? query : { ...query, professionId: args.professionId },
+    );
 
     return {
       ok: true,
@@ -379,4 +368,35 @@ export async function handleGetSkillCooccurrences(
     logger.warn({ e, args }, "[tool] get_skill_cooccurrences error");
     return err("UNAVAILABLE", "Co-occorrenze skill temporaneamente non disponibili");
   }
+}
+
+export async function getSkillCooccurrenceRows(args: {
+  skillName: string;
+  professionId?: number;
+  limit?: number;
+}): Promise<Array<{
+  coSkillName: string;
+  frequency: number;
+  frequencyRate: number;
+  period: string;
+}>> {
+  const limit = Math.min(Math.max(args.limit ?? 8, 1), 25);
+  return db
+    .select({
+      coSkillName:   skillCooccurrencesTable.coSkillName,
+      frequency:     skillCooccurrencesTable.frequency,
+      frequencyRate: skillCooccurrencesTable.frequencyRate,
+      period:        skillCooccurrencesTable.period,
+    })
+    .from(skillCooccurrencesTable)
+    .where(
+      and(
+        ilike(skillCooccurrencesTable.skillName, args.skillName),
+        args.professionId
+          ? eq(skillCooccurrencesTable.professionId, args.professionId)
+          : undefined,
+      ),
+    )
+    .orderBy(desc(skillCooccurrencesTable.frequencyRate))
+    .limit(limit);
 }

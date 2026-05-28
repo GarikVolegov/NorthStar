@@ -38,6 +38,12 @@ describe("Wendy core user tool coverage", () => {
     expect(toolNames("deep_analysis")).toContain("search_brain");
   });
 
+  it("exposes Try-a-Day scene generation for contextual role follow-up", () => {
+    expect(toolNames("conversation")).toContain("generate_day_scene");
+    expect(toolNames("deep_analysis")).toContain("generate_day_scene");
+    expect(toolNames("simple_qa")).not.toContain("generate_day_scene");
+  });
+
   it("registers a self-describing domain-scoped plugin tool", () => {
     toolRegistry.register({
       name: "get_salary_benchmark_test",

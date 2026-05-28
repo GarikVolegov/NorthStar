@@ -14,7 +14,7 @@ import { generateEmbedding } from "../embeddings/generate";
 import { recordToolCall } from "../metrics";
 import { logger } from "../logger";
 import { numberArg, stringArg, typedArgs } from "./tool-arg-utils";
-import { handleCompareSectors, handleGetGrowthArticles, handleGetLearningPaths, handleGetMarketTrend, handleGetNewsSummary, handleGetProfessionDetail, handleGetSectorDetail, handleGetUserObjectives, handleListSectors, handleSearchProfessions } from "./tool-handlers-data";
+import { handleCompareSectors, handleGenerateDayScene, handleGetGrowthArticles, handleGetLearningPaths, handleGetMarketTrend, handleGetNewsSummary, handleGetProfessionDetail, handleGetSectorDetail, handleGetUserObjectives, handleListSectors, handleSearchProfessions } from "./tool-handlers-data";
 import { handleGetUserContext } from "./tool-handlers-user";
 import { handleGetJobPostingTrend, handleGetSkillCooccurrences, handleGetWeakSignals, handleSearchBrain, handleSearchMemoryGraph, handleSearchRag } from "./tool-handlers-market";
 import { handleCheckFoodSafety, handleGetBreedInfo, handleGetRabbitCareGuide, handleSearchRabbitKb } from "./tool-handlers-rabbit";
@@ -288,6 +288,7 @@ export async function executeToolCall(
     case "get_sector_detail":          result = await handleGetSectorDetail(typedArgs(args)); break;
     case "list_sectors":               result = await handleListSectors(typedArgs(args)); break;
     case "get_profession_detail":      result = await handleGetProfessionDetail(typedArgs(args)); break;
+    case "generate_day_scene":         result = await handleGenerateDayScene(typedArgs(args)); break;
     case "search_professions":         result = await handleSearchProfessions(typedArgs(args)); break;
     case "compare_sectors":            result = await handleCompareSectors(typedArgs(args)); break;
     case "get_market_trend":           result = await handleGetMarketTrend(typedArgs(args)); break;

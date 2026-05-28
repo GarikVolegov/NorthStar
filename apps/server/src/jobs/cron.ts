@@ -3,6 +3,7 @@ import { rootLogger } from "../middleware/logger";
 import { runWeakSignalDetector } from "./weak-signal-detector";
 import { runProactiveInsightGenerator } from "./proactive-insight-generator";
 import { runBriefingGenerator } from "./briefing-generator";
+import { safeRunRoutineScheduler } from "./routine-scheduler";
 import { runFastCollector } from "./fast-collector";
 import { runVaultIngest } from "./vault-ingest";
 import { writeAgentRunSnapshot } from "../lib/agent-runs";
@@ -19,6 +20,7 @@ const GROWTH_LIBRARY_INTERVAL_MS    = Number(process.env.GROWTH_LIBRARY_INTERVAL
 const JOB_POSTINGS_INTERVAL_MS      = Number(process.env.JOB_POSTINGS_INTERVAL_MS)      || 24 * 60 * 60 * 1000; // 24 ore
 const VAULT_INGEST_INTERVAL_MS      = Number(process.env.VAULT_INGEST_INTERVAL_MS)      || 24 * 60 * 60 * 1000; // 24 ore
 const WENDY_NEURAL_DECAY_INTERVAL_MS = Number(process.env.WENDY_NEURAL_DECAY_INTERVAL_MS) || 24 * 60 * 60 * 1000; // 24 ore
+const ROUTINE_SCHEDULER_INTERVAL_MS = Number(process.env.ROUTINE_SCHEDULER_INTERVAL_MS) || 30 * 60 * 1000; // 30 min
 
 async function recordCronRun<T>(
   agentName: string,
@@ -225,6 +227,7 @@ export function startCronJobs(): void {
     jobPostingsIntervalH:      JOB_POSTINGS_INTERVAL_MS      / 3_600_000,
     vaultIngestIntervalH:      VAULT_INGEST_INTERVAL_MS      / 3_600_000,
     wendyNeuralDecayIntervalH: WENDY_NEURAL_DECAY_INTERVAL_MS / 3_600_000,
+    routineSchedulerIntervalMin: ROUTINE_SCHEDULER_INTERVAL_MS / 60_000,
     briefingWeeklyIntervalD:   BRIEFING_WEEKLY_INTERVAL_MS  / 86_400_000,
     briefingDailyIntervalH:    BRIEFING_DAILY_INTERVAL_MS   / 3_600_000,
   }, "[cron] starting scheduled jobs");
@@ -285,6 +288,12 @@ export function startCronJobs(): void {
     void safeRunVaultIngest();
     setInterval(() => { void safeRunVaultIngest(); }, VAULT_INGEST_INTERVAL_MS);
   }, 50 * 60 * 1000);
+
+  // Routine utente: esegue job_monitor, market_report e altri handler dovuti.
+  setTimeout(() => {
+    void safeRunRoutineScheduler();
+    setInterval(() => { void safeRunRoutineScheduler(); }, ROUTINE_SCHEDULER_INTERVAL_MS);
+  }, 52 * 60 * 1000);
 
   // Wendy Neural decay giornaliero: indebolisce edge non rinforzati senza cancellare dati.
   setTimeout(() => {

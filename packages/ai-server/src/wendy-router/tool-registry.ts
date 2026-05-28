@@ -54,6 +54,16 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
       { name: "professionId", type: "number", description: "ID numerico della professione", required: true },
     ],
   },
+  generate_day_scene: {
+    name:        "generate_day_scene",
+    description: "Genera scene Try-a-Day contestuali per una professione nella scheda ruolo. Usare per domande tipo 'com'è una giornata da questo ruolo?', 'perché questa task conta?' o follow-up sulla simulazione inline.",
+    parameters: [
+      { name: "professionId", type: "number", description: "ID numerico della professione", required: true },
+      { name: "timeBlock", type: "string", description: "Filtro opzionale: morning | afternoon | evening" },
+      { name: "roleContext", type: "string", description: "Contesto sintetico della scheda ruolo o scena corrente" },
+      { name: "userContext", type: "string", description: "Contesto utente non sensibile utile alla personalizzazione" },
+    ],
+  },
   search_professions: {
     name:        "search_professions",
     description: "Cerca professioni per keyword testuale o nome di skill. Usare quando NON si conosce l'ID della professione.",
@@ -335,6 +345,7 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_sector_detail",
     "list_sectors",
     "get_profession_detail",
+    "generate_day_scene",
     "search_professions",
     "get_user_objectives",
     "update_objective_progress",
@@ -385,6 +396,7 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_sector_detail",
     "list_sectors",
     "get_profession_detail",
+    "generate_day_scene",
     "search_professions",
     "compare_sectors",
     "get_market_trend",
