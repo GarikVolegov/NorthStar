@@ -1,10 +1,12 @@
 /**
  * rag_source — sorgenti indicizzate nel knowledge base RAG.
  *
- * Traccia ogni fonte (report PDF, feed JSON, RSS news) con metadati
- * di fiducia e frequenza di aggiornamento.
+ * Traccia ogni fonte (report PDF, feed JSON, RSS news, file del vault .brain/)
+ * con metadati di fiducia e frequenza di aggiornamento.
  *
- * PRIVACY: nessun dato utente — solo metadati di fonti pubbliche.
+ * sourceType: 'report' | 'job_agg' | 'news' | 'community' | 'brain'
+ *
+ * PRIVACY: nessun dato utente — solo metadati di fonti pubbliche o curate.
  */
 import {
   pgTable, text, serial, timestamp, real, index,
@@ -16,8 +18,9 @@ export const ragSourcesTable = pgTable(
     id:          serial("id").primaryKey(),
     name:        text("name").notNull(),          // "WEF Future of Jobs 2025"
     url:         text("url"),                     // URL originale, opzionale
-    sourceType:  text("source_type").notNull(),   // 'report' | 'job_agg' | 'news' | 'community'
-    format:      text("format").notNull(),        // 'pdf' | 'json' | 'html' | 'rss'
+    sourceType:  text("source_type").notNull(),   // 'report' | 'job_agg' | 'news' | 'community' | 'brain'
+    format:      text("format").notNull(),        // 'pdf' | 'json' | 'html' | 'rss' | 'markdown'
+    obsidianPath: text("obsidian_path"),          // path relativo per source 'brain' es. ".brain/20_Product/Subsystems/Wendy.md"
     trustScore:  real("trust_score").notNull().default(0.7), // 0.0–1.0
     geography:   text("geography").array().notNull().default([]),
     publishedAt: timestamp("published_at", { withTimezone: true }),
@@ -26,8 +29,9 @@ export const ragSourcesTable = pgTable(
     updatedAt:   timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    typeIdx: index("rag_sources_type_idx").on(t.sourceType),
-    nameIdx: index("rag_sources_name_idx").on(t.name),
+    typeIdx:     index("rag_sources_type_idx").on(t.sourceType),
+    nameIdx:     index("rag_sources_name_idx").on(t.name),
+    obsidianIdx: index("rag_sources_obsidian_idx").on(t.obsidianPath),
   }),
 );
 
