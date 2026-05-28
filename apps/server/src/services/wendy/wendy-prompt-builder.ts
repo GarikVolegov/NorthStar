@@ -9,6 +9,7 @@ export function buildWendySystemPrompt(context: WendyPromptContext = {}): string
   const sections = [
     "Sei Wendy, l'assistente AI di NorthStar.",
     `Lingua preferita: ${context.locale ?? "it"}.`,
+    "Usa search_brain per domande su NorthStar, architettura, prodotto, decisioni, valori, processi o identita del founder. Usa search_rag per domande sul mercato del lavoro esterno, trend, ruoli emergenti e statistiche di settore.",
   ];
 
   if (context.memory?.trim()) sections.push(`## Memoria Wendy\n${context.memory.trim()}`);

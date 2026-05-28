@@ -10,6 +10,97 @@ function err(code: string, message: string): ToolResult {
   return { ok: false, code, message };
 }
 
+export type BrainLayer = "identity" | "domain" | "product" | "process";
+
+export function brainLayerToSector(layer: BrainLayer): "L1" | "L2" | "L3" | "L3.5" {
+  const layerMap = {
+    identity: "L1",
+    domain: "L2",
+    product: "L3",
+    process: "L3.5",
+  } as const;
+  return layerMap[layer];
+}
+
+export function searchBrainSqlParts(args: { layer?: BrainLayer }): {
+  sourceType: "brain";
+  layerSector: "L1" | "L2" | "L3" | "L3.5" | null;
+} {
+  return {
+    sourceType: "brain",
+    layerSector: args.layer ? brainLayerToSector(args.layer) : null,
+  };
+}
+
+function vecLiteral(vec: number[]): string {
+  return `[${vec.join(",")}]`;
+}
+
+export async function handleSearchBrain(
+  args: {
+    query: string;
+    layer?: BrainLayer;
+    limit?: number;
+  },
+): Promise<ToolResult> {
+  if (!args.query?.trim()) return err("INVALID_INPUT", "Query brain vuota");
+
+  const limit = Math.min(Math.max(args.limit ?? 5, 1), 20);
+  const parts = searchBrainSqlParts(args.layer === undefined ? {} : { layer: args.layer });
+
+  try {
+    const vec = await queryEmbedding(args.query).catch(() => null);
+    if (!vec) return err("UNAVAILABLE", "Servizio embedding temporaneamente non disponibile");
+
+    const literal = vecLiteral(vec);
+    const layerFilter = parts.layerSector
+      ? sql`AND rc.sectors && ARRAY[${parts.layerSector}]::text[]`
+      : sql``;
+
+    const rows = await db.execute<{
+      content: string;
+      obsidian_path: string | null;
+      sectors: string[];
+      roles: string[];
+      similarity: number;
+      trust_score: number;
+    }>(sql`
+      SELECT
+        rc.content,
+        rs.obsidian_path,
+        rc.sectors,
+        rc.roles,
+        1 - (rc.embedding <=> ${literal}::vector) AS similarity,
+        rc.trust_score
+      FROM rag_chunks rc
+      JOIN rag_sources rs ON rc.source_id = rs.id
+      WHERE rc.embedding IS NOT NULL
+        AND rs.source_type = ${parts.sourceType}
+        ${layerFilter}
+      ORDER BY rc.embedding <=> ${literal}::vector
+      LIMIT ${limit}
+    `);
+
+    return {
+      ok: true,
+      data: {
+        chunks: rows.rows.map((row) => ({
+          content: row.content,
+          obsidianPath: row.obsidian_path ?? "",
+          sectors: row.sectors ?? [],
+          roles: row.roles ?? [],
+          similarity: Math.round(Number(row.similarity) * 1000) / 1000,
+          trustScore: row.trust_score,
+        })),
+        totalFound: rows.rows.length,
+      },
+    };
+  } catch (e) {
+    logger.warn({ e, args }, "[tool] search_brain error");
+    return err("UNAVAILABLE", "Ricerca brain temporaneamente non disponibile");
+  }
+}
+
 export async function handleSearchRag(
   args: {
     query: string;

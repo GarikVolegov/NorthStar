@@ -9,7 +9,7 @@
  * PRIVACY: nessun dato utente — solo metadati di fonti pubbliche o curate.
  */
 import {
-  pgTable, text, serial, timestamp, real, index,
+  pgTable, text, serial, timestamp, real, index, uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const ragSourcesTable = pgTable(
@@ -31,7 +31,7 @@ export const ragSourcesTable = pgTable(
   (t) => ({
     typeIdx:     index("rag_sources_type_idx").on(t.sourceType),
     nameIdx:     index("rag_sources_name_idx").on(t.name),
-    obsidianIdx: index("rag_sources_obsidian_idx").on(t.obsidianPath),
+    obsidianIdx: uniqueIndex("rag_sources_obsidian_unique_idx").on(t.obsidianPath),
   }),
 );
 

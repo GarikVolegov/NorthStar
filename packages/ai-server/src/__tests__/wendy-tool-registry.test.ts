@@ -32,6 +32,12 @@ describe("Wendy core user tool coverage", () => {
     expect(toolNames("deep_analysis")).toContain("recall_semantic_memory");
   });
 
+  it("exposes the NorthStar brain search tool for internal product questions", () => {
+    expect(toolNames("simple_qa")).toContain("search_brain");
+    expect(toolNames("conversation")).toContain("search_brain");
+    expect(toolNames("deep_analysis")).toContain("search_brain");
+  });
+
   it("registers a self-describing domain-scoped plugin tool", () => {
     toolRegistry.register({
       name: "get_salary_benchmark_test",

@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 import { buildSystemPrompt } from "../growth-agent/prompt-builder";
 
 describe("Wendy prompt brain separation", () => {
-  it("keeps user memory, Wendy Brain and code graph context in separate sections", () => {
+  it("keeps user memory, neural activation, Wendy Brain and code graph context in separate sections", () => {
     const prompt = buildSystemPrompt({
       userContext: {
         locale: "it",
         memorySection: "## Memoria utente\n- goal_main: cambiare lavoro",
+        neuralSection: "## Attivazione neurale Wendy\n- [brain_note] RAG Pipeline",
         wendyBrainSection: "## Wendy Brain\n- [style_rule] Rispondi con decisione",
         codeGraphSection: "## Graphify codice\n1. growth-agent -> router-agent",
       },
@@ -31,9 +32,11 @@ describe("Wendy prompt brain separation", () => {
     });
 
     expect(prompt).toContain("## Memoria utente");
+    expect(prompt).toContain("## Attivazione neurale Wendy");
     expect(prompt).toContain("## Wendy Brain");
     expect(prompt).toContain("## Graphify codice");
-    expect(prompt.indexOf("## Memoria utente")).toBeLessThan(prompt.indexOf("## Wendy Brain"));
+    expect(prompt.indexOf("## Memoria utente")).toBeLessThan(prompt.indexOf("## Attivazione neurale Wendy"));
+    expect(prompt.indexOf("## Attivazione neurale Wendy")).toBeLessThan(prompt.indexOf("## Wendy Brain"));
     expect(prompt.indexOf("## Wendy Brain")).toBeLessThan(prompt.indexOf("## Graphify codice"));
   });
 });
