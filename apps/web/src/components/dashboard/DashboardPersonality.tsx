@@ -33,11 +33,11 @@ const SPIRIT_LABELS: Record<string, string> = {
 };
 
 const SPIRIT_COLORS: Record<string, string> = {
-  shen: "bg-violet-400",
-  hun:  "bg-indigo-400",
-  po:   "bg-amber-400",
-  yi:   "bg-cyan-400",
-  zhi:  "bg-rose-400",
+  shen: "bg-chart-4/70",
+  hun:  "bg-info/70",
+  po:   "bg-primary/70",
+  yi:   "bg-growth/70",
+  zhi:  "bg-destructive/60",
 };
 
 const SPIRIT_ALIASES: Record<string, string> = {
@@ -269,9 +269,14 @@ export function DashboardPersonality({
                     <span className="text-foreground font-medium">{SPIRIT_LABELS[key] ?? key}</span>
                     <span className="text-muted-foreground">{val.toFixed(1)}</span>
                   </div>
-                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-muted/70 rounded-full overflow-hidden">
                     <div
-                      className={cn("h-full rounded-full transition-all duration-700", SPIRIT_COLORS[key] ?? "bg-primary")}
+                      role="meter"
+                      aria-label={`${SPIRIT_LABELS[key] ?? key}: ${val.toFixed(1)} su 5`}
+                      aria-valuemin={0}
+                      aria-valuemax={5}
+                      aria-valuenow={val}
+                      className={cn("h-full rounded-full transition-all duration-700", SPIRIT_COLORS[key] ?? "bg-primary/70")}
                       style={{ width: `${Math.max(4, pct)}%` }}
                     />
                   </div>

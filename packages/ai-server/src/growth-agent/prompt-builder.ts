@@ -6,6 +6,32 @@ import { buildToneSection }    from "./tone-adapter";
 import { buildWendyVoiceContract } from "../wendy-voice";
 import { wendyConfig } from "../config/wendy";
 
+export interface PsychologicalProfileContext {
+  /** Big Five OCEAN scores (0-1 ciascuno) */
+  ocean?: {
+    openness?: number | null;
+    conscientiousness?: number | null;
+    extraversion?: number | null;
+    agreeableness?: number | null;
+    neuroticism?: number | null;
+  } | null;
+  oceanConfidence?: number | null;
+  oceanSource?: "explicit" | "inferred" | "hybrid" | null;
+  /** Cronotype personale (non generico time-of-day) */
+  chronotype?: "morning" | "intermediate" | "evening" | null;
+  chronotypeConfidence?: number | null;
+  /** Stile decisionale */
+  decisionStyle?: "analytical" | "directive" | "intuitive" | "collaborative" | null;
+  /** Tolleranza al rischio */
+  riskTolerance?: "conservative" | "moderate" | "bold" | null;
+  /** Stile di comunicazione */
+  communicationStyle?: "concise" | "detailed" | "visual" | "narrative" | null;
+  /** Top 3 valori Schwartz */
+  primaryValues?: string[] | null;
+  /** Bisogno primario SDT */
+  primarySdtNeed?: "autonomy" | "competence" | "relatedness" | null;
+}
+
 export interface UserContext {
   name?:         string | undefined;
   journeyType?:  string | undefined;
@@ -19,6 +45,8 @@ export interface UserContext {
   locale?:       string | undefined;
   isPremium?:    boolean | undefined;
   stripeSubscriptionId?: string | null | undefined;
+  /** Profilo psicologico 360° — iniettato solo se confidence >= 0.5 */
+  psychologicalProfile?: PsychologicalProfileContext | null | undefined;
 }
 
 export interface BuildSystemPromptOptions {
@@ -80,11 +108,154 @@ const USER_TONE_MAP: Record<string, string> = {
   casual:   "Usa un tono informale e amichevole, come se parlassi con un amico.",
 };
 
+// ── Label leggibili per il profilo psicologico ────────────────────────────────
+
+const OCEAN_LABELS: Record<string, { high: string; low: string }> = {
+  openness:          { high: "Alta curiosità e creatività",         low: "Preferisce il familiare e concreto" },
+  conscientiousness: { high: "Molto organizzato e disciplinato",    low: "Flessibile e spontaneo" },
+  extraversion:      { high: "Socialmente energico, estroverso",    low: "Introverso, preferisce il silenzio" },
+  agreeableness:     { high: "Empatico e cooperativo",              low: "Diretto e competitivo" },
+  neuroticism:       { high: "Emotivamente reattivo allo stress",   low: "Emotivamente stabile e resiliente" },
+};
+
+const DECISION_STYLE_LABELS: Record<string, string> = {
+  analytical:    "Analitico — preferisce dati, analisi approfondita, logica",
+  directive:     "Direttivo — rapido, efficiente, regole chiare",
+  intuitive:     "Intuitivo — visione d'insieme, pattern, sensazioni",
+  collaborative: "Collaborativo — consensus, relazioni, impatto sulle persone",
+};
+
+const RISK_LABELS: Record<string, string> = {
+  conservative: "Conservativo — preferisce certezze e stabilità",
+  moderate:     "Moderato — accetta rischi calibrati con buon rapporto rischio/ricompensa",
+  bold:         "Audace — aperto a rischi significativi per grandi opportunità",
+};
+
+const COMM_LABELS: Record<string, string> = {
+  concise:   "Conciso — vuole risposte brevi, punti chiave, niente fronzoli",
+  detailed:  "Dettagliato — apprezza spiegazioni approfondite ed esempi",
+  visual:    "Visivo — ama metafore, analogie e descrizioni strutturate",
+  narrative: "Narrativo — preferisce storie, casi concreti e contesto",
+};
+
+const CHRONOTYPE_LABELS: Record<string, string> = {
+  morning:      "mattutino (picco cognitivo 7-11)",
+  intermediate: "intermedio (picco cognitivo 10-14)",
+  evening:      "serale (picco cognitivo 18-22)",
+};
+
+const VALUE_LABELS: Record<string, string> = {
+  self_direction: "Autonomia e curiosità",
+  stimulation:    "Eccitazione e novità",
+  hedonism:       "Piacere e qualità della vita",
+  achievement:    "Successo e competenza",
+  power:          "Influenza e status",
+  security:       "Stabilità e sicurezza",
+  conformity:     "Regole e autodisciplina",
+  tradition:      "Tradizione e umiltà",
+  benevolence:    "Benessere altrui",
+  universalism:   "Giustizia e ambiente",
+};
+
+const SDT_LABELS: Record<string, string> = {
+  autonomy:    "Autonomia — ha bisogno di controllo sulle proprie scelte",
+  competence:  "Competenza — è motivato dalla crescita e dalla padronanza",
+  relatedness: "Relazioni — è motivato dalla connessione con gli altri",
+};
+
+/**
+ * Costruisce la sezione "Profilo Psicologico" per il system prompt.
+ * Viene iniettata solo per intent conversation/planning/deep_analysis.
+ * Filtra per confidence: score con confidence < 0.5 non vengono inclusi.
+ */
+export function buildPsychologicalProfileSection(
+  profile: PsychologicalProfileContext | null | undefined,
+): string | null {
+  if (!profile) return null;
+
+  const lines: string[] = [];
+
+  // Big Five — solo se confidence >= 0.5
+  const oceanConfidence = profile.oceanConfidence ?? 0;
+  if (oceanConfidence >= 0.5 && profile.ocean) {
+    const { ocean } = profile;
+    const dominantTraits: string[] = [];
+
+    const traits: Array<[string, number | null | undefined]> = [
+      ["openness",          ocean.openness],
+      ["conscientiousness", ocean.conscientiousness],
+      ["extraversion",      ocean.extraversion],
+      ["agreeableness",     ocean.agreeableness],
+      ["neuroticism",       ocean.neuroticism],
+    ];
+
+    for (const [dim, val] of traits) {
+      if (val === null || val === undefined) continue;
+      const label = OCEAN_LABELS[dim];
+      if (!label) continue;
+      if (val >= 0.65) dominantTraits.push(label.high);
+      else if (val <= 0.35) dominantTraits.push(label.low);
+    }
+
+    if (dominantTraits.length > 0) {
+      const sourceNote = profile.oceanSource === "inferred" ? " (da analisi conversazioni)" : "";
+      lines.push(`- **Personalità${sourceNote}:** ${dominantTraits.join("; ")}`);
+    }
+  }
+
+  // Cronotype — solo se confidence >= 0.4
+  const chronoConf = profile.chronotypeConfidence ?? 0;
+  if (chronoConf >= 0.4 && profile.chronotype) {
+    lines.push(`- **Cronotype:** ${CHRONOTYPE_LABELS[profile.chronotype] ?? profile.chronotype} → suggerisci tasks cognitivi nelle ore di picco`);
+  }
+
+  // Stile decisionale
+  if (profile.decisionStyle) {
+    lines.push(`- **Stile decisionale:** ${DECISION_STYLE_LABELS[profile.decisionStyle] ?? profile.decisionStyle}`);
+  }
+
+  // Tolleranza al rischio
+  if (profile.riskTolerance) {
+    lines.push(`- **Tolleranza al rischio:** ${RISK_LABELS[profile.riskTolerance] ?? profile.riskTolerance}`);
+  }
+
+  // Stile di comunicazione (priorità su wendyTonePreference)
+  if (profile.communicationStyle) {
+    lines.push(`- **Stile comunicazione:** ${COMM_LABELS[profile.communicationStyle] ?? profile.communicationStyle}`);
+  }
+
+  // Valori primari Schwartz
+  if (profile.primaryValues && profile.primaryValues.length > 0) {
+    const valueLabels = profile.primaryValues
+      .slice(0, 3)
+      .map((v) => VALUE_LABELS[v] ?? v)
+      .join(", ");
+    lines.push(`- **Valori core:** ${valueLabels}`);
+  }
+
+  // Bisogno primario SDT
+  if (profile.primarySdtNeed) {
+    lines.push(`- **Bisogno motivazionale primario:** ${SDT_LABELS[profile.primarySdtNeed] ?? profile.primarySdtNeed}`);
+  }
+
+  if (lines.length === 0) return null;
+
+  return (
+    `## Profilo Psicologico\n` +
+    lines.join("\n") +
+    `\n\nUsa queste informazioni per adattare linguaggio, struttura e tipo di suggerimenti. ` +
+    `Non citare mai esplicitamente questi parametri (es. "ho visto che sei conscenzioso") — ` +
+    `incorporali naturalmente nella risposta. Se l'utente chiede del suo profilo, allora sì, descrivi.`
+  );
+}
+
 function buildAdaptiveTone(opts: {
   journeyType?:  string | undefined;
   localHour?:             number | undefined;
   localDayOfWeek?:        number | undefined;
   tonePreference?:    string | undefined;
+  chronotype?: "morning" | "intermediate" | "evening" | null;
+  chronotypeConfidence?: number | null;
 }): string | null {
   const { journeyType, localHour, localDayOfWeek, tonePreference } = opts;
   const parts: string[] = [];
@@ -95,9 +266,25 @@ function buildAdaptiveTone(opts: {
 
   if (typeof localHour === "number") {
     const pc = wendyConfig.prompt;
-    if (localHour >= pc.morningHourStart && localHour < pc.morningHourEnd) parts.push(TONE_BY_HOUR.morning ?? "");
-    else if (localHour >= pc.eveningHourStart && localHour < pc.eveningHourEnd) parts.push(TONE_BY_HOUR.evening ?? "");
-    else if (localHour >= pc.nightHourStart || localHour < pc.nightHourEnd) parts.push(TONE_BY_HOUR.night ?? "");
+    // Se abbiamo un cronotype personale con buona confidence, adattiamo in base a quello
+    // invece del generico time-of-day (precision individuale vs. media di popolazione)
+    const hasPersonalChronotype = opts.chronotype && (opts.chronotypeConfidence ?? 0) >= 0.4;
+    if (hasPersonalChronotype) {
+      const ct = opts.chronotype!;
+      // Per un mattutino alle 21 diciamo che è fuori dal suo picco → calmo/riflessivo
+      if (ct === "morning" && localHour >= 20) parts.push(TONE_BY_HOUR.night ?? "");
+      else if (ct === "morning" && localHour >= 13) parts.push(TONE_BY_HOUR.evening ?? "");
+      else if (ct === "evening" && localHour >= 7 && localHour < 14) parts.push("È mattina: per questo utente serale il picco cognitivo è in serata — tono senza fretta, no urgenza.");
+      // intermediate: usa regole standard
+      else if (localHour >= pc.morningHourStart && localHour < pc.morningHourEnd) parts.push(TONE_BY_HOUR.morning ?? "");
+      else if (localHour >= pc.eveningHourStart && localHour < pc.eveningHourEnd) parts.push(TONE_BY_HOUR.evening ?? "");
+      else if (localHour >= pc.nightHourStart || localHour < pc.nightHourEnd) parts.push(TONE_BY_HOUR.night ?? "");
+    } else {
+      // Nessun cronotype personale: usa fasce orarie generiche
+      if (localHour >= pc.morningHourStart && localHour < pc.morningHourEnd) parts.push(TONE_BY_HOUR.morning ?? "");
+      else if (localHour >= pc.eveningHourStart && localHour < pc.eveningHourEnd) parts.push(TONE_BY_HOUR.evening ?? "");
+      else if (localHour >= pc.nightHourStart || localHour < pc.nightHourEnd) parts.push(TONE_BY_HOUR.night ?? "");
+    }
   }
 
   if (typeof localDayOfWeek === "number") {
@@ -166,13 +353,16 @@ export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {
   } = opts;
 
   const sections: string[] = [buildBaseSystem(userContext.locale)];
+  const psychProfile = userContext.psychologicalProfile;
 
-  // ── Tono adattivo (Step 7) ──────────────────────────────────────────────
+  // ── Tono adattivo (Step 7 + cronotype personale) ────────────────────────
   const adaptiveTone = buildAdaptiveTone({
-    journeyType:    userContext.journeyType ?? undefined,
+    journeyType:          userContext.journeyType ?? undefined,
     localHour,
     localDayOfWeek,
-    tonePreference: wendyTonePreference,
+    tonePreference:       wendyTonePreference,
+    chronotype:           psychProfile?.chronotype ?? null,
+    chronotypeConfidence: psychProfile?.chronotypeConfidence ?? null,
   });
   if (adaptiveTone) sections.push(adaptiveTone);
 
@@ -186,6 +376,10 @@ export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {
     if (userContext.sectorName)  ctx.push(`Settore: ${userContext.sectorName}`);
     sections.push(`## Profilo utente\n${ctx.join("\n")}`);
   }
+
+  // ── Profilo Psicologico 360° (solo per intent profondi) ─────────────────
+  const psychSection = buildPsychologicalProfileSection(psychProfile);
+  if (psychSection) sections.push(psychSection);
 
   // ── Page context (Wendy copilot) ─────────────────────────────────────────
   if (userContext.pageContext && Object.keys(userContext.pageContext).length > 0) {

@@ -11,7 +11,7 @@ describe("frontend route config", () => {
     expect(paths.has("/admin-rag")).toBe(true);
   });
 
-  it("exposes the dedicated objectives page as a protected route", () => {
+  it("keeps the legacy objectives route protected for diary redirects", () => {
     const route = routes.find((item) => item.path === "/obiettivi");
 
     expect(route).toMatchObject({
@@ -20,5 +20,45 @@ describe("frontend route config", () => {
       layout: "default",
       title: "Obiettivi",
     });
+  });
+
+  it("exposes subscription management as a protected route", () => {
+    const route = routes.find((item) => item.path === "/abbonamento");
+
+    expect(route).toMatchObject({
+      path: "/abbonamento",
+      guard: "protected",
+      layout: "default",
+      title: "Abbonamento",
+    });
+  });
+
+  it("exposes the personal diary as a protected route", () => {
+    const route = routes.find((item) => item.path === "/diario");
+
+    expect(route).toMatchObject({
+      path: "/diario",
+      guard: "protected",
+      layout: "default",
+      title: "Diario",
+    });
+  });
+
+  it("exposes social sections as protected deep-link routes", () => {
+    const paths = new Map(routes.map((route) => [route.path, route]));
+
+    for (const [path, title] of [
+      ["/social/feed", "Social feed"],
+      ["/social/leaderboard", "Leaderboard"],
+      ["/social/chat", "Social chat"],
+      ["/social/profilo", "Profilo social"],
+    ] as const) {
+      expect(paths.get(path)).toMatchObject({
+        path,
+        guard: "protected",
+        layout: "default",
+        title,
+      });
+    }
   });
 });

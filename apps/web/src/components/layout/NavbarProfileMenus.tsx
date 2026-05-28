@@ -6,6 +6,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import type { AuthUser } from "@/contexts/AuthContext";
+import { useNotifications, type AppNotification } from "@/hooks/useNotifications";
 import { SUPPORTED_LANGUAGES } from "@/i18n";
 import {
   JOURNEY_LABELS,
@@ -15,13 +16,18 @@ import {
 } from "@/components/layout/navbarConfig";
 import {
   Brain,
+  Bell,
   Briefcase,
+  CheckCheck,
+  Circle,
   Globe2,
   LogOut,
   MapPin,
+  MoonStar,
   Settings,
   Sparkles,
   Users,
+  X,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AffiliateInvitePreview } from "@/hooks/useAffiliateInvitePreview";
@@ -36,6 +42,7 @@ interface ProfileMenuProps {
   insightsUnread: number;
   affiliatePreview: AffiliateInvitePreview;
   affiliateLinkCopied: boolean;
+  brandLogoUrl?: string;
   applicationsLabel: string;
   logoutLabel: string;
   onNavigate: (path: string) => void;
@@ -177,6 +184,155 @@ function AffiliateBlock({
   );
 }
 
+const SOURCE_LABELS: Record<string, string> = {
+  system: "Sistema",
+  wendy: "Wendy",
+  monthly_ritual: "Rito",
+  calendar: "Calendario",
+  agent: "Agente",
+  pipeline: "Pipeline",
+  social: "Social",
+  proactive_insight: "Insight",
+};
+
+function notificationIcon(notification: AppNotification) {
+  const className = "h-4 w-4";
+  if (notification.iconKey === "moon-star" || notification.source === "monthly_ritual") {
+    return <MoonStar className={`${className} text-primary`} />;
+  }
+  if (notification.source === "wendy" || notification.source === "proactive_insight") {
+    return <Sparkles className={`${className} text-amber-500`} />;
+  }
+  if (notification.source === "social") {
+    return <Users className={`${className} text-sky-500`} />;
+  }
+  return <Bell className={`${className} text-primary`} />;
+}
+
+function NotificationCenterBlock({
+  compact = false,
+  brandLogoUrl = "/logo.svg",
+  onNavigate,
+}: {
+  compact?: boolean;
+  brandLogoUrl?: string;
+  onNavigate: (path: string) => void;
+}) {
+  const {
+    notifications,
+    unreadCount,
+    markRead,
+    markAllRead,
+    openNotification,
+    dismiss,
+  } = useNotifications();
+  const visible = notifications.slice(0, compact ? 2 : 3);
+
+  const open = (notification: AppNotification) => {
+    markRead(notification.id);
+    openNotification(notification.id);
+    if (notification.ctaUrl) onNavigate(notification.ctaUrl);
+  };
+
+  return (
+    <div className={compact ? "space-y-2 px-2 py-2" : "space-y-2 px-2 py-1.5"}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <Bell className="h-4 w-4 shrink-0 text-primary" />
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Notifiche</p>
+          {unreadCount > 0 && (
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+              {unreadCount > 9 ? "9+" : unreadCount} {unreadCount === 1 ? "nuova" : "nuove"}
+            </span>
+          )}
+        </div>
+        {unreadCount > 0 && (
+          <button
+            type="button"
+            onClick={markAllRead}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+            aria-label="Segna tutte le notifiche come lette"
+          >
+            <CheckCheck className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      {visible.length === 0 ? (
+        <div className="rounded-md border border-border/70 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+          Nessuna nuova notifica.
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {visible.map((notification) => {
+            const unread = !notification.readAt;
+            return (
+              <div
+                key={notification.id}
+                className="rounded-md border border-border/70 bg-background/70 p-2"
+              >
+                <div className="flex items-start gap-2">
+                  <span className="relative mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10">
+                    {notificationIcon(notification)}
+                    <img
+                      src={brandLogoUrl}
+                      alt=""
+                      className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border border-background bg-card object-cover"
+                    />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      {unread && <Circle className="h-2 w-2 fill-primary text-primary" />}
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {SOURCE_LABELS[notification.source] ?? "NorthStar"}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 line-clamp-1 text-sm font-semibold leading-5 text-foreground">
+                      {notification.title}
+                    </p>
+                    {notification.body && (
+                      <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                        {notification.body}
+                      </p>
+                    )}
+                    <div className="mt-2 flex items-center gap-1.5">
+                      {notification.ctaUrl && notification.ctaLabel ? (
+                        <button
+                          type="button"
+                          onClick={() => open(notification)}
+                          className="inline-flex min-h-8 items-center rounded-md bg-primary px-2.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                        >
+                          {notification.ctaLabel}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => markRead(notification.id)}
+                          className="inline-flex min-h-8 items-center rounded-md border border-border px-2.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                        >
+                          Letta
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => dismiss(notification.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                        aria-label={`Nascondi notifica ${notification.title}`}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DesktopItem({
   icon,
   children,
@@ -252,6 +408,11 @@ export function NavbarDesktopProfileMenu(props: ProfileMenuProps) {
           profileBannerUrl={profileBannerUrl}
         />
       </DropdownMenuLabel>
+      <DropdownMenuSeparator />
+      <NotificationCenterBlock
+        {...(props.brandLogoUrl ? { brandLogoUrl: props.brandLogoUrl } : {})}
+        onNavigate={onNavigate}
+      />
       <DropdownMenuSeparator />
       <DesktopItem
         icon={<Settings className="mr-2 h-4 w-4 text-primary" />}
@@ -360,6 +521,12 @@ export function NavbarMobileProfileMenu(props: ProfileMenuProps) {
         displayName={displayName}
         initial={initial}
         profileBannerUrl={profileBannerUrl}
+      />
+      <div className="h-px bg-border" />
+      <NotificationCenterBlock
+        compact
+        {...(props.brandLogoUrl ? { brandLogoUrl: props.brandLogoUrl } : {})}
+        onNavigate={onNavigate}
       />
       <div className="h-px bg-border" />
       <div className="px-2 py-1">

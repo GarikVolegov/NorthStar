@@ -8,3 +8,7 @@ export function resolveWebPort(env: Record<string, string | undefined>): number 
 
   return port;
 }
+
+export function resolveWebHttps(env: Record<string, string | undefined>): boolean {
+  return env.VITE_HTTPS?.trim().toLowerCase() === "true";
+}

@@ -83,6 +83,34 @@ describe("admin Wendy tools", () => {
     });
   });
 
+  it("creates a medium-risk action card for the Research -> Review -> Publish pipeline", async () => {
+    const result = await executeAdminWendyTool({
+      name: "admin_pipeline_start",
+      args: { templateId: "research-review-publish", topics: ["focus lavoro"] },
+      adminUserId: 7,
+      requestId: "req_pipeline",
+      secret: "test-secret",
+      now: 1_000,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const data = result.data as { wendyAction: Record<string, unknown> };
+    expect(result.data).toMatchObject({
+      clientSide: true,
+      action: "admin_pipeline_start",
+    });
+    expect(data.wendyAction).toMatchObject({
+      type: "admin_pipeline_start",
+      risk: "medium",
+      requiresConfirmation: true,
+      payload: {
+        templateId: "research-review-publish",
+        topics: ["focus lavoro"],
+      },
+    });
+  });
+
   it("keeps public and admin registries named separately", () => {
     expect(getAdminWendyToolDefinition("admin_ops_status")?.name).toBe("admin_ops_status");
     expect(getAdminWendyToolDefinition("search_rag")).toBeNull();

@@ -246,6 +246,13 @@
       "when": 1779742600000,
       "tag": "0034_rag_routing_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1779742700000,
+      "tag": "0051_active_logo_preset",
+      "breakpoints": true
     }
   ]
 }

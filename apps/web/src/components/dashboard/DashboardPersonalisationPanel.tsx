@@ -7,7 +7,14 @@ import { DashboardLayoutManager } from "./DashboardLayoutManager";
 
 export function DashboardPersonalisationPanel() {
   const [isOpen, setIsOpen] = useState(false);
-  const { layout, isLoading, isSaving, updateLayout } = useDashboardLayout();
+  const {
+    availableSections,
+    defaultLayout,
+    layout,
+    isLoading,
+    isSaving,
+    updateLayout,
+  } = useDashboardLayout();
 
   return (
     <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
@@ -63,7 +70,12 @@ export function DashboardPersonalisationPanel() {
           {isLoading ? (
             <p className="text-xs text-muted-foreground py-4 text-center">Caricamento layout...</p>
           ) : (
-            <DashboardLayoutManager layout={layout} onLayoutChange={updateLayout} />
+            <DashboardLayoutManager
+              layout={layout}
+              availableSections={availableSections}
+              defaultLayout={defaultLayout}
+              onLayoutChange={updateLayout}
+            />
           )}
         </div>
       )}

@@ -1,9 +1,10 @@
 import { LinkedInImportWizard } from "@/components/LinkedInImportWizard";
-import { OpenHumanAgentCard } from "@/components/profile/OpenHumanAgentCard";
+import { ProfilingConsentManager } from "@/components/profile/ProfilingConsentManager";
 import { JourneySectionRenderer, type JourneyType } from "@/components/profile/profile-sections";
+import { PsychologicalProfileCard, type PsychologicalProfilePatch, type PsychologicalProfileResponse } from "@/components/profile/PsychologicalProfileCard";
 import { ProfileSettings } from "@/components/profile/ProfileSettings";
-import { BadgesAchievements } from "@/components/profile/sections/BadgesAchievements";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AuthUser } from "@/contexts/AuthContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageModule } from "@/hooks/usePageModule";
@@ -33,6 +34,10 @@ interface ProfileData {
   emailVerified: boolean;
   avatarUrl?: string | null;
   bannerUrl?: string | null;
+  bio?: string | null;
+  city?: string | null;
+  username?: string | null;
+  wendyTonePreference?: string | null;
   createdAt: string;
 }
 
@@ -355,6 +360,7 @@ export default function Profilo() {
   const [avatarUrl, setAvatarUrl] = useState<string | null | undefined>(user?.avatarUrl);
   const [bannerUrl, setBannerUrl] = useState<string | null | undefined>();
   const [linkedinWizardOpen, setLinkedinWizardOpen] = useState(false);
+  const [overrideSaving, setOverrideSaving] = useState(false);
   const { data: profile } = useProfile(user?.id ?? 0);
 
   useEffect(() => {
@@ -383,6 +389,14 @@ export default function Profilo() {
     retry: false,
   });
 
+  const psychologicalProfileQuery = useQuery<PsychologicalProfileResponse>({
+    queryKey: ["psychological-profile", user?.id],
+    queryFn: () => getJson<PsychologicalProfileResponse>(`${BASE}api/profile/psychological-profile`),
+    enabled: !!user?.id,
+    staleTime: 30_000,
+    retry: false,
+  });
+
   if (!isLoggedIn || !user) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
@@ -394,6 +408,16 @@ export default function Profilo() {
 
   const journeyType = (user.journeyType ?? "indeciso") as JourneyType;
   const showLinkedInImport = journeyType === "dipendente" || journeyType === "autonomo";
+
+  async function handlePsychologicalOverride(patch: PsychologicalProfilePatch) {
+    setOverrideSaving(true);
+    try {
+      await patchJson(`${BASE}api/profile/psychological-profile`, patch as unknown as Record<string, unknown>);
+      await psychologicalProfileQuery.refetch();
+    } finally {
+      setOverrideSaving(false);
+    }
+  }
 
   return (
     <div className="pb-10">
@@ -413,24 +437,62 @@ export default function Profilo() {
         onLogout={logout}
       />
 
-      <div className="container mx-auto grid max-w-5xl grid-cols-1 gap-6 px-4 md:grid-cols-3">
-        <div className="space-y-5 md:col-span-1">
-          <div id="impostazioni" className="scroll-mt-20">
-            <ProfileSettings
-              user={user}
-              {...(profile?.createdAt !== undefined ? { createdAt: profile.createdAt } : {})}
-            />
-          </div>
-          <BadgesAchievements completionData={completionData ?? null} />
-          <OpenHumanAgentCard />
-        </div>
+      <div className="container mx-auto max-w-5xl px-4">
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="mb-5 grid h-auto w-full grid-cols-2 rounded-xl p-1 sm:w-auto sm:inline-grid">
+            <TabsTrigger value="overview" className="min-h-10">Panoramica</TabsTrigger>
+            <TabsTrigger value="psychological" className="min-h-10">Profilo Psicologico</TabsTrigger>
+          </TabsList>
 
-        <div className="space-y-5 md:col-span-2">
-          <JourneySectionRenderer
-            journeyType={journeyType}
-            userId={user.id}
-          />
-        </div>
+          <TabsContent value="overview" className="mt-0">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+              <div className="space-y-5 md:col-span-1">
+                <div id="impostazioni" className="scroll-mt-20">
+                  <ProfileSettings
+                    user={user}
+                    {...(profile?.createdAt !== undefined ? { createdAt: profile.createdAt } : {})}
+                    completionData={completionData ?? null}
+                    bio={profile?.bio}
+                    city={profile?.city}
+                    username={profile?.username}
+                    wendyTonePreference={profile?.wendyTonePreference}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-5 md:col-span-2">
+                <JourneySectionRenderer
+                  journeyType={journeyType}
+                  userId={user.id}
+                />
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="psychological" className="mt-0">
+            {psychologicalProfileQuery.isLoading ? (
+              <div className="rounded-2xl border bg-card p-6 text-sm text-muted-foreground">
+                Caricamento profilo psicologico...
+              </div>
+            ) : psychologicalProfileQuery.data ? (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+                <PsychologicalProfileCard
+                  data={psychologicalProfileQuery.data}
+                  onOverride={handlePsychologicalOverride}
+                  isSaving={overrideSaving}
+                />
+                <ProfilingConsentManager
+                  data={psychologicalProfileQuery.data}
+                  onRefresh={() => psychologicalProfileQuery.refetch()}
+                />
+              </div>
+            ) : (
+              <div className="rounded-2xl border bg-card p-6 text-sm text-muted-foreground">
+                Non riesco a caricare il profilo psicologico in questo momento.
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
       <LinkedInImportWizard open={linkedinWizardOpen} onClose={() => setLinkedinWizardOpen(false)} />
     </div>

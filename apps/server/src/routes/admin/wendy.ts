@@ -25,6 +25,7 @@ function adminWendyEnabled(): boolean {
 
 function selectAdminTool(message: string): string | null {
   const q = message.toLowerCase();
+  if (/\b(pipeline|control room|research|review|publish|pubblica|revisione)\b/.test(q)) return "admin_pipeline_start";
   if (/\b(restart|riavvia).*\b(database|db|postgres)\b/.test(q)) return "admin_restart_database";
   if (/\b(restart|riavvia).*\b(server|backend)\b/.test(q)) return "admin_restart_server";
   if (/\b(stop|spegni).*\b(server|backend)\b/.test(q)) return "admin_stop_server";
@@ -90,6 +91,7 @@ router.post("/wendy", async (req: Request, res: Response) => {
         args: {
           ...(parsed.data.adminContext ? { adminContext: parsed.data.adminContext } : {}),
           agentKey: "collector",
+          templateId: "research-review-publish",
         },
         adminUserId,
         requestId,

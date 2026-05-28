@@ -89,4 +89,14 @@ describe("AdminWendyPanel", () => {
 
     expect(sendMessage).toHaveBeenCalledWith("controlla gli agenti");
   });
+
+  it("offers the Research Review Publish pipeline from the empty control room", () => {
+    const sendMessage = vi.fn(async () => undefined);
+    useWendyChatMock.mockReturnValue(chatReturn({ sendMessage }));
+
+    render(<AdminWendyPanel open section="agents" onClose={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: /Research.*Review.*Publish/i }));
+
+    expect(sendMessage).toHaveBeenCalledWith("Prepara la pipeline Research -> Review -> Publish");
+  });
 });

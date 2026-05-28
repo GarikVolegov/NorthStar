@@ -7,8 +7,11 @@ import usersRouter from "./routes/users";
 import adminRouter from "./routes/admin";
 import friendsRouter from "./routes/friends";
 import socialRouter from "./routes/social";
+import communitiesRouter from "./routes/communities";
+import diaryRouter from "./routes/diary";
 import profileRouter from "./routes/profile";
 import profileBackgroundRouter from "./routes/profile-background";
+import profileLogoRouter from "./routes/profile-logo";
 import profileVisionRouter from "./routes/profile-vision";
 import knowledgeRouter from "./routes/knowledge";
 import wikiRouter from "./routes/wiki";
@@ -42,6 +45,7 @@ import securityRouter from "./routes/security";
 import aiWendyRouter from "./routes/ai-wendy";
 import wendyFeedbackRouter from "./routes/wendy-feedback";
 import ragAdminRouter from "./routes/rag-admin";
+import firecrawlAdminRouter from "./routes/firecrawl-admin";
 import proactiveInsightsRouter from "./routes/proactive-insights";
 import onboardingRouter from "./routes/onboarding";
 import mlRouter from "./routes/ml";
@@ -63,6 +67,13 @@ import openhumanRouter from "./routes/openhuman";
 import graphifyRouter from "./routes/graphify";
 import skillsGapRouter from "./routes/skills-gap";
 import aiImageRouter from "./routes/ai-image";
+import routinesRouter from "./routes/routines";
+import discoveryRouter from "./routes/discovery";
+import moodRouter from "./routes/mood";
+import dashboardLayoutRouter from "./routes/dashboard-layout";
+import profileNavigationLayoutRouter from "./routes/profile-navigation-layout";
+import monthlyRitualRouter from "./routes/monthly-ritual";
+import pushRouter from "./routes/push";
 import { getHealthPayload } from "./lib/health";
 
 export type RouteAuthLevel = "public" | "authenticated" | "admin";
@@ -125,12 +136,16 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/roadmap", router: roadmapRouter, auth: "public", description: "Roadmap pubblica" },
   { path: "/api/contact", router: contactRouter, auth: "public", description: "Messaggi contatto" },
 
+  { path: "/api/profile", router: profileNavigationLayoutRouter, auth: "authenticated", description: "Layout navigazione profilo" },
+  { path: "/api/profile", router: profileLogoRouter, auth: "authenticated", description: "Logo applicazione personalizzabile" },
   { path: "/api/profile", router: profileRouter, auth: "authenticated", description: "Profilo utente" },
   { path: "/api/profile", router: profileBackgroundRouter, auth: "authenticated", description: "Sfondo personalizzabile profilo" },
   { path: "/api/profile-vision", router: profileVisionRouter, auth: "authenticated", description: "Analisi profilo con vision AI" },
   { path: "/api/users", router: usersRouter, auth: "authenticated", description: "Utenti" },
   { path: "/api/friends", router: friendsRouter, auth: "authenticated", description: "Amici e chat" },
   { path: "/api/social", router: socialRouter, auth: "authenticated", description: "Social feed" },
+  { path: "/api/communities", router: communitiesRouter, auth: "authenticated", description: "Comunita social" },
+  { path: "/api/diary", router: diaryRouter, auth: "authenticated", description: "Diario personale" },
   { path: "/api/objectives", router: objectivesRouter, auth: "authenticated", description: "Obiettivi" },
   { path: "/api/calendar", router: calendarRouter, auth: "authenticated", description: "Calendario" },
   { path: "/api/dashboard", router: dashboardRouter, auth: "authenticated", description: "Dashboard" },
@@ -177,8 +192,16 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/openhuman", router: openhumanRouter, auth: "authenticated", description: "OpenHuman bridge" },
   { path: "/api/graphify", router: graphifyRouter, auth: "authenticated", description: "Graphify bridge" },
   { path: "/api/skills-gap", router: skillsGapRouter, auth: "authenticated", description: "Skills gap analysis" },
+  // ── AaaS: Ritual Engine + Dashboard (Fase 1) ──────────────────────────────
+  { path: "/api/routines", router: routinesRouter, auth: "authenticated", description: "Routine autonome utente (AaaS)" },
+  { path: "/api/discovery", router: discoveryRouter, auth: "authenticated", description: "Discovery Engine — readiness, segnali, nudge (percorso indeciso)" },
+  { path: "/api/mood", router: moodRouter, auth: "authenticated", description: "Mood-to-Action — check-in emozionale e azione suggerita (B10)" },
+  { path: "/api/monthly-ritual", router: monthlyRitualRouter, auth: "authenticated", description: "Notte della Fondazione mensile" },
+  { path: "/api/push", router: pushRouter, auth: "authenticated", description: "Push subscription utente" },
+  { path: "/api/dashboard", router: dashboardLayoutRouter, auth: "authenticated", description: "Layout dashboard personalizzabile" },
 
   { path: "/api/admin", router: adminRouter, auth: "admin", description: "Pannello admin" },
   { path: "/api/admin/rag", router: ragAdminRouter, auth: "admin", description: "Admin RAG" },
+  { path: "/api/admin/firecrawl", router: firecrawlAdminRouter, auth: "admin", description: "Admin Firecrawl ingestion" },
   { path: "/api/ml", router: mlRouter, auth: "admin", description: "ML service proxy" },
 ];

@@ -9,6 +9,11 @@ import {
 import { getAdminOpsStatus, queueDockerOperation, validateOpsAction } from "./admin-ops";
 import { setMaintenanceMode } from "./maintenance-mode";
 import { writeAdminWendyAudit, type AdminWendyAuditEvent } from "./admin-wendy-audit";
+import {
+  cancelPipelineRun,
+  confirmPipelineStep,
+  createPipelineRunFromTemplate,
+} from "./pipeline-control-room";
 
 type AdminToolKind = "read" | "write";
 type EnvSource = Record<string, string | undefined>;
@@ -108,6 +113,9 @@ const ADMIN_TOOLS: Record<string, AdminWendyToolDefinition> = {
   admin_rag_search: readTool("admin_rag_search", "Cerca nel RAG admin.", "rag"),
   admin_graphify_search: readTool("admin_graphify_search", "Cerca nel grafo Graphify.", "graphify"),
   admin_run_agent: writeTool("admin_run_agent", "Prepara l'avvio di un agente allowlistato.", "agents", "medium"),
+  admin_pipeline_start: writeTool("admin_pipeline_start", "Prepara la pipeline Research -> Review -> Publish nella Control Room.", "wendy-control-room", "medium"),
+  admin_pipeline_confirm_step: writeTool("admin_pipeline_confirm_step", "Conferma uno step bloccato di una pipeline agentica.", "wendy-control-room", "medium"),
+  admin_pipeline_cancel: writeTool("admin_pipeline_cancel", "Annulla una pipeline agentica in corso.", "wendy-control-room", "medium"),
   admin_refresh_data: writeTool("admin_refresh_data", "Prepara refresh dati admin.", "status", "medium"),
   admin_approve_item: writeTool("admin_approve_item", "Prepara approvazione elemento admin.", "queue", "medium"),
   admin_reject_item: writeTool("admin_reject_item", "Prepara rifiuto elemento admin.", "queue", "medium"),
@@ -225,6 +233,22 @@ async function runPrintingPressBridge(
 }
 
 function actionPayloadFor(name: string, args: Record<string, unknown>): Record<string, unknown> {
+  if (name === "admin_pipeline_start") {
+    return {
+      templateId: stringArg(args, "templateId") ?? "research-review-publish",
+      ...(Array.isArray(args.topics) ? { topics: args.topics } : {}),
+      input: args.input && typeof args.input === "object" && !Array.isArray(args.input) ? args.input : {},
+    };
+  }
+  if (name === "admin_pipeline_confirm_step") {
+    return {
+      runId: Number(args.runId),
+      stepId: Number(args.stepId),
+    };
+  }
+  if (name === "admin_pipeline_cancel") {
+    return { runId: Number(args.runId) };
+  }
   if (name === "admin_run_agent") {
     return { agentKey: stringArg(args, "agentKey") ?? stringArg(args, "agent") ?? "collector" };
   }
@@ -369,6 +393,37 @@ async function executeConfirmedHandler(
   payload: Record<string, unknown>,
   adminUserId: number,
 ): Promise<Record<string, unknown>> {
+  if (toolName === "admin_pipeline_start") {
+    const templateId = typeof payload.templateId === "string" ? payload.templateId : "research-review-publish";
+    if (templateId !== "research-review-publish") {
+      return { accepted: false, error: "Template pipeline non consentito." };
+    }
+    const input = payload.input && typeof payload.input === "object" && !Array.isArray(payload.input)
+      ? payload.input as Record<string, unknown>
+      : {};
+    const topics = Array.isArray(payload.topics) ? payload.topics : undefined;
+    const run = await createPipelineRunFromTemplate({
+      templateId,
+      requestedBy: adminUserId,
+      input: { ...input, ...(topics ? { topics } : {}) },
+    });
+    return { accepted: true, run };
+  }
+  if (toolName === "admin_pipeline_confirm_step") {
+    const runId = Number(payload.runId);
+    const stepId = Number(payload.stepId);
+    if (!Number.isFinite(runId) || !Number.isFinite(stepId)) {
+      return { accepted: false, error: "runId e stepId sono obbligatori." };
+    }
+    const run = await confirmPipelineStep({ runId, stepId, confirmedBy: adminUserId });
+    return { accepted: true, run };
+  }
+  if (toolName === "admin_pipeline_cancel") {
+    const runId = Number(payload.runId);
+    if (!Number.isFinite(runId)) return { accepted: false, error: "runId obbligatorio." };
+    const run = await cancelPipelineRun({ runId, cancelledBy: adminUserId });
+    return { accepted: true, run };
+  }
   if (toolName === "admin_restart_database") {
     const validation = validateOpsAction({
       service: "postgres",

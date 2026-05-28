@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { WendyMessageBubble } from "@/components/search/WendyMessageBubble";
 import { useWendyChat } from "@/hooks/useWendyChat";
 import { cn } from "@/lib/utils";
-import { RotateCcw, Send, X } from "lucide-react";
+import { GitBranch, RotateCcw, Send, X } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
 type AdminWendyPanelProps = {
@@ -58,6 +58,11 @@ export function AdminWendyPanel({
     void chat.sendMessage(text);
   }
 
+  function askForResearchPipeline() {
+    if (chat.isStreaming) return;
+    void chat.sendMessage("Prepara la pipeline Research -> Review -> Publish");
+  }
+
   if (!open) return null;
 
   return (
@@ -101,7 +106,16 @@ export function AdminWendyPanel({
       <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {chat.messages.length === 0 && !chat.thinking.active && (
           <div className="rounded-md border bg-background px-3 py-3 text-sm text-muted-foreground">
-            Chiedimi stato operativo, salute agenti, code admin o azioni da preparare con conferma.
+            <p>Chiedimi stato operativo, salute agenti, code admin o azioni da preparare con conferma.</p>
+            <button
+              type="button"
+              onClick={askForResearchPipeline}
+              disabled={chat.isStreaming}
+              className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-md border border-primary/20 px-3 text-xs font-semibold text-foreground transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 disabled:opacity-50"
+            >
+              <GitBranch className="h-3.5 w-3.5" />
+              {"Research -> Review -> Publish"}
+            </button>
           </div>
         )}
         {chat.messages.map((message) => (

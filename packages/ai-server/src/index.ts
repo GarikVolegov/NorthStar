@@ -38,7 +38,8 @@ export {
 } from "./wendy-brain";
 export type { WendyBrainEventInput, WendyBrainHit, WendyBrainSearchOptions } from "./wendy-brain";
 export { buildSystemPrompt } from "./growth-agent/prompt-builder";
-export type { UserContext } from "./growth-agent/prompt-builder";
+export { buildPsychologicalProfileSection } from "./growth-agent/prompt-builder";
+export type { UserContext, PsychologicalProfileContext } from "./growth-agent/prompt-builder";
 export type { RetrievedChunk } from "./growth-agent/retriever";
 export type { IngestOptions, IngestResult, SourceType } from "./growth-agent/ingest";
 export type { GrowthAgentOptions, ChatMessage } from "./growth-agent/agent";
@@ -233,3 +234,17 @@ export { ingestRssToRag } from "./rag/ingestors/rss-ingestor";
 export type { RssIngestOptions, RssIngestResult } from "./rag/ingestors/rss-ingestor";
 export { ingestJsonToRag } from "./rag/ingestors/json-ingestor";
 export type { JsonIngestOptions, JsonIngestResult } from "./rag/ingestors/json-ingestor";
+
+// Firecrawl: client + RAG ingestor
+export { FirecrawlClient, FirecrawlError, getFirecrawlClient, resetFirecrawlClient } from "./firecrawl";
+export type {
+  FirecrawlClientConfig,
+  FirecrawlFormat,
+  ScrapeOptions, ScrapeResult,
+  CrawlOptions, CrawlStatus,
+  MapOptions,
+  SearchOptions, SearchResultItem,
+  ExtractOptions, ExtractResult,
+} from "./firecrawl";
+export { ingestFirecrawlCrawl, ingestFirecrawlUrl } from "./rag/ingestors/firecrawl-ingestor";
+export type { FirecrawlIngestOptions, FirecrawlIngestResult } from "./rag/ingestors/firecrawl-ingestor";

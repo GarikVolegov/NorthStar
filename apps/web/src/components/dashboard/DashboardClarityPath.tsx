@@ -1,0 +1,190 @@
+import { cn } from "@/lib/utils";
+import { Check, Compass, Scale, Sparkles, Target } from "lucide-react";
+import { Link } from "wouter";
+
+interface ClarityStep {
+  icon: React.ElementType;
+  label: string;
+  desc: string;
+  cta: string;
+  href: string;
+  done: boolean;
+  active: boolean;
+}
+
+export function DashboardClarityPath({
+  hasSession,
+  savedSectorsCount,
+  hasDecided,
+}: {
+  hasSession: boolean;
+  savedSectorsCount: number;
+  hasDecided: boolean;
+}) {
+  const steps: ClarityStep[] = [
+    {
+      icon: Compass,
+      label: "Scopri chi sei",
+      desc: hasSession ? "Profilo RIASEC completato" : "Fai il test per capire il tuo tipo",
+      cta: hasSession ? "Rivedi profilo" : "Inizia il test",
+      href: hasSession ? "/risultati/latest" : "/test",
+      done: hasSession,
+      active: !hasSession,
+    },
+    {
+      icon: Target,
+      label: "Esplora il mondo",
+      desc: savedSectorsCount > 0
+        ? `${savedSectorsCount} ${savedSectorsCount === 1 ? "settore salvato" : "settori salvati"}`
+        : "Sfoglia i settori e salva quelli che ti interessano",
+      cta: "Esplora settori",
+      href: "/settori",
+      done: savedSectorsCount >= 3,
+      active: hasSession && savedSectorsCount < 3,
+    },
+    {
+      icon: Scale,
+      label: "Confronta & filtra",
+      desc: savedSectorsCount >= 3
+        ? "Hai abbastanza dati per confrontare"
+        : "Salva 3+ settori per sbloccare il confronto",
+      cta: "Confronta",
+      href: "/settori",
+      done: hasDecided,
+      active: savedSectorsCount >= 3 && !hasDecided,
+    },
+    {
+      icon: Sparkles,
+      label: "Decidi",
+      desc: hasDecided ? "Percorso scelto — ora costruisci!" : "Scegli il tuo percorso e parti",
+      cta: "Scegli percorso",
+      href: "/percorso",
+      done: hasDecided,
+      active: savedSectorsCount >= 3,
+    },
+  ];
+
+  const currentStep = steps.findIndex((s) => s.active && !s.done);
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <div className="mb-4 flex items-center gap-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+          <Compass className="h-3.5 w-3.5" />
+        </div>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Mappa della chiarezza
+          </p>
+        </div>
+      </div>
+
+      {/* Mobile: vertical list */}
+      <div className="flex flex-col gap-3 sm:hidden">
+        {steps.map((step, i) => {
+          const Icon = step.icon;
+          const isCurrent = i === currentStep;
+          return (
+            <div
+              key={step.label}
+              className={cn(
+                "flex items-center gap-3 rounded-xl border p-3 transition-colors",
+                step.done && "border-primary/20 bg-primary/5",
+                isCurrent && !step.done && "border-primary/30 bg-primary/8",
+                !step.done && !isCurrent && "border-border bg-muted/20 opacity-60",
+              )}
+            >
+              <div
+                className={cn(
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border",
+                  step.done && "border-primary/30 bg-primary text-primary-foreground",
+                  isCurrent && !step.done && "border-primary/40 bg-primary/10 text-primary",
+                  !step.done && !isCurrent && "border-border bg-card text-muted-foreground",
+                )}
+              >
+                {step.done ? <Check className="h-4 w-4" /> : <Icon className="h-3.5 w-3.5" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className={cn("text-sm font-semibold leading-tight", step.done ? "text-primary" : isCurrent ? "text-foreground" : "text-muted-foreground")}>
+                  {step.label}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{step.desc}</p>
+              </div>
+              {isCurrent && !step.done && (
+                <Link
+                  href={step.href}
+                  className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  {step.cta}
+                </Link>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop: horizontal path */}
+      <div className="relative hidden sm:block">
+        {/* Connecting line */}
+        <div className="absolute left-[calc(12.5%)] right-[calc(12.5%)] top-[22px] h-px bg-border" aria-hidden="true" />
+
+        <div className="relative grid grid-cols-4 gap-3">
+          {steps.map((step, i) => {
+            const Icon = step.icon;
+            const isCurrent = i === currentStep;
+            return (
+              <div key={step.label} className="flex flex-col items-center gap-2 text-center">
+                {/* Node */}
+                <div
+                  className={cn(
+                    "relative z-10 flex h-11 w-11 items-center justify-center rounded-full border-2 shadow-sm transition-all duration-300",
+                    step.done && "border-primary bg-primary text-primary-foreground shadow-primary/20",
+                    isCurrent && !step.done && "border-primary/60 bg-primary/10 text-primary ring-4 ring-primary/10",
+                    !step.done && !isCurrent && "border-border bg-card text-muted-foreground",
+                  )}
+                >
+                  {step.done ? <Check className="h-5 w-5" /> : <Icon className="h-4.5 w-4.5" />}
+                </div>
+
+                {/* Label & desc */}
+                <div className="min-w-0">
+                  <p
+                    className={cn(
+                      "text-xs font-semibold leading-tight",
+                      step.done ? "text-primary" : isCurrent ? "text-foreground" : "text-muted-foreground",
+                    )}
+                  >
+                    {step.label}
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground line-clamp-2">
+                    {step.desc}
+                  </p>
+                </div>
+
+                {/* CTA only for current step */}
+                {isCurrent && !step.done && (
+                  <Link
+                    href={step.href}
+                    className="mt-0.5 rounded-full bg-primary px-3 py-1 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    {step.cta} →
+                  </Link>
+                )}
+
+                {/* Numero step */}
+                <span
+                  className={cn(
+                    "text-[10px] font-bold tabular-nums",
+                    step.done ? "text-primary" : "text-muted-foreground/50",
+                  )}
+                >
+                  0{i + 1}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -49,6 +49,7 @@ vi.mock("@workspace/db", () => {
     coachMemoryFactsTable,
     coachSessionsTable,
     usersTable,
+    COACH_SESSION_MODES: ["free", "socratic", "plateau", "exit"] as const,
     db: {
       select: vi.fn(() => selectChain()),
       insert: vi.fn(() => ({

@@ -13,36 +13,30 @@
  *   onEnd()               — scatta al termine della lettura
  */
 
+import { appAudio } from "@/lib/app-audio";
+
 const VOICE_PITCH  = 1.12;
 const VOICE_RATE   = 0.88;
 const VOICE_VOLUME = 1.0;
-const PAD_GAIN     = 0.038;
-const PAD_LFO_FREQ = 0.08;
 
 // ── Stato mute globale ─────────────────────────────────────────────────
-let _muted = false;
+let _muted = appAudio.getSnapshot().muted;
 const _mutedListeners: Set<(muted: boolean) => void> = new Set();
+
+appAudio.subscribe((snapshot) => {
+   if (_muted === snapshot.muted) return;
+   _muted = snapshot.muted;
+   _mutedListeners.forEach(listener => listener(_muted));
+   if (_muted && typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
+});
 
 export function isMuted(): boolean { return _muted; }
 export const getMuted = isMuted; // Alias for backward compatibility
 
 export function setMuted(value: boolean): void {
    if (_muted === value) return;
-   _muted = value;
-   _mutedListeners.forEach(listener => listener(_muted));
-   
-   if (value) {
-     if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
-     if (activePad) {
-       activePad.masterGain.gain.cancelScheduledValues(activePad.ctx.currentTime);
-       activePad.masterGain.gain.linearRampToValueAtTime(0, activePad.ctx.currentTime + 0.3);
-     }
-   } else {
-     if (activePad) {
-       activePad.masterGain.gain.cancelScheduledValues(activePad.ctx.currentTime);
-       activePad.masterGain.gain.linearRampToValueAtTime(PAD_GAIN, activePad.ctx.currentTime + 0.6);
-     }
-   }
+   appAudio.setMuted(value);
+   if (value && typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
 }
 
 export function toggleMuted(): void {
@@ -124,82 +118,10 @@ export function stopSpeech(): void {
 }
 
 // ── Ambient pad ────────────────────────────────────────────────────────
-interface PadNode {
-  ctx: AudioContext;
-  masterGain: GainNode;
-  oscillators: OscillatorNode[];
-  lfo: OscillatorNode;
-  lfoGain: GainNode;
-}
-
-let activePad: PadNode | null = null;
-
-const PAD_FREQUENCIES = [
-  { freq: 110.0, detune:  0 },
-  { freq: 110.0, detune:  4 },
-  { freq: 165.0, detune:  0 },
-  { freq: 220.0, detune: -4 },
-  { freq: 277.0, detune:  0 },
-];
-
 export function startAmbientPad(): void {
-  if (activePad) return;
-  if (typeof AudioContext === "undefined" && typeof (window as unknown as { webkitAudioContext?: unknown }).webkitAudioContext === "undefined") return;
-  const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-  const ctx = new AudioCtx();
-  const lpf = ctx.createBiquadFilter();
-  lpf.type            = "lowpass";
-  lpf.frequency.value = 400;
-  lpf.Q.value         = 0.7;
-  const masterGain = ctx.createGain();
-  masterGain.gain.value = 0;
-  masterGain.connect(ctx.destination);
-  lpf.connect(masterGain);
-  const lfo = ctx.createOscillator();
-  lfo.type            = "sine";
-  lfo.frequency.value = PAD_LFO_FREQ;
-  const lfoGain = ctx.createGain();
-  lfoGain.gain.value  = PAD_GAIN * 0.4;
-  lfo.connect(lfoGain);
-  lfoGain.connect(masterGain.gain);
-  lfo.start();
-  const oscillators: OscillatorNode[] = PAD_FREQUENCIES.map(({ freq, detune }) => {
-    const osc = ctx.createOscillator();
-    osc.type            = "sine";
-    osc.frequency.value = freq;
-    osc.detune.value    = detune;
-    osc.connect(lpf);
-    osc.start();
-    return osc;
-  });
-  if (!_muted) {
-    masterGain.gain.linearRampToValueAtTime(PAD_GAIN, ctx.currentTime + 2);
-  }
-  activePad = { ctx, masterGain, oscillators, lfo, lfoGain };
+  appAudio.startAmbient();
 }
 
 export function stopAmbientPad(fadeSec = 2): void {
-  if (!activePad) return;
-  const { ctx, masterGain, oscillators, lfo } = activePad;
-  activePad = null;
-  const now = ctx.currentTime;
-  masterGain.gain.cancelScheduledValues(now);
-  masterGain.gain.linearRampToValueAtTime(0, now + fadeSec);
-  setTimeout(() => {
-    oscillators.forEach((o) => {
-      try {
-        o.stop();
-      } catch {
-        o.disconnect();
-      }
-    });
-    try {
-      lfo.stop();
-    } catch {
-      lfo.disconnect();
-    }
-    if (ctx.state !== "closed") {
-      void ctx.close().catch(() => {});
-    }
-  }, fadeSec * 1000 + 100);
+  appAudio.stopAmbient(fadeSec);
 }

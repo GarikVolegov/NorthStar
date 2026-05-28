@@ -247,16 +247,30 @@ export interface CalendarEvent {
 export interface NotificationLog {
   id: number;
   userId: number;
-  /** @nullable */
-  eventId?: number | null;
-  channel: string;
+  source: "system" | "wendy" | "monthly_ritual" | "calendar" | "agent" | "pipeline" | "social" | "proactive_insight";
+  type: string;
+  severity: "info" | "success" | "warning" | "urgent";
   title: string;
   /** @nullable */
   body?: string | null;
-  isRead: boolean;
-  sentAt: string;
+  /** @nullable */
+  ctaLabel?: string | null;
+  /** @nullable */
+  ctaUrl?: string | null;
+  iconKey: string;
+  /** @nullable */
+  dedupeKey?: string | null;
+  metadata: Record<string, unknown>;
+  /** @nullable */
+  readAt?: string | null;
   /** @nullable */
   openedAt?: string | null;
+  /** @nullable */
+  dismissedAt?: string | null;
+  /** @nullable */
+  expiresAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type CreateCalendarEventBodyCategory =

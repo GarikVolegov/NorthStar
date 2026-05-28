@@ -1,8 +1,16 @@
 import { Router } from "express";
 import { eq, and, desc, isNull } from "drizzle-orm";
 import { z } from "zod/v4";
-import { db, coachMemoryFactsTable, coachSessionsTable } from "@workspace/db";
+import { db, coachMemoryFactsTable, coachSessionsTable, COACH_SESSION_MODES } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
+import {
+  buildSocraticSystemPrompt,
+  getNextStep,
+  getStepIntro,
+  SOCRATIC_STEPS,
+  type SocraticStep,
+} from "../services/coach/socratic-protocol";
+import { recordSignal } from "../services/discovery-engine";
 import {
   wendyLimiter,
   wendyIpLimiter,
@@ -22,6 +30,12 @@ const router = Router();
 const createSessionSchema = z.object({
   title: z.string().min(1).max(100).default("Nuova sessione"),
   firstMessage: z.string().min(1).max(2000).optional(),
+  mode: z.enum(COACH_SESSION_MODES).default("free"),
+});
+
+const advanceProtocolSchema = z.object({
+  step: z.enum(SOCRATIC_STEPS).optional(), // se omesso, avanza al successivo
+  notes: z.string().max(2000).optional(),  // sintesi step appena chiuso
 });
 
 const askSchema = z.object({
@@ -182,26 +196,93 @@ router.post("/sessions", requireAuth, async (req, res) => {
   const userId = req.user!.id;
   const data = createSessionSchema.parse(req.body);
 
-  const messages = data.firstMessage
-    ? [
-        {
-          role: "user" as const,
-          content: data.firstMessage,
-          createdAt: new Date().toISOString(),
-        },
-      ]
-    : [];
+  // In modalità socratic la sessione parte sempre da "mappa_rumore"
+  // e Wendy inizia con l'intro dello step (no firstMessage richiesto).
+  const isSocratic = data.mode === "socratic";
+  const initialStep: SocraticStep | null = isSocratic ? "mappa_rumore" : null;
+  const initialAssistant = isSocratic
+    ? {
+        role: "assistant" as const,
+        content: getStepIntro("mappa_rumore"),
+        createdAt: new Date().toISOString(),
+      }
+    : null;
+
+  const messages = [
+    ...(data.firstMessage
+      ? [{ role: "user" as const, content: data.firstMessage, createdAt: new Date().toISOString() }]
+      : []),
+    ...(initialAssistant ? [initialAssistant] : []),
+  ];
 
   const [session] = await db
     .insert(coachSessionsTable)
     .values({
       userId,
-      title: data.title,
+      title: isSocratic ? (data.title === "Nuova sessione" ? "Sessione socratica" : data.title) : data.title,
+      mode: data.mode,
+      protocolStep: initialStep,
       messages,
     })
     .returning();
 
   res.status(201).json(session);
+});
+
+// ── ADVANCE socratic protocol step ─────────────────────────────
+router.post("/sessions/:id/advance-step", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const id = parseInt(req.params.id ?? "", 10);
+  const data = advanceProtocolSchema.parse(req.body);
+
+  const [session] = await db
+    .select()
+    .from(coachSessionsTable)
+    .where(and(eq(coachSessionsTable.id, id), eq(coachSessionsTable.userId, userId)))
+    .limit(1);
+
+  if (!session) {
+    res.status(404).json({ error: "Sessione non trovata" });
+    return;
+  }
+  if (session.mode !== "socratic") {
+    res.status(400).json({ error: "Avanzamento step disponibile solo in modalità socratic" });
+    return;
+  }
+
+  const currentStep = (session.protocolStep ?? null) as SocraticStep | null;
+  const nextStep = data.step ?? getNextStep(currentStep);
+
+  const protocolState = (session.protocolState ?? {}) as Record<string, unknown>;
+  if (currentStep && data.notes) protocolState[currentStep] = data.notes;
+
+  const intro = getStepIntro(nextStep);
+  const updatedMessages = [
+    ...(session.messages ?? []),
+    { role: "assistant" as const, content: intro, createdAt: new Date().toISOString() },
+  ];
+
+  const [updated] = await db
+    .update(coachSessionsTable)
+    .set({
+      protocolStep: nextStep,
+      protocolState,
+      messages: updatedMessages,
+      updatedAt: new Date(),
+    })
+    .where(eq(coachSessionsTable.id, id))
+    .returning();
+
+  // Segnale al Discovery Engine: l'utente ha completato uno step socratico.
+  recordSignal({
+    userId,
+    signalType: "coach_socratic_step",
+    intensity: 0.7,
+    target: currentStep ?? "start",
+    payload: { fromStep: currentStep, toStep: nextStep, sessionId: id },
+  }).catch((err) => req.log.warn({ err }, "[coach] discovery signal failed"));
+
+  res.json(updated);
 });
 
 // ── GET single session ────────────────────────────────────────
@@ -290,9 +371,15 @@ router.post(
     }
 
     // ── Build messages array ────────────────────────────────────
-    const systemContent = memorySection
+    // In modalità "socratic" il system prompt è arricchito con il protocollo
+    // dello step corrente (vedi services/coach/socratic-protocol.ts).
+    const basePrompt = memorySection
       ? `${COACH_SYSTEM_PROMPT}\n\n${memorySection}`
       : COACH_SYSTEM_PROMPT;
+    const systemContent =
+      session.mode === "socratic" && session.protocolStep
+        ? buildSocraticSystemPrompt(session.protocolStep as SocraticStep, basePrompt)
+        : basePrompt;
 
     const history = (session.messages ?? []).map(
       (m: { role: string; content: string }) => ({

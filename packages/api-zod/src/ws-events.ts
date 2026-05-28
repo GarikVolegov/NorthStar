@@ -14,13 +14,22 @@ import { z } from "zod/v4";
 export const NotificationLogSchema = z.object({
   id: z.number(),
   userId: z.number(),
-  eventId: z.number().nullable(),
-  channel: z.string(),
+  source: z.enum(["system", "wendy", "monthly_ritual", "calendar", "agent", "pipeline", "social", "proactive_insight"]),
+  type: z.string(),
+  severity: z.enum(["info", "success", "warning", "urgent"]),
   title: z.string(),
   body: z.string().nullable(),
-  isRead: z.boolean(),
-  sentAt: z.string(),
-  openedAt: z.string().nullable(),
+  ctaLabel: z.string().nullable(),
+  ctaUrl: z.string().nullable(),
+  iconKey: z.string(),
+  dedupeKey: z.string().nullable(),
+  metadata: z.record(z.string(), z.unknown()),
+  readAt: z.coerce.date().nullable(),
+  openedAt: z.coerce.date().nullable(),
+  dismissedAt: z.coerce.date().nullable(),
+  expiresAt: z.coerce.date().nullable(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
 });
 
 export const WsNotificationNewEvent = z.object({
@@ -168,6 +177,27 @@ export const WsFriendOnlineEvent = z.object({
   }),
 });
 
+export const WsCommunityMessageEvent = z.object({
+  type: z.literal("community_message"),
+  payload: z.object({
+    communityId: z.number(),
+    channelId: z.number(),
+    message: z.object({
+      id: z.number(),
+      channelId: z.number(),
+      userId: z.number(),
+      content: z.string(),
+      mediaUrl: z.string().nullable(),
+      createdAt: z.string(),
+      author: z.object({
+        id: z.number(),
+        name: z.string(),
+        avatarUrl: z.string().nullable(),
+      }),
+    }),
+  }),
+});
+
 // ─── Client → Server events ────────────────────────────────────────────────
 
 export const WsTypingEvent = z.object({
@@ -201,6 +231,7 @@ export const ServerWsEvent = z.discriminatedUnion("type", [
   WsFriendMessageEvent,
   WsFriendMessageReadEvent,
   WsFriendOnlineEvent,
+  WsCommunityMessageEvent,
   WsPongEvent,
 ]);
 

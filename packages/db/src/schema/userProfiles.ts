@@ -33,6 +33,7 @@ export const userProfileSettingsTable = pgTable("user_profile_settings", {
   wendyTonePreference: text("wendy_tone_preference", {
                           enum: ["auto", "concise", "detailed", "formal", "casual"],
                         }).default("auto"),
+  activeLogoPreset: text("active_logo_preset").notNull().default("northstar"),
 
   city: text("city"),
   cityPlaceId: text("city_place_id"),

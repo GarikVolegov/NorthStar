@@ -1,9 +1,12 @@
 import { runCollector, runEnricher, runSectorDataAgent, runNewsPublisher, refreshCatalog, runGrowthLibraryAgent, runJobPostingsAgent } from "@workspace/ai-server";
 import { rootLogger } from "../middleware/logger";
+import { startRoutineScheduler } from "./routine-scheduler";
 import { runWeakSignalDetector } from "./weak-signal-detector";
 import { runProactiveInsightGenerator } from "./proactive-insight-generator";
+import { runProfileInferenceJob } from "./profile-inference-job";
 import { runBriefingGenerator } from "./briefing-generator";
 import { runFastCollector } from "./fast-collector";
+import { runMonthlyRitualPushLaunchJob, runMonthlyRitualVigilEmailJob } from "./monthly-ritual";
 import { writeAgentRunSnapshot } from "../lib/agent-runs";
 
 const COLLECTOR_INTERVAL_MS        = Number(process.env.COLLECTOR_INTERVAL_MS) || 6 * 60 * 60 * 1000;       // 6 ore
@@ -16,6 +19,7 @@ const BRIEFING_WEEKLY_INTERVAL_MS   = Number(process.env.BRIEFING_WEEKLY_INTERVA
 const BRIEFING_DAILY_INTERVAL_MS    = Number(process.env.BRIEFING_DAILY_INTERVAL_MS)    || 24 * 60 * 60 * 1000; // 24 ore
 const GROWTH_LIBRARY_INTERVAL_MS    = Number(process.env.GROWTH_LIBRARY_INTERVAL_MS)    || 24 * 60 * 60 * 1000; // 24 ore
 const JOB_POSTINGS_INTERVAL_MS      = Number(process.env.JOB_POSTINGS_INTERVAL_MS)      || 24 * 60 * 60 * 1000; // 24 ore
+const MONTHLY_RITUAL_INTERVAL_MS    = Number(process.env.MONTHLY_RITUAL_INTERVAL_MS)    || 24 * 60 * 60 * 1000; // 24 ore
 
 async function recordCronRun<T>(
   agentName: string,
@@ -145,7 +149,8 @@ async function safeRunSectorData(): Promise<void> {
   }
 }
 
-const SECTOR_DATA_INTERVAL_MS = Number(process.env.SECTOR_DATA_INTERVAL_MS) || 7 * 24 * 60 * 60 * 1000; // 7 giorni
+const SECTOR_DATA_INTERVAL_MS        = Number(process.env.SECTOR_DATA_INTERVAL_MS)        || 7 * 24 * 60 * 60 * 1000; // 7 giorni
+const PROFILE_INFERENCE_INTERVAL_MS  = Number(process.env.PROFILE_INFERENCE_INTERVAL_MS)  || 7 * 24 * 60 * 60 * 1000; // 7 giorni
 const MODEL_DISCOVERY_INTERVAL_MS = Number(process.env.MODEL_DISCOVERY_INTERVAL_MS) || 7 * 24 * 60 * 60 * 1000; // 7 giorni
 
 async function safeRunModelDiscovery(): Promise<void> {
@@ -171,6 +176,28 @@ async function safeRunWeakSignalDetector(): Promise<void> {
   }
 }
 
+async function safeRunProfileInferenceJob(): Promise<void> {
+  try {
+    rootLogger.info("[cron] profile-inference-job starting");
+    const result = await recordCronRun(
+      "profile-inference",
+      "cron",
+      runProfileInferenceJob,
+      (r) => ({
+        usersProcessed: r.usersProcessed,
+        profilesUpdated: r.profilesUpdated,
+        chronotypesUpdated: r.chronotypesUpdated,
+        behavioralSignalsInserted: r.behavioralSignalsInserted,
+        errors: r.errors,
+        durationMs: r.durationMs,
+      }),
+    );
+    rootLogger.info({ ...result }, "[cron] profile-inference-job complete");
+  } catch (err) {
+    rootLogger.error({ err }, "[cron] profile-inference-job failed");
+  }
+}
+
 async function safeRunProactiveInsightGenerator(): Promise<void> {
   try {
     rootLogger.info("[cron] proactive-insight-generator starting");
@@ -178,6 +205,16 @@ async function safeRunProactiveInsightGenerator(): Promise<void> {
     rootLogger.info({ ...result }, "[cron] proactive-insight-generator complete");
   } catch (err) {
     rootLogger.error({ err }, "[cron] proactive-insight-generator failed");
+  }
+}
+
+async function safeRunMonthlyRitualJobs(): Promise<void> {
+  try {
+    const vigil = await runMonthlyRitualVigilEmailJob();
+    const launch = await runMonthlyRitualPushLaunchJob();
+    rootLogger.info({ vigil, launch }, "[cron] monthly ritual jobs complete");
+  } catch (err) {
+    rootLogger.error({ err }, "[cron] monthly ritual jobs failed");
   }
 }
 
@@ -193,6 +230,7 @@ export function startCronJobs(): void {
     jobPostingsIntervalH:      JOB_POSTINGS_INTERVAL_MS      / 3_600_000,
     briefingWeeklyIntervalD:   BRIEFING_WEEKLY_INTERVAL_MS  / 86_400_000,
     briefingDailyIntervalH:    BRIEFING_DAILY_INTERVAL_MS   / 3_600_000,
+    monthlyRitualIntervalH:    MONTHLY_RITUAL_INTERVAL_MS   / 3_600_000,
   }, "[cron] starting scheduled jobs");
 
   // Run iniziale dopo startup delay (dà tempo al DB di inizializzarsi)
@@ -233,6 +271,12 @@ export function startCronJobs(): void {
     void safeRunProactiveInsightGenerator();
     setInterval(() => { void safeRunProactiveInsightGenerator(); }, PROACTIVE_INSIGHT_INTERVAL_MS);
   }, 10 * 60 * 1000);
+
+  // Notte della Fondazione: email di vigilia il 6, push/fallback il 7.
+  setTimeout(() => {
+    void safeRunMonthlyRitualJobs();
+    setInterval(() => { void safeRunMonthlyRitualJobs(); }, MONTHLY_RITUAL_INTERVAL_MS);
+  }, 12 * 60 * 1000);
 
   // Growth library agent giornaliero: cura contenuti growth e colma gap tematici.
   setTimeout(() => {
@@ -280,4 +324,23 @@ export function startCronJobs(): void {
       }
     }, BRIEFING_DAILY_INTERVAL_MS);
   }, 20 * 60 * 1000);
+
+  // 360° Profile inference job settimanale (domenica notte)
+  // Delay di 50 min per non sovraccaricare lo startup
+  setTimeout(() => {
+    if (new Date().getDay() === 0) { // domenica
+      void safeRunProfileInferenceJob();
+    }
+    setInterval(() => {
+      if (new Date().getDay() === 0) {
+        void safeRunProfileInferenceJob();
+      }
+    }, PROFILE_INFERENCE_INTERVAL_MS);
+  }, 50 * 60 * 1000);
+
+  // ── AaaS: User-level Routine Scheduler ───────────────────────────────────
+  // Poll user_routines ogni 60s — delay 60s per lasciare il pool DB warmup.
+  setTimeout(() => {
+    startRoutineScheduler();
+  }, 60_000);
 }

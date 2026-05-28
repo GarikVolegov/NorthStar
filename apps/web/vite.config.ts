@@ -4,9 +4,10 @@ import tailwindcss from "@tailwindcss/vite";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 import path from "path";
 import { VitePWA } from "vite-plugin-pwa";
-import { resolveWebPort } from "./src/lib/dev-port";
+import { resolveWebHttps, resolveWebPort } from "./src/lib/dev-port";
 
 const port = resolveWebPort(process.env);
+const useHttps = resolveWebHttps(process.env);
 
 const basePath = process.env.BASE_PATH || "/";
 const commitSha = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA;
@@ -41,7 +42,7 @@ export default defineConfig(async ({ command }) => ({
   plugins: [
     react(),
     tailwindcss(),
-    command === "serve" && basicSsl(),
+    command === "serve" && useHttps && basicSsl(),
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "hero.png", "robots.txt"],

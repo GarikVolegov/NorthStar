@@ -78,6 +78,9 @@ export interface SpecialistRunOptions {
   requestId?:            string | undefined;
   behavioralPatterns?:   Array<{ patternType: string; description: string; confidence: number }> | undefined;
   routingHistorySummary?: string | undefined;
+  localHour?:            number | undefined;
+  localDayOfWeek?:       number | undefined;
+  wendyTonePreference?:  string | undefined;
 }
 
 export type SpecialistEvent =
@@ -197,6 +200,9 @@ export abstract class SpecialistAgent {
     const systemPrompt = buildSystemPrompt({
       userContext: enrichedContext, personaExamples, documentChunks,
       webResults, cot, userMessage: analysisMessage, evalResult,
+      localHour: opts.localHour,
+      localDayOfWeek: opts.localDayOfWeek,
+      wendyTonePreference: opts.wendyTonePreference,
     });
 
     // ── 5. Stream + BUFFER ────────────────────────────────────────────────────

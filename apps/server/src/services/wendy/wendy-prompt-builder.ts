@@ -1,8 +1,14 @@
+import {
+  buildPsychologicalProfileSection,
+  type PsychologicalProfileContext,
+} from "@workspace/ai-server/growth-agent/prompt-builder";
+
 export interface WendyPromptContext {
   locale?: string;
   memory?: string;
   ragContext?: string;
   personalContext?: string;
+  psychologicalProfile?: PsychologicalProfileContext | null;
 }
 
 export function buildWendySystemPrompt(context: WendyPromptContext = {}): string {
@@ -16,6 +22,8 @@ export function buildWendySystemPrompt(context: WendyPromptContext = {}): string
   if (context.personalContext?.trim()) {
     sections.push(`## Contesto personale/progetto\n${context.personalContext.trim()}`);
   }
+  const psychologicalSection = buildPsychologicalProfileSection(context.psychologicalProfile);
+  if (psychologicalSection) sections.push(psychologicalSection);
 
   return sections.join("\n\n");
 }

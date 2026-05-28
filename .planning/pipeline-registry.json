@@ -1,0 +1,468 @@
+{
+  "version": "1.0",
+  "project": "NorthStar",
+  "description": "Authoritative registry for all AI agent pipelines. External pipelines (class: external) are run by Claude Code and similar dev agents. Internal pipelines (class: internal) are autonomous, single-responsibility agents that observe and report.",
+
+  "pipelines": {
+
+    "development": {
+      "class": "external",
+      "description": "Step-typed development pipeline for Claude Code. Implements PLAN.md steps with security gates baked in. Commit is blocked until gate passes.",
+      "skill": "gsd:ns-step",
+      "plan_file": ".planning/PLAN.md",
+      "commit_convention": "feat(aaas): Step N — [step name]",
+
+      "step_types": {
+
+        "db": {
+          "gsd_entry": "execute",
+          "flags": ["--interactive"],
+          "pattern_files": ["packages/db/src/schema/proactiveInsight.ts"],
+          "security_gate": {
+            "id": "gate-db",
+            "checks": [
+              {
+                "id": "fk-on-delete",
+                "description": "Every foreign key must have onDelete specified",
+                "grep_pattern": "\\.references\\(.*\\)(?!.*onDelete)",
+                "severity": "high"
+              },
+              {
+                "id": "pii-no-bare-text",
+                "description": "Columns named email/phone/name must be in a table with userId foreign key (user-owned data)",
+                "grep_pattern": "text\\(\"(email|phone|name|full_name|address)\"\\)",
+                "verify": "parent table has userId FK",
+                "severity": "medium"
+              },
+              {
+                "id": "cascade-on-user-data",
+                "description": "Tables with userId must cascade delete",
+                "grep_pattern": "userId.*references.*usersTable",
+                "verify": "includes onDelete: \"cascade\"",
+                "severity": "high"
+              }
+            ]
+          }
+        },
+
+        "api": {
+          "gsd_entry": "execute",
+          "flags": ["--interactive"],
+          "pattern_files": ["apps/server/src/routes/profile.ts"],
+          "security_gate": {
+            "id": "gate-api",
+            "checks": [
+              {
+                "id": "auth-before-query",
+                "description": "Every handler must access req.userId or req.user.id before any DB operation",
+                "grep_pattern": "async.*req.*res.*\\{(?![\\s\\S]*req\\.userId)[\\s\\S]*db\\.",
+                "severity": "critical"
+              },
+              {
+                "id": "zod-body-validation",
+                "description": "Every POST/PUT/PATCH must validate body with z.parse or z.safeParse",
+                "grep_pattern": "router\\.(post|put|patch)(?![\\s\\S]*z\\.(parse|safeParse))",
+                "severity": "high"
+              },
+              {
+                "id": "no-raw-db-objects",
+                "description": "No res.json() returning full DB row objects — select only needed fields",
+                "grep_pattern": "res\\.json\\(await db\\.select\\(\\)",
+                "severity": "medium"
+              },
+              {
+                "id": "route-config-auth",
+                "description": "Route must be registered in route-config.ts with auth: true",
+                "verify": "check apps/server/src/route-config.ts for route with auth: true",
+                "severity": "high"
+              },
+              {
+                "id": "cross-user-check",
+                "description": "PATCH/DELETE handlers must verify resource belongs to req.userId before modifying",
+                "verify": "grep for userId comparison before update/delete",
+                "severity": "critical"
+              }
+            ]
+          }
+        },
+
+        "worker": {
+          "gsd_entry": "plan",
+          "flags": ["--tdd"],
+          "pattern_files": [
+            "apps/server/src/jobs/cron.ts",
+            "apps/server/src/lib/agent-runs.ts"
+          ],
+          "security_gate": {
+            "id": "gate-worker",
+            "checks": [
+              {
+                "id": "timeout-enforced",
+                "description": "Worker must have explicit timeout (Promise.race or AbortSignal)",
+                "grep_pattern": "executeRoutine|runWorker",
+                "verify": "function has timeout/AbortSignal or wraps in Promise.race",
+                "severity": "high"
+              },
+              {
+                "id": "no-credentials-in-logs",
+                "description": "Log statements must not include token/password/secret/apiKey fields",
+                "grep_pattern": "logger\\.(info|error|warn|debug).*\\{.*(?:token|password|secret|apiKey)",
+                "severity": "critical"
+              },
+              {
+                "id": "max-batch-size",
+                "description": "Batch processing must have .limit(N) — never unbounded",
+                "grep_pattern": "\\.select\\(\\)(?![\\s\\S]{0,200}\\.limit\\()",
+                "severity": "high"
+              },
+              {
+                "id": "safe-run-pattern",
+                "description": "Must use safeRun wrapper or recordCronRun — no bare setInterval",
+                "grep_pattern": "setInterval\\(",
+                "severity": "high"
+              }
+            ]
+          }
+        },
+
+        "agent": {
+          "gsd_entry": "plan",
+          "flags": ["--tdd"],
+          "pattern_files": [
+            "apps/server/src/jobs/proactive-insight-generator.ts"
+          ],
+          "security_gate": {
+            "id": "gate-agent",
+            "checks": [
+              {
+                "id": "no-pii-in-llm-context",
+                "description": "Do not pass raw email, phone, or full name to LLM prompt without explicit sanitization",
+                "grep_pattern": "user\\.email|user\\.phone|user\\.fullName",
+                "verify": "verify each occurrence is sanitized or excluded from LLM context",
+                "severity": "high"
+              },
+              {
+                "id": "cost-model-check",
+                "description": "Use gpt-4o-mini or groq for non-critical agents — gpt-4o only for high-complexity",
+                "grep_pattern": "model.*gpt-4o(?!-mini)",
+                "verify": "confirm the model choice is justified",
+                "severity": "medium"
+              },
+              {
+                "id": "llm-error-handled",
+                "description": "LLM call must have try/catch or .catch() — never let uncaught LLM errors crash the worker",
+                "grep_pattern": "await.*openai|await.*anthropic|await.*groq",
+                "verify": "wrapped in try/catch",
+                "severity": "high"
+              }
+            ]
+          }
+        },
+
+        "delivery": {
+          "gsd_entry": "plan",
+          "flags": [],
+          "pattern_files": [
+            "apps/server/src/jobs/briefing-generator.ts"
+          ],
+          "security_gate": {
+            "id": "gate-delivery",
+            "checks": [
+              {
+                "id": "no-pii-in-delivery-logs",
+                "description": "Email delivery logs must not include message body (only status/userId)",
+                "grep_pattern": "logger.*body|logger.*content|logger.*html",
+                "severity": "medium"
+              },
+              {
+                "id": "resend-rate-limit",
+                "description": "Email sends must respect Resend rate limits — verify existing rate limiting wrapper is used",
+                "verify": "uses existing sendEmail or similar wrapper that has rate limiting",
+                "severity": "high"
+              }
+            ]
+          }
+        },
+
+        "ai-tool": {
+          "gsd_entry": "plan",
+          "flags": [],
+          "pattern_files": [
+            "packages/ai-server/src/tools/registry.ts",
+            "packages/ai-server/src/tools/types.ts"
+          ],
+          "security_gate": {
+            "id": "gate-ai-tool",
+            "checks": [
+              {
+                "id": "confirm-before-destructive",
+                "description": "Any action that creates/modifies/deletes data must require action: 'confirm' — never execute on first call",
+                "grep_pattern": "action.*preview|action.*confirm",
+                "verify": "tool handler checks action field before writing to DB",
+                "severity": "critical"
+              },
+              {
+                "id": "rate-limited-per-user",
+                "description": "Tool must be rate-limited per userId to prevent abuse",
+                "verify": "check for rate limit check in handler using userId",
+                "severity": "high"
+              },
+              {
+                "id": "tool-registered-in-index",
+                "description": "Tool must be exported from tools/index.ts",
+                "verify": "check packages/ai-server/src/tools/index.ts for export",
+                "severity": "medium"
+              }
+            ]
+          }
+        },
+
+        "ui-component": {
+          "gsd_entry": "execute",
+          "flags": ["--interactive"],
+          "pattern_files": [
+            "apps/web/src/components/dashboard/DashboardObjectives.tsx"
+          ],
+          "security_gate": {
+            "id": "gate-ui-component",
+            "checks": [
+              {
+                "id": "no-dangerous-html",
+                "description": "dangerouslySetInnerHTML must not be used with user-supplied content",
+                "grep_pattern": "dangerouslySetInnerHTML.*\\{",
+                "verify": "content is static or sanitized",
+                "severity": "critical"
+              },
+              {
+                "id": "no-sensitive-localstorage",
+                "description": "localStorage.setItem must not store tokens, passwords, or full user objects",
+                "grep_pattern": "localStorage\\.setItem.*(?:token|password|secret|user)",
+                "severity": "high"
+              }
+            ]
+          }
+        },
+
+        "ui-page": {
+          "gsd_entry": "plan",
+          "flags": [],
+          "pattern_files": [
+            "apps/web/src/pages/profilo.tsx",
+            "apps/web/src/route-config.ts"
+          ],
+          "security_gate": {
+            "id": "gate-ui-page",
+            "checks": [
+              {
+                "id": "route-registered",
+                "description": "Route must be added to both route-config.ts (web) and App.tsx",
+                "verify": "check apps/web/src/route-config.ts and apps/web/src/App.tsx",
+                "severity": "high"
+              },
+              {
+                "id": "auth-guard",
+                "description": "Private pages must use ProtectedRoute or equivalent auth guard",
+                "grep_pattern": "ProtectedRoute|requireAuth|useAuth",
+                "severity": "critical"
+              },
+              {
+                "id": "no-sensitive-localstorage",
+                "description": "Page must not store sensitive data in localStorage",
+                "grep_pattern": "localStorage\\.setItem.*(?:token|password|secret|user)",
+                "severity": "high"
+              }
+            ]
+          }
+        },
+
+        "test": {
+          "gsd_entry": "execute",
+          "flags": ["--interactive"],
+          "pattern_files": [
+            "apps/server/src/routes/admin.test.ts"
+          ],
+          "security_gate": {
+            "id": "gate-test",
+            "checks": [
+              {
+                "id": "no-real-credentials",
+                "description": "Test fixtures must not contain real API keys, passwords, or production tokens",
+                "grep_pattern": "sk-|Bearer eyJ|password.*=.*['\"][^'\"]{16,}",
+                "severity": "critical"
+              },
+              {
+                "id": "real-db-not-mock",
+                "description": "Integration tests must use real test DB, not mocked. Unit tests may mock @workspace/db. Rule scoped to *.integration.test.ts / *.e2e.test.ts only.",
+                "grep_pattern": "vi\\.mock.*@workspace/db|jest\\.mock.*@workspace/db",
+                "scope_glob": "**/*.{integration,e2e}.test.{ts,tsx}",
+                "severity": "high"
+              }
+            ]
+          }
+        },
+
+        "gate": {
+          "gsd_entry": "execute",
+          "flags": ["--interactive"],
+          "pattern_files": [
+            "packages/ai-server/src/feature-flags.ts"
+          ],
+          "security_gate": {
+            "id": "gate-gate",
+            "checks": [
+              {
+                "id": "default-on-safe",
+                "description": "Feature flags default-on (=!== 'false') must be safe to enable in production without additional setup",
+                "verify": "confirm the feature is production-ready before making it default-on",
+                "severity": "medium"
+              },
+              {
+                "id": "kill-switch",
+                "description": "Every flag must be disableable via env var (FF_NAME=false pattern)",
+                "grep_pattern": "process\\.env\\.FF_",
+                "verify": "flag reads from process.env and can be set to false",
+                "severity": "high"
+              }
+            ]
+          }
+        }
+      }
+    },
+
+    "security": {
+      "class": "internal",
+      "description": "Scans entire codebase for auth gaps, CVE, secret exposure, RBAC drift. Single responsibility: find and report security issues.",
+      "schedule": "on:pr-merge, 0 9 * * 1",
+      "agent": "gsd-security-auditor",
+      "output_file": ".reports/SECURITY-REPORT.md",
+      "last_run": null,
+      "severity_actions": {
+        "low": "report-only",
+        "medium": "report-only",
+        "high": "open-issue",
+        "critical": "block-deploy"
+      },
+      "checks": [
+        "npm-audit-critical",
+        "all-routes-have-auth-middleware",
+        "no-secrets-in-codebase",
+        "rbac-drift-detection",
+        "env-var-exposure-in-logs"
+      ]
+    },
+
+    "quality": {
+      "class": "internal",
+      "description": "Post-merge quality gate: coverage delta, type regressions, dead exports, untested routes.",
+      "schedule": "on:pr-merge, 0 2 * * *",
+      "agent": "gsd-code-reviewer",
+      "output_file": ".reports/QUALITY-REPORT.md",
+      "last_run": null,
+      "checks": [
+        "coverage-delta-on-changed-files",
+        "no-new-typescript-any",
+        "routes-without-tests",
+        "dead-exports"
+      ]
+    },
+
+    "compliance": {
+      "class": "internal",
+      "description": "GDPR, PII inventory, data retention, audit log coverage. Runs monthly and on every DB migration.",
+      "schedule": "0 10 1 * *, on:db-migration",
+      "agent": "gsd-security-auditor",
+      "output_file": ".reports/COMPLIANCE-REPORT.md",
+      "last_run": null,
+      "checks": [
+        "pii-table-inventory",
+        "gdpr-cascade-delete-coverage",
+        "data-retention-policy-enforcement",
+        "sensitive-action-audit-log-coverage"
+      ]
+    },
+
+    "infra-health": {
+      "class": "internal",
+      "description": "Continuous operational health monitor. Checks cron jobs, routine failures, DB pool, email delivery.",
+      "schedule": "*/15 * * * *",
+      "agent": "infra-health-agent",
+      "output": "alert-on-threshold",
+      "last_run": null,
+      "thresholds": {
+        "routine_failure_rate_24h": 0.05,
+        "cron_overdue_multiplier": 2.0,
+        "job_stuck_minutes": 10,
+        "email_bounce_rate_24h": 0.02,
+        "db_pool_usage_pct": 0.85
+      }
+    },
+
+    "eval-wendy": {
+      "class": "internal",
+      "description": "Wendy AI quality pipeline. Reruns 46 offline test cases, compares KPIs, detects prompt drift.",
+      "schedule": "0 8 * * 1, on:wendy-prompt-change",
+      "agent": "gsd-eval-auditor",
+      "output_file": ".reports/EVAL-REPORT.md",
+      "last_run": null,
+      "test_cases_file": "eval/wendy-test-cases.json",
+      "kpi_targets": {
+        "accuracy": 0.80,
+        "relevance": 0.85,
+        "safety": 1.00,
+        "privacy": 1.00,
+        "latency_p99_ms": 3000
+      },
+      "fail_action": "block-deploy"
+    },
+
+    "performance": {
+      "class": "internal",
+      "description": "Weekly performance regression check: slow queries, bundle size delta, API latency, cron execution time.",
+      "schedule": "0 9 * * 1, on:staging-deploy",
+      "agent": "gsd-code-reviewer",
+      "output_file": ".reports/PERF-REPORT.md",
+      "last_run": null,
+      "checks": [
+        "pg-slow-queries",
+        "bundle-size-delta",
+        "api-latency-p99-regression",
+        "cron-execution-time-regression"
+      ]
+    },
+
+    "analytics": {
+      "class": "internal",
+      "description": "Weekly product analytics: adoption, funnel, plan conversion, widget engagement.",
+      "schedule": "0 8 * * 1",
+      "agent": "analytics-agent",
+      "output_file": ".reports/ANALYTICS-REPORT.md",
+      "last_run": null,
+      "metrics": [
+        "pct-users-with-active-routine",
+        "wendy-to-routine-funnel",
+        "free-to-pro-conversion-at-limit",
+        "widget-visibility-rates",
+        "routine-execution-success-by-type"
+      ]
+    },
+
+    "tech-debt": {
+      "class": "internal",
+      "description": "Monthly technical debt audit: outdated deps, TODO age, schema drift, monorepo duplicates.",
+      "schedule": "0 10 1 * *",
+      "agent": "gsd-code-reviewer",
+      "output_file": ".reports/TECH-DEBT-REPORT.md",
+      "last_run": null,
+      "fail_action_threshold": {
+        "critical_items": 3
+      },
+      "checks": [
+        "npm-outdated-major",
+        "todo-fixme-age",
+        "db-schema-without-migration",
+        "duplicate-packages-in-monorepo"
+      ]
+    }
+
+  }
+}

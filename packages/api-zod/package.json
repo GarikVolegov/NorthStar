@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./logo-presets": "./src/logo-presets.ts",
     "./ws-events": "./src/ws-events.ts",
     "./agent-registry": "./src/agent-registry.ts"
   },

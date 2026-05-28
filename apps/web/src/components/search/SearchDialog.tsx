@@ -8,6 +8,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { useWendy } from "@/contexts/WendyProvider";
+import { useAppAudio } from "@/contexts/AppAudioProvider";
 import type { RouterOutput, SearchResult } from "@/hooks/useGlobalSearch";
 import { useWendyChat } from "@/hooks/useWendyChat";
 import { cn } from "@/lib/utils";
@@ -64,6 +65,7 @@ export function SearchDialog({
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const wendy = useWendy();
+  const { playWendyRitual } = useAppAudio();
   const closeWendy = wendy.close;
   const consumePendingAsk = wendy.consumePendingAsk;
   const getPageHints = wendy.getPageHints;
@@ -77,6 +79,10 @@ export function SearchDialog({
   useEffect(() => {
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 50);
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) playWendyRitual();
+  }, [isOpen, playWendyRitual]);
 
   useEffect(() => {
     if (!isOpen || chat.isStreaming) return;

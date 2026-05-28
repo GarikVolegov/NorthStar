@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <radialGradient id="etherealGlow" cx="50%" cy="50%" r="58%">
+      <stop offset="0" stop-color="#fff7c5"/>
+      <stop offset=".42" stop-color="#e6c263" stop-opacity=".75"/>
+      <stop offset="1" stop-color="#17223c" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="120" height="120" rx="24" fill="#17233d"/>
+  <circle cx="60" cy="60" r="51" fill="url(#etherealGlow)"/>
+  <circle cx="60" cy="60" r="42" stroke="#ead68e" stroke-width="2" opacity=".7"/>
+  <line x1="60" y1="17" x2="60" y2="103" stroke="#fff2ae" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+  <line x1="17" y1="60" x2="103" y2="60" stroke="#fff2ae" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+  <path d="M60 29 L67 53 L91 60 L67 67 L60 91 L53 67 L29 60 L53 53 Z" fill="#fff0a5"/>
+</svg>

@@ -199,7 +199,7 @@ describe("startRoutineScheduler", () => {
         updateCapture.patches.push(patch);
         return { where: vi.fn(async () => undefined) };
       }),
-    } as ReturnType<typeof db.update>));
+    } as unknown as ReturnType<typeof db.update>));
 
     executeRoutineMock.mockImplementation(async () => {
       callOrder.push("execute");

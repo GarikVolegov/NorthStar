@@ -3,6 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgentAnalysis } from "@/hooks/useAgentAnalysis";
 import { useDashboardData, type DashboardSession } from "@/hooks/useDashboardData";
+import { useDashboardLayout, type WidgetLayout } from "@/hooks/useDashboardLayout";
 import { usePageModule } from "@/hooks/usePageModule";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { apiFetch } from "@/lib/api-fetch";
@@ -37,13 +38,14 @@ import { useProactiveInsights, type ProactiveInsight } from "@/hooks/useProactiv
 import { useMonthlyRitualCurrent } from "@/hooks/useMonthlyRitual";
 
 import { AgentLoadingSkeleton } from "@/components/dashboard/AgentLoadingSkeleton";
-import { DashboardPersonalisationPanel } from "@/components/dashboard/DashboardPersonalisationPanel";
 import { DashboardCareerComparison } from "@/components/dashboard/DashboardCareerComparison";
 import { DashboardClarityPath } from "@/components/dashboard/DashboardClarityPath";
 import { DashboardDiscoveryFeed, useSavedSectorsCount } from "@/components/dashboard/DashboardDiscoveryFeed";
 import { DashboardWendyPrompts } from "@/components/dashboard/DashboardWendyPrompts";
+import { NextRoutineWidget } from "@/components/dashboard/widgets/NextRoutineWidget";
 import type { JourneyId } from "@/components/dashboard/dashboard-sections";
 import { JourneyToolsSection } from "@/components/dashboard/JourneyToolsSection";
+import { DashboardIndecisoTools } from "@/components/dashboard/DashboardIndecisoTools";
 import { ProfessionCard } from "@/components/dashboard/ProfessionCard";
 import { WorkModePanel } from "@/components/dashboard/WorkModePanel";
 
@@ -171,6 +173,7 @@ export default function Dashboard() {
 
   const { insights, markRead, dismiss } = useProactiveInsights();
   const { data: monthlyRitual } = useMonthlyRitualCurrent();
+  const { layout: dashboardLayout } = useDashboardLayout();
   const ritualRequested = location.includes("ritual=notte-fondazione");
   const objectives = dashData?.objectives ?? [];
   const strategicObjectives = objectives.filter((objective) => objective.category !== "idea_validation");
@@ -257,6 +260,167 @@ export default function Dashboard() {
     ? { sectorId: topTwoRecs[1].sectorId, sectorName: topTwoRecs[1].sectorName, matchScore: topTwoRecs[1].matchScore ?? 0 }
     : null;
 
+  function renderDiscoveryFeed() {
+    if (!user) return null;
+
+    return (
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+            <Sparkles className="w-3.5 h-3.5" />
+          </div>
+          <h2 className="font-bold text-sm text-foreground">Settori consigliati per te</h2>
+          <span className="text-xs text-muted-foreground">- salva quelli che ti interessano</span>
+        </div>
+        <DashboardDiscoveryFeed
+          sectors={recommendations.map((r) => ({
+            sectorId: r.sectorId,
+            sectorName: r.sectorName,
+            matchScore: r.matchScore ?? 0,
+            matchReason: (r as { matchReason?: string }).matchReason,
+          }))}
+          userId={user.id}
+          onSavedCountChange={setSavedSectorsCount}
+        />
+      </section>
+    );
+  }
+
+  function renderPersonality() {
+    const session = effectiveSession;
+
+    return (
+      <DashboardPersonality
+        {...(session?.riasecScores ? { riasecScores: session.riasecScores } : {})}
+        {...(session?.spiritScores ? { spiritScores: session.spiritScores } : {})}
+        {...(session?.primaryTypes ? { primaryTypes: session.primaryTypes } : {})}
+        agentSummary={summary}
+        objectivesProgress={objectivesProgress}
+      />
+    );
+  }
+
+  function renderTools() {
+    const isIndeciso = journeyType === "indeciso";
+    const toolsProps = topSectorId !== undefined
+      ? { journeyType, sectorId: topSectorId }
+      : { journeyType };
+
+    return (
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+            <LayoutGrid className="w-3.5 h-3.5" />
+          </div>
+          <h2 className="font-bold text-base text-foreground">Strumenti del percorso</h2>
+          {journeyMeta && <span className="text-xs text-muted-foreground">- {journeyMeta.label}</span>}
+        </div>
+        {isIndeciso ? (
+          <DashboardIndecisoTools toolsProps={toolsProps} />
+        ) : (
+          <JourneyToolsSection {...toolsProps} />
+        )}
+      </section>
+    );
+  }
+
+  function renderAnalysis() {
+    const selectedWorkMode = workMode;
+
+    return (
+      <>
+        {(agentLoading || detailLoading) && <AgentLoadingSkeleton />}
+        {agentError && !agentLoading && (
+          <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 flex items-center gap-3">
+            <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
+            <p className="text-sm text-muted-foreground">Analisi non disponibile. Riprova tra qualche minuto.</p>
+          </div>
+        )}
+        {agentData && !agentLoading && (professions.length > 0 || selectedWorkMode) && (
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+                  <Bot className="w-3.5 h-3.5" />
+                </div>
+                <h2 className="font-bold text-base text-foreground">Analisi personalizzata</h2>
+              </div>
+              {sessionId && (
+                <Link href={`/risultati/${sessionId}`} className="text-xs text-primary font-semibold hover:underline flex items-center gap-1">
+                  Analisi completa <ArrowRight className="w-3 h-3" />
+                </Link>
+              )}
+            </div>
+            <div className="space-y-5">
+              {professions.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {professions.slice(0, 3).map((p, i) => (
+                    <ProfessionCard key={`${p.title}-${i}`} p={p} index={i} />
+                  ))}
+                </div>
+              )}
+              {selectedWorkMode && <WorkModePanel wm={selectedWorkMode} isPremium={isPremium} />}
+            </div>
+          </section>
+        )}
+      </>
+    );
+  }
+
+  function renderDashboardSection(section: WidgetLayout) {
+    switch (section.id) {
+      case "clarity_path":
+        return <DashboardClarityPath hasSession={!!sessionId} savedSectorsCount={savedSectorsCount} hasDecided={false} />;
+      case "next_routine":
+        return <NextRoutineWidget size={section.size} />;
+      case "discovery_feed":
+        return renderDiscoveryFeed();
+      case "personality":
+        return renderPersonality();
+      case "career_comparison":
+        return <DashboardCareerComparison sectorA={compSectorA} sectorB={compSectorB} />;
+      case "wendy_prompts":
+        return <DashboardWendyPrompts />;
+      case "kpi_strip":
+        return (
+          <DashboardKpiStrip
+            profilePercent={profilePercent}
+            objectives={objectives}
+            objectivesProgress={objectivesProgress}
+            confirmedSectorName={confirmedSectorName}
+            sessionId={sessionId}
+          />
+        );
+      case "week_timeline":
+        return <DashboardWeekTimeline events={upcomingEvents} />;
+      case "diary_objectives":
+        return <DashboardDiaryBookCard objectives={strategicObjectives} />;
+      case "wendy_insights":
+        if (insights.length === 0) return null;
+        return (
+          <section className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
+              Insight da Wendy
+            </p>
+            {insights.slice(0, 2).map((insight: ProactiveInsight) => (
+              <ProactiveInsightCard
+                key={insight.id}
+                insight={insight}
+                onRead={markRead}
+                onDismiss={dismiss}
+              />
+            ))}
+          </section>
+        );
+      case "tools":
+        return renderTools();
+      case "analysis":
+        return renderAnalysis();
+      default:
+        return null;
+    }
+  }
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 md:py-12 space-y-5">
 
@@ -274,164 +438,14 @@ export default function Dashboard() {
 
       <MonthlyRitualBanner ritual={monthlyRitual} forceExpanded={ritualRequested} />
 
-      {/* ZONA 1b — Customizable widget grid */}
-      <DashboardPersonalisationPanel />
+      {dashboardLayout
+        .filter((section) => section.visible)
+        .sort((a, b) => a.position - b.position)
+        .map((section) => {
+          const content = renderDashboardSection(section);
+          return content ? <div key={section.id}>{content}</div> : null;
+        })}
 
-      {/* ZONA 2 — Layout condizionale per percorso */}
-      {journeyType === "indeciso" ? (
-        /* ── INDECISO LAYOUT ──────────────────────────────────────── */
-        <div className="space-y-5">
-          {/* Mappa della chiarezza */}
-          <DashboardClarityPath
-            hasSession={!!sessionId}
-            savedSectorsCount={savedSectorsCount}
-            hasDecided={false}
-          />
-
-          {/* Grid: Discovery Feed + Personalità */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            {/* Discovery feed — 2/3 */}
-            <div className="lg:col-span-2 space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
-                  <Sparkles className="w-3.5 h-3.5" />
-                </div>
-                <h2 className="font-bold text-sm text-foreground">Settori consigliati per te</h2>
-                <span className="text-xs text-muted-foreground">— salva quelli che ti interessano</span>
-              </div>
-              <DashboardDiscoveryFeed
-                sectors={recommendations.map((r) => ({
-                  sectorId: r.sectorId,
-                  sectorName: r.sectorName,
-                  matchScore: r.matchScore ?? 0,
-                  matchReason: (r as { matchReason?: string }).matchReason,
-                }))}
-                userId={user.id}
-                onSavedCountChange={setSavedSectorsCount}
-              />
-            </div>
-
-            {/* Personalità — 1/3 */}
-            <div className="space-y-4">
-              <DashboardPersonality
-                {...(effectiveSession?.riasecScores ? { riasecScores: effectiveSession.riasecScores } : {})}
-                {...(effectiveSession?.spiritScores ? { spiritScores: effectiveSession.spiritScores } : {})}
-                {...(effectiveSession?.primaryTypes ? { primaryTypes: effectiveSession.primaryTypes } : {})}
-                agentSummary={summary}
-                objectivesProgress={objectivesProgress}
-              />
-            </div>
-          </div>
-
-          {/* Confronto carriere */}
-          <DashboardCareerComparison sectorA={compSectorA} sectorB={compSectorB} />
-
-          {/* Wendy prompts */}
-          <DashboardWendyPrompts />
-        </div>
-      ) : (
-        /* ── LAYOUT STANDARD (altri percorsi) ─────────────────────── */
-        <>
-          {/* KPI Strip */}
-          <DashboardKpiStrip
-            profilePercent={profilePercent}
-            objectives={objectives}
-            objectivesProgress={objectivesProgress}
-            confirmedSectorName={confirmedSectorName}
-            sessionId={sessionId}
-          />
-
-          {/* Grid: sinistra 2/3, destra 1/3 */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            <div className="lg:col-span-2 space-y-5">
-              <DashboardWeekTimeline events={upcomingEvents} />
-              <DashboardDiaryBookCard objectives={strategicObjectives} />
-            </div>
-            <div className="space-y-4">
-              <DashboardPersonality
-                {...(effectiveSession?.riasecScores ? { riasecScores: effectiveSession.riasecScores } : {})}
-                {...(effectiveSession?.spiritScores ? { spiritScores: effectiveSession.spiritScores } : {})}
-                {...(effectiveSession?.primaryTypes ? { primaryTypes: effectiveSession.primaryTypes } : {})}
-                agentSummary={summary}
-                objectivesProgress={objectivesProgress}
-              />
-              {insights.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
-                    Insight da Wendy
-                  </p>
-                  {insights.slice(0, 2).map((insight: ProactiveInsight) => (
-                    <ProactiveInsightCard
-                      key={insight.id}
-                      insight={insight}
-                      onRead={markRead}
-                      onDismiss={dismiss}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ZONA 4 — Strumenti del percorso */}
-      <section>
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
-            <LayoutGrid className="w-3.5 h-3.5" />
-          </div>
-          <h2 className="font-bold text-base text-foreground">
-            Strumenti del percorso
-          </h2>
-          {journeyMeta && (
-            <span className="text-xs text-muted-foreground">— {journeyMeta.label}</span>
-          )}
-        </div>
-        <JourneyToolsSection
-          journeyType={journeyType}
-          {...(topSectorId !== undefined ? { sectorId: topSectorId } : {})}
-        />
-      </section>
-
-      {/* ZONA 5 — Analisi AI (max 3 professioni + modalità lavoro) */}
-      {(agentLoading || detailLoading) && <AgentLoadingSkeleton />}
-
-      {agentError && !agentLoading && (
-        <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 flex items-center gap-3">
-          <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
-          <p className="text-sm text-muted-foreground">Analisi non disponibile. Riprova tra qualche minuto.</p>
-        </div>
-      )}
-
-      {agentData && !agentLoading && (professions.length > 0 || workMode) && (
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
-                <Bot className="w-3.5 h-3.5" />
-              </div>
-              <h2 className="font-bold text-base text-foreground">Analisi personalizzata</h2>
-            </div>
-            {sessionId && (
-              <Link href={`/risultati/${sessionId}`} className="text-xs text-primary font-semibold hover:underline flex items-center gap-1">
-                Analisi completa <ArrowRight className="w-3 h-3" />
-              </Link>
-            )}
-          </div>
-
-          <div className="space-y-5">
-            {professions.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {professions.slice(0, 3).map((p, i) => (
-                  <ProfessionCard key={`${p.title}-${i}`} p={p} index={i} />
-                ))}
-              </div>
-            )}
-            {workMode && <WorkModePanel wm={workMode} isPremium={isPremium} />}
-          </div>
-        </section>
-      )}
     </div>
   );
 }

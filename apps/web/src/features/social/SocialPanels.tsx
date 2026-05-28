@@ -7,7 +7,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { readJsonResponse } from "@/lib/readJsonResponse";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Globe, Lock, MessageCircle, Plus, Search, Send, Trash2, UserCheck, UserPlus } from "lucide-react";
+import { Globe, Image, Lock, MessageCircle, Plus, Search, Send, Trash2, UserCheck, UserPlus, Video } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 
@@ -102,6 +102,38 @@ export function PostCard({
           </div>
           {post.author.city ? <p className="text-xs text-muted-foreground">{post.author.city}</p> : null}
           <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-foreground">{post.content}</p>
+          {post.mediaUrl && post.mediaType ? (
+            <div className="mt-3 overflow-hidden rounded-xl border bg-muted/20">
+              {post.mediaType === "image" ? (
+                <img
+                  src={post.mediaUrl}
+                  alt="Media del post"
+                  className="aspect-video w-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <video
+                  src={post.mediaUrl}
+                  aria-label="Video del post"
+                  className="aspect-video w-full bg-black object-contain"
+                  controls
+                  preload="metadata"
+                />
+              )}
+            </div>
+          ) : null}
+          {post.mediaDescription ? (
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">{post.mediaDescription}</p>
+          ) : null}
+          {post.hashtags?.length ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {post.hashtags.map((hashtag) => (
+                <span key={hashtag} className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                  #{hashtag.replace(/^#/, "")}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
         {post.userId === currentUserId ? (
           <button
@@ -453,6 +485,14 @@ export function ComposePostCard({
   setPostText,
   visibility,
   setVisibility,
+  mediaDataUrl,
+  setMediaDataUrl,
+  mediaType,
+  setMediaType,
+  mediaDescription,
+  setMediaDescription,
+  hashtagsText,
+  setHashtagsText,
   isPending,
   error,
   onCreate,
@@ -462,10 +502,39 @@ export function ComposePostCard({
   setPostText: (value: string) => void;
   visibility: Visibility;
   setVisibility: (value: Visibility) => void;
+  mediaDataUrl?: string;
+  setMediaDataUrl?: (value: string) => void;
+  mediaType?: "image" | "video" | null;
+  setMediaType?: (value: "image" | "video" | null) => void;
+  mediaDescription?: string;
+  setMediaDescription?: (value: string) => void;
+  hashtagsText?: string;
+  setHashtagsText?: (value: string) => void;
   isPending: boolean;
   error: Error | null;
   onCreate: () => void;
 }) {
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const previewUrl = mediaDataUrl?.trim() || null;
+  const previewType = mediaType ?? (previewUrl?.startsWith("data:video/") ? "video" : previewUrl ? "image" : null);
+
+  function handleFile(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+      setUploadError("Seleziona un'immagine o un video");
+      return;
+    }
+    setUploadError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") return;
+      setMediaDataUrl?.(reader.result);
+      setMediaType?.(file.type.startsWith("video/") ? "video" : "image");
+    };
+    reader.onerror = () => setUploadError("Impossibile leggere il file selezionato");
+    reader.readAsDataURL(file);
+  }
+
   return (
     <div className="rounded-2xl border bg-background p-4">
       <div className="flex gap-3">
@@ -477,11 +546,47 @@ export function ComposePostCard({
             placeholder="Condividi un aggiornamento lavorativo, un progetto, una candidatura o un progresso..."
             className="min-h-24 resize-none rounded-xl"
           />
+          {previewUrl && previewType ? (
+            <div className="overflow-hidden rounded-xl border bg-muted/20">
+              {previewType === "image" ? (
+                <img src={previewUrl} alt="Anteprima media" className="aspect-video w-full object-cover" />
+              ) : (
+                <video src={previewUrl} aria-label="Anteprima video" className="aspect-video w-full bg-black object-contain" controls />
+              )}
+            </div>
+          ) : null}
+          <div className="space-y-2 rounded-xl border bg-muted/20 p-3">
+            <label className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border bg-background px-3 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+              {mediaType === "video" ? <Video className="h-4 w-4" /> : <Image className="h-4 w-4" />}
+              Carica media dalla galleria
+              <input
+                type="file"
+                accept="image/*,video/*"
+                aria-label="Carica media dalla galleria"
+                className="sr-only"
+                onChange={(event) => handleFile(event.target.files?.[0])}
+              />
+            </label>
+            <Textarea
+              value={mediaDescription ?? ""}
+              onChange={(event) => setMediaDescription?.(event.target.value)}
+              placeholder="Descrizione del media"
+              className="min-h-16 resize-none rounded-xl bg-background"
+              maxLength={280}
+            />
+            <Input
+              value={hashtagsText ?? ""}
+              onChange={(event) => setHashtagsText?.(event.target.value)}
+              placeholder="Hashtag, separati da virgola"
+              className="min-h-11 rounded-xl bg-background"
+            />
+            {uploadError ? <p className="text-sm text-destructive">{uploadError}</p> : null}
+          </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <VisibilityPicker value={visibility} onChange={setVisibility} />
             <Button
               className="min-h-11 rounded-xl gap-2"
-              disabled={postText.trim().length < 2 || isPending}
+              disabled={(!postText.trim() && !previewUrl) || isPending}
               onClick={onCreate}
             >
               <Send className="h-4 w-4" />

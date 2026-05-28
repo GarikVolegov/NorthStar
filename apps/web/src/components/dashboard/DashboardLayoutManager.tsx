@@ -18,39 +18,10 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Eye, EyeOff, GripVertical, RotateCcw } from "lucide-react";
-import { InsightsWidget } from "./widgets/InsightsWidget";
-import { JobFeedWidget } from "./widgets/JobFeedWidget";
-import { MindsetStreakWidget } from "./widgets/MindsetStreakWidget";
-import { NextRoutineWidget } from "./widgets/NextRoutineWidget";
-import { ProgressObjectivesWidget } from "./widgets/ProgressObjectivesWidget";
+import {
+  type DashboardSectionDefinition,
+} from "./dashboard-layout-sections";
 import { cn } from "@/lib/utils";
-
-const WIDGET_LABELS: Record<string, string> = {
-  progress_objectives: "Obiettivi in corso",
-  next_routine:        "Prossima routine",
-  job_feed:            "Monitor offerte lavoro",
-  insights:            "Insight da Wendy",
-  mindset_streak:      "Streak mindset",
-};
-
-const DEFAULT_LAYOUT: WidgetLayout[] = [
-  { id: "progress_objectives", position: 0, visible: true,  size: "lg" },
-  { id: "next_routine",        position: 1, visible: true,  size: "md" },
-  { id: "job_feed",            position: 2, visible: true,  size: "md" },
-  { id: "insights",            position: 3, visible: true,  size: "md" },
-  { id: "mindset_streak",      position: 4, visible: false, size: "sm" },
-];
-
-function renderWidget(id: string, size: "sm" | "md" | "lg") {
-  switch (id) {
-    case "progress_objectives": return <ProgressObjectivesWidget size={size} />;
-    case "next_routine":        return <NextRoutineWidget size={size} />;
-    case "job_feed":            return <JobFeedWidget size={size} />;
-    case "insights":            return <InsightsWidget size={size} />;
-    case "mindset_streak":      return <MindsetStreakWidget size={size} />;
-    default:                    return null;
-  }
-}
 
 interface SortableItemProps {
   id: string;
@@ -98,10 +69,17 @@ function SortableItem({ id, children, visible, onToggleVisible }: SortableItemPr
 
 interface DashboardLayoutManagerProps {
   layout: WidgetLayout[];
+  availableSections: DashboardSectionDefinition[];
+  defaultLayout: WidgetLayout[];
   onLayoutChange: (newLayout: WidgetLayout[]) => void;
 }
 
-export function DashboardLayoutManager({ layout, onLayoutChange }: DashboardLayoutManagerProps) {
+export function DashboardLayoutManager({
+  layout,
+  availableSections,
+  defaultLayout,
+  onLayoutChange,
+}: DashboardLayoutManagerProps) {
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -133,8 +111,10 @@ export function DashboardLayoutManager({ layout, onLayoutChange }: DashboardLayo
   }
 
   function handleReset() {
-    onLayoutChange(DEFAULT_LAYOUT);
+    onLayoutChange(defaultLayout);
   }
+
+  const sectionsById = new Map(availableSections.map((section) => [section.id, section]));
 
   return (
     <div className="space-y-3">
@@ -151,12 +131,24 @@ export function DashboardLayoutManager({ layout, onLayoutChange }: DashboardLayo
               visible={widget.visible}
               onToggleVisible={() => handleToggleVisible(widget.id)}
             >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs text-muted-foreground font-medium">
-                  {WIDGET_LABELS[widget.id] ?? widget.id}
-                </span>
+              <div className="rounded-xl border bg-muted/20 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">
+                      {sectionsById.get(widget.id)?.label ?? widget.id}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                      {sectionsById.get(widget.id)?.description ?? "Sezione dashboard"}
+                    </p>
+                  </div>
+                  <span className={cn(
+                    "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                    widget.visible ? "border-primary/25 bg-primary/10 text-primary" : "border-border text-muted-foreground",
+                  )}>
+                    {widget.visible ? "Visibile" : "Nascosta"}
+                  </span>
+                </div>
               </div>
-              {widget.visible && renderWidget(widget.id, widget.size)}
             </SortableItem>
           ))}
         </SortableContext>

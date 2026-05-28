@@ -13,6 +13,7 @@ import { useWendy } from "@/contexts/WendyProvider";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAffiliateInvitePreview } from "@/hooks/useAffiliateInvitePreview";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
+import { useLogoPreset } from "@/hooks/useLogoPreset";
 import { useProactiveInsights } from "@/hooks/useProactiveInsights";
 import {
   BASE,
@@ -42,6 +43,7 @@ export function Navbar() {
   const [, setLocation] = useLocation();
   const prefersReduced = useReducedMotion();
   const search = useGlobalSearch();
+  const { activePreset: activeLogoPreset } = useLogoPreset();
   const wendy = useWendy();
   const { theme, setTheme } = useTheme();
   const isMobile = useIsMobile();
@@ -191,6 +193,7 @@ export function Navbar() {
         insightsUnread,
         affiliatePreview,
         affiliateLinkCopied,
+        brandLogoUrl: activeLogoPreset.assetUrl,
         applicationsLabel: t("nav.applications"),
         logoutLabel: t("nav.logout"),
         onNavigate: goToProfilePath,
@@ -307,7 +310,7 @@ export function Navbar() {
                 />
               ) : (
                 <img
-                  src="/logo.svg"
+                  src={activeLogoPreset.assetUrl}
                   alt=""
                   className="h-5 w-5 rounded-full object-cover opacity-40"
                 />

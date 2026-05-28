@@ -53,6 +53,7 @@ import { isHostTool, executeHostTool } from "../lib/wendy-host-tools";
 import { storeSemanticTurnInBackground } from "../lib/semantic-memory";
 import { withRouteTimeout } from "../lib/wendy-fast-path";
 import { resolveWendyLocale } from "../lib/wendy-locale";
+import { loadWendyProfileContext } from "../services/profiling/wendy-profile-context";
 import { checkRabbitEmergency } from "@workspace/ai-server";
 const router = Router();
 
@@ -94,6 +95,8 @@ router.post(
       locale: rawLocale,
       hasFileAttached,
       isPredefined,
+      localHour,
+      localDayOfWeek,
     } = parsed.data;
     const locale = resolveWendyLocale(rawLocale, message);
 
@@ -496,6 +499,15 @@ router.post(
         const userMemory = await loadMemory(userId);
         const memorySection =
           buildMemorySection(userMemory) + personalContext.contexts.semanticMemory + personalContext.contexts.openHuman;
+        const profileContext = await loadWendyProfileContext(userId).catch((err) => {
+          rootLogger.warn({ err, userId }, "[ai/wendy] psychological profile context unavailable");
+          return {
+            psychologicalProfile: null,
+            wendyTonePreference: undefined,
+            localHour: undefined,
+            localDayOfWeek: undefined,
+          };
+        });
 
         // Flatten compressed history per il growth agent
         const flatHistory = [
@@ -524,12 +536,16 @@ router.post(
               codeGraphSection: personalContext.contexts.graphify,
               locale,
               journeyType: pageContext?.journeyType,
+              psychologicalProfile: profileContext.psychologicalProfile,
             },
             history: flatHistory,
             userMessage: message,
             requestId,
             wendyIntent: intent, // abilita i Wendy domain tools nel full path
             isPredefined,
+            localHour: localHour ?? profileContext.localHour,
+            localDayOfWeek: localDayOfWeek ?? profileContext.localDayOfWeek,
+            wendyTonePreference: profileContext.wendyTonePreference,
           })) {
             if (aborted) break;
             if (event.type === "done") {

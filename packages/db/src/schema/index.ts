@@ -42,6 +42,7 @@ export * from "./auditLog";             // ← Fase 1: log immutabile
 // ── Other ─────────────────────────────────────────────────────────────
 export * from "./businessIdeas";
 export * from "./calendar";
+export * from "./appNotifications";
 export * from "./certifications";
 export * from "./coachMemory";
 export * from "./coachSessions";
@@ -62,6 +63,8 @@ export * from "./routingLogs";
 export * from "./qualityMetrics";
 export * from "./chatMessages";
 export * from "./social";
+export * from "./communities";
+export * from "./diary";
 // ── AI Cost tracking & request logging ──────────────────────────────
 export * from "./llmUsage";
 export * from "./aiRequestLog";
@@ -79,6 +82,8 @@ export * from "./appSearchIndex";
 export * from "./newsSubscriptions";
 // ── Agenti AI dipendenti ──────────────────────────────────────────────────
 export * from "./agentEmployees";
+export * from "./pipelineRuns";
+export * from "./monthlyRitual";
 // ── Step 7: SaaS maturo — subscription, workspace, collab, briefing ─────
 export * from "./subscription";
 export * from "./workspace";
@@ -97,3 +102,17 @@ export * from "./weakSignal";
 export * from "./jobPostingSnapshot";
 export * from "./skillCooccurrence";
 export * from "./proactiveInsight";
+// ── 360° User Profiling System ──────────────────────────────────
+export * from "./userPsychologicalProfile";  // Big Five, cronotype, stile decisionale
+export * from "./userMotivationalProfile";   // SDT, McClelland, Schwartz values
+export * from "./userBehavioralSignals";     // Segnali passivi aggregati settimanali
+export * from "./userProfilingConsents";     // Consenso GDPR granulare per dimensione
+// ── AaaS: Ritual Engine + Dashboard (Fase 1) ────────────────────
+export * from "./userRoutines";              // Routine autonome per utente (job monitor, market report, …)
+export * from "./routineExecutions";         // Storico risultati esecuzioni (feed in-app)
+export * from "./userDashboardLayout";       // Layout widget dashboard personalizzabile
+export * from "./userNavigationPreferences"; // Preferenze barra alta personalizzabile
+// ── Discovery Engine (Ondata 1 — percorso "indeciso") ────────────
+export * from "./userDiscoverySignals";      // Segnali real-time di scoperta per utente
+export * from "./commitmentReadiness";       // Score 0-100 di prontezza alla scelta
+export * from "./moodCheckins";              // Check-in emozionale "Mood-to-Action"

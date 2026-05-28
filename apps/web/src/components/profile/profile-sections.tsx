@@ -1,6 +1,7 @@
 import { CertificationsSection } from "@/components/CertificationsSection";
 import { CvSection } from "@/components/CvSection";
 import { JourneyScoreWidget } from "@/components/JourneyScoreWidget";
+import { DiaryPreviewWidget } from "@/components/diary/DiaryPreviewWidget";
 import { NftCertificateGallery } from "@/components/NftCertificateGallery";
 import { SavedItems } from "@/components/profile/sections/SavedItems";
 import { TestHistoryCard } from "@/components/TestHistoryCard";
@@ -13,14 +14,21 @@ interface SectionDef {
   render: (props: { userId: number }) => ReactNode;
 }
 
+const DIARY_SECTION: SectionDef = {
+  key: "diary-preview",
+  render: ({ userId }) => <DiaryPreviewWidget userId={userId} />,
+};
+
 const SECTION_MAP: Record<JourneyType, SectionDef[]> = {
   indeciso: [
+    DIARY_SECTION,
     { key: "test-history",  render: () => <TestHistoryCard /> },
     { key: "journey-score", render: ({ userId }) => <JourneyScoreWidget userId={userId} /> },
     { key: "saved",         render: () => <SavedItems /> },
     { key: "nft",           render: ({ userId }) => <NftCertificateGallery userId={userId} /> },
   ],
   dipendente: [
+    DIARY_SECTION,
     { key: "journey-score", render: ({ userId }) => <JourneyScoreWidget userId={userId} /> },
     { key: "cv",            render: ({ userId }) => <CvSection userId={userId} /> },
     { key: "certifications",render: ({ userId }) => <CertificationsSection userId={userId} /> },
@@ -29,6 +37,7 @@ const SECTION_MAP: Record<JourneyType, SectionDef[]> = {
     { key: "nft",           render: ({ userId }) => <NftCertificateGallery userId={userId} /> },
   ],
   autonomo: [
+    DIARY_SECTION,
     { key: "journey-score", render: ({ userId }) => <JourneyScoreWidget userId={userId} /> },
     { key: "cv",            render: ({ userId }) => <CvSection userId={userId} /> },
     { key: "certifications",render: ({ userId }) => <CertificationsSection userId={userId} /> },
@@ -36,12 +45,14 @@ const SECTION_MAP: Record<JourneyType, SectionDef[]> = {
     { key: "nft",           render: ({ userId }) => <NftCertificateGallery userId={userId} /> },
   ],
   azienda: [
+    DIARY_SECTION,
     { key: "journey-score", render: ({ userId }) => <JourneyScoreWidget userId={userId} /> },
     { key: "certifications",render: ({ userId }) => <CertificationsSection userId={userId} /> },
     { key: "saved",         render: () => <SavedItems /> },
     { key: "nft",           render: ({ userId }) => <NftCertificateGallery userId={userId} /> },
   ],
   investitore: [
+    DIARY_SECTION,
     { key: "journey-score", render: ({ userId }) => <JourneyScoreWidget userId={userId} /> },
     { key: "saved",         render: () => <SavedItems /> },
     { key: "nft",           render: ({ userId }) => <NftCertificateGallery userId={userId} /> },

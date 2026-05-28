@@ -14,6 +14,7 @@ import { asPlainRecord, isOneOf } from "../lib/type-guards";
 
 const router = Router();
 const VISIBILITIES = ["public", "friends"] as const;
+const MEDIA_TYPES = ["image", "video"] as const;
 
 router.use(requireAuth);
 
@@ -28,6 +29,36 @@ function readTrimmedString(value: unknown, fallback = "") {
 function readOptionalTrimmedString(value: unknown) {
   const trimmed = readTrimmedString(value);
   return trimmed || null;
+}
+
+function normalizeMediaType(value: unknown) {
+  return isOneOf(value, MEDIA_TYPES) ? value : null;
+}
+
+function normalizeHashtags(value: unknown): string[] {
+  const raw = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? value.split(",")
+      : [];
+
+  return Array.from(
+    new Set(
+      raw
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim().replace(/^#/, "").toLowerCase())
+        .filter((item) => /^[a-z0-9_à-ÿ-]{2,32}$/i.test(item)),
+    ),
+  ).slice(0, 10);
+}
+
+function normalizeUploadedMedia(value: unknown, mediaType: "image" | "video" | null) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const mediaDataUrl = value.trim();
+  if (!mediaType) return null;
+  if (!mediaDataUrl.startsWith(`data:${mediaType}/`)) return null;
+  if (!mediaDataUrl.includes(";base64,")) return null;
+  return mediaDataUrl;
 }
 
 async function getFriendIds(userId: number): Promise<Set<number>> {
@@ -69,6 +100,10 @@ function formatPost(row: {
   userId: number;
   content: string;
   visibility: string;
+  mediaUrl: string | null;
+  mediaType: "image" | "video" | null;
+  mediaDescription: string | null;
+  hashtags: string[];
   createdAt: Date;
   updatedAt: Date;
   authorName: string;
@@ -83,6 +118,10 @@ function formatPost(row: {
     userId: row.userId,
     content: row.content,
     visibility: row.visibility,
+    mediaUrl: row.mediaUrl,
+    mediaType: row.mediaType,
+    mediaDescription: row.mediaDescription,
+    hashtags: row.hashtags,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     author: {
@@ -131,6 +170,10 @@ async function loadPostRows(limit: number, userId?: number) {
       userId: socialPostsTable.userId,
       content: socialPostsTable.content,
       visibility: socialPostsTable.visibility,
+      mediaUrl: socialPostsTable.mediaUrl,
+      mediaType: socialPostsTable.mediaType,
+      mediaDescription: socialPostsTable.mediaDescription,
+      hashtags: socialPostsTable.hashtags,
       createdAt: socialPostsTable.createdAt,
       updatedAt: socialPostsTable.updatedAt,
       authorName: usersTable.name,
@@ -192,10 +235,23 @@ router.get("/users/:id/posts", async (req, res) => {
 router.post("/posts", async (req, res) => {
   const body = asPlainRecord(getRequestBody(req));
   const content = readTrimmedString(body.content);
-  if (content.length < 2 || content.length > 2000) {
+  const mediaType = normalizeMediaType(body.mediaType);
+  const mediaUrl = normalizeUploadedMedia(body.mediaDataUrl, mediaType);
+  const mediaDescription = readOptionalTrimmedString(body.mediaDescription);
+  const hashtags = normalizeHashtags(body.hashtags);
+
+  if (body.mediaUrl) {
+    res.status(400).json({ error: "Carica immagini e video dalla galleria, non tramite URL" });
+    return;
+  }
+  if ((!content && !mediaUrl) || content.length > 2000) {
     res
       .status(400)
-      .json({ error: "Il post deve contenere tra 2 e 2000 caratteri" });
+      .json({ error: "Aggiungi testo o un media al post" });
+    return;
+  }
+  if ((body.mediaDataUrl && !mediaUrl) || (mediaUrl && !mediaType)) {
+    res.status(400).json({ error: "Media caricato non valido" });
     return;
   }
 
@@ -203,8 +259,12 @@ router.post("/posts", async (req, res) => {
     .insert(socialPostsTable)
     .values({
       userId: req.user!.id,
-      content,
+      content: content || mediaDescription || "Media",
       visibility: normalizeVisibility(body.visibility),
+      mediaUrl,
+      mediaType,
+      mediaDescription,
+      hashtags,
     })
     .returning();
 
@@ -225,10 +285,23 @@ router.patch("/posts/:id", async (req, res) => {
 
   const body = asPlainRecord(getRequestBody(req));
   const content = readTrimmedString(body.content, existing.content);
-  if (content.length < 2 || content.length > 2000) {
+  const mediaType = body.mediaType === undefined ? existing.mediaType : normalizeMediaType(body.mediaType);
+  const mediaUrl = body.mediaDataUrl === undefined ? existing.mediaUrl : normalizeUploadedMedia(body.mediaDataUrl, mediaType);
+  const mediaDescription = body.mediaDescription === undefined ? existing.mediaDescription : readOptionalTrimmedString(body.mediaDescription);
+  const hashtags = body.hashtags === undefined ? existing.hashtags : normalizeHashtags(body.hashtags);
+
+  if (body.mediaUrl) {
+    res.status(400).json({ error: "Carica immagini e video dalla galleria, non tramite URL" });
+    return;
+  }
+  if ((!content && !mediaUrl) || content.length > 2000) {
     res
       .status(400)
-      .json({ error: "Il post deve contenere tra 2 e 2000 caratteri" });
+      .json({ error: "Aggiungi testo o un media al post" });
+    return;
+  }
+  if ((body.mediaDataUrl && !mediaUrl) || (mediaUrl && !mediaType)) {
+    res.status(400).json({ error: "Media caricato non valido" });
     return;
   }
 
@@ -237,6 +310,10 @@ router.patch("/posts/:id", async (req, res) => {
     .set({
       content,
       visibility: normalizeVisibility(body.visibility ?? existing.visibility),
+      mediaUrl,
+      mediaType,
+      mediaDescription,
+      hashtags,
       updatedAt: new Date(),
     })
     .where(eq(socialPostsTable.id, id))

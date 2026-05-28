@@ -14,6 +14,10 @@ export const socialPostsTable = pgTable(
     visibility: text("visibility", { enum: ["public", "friends"] })
       .notNull()
       .default("public"),
+    mediaUrl: text("media_url"),
+    mediaType: text("media_type", { enum: ["image", "video"] }),
+    mediaDescription: text("media_description"),
+    hashtags: text("hashtags").array().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),

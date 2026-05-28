@@ -5,6 +5,11 @@
  * PUT /api/dashboard/layout persists changes, debounced at 800ms.
  */
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  getDashboardSectionCatalog,
+  getDefaultDashboardSectionLayout,
+  resolveDashboardSectionLayout,
+} from "@/components/dashboard/dashboard-layout-sections";
 import { getJson, putJson } from "@/lib/apiClient";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
@@ -23,19 +28,11 @@ interface LayoutResponse {
 const LAYOUT_ENDPOINT = "/api/dashboard/layout";
 const QUERY_KEY = ["dashboard-layout"] as const;
 
-const DEFAULT_LAYOUT: WidgetLayout[] = [
-  { id: "progress_objectives", position: 0, visible: true,  size: "lg" },
-  { id: "next_routine",        position: 1, visible: true,  size: "md" },
-  { id: "job_feed",            position: 2, visible: true,  size: "md" },
-  { id: "insights",            position: 3, visible: true,  size: "md" },
-  { id: "mindset_streak",      position: 4, visible: false, size: "sm" },
-];
-
 async function fetchLayout(): Promise<LayoutResponse> {
   try {
     return await getJson<LayoutResponse>(LAYOUT_ENDPOINT);
   } catch {
-    return { layout: DEFAULT_LAYOUT };
+    return { layout: [] };
   }
 }
 
@@ -47,6 +44,7 @@ export function useDashboardLayout() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const hasUser = user !== null && user !== undefined;
+  const journeyType = user?.journeyType;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data, isLoading } = useQuery<LayoutResponse>({
@@ -78,7 +76,9 @@ export function useDashboardLayout() {
   );
 
   return {
-    layout: data?.layout ?? DEFAULT_LAYOUT,
+    layout: resolveDashboardSectionLayout(data?.layout, journeyType),
+    availableSections: getDashboardSectionCatalog(journeyType),
+    defaultLayout: getDefaultDashboardSectionLayout(journeyType),
     isLoading,
     isSaving: mutation.isPending,
     updateLayout,

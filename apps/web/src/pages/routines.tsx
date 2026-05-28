@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { RoutineFeed } from "@/components/routines/RoutineFeed";
 import { RoutinesList } from "@/components/routines/RoutinesList";
+import { ROUTINE_WENDY_PROMPT } from "@/components/dashboard/widgets/NextRoutineWidget";
+import { useOptionalWendy } from "@/contexts/WendyProvider";
 import {
   useDeleteRoutine,
   useMarkFeedRead,
@@ -10,7 +12,6 @@ import {
 } from "@/hooks/useRoutines";
 import { usePageMeta } from "@/lib/seo";
 import { Bot } from "lucide-react";
-import { Link } from "wouter";
 
 const DEFAULT_META = {
   total:       0,
@@ -26,6 +27,7 @@ export default function RoutinesPage() {
   const updateRoutine = useUpdateRoutine();
   const deleteRoutine = useDeleteRoutine();
   const markRead      = useMarkFeedRead();
+  const wendy = useOptionalWendy();
 
   usePageMeta({
     title:       "Routine | NorthStar",
@@ -53,9 +55,9 @@ export default function RoutinesPage() {
             Di' a Wendy cosa vuoi automatizzare e lei creerà la routine per te.
           </p>
         </div>
-        <Link href="/chat" className="ml-auto shrink-0">
-          <Button size="sm">Parla con Wendy</Button>
-        </Link>
+        <Button size="sm" className="ml-auto shrink-0" onClick={() => wendy?.ask(ROUTINE_WENDY_PROMPT)}>
+          Parla con Wendy
+        </Button>
       </div>
 
       {/* Two-column layout on md+: routines left, feed right */}

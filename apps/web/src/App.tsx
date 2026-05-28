@@ -2,6 +2,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { UserBackgroundLayer } from "@/components/user-background/UserBackgroundLayer";
 import { WendyInsightToastRunner } from "@/components/wendy/WendyInsightToastRunner";
 import { AppStateProvider } from "@/contexts/AppStateContext";
+import { AppAudioProvider } from "@/contexts/AppAudioProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AdminAgentProvider } from "@/contexts/AdminAgentContext";
 import { WendyProvider } from "@/contexts/WendyProvider";
@@ -199,18 +200,20 @@ function App() {
         <AuthProvider>
           <AppStateProvider>
             <TooltipProvider>
-              <WendyProvider>
-                <AdminAgentProvider>
-                  <UserBackgroundLayer />
-                  <div className="relative z-10 min-h-screen">
-                    <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                      <Router />
-                    </WouterRouter>
-                  </div>
-                  <WendyInsightToastRunner />
-                  <Toaster />
-                </AdminAgentProvider>
-              </WendyProvider>
+              <AppAudioProvider>
+                <WendyProvider>
+                  <AdminAgentProvider>
+                    <UserBackgroundLayer />
+                    <div className="relative z-10 min-h-screen">
+                      <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                        <Router />
+                      </WouterRouter>
+                    </div>
+                    <WendyInsightToastRunner />
+                    <Toaster />
+                  </AdminAgentProvider>
+                </WendyProvider>
+              </AppAudioProvider>
             </TooltipProvider>
           </AppStateProvider>
         </AuthProvider>

@@ -59,6 +59,7 @@ export const ROUTINE_TYPE_EMOJI: Record<string, string> = {
   mindset_exercise: "🧠",
   growth_briefing:  "🚀",
   interview_prep:   "🎯",
+  discovery_nudge:  "🧭",
 };
 
 export const ROUTINE_TYPE_LABEL: Record<string, string> = {
@@ -67,4 +68,5 @@ export const ROUTINE_TYPE_LABEL: Record<string, string> = {
   mindset_exercise: "Esercizio Mindset",
   growth_briefing:  "Briefing Crescita",
   interview_prep:   "Preparazione Colloquio",
+  discovery_nudge:  "Nudge di Scoperta",
 };

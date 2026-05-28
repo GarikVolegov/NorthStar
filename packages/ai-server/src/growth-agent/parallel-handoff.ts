@@ -53,6 +53,9 @@ export interface ParallelHandoffOptions {
   requestId?:            string | undefined;
   behavioralPatterns?:   Array<{ patternType: string; description: string; confidence: number }> | undefined;
   routingHistorySummary?: string | undefined;
+  localHour?:             number | undefined;
+  localDayOfWeek?:        number | undefined;
+  wendyTonePreference?:   string | undefined;
 }
 
 export type ParallelHandoffEvent =
@@ -215,6 +218,7 @@ export async function* runParallelHandoff(
     userId, userContext, history, userMessage,
     primaryRoute, secondaryRoute, memoryFactCount, maxHistory = 12,
     behavioralPatterns, routingHistorySummary,
+    localHour, localDayOfWeek, wendyTonePreference,
   } = opts;
 
   const primarySpecialist   = getSpecialist(primaryRoute.domain);
@@ -227,7 +231,10 @@ export async function* runParallelHandoff(
 
   yield { type: "status", value: `⚡ Attivo ${primaryRoute.domain} + ${secondaryRoute.domain} in parallelo...` };
 
-  const sharedOpts: Omit<SpecialistRunOptions, 'routeDecision' | 'userMessage'> = { userId, userContext, history, memoryFactCount, maxHistory, behavioralPatterns, routingHistorySummary };
+  const sharedOpts: Omit<SpecialistRunOptions, 'routeDecision' | 'userMessage'> = {
+    userId, userContext, history, memoryFactCount, maxHistory, behavioralPatterns,
+    routingHistorySummary, localHour, localDayOfWeek, wendyTonePreference,
+  };
   const startedAt  = Date.now();
 
   // ── Phase 8: race both drains ───────────────────────────────────────────────────
