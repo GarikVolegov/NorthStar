@@ -207,7 +207,8 @@ async function safeRunWendyNeuralDecay(): Promise<void> {
   try {
     rootLogger.info("[cron] wendy-neural-decay starting");
     const result = await recordCronRun("wendy-neural-decay", "cron", applyNeuralEdgeDecay, (result) => ({
-      archivedBefore: result.archivedBefore,
+      archivedEdges: result.archivedEdges,
+      decayDays: result.decayDays,
     }));
     rootLogger.info({ ...result }, "[cron] wendy-neural-decay complete");
   } catch (err) {

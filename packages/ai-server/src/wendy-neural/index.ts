@@ -191,14 +191,15 @@ function buildToolCandidates(intent: WendyIntent | string, message: string): Act
 async function buildBrainCandidates(message: string): Promise<ActivationCandidate[]> {
   const result = await handleSearchBrain({ query: message, limit: 4 });
   if (!result.ok) return [];
-  const chunks = (result.data as { chunks?: Array<{
+  const rawChunks = (result.data as { chunks?: Array<{
     obsidianPath?: string;
     content?: string;
     similarity?: number;
     trustScore?: number;
     sectors?: string[];
     roles?: string[];
-  }> }).chunks ?? [];
+  }> }).chunks;
+  const chunks = Array.isArray(rawChunks) ? rawChunks : [];
   return chunks.map((chunk) => ({
     itemKind: "brain_note" as const,
     itemRef: chunk.obsidianPath || chunk.content?.slice(0, 120) || "brain:unknown",
@@ -477,11 +478,11 @@ export async function reinforceCoActivations(input: ReinforceCoActivationsInput)
   }
 }
 
-export async function applyNeuralEdgeDecay(now = new Date()): Promise<{ archivedBefore: number }> {
-  const decayDays = Number.parseInt(process.env.WENDY_NEURAL_EDGE_DECAY_DAYS ?? "30", 10);
+export async function applyNeuralEdgeDecay(now = new Date()): Promise<{ archivedEdges: number; decayDays: number }> {
+  const parsedDays = Number.parseInt(process.env.WENDY_NEURAL_EDGE_DECAY_DAYS ?? "30", 10);
   const minWeight = Number.parseFloat(process.env.WENDY_NEURAL_MIN_EDGE_WEIGHT ?? "0.15");
-  const archivedBefore = Number.isFinite(decayDays) && decayDays > 0 ? decayDays : 30;
-  const cutoff = new Date(now.getTime() - archivedBefore * 24 * 60 * 60 * 1000);
+  const decayDays = Number.isFinite(parsedDays) && parsedDays > 0 ? parsedDays : 30;
+  const cutoff = new Date(now.getTime() - decayDays * 24 * 60 * 60 * 1000);
 
   await db
     .update(wendyNeuralEdgesTable)
@@ -491,15 +492,16 @@ export async function applyNeuralEdgeDecay(now = new Date()): Promise<{ archived
     })
     .where(sql`${wendyNeuralEdgesTable.lastReinforcedAt} < ${cutoff}`);
 
-  await db
+  const archived = await db
     .update(wendyNeuralEdgesTable)
     .set({ status: "archived" as WendyNeuralEdgeStatus, updatedAt: now })
     .where(and(
       eq(wendyNeuralEdgesTable.status, "candidate"),
       sql`${wendyNeuralEdgesTable.weight} * ${wendyNeuralEdgesTable.decayScore} < ${Number.isFinite(minWeight) ? minWeight : 0.15}`,
-    ));
+    ))
+    .returning({ id: wendyNeuralEdgesTable.id });
 
-  return { archivedBefore };
+  return { archivedEdges: archived.length, decayDays };
 }
 
 export async function listRecentNeuralActivations(limit = 50) {
