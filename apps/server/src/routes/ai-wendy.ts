@@ -47,6 +47,9 @@ import {
   shouldUseImmediateFastPathFallback,
   getLlmUnavailableReply,
   isLlmConfigured,
+  buildWendyIntelligenceDirectives,
+  evaluateWendyResponse,
+  planWendyDecision,
 } from "@workspace/ai-server";
 import type { CompressedHistory, WendyActivationContext, WendyPageContext } from "@workspace/ai-server";
 import {
@@ -344,6 +347,15 @@ router.post(
       "[ai/wendy] routed",
     );
 
+    const wendyDecisionPlan = planWendyDecision({
+      message,
+      intent,
+      page: pageContext?.page,
+      hasFileAttached,
+    });
+    const wendyIntelligenceDirectives =
+      buildWendyIntelligenceDirectives(wendyDecisionPlan);
+
     if (shouldUseImmediateFastPathFallback({ intent, message })) {
       const fallbackText = getFastPathFallbackReply({ intent, message, locale });
       if (fallbackText) {
@@ -409,6 +421,7 @@ router.post(
           buildLightPrompt({
             locale,
             intent,
+            userMessage: message,
             ...(pageContext
               ? { pageContext: pageContext as WendyPageContext }
               : {}),
@@ -588,7 +601,8 @@ router.post(
           buildMemorySection(userMemory) +
           buildSessionHistorySection(recentSummaries) +
           personalContext.contexts.semanticMemory +
-          personalContext.contexts.openHuman;
+          personalContext.contexts.openHuman +
+          `\n\n${wendyIntelligenceDirectives}`;
 
         // Flatten compressed history per il growth agent
         const flatHistory = [
@@ -722,6 +736,29 @@ router.post(
             items: neuralContext.activeItems,
           });
         }
+      }
+      const wendySelfCheck = evaluateWendyResponse({
+        userMessage: message,
+        responseText: assistantResponseForMemory,
+        decision: wendyDecisionPlan,
+        contextSources: [
+          ...new Set([
+            ...toolsUsedInRequest.filter((tool) => tool !== "__failed"),
+            ...ragSourcesUsed,
+            ...(ragChunksRetrieved > 0 ? ["search_rag"] : []),
+          ]),
+        ],
+      });
+      if (!wendySelfCheck.ok) {
+        rootLogger.warn(
+          {
+            userId,
+            requestId,
+            score: wendySelfCheck.score,
+            issues: wendySelfCheck.issues.map((issue) => issue.code),
+          },
+          "[ai/wendy] self-check issues detected",
+        );
       }
       const costUsdEst = estimateCost(decision.model, inputTokens, outputTokens);
       recordAiCall({

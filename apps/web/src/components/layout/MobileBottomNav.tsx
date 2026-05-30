@@ -1,3 +1,4 @@
+import { AppLogo } from "@/components/brand/AppLogo";
 import { useAuth } from "@/contexts/AuthContext";
 import { NAV_LABELS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -118,11 +119,10 @@ export function MobileBottomNav() {
                   />
                 )}
                 {brand ? (
-                  <img
-                    src="/logo.svg"
-                    alt=""
+                  <AppLogo
+                    decorative
                     className={cn(
-                      "h-4 w-4 rounded-full object-cover transition-all duration-200",
+                      "h-4 w-4 transition-all duration-200",
                       isActive ? "opacity-100" : "opacity-60",
                     )}
                   />

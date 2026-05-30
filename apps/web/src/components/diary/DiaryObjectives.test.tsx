@@ -46,6 +46,7 @@ describe("DiaryObjectives", () => {
         progress: 35,
         completed: false,
         completedAt: null,
+        isCertifiableMilestone: false,
         dueDate: null,
         createdAt: "2026-05-27T00:00:00.000Z",
       },
@@ -69,6 +70,11 @@ describe("DiaryObjectives", () => {
     await user.click(screen.getByRole("button", { name: /completa obiettivo/i }));
     expect(apiState.patchJson).toHaveBeenCalledWith("/api/objectives/1", {
       completed: true,
+    });
+
+    await user.click(screen.getByRole("button", { name: /rendi milestone certificabile/i }));
+    expect(apiState.patchJson).toHaveBeenCalledWith("/api/objectives/1", {
+      isCertifiableMilestone: true,
     });
 
     await user.click(screen.getByRole("button", { name: /elimina obiettivo/i }));

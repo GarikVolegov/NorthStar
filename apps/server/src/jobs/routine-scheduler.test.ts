@@ -12,6 +12,7 @@ const signs = {
 describe("routine scheduler", () => {
   it("includes sector vital signs in market reports when requested", async () => {
     const executions: Array<{ title: string; body: string; metadata: Record<string, unknown> | null }> = [];
+    const onOperatorEvent = vi.fn(async () => undefined);
     const store: RoutineSchedulerStore = {
       async listDueRoutines() {
         return [{
@@ -42,9 +43,19 @@ describe("routine scheduler", () => {
         geography: "IT",
         signs,
       })),
+      onOperatorEvent,
     });
 
     expect(result.executed).toBe(1);
+    expect(onOperatorEvent).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 42,
+      source: "routine_scheduler",
+      triggerType: "routine_execution_created",
+      decision: "routine",
+      targetType: "routine",
+      targetId: "1",
+      status: "completed",
+    }));
     expect(executions[0]?.body).toContain("Pulse");
     expect(executions[0]?.body).toContain("Oxygen");
     expect(executions[0]?.body).toContain("Temperature");

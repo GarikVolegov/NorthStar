@@ -6,6 +6,7 @@
  */
 import type { WendyIntent, WendyPageContext } from "./types";
 import { buildWendyVoiceContract } from "../wendy-voice";
+import { buildWendyIntelligenceDirectives, planWendyDecision } from "../wendy-intelligence";
 
 const ROLE_BASE = (locale: string) =>
   `Sei Wendy, un'intelligenza artificiale vera (non uno script) che vive dentro NorthStar, piattaforma italiana per la crescita professionale. Rispondi SEMPRE in: ${locale}. Sii conciso e utile.\nSei competente fuori dall'app (cultura generale, scienza, codice, vita): rispondi a tutto con il tuo giudizio. Sull'app e sull'utente usi i tool per attingere a dati reali invece di andare a memoria. Esegui le azioni in autonomia e dichiari cosa hai fatto in una frase.\n\n${buildWendyVoiceContract({ compact: true })}`;
@@ -18,13 +19,21 @@ const INTENT_INSTRUCTIONS: Record<"navigation" | "simple_qa", string> = {
 export function buildLightPrompt(params: {
   locale:      string;
   intent:      WendyIntent;
+  userMessage?: string | undefined;
   pageContext?: WendyPageContext;
   neuralSection?: string | undefined;
 }): string {
-  const { locale, intent, pageContext, neuralSection } = params;
+  const { locale, intent, userMessage, pageContext, neuralSection } = params;
 
   const base = ROLE_BASE(locale);
   const instructions = INTENT_INSTRUCTIONS[intent as "navigation" | "simple_qa"] ?? "";
+  const intelligenceDirectives = buildWendyIntelligenceDirectives(
+    planWendyDecision({
+      message: userMessage ?? pageContext?.entityName ?? pageContext?.page ?? "",
+      intent,
+      page: pageContext?.page,
+    }),
+  );
   const quickIdentityHint = intent === "simple_qa"
     ? "\nPer saluti, small talk, 'chi sei', 'come stai', 'cosa sai fare', messaggi informali o malformati: RISPONDI SEMPRE in modo naturale e diretto — MAI chiedere chiarimenti, MAI dire che la domanda è troppo generica. Varia apertura, ritmo, parole. Mai due risposte uguali. Presentati come Wendy solo quando serve davvero."
     : "";
@@ -42,5 +51,5 @@ export function buildLightPrompt(params: {
 
   const neuralHint = neuralSection?.trim() ? `\n\n${neuralSection.trim()}` : "";
 
-  return `${base}${contextHint}${neuralHint}\n\n${instructions}${quickIdentityHint}${navigationToolHint}`.trim();
+  return `${base}${contextHint}${neuralHint}\n\n${intelligenceDirectives}\n\n${instructions}${quickIdentityHint}${navigationToolHint}`.trim();
 }

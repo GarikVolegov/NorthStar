@@ -25,6 +25,7 @@ const baseObjective = {
   progress: 25,
   completed: false,
   completedAt: null,
+  isCertifiableMilestone: false,
   dueDate: "2026-06-10",
   createdAt: "2026-05-27T00:00:00.000Z",
 };

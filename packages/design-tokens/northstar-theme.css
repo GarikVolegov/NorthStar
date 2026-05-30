@@ -69,11 +69,13 @@
   --color-brand:                var(--brand);
   --color-brand-light:          var(--brand-light);
   --color-brand-dark:           var(--brand-dark);
+  --color-brand-surface:        var(--brand-surface);
   --color-brand-fg:             var(--brand-fg);
 
   --color-growth:               var(--growth);
   --color-growth-light:         var(--growth-light);
   --color-growth-dark:          var(--growth-dark);
+  --color-growth-surface:       var(--growth-surface);
   --color-growth-border:        var(--growth-border);
   --color-growth-fg:            var(--growth-fg);
 
@@ -90,10 +92,12 @@
   --font-serif:   var(--app-font-serif);
   --font-mono:    var(--app-font-mono);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: 0.5rem;      /* 8px  - chip */
+  --radius-md: 0.625rem;    /* 10px - small buttons */
+  --radius-lg: var(--radius); /* 12px - default card radius token */
+  --radius-xl: 1rem;        /* 16px - big cards */
+  --radius-2xl: 1rem;       /* 16px - app cards */
+  --radius-full: 9999px;    /* pills and primary home buttons */
 }
 
 /* ── CSS Custom Properties ────────────────────────────────────── */
@@ -144,33 +148,33 @@
   --accent-border:       hsl(220 15% 84%);
 
   /* ─ Destructive ─ */
-  --destructive:         4 62% 52%;
+  --destructive:         4 39% 49%;
   --destructive-foreground: 0 0% 100%;
-  --destructive-border:  hsl(4 62% 42%);
+  --destructive-border:  hsl(4 39% 39%);
 
-  --info:                210 55% 38%;
-  --info-surface:        210 55% 96%;
-  --info-muted:          210 55% 88%;
-  --success:             152 28% 34%;
-  --success-surface:     152 28% 95%;
-  --success-muted:       152 28% 86%;
-  --warning:             43 44% 36%;
-  --warning-surface:     43 70% 94%;
-  --warning-muted:       43 55% 84%;
-  --danger:              4 62% 42%;
-  --danger-surface:      4 62% 96%;
-  --danger-muted:        4 62% 88%;
+  --info:                210 26% 45%;
+  --info-surface:        210 26% 96%;
+  --info-muted:          210 26% 86%;
+  --success:             152 23% 40%;
+  --success-surface:     152 23% 95%;
+  --success-muted:       152 23% 86%;
+  --warning:             43 39% 43%;
+  --warning-surface:     43 39% 94%;
+  --warning-muted:       43 39% 84%;
+  --danger:              4 39% 49%;
+  --danger-surface:      4 39% 96%;
+  --danger-muted:        4 39% 88%;
 
   /* ─ Input / Ring ─ */
   --input:               220 15% 88%;
   --ring:                43 44% 44%;
 
   /* ─ Charts ─ */
-  --chart-1:  43 44% 50%;   /* gold   */
-  --chart-2: 152 28% 46%;   /* green  */
-  --chart-3: 210 55% 50%;   /* blue   */
-  --chart-4: 268 38% 52%;   /* purple */
-  --chart-5:   4 52% 50%;   /* red    */
+  --chart-1:  43 44% 50%;   /* gold  */
+  --chart-2: 152 26% 46%;   /* sage  */
+  --chart-3: 210 26% 50%;   /* slate */
+  --chart-4:  18 40% 50%;   /* terra */
+  --chart-5: 330 20% 46%;   /* vino  */
 
   /* ─ Typography ─ */
   --app-font-sans:  'Inter', system-ui, sans-serif;
@@ -180,21 +184,22 @@
   /* ─ Radius ─ */
   --radius: 0.75rem;
 
-  /* ─ Shadows (leggere) ─ */
-  --shadow-2xs: 0px 1px  2px 0px rgba(0,0,0,0.08);
-  --shadow-xs:  0px 1px  3px 0px rgba(0,0,0,0.10);
-  --shadow-sm:  0px 2px  6px 0px rgba(0,0,0,0.08), 0px 1px  2px -1px rgba(0,0,0,0.10);
-  --shadow:     0px 2px  8px 0px rgba(0,0,0,0.08), 0px 1px  3px -1px rgba(0,0,0,0.10);
-  --shadow-md:  0px 4px 16px 0px rgba(0,0,0,0.10), 0px 2px  6px -1px rgba(0,0,0,0.12);
-  --shadow-lg:  0px 8px 24px 0px rgba(0,0,0,0.10), 0px 4px 10px -2px rgba(0,0,0,0.14);
-  --shadow-xl:  0px 12px 36px 0px rgba(0,0,0,0.12), 0px 8px 16px -4px rgba(0,0,0,0.14);
-  --shadow-2xl: 0px 20px 48px 0px rgba(0,0,0,0.16);
+  /* ─ Shadows: navy depth, darker than a typical light theme ─ */
+  --shadow-2xs: 0 1px 2px 0 rgba(14, 16, 24, 0.12);
+  --shadow-xs:  0 4px 12px -8px rgba(14, 16, 24, 0.22), 0 1px 2px -1px rgba(14, 16, 24, 0.14);
+  --shadow-sm:  0 10px 24px -16px rgba(14, 16, 24, 0.30), 0 2px 6px -3px rgba(14, 16, 24, 0.16);
+  --shadow:     0 12px 28px -18px rgba(14, 16, 24, 0.32), 0 3px 8px -4px rgba(14, 16, 24, 0.18);
+  --shadow-md:  0 18px 42px -24px rgba(14, 16, 24, 0.38), 0 6px 14px -8px rgba(14, 16, 24, 0.20);
+  --shadow-lg:  0 26px 64px -32px rgba(14, 16, 24, 0.44), 0 10px 22px -12px rgba(14, 16, 24, 0.22);
+  --shadow-xl:  0 36px 88px -40px rgba(14, 16, 24, 0.52), 0 16px 36px -18px rgba(14, 16, 24, 0.24);
+  --shadow-2xl: 0 48px 120px -48px rgba(14, 16, 24, 0.62), 0 22px 48px -24px rgba(14, 16, 24, 0.28);
 
   /* ─ Brand / Champagne Gold ─ */
   --brand:        hsl(43 44% 44%);
   --brand-light:  hsl(43 44% 60%);
   --brand-dark:   hsl(43 44% 30%);
   --brand-border: hsl(43 44% 38%);
+  --brand-surface: rgba(193, 158, 74, 0.10);
   --brand-fg:     hsl(0 0% 100%);
 
   /* ─ Growth / Sage Green ─ */
@@ -202,6 +207,7 @@
   --growth-light:  hsl(152 26% 60%);
   --growth-dark:   hsl(152 26% 30%);
   --growth-border: hsl(152 26% 36%);
+  --growth-surface: rgba(125, 184, 154, 0.10);
   --growth-fg:     hsl(0 0% 100%);
 
   /* ─ Hero light surfaces ─ */
@@ -209,8 +215,8 @@
   --hero-dark-2: hsl(220 20% 91%);
 
   /* ─ Glow effects ─ */
-  --glow-primary: 0 0 28px 0 hsl(43 44% 44% / 0.18);
-  --glow-growth:  0 0 20px 0 hsl(152 26% 44% / 0.14);
+  --glow-primary: 0 0 0 1px hsl(43 44% 44% / 0.24), 0 18px 54px -24px hsl(43 44% 44% / 0.42);
+  --glow-growth:  0 0 0 1px hsl(152 26% 44% / 0.22), 0 18px 54px -24px hsl(152 26% 44% / 0.34);
 
   --tracking-normal: 0em;
   --spacing: 0.25rem;
@@ -228,17 +234,17 @@
   /* ─ Base surfaces ─ */
   --background:          224 24%  8%;   /* #0e1018 */
   --foreground:          220 14% 93%;   /* #e6e8ed */
-  --border:              224 18% 19%;
+  --border:              226 26% 16%;
 
   /* ─ Cards ─ */
-  --card:                224 22% 11%;
+  --card:                226 27% 10%;   /* #131621 */
   --card-foreground:     220 14% 93%;
-  --card-border:         224 18% 22%;
+  --card-border:         226 24% 19%;
 
   /* ─ Popovers ─ */
-  --popover:             224 22% 13%;
+  --popover:             226 30% 12%;   /* #161929 */
   --popover-foreground:  220 14% 93%;
-  --popover-border:      224 18% 24%;
+  --popover-border:      226 24% 20%;
 
   /* ─ Primary — Champagne Gold #c19e4a ─ */
   --primary:             43 44% 57%;
@@ -246,64 +252,65 @@
   --primary-border:      hsl(43 44% 42%);
 
   /* ─ Secondary ─ */
-  --secondary:           224 18% 15%;
+  --secondary:           225 23% 15%;
   --secondary-foreground:220 10% 72%;
-  --secondary-border:    hsl(224 18% 24%);
+  --secondary-border:    hsl(225 23% 24%);
 
   /* ─ Muted ─ */
-  --muted:               224 18% 13%;
+  --muted:               223 26% 12%;   /* #171b28 */
   --muted-foreground:    220  8% 54%;
-  --muted-border:        hsl(224 18% 21%);
+  --muted-border:        hsl(223 26% 21%);
 
   /* ─ Accent ─ */
-  --accent:              224 18% 16%;
+  --accent:              225 23% 15%;   /* #1c2133 */
   --accent-foreground:   220 14% 93%;
-  --accent-border:       hsl(224 18% 24%);
+  --accent-border:       hsl(225 23% 24%);
 
   /* ─ Destructive ─ */
-  --destructive:         4 62% 52%;
-  --destructive-foreground: 0 0% 100%;
-  --destructive-border:  hsl(4 62% 42%);
+  --destructive:         4 39% 59%;
+  --destructive-foreground: 224 24% 7%;
+  --destructive-border:  hsl(4 39% 47%);
 
-  --info:                210 55% 68%;
-  --info-surface:        210 45% 16%;
-  --info-muted:          210 45% 25%;
-  --success:             152 28% 68%;
-  --success-surface:     152 24% 15%;
-  --success-muted:       152 24% 25%;
-  --warning:             43 54% 70%;
-  --warning-surface:     43 36% 16%;
-  --warning-muted:       43 36% 26%;
-  --danger:              4 62% 66%;
-  --danger-surface:      4 36% 16%;
-  --danger-muted:        4 36% 26%;
+  --info:                210 26% 60%;   /* #7a99b6 */
+  --info-surface:        210 26% 14%;
+  --info-muted:          210 26% 24%;
+  --success:             152 23% 62%;   /* #8cb09f */
+  --success-surface:     152 23% 14%;
+  --success-muted:       152 23% 24%;
+  --warning:             43 39% 55%;    /* #b89e63 */
+  --warning-surface:     43 39% 14%;
+  --warning-muted:       43 39% 24%;
+  --danger:              4 39% 59%;     /* #c0716b */
+  --danger-surface:      4 39% 14%;
+  --danger-muted:        4 39% 24%;
 
   /* ─ Input / Ring ─ */
-  --input:               224 18% 18%;
+  --input:               223 26% 12%;
   --ring:                43 44% 57%;
 
   /* ─ Charts ─ */
-  --chart-1:  43 44% 57%;   /* gold   */
-  --chart-2: 152 28% 58%;   /* green  */
-  --chart-3: 210 55% 58%;   /* blue   */
-  --chart-4: 268 38% 60%;   /* purple */
-  --chart-5:   4 52% 56%;   /* red    */
+  --chart-1:  43 44% 57%;   /* oro   */
+  --chart-2: 152 26% 62%;   /* sage  */
+  --chart-3: 210 26% 60%;   /* slate */
+  --chart-4:  18 40% 56%;   /* terra */
+  --chart-5: 330 20% 52%;   /* vino  */
 
-  /* ─ Shadows (navy depth) ─ */
-  --shadow-2xs: 0px 1px  2px 0px rgba(0,0,0,0.55);
-  --shadow-xs:  0px 1px  3px 0px rgba(0,0,0,0.62);
-  --shadow-sm:  0px 2px  6px 0px rgba(0,0,0,0.55), 0px 1px  2px -1px rgba(0,0,0,0.65);
-  --shadow:     0px 2px  8px 0px rgba(0,0,0,0.55), 0px 1px  3px -1px rgba(0,0,0,0.65);
-  --shadow-md:  0px 4px 16px 0px rgba(0,0,0,0.55), 0px 2px  6px -1px rgba(0,0,0,0.65);
-  --shadow-lg:  0px 8px 24px 0px rgba(0,0,0,0.55), 0px 4px 10px -2px rgba(0,0,0,0.70);
-  --shadow-xl:  0px 12px 36px 0px rgba(0,0,0,0.62), 0px 8px 16px -4px rgba(0,0,0,0.70);
-  --shadow-2xl: 0px 20px 48px 0px rgba(0,0,0,0.75);
+  /* ─ Shadows: navy depth for dark cards, hover states and modals ─ */
+  --shadow-2xs: 0 1px 2px 0 rgba(0, 0, 0, 0.52);
+  --shadow-xs:  0 6px 16px -10px rgba(0, 0, 0, 0.70), 0 1px 3px -1px rgba(0, 0, 0, 0.62);
+  --shadow-sm:  0 12px 28px -18px rgba(0, 0, 0, 0.76), 0 3px 8px -4px rgba(0, 0, 0, 0.66);
+  --shadow:     0 14px 34px -20px rgba(0, 0, 0, 0.78), 0 4px 10px -5px rgba(0, 0, 0, 0.68);
+  --shadow-md:  0 20px 48px -26px rgba(0, 0, 0, 0.82), 0 8px 18px -10px rgba(0, 0, 0, 0.70);
+  --shadow-lg:  0 30px 72px -34px rgba(0, 0, 0, 0.86), 0 12px 28px -14px rgba(0, 0, 0, 0.72);
+  --shadow-xl:  0 40px 96px -42px rgba(0, 0, 0, 0.90), 0 18px 42px -20px rgba(0, 0, 0, 0.76);
+  --shadow-2xl: 0 56px 132px -52px rgba(0, 0, 0, 0.94), 0 26px 60px -28px rgba(0, 0, 0, 0.80);
 
   /* ─ Brand / Champagne Gold ─ */
   --brand:        hsl(43 44% 57%);  /* #c19e4a */
   --brand-light:  hsl(43 44% 72%);  /* #d4ba7c */
   --brand-dark:   hsl(43 44% 38%);  /* #7d6827 */
   --brand-border: hsl(43 44% 44%);  /* #95783f */
+  --brand-surface: rgba(193, 158, 74, 0.12);
   --brand-fg:     hsl(224 24%  7%); /* #0b0d12 */
 
   /* ─ Growth / Sage Green ─ */
@@ -311,6 +318,7 @@
   --growth-light:  hsl(152 26% 78%); /* #a3cfbc */
   --growth-dark:   hsl(152 26% 40%); /* #4e836a */
   --growth-border: hsl(152 26% 36%); /* #457560 */
+  --growth-surface: rgba(125, 184, 154, 0.12);
   --growth-fg:     hsl(224 24%  7%); /* #0b0d12 */
 
   /* ─ Hero dark surfaces ─ */
@@ -318,8 +326,8 @@
   --hero-dark-2: hsl(224 26%  6%);
 
   /* ─ Glow effects ─ */
-  --glow-primary: 0 0 28px 0 hsl(43 44% 57% / 0.20);
-  --glow-growth:  0 0 20px 0 hsl(152 26% 62% / 0.16);
+  --glow-primary: 0 0 0 1px hsl(43 44% 57% / 0.24), 0 22px 64px -26px hsl(43 44% 57% / 0.45);
+  --glow-growth:  0 0 0 1px hsl(152 26% 62% / 0.22), 0 22px 64px -26px hsl(152 26% 62% / 0.36);
 }
 
 /* ── Base layer ────────────────────────────────────────────────── */
@@ -422,12 +430,91 @@
     }
   }
 
-  /* Navbar pill */
+  /* Navbar pill — Wendy's signature golden-spark border */
+  @property --pill-spark-angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+  }
+
   .pill-nav {
+    position: relative;
+    isolation: isolate;
     background: hsl(var(--card) / 0.97);
     backdrop-filter: blur(10px);
     border: 1px solid hsl(var(--card-border));
     border-radius: 9999px;
+  }
+
+  /* A golden spark with a glowing tail that rotates around the whole pill,
+     progressively illuminating every border. Masked to a 1.5px ring so it
+     never overlaps the interactive content. */
+  .pill-nav::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: conic-gradient(
+      from var(--pill-spark-angle),
+      transparent 0deg,
+      transparent 205deg,
+      hsl(40 70% 52% / 0.16) 275deg,
+      hsl(43 85% 60% / 0.85) 340deg,
+      #fff3cf 353deg,
+      hsl(43 85% 60% / 0.85) 359deg,
+      transparent 360deg
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    z-index: 2;
+    animation: pill-spark-rotate 5s linear infinite;
+  }
+
+  /* Steady gold halo that fades in once — "piano piano illumina tutti i bordi":
+     after the spark's first laps the entire border keeps a soft gold glow. */
+  .pill-nav::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: linear-gradient(
+      120deg,
+      hsl(43 78% 56% / 0.5),
+      hsl(43 70% 50% / 0.12) 50%,
+      hsl(43 78% 56% / 0.5)
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0;
+    animation: pill-glow-in 3.2s ease-out 0.2s forwards;
+  }
+
+  /* Intensify while Wendy is thinking/speaking */
+  .pill-nav--active::before { animation-duration: 2.4s; }
+  .pill-nav--active::after  { opacity: 0.9; }
+
+  @keyframes pill-spark-rotate {
+    to { --pill-spark-angle: 360deg; }
+  }
+  @keyframes pill-glow-in {
+    from { opacity: 0; }
+    to   { opacity: 0.55; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pill-nav::before { animation: none; --pill-spark-angle: 322deg; }
+    .pill-nav::after  { animation: none; opacity: 0.5; }
   }
 
   @media (max-width: 768px) {
@@ -484,6 +571,37 @@
     font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.04em;
+  }
+
+  /* Token surfaces: 12% fill / 20% border for soft dark-mode contrast */
+  .surface-brand {
+    background: var(--brand-surface);
+    border-color: hsl(var(--primary) / 0.20);
+  }
+
+  .surface-growth {
+    background: var(--growth-surface);
+    border-color: hsl(152 26% 62% / 0.20);
+  }
+
+  .surface-info {
+    background: hsl(var(--info) / 0.08);
+    border-color: hsl(var(--info) / 0.20);
+  }
+
+  .surface-success {
+    background: hsl(var(--success) / 0.08);
+    border-color: hsl(var(--success) / 0.20);
+  }
+
+  .surface-warning {
+    background: hsl(var(--warning) / 0.08);
+    border-color: hsl(var(--warning) / 0.20);
+  }
+
+  .surface-danger {
+    background: hsl(var(--danger) / 0.08);
+    border-color: hsl(var(--danger) / 0.20);
   }
 
   /* Mobile touch scroll */

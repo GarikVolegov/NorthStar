@@ -57,6 +57,9 @@ if (failures.length === 0) {
     "  /calendar/quota:",
     "      operationId: getCalendarQuota",
     "    CalendarQuota:",
+    "                requestId:",
+    "                  enum: [up, down]",
+    "                  ok: { type: boolean }",
   ];
 
   for (const snippet of expectedSpecSnippets) {
@@ -69,6 +72,8 @@ if (failures.length === 0) {
     { file: "packages/api-client-react/src/generated/api.ts", text: "/api/healthz", body: reactClient },
     { file: "packages/api-client-react/src/generated/api.ts", text: "/api/calendar/quota", body: reactClient },
     { file: "packages/api-zod/src/generated/api.ts", text: "GetCalendarQuotaResponse", body: zodClient },
+    { file: "packages/api-client-react/src/generated/api.schemas.ts", text: "requestId: string", body: read("packages/api-client-react/src/generated/api.schemas.ts") },
+    { file: "packages/api-client-react/src/generated/api.schemas.ts", text: 'up: "up"', body: read("packages/api-client-react/src/generated/api.schemas.ts") },
   ];
 
   for (const { file, text, body } of expectedGeneratedSnippets) {

@@ -1,3 +1,4 @@
+import { AppLogo } from "@/components/brand/AppLogo";
 import { ProssimiEventi } from "@/components/calendario/ProssimiEventi";
 import { AnimateOnScroll, AnimateOnScrollItem } from "@/components/motion";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
@@ -11,25 +12,27 @@ import { LoggedInHero } from "@/features/home/LoggedInHero";
 import { PersonalizedRecommendationsSection } from "@/features/home/PersonalizedRecommendationsSection";
 import { QuickToolsSection } from "@/features/home/QuickToolsSection";
 import { TrendingMobileStrip } from "@/features/home/TrendingMobileStrip";
-import { TrendingSectorCard } from "@/features/home/TrendingSectorCard";
 import { ONBOARDING_KEY } from "@/features/home/homeConstants";
 import { useHomeNews, useLatestRecommendations, useTrendingSectors } from "@/features/home/homeApi";
 import type { Persona } from "@/features/home/homeTypes";
-import { cn } from "@/lib/utils";
+import { usePageMeta } from "@/lib/seo";
 import { useGetStatsSummary } from "@workspace/api-client-react";
 import { AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
   BarChart3,
+  BookOpen,
   Bot,
   Building2,
   CheckCircle2,
-  Flame,
+  Compass,
   HelpCircle,
+  Heart,
   MapPin,
   Newspaper,
   Rocket,
   Sparkles,
+  Target,
   TrendingUp,
   Zap,
 } from "lucide-react";
@@ -37,9 +40,284 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "wouter";
 
+function GuestNarrativeHero() {
+  const { t } = useTranslation();
+
+  return (
+    <section
+      data-testid="guest-narrative-hero"
+      className="relative isolate min-h-[calc(100dvh-6rem)] overflow-hidden border-b border-border bg-background"
+    >
+      <div
+        className="absolute inset-0 -z-20 bg-cover bg-center"
+        style={{ backgroundImage: "url('/hero.png')" }}
+        aria-hidden
+      />
+      <div className="absolute inset-0 -z-10 bg-background/82" aria-hidden />
+      <div className="container mx-auto flex min-h-[calc(100dvh-6rem)] max-w-6xl items-center px-4 py-20 md:px-6 md:py-28">
+        <div className="max-w-3xl">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-background/70 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-primary backdrop-blur">
+            <Compass className="h-3.5 w-3.5" />
+            {t("home.narrative.badge", { defaultValue: "Bussola professionale" })}
+          </div>
+          <h1 className="max-w-3xl text-4xl font-bold leading-tight text-foreground sm:text-5xl md:text-6xl">
+            {t("home.narrative.title", {
+              defaultValue:
+                "NorthStar e la bussola per capire quale direzione professionale ha senso per te.",
+            })}
+          </h1>
+          <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground md:text-lg">
+            {t("home.narrative.subtitle", {
+              defaultValue:
+                "Prima di scegliere tra corsi, lavori, settori o strumenti AI, NorthStar ti aiuta a leggere chi sei, cosa chiede il mercato e quale percorso puo diventare concreto.",
+            })}
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link href="/test" className="w-full sm:w-auto">
+              <div className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-7 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-colors hover:bg-primary/90">
+                {t("home.startTest")}
+                <ArrowRight className="h-4 w-4" />
+              </div>
+            </Link>
+            <a
+              href="#cos-e-northstar"
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-border bg-card/70 px-7 py-3 text-sm font-semibold text-foreground backdrop-blur transition-colors hover:bg-card sm:w-auto"
+            >
+              {t("home.narrative.discover", { defaultValue: "Capisci come funziona" })}
+              <MapPin className="h-4 w-4" />
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function GuestOrientationSections() {
+  const { t } = useTranslation();
+  const pillars = [
+    {
+      icon: Zap,
+      title: t("home.narrative.what.test.title", { defaultValue: "Parti da chi sei" }),
+      desc: t("home.narrative.what.test.desc", {
+        defaultValue:
+          "Il test combina interessi professionali e Bussola Interiore per darti un primo profilo leggibile.",
+      }),
+    },
+    {
+      icon: BarChart3,
+      title: t("home.narrative.what.market.title", { defaultValue: "Guarda il mercato reale" }),
+      desc: t("home.narrative.what.market.desc", {
+        defaultValue:
+          "Settori, salari, crescita e rischio automazione aiutano a distinguere desiderio e opportunita.",
+      }),
+    },
+    {
+      icon: Bot,
+      title: t("home.narrative.what.wendy.title", { defaultValue: "Chiedi a Wendy" }),
+      desc: t("home.narrative.what.wendy.desc", {
+        defaultValue:
+          "L'assistente AI ti aiuta a interpretare risultati, dubbi e prossimi passi senza partire da una schermata vuota.",
+      }),
+    },
+  ];
+  const values = [
+    {
+      icon: Target,
+      title: t("chiSiamo.values.0.title", { defaultValue: "Chiarezza" }),
+      desc: t("chiSiamo.values.0.desc", {
+        defaultValue: "Trasformiamo il disorientamento in direzione concreta.",
+      }),
+    },
+    {
+      icon: Heart,
+      title: t("chiSiamo.values.1.title", { defaultValue: "Empatia" }),
+      desc: t("chiSiamo.values.1.desc", {
+        defaultValue: "Ogni persona ha un percorso unico: lo rispettiamo e lo accompagniamo.",
+      }),
+    },
+    {
+      icon: BookOpen,
+      title: t("chiSiamo.values.3.title", { defaultValue: "Dati reali" }),
+      desc: t("chiSiamo.values.3.desc", {
+        defaultValue: "Usiamo dati aggiornati per orientare le scelte nel mercato.",
+      }),
+    },
+  ];
+
+  return (
+    <>
+      <section id="cos-e-northstar" className="border-b border-border py-14 md:py-20">
+        <div className="container mx-auto max-w-6xl px-4 md:px-6">
+          <div className="mb-8 max-w-3xl">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+              <Sparkles className="h-3.5 w-3.5" />
+              {t("home.narrative.what.badge", { defaultValue: "Cos'e NorthStar" })}
+            </div>
+            <h2 className="text-3xl font-bold text-foreground md:text-4xl">
+              {t("home.narrative.what.title", {
+                defaultValue: "Non iniziare da mille opzioni. Inizia da una lettura chiara.",
+              })}
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
+              {t("home.narrative.what.subtitle", {
+                defaultValue:
+                  "NorthStar unisce orientamento personale, dati di mercato e strumenti di crescita in un percorso unico: prima capisci, poi scegli.",
+              })}
+            </p>
+          </div>
+
+          <AnimateOnScroll stagger className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {pillars.map(({ icon: Icon, title, desc }) => (
+              <AnimateOnScrollItem key={title}>
+                <div className="h-full rounded-lg border border-border bg-card p-5">
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-bold text-foreground">{title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{desc}</p>
+                </div>
+              </AnimateOnScrollItem>
+            ))}
+          </AnimateOnScroll>
+        </div>
+      </section>
+
+      <section id="chi-siamo" className="scroll-mt-24 border-b border-border py-14 md:py-20">
+        <div className="container mx-auto grid max-w-6xl gap-10 px-4 md:grid-cols-[0.9fr_1.1fr] md:px-6">
+          <div>
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+              <Compass className="h-3.5 w-3.5" />
+              {t("chiSiamo.badge", { defaultValue: "La nostra storia" })}
+            </div>
+            <h2 className="text-3xl font-bold text-foreground md:text-4xl">
+              {t("chiSiamo.whyWeExist", { defaultValue: "Perche esistiamo" })}
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+              {t("chiSiamo.whyWeExistP1")}
+            </p>
+            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+              {t("chiSiamo.whyWeExistP3")}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {values.map(({ icon: Icon, title, desc }) => (
+              <div key={title} className="rounded-lg border border-border bg-card p-5">
+                <Icon className="mb-4 h-5 w-5 text-primary" />
+                <h3 className="font-semibold text-foreground">{title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function GuestMethodSection() {
+  const { t } = useTranslation();
+  const steps = [
+    {
+      step: "01",
+      icon: Zap,
+      title: t("chiSiamo.methodSteps.0.title", { defaultValue: "Test RIASEC + Bussola Interiore" }),
+      desc: t("chiSiamo.methodSteps.0.desc", {
+        defaultValue:
+          "Scopri interessi, motivazioni e modo di lavorare con un test breve e guidato.",
+      }),
+    },
+    {
+      step: "02",
+      icon: Target,
+      title: t("chiSiamo.methodSteps.1.title", { defaultValue: "Matching con i settori" }),
+      desc: t("chiSiamo.methodSteps.1.desc", {
+        defaultValue:
+          "Il profilo viene collegato a settori, ruoli e opportunita compatibili.",
+      }),
+    },
+    {
+      step: "03",
+      icon: TrendingUp,
+      title: t("chiSiamo.methodSteps.2.title", { defaultValue: "Esplorazione con dati reali" }),
+      desc: t("chiSiamo.methodSteps.2.desc", {
+        defaultValue:
+          "Ogni scelta viene letta con crescita, salari, competenze e segnali di mercato.",
+      }),
+    },
+    {
+      step: "04",
+      icon: Bot,
+      title: t("chiSiamo.methodSteps.3.title", { defaultValue: "Percorso e strumenti AI" }),
+      desc: t("chiSiamo.methodSteps.3.desc", {
+        defaultValue:
+          "Wendy, roadmap, obiettivi e contenuti ti aiutano a trasformare la direzione in azione.",
+      }),
+    },
+  ];
+
+  return (
+    <section className="border-b border-border py-14 md:py-20">
+      <div className="container mx-auto max-w-6xl px-4 md:px-6">
+        <div className="mb-8 max-w-3xl">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+            <MapPin className="h-3.5 w-3.5" />
+            {t("home.howItWorks.badge")}
+          </div>
+          <h2 className="text-3xl font-bold text-foreground md:text-4xl">
+            {t("home.howItWorks.subtitle", {
+              defaultValue: "Tre semplici passi per capire dove sei, dove vuoi arrivare e come arrivarci.",
+            })}
+          </h2>
+        </div>
+
+        <AnimateOnScroll stagger className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          {steps.map(({ step, icon: Icon, title, desc }) => (
+            <AnimateOnScrollItem key={step}>
+              <div className="h-full rounded-lg border border-border bg-card p-5">
+                <div className="mb-5 flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-widest text-primary">{step}</span>
+                  <Icon className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <h3 className="font-bold text-foreground">{title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{desc}</p>
+              </div>
+            </AnimateOnScrollItem>
+          ))}
+        </AnimateOnScroll>
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
   const { t } = useTranslation();
   const wendy = useWendy();
+  usePageMeta({
+    title: t("seo.home.title", {
+      defaultValue: "NorthStar - Scopri la tua direzione professionale",
+    }),
+    description: t("seo.home.description", {
+      defaultValue:
+        "Una bussola digitale per capire chi sei, leggere il mercato e scegliere un percorso professionale concreto.",
+    }),
+    path: "/",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: "NorthStar",
+      url: "https://northstar.app",
+      description:
+        "Piattaforma di orientamento e crescita personale che unisce test, dati di mercato e strumenti AI.",
+      knowsAbout: [
+        "orientamento professionale",
+        "test RIASEC",
+        "crescita personale",
+        "carriera",
+      ],
+    },
+  });
   const personas: Persona[] = [
     {
       id: "indeciso",
@@ -177,11 +455,16 @@ export default function Home() {
           latestResult={latestResult ?? null}
         />
       ) : (
-        <GuestPersonaHero
-          onLoginClick={() => navigateTo("/sign-in")}
-          personas={personas}
-          wendy={wendy}
-        />
+        <>
+          <GuestNarrativeHero />
+          <GuestOrientationSections />
+          <GuestMethodSection />
+          <GuestPersonaHero
+            onLoginClick={() => navigateTo("/sign-in")}
+            personas={personas}
+            wendy={wendy}
+          />
+        </>
       )}
 
       <section className="py-8 md:py-10 border-y border-border">
@@ -246,137 +529,6 @@ export default function Home() {
           </div>
         </section>
       )}
-
-      {!isLoggedIn && (
-        <section className="py-14 md:py-20 border-b border-border">
-          <div className="container mx-auto px-4 md:px-6 max-w-5xl">
-            <AnimateOnScroll>
-              <div className="text-center mb-10">
-                <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide mb-4">
-                  <Sparkles className="w-3.5 h-3.5" />{" "}
-                  {t("home.howItWorks.badge")}
-                </div>
-                <h2 className="text-3xl md:text-4xl font-bold text-foreground">
-                  {t("home.howItWorks.heading")}{" "}
-                  <span className="text-italic-serif text-primary">
-                    {t("home.howItWorks.headingHighlight")}
-                  </span>
-                </h2>
-                <p className="text-muted-foreground mt-3 max-w-xl mx-auto">
-                  {t("home.howItWorks.subtitle")}
-                </p>
-              </div>
-            </AnimateOnScroll>
-
-            <AnimateOnScroll
-              stagger
-              className="grid grid-cols-1 md:grid-cols-3 gap-6"
-            >
-              {[
-                {
-                  step: "01",
-                  icon: Zap,
-                  title: t("home.howItWorks.step1.title"),
-                  desc: t("home.howItWorks.step1.desc"),
-                  href: "/percorso",
-                  label: t("home.howItWorks.step1.label"),
-                  accent: "bg-primary/10 text-primary border-primary/20",
-                },
-                {
-                  step: "02",
-                  icon: CheckCircle2,
-                  title: t("home.howItWorks.step2.title"),
-                  desc: t("home.howItWorks.step2.desc"),
-                  href: "/test",
-                  label: t("home.howItWorks.step2.label"),
-                  accent: "bg-growth/10 text-growth border-growth/20",
-                },
-                {
-                  step: "03",
-                  icon: Bot,
-                  title: t("home.howItWorks.step3.title"),
-                  desc: t("home.howItWorks.step3.desc"),
-                  href: "/premium",
-                  label: t("home.howItWorks.step3.label"),
-                  accent: "bg-primary/10 text-primary border-primary/20",
-                },
-              ].map(
-                ({ step, icon: Icon, title, desc, href, label, accent }) => (
-                  <AnimateOnScrollItem key={step}>
-                    <Link href={href}>
-                      <div className="group flex flex-col h-full p-6 rounded-2xl border border-border bg-card hover:border-primary/30 hover:bg-card/80 transition-all duration-300 cursor-pointer">
-                        <div
-                          className={cn(
-                            "inline-flex items-center gap-2 text-xs font-bold rounded-full px-3 py-1 border mb-4 w-fit",
-                            accent,
-                          )}
-                        >
-                          <Icon className="w-3.5 h-3.5" />
-                          {t("home.howItWorks.stepLabel")} {step}
-                        </div>
-                        <h3 className="font-bold text-foreground mb-2">
-                          {title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed flex-1 mb-4">
-                          {desc}
-                        </p>
-                        <div className="flex items-center gap-1.5 text-sm font-semibold text-primary group-hover:gap-2 transition-all">
-                          {label} <ArrowRight className="w-3.5 h-3.5" />
-                        </div>
-                      </div>
-                    </Link>
-                  </AnimateOnScrollItem>
-                ),
-              )}
-            </AnimateOnScroll>
-          </div>
-        </section>
-      )}
-
-      <section className="py-14 md:py-20">
-        <div className="container mx-auto px-4 md:px-6 max-w-6xl">
-          <AnimateOnScroll>
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 md:mb-10">
-              <div>
-                <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide mb-3">
-                  <Flame className="w-3.5 h-3.5" /> {t("home.trending.badge")}
-                </div>
-                <h2 className="text-3xl md:text-4xl font-bold text-foreground">
-                  {t("home.trending.title")}
-                </h2>
-                <p className="text-muted-foreground mt-2 max-w-xl">
-                  {t("home.trending.subtitle")}
-                </p>
-              </div>
-              <Link href="/settori">
-                <div className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-border text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-white/20 transition-all">
-                  {t("home.trending.exploreAll")}{" "}
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </div>
-              </Link>
-            </div>
-          </AnimateOnScroll>
-
-          {!trendingData ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-72 w-full rounded-2xl" />
-              ))}
-            </div>
-          ) : (
-            <AnimateOnScroll
-              stagger
-              className="grid grid-cols-1 md:grid-cols-3 gap-6"
-            >
-              {trendingData.map((sector, i) => (
-                <AnimateOnScrollItem key={sector.id}>
-                  <TrendingSectorCard sector={sector} rank={i + 1} />
-                </AnimateOnScrollItem>
-              ))}
-            </AnimateOnScroll>
-          )}
-        </div>
-      </section>
 
       <section className="py-14 md:py-20 border-t border-border">
         <div className="container mx-auto px-4 md:px-6 max-w-6xl">
@@ -443,11 +595,7 @@ export default function Home() {
               <div className="rounded-3xl overflow-hidden border border-border bg-card">
                 <div className="hero-navy px-8 py-10 text-center">
                   <div className="w-16 h-16 rounded-full border-2 border-white/15 bg-white/8 flex items-center justify-center overflow-hidden mx-auto mb-5">
-                    <img
-                      src="/logo.svg"
-                      alt="NorthStar"
-                      className="w-full h-full object-cover"
-                    />
+                    <AppLogo alt="NorthStar" className="h-full w-full" />
                   </div>
                   <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">
                     Pronto a trovare{" "}

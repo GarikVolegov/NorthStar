@@ -71,6 +71,10 @@ export const JOURNEY_CATEGORIES: Record<NavPhase, string[]> = {
   investitore: ["finance", "business", "technology"],
 };
 
+export const DEFAULT_NEWS_TICKER_ITEMS = [
+  "Cybersecurity: competenze richieste in crescita negli ultimi 12 mesi",
+];
+
 export function prefetchRoute(path: string) {
   PREFETCH_MAP[path]?.();
 }

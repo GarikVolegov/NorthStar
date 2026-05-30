@@ -98,4 +98,40 @@ describe("KnowledgeChatPanel", () => {
     });
     expect(screen.queryByText("Avvioâ€¦")).not.toBeInTheDocument();
   });
+
+  it("uses the real knowledge ask contract and renders server token events", async () => {
+    streamMock.mockResolvedValue(
+      sseResponse([
+        `data: ${JSON.stringify({ type: "token", value: "Risposta " })}\n\n`,
+        `data: ${JSON.stringify({ type: "token", value: "dal grafo." })}\n\n`,
+        `data: ${JSON.stringify({ type: "sources", sources: [], indexStatus: "ready" })}\n\n`,
+        `data: ${JSON.stringify({ type: "done" })}\n\n`,
+      ]),
+    );
+
+    render(
+      <KnowledgeChatPanel
+        nodes={nodes}
+        onClose={vi.fn()}
+        onFocusNode={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "Cosa sai?" },
+    });
+    const sendButton = screen
+      .getAllByRole("button")
+      .findLast((button) => !button.hasAttribute("disabled"));
+    expect(sendButton).toBeDefined();
+    fireEvent.click(sendButton!);
+
+    await waitFor(() => {
+      expect(screen.getByText("Risposta dal grafo.")).toBeInTheDocument();
+    });
+    expect(streamMock).toHaveBeenCalledWith(expect.stringContaining("api/knowledge/ask"), {
+      method: "POST",
+      body: JSON.stringify({ message: "Cosa sai?" }),
+    });
+  });
 });

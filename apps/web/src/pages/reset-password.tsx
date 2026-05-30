@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/button";
+import { AppLogo } from "@/components/brand/AppLogo";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiClientError, postJson } from "@/lib/apiClient";
-import { AlertTriangle, CheckCircle2, Loader2, Star } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "wouter";
@@ -74,7 +75,7 @@ export default function ResetPassword() {
     <div className="min-h-[60vh] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-2 mb-6">
-          <Star className="h-5 w-5 text-primary fill-primary" />
+          <AppLogo decorative className="h-5 w-5" />
           <span className="font-serif font-bold text-lg text-primary">NorthStar</span>
         </div>
 

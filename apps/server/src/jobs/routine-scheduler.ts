@@ -1,5 +1,5 @@
 import { and, asc, eq, lte } from "drizzle-orm";
-import { computeVitalSigns, type VitalSigns } from "@workspace/ai-server";
+import { appendOperatorEvent, computeVitalSigns, type OperatorEventInput, type VitalSigns } from "@workspace/ai-server";
 import { computeNextRun } from "../lib/routine-schedule";
 import { rootLogger } from "../middleware/logger";
 
@@ -37,6 +37,7 @@ export interface RunDueRoutinesOptions {
   limit?: number;
   store?: RoutineSchedulerStore;
   computeVitals?: (sectorId: number, geography?: string) => Promise<VitalSigns>;
+  onOperatorEvent?: (input: OperatorEventInput) => Promise<unknown>;
 }
 
 const VITAL_LABELS = {
@@ -52,6 +53,7 @@ export async function runDueRoutines({
   limit = 25,
   store = dbRoutineSchedulerStore,
   computeVitals = computeVitalSigns,
+  onOperatorEvent = appendOperatorEvent,
 }: RunDueRoutinesOptions = {}): Promise<{ scanned: number; executed: number; failed: number }> {
   const routines = await store.listDueRoutines(now, limit);
   let executed = 0;
@@ -61,6 +63,21 @@ export async function runDueRoutines({
     try {
       const execution = await buildRoutineExecution(routine, computeVitals);
       await store.createExecution(execution);
+      await safeOperatorEvent(onOperatorEvent, {
+        userId: routine.userId,
+        source: "routine_scheduler",
+        triggerType: "routine_execution_created",
+        decision: "routine",
+        targetType: "routine",
+        targetId: String(routine.id),
+        status: "completed",
+        inputSummary: routine.name,
+        metadata: {
+          routineId: routine.id,
+          routineType: routine.type,
+          outputChannel: routine.outputChannel,
+        },
+      });
       await store.markRoutineRan(routine.id, {
         lastRunAt: now,
         nextRunAt: computeNextRun(routine.schedule, now),
@@ -73,6 +90,17 @@ export async function runDueRoutines({
   }
 
   return { scanned: routines.length, executed, failed };
+}
+
+async function safeOperatorEvent(
+  onOperatorEvent: (input: OperatorEventInput) => Promise<unknown>,
+  input: OperatorEventInput,
+): Promise<void> {
+  try {
+    await onOperatorEvent(input);
+  } catch (err) {
+    rootLogger.warn({ err, triggerType: input.triggerType, targetId: input.targetId }, "[routine-scheduler] operator event failed");
+  }
 }
 
 async function buildRoutineExecution(

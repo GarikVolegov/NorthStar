@@ -201,7 +201,7 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/push", router: pushRouter, auth: "authenticated", description: "Push notifications" },
   { path: "/api/favorites", router: favoritesRouter, auth: "authenticated", description: "Favorites" },
   { path: "/api/pinned-sectors", router: pinnedSectorsRouter, auth: "authenticated", description: "Settori pinnati" },
-  { path: "/api/nft-certificates", router: nftCertificatesRouter, auth: "authenticated", description: "NFT certificates" },
+  { path: "/api/nft-certificates", router: nftCertificatesRouter, auth: "public", description: "NFT certificates" },
   { path: "/api/certifications", router: certificationsRouter, auth: "authenticated", description: "Certifications" },
   { path: "/api/affiliazione", router: affiliazioneRouter, auth: "authenticated", description: "Programma affiliazione" },
   { path: "/api/affiliate", router: affiliateRouter, auth: "authenticated", description: "Affiliate" },

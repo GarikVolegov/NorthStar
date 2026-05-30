@@ -26,6 +26,7 @@ export * from "./newsArticles";
 export * from "./growthArticles";
 export * from "./agentReview";
 export * from "./agentPrompts";
+export * from "./agentOrchestrationEvents";
 export * from "./adminCatalogDrafts";
 // agentLogs.ts removed — table merged into agentReview.ts as agentRunsTable.
 // Run the following SQL to backfill and drop the old table if it still exists:

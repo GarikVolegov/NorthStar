@@ -4,6 +4,7 @@ import { BackgroundPicker } from "@/components/user-background/BackgroundPicker"
 import { DashboardNavigationSettings } from "@/components/profile/DashboardNavigationSettings";
 import { LogoPicker } from "@/components/profile/LogoPicker";
 import { MonthlyRitualSettings } from "@/components/profile/MonthlyRitualSettings";
+import { NftCertificateGallery } from "@/components/NftCertificateGallery";
 import { NotificationSettings } from "@/components/profile/NotificationSettings";
 import { PrivacyCard } from "@/components/profile/settings/PrivacyCard";
 import {
@@ -479,7 +480,7 @@ export function ProfileSettings({
               />
             </AccordionTrigger>
             <AccordionContent>
-              <div className="grid grid-cols-2 gap-2 pb-1">
+              <div className="grid grid-cols-2 gap-2 pb-5">
                 {BADGE_DEFS.map((b) => {
                   const earned = b.check(completionData);
                   return (
@@ -498,6 +499,7 @@ export function ProfileSettings({
                   );
                 })}
               </div>
+              <NftCertificateGallery userId={user.id} />
             </AccordionContent>
           </AccordionItem>
         )}

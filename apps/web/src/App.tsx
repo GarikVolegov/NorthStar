@@ -3,6 +3,7 @@ import { UserBackgroundLayer } from "@/components/user-background/UserBackground
 import { WendyInsightToastRunner } from "@/components/wendy/WendyInsightToastRunner";
 import { AppStateProvider } from "@/contexts/AppStateContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { AppLogoHeadSync } from "@/components/brand/AppLogoHeadSync";
 import { AppAudioProvider } from "@/contexts/AppAudioProvider";
 import { AdminAgentProvider } from "@/contexts/AdminAgentContext";
 import { WendyProvider } from "@/contexts/WendyProvider";
@@ -203,6 +204,7 @@ function App() {
               <TooltipProvider>
                 <WendyProvider>
                   <AdminAgentProvider>
+                  <AppLogoHeadSync />
                   <UserBackgroundLayer />
                   <div className="relative z-10 min-h-screen">
                     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>

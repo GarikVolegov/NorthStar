@@ -510,19 +510,34 @@ export type WendyFeedbackBodyRating =
   (typeof WendyFeedbackBodyRating)[keyof typeof WendyFeedbackBodyRating];
 
 export const WendyFeedbackBodyRating = {
-  upvote: "upvote",
-  downvote: "downvote",
+  up: "up",
+  down: "down",
+} as const;
+
+export type WendyFeedbackBodyReason =
+  (typeof WendyFeedbackBodyReason)[keyof typeof WendyFeedbackBodyReason];
+
+export const WendyFeedbackBodyReason = {
+  inaccurate: "inaccurate",
+  irrelevant: "irrelevant",
+  too_long: "too_long",
+  too_slow: "too_slow",
+  harmful: "harmful",
+  other: "other",
 } as const;
 
 export type WendyFeedbackBody = {
-  /** ID of the Wendy message being rated */
-  messageId: string;
+  /** ID of the Wendy request being rated */
+  requestId: string;
   rating: WendyFeedbackBodyRating;
-  sessionId?: string;
+  reason?: WendyFeedbackBodyReason;
+  intent?: string;
+  domain?: string;
+  toolsUsed?: string[];
 };
 
 export type WendyFeedback200 = {
-  success: boolean;
+  ok: boolean;
 };
 
 export type WendyVoiceBody = {

@@ -9,11 +9,14 @@
  */
 import { Router } from "express";
 import { z } from "zod";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray, count, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { rootLogger } from "../middleware/logger";
 import { db, agentEmployeesTable, agentTasksTable } from "@workspace/db";
 import { isOneOf } from "../lib/type-guards";
+import { agentRegistry } from "../lib/agent-registry";
+import { appendOperatorEvent } from "@workspace/ai-server";
+import { notifyAgentTaskFinished } from "../services/agents/agent-task-notifications";
 
 const router = Router();
 const log = rootLogger.child({ module: "agents" });
@@ -24,6 +27,22 @@ const AGENT_TASK_STATUSES = [
   "failed",
   "cancelled",
 ] as const;
+const AGENT_TASK_QUEUE_LOCK_NAMESPACE = 3001;
+
+router.get("/operator/status", requireAuth, async (_req, res) => {
+  try {
+    const snapshot = await agentRegistry.getSnapshot();
+    res.json({
+      ok: true,
+      health: snapshot.aggregates.executing > snapshot.aggregates.online ? "degraded" : "ok",
+      generatedAt: snapshot.generatedAt,
+      snapshot,
+    });
+  } catch (e) {
+    log.error({ e }, "[agents] operator status error");
+    res.status(500).json({ error: "Errore nel recupero dello stato operator" });
+  }
+});
 
 // ── GET /api/agents ────────────────────────────────────────────────────────────
 
@@ -110,64 +129,94 @@ router.post("/tasks", requireAuth, async (req, res) => {
     return;
   }
 
-  // Verifica che l'agente esista
-  const [agent] = await db
-    .select({ slug: agentEmployeesTable.slug })
-    .from(agentEmployeesTable)
-    .where(
-      and(
-        eq(agentEmployeesTable.slug, parsed.data.agentSlug),
-        eq(agentEmployeesTable.isActive, true),
-      ),
-    )
-    .limit(1);
-
-  if (!agent) {
-    res
-      .status(404)
-      .json({ error: `Agente ${parsed.data.agentSlug} non trovato` });
-    return;
-  }
-
-  // Limite: max 5 task in coda/running per utente
-  const runningCount = await db
-    .select({ count: agentTasksTable.id })
-    .from(agentTasksTable)
-    .where(
-      and(
-        eq(agentTasksTable.userId, userId),
-        eq(agentTasksTable.status, "queued"),
-      ),
-    );
-
-  if (runningCount.length >= 5) {
-    res
-      .status(429)
-      .json({
-        error:
-          "Hai raggiunto il limite di task in coda (max 5). Attendi il completamento di alcuni.",
-      });
-    return;
-  }
-
   try {
-    const [task] = await db
-      .insert(agentTasksTable)
-      .values({
-        userId,
-        agentSlug: parsed.data.agentSlug,
-        title: parsed.data.title,
-        prompt: parsed.data.prompt,
-        contextType: parsed.data.contextType,
-        contextId: parsed.data.contextId,
-        contextData: parsed.data.contextData,
-        status: "queued",
-      })
-      .returning({ id: agentTasksTable.id });
+    const creation = await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(${AGENT_TASK_QUEUE_LOCK_NAMESPACE}, ${userId})`);
 
-    if (!task) {
-      throw new Error("Task non creato");
+      const [agent] = await tx
+        .select({ slug: agentEmployeesTable.slug })
+        .from(agentEmployeesTable)
+        .where(
+          and(
+            eq(agentEmployeesTable.slug, parsed.data.agentSlug),
+            eq(agentEmployeesTable.isActive, true),
+          ),
+        )
+        .limit(1);
+
+      if (!agent) return { status: "missing_agent" as const };
+
+      const [taskCount] = await tx
+        .select({ value: count() })
+        .from(agentTasksTable)
+        .where(
+          and(
+            eq(agentTasksTable.userId, userId),
+            inArray(agentTasksTable.status, ["queued", "running"]),
+          ),
+        )
+        .limit(1);
+
+      if ((taskCount?.value ?? 0) >= 5) {
+        return { status: "limit_reached" as const };
+      }
+
+      const [task] = await tx
+        .insert(agentTasksTable)
+        .values({
+          userId,
+          agentSlug: parsed.data.agentSlug,
+          title: parsed.data.title,
+          prompt: parsed.data.prompt,
+          contextType: parsed.data.contextType,
+          contextId: parsed.data.contextId,
+          contextData: parsed.data.contextData,
+          status: "queued",
+        })
+        .returning({ id: agentTasksTable.id });
+
+      if (!task) {
+        throw new Error("Task non creato");
+      }
+
+      return { status: "created" as const, task };
+    });
+
+    if (creation.status === "missing_agent") {
+      res
+        .status(404)
+        .json({ error: `Agente ${parsed.data.agentSlug} non trovato` });
+      return;
     }
+
+    if (creation.status === "limit_reached") {
+      res
+        .status(429)
+        .json({
+          error:
+            "Hai raggiunto il limite di task in coda (max 5). Attendi il completamento di alcuni.",
+        });
+      return;
+    }
+
+    const { task } = creation;
+
+    const event = await safeAppendAgentTaskCreatedEvent({
+      userId,
+      source: "agent_route",
+      triggerType: "agent_task_created",
+      decision: "agent_task",
+      targetType: "agent_task",
+      targetId: String(task.id),
+      status: "dispatched",
+      inputSummary: parsed.data.title,
+      metadata: {
+        agentSlug: parsed.data.agentSlug,
+        executionMode: "background",
+        contextType: parsed.data.contextType ?? null,
+        contextId: parsed.data.contextId ?? null,
+      },
+    });
 
     log.info(
       { userId, taskId: task.id, agentSlug: parsed.data.agentSlug },
@@ -176,17 +225,34 @@ router.post("/tasks", requireAuth, async (req, res) => {
 
     // Esegui il task in background (fire-and-forget)
     import("@workspace/ai-server")
-      .then(({ executeAgentTask }) => executeAgentTask(task.id))
+      .then(async ({ executeAgentTask }) => {
+        await executeAgentTask(task.id, { source: "agent_route" });
+        await notifyAgentTaskFinished(task.id);
+      })
       .catch((err) =>
         log.error({ err, taskId: task.id }, "[agents] executor error"),
       );
 
-    res.status(201).json({ ok: true, taskId: task.id });
+    res.status(201).json({
+      ok: true,
+      taskId: task.id,
+      ...(event ? { orchestrationEventId: event.id } : {}),
+      executionMode: "background",
+    });
   } catch (e) {
     log.error({ e, userId }, "[agents] create task error");
     res.status(500).json({ error: "Errore nella creazione del task" });
   }
 });
+
+async function safeAppendAgentTaskCreatedEvent(input: Parameters<typeof appendOperatorEvent>[0]) {
+  try {
+    return await appendOperatorEvent(input);
+  } catch (err) {
+    log.warn({ err, targetId: input.targetId }, "[agents] operator event append failed");
+    return null;
+  }
+}
 
 // ── GET /api/agents/tasks/:id ─────────────────────────────────────────────────
 

@@ -255,6 +255,39 @@ export type {
 } from "./model-router/catalog";
 export { applyContextSignals } from "./model-router";
 
+// Wendy Jarvis intelligence core
+export {
+  buildWendyIntelligenceDirectives,
+  buildWendyRepairHint,
+  buildWendyTrainingPromptSection,
+  evaluateWendyResponse,
+  evaluateWendyTrainingCase,
+  evaluateWendyTrainingResponseShape,
+  getWendyTrainingCoverage,
+  getWendyCapability,
+  planWendyDecision,
+  runWendyTrainingEvaluation,
+  WENDY_CAPABILITIES,
+  WENDY_TRAINING_CASES,
+} from "./wendy-intelligence";
+export type {
+  WendyCapability,
+  WendyCapabilityKey,
+  WendyDecision,
+  WendyDecisionInput,
+  WendyDecisionMode,
+  WendyResponseRubric,
+  WendySelfCheckInput,
+  WendySelfCheckIssue,
+  WendySelfCheckResult,
+  WendyTrainingCase,
+  WendyTrainingCaseResult,
+  WendyTrainingCategory,
+  WendyTrainingCoverage,
+  WendyTrainingEvaluation,
+  WendyTrainingResponseShapeResult,
+} from "./wendy-intelligence";
+
 // Rabbit expert domain
 export { checkRabbitEmergency } from "./rabbit/emergency-triage";
 export type { TriageResult } from "./rabbit/emergency-triage";
@@ -271,6 +304,20 @@ export { withTimeout, gracefulDegrade } from "./utils";
 
 // Agenti AI dipendenti
 export { executeAgentTask } from "./agents/agent-executor";
+export type { ExecuteAgentTaskOptions } from "./agents/agent-executor";
+export { dispatchQueuedAgentTasks, recoverStaleAgentTasks } from "./operator/dispatcher";
+export { appendOperatorEvent } from "./operator/event-log";
+export { planOperatorTask } from "./operator/planner";
+export type {
+  OperatorAction,
+  OperatorDecision,
+  OperatorEventInput,
+  OperatorEventRecord,
+  OperatorEventStatus,
+  OperatorPlan,
+  OperatorPlanInput,
+  OperatorTargetType,
+} from "./operator/types";
 
 // Step 6/7: RAG pipeline
 export { chunkDocument, chunkReport, chunkNews } from "./rag/chunker";

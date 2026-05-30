@@ -77,6 +77,34 @@
     "reviewResults": "Rivedi i tuoi risultati",
     "alreadyAccount": "Hai già un account? Accedi",
     "welcomeBack": "Bentornato, {{name}} ✦",
+    "narrative": {
+      "badge": "Bussola professionale",
+      "title": "NorthStar è la bussola per capire quale direzione professionale ha senso per te.",
+      "subtitle": "Prima di scegliere tra corsi, lavori, settori o strumenti AI, NorthStar ti aiuta a leggere chi sei, cosa chiede il mercato e quale percorso può diventare concreto.",
+      "discover": "Capisci come funziona",
+      "what": {
+        "badge": "Cos'è NorthStar",
+        "title": "Non iniziare da mille opzioni. Inizia da una lettura chiara.",
+        "subtitle": "NorthStar unisce orientamento personale, dati di mercato e strumenti di crescita in un percorso unico: prima capisci, poi scegli.",
+        "test": {
+          "title": "Parti da chi sei",
+          "desc": "Il test combina interessi professionali e Bussola Interiore per darti un primo profilo leggibile."
+        },
+        "market": {
+          "title": "Guarda il mercato reale",
+          "desc": "Settori, salari, crescita e rischio automazione aiutano a distinguere desiderio e opportunità."
+        },
+        "wendy": {
+          "title": "Chiedi a Wendy",
+          "desc": "L'assistente AI ti aiuta a interpretare risultati, dubbi e prossimi passi senza partire da una schermata vuota."
+        }
+      }
+    },
+    "audience": {
+      "badge": "Per chi è pensata",
+      "title": "Scegli il punto di partenza solo dopo aver capito la mappa.",
+      "subtitle": "NorthStar accompagna bisogni diversi, ma parte sempre dalla stessa promessa: ridurre il rumore e trasformare le opzioni in una direzione leggibile."
+    },
     "stats": {
       "guided": "Persone guidate",
       "sectors": "Settori analizzati",

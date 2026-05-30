@@ -13,7 +13,7 @@ import {
 } from "@/lib/objectives-presentation";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Circle, Flag, Plus, Trash2 } from "lucide-react";
+import { BadgeCheck, CheckCircle2, Circle, Flag, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -34,7 +34,15 @@ function importanceClass(label: ReturnType<typeof getObjectiveImportance>) {
   return "border-border bg-muted text-muted-foreground";
 }
 
-function ObjectiveTimeline({ objective }: { objective: DashboardObjective }) {
+function ObjectiveTimeline({
+  objective,
+  onToggleCertifiable,
+  certifiablePending,
+}: {
+  objective: DashboardObjective;
+  onToggleCertifiable: () => void;
+  certifiablePending: boolean;
+}) {
   const importance = getObjectiveImportance(objective);
   const displayedProgress = objective.completed ? 100 : objective.progress;
 
@@ -54,6 +62,27 @@ function ObjectiveTimeline({ objective }: { objective: DashboardObjective }) {
             <span className="rounded-full border bg-muted/40 px-2 py-1 text-[11px] font-semibold text-muted-foreground">
               {displayedProgress}% progresso
             </span>
+            {!objective.completed && (
+              <button
+                type="button"
+                aria-label={
+                  objective.isCertifiableMilestone
+                    ? "Rimuovi milestone certificabile"
+                    : "Rendi milestone certificabile"
+                }
+                onClick={onToggleCertifiable}
+                disabled={certifiablePending}
+                className={cn(
+                  "inline-flex min-h-8 items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors",
+                  objective.isCertifiableMilestone
+                    ? "border-primary/30 bg-primary/10 text-primary"
+                    : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-primary",
+                )}
+              >
+                <BadgeCheck className="h-3 w-3" />
+                {objective.isCertifiableMilestone ? "Milestone certificabile" : "Milestone non certificabile"}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -105,6 +134,14 @@ export function DiaryObjectives() {
 
   const toggleMutation = useMutation({
     mutationFn: (objective: DashboardObjective) => patchJson(`${BASE}api/objectives/${objective.id}`, { completed: !objective.completed }),
+    onSuccess: invalidateObjectives,
+  });
+
+  const certifiableMutation = useMutation({
+    mutationFn: (objective: DashboardObjective) =>
+      patchJson(`${BASE}api/objectives/${objective.id}`, {
+        isCertifiableMilestone: !objective.isCertifiableMilestone,
+      }),
     onSuccess: invalidateObjectives,
   });
 
@@ -213,7 +250,11 @@ export function DiaryObjectives() {
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
-              <ObjectiveTimeline objective={objective} />
+              <ObjectiveTimeline
+                objective={objective}
+                onToggleCertifiable={() => certifiableMutation.mutate(objective)}
+                certifiablePending={certifiableMutation.isPending}
+              />
             </div>
           ))}
         </section>

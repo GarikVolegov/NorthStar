@@ -62,7 +62,7 @@ export default function CertificatePage() {
   const [, params] = useRoute("/certificato/:hash");
   const hash = params?.hash ?? "";
 
-  const imageUrl = `${BASE}api/nft-certificates/image/${hash}.png`;
+  const imageUrl = `${BASE}api/nft-certificates/image/${hash}.svg`;
 
   const { data, isLoading, isError } = useQuery<VerifyResult>({
     queryKey: ["verify-cert", hash],
@@ -108,7 +108,7 @@ export default function CertificatePage() {
           </h1>
           <p className="text-muted-foreground text-sm">
             Ogni certificato NorthStar è firmato crittograficamente e
-            verificabile pubblicamente
+            verificabile pubblicamente off-chain
           </p>
         </div>
 
@@ -255,13 +255,13 @@ export default function CertificatePage() {
                   text={window.location.href}
                   label="Copia link verifica"
                 />
-                <a href={imageUrl} download={`northstar-cert-${cert.id}.png`}>
+                <a href={imageUrl} download={`northstar-cert-${cert.id}.svg`}>
                   <Button
                     variant="outline"
                     size="sm"
                     className="rounded-lg gap-1.5 text-sm h-9"
                   >
-                    <ExternalLink className="h-3.5 w-3.5" /> Scarica PNG
+                    <ExternalLink className="h-3.5 w-3.5" /> Scarica SVG
                   </Button>
                 </a>
               </div>
