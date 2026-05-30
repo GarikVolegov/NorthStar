@@ -77,7 +77,7 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
     name:        "compare_sectors",
     description: "Confronta da 2 a 4 settori su salario, trend, automazione e autonomia. Richiede ALMENO 2 ID settori noti.",
     parameters: [
-      { name: "sectorIds", type: "array", description: "Array di 2-4 ID settori interi", required: true },
+      { name: "sectorIds", type: "array", itemType: "integer", description: "Array di 2-4 ID settori interi", required: true },
     ],
   },
 
@@ -225,7 +225,7 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
       { name: "roleTitle",    type: "string", description: "Titolo del ruolo (es. 'Data Engineer')" },
       { name: "professionId", type: "number", description: "ID professione (alternativo a roleTitle)" },
       { name: "geography",    type: "string", description: "Area geografica: IT | EU | US | Global", required: true },
-      { name: "periods",      type: "array",  description: "Array di periodi YYYY-MM (es. ['2024-10','2025-01'])", required: true },
+      { name: "periods",      type: "array",  itemType: "string", description: "Array di periodi YYYY-MM (es. ['2024-10','2025-01'])", required: true },
     ],
   },
   get_skill_cooccurrences: {
@@ -445,7 +445,7 @@ export function toolsToOpenAIFormat(tools: ToolDefinition[]): Array<{
           t.parameters.map((p) => [
             p.name,
             { type: p.type === "array" ? "array" : p.type, description: p.description,
-              ...(p.type === "array" ? { items: { type: "integer" } } : {}),
+              ...(p.type === "array" ? { items: { type: p.itemType ?? "string" } } : {}),
             },
           ]),
         ),
