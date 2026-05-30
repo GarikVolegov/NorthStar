@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   db,
   wendyBrainEventsTable,
@@ -211,6 +211,9 @@ export async function searchWendyBrain(
         inArray(wendyBrainNodesTable.status, statuses),
         options.types?.length ? inArray(wendyBrainNodesTable.type, options.types) : undefined,
       ))
+      // Order before the cap so the 200 candidates are the most salient nodes,
+      // not an arbitrary DB-order slice (JS re-ranks them semantically below).
+      .orderBy(desc(wendyBrainNodesTable.importance), desc(wendyBrainNodesTable.lastReinforcedAt))
       .limit(200);
     const queryEmbedding = await embedText(query).catch(() => null);
     return rows

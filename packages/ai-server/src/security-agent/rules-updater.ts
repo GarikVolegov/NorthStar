@@ -8,6 +8,22 @@ const SEVERITY_EMOJI: Record<string, string> = {
   LOW:    "🟢",
 };
 
+/** Neutralize LLM-generated text before writing it into the tracked
+ * SECURITY_RULES.md: strip control chars (incl. newlines), defuse markdown
+ * backticks, and cap length so a finding can't inject structure or bloat the
+ * file unbounded. */
+function sanitizeField(value: string, max = 500): string {
+  const cleaned = Array.from(String(value ?? ""))
+    .map((ch) => {
+      const code = ch.charCodeAt(0);
+      if (code < 0x20 || code === 0x7f) return " "; // strip control chars + newlines
+      return ch === "`" ? "'" : ch;               // defuse markdown backticks
+    })
+    .join("")
+    .trim();
+  return cleaned.slice(0, max);
+}
+
 export function updateSecurityRules(
   repoRoot:  string,
   findings:  SecurityFinding[],
@@ -25,12 +41,12 @@ export function updateSecurityRules(
   const findingsMd = findings.length === 0
     ? "_Nessuna vulnerabilità trovata._\n"
     : findings.map((f) =>
-        `#### ${SEVERITY_EMOJI[f.severity] ?? ""} [${f.severity}] ${f.title}\n` +
-        `- **File:** \`${f.file}:${f.line}\`\n` +
+        `#### ${SEVERITY_EMOJI[f.severity] ?? ""} [${f.severity}] ${sanitizeField(f.title, 200)}\n` +
+        `- **File:** \`${sanitizeField(f.file, 200)}:${f.line}\`\n` +
         `- **Categoria:** \`${f.category}\`\n` +
-        `- **Descrizione:** ${f.description}\n` +
-        `- **Exploit:** ${f.exploit}\n` +
-        `- **Fix:** ${f.fix}\n`
+        `- **Descrizione:** ${sanitizeField(f.description)}\n` +
+        `- **Exploit:** ${sanitizeField(f.exploit)}\n` +
+        `- **Fix:** ${sanitizeField(f.fix)}\n`
       ).join("\n");
 
   const scanSection =
