@@ -12,23 +12,20 @@ function err(code: string, message: string): ToolResult {
 
 export type BrainLayer = "identity" | "domain" | "product" | "process";
 
-export function brainLayerToSector(layer: BrainLayer): "L1" | "L2" | "L3" | "L3.5" {
-  const layerMap = {
-    identity: "L1",
-    domain: "L2",
-    product: "L3",
-    process: "L3.5",
-  } as const;
-  return layerMap[layer];
-}
-
+/**
+ * vault-ingest stores `rc.sectors = [layer]` using the RAW frontmatter layer
+ * word (identity|domain|product|process — see apps/server/.../vault-ingest.ts).
+ * The brain search filter must therefore match that same raw word; mapping to
+ * L1/L2/L3 codes here filtered against data that never contains them, so
+ * layer-scoped search silently returned zero rows.
+ */
 export function searchBrainSqlParts(args: { layer?: BrainLayer }): {
   sourceType: "brain";
-  layerSector: "L1" | "L2" | "L3" | "L3.5" | null;
+  layerTag: BrainLayer | null;
 } {
   return {
     sourceType: "brain",
-    layerSector: args.layer ? brainLayerToSector(args.layer) : null,
+    layerTag: args.layer ?? null,
   };
 }
 
@@ -53,8 +50,8 @@ export async function handleSearchBrain(
     if (!vec) return err("UNAVAILABLE", "Servizio embedding temporaneamente non disponibile");
 
     const literal = vecLiteral(vec);
-    const layerFilter = parts.layerSector
-      ? sql`AND rc.sectors && ARRAY[${parts.layerSector}]::text[]`
+    const layerFilter = parts.layerTag
+      ? sql`AND rc.sectors && ARRAY[${parts.layerTag}]::text[]`
       : sql``;
 
     const rows = await db.execute<{
