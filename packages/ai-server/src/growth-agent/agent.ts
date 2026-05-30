@@ -183,8 +183,13 @@ export async function* runGrowthAgent(
     ? "Non hai abbastanza informazioni per classificare la richiesta dell'utente. Invece di rispondere direttamente, fai 1 domanda di chiarimento specifica per capire meglio di cosa ha bisogno. Non inventare risposte generiche."
     : undefined;
   let lastSupervisorScore: number | undefined;
-  const saveAssistantMemory = (assistantResponse: string, sid: number): void =>
-    scheduleMemorySave({ userId, sessionId: sid, history, userMessage, assistantResponse, routeDecision, logFields, supervisorScore: lastSupervisorScore });
+  // Skip persistence when there is no real session id — inventing Date.now()
+  // wrote memory rows under a bogus session that never coalesces on later turns,
+  // polluting coachMemoryFacts.sourceSessionId / coachMemoryPatterns.sessionIds.
+  const saveAssistantMemory = (assistantResponse: string): void => {
+    if (sessionId == null) return;
+    scheduleMemorySave({ userId, sessionId, history, userMessage, assistantResponse, routeDecision, logFields, supervisorScore: lastSupervisorScore });
+  };
 
   const primaryConfident =
     routeDecision.confidence >= routeDecision.threshold &&
@@ -195,18 +200,25 @@ export async function* runGrowthAgent(
       logger.info({ ...logFields }, "parallel handoff disabled by flag — falling back to primary specialist");
     } else {
       let fullResponse = "";
-      for await (const event of runParallelHandoff({
-        userId, userContext: enrichedContext, history, userMessage: normalizedMessage,
-        primaryRoute:   routeDecision,
-        secondaryRoute: routeDecision.secondaryRoute,
-        memoryFactCount, maxHistory, requestId,
-      })) {
-        if (event.type === "token") fullResponse += event.value;
-        yield event;
-        if (event.type === "done") saveAssistantMemory(fullResponse, sessionId ?? Date.now());
+      try {
+        for await (const event of runParallelHandoff({
+          userId, userContext: enrichedContext, history, userMessage: normalizedMessage,
+          primaryRoute:   routeDecision,
+          secondaryRoute: routeDecision.secondaryRoute,
+          memoryFactCount, maxHistory, requestId,
+        })) {
+          if (event.type === "token") fullResponse += event.value;
+          yield event;
+          if (event.type === "done") saveAssistantMemory(fullResponse);
+        }
+        endRagTimer();
+        return;
+      } catch (err) {
+        // Mirror the single-specialist path: a thrown specialist must not kill
+        // the turn — fall through to the generic growth agent instead.
+        logger.warn({ err, ...logFields }, "parallel handoff failed, falling back to generic growth agent");
+        yield { type: "status", value: "Cambio approccio..." };
       }
-      endRagTimer();
-      return;
     }
   }
 
@@ -225,7 +237,7 @@ export async function* runGrowthAgent(
           }
           if (event.type === "token") fullResponse += event.value;
           yield event;
-          if (event.type === "done") saveAssistantMemory(fullResponse, sessionId ?? Date.now());
+          if (event.type === "done") saveAssistantMemory(fullResponse);
         }
         endRagTimer();
         return;
@@ -251,7 +263,7 @@ export async function* runGrowthAgent(
     const clarification = buildClarification(evalResult, userContext.name);
     yield { type: "token", value: clarification };
     yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], cot, evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
-    saveAssistantMemory(clarification, sessionId ?? Date.now());
+    saveAssistantMemory(clarification);
     return;
   }
 
@@ -378,7 +390,7 @@ export async function* runGrowthAgent(
           if (toolResult.ok && isClientSideToolData(toolData)) {
             yield { type: "tool_call", name: toolCall.name, result: toolData };
             yield { type: "done", sources: [], evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
-            saveAssistantMemory(`[tool: ${toolCall.name}]`, sessionId ?? Date.now());
+            saveAssistantMemory(`[tool: ${toolCall.name}]`);
             return;
           }
 
@@ -430,7 +442,7 @@ export async function* runGrowthAgent(
 
         const followUpText = followUpBuffer.join("");
         yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], evalResult, routeDecision };
-        saveAssistantMemory(followUpText, sessionId ?? Date.now());
+        saveAssistantMemory(followUpText);
         return;
       }
 
@@ -452,7 +464,7 @@ export async function* runGrowthAgent(
         sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults],
         evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent),
       };
-      saveAssistantMemory(`[UI: ${orderedToolCalls.map((toolCall) => toolCall.name).join(", ")}]`, sessionId ?? Date.now());
+      saveAssistantMemory(`[UI: ${orderedToolCalls.map((toolCall) => toolCall.name).join(", ")}]`);
       return;
     }
 
@@ -501,7 +513,7 @@ export async function* runGrowthAgent(
       uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent),
     };
 
-    saveAssistantMemory(finalText, sessionId ?? Date.now());
+    saveAssistantMemory(finalText);
     logger.info({ ...logFields, responseLength: finalText.length }, "response completed");
   } catch (err) {
     recordError("llm_generation", routeDecision.domain);

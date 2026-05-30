@@ -276,8 +276,11 @@ export async function* runParallelHandoff(
   }
 
   // ── Determine the two results in primary/secondary order ───────────────────────
-  const pResult = primaryResult ?? { domain: primaryRoute.domain, text: "", sources: [], statusEvents: [], finishedAt: Date.now(), error: "timeout" };
-  const sResult = secondaryResult ?? (loser ?? { domain: secondaryRoute.domain, text: "", sources: [], statusEvents: [], finishedAt: Date.now(), error: "timeout" }) as SpecialistResult;
+  // Derive strictly from primaryResult/secondaryResult — NOT from `loser` (which
+  // can hold the primary's result and would duplicate it into the secondary slot,
+  // double-counting sources and skewing the delta).
+  const pResult: SpecialistResult = primaryResult ?? { domain: primaryRoute.domain, text: "", sources: [], statusEvents: [], finishedAt: Date.now(), error: "timeout" };
+  const sResult: SpecialistResult = secondaryResult ?? { domain: secondaryRoute.domain, text: "", sources: [], statusEvents: [], finishedAt: Date.now(), error: "timeout" };
 
   const primaryOk   = !pResult.error   && pResult.text.length   > 0;
   const secondaryOk = !sResult.error   && sResult.text.length   > 0;
