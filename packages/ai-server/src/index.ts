@@ -167,6 +167,8 @@ export type { SearchProfessionRowsResult } from "./wendy-router/tool-handlers-da
 export { getSkillCooccurrenceRows } from "./wendy-router/tool-handlers-market";
 export { resolveWendyRoute } from "./wendy-router/router";
 export { buildLightPrompt }  from "./wendy-router/light-prompt";
+export { getFastPathFallbackReply, shouldUseImmediateFastPathFallback, getLlmUnavailableReply } from "./wendy-router/fast-path-fallback";
+export { isLlmConfigured, resolveActiveProvider, hasGroqKey, hasOpenRouterKey, hasOpenAIKey } from "./client";
 export { getLocalWendyReply, getLocalWendyFallbackReply, isLocalWendyReplyMessage } from "./wendy-router/local-reply";
 export type { WendyIntent, WendyPageContext, CompressedHistory, WendyRouterDecision, ToolDefinition } from "./wendy-router/types";
 

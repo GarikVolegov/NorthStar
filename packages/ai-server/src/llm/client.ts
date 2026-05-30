@@ -16,7 +16,7 @@ import Groq from "groq-sdk";
 import pRetry from "p-retry";
 import { logger } from "../logger";
 import { readToolCalls } from "./tool-call-parser";
-import { getOpenAIFallbackConfig, shouldFallbackToOpenAI } from "../client";
+import { getOpenAIFallbackConfig, shouldFallbackToOpenAI, resolveActiveProvider } from "../client";
 
 export interface LLMMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -461,7 +461,9 @@ let _provider: LLMProvider | null = null;
 export function getLLM(): LLMProvider {
   if (_provider) return _provider;
 
-  const provider = (process.env.AI_PROVIDER ?? "openai").toLowerCase();
+  // Auto-detect when AI_PROVIDER is unset so Wendy uses whichever provider has
+  // a usable key, instead of defaulting to openai and throwing on a missing key.
+  const provider = resolveActiveProvider();
 
   switch (provider) {
     case "openrouter":

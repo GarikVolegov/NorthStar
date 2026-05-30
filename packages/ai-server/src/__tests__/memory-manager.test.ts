@@ -19,6 +19,7 @@ vi.mock("../client", () => ({
       },
     },
   },
+  resolveActiveProvider: () => "openai",
 }));
 
 vi.mock("../logger", () => ({
@@ -153,6 +154,23 @@ describe("loadMemory", () => {
       .mockReturnValueOnce({ from: vi.fn(() => ({ where: wherePatterns })) });
 
     const result = await loadMemory(1);
+    expect(result.patterns).toHaveLength(0);
+  });
+
+  it("keeps Wendy available when one memory query fails because of schema drift", async () => {
+    const mockFact = { id: 1, userId: 1, key: "job", value: "dev" };
+
+    const whereFacts = vi.fn(() => Promise.resolve([mockFact]));
+    const wherePatterns = vi.fn(() =>
+      Promise.reject(new Error('column "last_reinforced_at" does not exist')),
+    );
+
+    mockDbSelect
+      .mockReturnValueOnce({ from: vi.fn(() => ({ where: whereFacts })) })
+      .mockReturnValueOnce({ from: vi.fn(() => ({ where: wherePatterns })) });
+
+    const result = await loadMemory(1);
+    expect(result.facts).toHaveLength(1);
     expect(result.patterns).toHaveLength(0);
   });
 });

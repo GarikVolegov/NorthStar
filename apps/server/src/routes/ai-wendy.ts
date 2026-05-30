@@ -41,6 +41,10 @@ import {
   buildWendyActivationContext,
   persistActivationTrace,
   reinforceCoActivations,
+  getFastPathFallbackReply,
+  shouldUseImmediateFastPathFallback,
+  getLlmUnavailableReply,
+  isLlmConfigured,
 } from "@workspace/ai-server";
 import type { CompressedHistory, WendyActivationContext, WendyPageContext } from "@workspace/ai-server";
 import {
@@ -197,14 +201,11 @@ router.post(
       }
     }
 
-    const personalContext = await buildWikiLLMContext({
-      query: message,
-      userId,
-      userRole: req.user!.role,
-      includePersonalMemory: true,
-      includeWendyBrain: false,
-      graphifyProfile: "auto",
-    });
+    let personalContext: Awaited<ReturnType<typeof buildWikiLLMContext>> = {
+      context: "",
+      contexts: { semanticMemory: "", openHuman: "", graphify: "", wendyBrain: "" },
+      sources: [],
+    };
 
     // ── SSE headers ───────────────────────────────────────────────────────────
     res.setHeader("Content-Type", "text/event-stream");
@@ -321,6 +322,7 @@ router.post(
         );
         send({ type: "token", value: triage.responseText });
         send(donePayload({ rabbitTriage: { emergency: true, signals: triage.matchedSignals } }));
+        if (!res.writableEnded) res.end();
         markIdle();
         return;
       }
@@ -339,6 +341,49 @@ router.post(
       { userId, intent, model: decision.model, tier: decision.tier },
       "[ai/wendy] routed",
     );
+
+    if (shouldUseImmediateFastPathFallback({ intent, message })) {
+      const fallbackText = getFastPathFallbackReply({ intent, message, locale });
+      if (fallbackText) {
+        outputTokens += estimateTokens(fallbackText);
+        assistantResponseForMemory += fallbackText;
+        if (ttftMs === null) ttftMs = Date.now() - startedAt;
+        send({ type: "token", value: fallbackText });
+        send({
+          ...donePayload({
+            intent,
+            usage: { model: "local-fast-path", inputTokens: estimateTokens(message), outputTokens },
+          }),
+        });
+        if (!res.writableEnded) res.end();
+        markIdle();
+        return;
+      }
+    }
+
+    // No chat LLM provider configured → degrade gracefully with a clear message
+    // instead of letting downstream LLM/embedding calls throw ("si è interrotta").
+    if (!isLlmConfigured()) {
+      const msg = getLlmUnavailableReply(locale);
+      outputTokens += estimateTokens(msg);
+      assistantResponseForMemory += msg;
+      if (ttftMs === null) ttftMs = Date.now() - startedAt;
+      rootLogger.warn({ userId, requestId }, "[ai/wendy] no LLM provider configured — returning graceful notice");
+      send({ type: "token", value: msg });
+      send(donePayload({ intent, usage: { model: "unconfigured", inputTokens: estimateTokens(message), outputTokens } }));
+      if (!res.writableEnded) res.end();
+      markIdle();
+      return;
+    }
+
+    personalContext = await buildWikiLLMContext({
+      query: message,
+      userId,
+      userRole: req.user!.role,
+      includePersonalMemory: true,
+      includeWendyBrain: false,
+      graphifyProfile: "auto",
+    });
 
     neuralContext = await buildWendyActivationContext({
       requestId,
@@ -410,15 +455,25 @@ router.post(
               { err, userId, requestId },
               "[ai/wendy] fast path tool call failed, retrying text-only",
             );
-            finalText = await withRouteTimeout(
-              llm.chatOnce(textOnlyMsgs, {
-                model: decision.model,
-                temperature: 0.2,
-                maxTokens: wendyConfig.fastPath.maxTokens,
-              }),
-              fastPathTimeoutMs,
-              "wendy fast path text-only",
-            );
+            try {
+              finalText = await withRouteTimeout(
+                llm.chatOnce(textOnlyMsgs, {
+                  model: decision.model,
+                  temperature: 0.2,
+                  maxTokens: wendyConfig.fastPath.maxTokens,
+                }),
+                fastPathTimeoutMs,
+                "wendy fast path text-only",
+              );
+            } catch (fallbackErr) {
+              const fallbackText = getFastPathFallbackReply({ intent, message, locale });
+              if (!fallbackText) throw fallbackErr;
+              rootLogger.warn(
+                { err: fallbackErr, userId, requestId },
+                "[ai/wendy] fast path text-only failed, using local simple_qa fallback",
+              );
+              finalText = fallbackText;
+            }
             outputTokens += estimateTokens(finalText);
             break;
           }
@@ -478,15 +533,25 @@ router.post(
         }
 
         if (!finalText && intent === "simple_qa") {
-          finalText = await withRouteTimeout(
-            llm.chatOnce(textOnlyMsgs, {
-              model: decision.model,
-              temperature: 0.2,
-              maxTokens: wendyConfig.fastPath.maxTokens,
-            }),
-            fastPathTimeoutMs,
-            "wendy fast path text-only",
-          );
+          try {
+            finalText = await withRouteTimeout(
+              llm.chatOnce(textOnlyMsgs, {
+                model: decision.model,
+                temperature: 0.2,
+                maxTokens: wendyConfig.fastPath.maxTokens,
+              }),
+              fastPathTimeoutMs,
+              "wendy fast path text-only",
+            );
+          } catch (fallbackErr) {
+            const fallbackText = getFastPathFallbackReply({ intent, message, locale });
+            if (!fallbackText) throw fallbackErr;
+            rootLogger.warn(
+              { err: fallbackErr, userId, requestId },
+              "[ai/wendy] empty fast path failed, using local simple_qa fallback",
+            );
+            finalText = fallbackText;
+          }
           outputTokens += estimateTokens(finalText);
         }
 

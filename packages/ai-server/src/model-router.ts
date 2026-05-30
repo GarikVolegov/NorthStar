@@ -19,6 +19,7 @@
  */
 
 import { aiPlugins } from "./plugins/registry";
+import { resolveActiveProvider } from "./client";
 
 export type RequestComplexity = "simple" | "standard" | "deep";
 
@@ -112,21 +113,13 @@ const PRO_STANDARD_OR = env("MODEL_PRO_STANDARD_OPENROUTER", "anthropic/claude-s
 const PREMIUM_OPENAI = env("MODEL_PREMIUM_OPENAI",        "gpt-4o");
 const CHEAP_OPENAI   = env("MODEL_CHEAP_OPENAI",          "gpt-4o-mini");
 const ALLOW_PAID_MODELS = process.env.ALLOW_PAID_AI_MODELS === "true";
-const MODEL_PROVIDERS = ["openai", "groq", "openrouter"] as const;
-type ModelProvider = (typeof MODEL_PROVIDERS)[number];
-
-function readModelProvider(value: string | undefined): ModelProvider {
-  const normalized = value?.toLowerCase();
-  return MODEL_PROVIDERS.find((provider) => provider === normalized) ?? "openai";
-}
 
 /**
  * Active backend. If AI_PROVIDER=openrouter we prefer OpenRouter free-tier models
  * for STANDARD/REASONING and fall back to OpenAI naming only when OpenRouter
  * isn't configured. The actual HTTP call goes through llm/client.ts.
  */
-const ACTIVE_PROVIDER: "openai" | "groq" | "openrouter" =
-  readModelProvider(process.env.AI_PROVIDER);
+const ACTIVE_PROVIDER: "openai" | "groq" | "openrouter" = resolveActiveProvider();
 
 function enforceFreeOpenRouterModel(model: string) {
   if (ALLOW_PAID_MODELS) return model;
