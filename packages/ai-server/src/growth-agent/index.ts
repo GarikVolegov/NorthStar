@@ -19,5 +19,8 @@ export type { SupervisorResult, SupervisorDimensions } from "./supervisor-agent"
 // Memory manager
 export { loadMemory, buildMemorySection, extractMemory, mergeMemory, type UserMemory, type MemoryFact, type MemoryPattern, type ExtractedMemory } from "./memory-manager";
 
+// Session summarizer (Phase 10 — session context window)
+export { summarizeSession, loadRecentSummaries, buildSessionHistorySection } from "./session-summarizer";
+
 // DB schemas (re-exported for admin routes)
 export { supervisorLogs, qualityMetrics } from "../db/schema";

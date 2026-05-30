@@ -278,21 +278,31 @@ router.post(
 
     const log = req.log;
 
-    // ── Load memory ────────────────────────────────────────────
+    // ── Load memory + recent session summaries ─────────────────
     let memorySection = "";
+    let sessionHistorySection = "";
     try {
-      const { loadMemory, buildMemorySection } =
-        await import("@workspace/ai-server/growth-agent");
-      const userMemory = await loadMemory(userId);
+      const {
+        loadMemory,
+        buildMemorySection,
+        loadRecentSummaries,
+        buildSessionHistorySection,
+      } = await import("@workspace/ai-server/growth-agent");
+      const [userMemory, recentSummaries] = await Promise.all([
+        loadMemory(userId),
+        loadRecentSummaries(userId),
+      ]);
       memorySection = buildMemorySection(userMemory);
+      sessionHistorySection = buildSessionHistorySection(recentSummaries);
     } catch (err) {
       log.warn({ err }, "coach memory load failed");
     }
 
     // ── Build messages array ────────────────────────────────────
-    const systemContent = memorySection
-      ? `${COACH_SYSTEM_PROMPT}\n\n${memorySection}`
-      : COACH_SYSTEM_PROMPT;
+    const systemContent =
+      COACH_SYSTEM_PROMPT +
+      (memorySection ? `\n\n${memorySection}` : "") +
+      sessionHistorySection;
 
     const history = (session.messages ?? []).map(
       (m: { role: string; content: string }) => ({
@@ -424,6 +434,31 @@ router.post(
           log.warn({ err }, "coach memory save failed/timed out");
         }
       })();
+
+      // ── Fire-and-forget: riepilogo di sessione (continuità) ──
+      // Throttle: ogni 2 scambi (4 messaggi) si aggiorna l'unica riga di
+      // riepilogo della sessione (upsert), così la sessione successiva ne
+      // eredita il contesto senza costo per ogni singolo turno.
+      const totalExchanges = Math.floor(updatedMessages.length / 2);
+      if (totalExchanges >= 2 && totalExchanges % 2 === 0) {
+        (async () => {
+          try {
+            const { summarizeSession } = await import(
+              "@workspace/ai-server/growth-agent"
+            );
+            await summarizeSession(
+              userId,
+              id,
+              updatedMessages.map((m: { role: string; content: string }) => ({
+                role: m.role,
+                content: m.content,
+              })),
+            );
+          } catch (err) {
+            log.warn({ err }, "coach session summarize failed");
+          }
+        })();
+      }
 
       res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
       res.end();

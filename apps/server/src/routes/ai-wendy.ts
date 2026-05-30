@@ -26,6 +26,8 @@ import {
   runGrowthAgent,
   loadMemory,
   buildMemorySection,
+  loadRecentSummaries,
+  buildSessionHistorySection,
   resolveWendyRoute,
   buildLightPrompt,
   toolsToOpenAIFormat,
@@ -578,9 +580,15 @@ router.post(
           send({ type: "error", message: wendyErrorMessage("error_timeout"), code: "error_timeout" });
         }, FULL_PATH_TIMEOUT_MS);
 
-        const userMemory = await loadMemory(userId);
+        const [userMemory, recentSummaries] = await Promise.all([
+          loadMemory(userId),
+          loadRecentSummaries(userId).catch(() => []),
+        ]);
         const memorySection =
-          buildMemorySection(userMemory) + personalContext.contexts.semanticMemory + personalContext.contexts.openHuman;
+          buildMemorySection(userMemory) +
+          buildSessionHistorySection(recentSummaries) +
+          personalContext.contexts.semanticMemory +
+          personalContext.contexts.openHuman;
 
         // Flatten compressed history per il growth agent
         const flatHistory = [

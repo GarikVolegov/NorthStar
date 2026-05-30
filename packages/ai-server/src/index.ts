@@ -20,6 +20,7 @@ export type { DifficultyLevel } from "./interview/adapt";
 
 export { runGrowthAgent } from "./growth-agent/agent";
 export { loadMemory, buildMemorySection } from "./growth-agent/memory-manager";
+export { loadRecentSummaries, buildSessionHistorySection } from "./growth-agent/session-summarizer";
 export { recordQualityEvent, recordUserFeedback } from "./growth-agent/quality-tracker";
 export { ingestText, ingestPersonaExample, ingestUrl } from "./growth-agent/ingest";
 export { retrieve } from "./growth-agent/retriever";
