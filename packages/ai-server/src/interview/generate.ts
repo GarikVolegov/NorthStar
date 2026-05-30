@@ -1,3 +1,4 @@
+import { isRecord } from "../utils";
 import { getLLM } from "../llm/client";
 import { logger } from "../logger";
 import { withTimeout } from "../utils";
@@ -9,9 +10,7 @@ export interface InterviewQuestion {
   focus: string;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+
 
 function readDifficulty(value: unknown): InterviewQuestion["difficulty"] {
   return value === "base" || value === "media" || value === "avanzata"

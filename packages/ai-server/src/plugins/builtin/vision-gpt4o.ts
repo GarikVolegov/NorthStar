@@ -1,3 +1,4 @@
+import { isRecord } from "../../utils";
 import type { Buffer } from "node:buffer";
 import type { AIPlugin, AIPluginHealth } from "../types";
 
@@ -34,9 +35,7 @@ function readString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+
 
 function extractModelText(payload: unknown): string {
   if (!isRecord(payload) || !Array.isArray(payload.choices)) return "";

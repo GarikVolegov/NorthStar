@@ -1,8 +1,7 @@
+import { isRecord } from "../utils";
 import type { ToolCall } from "./client";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+
 
 function parseArguments(raw: unknown): Record<string, unknown> {
   if (typeof raw !== "string") return {};

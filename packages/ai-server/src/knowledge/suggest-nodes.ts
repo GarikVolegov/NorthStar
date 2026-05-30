@@ -1,3 +1,4 @@
+import { isRecord } from "../utils";
 import { getLLM } from "../llm/client";
 import { logger } from "../logger";
 import { withTimeout } from "../utils";
@@ -9,9 +10,7 @@ export interface NodeSuggestion {
   reason: string;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+
 
 export async function suggestMissingNodes(
   existingNodes: Array<{ title: string; type: string; content: string }>,

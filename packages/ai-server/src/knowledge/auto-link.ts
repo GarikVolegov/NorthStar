@@ -1,3 +1,4 @@
+import { isRecord } from "../utils";
 import { getLLM } from "../llm/client";
 import { embedText } from "../growth-agent/embedder";
 import { logger } from "../logger";
@@ -19,9 +20,7 @@ export interface KnowledgeNodeBrief {
   type: string;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+
 
 function readLinkSuggestion(value: unknown): { index: number; label?: string; reason?: string } | null {
   if (!isRecord(value) || typeof value.index !== "number") return null;

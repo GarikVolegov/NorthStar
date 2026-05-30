@@ -14,6 +14,7 @@ import { hydrateMissingImages } from "./collector-preview";
 import type { RawItem } from "./collector-types";
 import { generateNewsImage } from "./news-image-generator";
 import { isPublishableDiscoveryNews, normalize } from "./news-policy";
+import { mapWithConcurrency } from "../utils";
 import { computeCorroboration } from "./news-verifier";
 
 const MIN_RELEVANCE = 0.25;
@@ -140,25 +141,6 @@ async function rewriteNewsForNorthStar(input: NewsRewriteInput): Promise<NewsRew
     logger.warn({ err, title: input.title }, "[news-publisher] AI rewrite failed, using fallback");
     return fallback;
   }
-}
-
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  mapper: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let index = 0;
-
-  async function worker() {
-    while (index < items.length) {
-      const current = index++;
-      results[current] = await mapper(items[current]!);
-    }
-  }
-
-  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
-  return results;
 }
 
 export async function runNewsPublisher(): Promise<NewsPublisherResult> {

@@ -16,6 +16,7 @@ import { handleSearchBrain } from "../wendy-router/tool-handlers-market";
 import { getToolsForIntent } from "../wendy-router/tool-registry";
 import type { WendyIntent, WendyPageContext } from "../wendy-router/types";
 import { logger } from "../logger";
+import { clamp01 } from "../utils";
 
 type ActivationDomain = string | null | undefined;
 
@@ -96,11 +97,6 @@ function enabled(): boolean {
 function maxItems(): number {
   const parsed = Number.parseInt(process.env.WENDY_NEURAL_MAX_ITEMS ?? "12", 10);
   return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 24) : 12;
-}
-
-function clamp01(value: number | undefined, fallback = 0): number {
-  if (!Number.isFinite(value)) return fallback;
-  return Math.max(0, Math.min(1, Number(value)));
 }
 
 function round3(value: number): number {

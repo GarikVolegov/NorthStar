@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { embedText } from "./growth-agent/embedder";
 import { logger } from "./logger";
+import { clamp01 } from "./utils";
 import "./wendy-router/tool-registry";
 import { toolRegistry } from "./tools/registry";
 import type { PluginToolDefinition } from "./tools/types";
@@ -61,11 +62,6 @@ function maxContextNodes(): number {
 
 function autoPromote(): boolean {
   return process.env.WENDY_BRAIN_AUTO_PROMOTE === "true";
-}
-
-function clamp01(value: number | undefined, fallback: number): number {
-  if (!Number.isFinite(value)) return fallback;
-  return Math.max(0, Math.min(1, Number(value)));
 }
 
 export function normalizeBrainTitle(title: string): string {

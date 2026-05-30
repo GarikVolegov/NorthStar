@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db, discoverySourcesTable } from "@workspace/db";
 import { logger } from "../logger";
 import type { ItemType, RawItem } from "./collector-types";
+import { mapWithConcurrency } from "../utils";
 
 export interface ScrapingDiscoverySource {
   id: number;
@@ -90,23 +91,6 @@ async function callPrintingPressBridge(source: ScrapingDiscoverySource): Promise
   if (!res.ok) throw new Error(`printing-press bridge ${res.status}`);
   const parsed = await res.json() as { items?: ScrapedItem[] } | ScrapedItem[];
   return Array.isArray(parsed) ? parsed : parsed.items ?? [];
-}
-
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  mapper: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let index = 0;
-  async function worker() {
-    while (index < items.length) {
-      const current = index++;
-      results[current] = await mapper(items[current]!);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
-  return results;
 }
 
 export async function collectScrapingSources(): Promise<RawItem[]> {
