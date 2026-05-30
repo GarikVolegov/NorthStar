@@ -1,4 +1,7 @@
 import type { RawItem } from "./collector-types";
+import { isSafeHttpUrl, safeFetch } from "../net-safety";
+
+export { isSafeHttpUrl } from "../net-safety";
 
 function decodeHtmlEntities(value: string): string {
   return value
@@ -7,17 +10,6 @@ function decodeHtmlEntities(value: string): string {
     .replace(/&#39;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
-}
-
-export function isSafeHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
-    const host = url.hostname.toLowerCase();
-    return !(host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host.endsWith(".local"));
-  } catch {
-    return false;
-  }
 }
 
 function extractMetaImage(html: string, pageUrl: string): string | undefined {
@@ -43,15 +35,14 @@ function extractMetaImage(html: string, pageUrl: string): string | undefined {
 async function fetchPagePreviewImage(pageUrl: string): Promise<string | undefined> {
   if (!isSafeHttpUrl(pageUrl)) return undefined;
   try {
-    const res = await fetch(pageUrl, {
+    const res = await safeFetch(pageUrl, {
       headers: {
         "Accept": "text/html,application/xhtml+xml",
         "User-Agent": "NorthStar/1.0 (news-preview-image; +https://northstar.app)",
       },
-      redirect: "follow",
       signal: AbortSignal.timeout(6_000),
     });
-    if (!res.ok) return undefined;
+    if (!res || !res.ok) return undefined;
     const contentType = res.headers.get("content-type") ?? "";
     if (!contentType.includes("text/html")) return undefined;
     return extractMetaImage((await res.text()).slice(0, 250_000), pageUrl);

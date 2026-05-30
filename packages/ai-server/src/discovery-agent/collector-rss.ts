@@ -1,5 +1,6 @@
 import { logger } from "../logger";
 import type { RSSEntry } from "./collector-types";
+import { isSafeHttpUrl, safeFetch } from "../net-safety";
 
 function extractTag(xml: string, tag: string): string {
   const re = new RegExp(`<${tag}[^>]*>(?:<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>|([\\s\\S]*?))</${tag}>`, "i");
@@ -48,13 +49,18 @@ function parseRSS(xml: string, limit = 8): RSSEntry[] {
 }
 
 export async function fetchRSS(feedUrl: string, limit = 8): Promise<RSSEntry[]> {
+  if (!isSafeHttpUrl(feedUrl)) {
+    logger.warn({ feedUrl }, "[collector] fetchRSS rejected unsafe feed URL");
+    return [];
+  }
   const headers = {
     "Accept": "application/rss+xml, application/xml, text/xml, application/atom+xml, */*",
     "User-Agent": "NorthStar/1.0 (discovery-agent; +https://northstar.app)",
   };
-  let res = await fetch(feedUrl, { headers, redirect: "follow", signal: AbortSignal.timeout(12_000) });
-  if ((res.status === 301 || res.status === 302) && res.headers.get("location")) {
-    res = await fetch(res.headers.get("location")!, { headers, redirect: "follow", signal: AbortSignal.timeout(10_000) });
+  const res = await safeFetch(feedUrl, { headers, signal: AbortSignal.timeout(12_000) });
+  if (!res) {
+    logger.warn({ feedUrl }, "[collector] fetchRSS blocked unsafe redirect");
+    return [];
   }
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${feedUrl}`);
   const xml = await res.text();
