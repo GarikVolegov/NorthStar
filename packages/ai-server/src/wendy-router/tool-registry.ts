@@ -385,6 +385,7 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_user_context",
     "search_memory_graph",
     "search_rag",                // Step 6: grounding per piano basato su dati reali
+    "search_brain",              // Brain runtime: piani su NorthStar identity/product/process
     "get_weak_signals",          // Step 6: ruoli emergenti rilevanti per il piano
     "get_job_posting_trend",     // Step 6: trend domanda per il ruolo target
     "get_skill_cooccurrences",   // Step 6: skill complementari per il piano

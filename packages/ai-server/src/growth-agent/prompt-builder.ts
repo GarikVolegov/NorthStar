@@ -154,7 +154,16 @@ REGOLE RAG E DATI DI MERCATO (Step 6):
   "Non ho dati aggiornati sufficienti su questo argomento. Per informazioni recenti consulta
   direttamente il World Economic Forum (weforum.org) o LinkedIn Economic Graph."
 - I weak signals sono tendenze emergenti, non certezze — presentali come tali:
-  "Stiamo osservando un segnale emergente che suggerisce..." (non "è confermato che").`;
+  "Stiamo osservando un segnale emergente che suggerisce..." (non "è confermato che").
+
+REGOLE BRAIN INTERNO (NorthStar):
+- Per domande sul prodotto NorthStar, sulla sua identità/valori, sul dominio o sui processi
+  interni (GSD, pipeline, decisioni, "perché funziona così", architettura di prodotto):
+  usa search_brain — NON search_rag (che serve per il mercato del lavoro e dati esterni).
+- Regola pratica: domanda interna/prodotto/processo → search_brain; domanda su
+  mercato/ruoli/trend esterni → search_rag. Nel dubbio su NorthStar stesso, preferisci search_brain.
+- explain_app_with_graphify spiega il CODICE/funzionamento tecnico; per valori, decisioni e
+  processo di prodotto usa invece search_brain.`;
 }
 
 export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {
