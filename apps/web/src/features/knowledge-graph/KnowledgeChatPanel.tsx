@@ -185,6 +185,7 @@ export function KnowledgeChatPanel({
       if (!reader) throw new Error("Nessun reader");
       const decoder = new TextDecoder();
       let buffer = "";
+      let completed = false;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -219,15 +220,35 @@ export function KnowledgeChatPanel({
                 error: data.error,
                 status: undefined,
               };
-            else if (data.kind === "done")
+            else if (data.kind === "done") {
+              completed = true;
               next[next.length - 1] = {
                 ...last,
                 content: last.content || "Nessuna risposta ricevuta.",
                 status: undefined,
               };
+            }
             return next;
           });
         }
+      }
+      const trailing = buffer.trim();
+      if (trailing) {
+        throw new Error("Risposta interrotta: il grafo ha inviato dati incompleti.");
+      }
+      if (!completed) {
+        setMessages((prev) => {
+          const next = prev.slice();
+          const last = next[next.length - 1];
+          if (last?.role === "assistant" && !last.content && !last.error) {
+            next[next.length - 1] = {
+              ...last,
+              error: "Lo stream si e interrotto prima della risposta. Riprova.",
+              status: undefined,
+            };
+          }
+          return next;
+        });
       }
     } catch (err) {
       setMessages((prev) => {

@@ -13,8 +13,12 @@ export function KnowledgeGraphEdgeLabelEditor({
   onSave,
 }: KnowledgeGraphEdgeLabelEditorProps) {
   const commit = async () => {
-    await onSave(edgeLabelEdit.edgeId, edgeLabelEdit.draft);
-    onChange(null);
+    try {
+      await onSave(edgeLabelEdit.edgeId, edgeLabelEdit.draft);
+      onChange(null);
+    } catch {
+      /* toast handled by data layer; keep editor open */
+    }
   };
 
   return (

@@ -8,20 +8,12 @@
  * Usato in dashboard.tsx solo quando journeyType === "indeciso".
  */
 import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api-fetch";
-import { CommitmentReadinessWidget } from "./CommitmentReadinessWidget";
+import {
+  CommitmentReadinessWidget,
+  fetchReadiness,
+  isReadinessData,
+} from "./CommitmentReadinessWidget";
 import { JourneyToolsSection } from "./JourneyToolsSection";
-
-interface ReadinessLite {
-  band: "low" | "mid" | "high";
-}
-
-async function fetchBand(): Promise<ReadinessLite> {
-  const res = await apiFetch("/api/discovery/readiness");
-  if (!res.ok) throw new Error("Errore caricamento readiness");
-  const j = await res.json();
-  return { band: j.band };
-}
 
 interface Props {
   toolsProps: { journeyType?: string | null; sectorId?: number };
@@ -31,9 +23,10 @@ export function DashboardIndecisoTools({ toolsProps }: Props) {
   // Stessa queryKey del widget interno → React Query condivide il dato (no doppia chiamata).
   const { data } = useQuery({
     queryKey: ["discovery-readiness"],
-    queryFn: fetchBand,
+    queryFn: fetchReadiness,
     staleTime: 60 * 1000,
   });
+  const readinessBand = isReadinessData(data) ? data.band : undefined;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -44,7 +37,7 @@ export function DashboardIndecisoTools({ toolsProps }: Props) {
         <JourneyToolsSection
           journeyType={toolsProps.journeyType}
           {...(toolsProps.sectorId !== undefined ? { sectorId: toolsProps.sectorId } : {})}
-          {...(data?.band ? { readinessBand: data.band } : {})}
+          {...(readinessBand ? { readinessBand } : {})}
         />
       </div>
     </div>

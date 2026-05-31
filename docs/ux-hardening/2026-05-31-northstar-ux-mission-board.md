@@ -160,6 +160,17 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - Wendy conserva gli errori stream come terminali, evita persistenza/TTS di risposte fallite e aggiunge follow-up cliccabili orientati a strumenti app, obiettivi e prossimo checkpoint.
 - I suggerimenti backend di Wendy vengono sanificati, deduplicati e completati con fallback fino a tre azioni cliccabili.
 
+## Tranche 14 Applicata
+
+- Affiliate dashboard non mostra piu `Copiato` se clipboard e fallback copy falliscono: espone un messaggio recuperabile e lascia il link selezionabile manualmente.
+- Il QR affiliate non fallisce in silenzio: fetch/download mostrano errore, stato di caricamento e `Riprova QR`, mantenendo disponibile la condivisione via link.
+- Idea Validator valida le risposte Wendy radar/decisione prima di scriverle in UI: payload malformati non sovrascrivono score o consigli con dati rotti/stale.
+- Idea Validator cancella suggerimenti AI ottimistici all'avvio di nuove richieste e rende errori di salvataggio, radar, decisione ed esperimenti annunciabili con `role="alert"`.
+- Knowledge Graph espone errori di caricamento con stato recuperabile su canvas desktop e lista mobile, invece di cadere nello stato vuoto ambiguo.
+- Knowledge Graph mantiene editor/dialog aperti quando mutazioni nodo/arco falliscono, mostra errore inline/toast e non segnala `Salvato` dopo un save fallito.
+- La chat del grafo non resta bloccata su `Avvio`: stream malformati, vuoti o chiusi senza evento terminale diventano messaggi recuperabili.
+- Dashboard indeciso usa la stessa validazione del widget readiness prima di bandizzare gli strumenti, evitando consigli adattivi basati su cache incompleta.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -267,6 +278,14 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - `pnpm --filter @northstar/web exec vitest run --configLoader runner src/pages/growth.test.tsx`
 - `pnpm --filter @northstar/web exec vitest run --configLoader runner src/hooks/useWendyChat.test.tsx src/hooks/wendySuggestedPrompts.test.ts`
 - `pnpm --filter @northstar/server run typecheck`
+- `pnpm --filter @northstar/web run typecheck`
+- `git diff --check`
+
+## Verifica Tranche 14
+
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner --maxWorkers=1 src/components/affiliate/AffiliateDashboard.test.tsx src/components/dashboard/DashboardIndecisoTools.test.tsx src/components/dashboard/CommitmentReadinessWidget.test.tsx`
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner --maxWorkers=1 src/features/idea-validator/IdeaValidatorErrorStates.test.tsx src/features/idea-validator/useIdeaValidatorScoringActions.test.tsx`
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner src/pages/grafo-conoscenza.test.tsx src/features/knowledge-graph/KnowledgeChatPanel.test.tsx src/features/knowledge-graph/KnowledgeNodeEditor.test.tsx src/features/knowledge-graph/useKnowledgeGraphData.test.tsx`
 - `pnpm --filter @northstar/web run typecheck`
 - `git diff --check`
 

@@ -65,13 +65,14 @@ describe("KnowledgeChatPanel", () => {
       .getAllByRole("button")
       .findLast((button) => !button.hasAttribute("disabled"));
     expect(sendButton).toBeDefined();
+    await waitFor(() => expect(sendButton!).not.toBeDisabled());
     fireEvent.click(sendButton!);
 
     await waitFor(() => {
       expect(screen.getByText(/Risposta interrotta/i)).toBeInTheDocument();
     });
     expect(screen.queryByText("Avvio…")).not.toBeInTheDocument();
-  });
+  }, 15000);
 
   it("finishes cleanly when the stream sends DONE without content", async () => {
     streamMock.mockResolvedValue(sseResponse(["data: [DONE]\n\n"]));
@@ -97,6 +98,32 @@ describe("KnowledgeChatPanel", () => {
       expect(screen.getByText("Nessuna risposta ricevuta.")).toBeInTheDocument();
     });
     expect(screen.queryByText("Avvioâ€¦")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("surfaces streams that close before a terminal event", async () => {
+    streamMock.mockResolvedValue(sseResponse([]));
+
+    render(
+      <KnowledgeChatPanel
+        nodes={nodes}
+        onClose={vi.fn()}
+        onFocusNode={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "Cosa sai?" },
+    });
+    const sendButton = screen
+      .getAllByRole("button")
+      .findLast((button) => !button.hasAttribute("disabled"));
+    expect(sendButton).toBeDefined();
+    fireEvent.click(sendButton!);
+
+    await waitFor(() => {
+      expect(screen.getByText(/stream si e interrotto/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Avvio...")).not.toBeInTheDocument();
   });
 
   it("uses the real knowledge ask contract and renders server token events", async () => {

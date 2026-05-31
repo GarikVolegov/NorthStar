@@ -96,12 +96,16 @@ export function KnowledgeGraphOverlays({
                 <div key={s.id} className="flex items-center gap-1">
                   <button
                     onClick={async () => {
-                      await onCreateEdge(autoLinkSourceId, s.id);
-                      onSetAutoLinkSuggestions((prev) =>
-                        prev.filter((x) => x.id !== s.id),
-                      );
-                      if (autoLinkSuggestions.length === 1)
-                        onSetAutoLinkSourceId(null);
+                      try {
+                        await onCreateEdge(autoLinkSourceId, s.id);
+                        onSetAutoLinkSuggestions((prev) =>
+                          prev.filter((x) => x.id !== s.id),
+                        );
+                        if (autoLinkSuggestions.length === 1)
+                          onSetAutoLinkSourceId(null);
+                      } catch {
+                        /* toast handled by data layer; keep suggestion visible */
+                      }
                     }}
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] hover:opacity-90 transition-opacity"
                     style={{
@@ -166,13 +170,17 @@ export function KnowledgeGraphOverlays({
               onChange={(e) => onSetEdgeLabelDraft(e.target.value)}
               onKeyDown={async (e) => {
                 if (e.key === "Enter") {
-                  await onCreateEdge(
-                    pendingEdge.sourceId,
-                    pendingEdge.targetId,
-                    edgeLabelDraft,
-                  );
-                  onSetPendingEdge(null);
-                  onSetEdgeLabelDraft("");
+                  try {
+                    await onCreateEdge(
+                      pendingEdge.sourceId,
+                      pendingEdge.targetId,
+                      edgeLabelDraft,
+                    );
+                    onSetPendingEdge(null);
+                    onSetEdgeLabelDraft("");
+                  } catch {
+                    /* toast handled by data layer; keep dialog open */
+                  }
                 }
                 if (e.key === "Escape") {
                   onSetPendingEdge(null);
@@ -192,13 +200,17 @@ export function KnowledgeGraphOverlays({
               <Button
                 size="sm"
                 onClick={async () => {
-                  await onCreateEdge(
-                    pendingEdge.sourceId,
-                    pendingEdge.targetId,
-                    edgeLabelDraft,
-                  );
-                  onSetPendingEdge(null);
-                  onSetEdgeLabelDraft("");
+                  try {
+                    await onCreateEdge(
+                      pendingEdge.sourceId,
+                      pendingEdge.targetId,
+                      edgeLabelDraft,
+                    );
+                    onSetPendingEdge(null);
+                    onSetEdgeLabelDraft("");
+                  } catch {
+                    /* toast handled by data layer; keep dialog open */
+                  }
                 }}
               >
                 Collega
@@ -255,7 +267,7 @@ export function KnowledgeGraphOverlays({
           <button
             className="w-full text-left px-3 py-1.5 hover:bg-destructive/10 flex items-center gap-2 text-xs text-destructive"
             onClick={() => {
-              void onDeleteNode(contextMenu.nodeId);
+              void Promise.resolve(onDeleteNode(contextMenu.nodeId)).catch(() => undefined);
               onSetContextMenu(null);
             }}
           >

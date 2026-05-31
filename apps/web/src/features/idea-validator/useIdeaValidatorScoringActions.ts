@@ -20,6 +20,10 @@ import type {
 import { readResponseError } from "../../pages/validatore-idea-api";
 
 const BASE = import.meta.env.BASE_URL || "/";
+const RADAR_MALFORMED_ERROR =
+  "Wendy non ha restituito una valutazione utilizzabile. Riprova tra poco.";
+const DECISION_MALFORMED_ERROR =
+  "Wendy non ha restituito una decisione utilizzabile. Riprova tra poco.";
 
 type WendyApi = ReturnType<typeof useWendy>;
 
@@ -69,6 +73,68 @@ interface ScoringActionOptions {
   canvasTimelineTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
   scoreTimelineTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
   wendyAdviceTimelineTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isValidScoreMap(value: unknown): value is Record<ScoreKey, number> {
+  if (!isRecord(value)) return false;
+  return (Object.keys(SCORE_LABELS) as ScoreKey[]).every(
+    (key) => typeof value[key] === "number" && value[key] >= 1 && value[key] <= 5,
+  );
+}
+
+function isValidScoreTextMap(value: unknown): value is Record<ScoreKey, string> {
+  if (!isRecord(value)) return false;
+  return (Object.keys(SCORE_LABELS) as ScoreKey[]).every((key) => typeof value[key] === "string");
+}
+
+function parseRadarSuggestion(value: unknown): RadarSuggestion {
+  if (!isRecord(value)) throw new Error(RADAR_MALFORMED_ERROR);
+  const suggestion = value as Partial<RadarSuggestion>;
+  if (
+    !isValidScoreMap(suggestion.scores) ||
+    !isValidScoreTextMap(suggestion.reasons) ||
+    !isValidScoreTextMap(suggestion.suggestions) ||
+    typeof suggestion.generatedAt !== "string" ||
+    typeof suggestion.model !== "string"
+  ) {
+    throw new Error(RADAR_MALFORMED_ERROR);
+  }
+  return {
+    scores: suggestion.scores,
+    reasons: suggestion.reasons,
+    suggestions: suggestion.suggestions,
+    generatedAt: suggestion.generatedAt,
+    model: suggestion.model,
+  };
+}
+
+function parseDecisionSuggestion(value: unknown): DecisionSuggestion {
+  if (!isRecord(value)) throw new Error(DECISION_MALFORMED_ERROR);
+  const suggestion = value as Partial<DecisionSuggestion>;
+  if (
+    typeof suggestion.state !== "string" ||
+    !(suggestion.state in DECISION_LABELS) ||
+    typeof suggestion.reason !== "string" ||
+    typeof suggestion.confidence !== "number" ||
+    !Array.isArray(suggestion.nextActions) ||
+    !suggestion.nextActions.every((action) => typeof action === "string") ||
+    typeof suggestion.generatedAt !== "string" ||
+    typeof suggestion.model !== "string"
+  ) {
+    throw new Error(DECISION_MALFORMED_ERROR);
+  }
+  return {
+    state: suggestion.state as DecisionState,
+    reason: suggestion.reason,
+    confidence: suggestion.confidence,
+    nextActions: suggestion.nextActions,
+    generatedAt: suggestion.generatedAt,
+    model: suggestion.model,
+  };
 }
 
 export function useIdeaValidatorScoringActions(options: ScoringActionOptions) {
@@ -144,6 +210,11 @@ export function useIdeaValidatorScoringActions(options: ScoringActionOptions) {
   const requestRadarSuggestion = useCallback(async () => {
     setRadarState("loading");
     setRadarError("");
+    setProposedScores({});
+    setScoreReasons({});
+    setScoreSuggestions({});
+    setScoreGeneratedAt("");
+    setScoreModel("");
     let ideaId = activeIdeaId;
     if (!ideaId) ideaId = (await persistIdea("create"))?.id ?? null;
     if (!ideaId) {
@@ -158,7 +229,7 @@ export function useIdeaValidatorScoringActions(options: ScoringActionOptions) {
         body: JSON.stringify({ title: ideaName, ideaText: oneLiner, canvas, assumption, experiment: activeExperimentSummary }),
       });
       if (!res.ok) throw new Error(await readResponseError(res, "Valutazione Wendy non disponibile"));
-      const suggestion = (await res.json()) as RadarSuggestion;
+      const suggestion = parseRadarSuggestion(await res.json());
       setProposedScores(suggestion.scores);
       setScoreReasons(suggestion.reasons);
       setScoreSuggestions(suggestion.suggestions);
@@ -251,6 +322,7 @@ export function useIdeaValidatorScoringActions(options: ScoringActionOptions) {
   const requestDecisionSuggestion = useCallback(async () => {
     setDecisionLoading(true);
     setDecisionError("");
+    setDecisionSuggested(null);
     let ideaId = activeIdeaId;
     if (!ideaId) ideaId = (await persistIdea("create"))?.id ?? null;
     if (!ideaId) {
@@ -265,7 +337,7 @@ export function useIdeaValidatorScoringActions(options: ScoringActionOptions) {
         body: JSON.stringify({ title: ideaName, ideaText: oneLiner, data: ideaContext }),
       });
       if (!res.ok) throw new Error(await readResponseError(res, "Suggerimento decisione non disponibile"));
-      const suggestion = (await res.json()) as DecisionSuggestion;
+      const suggestion = parseDecisionSuggestion(await res.json());
       setDecisionSuggested(suggestion);
       addTimelineEvent("wendy_feedback", "Decisione consigliata da Wendy", `${DECISION_LABELS[suggestion.state]} - ${suggestion.reason}`, {
         state: suggestion.state,

@@ -14,7 +14,7 @@ import { AlertTriangle, ArrowRight, Compass, RefreshCw, Sparkles } from "lucide-
 import { apiFetch } from "@/lib/api-fetch";
 import { Button } from "@/components/ui/button";
 
-interface ReadinessData {
+export interface ReadinessData {
   score: number;
   band: "low" | "mid" | "high";
   components: {
@@ -41,10 +41,25 @@ const BAND_LABEL: Record<ReadinessData["band"], { headline: string; sub: string;
   high: { headline: "La scelta è vicina",    sub: "Potresti essere pronto per la fase attiva.", tone: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20" },
 };
 
-async function fetchReadiness(): Promise<ReadinessData> {
+export async function fetchReadiness(): Promise<ReadinessData> {
   const res = await apiFetch("/api/discovery/readiness");
   if (!res.ok) throw new Error("Errore caricamento readiness");
   return res.json();
+}
+
+export function isReadinessData(data: unknown): data is ReadinessData {
+  const candidate = data as Partial<ReadinessData> | undefined;
+  return Boolean(
+    candidate
+      && typeof candidate.score === "number"
+      && (candidate.band === "low" || candidate.band === "mid" || candidate.band === "high")
+      && candidate.components
+      && typeof candidate.components.selfKnowledge === "number"
+      && typeof candidate.components.exploration === "number"
+      && typeof candidate.components.reflection === "number"
+      && typeof candidate.components.emotion === "number"
+      && typeof candidate.components.commitment === "number",
+  );
 }
 
 export function CommitmentReadinessWidget() {
@@ -63,7 +78,7 @@ export function CommitmentReadinessWidget() {
       </div>
     );
   }
-  if (isError || !data) {
+  if (isError || !isReadinessData(data)) {
     return (
       <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-5">
         <div className="flex items-start gap-3">

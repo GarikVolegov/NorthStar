@@ -95,7 +95,7 @@ export function RadarAndTestSetupSection({
         </div>
 
         {radarError ? (
-          <div className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div role="alert" className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {radarError}
           </div>
         ) : null}
@@ -352,7 +352,7 @@ function ActiveExperimentEditor({
         <p className="text-xs font-semibold uppercase tracking-wide text-primary">Trasforma in azione</p>
         <p className="text-sm text-muted-foreground">Collega l'esperimento a obiettivi e calendario NorthStar.</p>
         {experimentActionError ? (
-          <div className="my-3 rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <div role="alert" className="my-3 rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {experimentActionError}
           </div>
         ) : null}

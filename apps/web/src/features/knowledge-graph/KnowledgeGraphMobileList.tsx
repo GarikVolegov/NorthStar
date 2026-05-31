@@ -5,16 +5,20 @@ import type { GraphData, KNode, NodeType } from "./knowledgeGraphTypes";
 interface KnowledgeGraphMobileListProps {
   data: GraphData;
   filteredNodes: KNode[];
+  loadError?: string | null;
   onAddNode: (type?: NodeType) => void;
   onImport: () => void;
+  onRetryLoad?: () => void;
   onSelectNode: (id: number) => void;
 }
 
 export function KnowledgeGraphMobileList({
   data,
   filteredNodes,
+  loadError,
   onAddNode,
   onImport,
+  onRetryLoad,
   onSelectNode,
 }: KnowledgeGraphMobileListProps) {
   return (
@@ -23,7 +27,21 @@ export function KnowledgeGraphMobileList({
         <span className="shrink-0 text-lg leading-none">Desktop</span>
         <p>Per l'esperienza completa con drag & drop, apri da desktop.</p>
       </div>
-      {data.nodes.length === 0 ? (
+      {loadError ? (
+        <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm">
+          <p className="font-semibold text-destructive">Archivio non caricato</p>
+          <p className="mt-1 text-muted-foreground">{loadError}</p>
+          {onRetryLoad && (
+            <button
+              type="button"
+              onClick={onRetryLoad}
+              className="mt-3 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium"
+            >
+              Riprova
+            </button>
+          )}
+        </div>
+      ) : data.nodes.length === 0 ? (
         <KnowledgeEmptyState onAdd={onAddNode} onImport={onImport} />
       ) : (
         filteredNodes.map((node) => {

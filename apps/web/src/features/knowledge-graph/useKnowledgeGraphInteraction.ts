@@ -95,7 +95,7 @@ export function useKnowledgeGraphInteraction({
       }
       if ((event.key === "Delete" || event.key === "Backspace") && !isEditing && selectedId !== null) {
         event.preventDefault();
-        void handleDeleteNode(selectedId);
+        void handleDeleteNode(selectedId).catch(() => undefined);
         return;
       }
       if ((event.ctrlKey || event.metaKey) && event.key === "s" && selectedId !== null) {

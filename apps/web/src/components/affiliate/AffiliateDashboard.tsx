@@ -13,7 +13,6 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   formatCents,
-  useAffiliateCopyLink,
   useAffiliateDashboard,
   useAffiliateWithdraw,
 } from '@/hooks/useAffiliateDashboard';
@@ -66,22 +65,60 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secon
   cancelled: { label: 'Cancellato', variant: 'outline' },
 };
 
+async function copyTextToClipboard(value: string): Promise<boolean> {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch {
+      // Continue with the textarea fallback below.
+    }
+  }
+
+  const textarea = document.createElement('textarea');
+  const previouslyFocused = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : null;
+  textarea.value = value;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  textarea.style.opacity = '0';
+
+  try {
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+    return document.execCommand?.('copy') === true;
+  } catch {
+    return false;
+  } finally {
+    textarea.remove();
+    previouslyFocused?.focus();
+  }
+}
+
 export function AffiliateDashboard() {
   const { data, isLoading, isError, error, refetch } = useAffiliateDashboard();
   const withdraw = useAffiliateWithdraw();
-  const copyLink = useAffiliateCopyLink();
 
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [qrObjectUrl, setQrObjectUrl] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
+  const [qrDownloadLoading, setQrDownloadLoading] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
+  const [qrRetryKey, setQrRetryKey] = useState(0);
 
   useEffect(() => {
     setQrObjectUrl((current) => {
       if (current) URL.revokeObjectURL(current);
       return null;
     });
+    setQrError(null);
 
     if (!data?.qrCodeUrl) {
       return;
@@ -92,14 +129,20 @@ export function AffiliateDashboard() {
     setQrLoading(true);
 
     apiFetch(data.qrCodeUrl)
-      .then((response) => (response.ok ? response.blob() : null))
+      .then((response) => {
+        if (!response.ok) throw new Error('QR unavailable');
+        return response.blob();
+      })
       .then((blob) => {
-        if (!blob || cancelled) return;
+        if (cancelled) return;
         objectUrl = URL.createObjectURL(blob);
         setQrObjectUrl(objectUrl);
       })
       .catch(() => {
-        if (!cancelled) setQrObjectUrl(null);
+        if (!cancelled) {
+          setQrObjectUrl(null);
+          setQrError('QR non disponibile. Puoi riprovare o condividere il link personale.');
+        }
       })
       .finally(() => {
         if (!cancelled) setQrLoading(false);
@@ -109,11 +152,18 @@ export function AffiliateDashboard() {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [data?.qrCodeUrl]);
+  }, [data?.qrCodeUrl, qrRetryKey]);
 
   async function handleCopy() {
     if (!data?.referralLink) return;
-    await copyLink(data.referralLink);
+    const success = await copyTextToClipboard(data.referralLink);
+    if (!success) {
+      setCopied(false);
+      setCopyError('Non siamo riusciti a copiare automaticamente. Seleziona il link e copialo manualmente.');
+      return;
+    }
+
+    setCopyError(null);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -157,18 +207,27 @@ export function AffiliateDashboard() {
   async function handleDownloadQr() {
     if (!data?.qrCodeUrl) return;
     const separator = data.qrCodeUrl.includes('?') ? '&' : '?';
-    const response = await apiFetch(`${data.qrCodeUrl}${separator}download=1`);
-    if (!response.ok) return;
+    setQrDownloadLoading(true);
+    setQrError(null);
 
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `northstar-referral-${data.referralCode}.svg`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    try {
+      const response = await apiFetch(`${data.qrCodeUrl}${separator}download=1`);
+      if (!response.ok) throw new Error('QR download unavailable');
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `northstar-referral-${data.referralCode}.svg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {
+      setQrError('Download QR non riuscito. Riprova tra poco o copia il link personale.');
+    } finally {
+      setQrDownloadLoading(false);
+    }
   }
 
   function handleWithdraw() {
@@ -297,6 +356,11 @@ export function AffiliateDashboard() {
               <p className="text-xs text-muted-foreground">
                 Le commissioni coprono prima una mensilita Premium; il resto diventa ritirabile.
               </p>
+              {copyError ? (
+                <p className="text-xs font-medium text-destructive" role="status">
+                  {copyError}
+                </p>
+              ) : null}
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -335,17 +399,35 @@ export function AffiliateDashboard() {
                   className="h-full w-full object-contain"
                 />
               ) : (
-                <AlertCircle className="h-8 w-8 text-muted-foreground" />
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <AlertCircle className="h-8 w-8 text-muted-foreground" />
+                  {qrError ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setQrRetryKey((key) => key + 1)}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                      Riprova QR
+                    </Button>
+                  ) : null}
+                </div>
               )}
             </div>
+            {qrError ? (
+              <p className="mt-2 text-xs font-medium text-destructive" role="status">
+                {qrError}
+              </p>
+            ) : null}
             <Button
               variant="outline"
               className="mt-3 min-h-11 w-full"
               onClick={() => void handleDownloadQr()}
-              disabled={!data?.qrCodeUrl}
+              disabled={!data?.qrCodeUrl || qrLoading || qrDownloadLoading}
             >
               <Download className="h-4 w-4 mr-2" />
-              Scarica QR
+              {qrDownloadLoading ? 'Scaricamento...' : 'Scarica QR'}
             </Button>
           </div>
         </div>

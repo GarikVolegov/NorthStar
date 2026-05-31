@@ -35,6 +35,7 @@ export function KnowledgeNodeEditor({
   const [type, setType] = useState<NodeType>(node.type);
   const [url, setUrl] = useState(node.url ?? "");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [savedBadge, setSavedBadge] = useState(false);
   const autoSaveTimer = useRef<number | null>(null);
@@ -56,16 +57,22 @@ export function KnowledgeNodeEditor({
     async (silent = false) => {
       if (!dirty) return;
       setSaving(true);
-      await onSave({
-        title: title.trim() || "Senza titolo",
-        content,
-        type,
-        url: url.trim() || null,
-      });
-      setSaving(false);
-      if (silent) {
-        setSavedBadge(true);
-        setTimeout(() => setSavedBadge(false), 2000);
+      setSaveError(null);
+      try {
+        await onSave({
+          title: title.trim() || "Senza titolo",
+          content,
+          type,
+          url: url.trim() || null,
+        });
+        if (silent) {
+          setSavedBadge(true);
+          setTimeout(() => setSavedBadge(false), 2000);
+        }
+      } catch (err) {
+        setSaveError(err instanceof Error && err.message ? err.message : "Salvataggio non riuscito.");
+      } finally {
+        setSaving(false);
       }
     },
     [dirty, title, content, type, url, onSave],
@@ -123,10 +130,11 @@ export function KnowledgeNodeEditor({
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         <div>
-          <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+          <label htmlFor="knowledge-node-title" className="text-[11px] font-medium text-muted-foreground block mb-1">
             Titolo
           </label>
           <Input
+            id="knowledge-node-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             className="rounded-xl"
@@ -160,10 +168,11 @@ export function KnowledgeNodeEditor({
         </div>
         {(type === "link" || type === "document") && (
           <div>
-            <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+            <label htmlFor="knowledge-node-url" className="text-[11px] font-medium text-muted-foreground block mb-1">
               URL
             </label>
             <Input
+              id="knowledge-node-url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://\u2026"
@@ -207,10 +216,11 @@ export function KnowledgeNodeEditor({
           </div>
         </div>
         <div>
-          <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+          <label htmlFor="knowledge-node-content" className="text-[11px] font-medium text-muted-foreground block mb-1">
             Contenuto
           </label>
           <Textarea
+            id="knowledge-node-content"
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Appunti, descrizione, riferimenti\u2026"
@@ -270,7 +280,7 @@ export function KnowledgeNodeEditor({
                     </span>
                   )}
                   <button
-                    onClick={() => onDeleteEdge(e.id)}
+                    onClick={() => void Promise.resolve(onDeleteEdge(e.id)).catch(() => undefined)}
                     className="ml-auto text-muted-foreground hover:text-destructive"
                   >
                     <X className="w-3 h-3" />
@@ -282,12 +292,17 @@ export function KnowledgeNodeEditor({
         </div>
       </div>
       <div className="border-t p-3 flex items-center gap-2">
+        {saveError && (
+          <p className="mr-auto max-w-44 text-xs text-destructive" role="alert">
+            {saveError}
+          </p>
+        )}
         {confirming ? (
           <>
             <Button
               size="sm"
               variant="destructive"
-              onClick={onDelete}
+              onClick={() => void Promise.resolve(onDelete()).catch(() => undefined)}
               className="rounded-xl"
             >
               Conferma elimina

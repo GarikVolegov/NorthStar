@@ -169,8 +169,10 @@ export default function Archivio() {
           <KnowledgeGraphMobileList
             data={graph.data}
             filteredNodes={graph.filteredNodes}
+            loadError={graph.loadError}
             onAddNode={graph.handleAddNode}
             onImport={() => fileInputRef.current?.click()}
+            onRetryLoad={graph.loadGraph}
             onSelectNode={graph.setSelectedId}
           />
         ) : (
@@ -179,12 +181,14 @@ export default function Archivio() {
             data={graph.data}
             filteredNodes={graph.filteredNodes}
             visibleEdges={graph.visibleEdges}
+            loadError={graph.loadError}
             selectedId={graph.selectedId}
             linkMode={graph.linkMode}
             view={view}
             fitAnimating={fitAnimating}
             onAddNode={graph.handleAddNode}
             onImport={() => fileInputRef.current?.click()}
+            onRetryLoad={graph.loadGraph}
             onMinimapPan={(x, y) => setViewAndRef({ x, y, k: viewRef.current.k })}
             onFit={graph.handleFit}
             onZoomIn={() => setViewAndRef({ ...viewRef.current, k: Math.min(2.5, viewRef.current.k * 1.2) })}

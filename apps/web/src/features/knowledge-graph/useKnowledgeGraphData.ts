@@ -34,6 +34,7 @@ export function useKnowledgeGraphData({
 
   const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [linkMode, setLinkMode] = useState<{ sourceId: number } | null>(null);
   const [search, setSearch] = useState("");
@@ -90,6 +91,7 @@ export function useKnowledgeGraphData({
 
   const loadGraph = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const g = await api<GraphData>("/graph");
       setData(g);
@@ -105,12 +107,18 @@ export function useKnowledgeGraphData({
         viewRef.current = fv;
         setTimeout(() => setFitAnimating(false), 400);
       }
-    } catch {
-      /* silent */
+    } catch (err) {
+      const message = errorMessage(err, "Errore di rete.");
+      setLoadError(message);
+      toast({
+        title: "Archivio non caricato",
+        description: message,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
-  }, [setView, svgRef, setFitAnimating, viewRef]);
+  }, [setView, svgRef, setFitAnimating, toast, viewRef]);
 
   const handleFit = useCallback(() => {
     if (!svgRef.current || data.nodes.length === 0) return;
@@ -269,11 +277,15 @@ export function useKnowledgeGraphData({
         });
         setData((d) => ({ ...d, nodes: [...d.nodes, created] }));
         setSelectedId(created.id);
-      } catch {
-        /* silent */
+      } catch (err) {
+        toast({
+          title: "Creazione elemento fallita",
+          description: errorMessage(err, "Errore di rete."),
+          variant: "destructive",
+        });
       }
     },
-    [creatingType, svgRef, viewRef]
+    [creatingType, svgRef, toast, viewRef]
   );
 
   const handleUpdateNode = useCallback(
@@ -288,11 +300,16 @@ export function useKnowledgeGraphData({
           nodes: d.nodes.map((n) => (n.id === id ? updated : n)),
         }));
         if (patch.content && patch.content.length > 20) void fetchAutoLinks(id);
-      } catch {
-        /* silent */
+      } catch (err) {
+        toast({
+          title: "Salvataggio fallito",
+          description: errorMessage(err, "Errore di rete."),
+          variant: "destructive",
+        });
+        throw err;
       }
     },
-    [fetchAutoLinks]
+    [fetchAutoLinks, toast]
   );
 
   const handleDeleteNode = useCallback(
@@ -304,11 +321,16 @@ export function useKnowledgeGraphData({
           edges: d.edges.filter((e) => e.sourceId !== id && e.targetId !== id),
         }));
         if (selectedId === id) setSelectedId(null);
-      } catch {
-        /* silent */
+      } catch (err) {
+        toast({
+          title: "Eliminazione fallita",
+          description: errorMessage(err, "Errore di rete."),
+          variant: "destructive",
+        });
+        throw err;
       }
     },
-    [selectedId]
+    [selectedId, toast]
   );
 
   const handleCreateEdge = useCallback(
@@ -330,21 +352,31 @@ export function useKnowledgeGraphData({
           }),
         });
         setData((d) => ({ ...d, edges: [...d.edges, created] }));
-      } catch {
-        /* silent */
+      } catch (err) {
+        toast({
+          title: "Collegamento fallito",
+          description: errorMessage(err, "Errore di rete."),
+          variant: "destructive",
+        });
+        throw err;
       }
     },
-    [data.edges]
+    [data.edges, toast]
   );
 
   const handleDeleteEdge = useCallback(async (id: number) => {
     try {
       await api(`/edges/${id}`, { method: "DELETE" });
       setData((d) => ({ ...d, edges: d.edges.filter((e) => e.id !== id) }));
-    } catch {
-      /* silent */
+    } catch (err) {
+      toast({
+        title: "Eliminazione collegamento fallita",
+        description: errorMessage(err, "Errore di rete."),
+        variant: "destructive",
+      });
+      throw err;
     }
-  }, []);
+  }, [toast]);
 
   const handleUpdateEdgeLabel = useCallback(
     async (id: number, label: string) => {
@@ -357,11 +389,16 @@ export function useKnowledgeGraphData({
           ...d,
           edges: d.edges.map((e) => (e.id === id ? updated : e)),
         }));
-      } catch {
-        /* silent */
+      } catch (err) {
+        toast({
+          title: "Etichetta non salvata",
+          description: errorMessage(err, "Errore di rete."),
+          variant: "destructive",
+        });
+        throw err;
       }
     },
-    []
+    [toast]
   );
 
   const handleDuplicateNode = useCallback(
@@ -386,8 +423,12 @@ export function useKnowledgeGraphData({
           title: "Nodo duplicato",
           description: `\u00ab${src.title}\u00bb copiato con successo.`,
         });
-      } catch {
-        /* silent */
+      } catch (err) {
+        toast({
+          title: "Duplicazione fallita",
+          description: errorMessage(err, "Errore di rete."),
+          variant: "destructive",
+        });
       }
     },
     [data.nodes, toast]
@@ -414,6 +455,7 @@ export function useKnowledgeGraphData({
     data,
     setData,
     loading,
+    loadError,
     selectedId,
     setSelectedId,
     linkMode,
@@ -455,4 +497,8 @@ export function useKnowledgeGraphData({
     handleUpdateEdgeLabel,
     handleDuplicateNode,
   };
+}
+
+function errorMessage(err: unknown, fallback: string) {
+  return err instanceof Error && err.message ? err.message : fallback;
 }

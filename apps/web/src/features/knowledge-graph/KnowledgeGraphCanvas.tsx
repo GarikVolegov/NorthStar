@@ -16,12 +16,14 @@ interface KnowledgeGraphCanvasProps {
   data: GraphData;
   filteredNodes: KNode[];
   visibleEdges: KEdge[];
+  loadError?: string | null;
   selectedId: number | null;
   linkMode: { sourceId: number } | null;
   view: { x: number; y: number; k: number };
   fitAnimating: boolean;
   onAddNode: (type?: NodeType) => void;
   onImport: () => void;
+  onRetryLoad?: () => void;
   onNodePointerDown: (event: React.PointerEvent, node: KNode) => void;
   onNodePointerUp: (event: React.PointerEvent, node: KNode) => void;
   onNodeContextMenu: (event: React.MouseEvent, node: KNode) => void;
@@ -41,12 +43,14 @@ export function KnowledgeGraphCanvas({
   data,
   filteredNodes,
   visibleEdges,
+  loadError,
   selectedId,
   linkMode,
   view,
   fitAnimating,
   onAddNode,
   onImport,
+  onRetryLoad,
   onNodePointerDown,
   onNodePointerUp,
   onNodeContextMenu,
@@ -62,11 +66,18 @@ export function KnowledgeGraphCanvas({
 }: KnowledgeGraphCanvasProps) {
   return (
     <div className="relative flex-1 overflow-hidden bg-[radial-gradient(circle,hsl(var(--border))_1px,transparent_1px)] bg-size-[24px_24px]">
-      {data.nodes.length === 0 && (
+      {loadError ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <KnowledgeLoadError
+            message={loadError}
+            {...(onRetryLoad ? { onRetry: onRetryLoad } : {})}
+          />
+        </div>
+      ) : data.nodes.length === 0 ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <KnowledgeEmptyState onAdd={onAddNode} onImport={onImport} />
         </div>
-      )}
+      ) : null}
       <svg
         ref={svgRef}
         className="h-full w-full touch-none select-none"
@@ -128,6 +139,35 @@ export function KnowledgeGraphCanvas({
         nodesCount={filteredNodes.length}
         edgesCount={visibleEdges.length}
       />
+    </div>
+  );
+}
+
+function KnowledgeLoadError({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div className="mx-auto flex max-w-sm flex-col items-center px-6 py-12 text-center">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-destructive/20 bg-destructive/10 text-destructive">
+        !
+      </div>
+      <h2 className="mb-2 text-lg font-semibold">Archivio non caricato</h2>
+      <p className="mb-5 text-sm leading-relaxed text-muted-foreground">
+        {message}
+      </p>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="rounded-xl border bg-card px-4 py-2 text-sm font-medium hover:border-primary/40"
+        >
+          Riprova
+        </button>
+      )}
     </div>
   );
 }

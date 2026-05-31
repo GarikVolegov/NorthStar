@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CommitmentReadinessWidget } from "./CommitmentReadinessWidget";
 
@@ -16,10 +16,13 @@ vi.mock("wouter", () => ({
   ),
 }));
 
-function renderWithQueryClient() {
-  const client = new QueryClient({
+function createClient() {
+  return new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+}
+
+function renderWithQueryClient(client = createClient()) {
 
   return render(
     <QueryClientProvider client={client}>
@@ -29,6 +32,10 @@ function renderWithQueryClient() {
 }
 
 describe("CommitmentReadinessWidget", () => {
+  beforeEach(() => {
+    apiFetchMock.mockReset();
+  });
+
   it("shows a recoverable error instead of disappearing when readiness cannot load", async () => {
     apiFetchMock.mockResolvedValueOnce({
       ok: false,
@@ -40,5 +47,15 @@ describe("CommitmentReadinessWidget", () => {
     expect(await screen.findByText(/discovery engine non disponibile/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /riprova/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /apri strumenti/i })).toHaveAttribute("href", "/dashboard");
+  });
+
+  it("shows a recoverable error if the shared readiness cache contains incomplete data", async () => {
+    const client = createClient();
+    client.setQueryData(["discovery-readiness"], { band: "low" });
+
+    renderWithQueryClient(client);
+
+    expect(await screen.findByText(/discovery engine non disponibile/i)).toBeInTheDocument();
+    expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
   });
 });
