@@ -160,6 +160,7 @@ export function SearchDialog({
   const isAIActive = hasConversation || chat.isStreaming;
   const queryLong  = query.length >= 3 || hasConversation;
   const showSideResults = isLoading || showResults || showSearchEmpty || showSearchError;
+  const mobileAIStack = isMobile && isAIActive && queryLong;
 
   return (
     <AnimatePresence>
@@ -215,10 +216,10 @@ export function SearchDialog({
 
             <div className={cn(
               "overflow-hidden",
-              isMobile ? "flex flex-col flex-1" : "rounded-3xl border border-white/10 bg-card/90 backdrop-blur-2xl shadow-2xl",
+              isMobile ? "flex min-h-0 flex-1 flex-col" : "rounded-3xl border border-white/10 bg-card/90 backdrop-blur-2xl shadow-2xl",
             )}>
               {/* Input sempre in cima */}
-              <Command shouldFilter={false}>
+              <Command shouldFilter={false} className={mobileAIStack ? "min-h-0" : undefined}>
                 {(showDefaultSuggestions || query.length < 3) && (
                   <div className="flex gap-2 overflow-x-auto border-b border-white/10 px-3 py-3">
                     {quickActions.map((action) => (
@@ -336,7 +337,7 @@ export function SearchDialog({
 
                 ) : (
                   /* Layout classico (senza AI attiva) */
-                  <CommandList className="max-h-[60vh]">
+                  <CommandList className={mobileAIStack ? "min-h-0 flex-1 max-h-none" : "max-h-[60vh]"}>
                     {isLoading && (
                       <div className="flex items-center gap-2 px-4 py-6 text-sm text-muted-foreground">
                         <Sparkles className="h-4 w-4 animate-pulse text-primary" />
@@ -457,8 +458,8 @@ export function SearchDialog({
                   </CommandList>
                 )}
 
-                {isMobile && isAIActive && queryLong && (
-                  <section className="border-t border-white/10" style={{ maxHeight: "58vh" }} aria-label="Chat Wendy">
+                {mobileAIStack && (
+                  <section className="max-h-[52dvh] shrink-0 overflow-hidden border-t border-white/10" aria-label="Chat Wendy">
                     <WendyConsole
                       chat={chat}
                       query={query}
@@ -467,6 +468,7 @@ export function SearchDialog({
                       starterPrompts={quickActions.map((a) => ({ label: a.label, icon: a.icon }))}
                       inputRef={inputRef}
                       compact
+                      className="min-h-0"
                     />
                   </section>
                 )}

@@ -180,13 +180,26 @@ router.post("/clerk-sync", async (req, res) => {
 
       let [existingByEmail] = await protectedDbQuery(async () => {
         return await db
-          .select({ id: usersTable.id })
+          .select({ id: usersTable.id, clerkId: usersTable.clerkId })
           .from(usersTable)
           .where(eq(usersTable.email, normalizedEmail))
           .limit(1);
       });
 
       if (existingByEmail) {
+        if (
+          typeof existingByEmail.clerkId === "string" &&
+          existingByEmail.clerkId.trim() &&
+          existingByEmail.clerkId !== clerkId
+        ) {
+          res.status(409).json({
+            error:
+              "Questa email risulta gia collegata a un altro account Clerk. Accedi con quell'account o usa un'email diversa.",
+            code: "CLERK_SYNC_EMAIL_ALREADY_LINKED",
+          });
+          return;
+        }
+
         try {
           await protectedDbQuery(async () => {
             return await db

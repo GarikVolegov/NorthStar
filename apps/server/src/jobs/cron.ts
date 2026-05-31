@@ -280,12 +280,16 @@ export function startCronJobs(): void {
   // Collector ogni 6 ore
   setInterval(() => { void safeRunCollector(); }, COLLECTOR_INTERVAL_MS);
 
-  // Fast lane news collector ogni 90 minuti, sfalsato rispetto allo startup.
-  if (RUN_STARTUP_HEAVY_JOBS) {
+  // Fast lane news collector ogni 90 minuti. In dev popola la news feed
+  // all'avvio senza lanciare i job heavy; NEWS_RUN_ON_STARTUP=false resta opt-out.
+  if (RUN_STARTUP_NEWS_JOBS) {
+    const fastNewsStartupDelay = RUN_STARTUP_HEAVY_JOBS
+      ? STARTUP_DELAY_MS + 45_000
+      : STARTUP_DELAY_MS;
     setTimeout(() => {
       void safeRunFastNewsPipeline();
       setInterval(() => { void safeRunFastNewsPipeline(); }, FAST_COLLECTOR_INTERVAL_MS);
-    }, STARTUP_DELAY_MS + 45_000);
+    }, fastNewsStartupDelay);
   } else {
     setInterval(() => { void safeRunFastNewsPipeline(); }, FAST_COLLECTOR_INTERVAL_MS);
   }

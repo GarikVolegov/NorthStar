@@ -117,19 +117,19 @@ export default function MemoriaWendy() {
       </div>
 
       {/* Add fact */}
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Input
           value={newFact}
           onChange={(e) => setNewFact(e.target.value.slice(0, 200))}
           onKeyDown={(e) => { if (e.key === "Enter" && newFact.trim()) addMutation.mutate(newFact.trim()); }}
           placeholder="Aggiunge un fatto manuale (es. «lavoro nel settore finanziario»)…"
-          className="text-sm"
+          className="min-h-11 text-sm"
         />
         <Button
           onClick={() => { if (newFact.trim()) addMutation.mutate(newFact.trim()); }}
           disabled={!newFact.trim() || addMutation.isPending}
           size="sm"
-          className="gap-1.5 shrink-0"
+          className="min-h-11 w-full gap-1.5 shrink-0 sm:w-auto"
         >
           {addMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           Aggiungi

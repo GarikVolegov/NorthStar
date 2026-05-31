@@ -127,7 +127,20 @@ describe("cron startup guard", () => {
     delete process.env.NEWS_RUN_ON_STARTUP;
   });
 
-  it("does not run collector or news jobs on development startup unless CRON_RUN_ON_STARTUP is true", async () => {
+  it("runs the fast news pipeline on development startup without running heavy jobs", async () => {
+    const { startCronJobs } = await loadCron();
+
+    startCronJobs();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(mocks.runCollector).not.toHaveBeenCalled();
+    expect(mocks.runEnricher).not.toHaveBeenCalled();
+    expect(mocks.runFastCollector).toHaveBeenCalledTimes(1);
+    expect(mocks.runNewsPublisher).toHaveBeenCalledTimes(1);
+  });
+
+  it("honors NEWS_RUN_ON_STARTUP=false for the development fast news pipeline", async () => {
+    process.env.NEWS_RUN_ON_STARTUP = "false";
     const { startCronJobs } = await loadCron();
 
     startCronJobs();

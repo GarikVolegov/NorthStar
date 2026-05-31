@@ -58,4 +58,17 @@ describe("Memoria Wendy accessibility", () => {
     expect(deleteButton).not.toHaveClass("group-hover:opacity-100");
     expect(deleteButton).toHaveClass("min-h-11", "min-w-11");
   });
+
+  it("keeps the manual memory composer comfortable on narrow mobile screens", async () => {
+    getJsonMock.mockResolvedValue({ facts: [] });
+
+    renderMemoryPage();
+
+    const input = await screen.findByPlaceholderText(/Aggiunge un fatto manuale/i);
+    const addButton = screen.getByRole("button", { name: /aggiungi/i });
+
+    expect(input.parentElement).toHaveClass("flex-col", "sm:flex-row");
+    expect(input).toHaveClass("min-h-11");
+    expect(addButton).toHaveClass("min-h-11", "w-full", "sm:w-auto");
+  });
 });

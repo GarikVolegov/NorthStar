@@ -89,6 +89,14 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - I test Wendy API sono allineati al contratto attuale: small talk locale dichiara `answerMode: "local-fast-path"` e restituisce `suggestedPrompts`.
 - Verifica runtime ha individuato DB locale con schema `discovery_sources` incompleto; applicata localmente la migration `0041_discovery_sources_fast_lane.sql`, rendendo `/api/health/ready` verde.
 
+## Tranche 6 Applicata
+
+- Growth `/per-te` ora usa l'ultima sessione test reale dell'utente, non un flag profilo vuoto: espone tipi RIASEC/italiani e ordina prima gli articoli compatibili con `personalityMatches`.
+- Clerk sync non collega piu silenziosamente un'email gia associata a un altro `clerkId`: risponde `409 CLERK_SYNC_EMAIL_ALREADY_LINKED` con messaggio azionabile.
+- News fast lane parte allo startup quando `NEWS_RUN_ON_STARTUP` e attivo, anche in development con cron heavy spento, cosi la feed puo popolarsi senza aspettare l'intervallo da 90 minuti.
+- SearchDialog mobile non somma piu risultati `60vh` e chat Wendy `58vh` dentro un bottom sheet limitato: la lista diventa flessibile e la chat resta raggiungibile.
+- Memoria Wendy ha composer mobile stacked, input e CTA con target 44px, evitando campi compressi su schermi stretti.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -136,10 +144,18 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - `pnpm --filter @northstar/server run typecheck`
 - `pnpm --filter @northstar/web run typecheck`
 
+## Verifica Tranche 6
+
+- `pnpm --filter @northstar/server exec vitest run --configLoader runner src/routes/auth-clerk-sync.test.ts src/jobs/cron.test.ts src/routes/news.test.ts src/routes/growth.test.ts`
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner src/components/search/SearchDialog.test.tsx src/pages/memoria-wendy.test.tsx`
+- `pnpm --filter @northstar/server run typecheck`
+- `pnpm --filter @northstar/web run typecheck`
+- `git diff --check`
+
 ## Backlog Prossima Tranche
 
-1. Correggere stati auth/sync Clerk con token verificato obbligatorio.
-2. Collegare Growth `types`/`italianTypes` a profilo/test reale invece di lasciarli vuoti.
-3. Sostituire route placeholder di candidature/lavori con persistenza o provider reale quando il prodotto lo richiede.
-4. Verificare mobile reale delle aree critiche: SearchDialog, Wendy full-screen, memoria, dashboard.
+1. Rafforzare ulteriormente auth/sync Clerk: rendere token verification obbligatoria in produzione e chiarire UX lato `AuthContext`.
+2. Sostituire route placeholder di candidature/lavori con persistenza o provider reale quando il prodotto lo richiede.
+3. Verificare mobile reale delle aree critiche con Playwright visuale: SearchDialog, Wendy full-screen, memoria, dashboard.
+4. Aggiungere diagnostica provider a `/api/news` (`lastAttempt`, provider status, refresh action) senza appesantire il contratto pubblico.
 5. Estendere E2E full-stack a referral, affiliate UI e mobile viewport, eliminando le ultime assunzioni su seed account.

@@ -112,6 +112,7 @@ function renderDialog(overrides: Partial<React.ComponentProps<typeof SearchDialo
 
 describe("SearchDialog", () => {
   beforeEach(() => {
+    window.innerWidth = 1024;
     global.ResizeObserver = class ResizeObserver {
       observe() {}
       unobserve() {}
@@ -154,5 +155,24 @@ describe("SearchDialog", () => {
 
     expect(screen.getByText("La ricerca globale non e disponibile adesso.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Chiedi a Wendy/i })).toBeInTheDocument();
+  });
+
+  it("keeps mobile search results and Wendy chat inside one reachable sheet layout", () => {
+    window.innerWidth = 390;
+    useWendyChatMock.mockReturnValue(chatReturn({
+      messages: [{ id: "m1", role: "assistant", content: "Ciao", timestamp: 1 }],
+    }));
+
+    const { container } = renderDialog({
+      query: "design",
+      results: [{ id: 1, type: "role", title: "UX Designer", description: "Design role", url: "/roles/ux", icon: "x", color: "blue" }],
+    });
+
+    const commandList = container.querySelector("[cmdk-list]");
+    const chatRegion = screen.getByRole("region", { name: "Chat Wendy" });
+
+    expect(commandList).toHaveClass("min-h-0", "flex-1", "max-h-none");
+    expect(commandList).not.toHaveClass("max-h-[60vh]");
+    expect(chatRegion).toHaveClass("max-h-[52dvh]", "shrink-0", "overflow-hidden");
   });
 });

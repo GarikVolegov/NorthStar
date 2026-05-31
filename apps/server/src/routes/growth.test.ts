@@ -58,7 +58,7 @@ function app() {
   return instance;
 }
 
-function mockSelectRows(rows: typeof articles) {
+function mockSelectRows(rows: unknown[]) {
   const chain = {
     from: vi.fn(() => chain),
     where: vi.fn(() => chain),
@@ -86,6 +86,7 @@ describe("growth routes", () => {
       testSessionId: null,
       onboardingCompleted: false,
     };
+    mockSelectRows([]);
     mockSelectRows(articles);
 
     const response = await request(app())
@@ -98,6 +99,55 @@ describe("growth routes", () => {
       personalization: "generic",
       types: [],
       italianTypes: [],
+    });
+  });
+
+  it("personalizes growth content from the user's latest test session", async () => {
+    authState.user = {
+      id: 7,
+      name: "Ada",
+      email: "ada@example.com",
+      role: "user",
+      stripeSubscriptionId: null,
+      journeyType: null,
+      testSessionId: null,
+      onboardingCompleted: true,
+    };
+    mockSelectRows([
+      {
+        sessionId: 99,
+        primaryTypes: ["Investigativo", "Artistico"],
+        riasecScores: { I: 4.8, A: 4.2, S: 2 },
+      } as never,
+    ]);
+    mockSelectRows([
+      {
+        ...articles[0],
+        id: 2,
+        title: "Allenare pensiero creativo",
+        personalityMatches: ["Artistico"],
+      },
+      {
+        ...articles[0],
+        id: 3,
+        title: "Organizzare documenti",
+        personalityMatches: ["Convenzionale"],
+      },
+    ]);
+
+    const response = await request(app())
+      .get("/api/crescita/per-te")
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      hasProfile: true,
+      personalization: "profile",
+      types: ["Investigativo", "Artistico"],
+      italianTypes: ["Investigativo", "Artistico"],
+    });
+    expect(response.body.articles[0]).toMatchObject({
+      id: 2,
+      personalityMatches: ["Artistico"],
     });
   });
 

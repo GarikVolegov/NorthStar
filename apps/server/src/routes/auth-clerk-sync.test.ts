@@ -233,4 +233,28 @@ describe("auth clerk-sync route", () => {
 
     expect(response.status, JSON.stringify(response.body)).not.toBe(500);
   });
+
+  it("rejects linking an email that is already attached to another Clerk user", async () => {
+    selectRows.queue = [
+      [],
+      [{ id: 46, clerkId: "clerk-existing" }],
+    ];
+
+    const response = await request(app())
+      .post("/api/auth/clerk-sync")
+      .set("Authorization", `Bearer ${clerkJwt("clerk-new")}`)
+      .set("Content-Type", "application/json")
+      .send(JSON.stringify({
+        clerkId: "clerk-new",
+        email: "linked@example.com",
+        name: "Wrong Link",
+      }))
+      .expect(409);
+
+    expect(response.body).toMatchObject({
+      code: "CLERK_SYNC_EMAIL_ALREADY_LINKED",
+      error: expect.any(String),
+    });
+    expect(userUpdateMock).not.toHaveBeenCalled();
+  });
 });
