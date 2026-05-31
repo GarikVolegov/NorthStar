@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SupervisorAgent } from "../growth-agent/supervisor-agent";
 
-const { mockChatOnce, mockEmbedText } = vi.hoisted(() => ({
+const { mockChatOnce, mockEmbedText, mockDbInsert, mockDbValues } = vi.hoisted(() => ({
   mockChatOnce: vi.fn(),
   mockEmbedText: vi.fn(),
+  mockDbInsert: vi.fn(),
+  mockDbValues: vi.fn(),
 }));
 
 vi.mock("../llm/client", () => ({
@@ -13,7 +15,9 @@ vi.mock("../llm/client", () => ({
 }));
 
 vi.mock("../db/client", () => ({
-  db: null,
+  db: {
+    insert: mockDbInsert,
+  },
 }));
 
 vi.mock("../growth-agent/embedder", () => ({
@@ -27,6 +31,8 @@ describe("SupervisorAgent", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDbInsert.mockReturnValue({ values: mockDbValues });
+    mockDbValues.mockResolvedValue(undefined);
     process.env.AI_INTEGRATIONS_OPENAI_API_KEY = "test-key";
     mockEmbedText.mockResolvedValue([1, 0, 0]);
     supervisor = new SupervisorAgent();
@@ -252,6 +258,36 @@ describe("SupervisorAgent", () => {
         failResult,
       );
       expect(rewritten).toBe(goodDraft);
+    });
+
+    it("redacts obvious PII before writing supervisor logs", async () => {
+      mockChatOnce.mockResolvedValue(
+        "Ecco 3 azioni concrete: 1. Scrivi le spese oggi. 2. Scegli un limite. 3. Ricontrolla venerdi.",
+      );
+      const failResult = await supervisor.evaluate({
+        userMessage: "scrivimi a ada@example.com o chiamami al +39 333 123 4567",
+        draft: "Ti rispondo via ada@example.com e telefono +39 333 123 4567.",
+        domain: "finance",
+        intent: "plan",
+      });
+
+      await supervisor.rewrite(
+        {
+          userMessage: "scrivimi a ada@example.com o chiamami al +39 333 123 4567",
+          draft: "Ti rispondo via ada@example.com e telefono +39 333 123 4567.",
+          domain: "finance",
+          intent: "plan",
+        },
+        failResult,
+      );
+
+      expect(mockDbValues).toHaveBeenCalledWith(expect.objectContaining({
+        userMessage: "scrivimi a [redacted-email] o chiamami al [redacted-phone]",
+        draft: "Ti rispondo via [redacted-email] e telefono [redacted-phone].",
+      }));
+      const logged = mockDbValues.mock.calls.at(-1)?.[0] as { userMessage: string; draft: string };
+      expect(logged.userMessage).not.toContain("ada@example.com");
+      expect(logged.draft).not.toContain("+39 333 123 4567");
     });
   });
 });

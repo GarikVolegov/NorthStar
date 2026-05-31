@@ -31,6 +31,7 @@ describe("certificate issuer", () => {
     expect(first.status).toBe("issued");
     expect(first.chain).toBe("NorthStar Ledger");
     expect(first.txHash).toBeNull();
+    expect(first.isPublic).toBe(false);
     expect(first.metadata).toMatchObject({
       version: 1,
       objectiveId: 7,
@@ -51,5 +52,21 @@ describe("certificate issuer", () => {
     });
 
     expect(await store.listByUser(42)).toHaveLength(1);
+  });
+
+  it("keeps newly issued certificates private until the user opts in", async () => {
+    const store = createMemoryCertificateStore();
+    const issuer = createCertificateIssuer({ store });
+
+    const certificate = await issuer.issueMilestoneCertificate(milestoneInput());
+
+    expect(await store.findPublicByHash(certificate.certificateHash)).toBeNull();
+
+    await store.setPublic(certificate.certificateHash, true);
+
+    expect(await store.findPublicByHash(certificate.certificateHash)).toMatchObject({
+      certificateHash: certificate.certificateHash,
+      isPublic: true,
+    });
   });
 });

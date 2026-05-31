@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatPublicNewsSource,
   isPublicNewsArticleSource,
   isPublishableDiscoveryNews,
+  shouldAutoPublishTrustedNews,
 } from "../discovery-agent/news-policy";
 
 describe("news policy", () => {
@@ -31,6 +33,23 @@ describe("news policy", () => {
     })).toBe(true);
   });
 
+  it("keeps GNews and Tavily articles public while preserving the editorial source name", () => {
+    const gnewsSource = formatPublicNewsSource({
+      source: "La Stampa",
+      collectorSource: "gnews",
+    });
+    const tavilySource = formatPublicNewsSource({
+      source: "Il Post",
+      collectorSource: "tavily_news",
+    });
+
+    expect(gnewsSource).toBe("GNews: La Stampa");
+    expect(tavilySource).toBe("Tavily: Il Post");
+    expect(isPublicNewsArticleSource({ source: gnewsSource, url: "https://www.lastampa.it/economia/lavoro/x" })).toBe(true);
+    expect(isPublicNewsArticleSource({ source: tavilySource, url: "https://www.ilpost.it/lavoro/x" })).toBe(true);
+    expect(isPublicNewsArticleSource({ source: "GNews: Reddit", url: "https://www.reddit.com/r/italy/post" })).toBe(false);
+  });
+
   it("publishes only enriched real news discoveries", () => {
     expect(isPublishableDiscoveryNews({
       type: "news",
@@ -47,6 +66,30 @@ describe("news policy", () => {
       source: "Reddit r/ItaliaPersonalFinance",
       url: "https://www.reddit.com/r/ItaliaPersonalFinance/post",
       collectorSource: "reddit",
+    })).toBe(false);
+  });
+
+  it("allows trusted Italian news collectors to bypass LLM enrichment for baseline population", () => {
+    expect(shouldAutoPublishTrustedNews({
+      type: "news",
+      source: "GNews",
+      url: "https://example.com/lavoro-ai",
+      collectorSource: "gnews",
+      summary: "Notizia italiana sul mondo del lavoro e competenze digitali.",
+    })).toBe(true);
+    expect(shouldAutoPublishTrustedNews({
+      type: "news",
+      source: "Tavily",
+      url: "https://example.com/lavoro-sanita",
+      collectorSource: "tavily_news",
+      summary: "Approfondimento italiano sul lavoro nella sanita.",
+    })).toBe(true);
+    expect(shouldAutoPublishTrustedNews({
+      type: "news",
+      source: "Reddit",
+      url: "https://reddit.com/r/italy",
+      collectorSource: "reddit",
+      summary: "thread",
     })).toBe(false);
   });
 });

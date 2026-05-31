@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { deleteJson, getJson, postJson } from "@/lib/apiClient";
 import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
@@ -249,6 +250,31 @@ export default function News() {
     staleTime: 60_000,
   });
   const subscriptions = subsData ?? [];
+  const activeCategory = CATEGORY_CONFIG.find((cat) => cat.id === activeTab);
+  const activeContextName =
+    activeTab === "__sector__" && confirmedSector
+      ? `Settore confermato: ${confirmedSector.name}; iscrizioni:${subscriptions.length}`
+      : `Categoria news: ${activeCategory?.id ?? activeTab}; iscrizioni:${subscriptions.length}`;
+
+  useWendyPageContext({
+    page: "news",
+    title: t("news.title"),
+    entityType: "news",
+    entityName: activeContextName,
+    journeyType: user?.journeyType ?? undefined,
+    sector: activeTab === "__sector__" ? confirmedSector?.name : undefined,
+    capabilities: ["search_news", "get_user_profile", "search_rag"],
+    fields: [
+      `activeTab:${activeTab}`,
+      `subscriptions:${subscriptions.length}`,
+      confirmedSector ? `confirmedSector:${confirmedSector.name}` : "confirmedSector:none",
+    ],
+    actions: [
+      "riassumi le notizie rilevanti per orientamento e crescita professionale",
+      "collega trend e segnali deboli al settore o profilo dell'utente",
+      "suggerisci categorie da seguire o articoli da salvare",
+    ],
+  });
 
   const subMutation = useMutation({
     mutationFn: async ({ category, subscribe }: { category: string; subscribe: boolean }) => {

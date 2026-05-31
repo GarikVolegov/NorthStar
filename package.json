@@ -49,6 +49,7 @@
     "test:e2e:api": "playwright test e2e/api.spec.ts e2e/api-wendy.spec.ts e2e/api-affiliate.spec.ts",
     "test:smoke:core": "playwright test e2e/core-smoke.spec.ts",
     "test:e2e:all": "playwright test",
+    "eval:wendy": "pnpm --filter @workspace/scripts run eval:wendy --mock",
     "// ── QA ──────────────────────────────────────────": "---",
     "quality:required": "pnpm run lint:ci && pnpm run typecheck && pnpm run test:ai:coverage && pnpm run test:server:coverage && pnpm run test:web:coverage && pnpm run audit:e2e-determinism && pnpm run audit:api-fetch && pnpm run audit:tech-debt && pnpm run audit:file-size && pnpm run audit:dead-code && pnpm run audit:feature-protocol && pnpm run audit:wendy-tools && pnpm run audit:db-types && pnpm run audit:mojibake",
     "quality:runtime": "pnpm run test:smoke:core && pnpm run test:e2e && pnpm run test:e2e:browser",

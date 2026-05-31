@@ -241,7 +241,51 @@ router.post("/:sessionId/assign-user", requireAuth, async (req, res) => {
   }
 });
 
-/* ─── POST /api/objectives/seed  —  inizializza obiettivi ─── */
+/* POST /api/test-sessions/:sessionId/confirm - conferma settore scelto */
+router.post("/:sessionId/confirm", requireAuth, async (req, res) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId ?? "", 10);
+    if (isNaN(sessionId)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+    const sectorId = Number((req.body as { sectorId?: unknown })?.sectorId);
+    if (!Number.isInteger(sectorId) || sectorId <= 0) {
+      res.status(400).json({ error: "sectorId richiesto" });
+      return;
+    }
+
+    const [sector] = await db
+      .select({ id: sectorsTable.id })
+      .from(sectorsTable)
+      .where(and(eq(sectorsTable.id, sectorId), eq(sectorsTable.isActive, true)))
+      .limit(1);
+
+    if (!sector) {
+      res.status(404).json({ error: "Settore non trovato o non attivo" });
+      return;
+    }
+
+    const [session] = await db
+      .update(testSessionsTable)
+      .set({ confirmedSectorId: sectorId })
+      .where(and(
+        eq(testSessionsTable.id, sessionId),
+        eq(testSessionsTable.userId, req.user!.id),
+      ))
+      .returning();
+
+    if (!session) {
+      res.status(404).json({ error: "Sessione non trovata" });
+      return;
+    }
+
+    res.json({ success: true, session });
+  } catch (err) {
+    req.log?.error?.({ err }, "test-sessions confirm error");
+    res.status(500).json({ error: "Errore nella conferma del settore" });
+  }
+});
+
+/* POST /api/objectives/seed - inizializza obiettivi */
 router.post("/objectives/seed", requireAuth, async (req, res) => {
   try {
     res.json({ success: true });

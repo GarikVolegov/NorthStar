@@ -63,6 +63,7 @@ describe("Wendy fast path fallback", () => {
 
     expect(reply).toContain("NorthStar funziona");
     expect(reply).toContain("test");
+    expect(reply).toContain("roadmap");
   });
 
   it("does not answer non-simple intents locally", () => {
@@ -89,6 +90,10 @@ describe("Wendy fast path fallback", () => {
     expect(shouldUseImmediateFastPathFallback({
       intent: "simple_qa",
       message: "ei",
+    })).toBe(true);
+    expect(shouldUseImmediateFastPathFallback({
+      intent: "conversation",
+      message: "Ciao Wendy",
     })).toBe(true);
     expect(shouldUseImmediateFastPathFallback({
       intent: "conversation",

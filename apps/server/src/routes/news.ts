@@ -1,8 +1,10 @@
 import { Router } from "express";
-import { eq, desc, or, like, and, lt, sql, type SQL } from "drizzle-orm";
+import { eq, desc, or, and, lt, ilike, sql, type SQL } from "drizzle-orm";
 import { db, newsArticlesTable } from "@workspace/db";
 import { PUBLIC_NEWS_SOURCES } from "@workspace/ai-server";
 import { cacheGet, cacheSet } from "../lib/redis";
+import { clampContentLimit, readContentSearchQuery } from "../lib/content-search";
+import { mapNewsCategoryForUi, resolveNewsCategoryFilter } from "../lib/news-category";
 
 const router = Router();
 
@@ -32,17 +34,62 @@ function isMissingColumnError(err: unknown): boolean {
 }
 
 function publicNewsWhere(extra?: SQL<unknown>): SQL<unknown> {
-  const sourceList = sql.join(
-    PUBLIC_NEWS_SOURCES.map((source) => sql`${source}`),
-    sql`, `,
-  );
+  const sourceClauses = PUBLIC_NEWS_SOURCES.flatMap((source) => [
+    sql`lower(${newsArticlesTable.source}) = ${source}`,
+    sql`lower(${newsArticlesTable.source}) like ${`${source}:%`}`,
+    sql`lower(${newsArticlesTable.source}) like ${`${source} -%`}`,
+    sql`lower(${newsArticlesTable.source}) like ${`${source} %`}`,
+  ]);
   const base = and(
-    sql`lower(${newsArticlesTable.source}) in (${sourceList})`,
+    or(...sourceClauses)!,
     sql`${newsArticlesTable.url} not like 'https://northstar.internal/seed/%'`,
     sql`${newsArticlesTable.url} not ilike '%reddit.com%'`,
     sql`${newsArticlesTable.url} not ilike '%dev.to%'`,
   );
   return extra ? (and(base, extra) ?? base!) : base!;
+}
+
+function newsSearchWhere(search: string): SQL<unknown> | undefined {
+  if (!search) return undefined;
+  const pattern = `%${search}%`;
+  return or(
+    ilike(newsArticlesTable.title, pattern),
+    ilike(newsArticlesTable.summary, pattern),
+    ilike(newsArticlesTable.content, pattern),
+    sql`${newsArticlesTable.sectorNames}::text ILIKE ${pattern}`,
+    ilike(newsArticlesTable.category, pattern),
+    ilike(newsArticlesTable.source, pattern),
+  );
+}
+
+function cursorWhere(cursor: string): SQL<unknown> {
+  const [cursorTs, cursorId] = decodeCursor(cursor);
+  return or(
+    lt(newsArticlesTable.publishedAt, new Date(cursorTs)),
+    and(
+      eq(newsArticlesTable.publishedAt, new Date(cursorTs)),
+      lt(newsArticlesTable.id, cursorId),
+    ),
+  )!;
+}
+
+function sectorWhere(sectorName: string): SQL<unknown> {
+  const pattern = `%${sectorName}%`;
+  return or(
+    sql`exists (select 1 from unnest(${newsArticlesTable.sectorNames}) as sector_name where sector_name ilike ${pattern})`,
+    eq(newsArticlesTable.category, sectorName),
+    ilike(newsArticlesTable.title, pattern),
+    ilike(newsArticlesTable.summary, pattern),
+  )!;
+}
+
+function categoryWhere(category: string): SQL<unknown> | undefined {
+  const filter = resolveNewsCategoryFilter(category);
+  if (!filter) return undefined;
+
+  const categoryClauses = filter.categories.map((cat) => eq(newsArticlesTable.category, cat));
+  const sectorClauses = filter.sectors.map((sector) => sectorWhere(sector));
+  return or(...categoryClauses, ...sectorClauses);
 }
 
 function legacyNewsSelect() {
@@ -91,7 +138,8 @@ router.get("/", async (req, res) => {
   try {
     const { multi, categories, perCategory, category, limit } = req.query;
     const cursor = req.query.cursor as string | undefined;
-    const limitNum = Math.min(50, Math.max(1, parseInt(limit as string, 10) || 20));
+    const search = readContentSearchQuery(req.query as Record<string, string | string[] | undefined>);
+    const limitNum = clampContentLimit(limit as string | undefined, 20, 50);
 
     // Multi-category mode: fetch perCategory articles per category
     if (multi === "true" && categories) {
@@ -102,11 +150,12 @@ router.get("/", async (req, res) => {
         cats.map(async (cat) => {
           try {
             // Build cursor-based query per category
-            let whereClause = publicNewsWhere(eq(newsArticlesTable.category, cat.trim()));
+            const baseCategoryWhere = categoryWhere(cat.trim());
+            let whereClause = publicNewsWhere(baseCategoryWhere);
             if (cursor) {
               const [cursorTs, cursorId] = decodeCursor(cursor);
               whereClause = publicNewsWhere(and(
-                eq(newsArticlesTable.category, cat.trim()),
+                baseCategoryWhere,
                 or(
                   lt(newsArticlesTable.publishedAt, new Date(cursorTs)),
                   and(
@@ -124,8 +173,9 @@ router.get("/", async (req, res) => {
               articles: hasMoreCat ? articles.slice(0, perCat) : articles,
               hasMore: hasMoreCat,
             };
-          } catch {
-            return { articles: [] as typeof newsArticlesTable.$inferSelect[], hasMore: false };
+          } catch (err) {
+            req.log?.error?.({ err, category: cat.trim() }, "news multi-category query error");
+            return { articles: [] as typeof newsArticlesTable.$inferSelect[], hasMore: false, error: "news_unavailable" };
           }
         }),
       );
@@ -133,16 +183,22 @@ router.get("/", async (req, res) => {
       const news = results.flatMap((r) => r.articles).map(mapNewsItem);
       const anyMore = results.some((r) => r.hasMore);
       const lastNews = news.at(-1);
-      res.json({ news, nextCursor: anyMore && lastNews ? encodeCursor(lastNews.publishedAt, parseInt(lastNews.id, 10)) : null });
+      const errors = results.filter((r) => "error" in r).map(() => "news_unavailable");
+      res.json({
+        news,
+        nextCursor: anyMore && lastNews ? encodeCursor(lastNews.publishedAt, parseInt(lastNews.id, 10)) : null,
+        source: errors.length > 0 ? "partial" : "live",
+        ...(errors.length > 0 ? { errors } : {}),
+      });
       return;
     }
 
     // Try cache first for non-filtered requests
-    if (!category && !cursor) {
-      const cacheKey = "news:recent:real:v1";
+    if (!category && !cursor && !search) {
+      const cacheKey = "news:recent:real:v3";
       const cached = await cacheGet<ReturnType<typeof mapNewsItem>[]>(cacheKey);
       if (cached) {
-        res.json({ news: cached, nextCursor: null });
+        res.json({ news: cached, nextCursor: null, source: "live" });
         return;
       }
     }
@@ -150,15 +206,16 @@ router.get("/", async (req, res) => {
     // Build cursor-based WHERE clause
     let whereClause;
     if (category) {
-      whereClause = eq(newsArticlesTable.category, category as string);
+      whereClause = categoryWhere(category as string);
+    }
+
+    const searchClause = newsSearchWhere(search);
+    if (searchClause) {
+      whereClause = whereClause ? and(whereClause, searchClause) : searchClause;
     }
 
     if (cursor) {
-      const [cursorTs, cursorId] = decodeCursor(cursor);
-      const cursorCond = and(
-        lt(newsArticlesTable.publishedAt, new Date(cursorTs)),
-        lt(newsArticlesTable.id, cursorId),
-      );
+      const cursorCond = cursorWhere(cursor);
       whereClause = whereClause ? and(whereClause, cursorCond) : cursorCond;
     }
 
@@ -170,8 +227,8 @@ router.get("/", async (req, res) => {
     const mapped = capped.map(mapNewsItem);
 
     // Cache non-filtered first page
-    if (!category && !cursor) {
-      await cacheSet("news:recent:real:v1", mapped, CACHE_TTL);
+    if (!category && !cursor && !search) {
+      await cacheSet("news:recent:real:v3", mapped, CACHE_TTL);
     }
 
     const last = mapped[mapped.length - 1];
@@ -179,10 +236,10 @@ router.get("/", async (req, res) => {
       ? encodeCursor(last.publishedAt, parseInt(last.id))
       : null;
 
-    res.json({ news: mapped, nextCursor });
+    res.json({ news: mapped, nextCursor, source: "live" });
   } catch (err) {
     req.log?.error?.({ err }, "news list error");
-    res.status(200).json({ news: [], nextCursor: null });
+    res.status(200).json({ news: [], nextCursor: null, source: "error", error: "news_unavailable" });
   }
 });
 
@@ -215,23 +272,10 @@ router.get("/sector/:sectorName", async (req, res) => {
     const cursor = req.query.cursor as string | undefined;
 
     // Build cursor-based query
-    let whereClause = or(
-      like(newsArticlesTable.sectorNames, `%${sectorName}%`),
-      eq(newsArticlesTable.category, sectorName),
-    );
+    let whereClause = sectorWhere(sectorName);
 
     if (cursor) {
-      const [cursorTs, cursorId] = decodeCursor(cursor);
-      whereClause = and(
-        whereClause,
-        or(
-          lt(newsArticlesTable.publishedAt, new Date(cursorTs)),
-          and(
-            eq(newsArticlesTable.publishedAt, new Date(cursorTs)),
-            lt(newsArticlesTable.id, cursorId),
-          ),
-        ),
-      ) ?? whereClause;
+      whereClause = and(whereClause, cursorWhere(cursor)) ?? whereClause;
     }
 
     const articles = await selectNewsRows(publicNewsWhere(whereClause), limitNum + 1);
@@ -245,10 +289,10 @@ router.get("/sector/:sectorName", async (req, res) => {
       ? encodeCursor(last.publishedAt, parseInt(last.id))
       : null;
 
-    res.json({ news: mapped, nextCursor });
+    res.json({ news: mapped, nextCursor, source: "live" });
   } catch (err) {
     req.log?.error?.({ err }, "news by sector error");
-    res.json({ news: [] });
+    res.status(200).json({ news: [], nextCursor: null, source: "error", error: "news_unavailable" });
   }
 });
 
@@ -285,7 +329,7 @@ function mapNewsItem(a: typeof newsArticlesTable.$inferSelect) {
     detailUrl: `/news/${a.id}`,
     publishedAt,
     image: a.imageUrl ?? null,
-    category: a.category,
+    category: mapNewsCategoryForUi(a.category, a.sectorNames ?? []),
     sector: a.sectorNames?.[0] ?? null,
     tags: a.sectorNames ?? [],
     relevance: a.relevanceScore,

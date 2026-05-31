@@ -1,5 +1,128 @@
-import { describe, expect, it } from "vitest";
-import { normalizeWendyAction } from "./useWendyActionExecutor";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, renderHook } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { normalizeWendyAction, useWendyActionExecutor, type WendyAction } from "./useWendyActionExecutor";
+
+const apiFetchMock = vi.hoisted(() => vi.fn());
+const toastMock = vi.hoisted(() => vi.fn());
+const setLocationMock = vi.hoisted(() => vi.fn());
+const eventEmitMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/api-fetch", () => ({
+  apiFetch: apiFetchMock,
+}));
+
+vi.mock("@/hooks/use-toast", () => ({
+  useToast: () => ({ toast: toastMock }),
+}));
+
+vi.mock("@/lib/event-bus", () => ({
+  eventBus: { emit: eventEmitMock },
+}));
+
+vi.mock("wouter", () => ({
+  useLocation: () => ["/dashboard", setLocationMock] as const,
+}));
+
+function wrapperFactory() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(QueryClientProvider, { client: queryClient }, children);
+  };
+}
+
+function progressAction(payload: Record<string, unknown>): WendyAction {
+  return {
+    id: "progress-1",
+    type: "update_objective_progress",
+    status: "needs_confirmation",
+    risk: "medium",
+    label: "Aggiornare il progresso?",
+    description: "Conferma prima di modificare questo obiettivo.",
+    requiresConfirmation: true,
+    payload,
+  };
+}
+
+describe("useWendyActionExecutor", () => {
+  beforeEach(() => {
+    apiFetchMock.mockReset();
+    toastMock.mockReset();
+    setLocationMock.mockReset();
+    eventEmitMock.mockReset();
+  });
+
+  it("rejects progress updates without a valid objective id before fetching", async () => {
+    const { result } = renderHook(() => useWendyActionExecutor(), { wrapper: wrapperFactory() });
+
+    let updated: WendyAction | undefined;
+    await act(async () => {
+      updated = await result.current.confirm(progressAction({ progress: 55 }));
+    });
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(updated).toMatchObject({
+      status: "failed",
+      error: expect.stringContaining("ID obiettivo"),
+    });
+    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({
+      variant: "destructive",
+      description: expect.stringContaining("ID obiettivo"),
+    }));
+  });
+
+  it("rejects progress updates with invalid progress before fetching", async () => {
+    const { result } = renderHook(() => useWendyActionExecutor(), { wrapper: wrapperFactory() });
+
+    let updated: WendyAction | undefined;
+    await act(async () => {
+      updated = await result.current.confirm(progressAction({ objectiveId: 42, progress: Number.NaN }));
+    });
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(updated).toMatchObject({
+      status: "failed",
+      error: expect.stringContaining("progresso"),
+    });
+  });
+
+  it("rejects progress updates with empty progress before fetching", async () => {
+    const { result } = renderHook(() => useWendyActionExecutor(), { wrapper: wrapperFactory() });
+
+    let updated: WendyAction | undefined;
+    await act(async () => {
+      updated = await result.current.confirm(progressAction({ objectiveId: 42, progress: "" }));
+    });
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(updated).toMatchObject({
+      status: "failed",
+      error: expect.stringContaining("progresso"),
+    });
+  });
+
+  it("patches valid progress updates with a numeric objective id and completion flag", async () => {
+    apiFetchMock.mockResolvedValue({ ok: true } as Response);
+    const { result } = renderHook(() => useWendyActionExecutor(), { wrapper: wrapperFactory() });
+
+    let updated: WendyAction | undefined;
+    await act(async () => {
+      updated = await result.current.confirm(progressAction({ objectiveId: "42", progress: "100" }));
+    });
+
+    expect(apiFetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/api\/objectives\/42$/),
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ progress: 100, completed: true }),
+      }),
+    );
+    expect(updated).toMatchObject({ status: "executed" });
+  });
+});
 
 describe("normalizeWendyAction", () => {
   it("normalizes Wendy progress updates as confirmation-gated app actions", () => {

@@ -320,19 +320,29 @@ export async function handleUpdateObjectiveProgress(
   args: { objectiveId: number; progress: number },
   userId: number,
 ): Promise<ToolResult> {
-  if (typeof args.progress !== "number" || args.progress < 0 || args.progress > 100)
+  if (!Number.isInteger(args.objectiveId) || args.objectiveId <= 0) {
+    return err("INVALID_INPUT", "ID obiettivo obbligatorio e valido");
+  }
+  if (typeof args.progress !== "number" || !Number.isFinite(args.progress) || args.progress < 0 || args.progress > 100)
     return err("INVALID_INPUT", "Il progresso deve essere un numero tra 0 e 100");
   try {
+    const activeOwnedObjective = and(
+      eq(userObjectivesTable.id, args.objectiveId),
+      eq(userObjectivesTable.userId, userId),
+      isNull(userObjectivesTable.deletedAt),
+    );
     const [existing] = await db
       .select({ id: userObjectivesTable.id })
       .from(userObjectivesTable)
-      .where(and(eq(userObjectivesTable.id, args.objectiveId), eq(userObjectivesTable.userId, userId)))
+      .where(activeOwnedObjective)
       .limit(1);
-    if (!existing) return err("FORBIDDEN", "Obiettivo non trovato o non accessibile");
-    await db
+    if (!existing) return err("NOT_FOUND", "Obiettivo non trovato o non appartiene all'utente");
+    const [updated] = await db
       .update(userObjectivesTable)
       .set({ progress: args.progress, completed: args.progress === 100, updatedAt: new Date() })
-      .where(and(eq(userObjectivesTable.id, args.objectiveId), eq(userObjectivesTable.userId, userId)));
+      .where(activeOwnedObjective)
+      .returning({ id: userObjectivesTable.id });
+    if (!updated) return err("NOT_FOUND", "Obiettivo non trovato o non appartiene all'utente");
     return { ok: true, data: { ok: true } };
   } catch (e) {
     logger.warn({ e, userId, args }, "[tool] update_objective_progress error");
@@ -344,7 +354,7 @@ export async function handleGetGrowthArticles(
 ): Promise<ToolResult> {
   try {
     const pattern = `%${args.topic}%`;
-    const limit = Math.min(args.limit ?? 3, 5);
+    const limit = Math.max(1, Math.min(Number(args.limit) || 3, 5));
     const rows = await db
       .select({
         id: growthArticlesTable.id, title: growthArticlesTable.title,
@@ -352,7 +362,17 @@ export async function handleGetGrowthArticles(
         difficulty: growthArticlesTable.difficulty, readTimeMinutes: growthArticlesTable.readTimeMinutes,
       })
       .from(growthArticlesTable)
-      .where(or(ilike(growthArticlesTable.title, pattern), ilike(growthArticlesTable.description, pattern)))
+      .where(and(
+        eq(growthArticlesTable.status, "published"),
+        or(
+          ilike(growthArticlesTable.title, pattern),
+          ilike(growthArticlesTable.description, pattern),
+          ilike(growthArticlesTable.content, pattern),
+          sql`${growthArticlesTable.tags}::text ILIKE ${pattern}`,
+          sql`${growthArticlesTable.personalityMatches}::text ILIKE ${pattern}`,
+          sql`${growthArticlesTable.sectorLinks}::text ILIKE ${pattern}`,
+        ),
+      ))
       .limit(limit);
     const articles = rows.map((a) => ({ ...a, url: `/crescita/articolo/${a.slug}` }));
     return { ok: true, data: { articles } };
@@ -366,7 +386,7 @@ export async function handleGetNewsSummary(
 ): Promise<ToolResult> {
   try {
     const pattern = `%${args.topic}%`;
-    const limit = Math.min(args.limit ?? 3, 5);
+    const limit = Math.max(1, Math.min(Number(args.limit) || 3, 5));
     const rows = await db
       .select({
         id: newsArticlesTable.id, title: newsArticlesTable.title,

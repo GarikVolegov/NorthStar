@@ -13,6 +13,7 @@
     "backfill:embeddings": "tsx ./src/backfill-embeddings.ts",
     "security:scan": "tsx ./src/security-agent.ts",
     "security:scan:all": "tsx ./src/security-agent.ts -- --all",
+    "eval:wendy": "tsx ./src/eval-wendy.ts",
     "test:wendy-tools": "tsx ./src/test-wendy-tools.ts",
     "seed:rag": "tsx ./src/seed-rag.ts",
     "seed:rabbit-kb": "tsx ./src/seed-rabbit-kb.ts",

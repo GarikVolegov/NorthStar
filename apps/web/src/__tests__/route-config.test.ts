@@ -36,4 +36,25 @@ describe("frontend route config", () => {
       title: "Mood",
     });
   });
+
+  it("keeps Italian CTA aliases wired to safe auth and premium destinations", () => {
+    expect(routes.find((item) => item.path === "/accedi")).toMatchObject({
+      path: "/accedi",
+      guard: "publicOnly",
+      layout: "default",
+      title: "Accesso",
+    });
+    expect(routes.find((item) => item.path === "/registrati")).toMatchObject({
+      path: "/registrati",
+      guard: "publicOnly",
+      layout: "default",
+      title: "Registrazione",
+    });
+    expect(routes.find((item) => item.path === "/abbonamento")).toMatchObject({
+      path: "/abbonamento",
+      guard: "public",
+      layout: "default",
+      title: "Abbonamento",
+    });
+  });
 });

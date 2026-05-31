@@ -84,7 +84,7 @@ export function createCertificateIssuer({
           chain: LEDGER_CHAIN,
           chainId: null,
           status: "issued",
-          isPublic: true,
+          isPublic: false,
         });
       } catch (err) {
         if (isUniqueConflict(err)) {

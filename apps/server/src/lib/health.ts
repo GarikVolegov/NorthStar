@@ -25,6 +25,12 @@ export interface RedisDependencyCheck extends DependencyCheck {
   required: boolean;
 }
 
+export interface DiscoverySourcesSchemaCheck extends DependencyCheck {
+  requiredColumns: string[];
+  missingColumns: string[];
+  migration: "0041_discovery_sources_fast_lane.sql";
+}
+
 export interface EmbedderDependencyCheck {
   status: EmbedderStatus;
   probe: "cached" | "fresh" | "disabled";
@@ -43,6 +49,7 @@ export interface HealthPayload {
     db: DependencyCheck;
     redis: RedisDependencyCheck;
     pgvector: DependencyCheck;
+    discoverySources: DiscoverySourcesSchemaCheck;
     embedder: EmbedderDependencyCheck;
   };
 }
@@ -59,6 +66,14 @@ const REQUIRE_EMBED_OK =
   (process.env.HEALTH_REQUIRE_EMBED_OK == null && HAS_EMBED_API_KEY);
 const REDIS_BYPASSED =
   process.env.NODE_ENV === "test" || process.env.USE_MOCK_AI === "true";
+const REQUIRED_DISCOVERY_SOURCE_COLUMNS = [
+  "priority",
+  "source_type",
+  "scraping_url",
+  "scraping_selector",
+  "enabled",
+  "last_fetch_at",
+];
 
 let cachedEmbedderCheck: EmbedderDependencyCheck | null = null;
 let cachedEmbedderCheckAt = 0;
@@ -122,6 +137,57 @@ export async function checkPgvectorHealth(): Promise<DependencyCheck> {
     return {
       status: "fail",
       latencyMs: elapsedSince(start),
+      message: messageFrom(error),
+    };
+  }
+}
+
+export async function checkDiscoverySourcesSchemaHealth(): Promise<DiscoverySourcesSchemaCheck> {
+  const start = performance.now();
+  try {
+    const result = (await withTimeout(
+      pool.query<{ column_name: string }>(
+        `
+          SELECT column_name
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'discovery_sources'
+            AND column_name = ANY($1::text[])
+        `,
+        [REQUIRED_DISCOVERY_SOURCE_COLUMNS],
+      ),
+      "discovery_sources schema health check",
+    )) as { rows: Array<{ column_name: string }> };
+    const present = new Set(result.rows.map((row) => row.column_name));
+    const missingColumns = REQUIRED_DISCOVERY_SOURCE_COLUMNS.filter(
+      (column) => !present.has(column),
+    );
+
+    if (missingColumns.length > 0) {
+      return {
+        status: "fail",
+        latencyMs: elapsedSince(start),
+        requiredColumns: REQUIRED_DISCOVERY_SOURCE_COLUMNS,
+        missingColumns,
+        migration: "0041_discovery_sources_fast_lane.sql",
+        message: `discovery_sources schema drift: missing columns ${missingColumns.join(", ")}. Run pnpm run db:migrate before starting collectors/news.`,
+      };
+    }
+
+    return {
+      status: "ok",
+      latencyMs: elapsedSince(start),
+      requiredColumns: REQUIRED_DISCOVERY_SOURCE_COLUMNS,
+      missingColumns,
+      migration: "0041_discovery_sources_fast_lane.sql",
+    };
+  } catch (error) {
+    return {
+      status: "fail",
+      latencyMs: elapsedSince(start),
+      requiredColumns: REQUIRED_DISCOVERY_SOURCE_COLUMNS,
+      missingColumns: [],
+      migration: "0041_discovery_sources_fast_lane.sql",
       message: messageFrom(error),
     };
   }
@@ -203,16 +269,18 @@ export async function checkEmbedderHealth(): Promise<EmbedderDependencyCheck> {
 }
 
 export async function getHealthPayload(): Promise<HealthPayload> {
-  const [db, redis, pgvector, embedder] = await Promise.all([
+  const [db, redis, pgvector, discoverySources, embedder] = await Promise.all([
     checkDbHealth(),
     checkRedisHealth(),
     checkPgvectorHealth(),
+    checkDiscoverySourcesSchemaHealth(),
     checkEmbedderHealth(),
   ]);
 
   const criticalFailed =
     db.status === "fail" ||
     pgvector.status === "fail" ||
+    discoverySources.status === "fail" ||
     (redis.required && redis.status === "fail") ||
     (REQUIRE_EMBED_OK && embedder.status !== "ok");
   const embedderCanDegrade = HAS_EMBED_API_KEY || REQUIRE_EMBED_OK;
@@ -233,6 +301,6 @@ export async function getHealthPayload(): Promise<HealthPayload> {
       process.env.GITHUB_SHA ??
       "development",
     uptimeSec: Math.round(process.uptime()),
-    checks: { db, redis, pgvector, embedder },
+    checks: { db, redis, pgvector, discoverySources, embedder },
   };
 }

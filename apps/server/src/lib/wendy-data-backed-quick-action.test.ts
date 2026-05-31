@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildWendyDataBackedGuidedAction,
+  buildWendyDataBackedSuggestedPrompts,
   classifyWendyDataBackedQuickAction,
   formatWendyDataBackedQuickActionReply,
 } from "./wendy-data-backed-quick-action";
@@ -18,10 +19,12 @@ describe("wendy data-backed quick actions", () => {
     expect(classifyWendyDataBackedQuickAction("Quali settori sono piu adatti a me?")).toBe("sectors");
     expect(classifyWendyDataBackedQuickAction("Ho gia fatto il test, che settore scelgo?")).toBe("sectors");
     expect(classifyWendyDataBackedQuickAction("L'ho gia fatto, che settore scelgo?")).toBe("sectors");
+    expect(classifyWendyDataBackedQuickAction("Segna questa attivita come completata")).toBe("complete");
     expect(classifyWendyDataBackedQuickAction("What should I do today?")).toBe("today");
     expect(classifyWendyDataBackedQuickAction("What is my next step?")).toBe("today");
     expect(classifyWendyDataBackedQuickAction("Analyze my profile and tell me the next move")).toBe("profile");
     expect(classifyWendyDataBackedQuickAction("Which sectors fit me best?")).toBe("sectors");
+    expect(classifyWendyDataBackedQuickAction("Mark this task as completed")).toBe("complete");
     expect(classifyWendyDataBackedQuickAction("I already did the test, which sector should I choose?")).toBe("sectors");
   });
 
@@ -45,6 +48,18 @@ describe("wendy data-backed quick actions", () => {
     expect(reply).toContain("Cybersecurity");
     expect(reply).toContain("Data");
     expect(reply).toContain("fit personale");
+    expect(reply).toContain("competenze");
+  });
+
+  it("builds an explicit completion reply when an activity is done", () => {
+    const reply = formatWendyDataBackedQuickActionReply({
+      kind: "complete",
+      objectives: { objectives: [] },
+    });
+
+    expect(reply).toContain("completata");
+    expect(reply).toContain("progressi");
+    expect(reply).toContain("aggiornati");
   });
 
   it("uses profile and objectives when no preferred sectors are available", () => {
@@ -82,6 +97,20 @@ describe("wendy data-backed quick actions", () => {
     expect(action).toEqual({
       toolName: "update_objective_progress",
       args: { objectiveId: 42, progress: 55 },
+    });
+  });
+
+  it("builds a completion action that moves the linked objective to 100 percent", () => {
+    const action = buildWendyDataBackedGuidedAction({
+      kind: "complete",
+      objectives: {
+        objectives: [{ id: 42, text: "Finire il portfolio", progress: 40 }],
+      },
+    });
+
+    expect(action).toEqual({
+      toolName: "update_objective_progress",
+      args: { objectiveId: 42, progress: 100 },
     });
   });
 
@@ -132,5 +161,37 @@ describe("wendy data-backed quick actions", () => {
       confirmBeforeExecution: true,
       args: { viewId: "settori" },
     });
+  });
+
+  it("builds coherent Italian suggested prompts for fallback quick actions", () => {
+    const prompts = buildWendyDataBackedSuggestedPrompts({
+      kind: "today",
+      locale: "it",
+    });
+
+    expect(prompts).toHaveLength(3);
+    expect(prompts.map((prompt) => prompt.prompt).join(" ")).toMatch(/oggi|25 minuti|obiettivo/i);
+    expect(prompts.map((prompt) => prompt.prompt).join(" ")).not.toContain("I can still help");
+  });
+
+  it("builds coherent sector prompts from the same quick-action intent", () => {
+    const prompts = buildWendyDataBackedSuggestedPrompts({
+      kind: "sectors",
+      locale: "it",
+    });
+
+    expect(prompts.length).toBeGreaterThanOrEqual(2);
+    expect(prompts.length).toBeLessThanOrEqual(3);
+    expect(prompts.map((prompt) => prompt.prompt).join(" ")).toMatch(/settori|profilo|fit/i);
+  });
+
+  it("builds completion prompts that keep Wendy moving forward", () => {
+    const prompts = buildWendyDataBackedSuggestedPrompts({
+      kind: "complete",
+      locale: "it",
+    });
+
+    expect(prompts).toHaveLength(3);
+    expect(prompts.map((prompt) => prompt.prompt).join(" ")).toMatch(/completata|progressi|prossimo/i);
   });
 });

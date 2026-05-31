@@ -78,13 +78,21 @@ function EditModal({
   async function handleApprove() {
     setSaving(true);
     try {
-      await apiFetch(`${BASE}api/admin/growth-queue/${article.id}/approve`, {
-        method: "POST",
+      await apiFetch(`${BASE}api/admin/growth-queue/${article.id}`, {
+        method: "PATCH",
         headers: {
           Authorization: `Bearer ${adminKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ title, description, content }),
+      });
+      await apiFetch(`${BASE}api/admin/growth-queue/${article.id}/publish`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ notes: "Pubblicato dalla pagina admin crescita legacy." }),
       });
       onSaved();
     } finally {
@@ -172,7 +180,7 @@ function ArticleCard({
   async function approve() {
     setLoading(true);
     try {
-      await apiFetch(`${BASE}api/admin/growth-queue/${article.id}/approve`, {
+      await apiFetch(`${BASE}api/admin/growth-queue/${article.id}/publish`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${adminKey}`,
@@ -191,7 +199,11 @@ function ArticleCard({
     try {
       await apiFetch(`${BASE}api/admin/growth-queue/${article.id}/reject`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${adminKey}` },
+        headers: {
+          Authorization: `Bearer ${adminKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ reason: "Scartato dalla pagina admin crescita legacy." }),
       });
       onRefresh();
     } finally {
@@ -200,12 +212,16 @@ function ArticleCard({
   }
 
   async function remove() {
-    if (!confirm("Eliminare definitivamente?")) return;
+    if (!confirm("Scartare questo articolo dalla coda?")) return;
     setLoading(true);
     try {
-      await apiFetch(`${BASE}api/admin/growth-queue/${article.id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${adminKey}` },
+      await apiFetch(`${BASE}api/admin/growth-queue/${article.id}/reject`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ reason: "Rimosso dalla coda tramite pagina admin crescita legacy." }),
       });
       onRefresh();
     } finally {

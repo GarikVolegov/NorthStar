@@ -56,7 +56,7 @@ export async function hydrateMissingImages<T extends RawItem>(items: T[]): Promi
   const missingIndexes = hydrated
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => !item.imageUrl && isSafeHttpUrl(item.url))
-    .slice(0, 40);
+    .slice(0, Number(process.env.NEWS_IMAGE_HYDRATE_MAX_PER_RUN) || 12);
   for (let i = 0; i < missingIndexes.length; i += 8) {
     const chunk = missingIndexes.slice(i, i + 8);
     const results = await Promise.allSettled(chunk.map(({ item }) => fetchPagePreviewImage(item.url)));

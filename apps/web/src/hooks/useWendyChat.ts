@@ -36,9 +36,20 @@ import {
 } from './wendyPersistence';
 import { useWendyTabRemoteSync } from './useWendyTabRemoteSync';
 import { FATAL_ERRORS, THINKING_LABELS } from './wendy.config';
+import { withWendySuggestedPromptFallback } from './wendySuggestedPrompts';
 
 const RECONNECT_DELAY_MS = [1000, 2000, 4000] as const;
 const WENDY_PAGE_ENTITY_TYPES = new Set(['sector', 'profession', 'article', 'news']);
+const AUTH_SESSION_ERROR_PATTERNS = [
+  '401',
+  '403',
+  'UNAUTHORIZED',
+  'FORBIDDEN',
+  'TOKEN',
+  'SESSION_EXPIRED',
+  'SESSION EXPIRED',
+  'AUTH',
+] as const;
 
 function readSupportedWendyEntityType(record: Record<string, unknown> | undefined): string | undefined {
   const entityType = readStringField(record, 'entityType');
@@ -287,7 +298,13 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       const completedAnswerMode = answerModeRef.current;
       const completedRecovery = recoveryRef.current;
       const completedAdaptiveReasoning = adaptiveReasoningRef.current;
-      const completedSuggestedPrompts = suggestedPromptsRef.current;
+      const completedSuggestedPrompts = emptyWithoutOutput
+        ? []
+        : withWendySuggestedPromptFallback(
+            suggestedPromptsRef.current,
+            completedContent,
+            wendyCtx?.pageContext,
+          );
 
       const completedMsg: ChatMessage = {
         id:          assistantMsgIdRef.current,
@@ -367,7 +384,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     },
 
     onError: (err) => {
-      const isFatal = FATAL_ERRORS.some((code) => err.message.includes(code));
+      const isFatal = _isNonRetryableStreamError(err);
       if (!isFatal && retriesRef.current < maxRetries) {
         retriesRef.current += 1;
         setRetryState({ active: true, attempt: retriesRef.current, max: maxRetries });
@@ -438,9 +455,18 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       return 'Wendy non risponde. Controlla la connessione e riprova.';
     if (err.message.includes('503'))
       return 'Il servizio AI è momentaneamente non disponibile. Riprova tra qualche istante.';
-    if (err.message.includes('401') || err.message.includes('403'))
+    if (_isAuthSessionError(err))
       return 'Sessione scaduta. Effettua nuovamente il login.';
     return 'Wendy si è interrotta. Riprova.';
+  }
+
+  function _isAuthSessionError(err: Error): boolean {
+    const message = err.message.toUpperCase();
+    return AUTH_SESSION_ERROR_PATTERNS.some((pattern) => message.includes(pattern));
+  }
+
+  function _isNonRetryableStreamError(err: Error): boolean {
+    return _isAuthSessionError(err) || FATAL_ERRORS.some((code) => err.message.includes(code));
   }
 
   async function _doStream(text: string, contextPrompt?: string, isPredefined = false) {

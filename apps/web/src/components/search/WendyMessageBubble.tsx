@@ -1,6 +1,7 @@
 import { UiToolRenderer } from "@/components/wendy/UiToolRenderer";
 import { WendyActionCard } from "@/components/wendy/WendyActionCard";
 import type { ChatMessage as WendyMessage } from "@/hooks/useWendyChat";
+import { withWendySuggestedPromptFallback } from "@/hooks/wendySuggestedPrompts";
 import { cn } from "@/lib/utils";
 import { WendySources } from "./WendySources";
 
@@ -53,7 +54,9 @@ export function WendyMessageBubble({
 
   const isUser = message.role === "user";
   const hasBody = !!message.content || !!message.uiTool;
-  const suggestedPrompts = !isUser && !message.isStreaming ? (message.suggestedPrompts ?? []) : [];
+  const suggestedPrompts = !isUser && !message.isStreaming
+    ? withWendySuggestedPromptFallback(message.suggestedPrompts, message.content)
+    : [];
 
   return (
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>

@@ -1,5 +1,5 @@
 import { coachMemoryFactsTable, coachMemoryPatternsTable, db, type CoachMemoryFact, type CoachMemoryPattern } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { openai } from "../client";
 import { embedText } from "./embedder";
 import { logger } from "../logger";
@@ -183,12 +183,12 @@ export async function mergeMemory(
     db
       .select()
       .from(coachMemoryFactsTable)
-      .where(eq(coachMemoryFactsTable.userId, userId))
+      .where(and(eq(coachMemoryFactsTable.userId, userId), isNull(coachMemoryFactsTable.deletedAt)))
       .limit(MAX_MEMORY_ROWS),
     db
       .select()
       .from(coachMemoryPatternsTable)
-      .where(eq(coachMemoryPatternsTable.userId, userId))
+      .where(and(eq(coachMemoryPatternsTable.userId, userId), isNull(coachMemoryPatternsTable.deletedAt)))
       .limit(MAX_MEMORY_ROWS),
   ]);
 
@@ -249,6 +249,7 @@ export async function mergeMemory(
           and(
             eq(coachMemoryFactsTable.userId, userId),
             eq(coachMemoryFactsTable.key, f.key),
+            isNull(coachMemoryFactsTable.deletedAt),
           ),
         );
     }),
@@ -324,7 +325,7 @@ export async function mergeMemory(
           decayScore: 1.0,   // reset decay on every reinforcement
           updatedAt: now,
         })
-        .where(eq(coachMemoryPatternsTable.id, u.id)),
+        .where(and(eq(coachMemoryPatternsTable.id, u.id), isNull(coachMemoryPatternsTable.deletedAt))),
     ),
     patternInserts.length > 0
       ? db.insert(coachMemoryPatternsTable).values(patternInserts)
@@ -366,11 +367,11 @@ export async function loadMemory(userId: number): Promise<UserMemory> {
     db
       .select()
       .from(coachMemoryFactsTable)
-      .where(eq(coachMemoryFactsTable.userId, userId)),
+      .where(and(eq(coachMemoryFactsTable.userId, userId), isNull(coachMemoryFactsTable.deletedAt))),
     db
       .select()
       .from(coachMemoryPatternsTable)
-      .where(eq(coachMemoryPatternsTable.userId, userId)),
+      .where(and(eq(coachMemoryPatternsTable.userId, userId), isNull(coachMemoryPatternsTable.deletedAt))),
   ]);
 
   const facts = factsResult.status === "fulfilled" ? factsResult.value : [];

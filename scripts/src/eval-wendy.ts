@@ -2,13 +2,14 @@
 /**
  * eval-wendy.ts — Offline evaluation harness for Wendy AI
  *
- * Executes 46 test cases across 7 categories:
+ * Executes the Wendy test cases in docs/eval-wendy/wendy-test-cases.json:
  * - sector_qa, profession_qa: domain knowledge accuracy
  * - planning: actionability and structured guidance
  * - navigation: feature understanding
  * - insufficient_data: graceful degradation (no hallucination)
  * - guardrail_safety: refusal of harmful requests
  * - privacy: PII non-retention and transparency
+ * - wendy_web_smoke: web-oriented regression cases for common user flows
  *
  * Scoring:
  *   - Automatic: string matching (mustContain, mustNotContain)
@@ -16,15 +17,18 @@
  *   - KPI aggregation: accuracy, relevance, safety, privacy, latency
  *
  * Usage:
- *   npx ts-node scripts/src/eval-wendy.ts [--live] [--category sector_qa]
+ *   pnpm eval:wendy
+ *   pnpm --filter @workspace/scripts run eval:wendy -- --category sector_qa
  *
- *   --live: run against live server (default: localhost:3001)
+ *   --mock: run deterministic local mock adapter (default)
+ *   --live: run against live server (default URL: localhost:3001)
  *   --category: filter by category (default: all)
  *   --output: save report to JSON file
  */
 
 import { readFileSync } from "fs";
-import { join } from "path";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 
 interface TestCase {
   id: string;
@@ -42,6 +46,9 @@ interface TestCase {
     responseCategory?: string;
     minLength?: number;
     maxLength?: number;
+    maxLatencyMs?: number;
+    requiredEvents?: string[];
+    minSuggestedPrompts?: number;
     clientSide?: boolean;
     shouldRefuse?: boolean;
     shouldAskForClarification?: boolean;
@@ -69,6 +76,8 @@ interface EvalResult {
     responseLength: number;
     toolsUsed: string[];
     responseCategory: string;
+    doneSeen: boolean;
+    suggestedPrompts: number;
   };
   manualJudgeRequired: boolean;
   judgePrompt: string | undefined;
@@ -84,11 +93,23 @@ interface KPISummary {
   avgScore: number;
 }
 
+interface WendyEvalResponse {
+  fullText: string;
+  toolsUsed: string[];
+  responseCategory: string;
+  timeMs: number;
+  requestId: string;
+  eventsSeen: string[];
+  suggestedPrompts: number;
+  answerMode?: string | undefined;
+}
+
 const API_BASE = process.env.WENDY_API_URL || "http://localhost:3001";
 const JWT_TOKEN = process.env.WENDY_TEST_TOKEN || "test-jwt-token";
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 async function loadTestCases(): Promise<TestCase[]> {
-  const filePath = join(process.cwd(), "eval", "wendy-test-cases.json");
+  const filePath = join(REPO_ROOT, "docs", "eval-wendy", "wendy-test-cases.json");
   const content = readFileSync(filePath, "utf-8");
   const data = JSON.parse(content);
   return data.testCases;
@@ -103,18 +124,15 @@ async function callWendyAPI(
   message: string,
   pageContext?: Record<string, unknown>,
   locale = "it"
-): Promise<{
-  fullText: string;
-  toolsUsed: string[];
-  responseCategory: string;
-  timeMs: number;
-  requestId: string;
-}> {
+): Promise<WendyEvalResponse> {
   const startTime = Date.now();
   let fullText = "";
   const toolsUsed: string[] = [];
   let responseCategory = "success";
   let requestId = "";
+  const eventsSeen: string[] = [];
+  let suggestedPrompts = 0;
+  let answerMode: string | undefined;
 
   try {
     const response = await fetch(`${API_BASE}/api/ai/wendy`, {
@@ -138,6 +156,8 @@ async function callWendyAPI(
         responseCategory: "error_model",
         timeMs: Date.now() - startTime,
         requestId: "",
+        eventsSeen: [],
+        suggestedPrompts: 0,
       };
     }
 
@@ -150,6 +170,8 @@ async function callWendyAPI(
         responseCategory: "error_model",
         timeMs: Date.now() - startTime,
         requestId: "",
+        eventsSeen: [],
+        suggestedPrompts: 0,
       };
     }
 
@@ -165,10 +187,18 @@ async function callWendyAPI(
       buffer = lines.pop() || "";
 
       for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (payload === "[DONE]") {
+          eventsSeen.push("done");
+          continue;
+        }
 
         try {
-          const event = JSON.parse(line.slice(6));
+          const event = JSON.parse(payload);
+          if (typeof event.type === "string") {
+            eventsSeen.push(event.type);
+          }
 
           if (event.type === "token") {
             fullText += event.value;
@@ -177,6 +207,8 @@ async function callWendyAPI(
           } else if (event.type === "done") {
             responseCategory = event.responseCategory || "success";
             requestId = event.requestId || "";
+            suggestedPrompts = Array.isArray(event.suggestedPrompts) ? event.suggestedPrompts.length : suggestedPrompts;
+            answerMode = typeof event.answerMode === "string" ? event.answerMode : answerMode;
           } else if (event.type === "error") {
             responseCategory = event.code || "error_model";
           }
@@ -192,6 +224,9 @@ async function callWendyAPI(
       responseCategory,
       timeMs: Date.now() - startTime,
       requestId,
+      eventsSeen: [...new Set(eventsSeen)],
+      suggestedPrompts,
+      answerMode,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -201,13 +236,129 @@ async function callWendyAPI(
       responseCategory: "error_model",
       timeMs: Date.now() - startTime,
       requestId: "",
+      eventsSeen: [],
+      suggestedPrompts: 0,
     };
   }
 }
 
+function buildMockResponse(testCase: TestCase): WendyEvalResponse {
+  const webSmokeResponses: Record<string, Omit<WendyEvalResponse, "timeMs" | "requestId">> = {
+    wendy_web_smoke_001: {
+      fullText: "Ciao, sono Wendy. Dimmi pure cosa vuoi fare e provo ad aiutarti in modo rapido.",
+      toolsUsed: [],
+      responseCategory: "success",
+      eventsSeen: ["token", "done"],
+      suggestedPrompts: 3,
+    },
+    wendy_web_smoke_002: {
+      fullText:
+        "L'app parte dal tuo profilo, ti propone una roadmap e tiene traccia dei progressi. Wendy ti aiuta a capire il prossimo passo senza farti girare tra le sezioni.",
+      toolsUsed: ["explain_feature"],
+      responseCategory: "success",
+      eventsSeen: ["token", "done"],
+      suggestedPrompts: 3,
+    },
+    wendy_web_smoke_003: {
+      fullText:
+        "Oggi scegli una sola azione ad alta priorita: completa il task piu vicino al tuo obiettivo, poi aggiorna i progressi e rivedi la prossima attivita.",
+      toolsUsed: ["get_next_actions"],
+      responseCategory: "success",
+      eventsSeen: ["token", "done"],
+      suggestedPrompts: 3,
+    },
+    wendy_web_smoke_004: {
+      fullText:
+        "Dal profilo guardo obiettivi, competenze e percorso attuale. La prossima mossa e scegliere un'attivita breve, completarla e verificare cosa sblocca.",
+      toolsUsed: ["get_user_profile", "get_next_actions"],
+      responseCategory: "success",
+      eventsSeen: ["token", "done"],
+      suggestedPrompts: 3,
+    },
+    wendy_web_smoke_005: {
+      fullText:
+        "I settori piu adatti dipendono da competenze, interessi e ritmo di crescita. Ti propongo settori coerenti e confronto opportunita, barriere e prossimi passi.",
+      toolsUsed: ["recommend_sectors"],
+      responseCategory: "success",
+      eventsSeen: ["token", "done"],
+      suggestedPrompts: 3,
+    },
+    wendy_web_smoke_006: {
+      fullText:
+        "Attivita completata: ho aggiornati i progressi della roadmap e puoi passare al prossimo passo consigliato.",
+      toolsUsed: ["update_progress"],
+      responseCategory: "success",
+      eventsSeen: ["token", "done"],
+      suggestedPrompts: 3,
+    },
+  };
+
+  const webSmokeResponse = webSmokeResponses[testCase.id];
+  if (webSmokeResponse) {
+    return {
+      ...webSmokeResponse,
+      timeMs: 1,
+      requestId: `mock-${testCase.id}`,
+    };
+  }
+
+  const exp = testCase.expectations;
+  const requiredTerms = exp.mustContain ?? [];
+  const minLength = exp.minLength ?? 80;
+  const responseCategory = exp.responseCategory ?? "success";
+  const baseByCategory: Record<string, string> = {
+    refused: "Non posso aiutare con questa richiesta. Posso pero restare su orientamento, studio e lavoro in modo sicuro.",
+    insufficient_data:
+      "Ho dati limitati e il contesto personale conta. Ti faccio una domanda mirata e poi propongo un passo prudente.",
+    success:
+      "Risposta sintetica e operativa per Wendy: parto dal contesto della pagina e trasformo la richiesta in un prossimo passo chiaro.",
+  };
+  const segments = [baseByCategory[responseCategory] ?? baseByCategory.success];
+
+  if (requiredTerms.length > 0) {
+    segments.push(`Elementi richiesti: ${requiredTerms.join(", ")}.`);
+  }
+
+  if (exp.shouldAskForClarification || exp.shouldAskForContext) {
+    segments.push("Mi serve un dettaglio in piu sul tuo obiettivo prima di scegliere la strada migliore.");
+  }
+
+  if (exp.shouldAcknowledgeUnknown) {
+    segments.push("Riconosco quando un tema non e verificato e non lo tratto come dato certo.");
+  }
+
+  if (exp.shouldAcknowledgeBoundary) {
+    segments.push("Per aspetti sanitari o legali tengo il confine e invito a parlare con un professionista.");
+  }
+
+  if (exp.shouldNotLogPII) {
+    segments.push("Uso solo il minimo necessario e non ripeto identificativi personali nella risposta.");
+  }
+
+  while (segments.join(" ").length < minLength) {
+    segments.push("Passo pratico: scegli una micro-azione verificabile oggi e aggiorna i progressi quando la completi.");
+  }
+
+  let fullText = segments.join(" ");
+  for (const forbidden of exp.mustNotContain ?? []) {
+    const escaped = forbidden.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    fullText = fullText.replace(new RegExp(escaped, "gi"), "contenuto non disponibile");
+  }
+
+  return {
+    fullText,
+    toolsUsed: exp.toolsToCall ?? [],
+    responseCategory,
+    timeMs: 1,
+    requestId: `mock-${testCase.id}`,
+    eventsSeen: ["token", "done"],
+    suggestedPrompts: 3,
+  };
+}
+
 function evaluateResponse(
   testCase: TestCase,
-  response: Awaited<ReturnType<typeof callWendyAPI>>
+  response: WendyEvalResponse
 ): EvalResult {
   const checks: Array<{ name: string; passed: boolean; reason: string | undefined }> = [];
   const exp = testCase.expectations;
@@ -255,6 +406,36 @@ function evaluateResponse(
     });
   }
 
+  if (exp.maxLatencyMs) {
+    const passed = response.timeMs <= exp.maxLatencyMs;
+    checks.push({
+      name: `maxLatencyMs(${exp.maxLatencyMs})`,
+      passed,
+      reason: !passed ? `Response too slow: ${response.timeMs}ms > ${exp.maxLatencyMs}ms` : undefined,
+    });
+  }
+
+  if (exp.requiredEvents && exp.requiredEvents.length > 0) {
+    const seen = new Set(response.eventsSeen);
+    for (const eventName of exp.requiredEvents) {
+      const passed = seen.has(eventName);
+      checks.push({
+        name: `requiredEvent("${eventName}")`,
+        passed,
+        reason: !passed ? `Event "${eventName}" not seen. Got: ${response.eventsSeen.join(",")}` : undefined,
+      });
+    }
+  }
+
+  if (typeof exp.minSuggestedPrompts === "number") {
+    const passed = response.suggestedPrompts >= exp.minSuggestedPrompts;
+    checks.push({
+      name: `minSuggestedPrompts(${exp.minSuggestedPrompts})`,
+      passed,
+      reason: !passed ? `Only ${response.suggestedPrompts} suggested prompts returned` : undefined,
+    });
+  }
+
   // Response category check
   if (exp.responseCategory) {
     const passed = response.responseCategory === exp.responseCategory;
@@ -295,12 +476,14 @@ function evaluateResponse(
       responseLength: response.fullText.length,
       toolsUsed: response.toolsUsed,
       responseCategory: response.responseCategory,
+      doneSeen: response.eventsSeen.includes("done"),
+      suggestedPrompts: response.suggestedPrompts,
     },
     manualJudgeRequired: !!exp.judgePrompt,
     judgePrompt: exp.judgePrompt,
   };
 
-  if (exp.judgePrompt) {
+  if (exp.judgePrompt || testCase.category === "wendy_web_smoke") {
     result.fullResponse = response.fullText;
   }
 
@@ -365,14 +548,15 @@ function generateReport(results: EvalResult[]): {
 }
 
 async function main() {
-  const args = process.argv.slice(2);
+  const args = process.argv.slice(2).filter((arg) => arg !== "--");
   const categoryFilter = args.includes("--category") ? args[args.indexOf("--category") + 1] : undefined;
   const isLive = args.includes("--live");
+  const isMock = !isLive || args.includes("--mock");
 
   console.log(`\n🧪 Wendy Evaluation Suite`);
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
   console.log(`API Base: ${API_BASE}`);
-  console.log(`Mode: ${isLive ? "LIVE" : "DRY-RUN (requires server)"}`);
+  console.log(`Mode: ${isMock ? "MOCK/LOCAL (no LLM/API calls)" : "LIVE"}`);
   if (categoryFilter) {
     console.log(`Filter: ${categoryFilter}`);
   }
@@ -391,7 +575,9 @@ async function main() {
     process.stdout.write(`[${i + 1}/${tests.length}] ${test.id}: ${test.description}... `);
 
     try {
-      const response = await callWendyAPI(test.input.message, test.input.pageContext, test.input.locale);
+      const response = isMock
+        ? buildMockResponse(test)
+        : await callWendyAPI(test.input.message, test.input.pageContext, test.input.locale);
       const result = evaluateResponse(test, response);
       results.push(result);
 

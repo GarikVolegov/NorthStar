@@ -1,7 +1,7 @@
 {
   "metadata": {
     "version": "1.1.0",
-    "totalCases": 54,
+    "totalCases": 60,
     "categories": [
       "sector_qa",
       "profession_qa",
@@ -10,7 +10,8 @@
       "insufficient_data",
       "guardrail_safety",
       "privacy",
-      "rag_grounding"
+      "rag_grounding",
+      "wendy_web_smoke"
     ],
     "description": "Offline evaluation test set for Wendy AI assistant — covers KPIs: accuracy, relevance, latency, safety, privacy compliance, RAG grounding quality"
   },
@@ -953,6 +954,116 @@
         "toolsToCall": ["search_rag"],
         "mustNotContain": ["100.000 posti", "500.000 posti", "sicuramente"],
         "judgePrompt": "Does Wendy avoid hallucinating specific numbers? If it gives numbers, are they cited from a source? Rate 1-5 on anti-hallucination."
+      }
+    },
+    {
+      "id": "wendy_web_smoke_001",
+      "category": "wendy_web_smoke",
+      "description": "Saluto breve senza risposta verbosa",
+      "input": {
+        "message": "Ciao Wendy",
+        "pageContext": { "page": "dashboard" },
+        "locale": "it"
+      },
+      "expectations": {
+        "mustContain": ["ciao", "aiutarti"],
+        "mustNotContain": ["non posso", "errore"],
+        "responseCategory": "success",
+        "maxLength": 220,
+        "maxLatencyMs": 3000,
+        "requiredEvents": ["token", "done"],
+        "minSuggestedPrompts": 2
+      }
+    },
+    {
+      "id": "wendy_web_smoke_002",
+      "category": "wendy_web_smoke",
+      "description": "Spiega come funziona l'app",
+      "input": {
+        "message": "Come funziona l'app?",
+        "pageContext": { "page": "dashboard" },
+        "locale": "it"
+      },
+      "expectations": {
+        "mustContain": ["profilo", "roadmap", "progressi"],
+        "responseCategory": "success",
+        "minLength": 120,
+        "maxLatencyMs": 3000,
+        "requiredEvents": ["token", "done"],
+        "minSuggestedPrompts": 2
+      }
+    },
+    {
+      "id": "wendy_web_smoke_003",
+      "category": "wendy_web_smoke",
+      "description": "Suggerisce cosa fare oggi",
+      "input": {
+        "message": "Cosa dovrei fare oggi?",
+        "pageContext": { "page": "dashboard" },
+        "locale": "it"
+      },
+      "expectations": {
+        "mustContain": ["oggi", "azione", "priorita"],
+        "toolsToCall": ["get_next_actions", "get_user_objectives", "save_objective", "update_objective_progress"],
+        "responseCategory": "success",
+        "minLength": 120,
+        "requiredEvents": ["token", "done"],
+        "minSuggestedPrompts": 2
+      }
+    },
+    {
+      "id": "wendy_web_smoke_004",
+      "category": "wendy_web_smoke",
+      "description": "Usa profilo e prossima mossa",
+      "input": {
+        "message": "In base al mio profilo, qual e la prossima mossa?",
+        "pageContext": { "page": "profile" },
+        "locale": "it"
+      },
+      "expectations": {
+        "mustContain": ["profilo", "prossima", "mossa"],
+        "toolsToCall": ["get_user_profile", "get_next_actions", "get_user_context", "get_user_objectives"],
+        "responseCategory": "success",
+        "minLength": 120,
+        "requiredEvents": ["token", "done"],
+        "minSuggestedPrompts": 2
+      }
+    },
+    {
+      "id": "wendy_web_smoke_005",
+      "category": "wendy_web_smoke",
+      "description": "Consiglia settori adatti",
+      "input": {
+        "message": "Quali settori sono piu adatti a me?",
+        "pageContext": { "page": "sectors" },
+        "locale": "it"
+      },
+      "expectations": {
+        "mustContain": ["settori", "adatti", "competenze"],
+        "toolsToCall": ["recommend_sectors", "set_filters", "open_view", "get_user_context"],
+        "responseCategory": "success",
+        "minLength": 120,
+        "requiredEvents": ["token", "done"],
+        "minSuggestedPrompts": 2
+      }
+    },
+    {
+      "id": "wendy_web_smoke_006",
+      "category": "wendy_web_smoke",
+      "description": "Update progress action lato web",
+      "input": {
+        "message": "Segna questa attivita come completata",
+        "pageContext": { "page": "roadmap", "actionId": "action-123" },
+        "locale": "it"
+      },
+      "expectations": {
+        "mustContain": ["completata", "progressi", "aggiornati"],
+        "toolsToCall": ["update_progress", "update_objective_progress", "get_user_objectives"],
+        "responseCategory": "success",
+        "minLength": 80,
+        "requiredEvents": ["token", "done"],
+        "minSuggestedPrompts": 2,
+        "clientSide": true
       }
     },
     {

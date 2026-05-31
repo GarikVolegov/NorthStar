@@ -123,10 +123,11 @@ async function liveFallbackSearch(
   query: string,
   userId: number | null,
   limit: number,
+  types?: GlobalSearchEntityType[],
 ): Promise<GlobalSearchResult[]> {
   const pattern = `%${query}%`;
   const chunks = await Promise.all([
-    safe(async () => {
+    types && !types.includes("sector") ? Promise.resolve([]) : safe(async () => {
       const rows = await db
         .select({
           id: sectorsTable.id,
@@ -153,7 +154,7 @@ async function liveFallbackSearch(
         }),
       );
     }),
-    safe(async () => {
+    types && !types.includes("role") ? Promise.resolve([]) : safe(async () => {
       const rows = await db
         .select({
           id: professionsTable.id,
@@ -178,16 +179,30 @@ async function liveFallbackSearch(
         }),
       );
     }),
-    safe(async () => {
+    types && !types.includes("article") ? Promise.resolve([]) : safe(async () => {
       const rows = await db
         .select({
           id: growthArticlesTable.id,
           title: growthArticlesTable.title,
           description: growthArticlesTable.description,
           slug: growthArticlesTable.slug,
+          content: growthArticlesTable.content,
+          tags: growthArticlesTable.tags,
+          personalityMatches: growthArticlesTable.personalityMatches,
+          sectorLinks: growthArticlesTable.sectorLinks,
         })
         .from(growthArticlesTable)
-        .where(and(eq(growthArticlesTable.status, "published"), or(sql`${growthArticlesTable.title} ILIKE ${pattern}`, sql`${growthArticlesTable.description} ILIKE ${pattern}`)))
+        .where(and(
+          eq(growthArticlesTable.status, "published"),
+          or(
+            sql`${growthArticlesTable.title} ILIKE ${pattern}`,
+            sql`${growthArticlesTable.description} ILIKE ${pattern}`,
+            sql`${growthArticlesTable.content} ILIKE ${pattern}`,
+            sql`${growthArticlesTable.tags}::text ILIKE ${pattern}`,
+            sql`${growthArticlesTable.personalityMatches}::text ILIKE ${pattern}`,
+            sql`${growthArticlesTable.sectorLinks}::text ILIKE ${pattern}`,
+          ),
+        ))
         .limit(limit);
       return rows.map((row) =>
         result({
@@ -200,19 +215,38 @@ async function liveFallbackSearch(
           icon: TYPE_META.article.icon,
           color: TYPE_META.article.color,
           visibility: "public",
-          lexicalRaw: textIncludesScore(query, row.title, row.description),
+          lexicalRaw: textIncludesScore(
+            query,
+            row.title,
+            row.description,
+            row.content,
+            row.tags?.join(" "),
+            row.personalityMatches?.join(" "),
+            row.sectorLinks?.join(" "),
+          ),
         }),
       );
     }),
-    safe(async () => {
+    types && !types.includes("news") ? Promise.resolve([]) : safe(async () => {
       const rows = await db
         .select({
           id: newsArticlesTable.id,
           title: newsArticlesTable.title,
           description: newsArticlesTable.summary,
+          content: newsArticlesTable.content,
+          category: newsArticlesTable.category,
+          source: newsArticlesTable.source,
+          sectorNames: newsArticlesTable.sectorNames,
         })
         .from(newsArticlesTable)
-        .where(or(sql`${newsArticlesTable.title} ILIKE ${pattern}`, sql`${newsArticlesTable.summary} ILIKE ${pattern}`))
+        .where(or(
+          sql`${newsArticlesTable.title} ILIKE ${pattern}`,
+          sql`${newsArticlesTable.summary} ILIKE ${pattern}`,
+          sql`${newsArticlesTable.content} ILIKE ${pattern}`,
+          sql`${newsArticlesTable.category} ILIKE ${pattern}`,
+          sql`${newsArticlesTable.source} ILIKE ${pattern}`,
+          sql`${newsArticlesTable.sectorNames}::text ILIKE ${pattern}`,
+        ))
         .limit(limit);
       return rows.map((row) =>
         result({
@@ -225,11 +259,19 @@ async function liveFallbackSearch(
           icon: TYPE_META.news.icon,
           color: TYPE_META.news.color,
           visibility: "public",
-          lexicalRaw: textIncludesScore(query, row.title, row.description),
+          lexicalRaw: textIncludesScore(
+            query,
+            row.title,
+            row.description,
+            row.content,
+            row.category,
+            row.source,
+            row.sectorNames?.join(" "),
+          ),
         }),
       );
     }),
-    userId
+    userId && (!types || types.includes("idea"))
       ? safe(async () => {
           const rows = await db
             .select({
@@ -256,7 +298,7 @@ async function liveFallbackSearch(
           );
         })
       : Promise.resolve([]),
-    userId
+    userId && (!types || types.includes("objective"))
       ? safe(async () => {
           const rows = await db
             .select({
@@ -283,7 +325,7 @@ async function liveFallbackSearch(
           );
         })
       : Promise.resolve([]),
-    userId
+    userId && (!types || types.includes("calendar"))
       ? safe(async () => {
           const rows = await db
             .select({
@@ -310,7 +352,7 @@ async function liveFallbackSearch(
           );
         })
       : Promise.resolve([]),
-    userId
+    userId && (!types || types.includes("certification"))
       ? safe(async () => {
           const rows = await db
             .select({
@@ -337,7 +379,7 @@ async function liveFallbackSearch(
           );
         })
       : Promise.resolve([]),
-    userId
+    userId && (!types || types.includes("memory"))
       ? safe(async () => {
           const [facts, patterns] = await Promise.all([
             db
@@ -367,7 +409,7 @@ async function liveFallbackSearch(
           );
         })
       : Promise.resolve([]),
-    userId
+    userId && (!types || types.includes("workspace"))
       ? safe(async () => {
           const rows = await db
             .select({
@@ -394,7 +436,7 @@ async function liveFallbackSearch(
           );
         })
       : Promise.resolve([]),
-    userId
+    userId && (!types || types.includes("profile"))
       ? safe(async () => {
           const rows = await db
             .select({
@@ -523,7 +565,7 @@ export async function globalSearch(input: {
       };
     }
 
-    const fallback = await liveFallbackSearch(query, userId, limit);
+    const fallback = await liveFallbackSearch(query, userId, limit, types);
     return {
       results: fallback,
       has_semantic: false,
@@ -531,7 +573,7 @@ export async function globalSearch(input: {
       indexStatus: "degraded",
     };
   } catch {
-    const fallback = await liveFallbackSearch(query, userId, limit);
+    const fallback = await liveFallbackSearch(query, userId, limit, types);
     return {
       results: fallback,
       has_semantic: false,

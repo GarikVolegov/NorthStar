@@ -5,7 +5,7 @@ import { getEffectivePlan, planMeets } from "../middleware/check-feature";
 
 const router = Router();
 
-const SUPPORTED_TASK_TYPES = ["status", "introspection", "summary"] as const;
+const SUPPORTED_TASK_TYPES = ["status", "introspection", "summary", "full_profile"] as const;
 type SupportedTaskType = (typeof SUPPORTED_TASK_TYPES)[number];
 
 const AgentRequestSchema = z.object({
@@ -25,6 +25,10 @@ const capabilities = [
   {
     taskType: "summary",
     description: "Returns the legacy empty summary envelope for compatibility.",
+  },
+  {
+    taskType: "full_profile",
+    description: "Returns a minimal deterministic career profile analysis.",
   },
 ] satisfies Array<{ taskType: SupportedTaskType; description: string }>;
 
@@ -65,6 +69,19 @@ async function sendAgentResponse(
         news: [],
         calendarEvents: [],
       },
+      ...(taskType === "full_profile"
+        ? {
+            fullProfile: {
+              userId,
+              analysisStatus: "minimal",
+              sections: {
+                career: [],
+                education: [],
+                growth: [],
+              },
+            },
+          }
+        : {}),
       durationMs: Date.now() - start,
       validation: { valid: true, errors: [], warnings: [] },
     },

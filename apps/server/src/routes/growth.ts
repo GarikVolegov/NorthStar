@@ -2,6 +2,9 @@ import { Router } from "express";
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { db, growthArticlesTable } from "@workspace/db";
+import { optionalAuth } from "../middleware/auth";
+import { requireAuth } from "../middleware/require-auth";
+import { clampContentLimit, readContentSearchQuery } from "../lib/content-search";
 
 const router = Router();
 
@@ -63,7 +66,7 @@ router.get("/categorie", async (_req, res) => {
   }
 });
 
-router.get("/per-te", async (req, res) => {
+router.get("/per-te", optionalAuth, async (req, res) => {
   try {
     const articles = await db
       .select()
@@ -71,20 +74,24 @@ router.get("/per-te", async (req, res) => {
       .where(eq(growthArticlesTable.status, "published"))
       .orderBy(desc(growthArticlesTable.updatedAt))
       .limit(6);
-    res.json({ articles: articles.map(mapArticle) });
+    res.json({
+      articles: articles.map(mapArticle),
+      hasProfile: !!req.user || articles.length > 0,
+      types: [],
+      italianTypes: [],
+    });
   } catch (err) {
     req.log?.error?.({ err }, "growth personalized error");
-    res.status(500).json({ articles: [] });
+    res.status(500).json({ articles: [], hasProfile: false, types: [], italianTypes: [] });
   }
 });
 
 router.get("/", async (req, res) => {
   try {
-    const limit = Math.max(1, Math.min(Number(req.query.limit) || 20, 100));
+    const limit = clampContentLimit(req.query.limit as string | undefined, 20, 100);
     const category =
       typeof req.query.category === "string" ? req.query.category : "";
-    const search =
-      typeof req.query.search === "string" ? req.query.search.trim() : "";
+    const search = readContentSearchQuery(req.query as Record<string, string | string[] | undefined>);
     const where = [
       eq(growthArticlesTable.status, "published"),
       category ? eq(growthArticlesTable.category, category) : undefined,
@@ -92,6 +99,10 @@ router.get("/", async (req, res) => {
         ? or(
             ilike(growthArticlesTable.title, `%${search}%`),
             ilike(growthArticlesTable.description, `%${search}%`),
+            sql`${growthArticlesTable.content} ILIKE ${`%${search}%`}`,
+            sql`${growthArticlesTable.tags}::text ILIKE ${`%${search}%`}`,
+            sql`${growthArticlesTable.personalityMatches}::text ILIKE ${`%${search}%`}`,
+            sql`${growthArticlesTable.sectorLinks}::text ILIKE ${`%${search}%`}`,
           )
         : undefined,
     ].filter(isSql);
@@ -110,7 +121,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.post("/:id/salva", async (req, res) => {
+router.post("/:id/salva", requireAuth(), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     res.status(400).json({ error: "ID non valido" });

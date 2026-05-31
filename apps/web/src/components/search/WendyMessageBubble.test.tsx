@@ -38,4 +38,28 @@ describe("WendyMessageBubble", () => {
       expect.stringContaining("Ho letto il tuo profilo."),
     );
   });
+
+  it("renders fallback next steps when an assistant message has no backend suggestions", () => {
+    const onFollowUpPrompt = vi.fn();
+
+    render(
+      <WendyMessageBubble
+        message={assistantMessage({
+          suggestedPrompts: undefined,
+          content: "Il tuo profilo mostra buone affinita con dati, sicurezza e prodotto.",
+        })}
+        onConfirmAction={vi.fn()}
+        onCancelAction={vi.fn()}
+        onFollowUpPrompt={onFollowUpPrompt}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /piano/i }));
+
+    expect(screen.getByText("Continua con Wendy")).toBeInTheDocument();
+    expect(onFollowUpPrompt).toHaveBeenCalledWith(
+      expect.stringContaining("piano"),
+      expect.stringContaining("Il tuo profilo mostra"),
+    );
+  });
 });

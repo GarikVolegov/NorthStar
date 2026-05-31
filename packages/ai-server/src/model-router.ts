@@ -19,7 +19,7 @@
  */
 
 import { aiPlugins } from "./plugins/registry";
-import { resolveActiveProvider } from "./client";
+import { resolveActiveProvider, type LlmProvider } from "./client";
 
 export type RequestComplexity = "simple" | "standard" | "deep";
 
@@ -85,6 +85,8 @@ export interface ModelRoute {
   temperature: number;
   maxTokens: number;
   reason: string;
+  tier?: "nano" | "micro" | "standard" | "reasoning";
+  fallbackOrder?: Array<{ provider: "openai" | "groq" | "openrouter"; model: string }>;
   /** Set when the route is fulfilled by a registered AIPlugin; consumer should dispatch via the plugin. */
   pluginId?: string;
 }
@@ -119,7 +121,23 @@ const ALLOW_PAID_MODELS = process.env.ALLOW_PAID_AI_MODELS === "true";
  * for STANDARD/REASONING and fall back to OpenAI naming only when OpenRouter
  * isn't configured. The actual HTTP call goes through llm/client.ts.
  */
-const ACTIVE_PROVIDER: "openai" | "groq" | "openrouter" = resolveActiveProvider();
+function hasUsableKey(value: string | undefined): boolean {
+  const k = value?.toLowerCase().trim();
+  if (!k) return false;
+  return !(k.includes("placeholder") || k.includes("inactive") || k.includes("changeme") || k.startsWith("your_"));
+}
+
+function hasGroqKey(): boolean {
+  return hasUsableKey(process.env.AI_INTEGRATIONS_GROQ_API_KEY) || hasUsableKey(process.env.GROQ_API_KEY);
+}
+
+function hasOpenRouterKey(): boolean {
+  return hasUsableKey(process.env.OPENROUTER_API_KEY);
+}
+
+function hasOpenAIKey(): boolean {
+  return hasUsableKey(process.env.AI_INTEGRATIONS_OPENAI_API_KEY) || hasUsableKey(process.env.OPENAI_API_KEY);
+}
 
 function enforceFreeOpenRouterModel(model: string) {
   if (ALLOW_PAID_MODELS) return model;
@@ -127,28 +145,60 @@ function enforceFreeOpenRouterModel(model: string) {
   return OPENROUTER_FREE_ROUTER;
 }
 
-function standardModel(): { model: string; provider: ModelRoute["provider"] } {
-  if (ACTIVE_PROVIDER === "openrouter") return { model: enforceFreeOpenRouterModel(STANDARD_OR), provider: "openrouter" };
-  if (ACTIVE_PROVIDER === "groq") return { model: STANDARD_GROQ, provider: "groq" };
-  return { model: CHEAP_OPENAI, provider: "openai" };
+function explicitProvider(): LlmProvider | null {
+  const explicit = process.env.AI_PROVIDER?.trim().toLowerCase();
+  return explicit === "groq" || explicit === "openrouter" || explicit === "openai"
+    ? explicit
+    : null;
 }
 
-function reasoningModel(): { model: string; provider: ModelRoute["provider"] } {
-  if (ACTIVE_PROVIDER === "openrouter") return { model: enforceFreeOpenRouterModel(REASONING_OR), provider: "openrouter" };
-  if (ACTIVE_PROVIDER === "groq") return { model: MICRO_GROQ, provider: "groq" };
-  return { model: PREMIUM_OPENAI, provider: "openai" }; // fallback if only OpenAI
+function hasProviderKey(provider: LlmProvider): boolean {
+  if (provider === "groq") return hasGroqKey();
+  if (provider === "openrouter") return hasOpenRouterKey();
+  return hasOpenAIKey();
 }
 
-function nanoModel(): { model: string; provider: ModelRoute["provider"] } {
-  if (ACTIVE_PROVIDER === "groq")       return { model: NANO_GROQ, provider: "groq" };
-  if (ACTIVE_PROVIDER === "openrouter") return { model: enforceFreeOpenRouterModel(NANO_OR),   provider: "openrouter" };
-  return { model: CHEAP_OPENAI, provider: "openai" };
+function uniqueProviders(providers: LlmProvider[]): LlmProvider[] {
+  return providers.filter((provider, index) => providers.indexOf(provider) === index);
 }
 
-function microModel(): { model: string; provider: ModelRoute["provider"] } {
-  if (ACTIVE_PROVIDER === "groq")       return { model: MICRO_GROQ, provider: "groq" };
-  if (ACTIVE_PROVIDER === "openrouter") return { model: enforceFreeOpenRouterModel(MICRO_OR),   provider: "openrouter" };
-  return { model: CHEAP_OPENAI, provider: "openai" };
+function providerOrderForTier(tier: RoleConfig["tier"]): LlmProvider[] {
+  const preferred: LlmProvider[] =
+    tier === "reasoning" ? ["openrouter", "groq", "openai"] :
+    tier === "standard"  ? ["openrouter", "groq", "openai"] :
+                            ["groq", "openrouter", "openai"];
+  const explicit = explicitProvider();
+  if (explicit) return uniqueProviders([explicit, ...preferred.filter(hasProviderKey)]);
+  const available = preferred.filter(hasProviderKey);
+  return available.length > 0 ? available : ["openai"];
+}
+
+function modelForProvider(tier: RoleConfig["tier"], provider: LlmProvider): string {
+  if (provider === "groq") {
+    if (tier === "nano") return NANO_GROQ;
+    if (tier === "standard") return STANDARD_GROQ;
+    return MICRO_GROQ;
+  }
+  if (provider === "openrouter") {
+    if (tier === "nano") return enforceFreeOpenRouterModel(NANO_OR);
+    if (tier === "micro") return enforceFreeOpenRouterModel(MICRO_OR);
+    if (tier === "reasoning") return enforceFreeOpenRouterModel(REASONING_OR);
+    return enforceFreeOpenRouterModel(STANDARD_OR);
+  }
+  return tier === "reasoning" ? PREMIUM_OPENAI : CHEAP_OPENAI;
+}
+
+function routeForTier(tier: RoleConfig["tier"]): {
+  model: string;
+  provider: ModelRoute["provider"];
+  fallbackOrder: NonNullable<ModelRoute["fallbackOrder"]>;
+} {
+  const candidates = providerOrderForTier(tier).map((provider) => ({
+    provider,
+    model: modelForProvider(tier, provider),
+  }));
+  const [primary = { provider: "openai" as const, model: modelForProvider(tier, "openai") }, ...fallbackOrder] = candidates;
+  return { ...primary, fallbackOrder };
 }
 
 // ── Per-role configuration ────────────────────────────────────────────────────
@@ -277,6 +327,10 @@ export function selectModelFor(role: AgentRole, opts: RouterOptions = {}): Model
       temperature: cfg.temperature,
       maxTokens: cfg.maxTokens,
       reason: `${role}:groq-preferred`,
+      tier: cfg.tier,
+      fallbackOrder: hasOpenRouterKey()
+        ? [{ provider: "openrouter", model: modelForProvider(cfg.tier, "openrouter") }]
+        : [],
     };
   }
 
@@ -295,34 +349,36 @@ export function selectModelFor(role: AgentRole, opts: RouterOptions = {}): Model
 
   // Premium upgrade path (only when the role opts in)
   if (cfg.upgradeOnPremiumDeep && isPremium && complexity !== "simple") {
-    if (ACTIVE_PROVIDER === "openrouter") {
+    const activeProvider = resolveActiveProvider();
+    if (activeProvider === "openrouter" && ALLOW_PAID_MODELS) {
       // Paid Pro route: Claude Sonnet 4.6 when paid models allowed, else best free
-      if (ALLOW_PAID_MODELS) {
-        return { model: PRO_STANDARD_OR, provider: "openrouter", temperature: cfg.temperature, maxTokens: cfg.maxTokens, reason: `${role}:pro-sonnet` };
-      }
-      const r = reasoningModel();
-      return { model: r.model, provider: r.provider, temperature: cfg.temperature, maxTokens: cfg.maxTokens, reason: `${role}:openrouter-premium-free` };
+      return { model: PRO_STANDARD_OR, provider: "openrouter", temperature: cfg.temperature, maxTokens: cfg.maxTokens, reason: `${role}:pro-sonnet`, tier: effectiveTier, fallbackOrder: [] };
     }
-    // Su Groq: usa il modello micro (llama-3.3-70b, gratuito)
-    if (ACTIVE_PROVIDER === "groq") {
-      return { model: MICRO_GROQ, provider: "groq", temperature: cfg.temperature, maxTokens: cfg.maxTokens, reason: `${role}:groq-premium` };
+    if (activeProvider === "openai" && !hasGroqKey() && !hasOpenRouterKey()) {
+      return {
+        model: PREMIUM_OPENAI,
+        provider: "openai",
+        temperature: cfg.temperature,
+        maxTokens: cfg.maxTokens,
+        reason: `${role}:premium-deep`,
+        tier: effectiveTier,
+        fallbackOrder: [],
+      };
     }
-    // Solo su OpenAI: upgrade reale a gpt-4o
+    const freePremiumRoute = routeForTier("reasoning");
     return {
-      model: PREMIUM_OPENAI,
-      provider: "openai",
+      model: freePremiumRoute.model,
+      provider: freePremiumRoute.provider,
       temperature: cfg.temperature,
       maxTokens: cfg.maxTokens,
-      reason: `${role}:premium-deep`,
+      reason: `${role}:premium-free-reasoning`,
+      tier: "reasoning",
+      fallbackOrder: freePremiumRoute.fallbackOrder,
     };
   }
 
   // Tier-based default (uses effectiveTier from context signals)
-  const pick =
-    effectiveTier === "nano"      ? nanoModel()      :
-    effectiveTier === "micro"     ? microModel()     :
-    effectiveTier === "reasoning" ? reasoningModel() :
-    /* standard */                  standardModel();
+  const pick = routeForTier(effectiveTier);
 
   return {
     model: pick.model,
@@ -330,6 +386,8 @@ export function selectModelFor(role: AgentRole, opts: RouterOptions = {}): Model
     temperature: cfg.temperature,
     maxTokens: cfg.maxTokens,
     reason: `${role}:${effectiveTier}${signalSuffix}`,
+    tier: effectiveTier,
+    fallbackOrder: pick.fallbackOrder,
   };
 }
 
@@ -352,6 +410,8 @@ function lookupReasoningPluginRoute(role: AgentRole, cfg: RoleConfig): ModelRout
     temperature: cfg.temperature,
     maxTokens: cfg.maxTokens,
     reason: `${role}:plugin(${plugin.id})`,
+    tier: "reasoning",
+    fallbackOrder: [],
     pluginId: plugin.id,
   };
 }
@@ -366,7 +426,7 @@ export function modelFor(role: AgentRole, opts: RouterOptions = {}): string {
 
 export function getModelRoutingPolicy() {
   return {
-    activeProvider: ACTIVE_PROVIDER,
+    activeProvider: resolveActiveProvider(),
     allowPaidModels: ALLOW_PAID_MODELS,
     openRouterFreeRouter: OPENROUTER_FREE_ROUTER,
     source: "env + role policy",

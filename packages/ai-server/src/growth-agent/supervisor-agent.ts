@@ -91,6 +91,21 @@ const ACTION_PATTERNS = [
   /- \[\s*\]/,
 ];
 
+const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+const PHONE_RE = /(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?){2,}\d{3,4}/g;
+const IBAN_RE = /\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b/gi;
+const ITALIAN_FISCAL_CODE_RE = /\b[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]\b/gi;
+
+function redactSupervisorLogText(text: string): string {
+  return text
+    .replace(EMAIL_RE, "[redacted-email]")
+    .replace(PHONE_RE, "[redacted-phone]")
+    .replace(IBAN_RE, "[redacted-iban]")
+    .replace(ITALIAN_FISCAL_CODE_RE, "[redacted-fiscal-code]")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 // ── Dimension scorers (local, ~0ms) ────────────────────────────────────────
 
 function scoreActionability(draft: string): number {
@@ -281,9 +296,9 @@ REGOLE DI RISCRITTURA:
         sessionId:   sessionId ?? null,
         domain,
         intent,
-        userMessage,
-        draft,
-        finalText:   finalText ?? rewritten,
+        userMessage: redactSupervisorLogText(userMessage),
+        draft:       redactSupervisorLogText(draft),
+        finalText:   redactSupervisorLogText(finalText ?? rewritten),
         scoreBefore: failResult.score,
         scoreAfter:  rewrittenResult.score,
         reasons:     JSON.stringify(failResult.reasons),

@@ -70,6 +70,7 @@ import { withRouteTimeout } from "../lib/wendy-fast-path";
 import { resolveWendyLocale } from "../lib/wendy-locale";
 import {
   buildWendyDataBackedGuidedAction,
+  buildWendyDataBackedSuggestedPrompts,
   classifyWendyDataBackedQuickAction,
   formatWendyDataBackedQuickActionReply,
 } from "../lib/wendy-data-backed-quick-action";
@@ -153,6 +154,12 @@ router.post(
       isPredefined,
     } = parsed.data;
     const locale = resolveWendyLocale(rawLocale, message);
+    const dataBackedSuggestedPromptExtraFor = (candidateMessage: string) => {
+      const kind = classifyWendyDataBackedQuickAction(candidateMessage);
+      return kind
+        ? { suggestedPrompts: buildWendyDataBackedSuggestedPrompts({ kind, locale }) }
+        : {};
+    };
     const followUpContext = contextPrompt?.trim();
     const effectiveMessage = followUpContext
       ? `${message}\n\n[Contesto operativo follow-up Wendy]\n${followUpContext}`
@@ -451,6 +458,7 @@ router.post(
       sendDoneOnce({
         intent,
         answerMode: "recovery-fallback",
+        ...dataBackedSuggestedPromptExtraFor(message),
         usage: {
           model: "local-recovery-fallback",
           inputTokens: estimateTokens(message),
@@ -517,6 +525,10 @@ router.post(
       sendDoneOnce({
         intent,
         answerMode: "local-quick-action",
+        suggestedPrompts: buildWendyDataBackedSuggestedPrompts({
+          kind: dataBackedQuickAction,
+          locale,
+        }),
         usage: {
           model: "local-data-quick-action",
           inputTokens: estimateTokens(message),
@@ -537,6 +549,7 @@ router.post(
       sendDoneOnce({
         intent,
         answerMode: "local-quick-action",
+        ...dataBackedSuggestedPromptExtraFor(message),
         usage: {
           model: "local-quick-action",
           inputTokens: estimateTokens(message),

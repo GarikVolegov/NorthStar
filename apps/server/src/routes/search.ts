@@ -84,6 +84,7 @@ router.get("/", async (req, res) => {
             or(
               sql`${growthArticlesTable.title} ILIKE ${pattern}`,
               sql`${growthArticlesTable.description} ILIKE ${pattern}`,
+              sql`${growthArticlesTable.content} ILIKE ${pattern}`,
               sql`${growthArticlesTable.tags}::text ILIKE ${pattern}`,
             ),
           ),
@@ -141,7 +142,7 @@ router.get("/", async (req, res) => {
         id: n.id,
         title: n.title,
         description: n.description,
-        url: `/news`,
+        url: `/news/${n.id}`,
         icon: "newspaper",
         color: "#8b5cf6",
       })),
@@ -228,7 +229,7 @@ router.get("/suggest", async (req, res) => {
       suggestions.push({
         title: `Notizie: ${newsItem.title}`,
         description: "Novita dal settore",
-        url: "/news",
+        url: `/news/${newsItem.id}`,
       });
     }
 

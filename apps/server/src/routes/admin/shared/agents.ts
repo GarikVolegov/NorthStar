@@ -21,13 +21,13 @@ export const RUNNABLE_PIPELINES = [
   {
     key: "news-publishing",
     label: "Ricerca e pubblica notizie",
-    description: "Raccoglie fonti news, arricchisce i discovery item e pubblica articoli editoriali reali.",
+    description: "Raccoglie news italiane su lavoro e settori da GNews/Tavily/RSS e pubblica articoli editoriali reali.",
     endpoint: "/admin/pipelines/news-publishing/run",
     method: "POST",
     risk: "low",
-    steps: ["Collector", "Enricher", "News publisher"],
+    steps: ["GNews/Tavily/RSS collector", "Enricher se disponibile", "News publisher"],
     outputs: ["News pubblicate", "Coverage settori", "Warning editoriali"],
-    requiredConfigKeys: ["OPENAI_API_KEY"],
+    requiredConfigKeys: ["GNEWS_API_KEY", "TAVILY_API_KEY"],
     reviewPolicy: "auto_publish",
   },
   {

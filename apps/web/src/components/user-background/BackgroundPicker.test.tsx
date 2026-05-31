@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BackgroundPicker } from "./BackgroundPicker";
 
@@ -66,7 +67,8 @@ describe("BackgroundPicker", () => {
     });
   });
 
-  it("shows library full state without crashing", () => {
+  it("shows library full state without crashing", async () => {
+    const user = userEvent.setup();
     hookMock.mockReturnValue({
       presets: [],
       library: Array.from({ length: 5 }, (_, index) => ({
@@ -101,10 +103,10 @@ describe("BackgroundPicker", () => {
     });
 
     render(<BackgroundPicker userId={7} open onOpenChange={vi.fn()} />);
-    fireEvent.click(screen.getByRole("tab", { name: /Foto/i }));
+    await user.click(screen.getByRole("tab", { name: /Foto/i }));
 
     expect(screen.getAllByText(/massimo/i).length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: /Carica foto/i })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: /Carica foto/i })).toBeDisabled();
   });
 
   it("keeps presets available when background persistence is unavailable", () => {
@@ -152,6 +154,7 @@ describe("BackgroundPicker", () => {
   });
 
   it("exposes liquid glass appearance controls", async () => {
+    const user = userEvent.setup();
     const updateAppearance = vi.fn().mockResolvedValue(undefined);
     hookMock.mockReturnValue({
       presets: [],
@@ -182,8 +185,8 @@ describe("BackgroundPicker", () => {
     });
 
     render(<BackgroundPicker userId={7} open onOpenChange={vi.fn()} />);
-    fireEvent.click(screen.getByRole("tab", { name: /Aspetto/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Manuale/i }));
+    await user.click(screen.getByRole("tab", { name: /Aspetto/i }));
+    await user.click(await screen.findByRole("button", { name: /Manuale/i }));
 
     await waitFor(() => {
       expect(updateAppearance).toHaveBeenCalledWith(expect.objectContaining({ mode: "manual" }));

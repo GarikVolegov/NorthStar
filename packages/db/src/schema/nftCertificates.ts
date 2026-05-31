@@ -29,7 +29,7 @@ export const nftCertificatesTable = pgTable(
     chainId: integer("chain_id"),
     status: text("status").notNull().default("minted"),
     mintedAt: timestamp("minted_at", { withTimezone: true }).notNull().defaultNow(),
-    isPublic: boolean("is_public").notNull().default(true),
+    isPublic: boolean("is_public").notNull().default(false),
   },
   (table) => ({
     userObjectiveUnique: uniqueIndex("idx_nft_certificates_user_objective_unique").on(

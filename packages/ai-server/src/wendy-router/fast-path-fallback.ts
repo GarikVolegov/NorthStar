@@ -5,7 +5,7 @@ const THANKS_PATTERN = /\b(grazie|thanks|thank you|gracias|merci)\b/i;
 const IDENTITY_PATTERN = /\b(chi sei|cosa sai fare|che cosa sai fare|come funziona|who are you|what can you do|what do you do|how does this work|quien eres|que sabes hacer|como funciona|qui etes-vous|que savez-vous faire|comment ca marche)\b/i;
 const APP_EXPLAIN_PATTERN = /\bcome funziona\b(\s*\?)?$|\b(come funziona|funziona)\b.*\b(app|northstar|piattaforma)\b|\b(app|northstar|piattaforma)\b.*\b(come funziona|funziona)\b/i;
 const SOCIAL_PATTERN = /\b(ciao|hey|hei|ei|ehi|salve|buongiorno|buonasera|come stai|come va|tutto bene|ok|perfetto|va bene|hi|hello|hru|how are you|how's it going|everything good|all good|thanks|hola|que tal|como estas|todo bien|gracias|salut|ca va|tout va bien|merci)\b/i;
-const SAFE_SOCIAL_FRAGMENT_PATTERN = /^(ciao|hey|hei|ei|ehi|salve|ok|perfetto|grazie|hi|hello|thanks|hola|salut|merci)[!?.\s]*$/i;
+const SAFE_SOCIAL_FRAGMENT_PATTERN = /^(ciao|hey|hei|ei|ehi|salve|ok|perfetto|grazie|hi|hello|thanks|hola|salut|merci)(?:\s+wendy)?[!?.\s]*$/i;
 const ACK_PATTERN = /\b(ce\s+l\s*ho|ce\s+lho|ce\s+l'ho|l\s*ho\s+gi[aà]|lho\s+gi[aà]|l'ho\s+gi[aà]|gi[aà]\s+ce\s+l\s*ho|gi[aà]\s+ce\s+lho)\b/i;
 
 function isPunctuationOnly(message: string): boolean {
@@ -72,7 +72,7 @@ export function getFastPathFallbackReply(input: {
   }
   if (APP_EXPLAIN_PATTERN.test(message)) {
     return [
-      "NorthStar funziona come una bussola personale: parti dal test, ottieni un profilo iniziale e poi esplori settori, ruoli e percorsi compatibili con te.",
+      "NorthStar funziona come una bussola personale: parti dal test, ottieni un profilo iniziale e una roadmap, poi esplori settori, ruoli e percorsi compatibili con te.",
       "Da li puoi salvare obiettivi, confrontare alternative, seguire i progressi e chiedere a Wendy di trasformare i dati in una prossima azione concreta.",
     ].join(" ");
   }

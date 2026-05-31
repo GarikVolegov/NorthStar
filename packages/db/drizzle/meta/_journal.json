@@ -281,6 +281,13 @@
       "when": 1780149600000,
       "tag": "0047_pinned_sectors",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1780236000000,
+      "tag": "0050_nft_certificates_private_default",
+      "breakpoints": true
     }
   ]
 }

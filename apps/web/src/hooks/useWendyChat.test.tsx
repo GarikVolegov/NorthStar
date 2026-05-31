@@ -178,6 +178,45 @@ describe("useWendyChat", () => {
     });
   });
 
+  it("adds fallback suggested prompts when Wendy completes without backend prompts", async () => {
+    wendyProviderMock.pageContext = {
+      page: "sector",
+      data: { entityType: "sector", entityId: 7, entityName: "Cybersecurity" },
+    };
+    sse.start.mockImplementation(async () => {
+      sse.options?.onRawChunk?.(JSON.stringify({
+        type: "token",
+        value: "Cybersecurity e profilo tecnico: parti da una mappa delle competenze.",
+      }));
+      sse.options?.onRawChunk?.(JSON.stringify({
+        type: "done",
+        requestId: "req-fallback",
+        contextSources: ["app-data"],
+      }));
+      sse.options?.onComplete?.("Cybersecurity e profilo tecnico: parti da una mappa delle competenze.");
+    });
+
+    const { result } = renderHook(() => useWendyChat({ ttsEnabled: false }));
+    await act(async () => {
+      await result.current.sendMessage("analizza questa pagina");
+    });
+
+    expect(result.current.messages.at(-1)?.suggestedPrompts).toEqual([
+      expect.objectContaining({
+        label: expect.stringContaining("Cybersecurity"),
+        prompt: expect.stringContaining("Cybersecurity"),
+      }),
+      expect.objectContaining({
+        label: expect.any(String),
+        prompt: expect.any(String),
+      }),
+      expect.objectContaining({
+        label: expect.any(String),
+        prompt: expect.any(String),
+      }),
+    ]);
+  });
+
   it("retries non-fatal stream errors and can stop streaming", async () => {
     vi.useFakeTimers();
     sse.start.mockImplementation(async () => {
@@ -210,6 +249,30 @@ describe("useWendyChat", () => {
       await result.current.sendMessage("ciao");
     });
 
+    expect(result.current.messages.at(-1)).toMatchObject({
+      role: "error",
+      content: "Sessione scaduta. Effettua nuovamente il login.",
+    });
+  });
+
+  it("does not retry session-expired stream failures", async () => {
+    vi.useFakeTimers();
+    sse.start.mockImplementation(async () => {
+      sse.options?.onError?.(new Error("SESSION_EXPIRED: login required"));
+    });
+
+    const { result } = renderHook(() => useWendyChat({ ttsEnabled: false, maxRetries: 2 }));
+    await act(async () => {
+      await result.current.sendMessage("ciao");
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+      await Promise.resolve();
+    });
+
+    expect(sse.start).toHaveBeenCalledTimes(1);
+    expect(result.current.retryState.active).toBe(false);
     expect(result.current.messages.at(-1)).toMatchObject({
       role: "error",
       content: "Sessione scaduta. Effettua nuovamente il login.",

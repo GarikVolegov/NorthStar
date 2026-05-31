@@ -184,21 +184,25 @@ function proposeSaveObjective(args: { text?: string; category?: string; deadline
 }
 
 function proposeUpdateObjectiveProgress(args: { objectiveId?: number; progress?: number }): ToolResult {
-  if (!args.objectiveId) return err("INVALID_INPUT", "ID obiettivo obbligatorio");
-  if (typeof args.progress !== "number" || args.progress < 0 || args.progress > 100)
+  if (!Number.isInteger(args.objectiveId) || (args.objectiveId ?? 0) <= 0) {
+    return err("INVALID_INPUT", "ID obiettivo obbligatorio e valido");
+  }
+  if (typeof args.progress !== "number" || !Number.isFinite(args.progress) || args.progress < 0 || args.progress > 100)
     return err("INVALID_INPUT", "Il progresso deve essere un numero tra 0 e 100");
+  const completedLabel = args.progress === 100 ? "Completato" : "In corso";
   return wendyAction({
     type: "update_objective_progress",
     status: "needs_confirmation",
     risk: "medium",
     label: "Aggiornare il progresso?",
-    description: "Conferma prima di modificare questo obiettivo.",
+    description: `Conferma prima di portare l'obiettivo #${args.objectiveId} al ${args.progress}%.`,
     requiresConfirmation: true,
     targetRoute: "/dashboard",
     payload: { objectiveId: args.objectiveId, progress: args.progress },
     preview: [
-      { label: "Obiettivo ID", value: String(args.objectiveId) },
-      { label: "Progresso", value: `${args.progress}%` },
+      { label: "Obiettivo ID", value: `#${args.objectiveId}` },
+      { label: "Nuovo progresso", value: `${args.progress}%` },
+      { label: "Stato", value: completedLabel },
     ],
   });
 }

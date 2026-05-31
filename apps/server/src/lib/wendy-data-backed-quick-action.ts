@@ -1,4 +1,9 @@
-type QuickActionKind = "today" | "profile" | "sectors" | "progress";
+type QuickActionKind = "today" | "profile" | "sectors" | "progress" | "complete";
+
+type SuggestedPrompt = {
+  label: string;
+  prompt: string;
+};
 
 type Objective = {
   id?: unknown;
@@ -46,6 +51,19 @@ function wantsEnglish(locale: unknown): boolean {
   return typeof locale === "string" && locale.toLowerCase().startsWith("en");
 }
 
+function uniqueLimit(prompts: SuggestedPrompt[]): SuggestedPrompt[] {
+  const seen = new Set<string>();
+  return prompts
+    .filter((prompt) => prompt.label.trim() && prompt.prompt.trim())
+    .filter((prompt) => {
+      const key = prompt.prompt.trim().toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 3);
+}
+
 function progress(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
@@ -70,6 +88,11 @@ function primaryObjective(objectives: Objective[]): Objective | undefined {
 
 export function classifyWendyDataBackedQuickAction(message: string): QuickActionKind | null {
   const normalized = normalize(message);
+  if (
+    /\b(segna|marca|metti|imposta)\b.*\b(completat\w*|completa|fatto|finita|finito)\b/.test(normalized) ||
+    /\b(attivita|azione|task|obiettivo)\b.*\b(completat\w*|fatto|finita|finito)\b/.test(normalized) ||
+    /\b(mark|set)\b.*\b(done|complete|completed)\b/.test(normalized)
+  ) return "complete";
   if (/\b(analizza|analyze)\b.*\b(progress|progressi)\b/.test(normalized)) return "progress";
   if (
     (normalized.includes("profilo") || normalized.includes("profile")) &&
@@ -99,7 +122,13 @@ export function buildWendyDataBackedGuidedAction(input: {
   args: Record<string, unknown>;
   confirmBeforeExecution?: boolean;
 } | null {
-  if (input.kind !== "today" && input.kind !== "progress" && input.kind !== "profile" && input.kind !== "sectors") return null;
+  if (
+    input.kind !== "today" &&
+    input.kind !== "progress" &&
+    input.kind !== "profile" &&
+    input.kind !== "sectors" &&
+    input.kind !== "complete"
+  ) return null;
 
   const objectiveRows = objectiveRowsFromPayload(input.objectives);
   const userContext = typeof input.userContext === "object" && input.userContext !== null
@@ -136,7 +165,9 @@ export function buildWendyDataBackedGuidedAction(input: {
 
   if (firstObjective && id) {
     const currentProgress = progress(firstObjective.progress);
-    const nextProgress = Math.min(100, Math.max(currentProgress + 15, currentProgress === 0 ? 15 : currentProgress));
+    const nextProgress = input.kind === "complete"
+      ? 100
+      : Math.min(100, Math.max(currentProgress + 15, currentProgress === 0 ? 15 : currentProgress));
     return {
       toolName: "update_objective_progress",
       args: {
@@ -158,6 +189,83 @@ export function buildWendyDataBackedGuidedAction(input: {
   }
 
   return null;
+}
+
+export function buildWendyDataBackedSuggestedPrompts(input: {
+  kind: QuickActionKind;
+  locale?: string | undefined;
+}): SuggestedPrompt[] {
+  const english = wantsEnglish(input.locale);
+
+  if (english) {
+    if (input.kind === "today") {
+      return uniqueLimit([
+        { label: "Update objective", prompt: "Update the objective I should move forward today and prepare the next 25-minute step." },
+        { label: "Build plan", prompt: "Turn today's priority into a 25-minute execution plan with one measurable outcome." },
+        { label: "Recheck progress", prompt: "Analyze my progress after this step and tell me what to postpone." },
+      ]);
+    }
+    if (input.kind === "profile") {
+      return uniqueLimit([
+        { label: "Analyze profile", prompt: "Analyze my profile and choose the most useful next move for today." },
+        { label: "Pick sector", prompt: "Use my profile to pick one sector to explore for 30 minutes." },
+        { label: "Create objective", prompt: "Create a measurable objective from this profile insight and ask me to confirm it." },
+      ]);
+    }
+    if (input.kind === "sectors") {
+      return uniqueLimit([
+        { label: "Compare sectors", prompt: "Compare the best-fit sectors for my profile and rank them by actionability." },
+        { label: "Open best fit", prompt: "Open the sector with the best personal fit and prepare the first exploration step." },
+        { label: "Build proof", prompt: "Create a 7-day proof plan for the sector that fits me best." },
+      ]);
+    }
+    if (input.kind === "complete") {
+      return uniqueLimit([
+        { label: "Confirm progress", prompt: "Confirm the completed activity and update the linked objective progress." },
+        { label: "Choose next", prompt: "Now that this activity is complete, choose the next useful step." },
+        { label: "Review blockers", prompt: "Review what changed after completing this activity and remove one blocker." },
+      ]);
+    }
+    return uniqueLimit([
+      { label: "Update progress", prompt: "Analyze my current objectives and prepare the progress update I should confirm." },
+      { label: "Find blocker", prompt: "Find the objective that is most blocked and suggest one micro-step to unblock it." },
+      { label: "Plan next", prompt: "Choose the next objective step and turn it into a 25-minute plan." },
+    ]);
+  }
+
+  if (input.kind === "today") {
+    return uniqueLimit([
+      { label: "Aggiorna obiettivo", prompt: "Aggiorna l'obiettivo che dovrei avanzare oggi e prepara il prossimo passo da 25 minuti." },
+      { label: "Piano da 25 minuti", prompt: "Trasforma la priorita di oggi in un piano da 25 minuti con un risultato misurabile." },
+      { label: "Ricalibra priorita", prompt: "Analizza i progressi dopo questo passo e dimmi cosa rimandare." },
+    ]);
+  }
+  if (input.kind === "profile") {
+    return uniqueLimit([
+      { label: "Analizza profilo", prompt: "Analizza il mio profilo e scegli la prossima mossa piu utile per oggi." },
+      { label: "Scegli settore", prompt: "Usa il mio profilo per scegliere un settore da esplorare per 30 minuti." },
+      { label: "Crea obiettivo", prompt: "Crea un obiettivo misurabile da questo insight di profilo e chiedimi conferma." },
+    ]);
+  }
+  if (input.kind === "sectors") {
+    return uniqueLimit([
+      { label: "Confronta settori", prompt: "Confronta i settori piu adatti al mio profilo e ordinali per azionabilita." },
+      { label: "Apri fit migliore", prompt: "Apri il settore con il miglior fit personale e prepara il primo passo di esplorazione." },
+      { label: "Costruisci prova", prompt: "Crea un piano prova di 7 giorni per il settore piu adatto a me." },
+    ]);
+  }
+  if (input.kind === "complete") {
+    return uniqueLimit([
+      { label: "Conferma progresso", prompt: "Conferma l'attivita completata e aggiorna i progressi dell'obiettivo collegato." },
+      { label: "Scegli prossimo", prompt: "Ora che questa attivita e completata, scegli il prossimo passo utile." },
+      { label: "Rivedi blocchi", prompt: "Rivedi cosa e cambiato dopo questa attivita e togli un blocco." },
+    ]);
+  }
+  return uniqueLimit([
+    { label: "Aggiorna progressi", prompt: "Analizza i miei obiettivi attuali e prepara l'aggiornamento progresso da confermare." },
+    { label: "Trova blocco", prompt: "Trova l'obiettivo piu bloccato e suggerisci un micro-step per sbloccarlo." },
+    { label: "Pianifica prossimo", prompt: "Scegli il prossimo passo dell'obiettivo e trasformalo in un piano da 25 minuti." },
+  ]);
 }
 
 export function formatWendyDataBackedQuickActionReply(input: {
@@ -187,9 +295,9 @@ export function formatWendyDataBackedQuickActionReply(input: {
       return `Oggi partirei da un passo concreto su "${text(firstObjective.text)}"${percent ? `, che ora e al ${percent}%` : ""}. Fai 25 minuti di lavoro concentrato, aggiorna il progresso e poi scegli una sola cosa da rimandare.`;
     }
     if (english) {
-      return "Today I would keep it simple: complete or update the test, create one small objective, then ask me to turn it into a 25-minute plan.";
+      return "Today I would choose one priority action: complete or update the test, create one small objective, then ask me to turn it into a 25-minute plan.";
     }
-    return "Oggi farei una cosa semplice: completa o aggiorna il test, crea un obiettivo piccolo e chiedimi subito di trasformarlo in un piano da 25 minuti.";
+    return "Oggi sceglierei una sola azione prioritaria: completa o aggiorna il test, crea un obiettivo piccolo e chiedimi subito di trasformarlo in un piano da 25 minuti.";
   }
 
   if (input.kind === "progress") {
@@ -209,18 +317,31 @@ export function formatWendyDataBackedQuickActionReply(input: {
     if (english) {
       const profileHint = journeyType ? `Your current profile is "${journeyType}". ` : "";
       const objectiveHint = firstObjective ? `The next move should connect to "${text(firstObjective.text)}". ` : "";
-      return `${profileHint}${objectiveHint}Choose one verifiable decision: a sector to explore for 30 minutes, a skill to validate, and one objective to update today.`;
+      return `${profileHint}${objectiveHint}The next move is one verifiable decision: a sector to explore for 30 minutes, a skill to validate, and one objective to update today.`;
     }
     const profileHint = journeyType ? `Il tuo profilo attuale e "${journeyType}". ` : "";
     const objectiveHint = firstObjective ? `La prossima mossa dovrebbe collegarsi a "${text(firstObjective.text)}". ` : "";
-    return `${profileHint}${objectiveHint}Scegli una decisione verificabile: un settore da esplorare per 30 minuti, una competenza da validare e un obiettivo da aggiornare entro oggi.`;
+    return `${profileHint}${objectiveHint}La prossima mossa e una decisione verificabile: un settore da esplorare per 30 minuti, una competenza da validare e un obiettivo da aggiornare entro oggi.`;
+  }
+
+  if (input.kind === "complete") {
+    if (firstObjective) {
+      if (english) {
+        return `I can mark "${text(firstObjective.text)}" as completed by moving its progress to 100%. Confirm the update, then I will treat the progress as updated and prepare the next step.`;
+      }
+      return `Posso segnare "${text(firstObjective.text)}" come completata portando i progressi al 100%. Conferma l'aggiornamento, poi considero i progressi aggiornati e preparo il prossimo passo.`;
+    }
+    if (english) {
+      return "I understand: this activity is completed. To update progress for real I need a linked objective or the action card confirmation; after that the progress is updated and I can choose the next step.";
+    }
+    return "Capito: questa attivita e completata. Per aggiornare davvero i progressi mi serve un obiettivo collegato o la conferma sulla action card; poi i progressi risultano aggiornati e passo al prossimo step.";
   }
 
   if (sectors.length > 0) {
     if (english) {
       return `I would start from the sectors you already signaled: ${sectors.slice(0, 3).join(", ")}. Compare them by personal fit, work mode, indicative compensation, and AI impact; then open the one with the best balance, not the loudest one.`;
     }
-    return `Partirei dai settori che hai gia segnalato: ${sectors.slice(0, 3).join(", ")}. Confrontali per fit personale, modalita di lavoro, compenso indicativo e impatto AI; poi apri quello con il miglior equilibrio, non quello piu rumoroso.`;
+    return `Partirei dai settori adatti che hai gia segnalato: ${sectors.slice(0, 3).join(", ")}. Confrontali per fit personale, competenze, modalita di lavoro, compenso indicativo e impatto AI; poi apri quello con il miglior equilibrio, non quello piu rumoroso.`;
   }
 
   if (journeyType || firstObjective) {
@@ -231,7 +352,7 @@ export function formatWendyDataBackedQuickActionReply(input: {
     }
     const profileHint = journeyType ? `Per il tuo profilo "${journeyType}"` : "Per il tuo profilo";
     const objectiveHint = firstObjective ? ` e l'obiettivo "${text(firstObjective.text)}"` : "";
-    return `${profileHint}${objectiveHint}, sceglierei una shortlist di 3 settori e li confronterei su fit personale, modalita di lavoro, compenso indicativo e impatto AI. Apri prima quello che rende piu facile produrre una prova concreta entro 7 giorni.`;
+    return `${profileHint}${objectiveHint}, sceglierei una shortlist di 3 settori adatti e li confronterei su fit personale, competenze, modalita di lavoro, compenso indicativo e impatto AI. Apri prima quello che rende piu facile produrre una prova concreta entro 7 giorni.`;
   }
 
   if (english) {

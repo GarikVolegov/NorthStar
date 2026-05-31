@@ -1,4 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { getJson } from "@/lib/apiClient";
 import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
@@ -270,6 +271,25 @@ export default function Crescita() {
   const totalArticles = catData.reduce((sum, c) => sum + c.count, 0);
   const totalCategories = catData.filter(c => c.count > 0).length;
   const recentArticles = recentData?.articles ?? [];
+
+  useWendyPageContext({
+    page: "crescita",
+    title: t("growth.title"),
+    entityName: `Knowledge base crescita: ${totalCategories} aree, ${totalArticles} articoli`,
+    journeyType: user?.journeyType ?? undefined,
+    capabilities: ["search_growth_articles", "get_user_profile", "search_rag"],
+    fields: [
+      `totalCategories:${totalCategories}`,
+      `totalArticles:${totalArticles}`,
+      `recentArticles:${recentArticles.length}`,
+      isLoggedIn ? "authState:logged-in" : "authState:guest",
+    ],
+    actions: [
+      "aiuta l'utente a scegliere un'area di crescita da cui partire",
+      "collega articoli e esercizi al profilo RIASEC o al percorso corrente",
+      "suggerisci il prossimo contenuto o il test se manca il profilo",
+    ],
+  });
 
   return (
     <div className="min-h-screen">

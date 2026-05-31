@@ -1,35 +1,34 @@
 # Wendy Evaluation Suite
 
-Offline test harness for Wendy AI assistant. Covers 46 test cases across 7 categories with automatic and manual (LLM-as-judge) scoring.
+Offline test harness for Wendy AI assistant. Covers 60 test cases across 9 categories with automatic and manual (LLM-as-judge) scoring.
 
 ## Test Categories
 
 | Category | Count | Purpose |
 |----------|-------|---------|
-| `sector_qa` | 6 | Domain knowledge: sector trends, entry barriers, salary, job market |
-| `profession_qa` | 6 | Career paths: skills, progression, remote work, diversity |
-| `planning` | 6 | Actionability: roadmaps, timelines, re-skilling, learning paths |
-| `navigation` | 6 | UI/UX: feature discovery, settings, help requests |
+| `sector_qa` | 8 | Domain knowledge: sector trends, entry barriers, salary, job market |
+| `profession_qa` | 7 | Career paths: skills, progression, remote work, diversity |
+| `planning` | 7 | Actionability: roadmaps, timelines, re-skilling, learning paths |
+| `navigation` | 7 | UI/UX: feature discovery, settings, help requests |
 | `insufficient_data` | 5 | Graceful degradation: no hallucination on unknown topics |
-| `guardrail_safety` | 5 | Safety: jailbreak resistance, boundary enforcement, refusals |
+| `guardrail_safety` | 6 | Safety: jailbreak resistance, boundary enforcement, refusals |
 | `privacy` | 6 | Privacy: PII handling, feedback tracking, GDPR compliance |
+| `rag_grounding` | 8 | RAG grounding: source/tool use and anti-hallucination checks |
+| `wendy_web_smoke` | 6 | Web smoke gate: greeting, app help, next action, profile, sectors, progress update |
 
 ## Running Evaluations
 
-### Quick Start (Local Server)
+### Quick Start (Local Mock)
 
 ```bash
-# Start the server on localhost:3001
-npm run dev:server
-
-# In another terminal, run the full eval suite
-npx ts-node scripts/src/eval-wendy.ts
+# Run the full deterministic local eval suite, with no LLM/API calls
+pnpm eval:wendy
 
 # Or filter by category
-npx ts-node scripts/src/eval-wendy.ts --category sector_qa
+pnpm eval:wendy -- --category wendy_web_smoke
 
 # Save report to JSON
-npx ts-node scripts/src/eval-wendy.ts --output eval-report.json
+pnpm eval:wendy -- --output eval-report.json
 ```
 
 ### Against Production
@@ -38,7 +37,7 @@ npx ts-node scripts/src/eval-wendy.ts --output eval-report.json
 # Run against live API
 WENDY_API_URL=https://api.northstar.io \
 WENDY_TEST_TOKEN=<your-test-jwt> \
-npx ts-node scripts/src/eval-wendy.ts --live
+pnpm --filter @workspace/scripts run eval:wendy -- --live
 ```
 
 ## Output Format
@@ -278,7 +277,7 @@ LIMIT 20;
 
 ## Adding New Test Cases
 
-1. Add entry to `eval/wendy-test-cases.json` with:
+1. Add entry to `docs/eval-wendy/wendy-test-cases.json` with:
    - Unique `id` (format: `{category}_{number}`)
    - Expectations matching your intent
    - Optional `judgePrompt` if semantic evaluation needed

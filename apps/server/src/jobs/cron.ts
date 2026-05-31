@@ -26,6 +26,7 @@ const AGENT_OPERATOR_INTERVAL_MS = Number(process.env.AGENT_OPERATOR_INTERVAL_MS
 const RUN_STARTUP_HEAVY_JOBS =
   process.env.CRON_RUN_ON_STARTUP === "true" ||
   (process.env.NODE_ENV === "production" && process.env.CRON_RUN_ON_STARTUP !== "false");
+const RUN_STARTUP_NEWS_JOBS = process.env.NEWS_RUN_ON_STARTUP !== "false";
 
 async function recordCronRun<T>(
   agentName: string,
@@ -221,6 +222,11 @@ async function safeRunWendyNeuralDecay(): Promise<void> {
   }
 }
 
+async function safeRunFastNewsPipeline(): Promise<void> {
+  await safeRunFastCollector();
+  await safeRunNewsPublisher();
+}
+
 async function safeRunAgentOperator(): Promise<void> {
   try {
     const recovered = await recoverStaleAgentTasks({
@@ -256,6 +262,7 @@ export function startCronJobs(): void {
     agentOperatorIntervalMin: AGENT_OPERATOR_INTERVAL_MS / 60_000,
     briefingWeeklyIntervalD:   BRIEFING_WEEKLY_INTERVAL_MS  / 86_400_000,
     briefingDailyIntervalH:    BRIEFING_DAILY_INTERVAL_MS   / 3_600_000,
+    startupNewsJobs: RUN_STARTUP_NEWS_JOBS,
   }, "[cron] starting scheduled jobs");
 
   // Run iniziale dopo startup delay. In development resta opt-in: questi job
@@ -276,11 +283,11 @@ export function startCronJobs(): void {
   // Fast lane news collector ogni 90 minuti, sfalsato rispetto allo startup.
   if (RUN_STARTUP_HEAVY_JOBS) {
     setTimeout(() => {
-      void safeRunFastCollector();
-      setInterval(() => { void safeRunFastCollector(); }, FAST_COLLECTOR_INTERVAL_MS);
+      void safeRunFastNewsPipeline();
+      setInterval(() => { void safeRunFastNewsPipeline(); }, FAST_COLLECTOR_INTERVAL_MS);
     }, STARTUP_DELAY_MS + 45_000);
   } else {
-    setInterval(() => { void safeRunFastCollector(); }, FAST_COLLECTOR_INTERVAL_MS);
+    setInterval(() => { void safeRunFastNewsPipeline(); }, FAST_COLLECTOR_INTERVAL_MS);
   }
 
   // Enricher ogni 2 ore → poi publisher pubblica gli arricchiti

@@ -1,4 +1,4 @@
-import { Router, type Router as ExpressRouter } from "express";
+import type { Router as ExpressRouter } from "express";
 import objectivesRouter from "./routes/objectives";
 import calendarRouter from "./routes/calendar";
 import dashboardRouter from "./routes/dashboard";
@@ -76,7 +76,9 @@ import skillsGapRouter from "./routes/skills-gap";
 import aiImageRouter from "./routes/ai-image";
 import monthlyRitualRouter from "./routes/monthly-ritual";
 import discoveryReadinessRouter from "./routes/discovery-readiness";
-import { getHealthPayload } from "./lib/health";
+import { createHealthRouter } from "./routes/health";
+
+export { createHealthRouter } from "./routes/health";
 
 export type RouteAuthLevel = "public" | "authenticated" | "admin";
 export type RouteRateLimit = "global" | "strict" | "none";
@@ -87,47 +89,6 @@ export interface RouteConfig {
   auth: RouteAuthLevel;
   rateLimit?: RouteRateLimit;
   description: string;
-}
-
-export function createHealthRouter(): ExpressRouter {
-  const healthRouter = Router();
-
-  healthRouter.get("/live", (_req, res) => {
-    res.json({ status: "alive" });
-  });
-
-  healthRouter.get("/ready", async (_req, res) => {
-    const payload = await getHealthPayload();
-    res.status(payload.status === "fail" ? 503 : 200).json(payload);
-  });
-
-  healthRouter.get("/", async (_req, res) => {
-    const payload = await getHealthPayload();
-    res.status(payload.status === "fail" ? 503 : 200).json(payload);
-  });
-
-  healthRouter.get("/db", async (_req, res) => {
-    try {
-      const { pool } = await import("@workspace/db");
-      res.json({
-        status: "ok",
-        pool: {
-          totalCount: pool.totalCount,
-          idleCount: pool.idleCount,
-          waitingCount: pool.waitingCount,
-        },
-      });
-    } catch (err) {
-      res.status(503).json({ status: "error", message: String(err) });
-    }
-  });
-
-  healthRouter.get("/alerts", async (_req, res) => {
-    const { getAlertHistory } = await import("./lib/alerts");
-    res.json({ alerts: getAlertHistory() });
-  });
-
-  return healthRouter;
 }
 
 const healthRouter = createHealthRouter();
@@ -173,17 +134,17 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/test-sessions", router: testSessionsRouter, auth: "authenticated", description: "Test sessions" },
   { path: "/api/business-ideas", router: businessIdeasRouter, auth: "authenticated", description: "Business ideas" },
   { path: "/api/jobs", router: jobsRouter, auth: "authenticated", description: "Jobs" },
-  { path: "/api/crescita", router: growthRouter, auth: "authenticated", description: "Crescita" },
+  { path: "/api/crescita", router: growthRouter, auth: "public", description: "Crescita" },
   { path: "/api/journey-type", router: journeyTypeRouter, auth: "authenticated", description: "Tipo percorso" },
   { path: "/api/account", router: accountRouter, auth: "authenticated", description: "Account" },
   { path: "/api/routines", router: routinesRouter, auth: "authenticated", description: "Routine utente" },
   { path: "/api/wendy", router: wendyRouter, auth: "authenticated", description: "Wendy" },
   { path: "/api/simulated-days", router: simulatedDaysRouter, auth: "authenticated", description: "Simulazioni Try-a-Day" },
   { path: "/api/user/skill-bridge", router: skillBridgeRouter, auth: "authenticated", description: "Skill Bridge Map" },
-  { path: "/api/search", router: searchRouter, auth: "authenticated", description: "Search" },
-  { path: "/api/search/route", router: searchRouteRouter, auth: "authenticated", description: "Search route" },
-  { path: "/api/search/hybrid", router: searchHybridRouter, auth: "authenticated", description: "Hybrid search" },
-  { path: "/api/search/track", router: searchTrackRouter, auth: "authenticated", description: "Search tracking" },
+  { path: "/api/search", router: searchRouter, auth: "public", description: "Search" },
+  { path: "/api/search/route", router: searchRouteRouter, auth: "public", description: "Search route" },
+  { path: "/api/search/hybrid", router: searchHybridRouter, auth: "public", description: "Hybrid search" },
+  { path: "/api/search/track", router: searchTrackRouter, auth: "public", description: "Search tracking" },
   { path: "/api/security", router: securityRouter, auth: "authenticated", description: "Security settings" },
   { path: "/api/ai/wendy", router: aiWendyRouter, auth: "authenticated", description: "Wendy AI streaming" },
   { path: "/api/ai/wendy/feedback", router: wendyFeedbackRouter, auth: "authenticated", description: "Wendy feedback" },

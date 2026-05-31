@@ -41,7 +41,7 @@ function app(store: CertificateStore) {
   return instance;
 }
 
-async function issueSample(store: CertificateStore, isPublic = true) {
+async function issueSample(store: CertificateStore, isPublic = false) {
   const issuer = createCertificateIssuer({ store });
   const cert = await issuer.issueMilestoneCertificate({
     userId: 42,
@@ -51,8 +51,8 @@ async function issueSample(store: CertificateStore, isPublic = true) {
     category: "analisi",
     completedAt: new Date("2026-05-29T10:15:00.000Z"),
   });
-  if (!isPublic) {
-    await store.setPublic(cert.certificateHash, false);
+  if (isPublic) {
+    await store.setPublic(cert.certificateHash, true);
   }
   return cert;
 }
@@ -77,6 +77,7 @@ describe("nft certificate routes", () => {
         objectiveText: "Analizza 5 settori in crescita",
         status: "issued",
         chain: "NorthStar Ledger",
+        isPublic: false,
         certificateHash: cert.certificateHash,
         verifyUrl: `/certificato/${cert.certificateHash}`,
         imageUrl: `/api/nft-certificates/image/${cert.certificateHash}.svg`,
@@ -86,7 +87,7 @@ describe("nft certificate routes", () => {
 
   it("verifies public certificates without authentication", async () => {
     const store = createMemoryCertificateStore();
-    const cert = await issueSample(store);
+    const cert = await issueSample(store, true);
 
     const response = await request(app(store))
       .get(`/api/nft-certificates/verify/${cert.certificateHash}`)
@@ -101,9 +102,9 @@ describe("nft certificate routes", () => {
     });
   });
 
-  it("does not verify private or missing certificate hashes", async () => {
+  it("does not verify newly issued private or missing certificate hashes", async () => {
     const store = createMemoryCertificateStore();
-    const privateCert = await issueSample(store, false);
+    const privateCert = await issueSample(store);
 
     await request(app(store))
       .get(`/api/nft-certificates/verify/${privateCert.certificateHash}`)
@@ -115,7 +116,7 @@ describe("nft certificate routes", () => {
 
   it("renders a public certificate as SVG", async () => {
     const store = createMemoryCertificateStore();
-    const cert = await issueSample(store);
+    const cert = await issueSample(store, true);
 
     const response = await request(app(store))
       .get(`/api/nft-certificates/image/${cert.certificateHash}.svg`)

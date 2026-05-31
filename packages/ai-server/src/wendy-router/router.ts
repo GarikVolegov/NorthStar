@@ -29,6 +29,20 @@ export interface ResolvedWendyRoute {
   decision:         WendyRouterDecision;
 }
 
+function resolveRouteTier(modelRoute: ReturnType<typeof selectModelFor>): WendyRouterDecision["tier"] {
+  if (modelRoute.tier) return modelRoute.tier;
+  return modelRoute.reason.includes("nano")      ? "nano" :
+         modelRoute.reason.includes("micro")     ? "micro" :
+         modelRoute.reason.includes("reasoning") ? "reasoning" : "standard";
+}
+
+function formatFallbackOrder(modelRoute: ReturnType<typeof selectModelFor>): string {
+  if (!modelRoute.fallbackOrder || modelRoute.fallbackOrder.length === 0) return "none";
+  return modelRoute.fallbackOrder
+    .map((fallback) => `${fallback.provider}:${fallback.model}`)
+    .join(">");
+}
+
 export function resolveWendyRoute(opts: {
   userMessage:       string;
   pageContext?:      WendyPageContext | undefined;
@@ -59,14 +73,12 @@ export function resolveWendyRoute(opts: {
 
   const decision: WendyRouterDecision = {
     intent,
-    tier:            modelRoute.reason.includes("nano")      ? "nano" :
-                     modelRoute.reason.includes("micro")     ? "micro" :
-                     modelRoute.reason.includes("reasoning") ? "reasoning" : "standard",
+    tier:            resolveRouteTier(modelRoute),
     model:           modelRoute.model,
     provider:        modelRoute.provider,
     toolsEnabled,
     skipFullPipeline,
-    reasoning:       `intent=${intent}, role=${role}, model=${modelRoute.model}`,
+    reasoning:       `intent=${intent}, role=${role}, tier=${resolveRouteTier(modelRoute)}, provider=${modelRoute.provider}, model=${modelRoute.model}, reason=${modelRoute.reason}, fallback=${formatFallbackOrder(modelRoute)}`,
   };
 
   return { intent, decision };

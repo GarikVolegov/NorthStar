@@ -91,6 +91,37 @@ describe("agent route", () => {
     expect(response.body.data.durationMs).toEqual(expect.any(Number));
   });
 
+  it("returns a minimal structured full profile analysis", async () => {
+    const response = await request(app())
+      .post("/api/agent")
+      .set("Authorization", `Bearer ${token()}`)
+      .send({ taskType: "full_profile", payload: { source: "career-core" } })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      success: true,
+      action: {
+        taskType: "full_profile",
+        status: "completed",
+        mode: "deterministic",
+        externalServices: false,
+      },
+      data: {
+        fullProfile: {
+          userId: 42,
+          analysisStatus: "minimal",
+          sections: {
+            career: [],
+            education: [],
+            growth: [],
+          },
+        },
+        validation: { valid: true, errors: [], warnings: [] },
+      },
+    });
+    expect(response.body.data.status.availableTaskTypes).toContain("full_profile");
+  });
+
   it("rejects unsupported agent task types instead of returning a fake success", async () => {
     const response = await request(app())
       .post("/api/agent")
@@ -100,7 +131,7 @@ describe("agent route", () => {
 
     expect(response.body).toMatchObject({
       error: "Task agente non supportato",
-      supportedTaskTypes: ["status", "introspection", "summary"],
+      supportedTaskTypes: ["status", "introspection", "summary", "full_profile"],
     });
   });
 });

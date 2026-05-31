@@ -21,6 +21,7 @@ import { SectorErrorState, SectorLoadingState } from "@/features/sector/SectorSt
 import type { ChartEntry, SectorExtended } from "@/features/sector/sectorTypes";
 import { CompareDrawer } from "@/features/sector-vitals/CompareDrawer";
 import { VitalSignsRow } from "@/features/sector-vitals/VitalSignsRow";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { getCareerStepGroup } from "@/lib/career-steps-utils";
 import { RIASEC_LABELS, SectorIcon } from "@/lib/sector-icon";
 import { buildSectorMeta, usePageMeta } from "@/lib/seo";
@@ -88,6 +89,31 @@ export default function Sector() {
 
   const { data: roles, isLoading: isLoadingRoles } = useGetSectorRoles(id, {
     query: { enabled: !!id, queryKey: ["sectorRoles", id] },
+  });
+
+  useWendyPageContext({
+    page: "settore",
+    title: sector?.name ?? t("sector.loadingTitle"),
+    entityType: "sector",
+    entityId: id || undefined,
+    entityName: sector?.name,
+    journeyType: user?.journeyType ?? undefined,
+    sector: sector?.name,
+    capabilities: ["get_sector_detail", "get_sector_roles", "search_rag"],
+    fields: [
+      "description",
+      "riasecTypes",
+      "trend",
+      "workMode",
+      "skills",
+      "growthProjection",
+      "roles",
+    ],
+    actions: [
+      "spiega se il settore e coerente con il profilo dell'utente",
+      "confronta opportunita, rischi e modalita di lavoro",
+      "suggerisci ruoli e prossimi passi concreti",
+    ],
   });
 
   usePageMeta(

@@ -120,6 +120,24 @@ function objectiveDueDateFromWeeks(weeks: unknown) {
   return d.toISOString().split("T")[0] ?? null;
 }
 
+function readPositiveInteger(value: unknown): number | null {
+  const parsed = typeof value === "number"
+    ? value
+    : typeof value === "string" && value.trim() !== ""
+      ? Number(value)
+      : Number.NaN;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function readProgressPercent(value: unknown): number | null {
+  const parsed = typeof value === "number"
+    ? value
+    : typeof value === "string" && value.trim() !== ""
+      ? Number(value)
+      : Number.NaN;
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 100 ? parsed : null;
+}
+
 function calendarPayload(payload: Record<string, unknown>) {
   const date = typeof payload.date === "string" ? payload.date : new Date().toISOString().split("T")[0];
   const startAt = new Date(`${date}T09:00:00`);
@@ -298,8 +316,10 @@ export function useWendyActionExecutor() {
       }
 
       if (action.type === "update_objective_progress") {
-        const objectiveId = Number(action.payload.objectiveId);
-        const progress = Number(action.payload.progress);
+        const objectiveId = readPositiveInteger(action.payload.objectiveId);
+        if (objectiveId === null) throw new Error("ID obiettivo non valido: non posso aggiornare il progresso.");
+        const progress = readProgressPercent(action.payload.progress);
+        if (progress === null) throw new Error("Il progresso deve essere un numero tra 0 e 100.");
         const res = await apiFetch(`${BASE}api/objectives/${objectiveId}`, {
           method: "PATCH",
           body: JSON.stringify({ progress, completed: progress === 100 }),
