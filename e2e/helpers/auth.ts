@@ -26,11 +26,44 @@ export interface LoginOptions {
   password?: string;
 }
 
+type AuthResponse = {
+  token?: string;
+};
+
 function readToken(body: unknown): string {
   if (typeof body === "object" && body !== null && "token" in body && typeof body.token === "string") {
     return body.token;
   }
   return "";
+}
+
+async function registerE2eUserToken(
+  request: APIRequestContext,
+  prefix = "e2e-user",
+): Promise<string> {
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const email = `${prefix}-${unique}@northstar.test`;
+  const res = await request.post(`${TEST_API_URL}/api/auth/register`, {
+    data: {
+      name: "NorthStar E2E User",
+      email,
+      password: "testpassword",
+    },
+  });
+  expect(res.status(), `Register API deve rispondere 201 (email: ${email})`).toBe(201);
+
+  const body = (await res.json()) as AuthResponse;
+  const token = readToken(body);
+  expect(token, "Il token JWT deve essere presente nella risposta di /api/auth/register").toBeTruthy();
+  return token;
+}
+
+export async function registerE2eUser(
+  request: APIRequestContext,
+  prefix = "e2e-user",
+): Promise<Record<string, string>> {
+  const token = await registerE2eUserToken(request, prefix);
+  return { Authorization: `Bearer ${token}` };
 }
 
 /**
@@ -49,6 +82,23 @@ export async function loginViaApi(
   const res = await page.request.post("/api/auth/login", {
     data: { email, password },
   });
+  const usesDefaultSeed =
+    !opts.email &&
+    !opts.password &&
+    !process.env.TEST_USER_EMAIL &&
+    !process.env.TEST_USER_PASSWORD;
+
+  if (res.status() !== 200 && usesDefaultSeed) {
+    const token = await registerE2eUserToken(page.request, "login-e2e");
+    await page.addInitScript((t: string) => {
+      localStorage.setItem("northstar_token", t);
+      sessionStorage.setItem("northstar_token", t);
+      localStorage.setItem("ns_token", t);
+      sessionStorage.setItem("ns_token", t);
+    }, token);
+    return;
+  }
+
   expect(res.status(), `Login API deve rispondere 200 (email: ${email})`).toBe(
     200,
   );
@@ -91,6 +141,14 @@ export async function loginAsTestUser(
   const res = await request.post(`${TEST_API_URL}/api/auth/login`, {
     data: { email, password },
   });
+  const usesDefaultSeed =
+    !process.env.TEST_USER_EMAIL &&
+    !process.env.TEST_USER_PASSWORD;
+
+  if (res.status() !== 200 && usesDefaultSeed) {
+    return registerE2eUser(request, "test-user-e2e");
+  }
+
   expect(res.status(), `Login API deve rispondere 200 (email: ${email})`).toBe(
     200,
   );

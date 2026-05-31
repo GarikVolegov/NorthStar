@@ -84,7 +84,8 @@ test.describe("Wendy Coach API", () => {
 
     const text = await res.text();
     expect(text).toContain('"type":"token"');
-    expect(text).toContain("local-wendy-reply");
+    expect(text).toContain('"answerMode":"local-fast-path"');
+    expect(text).toContain('"suggestedPrompts"');
     expect(text).not.toContain('"type":"error"');
   });
 

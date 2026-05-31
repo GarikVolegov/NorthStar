@@ -80,6 +80,15 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - Il parser SSE Wendy conserva i metadati del gate auth, cosi il client puo distinguere login richiesto da errore tecnico.
 - Memoria Wendy rende il pulsante delete sempre visibile su touch/focus, con target 44px e focus ring.
 
+## Tranche 5 Applicata
+
+- Aggiunta copertura E2E runtime per Wendy integrata nella search bar, stati guest/auth, stream SSE token+done e contratto API usato dalla chat.
+- Aggiunta copertura E2E per news, contenuti growth e settori: contenuto presente, empty state reale, errore recuperabile e piramide decisionale.
+- Aggiunta copertura E2E per test RIASEC pubblico e flusso obiettivi autenticato con aggiornamento progresso riflesso in dashboard.
+- L'helper auth E2E non dipende piu obbligatoriamente dall'utente seed locale: se non ci sono credenziali esplicite e il seed manca, crea un utente temporaneo.
+- I test Wendy API sono allineati al contratto attuale: small talk locale dichiara `answerMode: "local-fast-path"` e restituisce `suggestedPrompts`.
+- Verifica runtime ha individuato DB locale con schema `discovery_sources` incompleto; applicata localmente la migration `0041_discovery_sources_fast_lane.sql`, rendendo `/api/health/ready` verde.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -118,10 +127,19 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - `pnpm --filter @northstar/web run typecheck`
 - `git diff --check`
 
+## Verifica Tranche 5
+
+- `pnpm exec playwright test e2e/core-smoke.spec.ts e2e/wendy.spec.ts e2e/wendy-states.spec.ts e2e/content-sectors.spec.ts e2e/test-riasec.spec.ts e2e/objectives.spec.ts --project=chromium --workers=1`
+- `pnpm exec playwright test e2e/api-affiliate.spec.ts --project=chromium --workers=1`
+- `pnpm exec playwright test e2e/api-wendy.spec.ts --project=chromium --workers=1`
+- `pnpm run audit:e2e-determinism`
+- `pnpm --filter @northstar/server run typecheck`
+- `pnpm --filter @northstar/web run typecheck`
+
 ## Backlog Prossima Tranche
 
-1. Aggiungere E2E runtime: Wendy live, news, growth, sectors explore, onboarding/test completo, objectives UI.
-2. Correggere stati auth/sync Clerk con token verificato obbligatorio.
-3. Collegare Growth `types`/`italianTypes` a profilo/test reale invece di lasciarli vuoti.
-4. Sostituire route placeholder di candidature/lavori con persistenza o provider reale quando il prodotto lo richiede.
-5. Verificare mobile reale delle aree critiche: SearchDialog, Wendy full-screen, memoria, dashboard.
+1. Correggere stati auth/sync Clerk con token verificato obbligatorio.
+2. Collegare Growth `types`/`italianTypes` a profilo/test reale invece di lasciarli vuoti.
+3. Sostituire route placeholder di candidature/lavori con persistenza o provider reale quando il prodotto lo richiede.
+4. Verificare mobile reale delle aree critiche: SearchDialog, Wendy full-screen, memoria, dashboard.
+5. Estendere E2E full-stack a referral, affiliate UI e mobile viewport, eliminando le ultime assunzioni su seed account.
