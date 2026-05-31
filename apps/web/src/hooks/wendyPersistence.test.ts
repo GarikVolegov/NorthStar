@@ -31,6 +31,75 @@ describe('wendyPersistence', () => {
     expect(hasRecentPersistedThread()).toBe(true);
   });
 
+  it('hydrates visible messages from legacy history-only payloads', () => {
+    const savedAt = Date.now();
+    window.localStorage.setItem(
+      'wendy:thread:v1',
+      JSON.stringify({
+        v: 1,
+        history: [
+          { role: 'user', content: 'ciao' },
+          { role: 'assistant', content: 'ehi' },
+        ],
+        savedAt,
+      }),
+    );
+
+    const loaded = loadPersistedThread();
+
+    expect(loaded?.messages).toEqual([
+      { id: 'persisted-user-0', role: 'user', content: 'ciao', timestamp: savedAt },
+      { id: 'persisted-assistant-1', role: 'assistant', content: 'ehi', timestamp: savedAt + 1 },
+    ]);
+  });
+
+  it('saves and restores visible messages with Wendy tools and actions', () => {
+    savePersistedThread(
+      [
+        { role: 'user', content: 'trova match' },
+        { role: 'assistant', content: '[Azione Wendy proposta o completata]' },
+      ],
+      undefined,
+      [
+        { id: 'user-1', role: 'user', content: 'trova match', timestamp: 1 },
+        {
+          id: 'assistant-1',
+          role: 'assistant',
+          content: '[Azione Wendy proposta o completata]',
+          timestamp: 2,
+          uiTool: { name: 'career_match', args: { role: 'Designer' } },
+          toolsUsed: ['career_match'],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'set_filters',
+              label: 'Applica filtri',
+              status: 'preview',
+              risk: 'low',
+              description: 'Prepara la lista filtrata.',
+              requiresConfirmation: false,
+              payload: { sector: 'design' },
+            },
+          ],
+        },
+      ],
+    );
+
+    const loaded = loadPersistedThread();
+
+    expect(loaded?.messages).toEqual([
+      { id: 'user-1', role: 'user', content: 'trova match', timestamp: 1 },
+      expect.objectContaining({
+        id: 'assistant-1',
+        role: 'assistant',
+        content: '[Azione Wendy proposta o completata]',
+        uiTool: { name: 'career_match', args: { role: 'Designer' } },
+        toolsUsed: ['career_match'],
+        actions: [expect.objectContaining({ id: 'action-1', type: 'set_filters' })],
+      }),
+    ]);
+  });
+
   it('persists the summary alongside the history', () => {
     savePersistedThread(
       [{ role: 'user', content: 'qualcosa' }],

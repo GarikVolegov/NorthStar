@@ -864,6 +864,7 @@ router.post(
               codeGraphSection: personalContext.contexts.graphify,
               locale,
               journeyType: pageContext?.journeyType,
+              pageContext: pageContext as Record<string, unknown> | undefined,
             },
             history: flatHistory,
             userMessage: effectiveMessage,

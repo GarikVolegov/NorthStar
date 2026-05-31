@@ -53,14 +53,14 @@ export function SearchChatComposer({
             type="button"
             onClick={() => sttIsListening ? commitSTT() : startSTT()}
             className={cn(
-              "flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
               sttIsListening
                 ? "bg-destructive text-destructive-foreground animate-pulse"
                 : "text-muted-foreground/60 hover:text-muted-foreground",
             )}
             aria-label={sttIsListening ? "Invia dettatura" : "Detta a Wendy"}
           >
-            <Mic className="h-3.5 w-3.5" />
+            <Mic className="h-4 w-4" />
           </button>
         )}
 
@@ -77,24 +77,24 @@ export function SearchChatComposer({
           <button
             type="button"
             onClick={stopStream}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-destructive/12 text-destructive transition-colors hover:bg-destructive/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-destructive/12 text-destructive transition-colors hover:bg-destructive/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
             aria-label="Interrompi Wendy"
           >
-            <Square className="h-3 w-3 fill-current" />
+            <Square className="h-4 w-4 fill-current" />
           </button>
         ) : (
           <button
             type="submit"
             disabled={!hasQuery}
             className={cn(
-              "flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
               hasQuery
                 ? "bg-amber-500 text-white shadow-sm hover:bg-amber-400"
                 : "bg-muted text-muted-foreground/40",
             )}
             aria-label="Invia a Wendy"
           >
-            <ArrowUp className="h-3.5 w-3.5" />
+            <ArrowUp className="h-4 w-4" />
           </button>
         )}
       </div>

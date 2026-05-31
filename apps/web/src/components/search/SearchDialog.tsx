@@ -9,6 +9,7 @@ import {
 import { useWendy } from "@/contexts/WendyProvider";
 import type { RouterOutput, SearchResult } from "@/hooks/useGlobalSearch";
 import { useWendyChat } from "@/hooks/useWendyChat";
+import { eventBus } from "@/lib/event-bus";
 import { cn } from "@/lib/utils";
 import { ORDER, SUGGESTIONS_DEFAULTS, TYPE_CONFIG } from "./searchDialogConfig";
 import { useSearchDialogMobile } from "./useSearchDialogMobile";
@@ -112,6 +113,13 @@ export function SearchDialog({
     close();
     closeWendy();
   }, [close, closeWendy]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    return eventBus.on("wendy:navigation-complete", () => {
+      handleClose();
+    });
+  }, [handleClose, isOpen]);
 
   function handleSelect(url: string) {
     if (url === "#wendy") {

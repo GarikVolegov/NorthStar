@@ -33,8 +33,10 @@ interface Article {
 interface PerTeData {
   articles: Article[];
   hasProfile: boolean;
+  personalization?: "profile" | "generic";
   types?: string[];
   italianTypes?: string[];
+  status?: "ok" | "empty" | "error";
 }
 
 const RIASEC_LABELS: Record<string, string> = {
@@ -122,7 +124,7 @@ function ArticleCard({ article, recommended }: { article: Article; recommended?:
 }
 
 function PerTeSection({ userId }: { userId: number }) {
-  const { data, isLoading } = useQuery<PerTeData>({
+  const { data, isLoading, isError } = useQuery<PerTeData>({
     queryKey: ["crescita-per-te", userId],
     queryFn: () => getJson<PerTeData>(`${BASE}api/crescita/per-te`),
     staleTime: 1000 * 60 * 10,
@@ -146,7 +148,54 @@ function PerTeSection({ userId }: { userId: number }) {
     );
   }
 
-  if (!data?.hasProfile) {
+  if (isError) {
+    return (
+      <section className="py-14 border-b">
+        <div className="container mx-auto px-4 md:px-6 max-w-6xl">
+          <div className="rounded-2xl border border-destructive/25 bg-destructive/5 p-6">
+            <h3 className="font-serif font-semibold text-lg text-foreground mb-1">
+              Non riesco a caricare i contenuti di crescita adesso.
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Riprova tra poco: evitiamo di mostrarti consigli non verificati.
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (!data) return null;
+
+  if (!data.hasProfile && data.articles.length > 0) {
+    return (
+      <section className="py-14 border-b">
+        <div className="container mx-auto px-4 md:px-6 max-w-6xl">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <BookOpen className="w-4 h-4 text-primary" />
+                <h2 className="text-2xl font-serif font-bold text-foreground">Contenuti di crescita in evidenza</h2>
+              </div>
+              <p className="text-muted-foreground text-sm">
+                Una selezione generale dalla libreria NorthStar. Completa il test per ottenere suggerimenti basati sul tuo profilo reale.
+              </p>
+            </div>
+            <Link href="/test" className="text-sm font-medium text-primary hover:underline flex items-center gap-1 self-start sm:self-auto">
+              Fai il test <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {data.articles.map(a => (
+              <ArticleCard key={a.id} article={a} />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (!data.hasProfile) {
     return (
       <section className="py-14 border-b">
         <div className="container mx-auto px-4 md:px-6 max-w-6xl">
@@ -156,10 +205,10 @@ function PerTeSection({ userId }: { userId: number }) {
             </div>
             <div className="text-center md:text-left flex-1">
               <h3 className="font-serif font-semibold text-lg text-foreground mb-1">
-                Sblocca i contenuti per te
+                Costruisci il tuo profilo di crescita
               </h3>
               <p className="text-sm text-muted-foreground">
-                Fai il test RIASEC per ricevere articoli di crescita allineati al tuo profilo di personalità.
+                Fai il test RIASEC per permetterci di distinguere i consigli personalizzati dalla libreria generale.
               </p>
             </div>
             <Link href="/test">
@@ -219,10 +268,10 @@ function NoProfileTeaser() {
           </div>
           <div className="text-center md:text-left flex-1">
             <h3 className="font-serif font-semibold text-lg text-foreground mb-1">
-              Contenuti personalizzati per il tuo profilo
+              Costruisci il tuo profilo di crescita
             </h3>
             <p className="text-sm text-muted-foreground">
-              Accedi o registrati per ricevere articoli selezionati in base al tuo tipo di personalità RIASEC.
+              Accedi o registrati, poi completa il test: i suggerimenti personalizzati arrivano solo quando esiste un profilo reale.
             </p>
           </div>
           <div className="flex gap-3 flex-shrink-0">
@@ -253,13 +302,13 @@ export default function Crescita() {
 
   const { user, isLoggedIn } = useAuth();
 
-  const { data: catData = [] } = useQuery<Category[]>({
+  const { data: catData = [], isError: categoriesError } = useQuery<Category[]>({
     queryKey: ["crescita-categorie"],
     queryFn: () => getJson<Category[]>(`${BASE}api/crescita/categorie`),
     staleTime: 1000 * 60 * 10,
   });
 
-  const { data: recentData } = useQuery<{ articles: Article[] }>({
+  const { data: recentData, isError: recentError } = useQuery<{ articles: Article[] }>({
     queryKey: ["crescita-recent"],
     queryFn: async () => {
       const data = await getJson<{ articles?: Article[] }>(`${BASE}api/crescita?limit=6`);
@@ -271,6 +320,7 @@ export default function Crescita() {
   const totalArticles = catData.reduce((sum, c) => sum + c.count, 0);
   const totalCategories = catData.filter(c => c.count > 0).length;
   const recentArticles = recentData?.articles ?? [];
+  const growthLoadError = categoriesError || recentError;
 
   useWendyPageContext({
     page: "crescita",
@@ -334,6 +384,16 @@ export default function Crescita() {
       {/* Categories */}
       <section className="py-10 md:py-14">
         <div className="container mx-auto px-4 md:px-6 max-w-6xl">
+          {growthLoadError && (
+            <div className="rounded-2xl border border-destructive/25 bg-destructive/5 p-6 mb-8">
+              <h2 className="font-serif font-semibold text-lg text-foreground mb-1">
+                Non riesco a caricare i contenuti di crescita adesso.
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Riprova tra poco: questa pagina non usa contenuti finti quando l'API non risponde.
+              </p>
+            </div>
+          )}
           <div className="mb-6 md:mb-8">
             <h2 className="text-xl md:text-2xl font-serif font-bold text-foreground mb-1">{t("growth.exploreByArea", { defaultValue: "Esplora per area" })}</h2>
             <p className="text-sm md:text-base text-muted-foreground">{t("growth.exploreByAreaDesc", { defaultValue: "Scegli il tema su cui vuoi lavorare adesso." })}</p>

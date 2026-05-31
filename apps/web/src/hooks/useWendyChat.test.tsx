@@ -19,6 +19,10 @@ const wendyProviderMock = vi.hoisted(() => ({
   setPhase: vi.fn(),
 }));
 
+const actionExecutorMock = vi.hoisted(() => ({
+  normalizeWendyAction: vi.fn(() => null as WendyAction | null),
+}));
+
 vi.mock("./useSSEStream.js", () => ({
   useSSEStream: vi.fn((options: SseOptions) => {
     sse.options = options;
@@ -57,7 +61,7 @@ vi.mock("./useWendyOpenAITTS.js", () => ({
 }));
 
 vi.mock("./useWendyActionExecutor", () => ({
-  normalizeWendyAction: vi.fn(() => null),
+  normalizeWendyAction: actionExecutorMock.normalizeWendyAction,
   useWendyActionExecutor: () => ({
     executeImmediate: vi.fn((action: WendyAction) => action),
     confirm: vi.fn(async (action: WendyAction) => action),
@@ -71,6 +75,7 @@ vi.mock("./useWendyHistoryCompression", () => ({
 }));
 
 import { useWendyChat } from "./useWendyChat";
+import { loadPersistedThread, savePersistedThread } from "./wendyPersistence";
 
 describe("useWendyChat", () => {
   beforeEach(() => {
@@ -81,7 +86,80 @@ describe("useWendyChat", () => {
     sse.options = undefined;
     wendyProviderMock.pageContext = null;
     wendyProviderMock.setPhase.mockReset();
+    actionExecutorMock.normalizeWendyAction.mockReset();
+    actionExecutorMock.normalizeWendyAction.mockReturnValue(null);
+    localStorage.clear();
     vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true } as Response);
+  });
+
+  it("hydrates persisted visible messages when a page starts with an empty thread", async () => {
+    savePersistedThread(
+      [
+        { role: "user", content: "trova match" },
+        { role: "assistant", content: "[Azione Wendy proposta o completata]" },
+      ],
+      undefined,
+      [
+        { id: "user-1", role: "user", content: "trova match", timestamp: 1 },
+        {
+          id: "assistant-1",
+          role: "assistant",
+          content: "[Azione Wendy proposta o completata]",
+          timestamp: 2,
+          uiTool: { name: "career_match", args: { role: "Designer" } },
+          toolsUsed: ["career_match"],
+          actions: [
+            {
+              id: "action-1",
+              type: "set_filters",
+              label: "Applica filtri",
+              status: "preview",
+              risk: "low",
+              description: "Prepara la lista filtrata.",
+              requiresConfirmation: false,
+              payload: { sector: "design" },
+            },
+          ],
+        },
+      ],
+    );
+
+    const { result } = renderHook(() => useWendyChat({ ttsEnabled: false }));
+
+    await waitFor(() => expect(result.current.restoredFromPersistence).toBe(true));
+    expect(result.current.messages).toEqual([
+      { id: "user-1", role: "user", content: "trova match", timestamp: 1 },
+      expect.objectContaining({
+        id: "assistant-1",
+        role: "assistant",
+        uiTool: { name: "career_match", args: { role: "Designer" } },
+        toolsUsed: ["career_match"],
+        actions: [expect.objectContaining({ id: "action-1", type: "set_filters" })],
+      }),
+    ]);
+  });
+
+  it("hydrates legacy history-only threads into the visible conversation", async () => {
+    const savedAt = Date.now();
+    localStorage.setItem(
+      "wendy:thread:v1",
+      JSON.stringify({
+        v: 1,
+        history: [
+          { role: "user", content: "ciao" },
+          { role: "assistant", content: "ehi" },
+        ],
+        savedAt,
+      }),
+    );
+
+    const { result } = renderHook(() => useWendyChat({ ttsEnabled: false }));
+
+    await waitFor(() => expect(result.current.messages).toEqual([
+      { id: "persisted-user-0", role: "user", content: "ciao", timestamp: savedAt },
+      { id: "persisted-assistant-1", role: "assistant", content: "ehi", timestamp: savedAt + 1 },
+    ]));
+    expect(result.current.restoredFromPersistence).toBe(true);
   });
 
   it("sends a message and parses token, citations, and done events", async () => {
@@ -138,6 +216,57 @@ describe("useWendyChat", () => {
       ],
       isStreaming: false,
     });
+  });
+
+  it("persists the completed visible turn with streamed tools and actions", async () => {
+    actionExecutorMock.normalizeWendyAction.mockReturnValue({
+      id: "action-1",
+      type: "set_filters",
+      status: "preview",
+      risk: "low",
+      label: "Applica filtri",
+      description: "Prepara la lista filtrata.",
+      requiresConfirmation: false,
+      payload: { listType: "roles", filters: { sector: "design" } },
+      sourceTool: "career_match",
+    });
+    sse.start.mockImplementation(async () => {
+      sse.options?.onRawChunk?.(JSON.stringify({
+        type: "tool_call",
+        name: "career_match",
+        args: { sector: "design" },
+        result: { clientSide: true, action: "set_filters" },
+      }));
+      sse.options?.onRawChunk?.(JSON.stringify({
+        type: "ui_tool",
+        name: "career_match",
+        args: { role: "Designer" },
+      }));
+      sse.options?.onRawChunk?.(JSON.stringify({ type: "done", requestId: "req-tool", contextSources: [] }));
+      sse.options?.onComplete?.("");
+    });
+
+    const { result, unmount } = renderHook(() => useWendyChat({ ttsEnabled: false }));
+    await act(async () => {
+      await result.current.sendMessage("trova match");
+    });
+
+    const persisted = loadPersistedThread();
+    expect(persisted?.messages?.at(-1)).toMatchObject({
+      role: "assistant",
+      content: "[Azione Wendy proposta o completata]",
+      requestId: "req-tool",
+      toolsUsed: ["career_match"],
+      uiTool: { name: "career_match", args: { role: "Designer" } },
+      actions: [expect.objectContaining({ id: "action-1", type: "set_filters" })],
+    });
+
+    unmount();
+    const restored = renderHook(() => useWendyChat({ ttsEnabled: false }));
+    await waitFor(() => expect(restored.result.current.messages.at(-1)).toMatchObject({
+      uiTool: { name: "career_match", args: { role: "Designer" } },
+      actions: [expect.objectContaining({ id: "action-1" })],
+    }));
   });
 
   it("handles gate and stream errors without losing observability", async () => {

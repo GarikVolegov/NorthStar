@@ -120,6 +120,9 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     if (!persisted || persisted.history.length === 0) return;
     historyRef.current = persisted.history;
     if (persisted.summary) threadSummaryRef.current = persisted.summary;
+    if (persisted.messages?.length) {
+      setMessages((current) => (current.length === 0 ? persisted.messages ?? [] : current));
+    }
     setRestoredFromPersistence(true);
   }, [restorePersisted]);
 
@@ -294,6 +297,9 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       const emptyWithoutOutput = !completedContent.trim() && !hasNonTextOutput;
       const thinkingMs = firstChunkReceivedRef.current
         ? Date.now() - thinkingStartRef.current : 0;
+      const completedCitations = pendingCitationsRef.current;
+      const completedToolsUsed = [...toolsUsedRef.current];
+      const completedRequestId = lastRequestIdRef.current;
       const completedContextSources = [...contextSourcesRef.current];
       const completedAnswerMode = answerModeRef.current;
       const completedRecovery = recoveryRef.current;
@@ -315,35 +321,15 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
         timestamp:   Date.now(),
         isStreaming: false,
         thinkingMs,
-        citations:   pendingCitationsRef.current,
+        citations:   completedCitations,
+        toolsUsed: completedToolsUsed,
+        requestId: completedRequestId,
         contextSources: completedContextSources,
         answerMode: completedAnswerMode,
         recovery: completedRecovery,
         adaptiveReasoning: completedAdaptiveReasoning,
         suggestedPrompts: completedSuggestedPrompts,
       };
-
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantMsgIdRef.current
-            ? {
-                ...m,
-                role: emptyWithoutOutput ? 'error' : m.role,
-                content: emptyWithoutOutput
-                  ? 'Wendy non ha prodotto una risposta. Riprova tra un attimo.'
-                  : completedContent || m.content,
-                isStreaming: false,
-                thinkingMs,
-                citations: pendingCitationsRef.current,
-                contextSources: completedContextSources,
-                answerMode: completedAnswerMode,
-                recovery: completedRecovery,
-                adaptiveReasoning: completedAdaptiveReasoning,
-                suggestedPrompts: completedSuggestedPrompts,
-              }
-            : m,
-        ),
-      );
 
       if (!emptyWithoutOutput && !hasTerminalErrorRef.current) {
         const assistantHistory = completedContent.trim() || '[Azione Wendy proposta o completata]';
@@ -355,10 +341,41 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
           ...historyRef.current,
           ...newEntries,
         ].slice(-40); // max 20 coppie
-        savePersistedThread(historyRef.current, threadSummaryRef.current);
       } else if (emptyWithoutOutput) {
         setStreamError(new Error('EMPTY_WENDY_RESPONSE'));
       }
+
+      let completedVisibleMessage: ChatMessage = completedMsg;
+      setMessages((prev) => {
+        const finalizedMessages = prev.map((m) =>
+          m.id === assistantMsgIdRef.current
+            ? {
+                ...m,
+                role: emptyWithoutOutput ? 'error' : m.role,
+                content: emptyWithoutOutput
+                  ? 'Wendy non ha prodotto una risposta. Riprova tra un attimo.'
+                  : completedContent || m.content || '[Azione Wendy proposta o completata]',
+                isStreaming: false,
+                thinkingMs,
+                citations: completedCitations,
+                toolsUsed: completedToolsUsed,
+                contextSources: completedContextSources,
+                answerMode: completedAnswerMode,
+                recovery: completedRecovery,
+                adaptiveReasoning: completedAdaptiveReasoning,
+                suggestedPrompts: completedSuggestedPrompts,
+                requestId: completedRequestId,
+              }
+            : m,
+        );
+
+        const finalizedAssistant = finalizedMessages.find((m) => m.id === assistantMsgIdRef.current);
+        if (finalizedAssistant) completedVisibleMessage = finalizedAssistant;
+        if (!emptyWithoutOutput && !hasTerminalErrorRef.current) {
+          savePersistedThread(historyRef.current, threadSummaryRef.current, finalizedMessages);
+        }
+        return finalizedMessages;
+      });
 
       pendingCitationsRef.current = [];
       contextSourcesRef.current = [];
@@ -380,7 +397,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
           if (tts.supported) tts.speak(completedContent, sttLang);
         });
       }
-      onMessageComplete?.(completedMsg);
+      onMessageComplete?.(completedVisibleMessage);
     },
 
     onError: (err) => {
@@ -624,8 +641,8 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     actionId: string,
     update: WendyAction | ((action: WendyAction) => WendyAction),
   ) => {
-    setMessages((prev) =>
-      prev.map((message) => {
+    setMessages((prev) => {
+      const updatedMessages = prev.map((message) => {
         if (message.id !== messageId) return message;
         return {
           ...message,
@@ -634,8 +651,10 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
             return typeof update === 'function' ? update(action) : update;
           }),
         };
-      }),
-    );
+      });
+      savePersistedThread(historyRef.current, threadSummaryRef.current, updatedMessages);
+      return updatedMessages;
+    });
   }, []);
 
   const confirmAction = useCallback(async (messageId: string, actionId: string, confirmationText?: string) => {

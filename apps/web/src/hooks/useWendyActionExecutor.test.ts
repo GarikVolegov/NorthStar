@@ -122,6 +122,34 @@ describe("useWendyActionExecutor", () => {
     );
     expect(updated).toMatchObject({ status: "executed" });
   });
+
+  it("parses JSON string filters and emits navigation completion when applying filters", () => {
+    const { result } = renderHook(() => useWendyActionExecutor(), { wrapper: wrapperFactory() });
+
+    let updated: WendyAction | undefined;
+    act(() => {
+      updated = result.current.executeImmediate({
+        id: "filters-1",
+        type: "set_filters",
+        status: "preview",
+        risk: "low",
+        label: "Applica filtri",
+        description: "Filtra i settori.",
+        requiresConfirmation: false,
+        payload: {
+          listType: "sectors",
+          filters: "{\"trend\":\"growing\",\"riasecTypes\":[\"I\",\"A\"]}",
+        },
+      });
+    });
+
+    expect(setLocationMock).toHaveBeenCalledWith("/settori?trend=growing&riasecTypes=I%2CA");
+    expect(eventEmitMock).toHaveBeenCalledWith("wendy:navigation-complete", expect.objectContaining({
+      route: "/settori?trend=growing&riasecTypes=I%2CA",
+      actionType: "set_filters",
+    }));
+    expect(updated).toMatchObject({ status: "executed", targetRoute: "/settori?trend=growing&riasecTypes=I%2CA" });
+  });
 });
 
 describe("normalizeWendyAction", () => {

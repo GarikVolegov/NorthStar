@@ -98,6 +98,7 @@ async function matchSectors(riasecScores: Record<string, number>) {
   return recs.sort((a, b) => b.matchScore - a.matchScore).slice(0, 5);
 }
 
+export const publicTestSessionsRouter = Router();
 const router = Router();
 
 /* ─── GET /api/test-sessions/history  —  storico sessioni utente ─── */
@@ -126,7 +127,7 @@ router.get("/history", requireAuth, async (req, res) => {
 });
 
 /* ─── POST /api/test-sessions  —  crea sessione + calcola score ─── */
-router.post("/", async (req, res) => {
+publicTestSessionsRouter.post("/", async (req, res) => {
   try {
     const answers = normalizeAnswers((req.body as { answers?: unknown })?.answers);
     if (!answers) {
@@ -193,7 +194,7 @@ router.get("/latest", requireAuth, async (req, res) => {
 });
 
 /* ─── GET /api/test-sessions/:sessionId  —  dettagli sessione ─── */
-router.get("/:sessionId", async (req, res) => {
+publicTestSessionsRouter.get("/:sessionId(\\d+)", async (req, res) => {
   try {
     const sessionId = parseInt(req.params.sessionId ?? "", 10);
     if (isNaN(sessionId)) { res.status(400).json({ error: "ID non valido" }); return; }

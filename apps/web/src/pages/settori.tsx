@@ -20,6 +20,7 @@ import {
   BarChart3,
   ChevronDown,
   GitCompare,
+  RefreshCw,
   Search,
   ShieldCheck,
   SlidersHorizontal,
@@ -365,6 +366,27 @@ function EvidenceItem({
   );
 }
 
+function SectorEmptyState({
+  icon: Icon,
+  title,
+  description,
+  action,
+}: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-border bg-card p-10 text-center text-muted-foreground">
+      <Icon className="mx-auto mb-3 h-10 w-10 opacity-40" />
+      <p className="font-semibold text-foreground">{title}</p>
+      <p className="mt-1 text-sm">{description}</p>
+      {action ? <div className="mt-5">{action}</div> : null}
+    </section>
+  );
+}
+
 export default function Settori() {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -382,9 +404,10 @@ export default function Settori() {
     actions: ["Filtra settori", "Apri settore", "Confronta opportunita"],
   });
 
-  const { data: sectors = [], isLoading } = useAllSectors();
+  const sectorsQuery = useAllSectors();
   const { data: latestSession } = useLatestSession(Boolean(user?.id));
   const { workPreference } = useWorkPreference(user?.id);
+  const sectors = sectorsQuery.data ?? [];
 
   const [search, setSearch] = useState("");
   const [activeRiasec, setActiveRiasec] = useState<string[]>([]);
@@ -462,6 +485,8 @@ export default function Settori() {
   const [apexSector, ...rest] = pyramid;
   const middleSectors = rest.slice(0, 2);
   const baseSectors = rest.slice(2);
+  const hasBackendData = sectors.length > 0;
+  const hasVisibleResults = ranked.length > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -572,7 +597,7 @@ export default function Settori() {
           </div>
         </section>
 
-        {isLoading ? (
+        {sectorsQuery.isLoading ? (
           <div className="space-y-4">
             <Skeleton className="h-56 rounded-2xl" />
             <div className="grid gap-4 sm:grid-cols-2">
@@ -580,21 +605,44 @@ export default function Settori() {
               <Skeleton className="h-44 rounded-2xl" />
             </div>
           </div>
-        ) : ranked.length === 0 ? (
-          <section className="rounded-2xl border border-border bg-card p-10 text-center text-muted-foreground">
-            <Search className="mx-auto mb-3 h-10 w-10 opacity-40" />
-            <p className="font-semibold text-foreground">Nessun settore trovato</p>
-            <p className="mt-1 text-sm">Prova a rimuovere un filtro o cambiare ricerca.</p>
-            {hasFilters ? (
+        ) : sectorsQuery.isError ? (
+          <SectorEmptyState
+            icon={RefreshCw}
+            title="Errore nel caricamento dei settori"
+            description="Non siamo riusciti a recuperare i dati. La piramide torna appena il catalogo risponde."
+            action={
               <button
                 type="button"
-                onClick={clearAll}
+                onClick={() => void sectorsQuery.refetch()}
                 className="mt-5 rounded-full border border-primary/25 px-4 py-2 text-sm font-semibold text-primary"
               >
-                Rimuovi filtri
+                Riprova
               </button>
-            ) : null}
-          </section>
+            }
+          />
+        ) : !hasBackendData ? (
+          <SectorEmptyState
+            icon={Search}
+            title="Nessun dato backend"
+            description="I settori non sono ancora disponibili."
+          />
+        ) : !hasVisibleResults ? (
+          <SectorEmptyState
+            icon={Search}
+            title="Nessun risultato filtrato"
+            description="Prova a rimuovere un filtro o cambiare ricerca."
+            action={
+              hasFilters ? (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="rounded-full border border-primary/25 px-4 py-2 text-sm font-semibold text-primary"
+                >
+                  Rimuovi filtri
+                </button>
+              ) : null
+            }
+          />
         ) : (
           <>
             <section
@@ -707,7 +755,7 @@ export default function Settori() {
           </>
         )}
 
-        {!isLoading && sectors.length > 0 ? (
+        {!sectorsQuery.isLoading && hasBackendData ? (
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href="/confronta">
               <div className="inline-flex min-h-11 items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10">

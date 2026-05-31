@@ -5,12 +5,14 @@
  * Le entries scadono dopo TTL_MS per evitare che chat vecchie restino indefinitamente.
  */
 import { clientLogger } from '../lib/clientLogger';
+import type { ChatMessage } from './useWendyChat.types';
 
 export type WendyHistoryEntry = { role: 'user' | 'assistant'; content: string };
 
 interface PersistedThread {
   v: 1;
   history: WendyHistoryEntry[];
+  messages?: ChatMessage[];
   summary?: string;
   savedAt: number;
 }
@@ -29,7 +31,48 @@ function isPersistedThread(value: unknown): value is PersistedThread {
   );
 }
 
-export function loadPersistedThread(): { history: WendyHistoryEntry[]; summary?: string } | null {
+function sanitizeHistory(history: unknown[]): WendyHistoryEntry[] {
+  return history
+    .filter((e): e is WendyHistoryEntry =>
+      Boolean(e) &&
+      typeof e === 'object' &&
+      ((e as WendyHistoryEntry).role === 'user' || (e as WendyHistoryEntry).role === 'assistant') &&
+      typeof (e as WendyHistoryEntry).content === 'string',
+    )
+    .slice(-MAX_TURNS);
+}
+
+function sanitizeMessages(messages: unknown): ChatMessage[] | undefined {
+  if (!Array.isArray(messages)) return undefined;
+  const sanitized = messages
+    .filter((message): message is ChatMessage => {
+      if (!message || typeof message !== 'object') return false;
+      const item = message as Partial<ChatMessage>;
+      return (
+        typeof item.id === 'string' &&
+        (item.role === 'user' || item.role === 'assistant' || item.role === 'error') &&
+        typeof item.content === 'string' &&
+        typeof item.timestamp === 'number'
+      );
+    })
+    .map((message) => (
+      message.isStreaming ? { ...message, isStreaming: false } : message
+    ))
+    .slice(-MAX_TURNS);
+  return sanitized.length > 0 ? sanitized : undefined;
+}
+
+function messagesFromHistory(history: WendyHistoryEntry[], savedAt: number): ChatMessage[] | undefined {
+  if (history.length === 0) return undefined;
+  return history.map((entry, index) => ({
+    id: `persisted-${entry.role}-${index}`,
+    role: entry.role,
+    content: entry.content,
+    timestamp: savedAt + index,
+  }));
+}
+
+export function loadPersistedThread(): { history: WendyHistoryEntry[]; messages?: ChatMessage[]; summary?: string } | null {
   if (typeof window === 'undefined' || !window.localStorage) return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -43,16 +86,13 @@ export function loadPersistedThread(): { history: WendyHistoryEntry[]; summary?:
       window.localStorage.removeItem(STORAGE_KEY);
       return null;
     }
-    const history = parsed.history
-      .filter((e): e is WendyHistoryEntry =>
-        Boolean(e) &&
-        (e.role === 'user' || e.role === 'assistant') &&
-        typeof e.content === 'string',
-      )
-      .slice(-MAX_TURNS);
-    return parsed.summary
-      ? { history, summary: parsed.summary }
-      : { history };
+    const history = sanitizeHistory(parsed.history);
+    const messages = sanitizeMessages(parsed.messages) ?? messagesFromHistory(history, parsed.savedAt);
+    return {
+      history,
+      ...(messages ? { messages } : {}),
+      ...(parsed.summary ? { summary: parsed.summary } : {}),
+    };
   } catch (err) {
     clientLogger.warn('[wendyPersistence] load failed', {
       error: err instanceof Error ? err.message : String(err),
@@ -61,12 +101,18 @@ export function loadPersistedThread(): { history: WendyHistoryEntry[]; summary?:
   }
 }
 
-export function savePersistedThread(history: WendyHistoryEntry[], summary?: string): void {
+export function savePersistedThread(
+  history: WendyHistoryEntry[],
+  summary?: string,
+  messages?: ChatMessage[],
+): void {
   if (typeof window === 'undefined' || !window.localStorage) return;
   try {
+    const visibleMessages = sanitizeMessages(messages);
     const payload: PersistedThread = {
       v: 1,
-      history: history.slice(-MAX_TURNS),
+      history: sanitizeHistory(history),
+      ...(visibleMessages ? { messages: visibleMessages } : {}),
       ...(summary ? { summary } : {}),
       savedAt: Date.now(),
     };

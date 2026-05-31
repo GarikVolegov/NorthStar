@@ -1,19 +1,27 @@
 import React, { memo } from 'react';
 
 interface RoadmapStep {
-  title: string;
+  title?: string;
+  label?: string;
   description: string;
   duration?: string;
+  durationWeeks?: number;
 }
 
 interface MatchScore {
-  role: string;
-  score: number;
+  role?: string;
+  careerName?: string;
+  score?: number;
+  matchScore?: number;
   pros: string[];
+  cons?: string[];
+  nextStep?: string;
+  riasecTypes?: string[];
 }
 
 interface QuizQuestion {
-  question: string;
+  question?: string;
+  text?: string;
   options: string[];
   correct: number;
 }
@@ -22,12 +30,15 @@ interface ResourceItem {
   title: string;
   url?: string;
   type?: string;
+  description?: string;
 }
 
 interface ActionPlanTask {
   task: string;
   day?: string;
   done?: boolean;
+  durationMin?: number;
+  why?: string;
 }
 
 type UiToolArgs =
@@ -37,8 +48,20 @@ type UiToolArgs =
   | { items: ResourceItem[]; title?: string }
   | { tasks: ActionPlanTask[]; title?: string };
 
+function arrayOf<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function numberValue(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
 function renderRoadmap(args: UiToolArgs) {
-  const data = args as { steps: RoadmapStep[]; title?: string };
+  const raw = args as { steps?: RoadmapStep[]; title?: string };
+  const data = {
+    title: raw.title,
+    steps: arrayOf<RoadmapStep>(raw.steps),
+  };
   return (
     <div className="p-4">
       {data.title && <p className="mb-3 text-sm font-semibold text-white/80">{data.title}</p>}
@@ -52,53 +75,78 @@ function renderRoadmap(args: UiToolArgs) {
               {i < data.steps.length - 1 && <div className="mt-1 h-full w-px bg-white/10" />}
             </div>
             <div className="flex-1 pb-4">
-              <div className="text-sm font-medium text-white/90">{s.title}</div>
+              <div className="text-sm font-medium text-white/90">{s.title ?? s.label ?? `Step ${i + 1}`}</div>
               <div className="mt-0.5 text-xs text-white/50">{s.description}</div>
-              {s.duration && <div className="mt-1 text-[11px] text-violet-400/60">{s.duration}</div>}
+              {(s.duration || s.durationWeeks) && (
+                <div className="mt-1 text-[11px] text-violet-400/60">
+                  {s.duration ?? `${s.durationWeeks} settimane`}
+                </div>
+              )}
             </div>
           </div>
         ))}
+        {data.steps.length === 0 && <p className="text-sm text-white/50">Roadmap in preparazione.</p>}
       </div>
     </div>
   );
 }
 
 function renderCareerMatch(args: UiToolArgs) {
-  const data = args as { matches: MatchScore[]; title?: string };
+  const raw = args as { matches?: MatchScore[]; title?: string; careerName?: string; matchScore?: number; pros?: string[]; cons?: string[]; nextStep?: string; riasecTypes?: string[] };
+  const data = {
+    title: raw.title,
+    matches: (raw.matches
+      ? arrayOf<MatchScore>(raw.matches)
+      : [{
+          careerName: raw.careerName,
+          matchScore: raw.matchScore,
+          pros: arrayOf<string>(raw.pros),
+          cons: arrayOf<string>(raw.cons),
+          nextStep: raw.nextStep,
+          riasecTypes: arrayOf<string>(raw.riasecTypes),
+        }]) as MatchScore[],
+  };
   return (
     <div className="p-4">
       {data.title && <p className="mb-3 text-sm font-semibold text-white/80">{data.title}</p>}
       <div className="space-y-3">
-        {data.matches.map((m, i) => (
+        {data.matches.filter((m) => m.role || m.careerName).map((m, i) => {
+          const score = Math.max(0, Math.min(100, numberValue(m.score ?? m.matchScore)));
+          return (
           <div key={i} className="rounded-xl border border-white/10 bg-white/5 p-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-white/90">{m.role}</span>
+              <span className="text-sm font-medium text-white/90">{m.role ?? m.careerName}</span>
               <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-xs font-medium text-violet-400">
-                {m.score}%
+                {score}%
               </span>
             </div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500"
-                style={{ width: `${m.score}%` }}
+                style={{ width: `${score}%` }}
               />
             </div>
-            {m.pros.length > 0 && (
+            {arrayOf<string>(m.pros).length > 0 && (
               <ul className="mt-2 space-y-0.5">
-                {m.pros.map((p, j) => (
+                {arrayOf<string>(m.pros).map((p, j) => (
                   <li key={j} className="text-[11px] text-white/50">+ {p}</li>
                 ))}
               </ul>
             )}
+            {m.nextStep && <p className="mt-2 text-[11px] text-primary/80">{m.nextStep}</p>}
           </div>
-        ))}
+        );})}
       </div>
     </div>
   );
 }
 
 function renderActionPlan(args: UiToolArgs) {
-  const data = args as { tasks: ActionPlanTask[]; title?: string };
+  const raw = args as { tasks?: ActionPlanTask[]; title?: string; weekLabel?: string };
+  const data = {
+    title: raw.title ?? raw.weekLabel,
+    tasks: arrayOf<ActionPlanTask>(raw.tasks),
+  };
   return (
     <div className="p-4">
       {data.title && <p className="mb-3 text-sm font-semibold text-white/80">{data.title}</p>}
@@ -109,6 +157,8 @@ function renderActionPlan(args: UiToolArgs) {
             <div className="flex-1 min-w-0">
               <span className={`text-sm ${t.done ? 'line-through text-white/30' : 'text-white/90'}`}>{t.task}</span>
               {t.day && <span className="ml-2 text-[11px] text-white/40">{t.day}</span>}
+              {t.durationMin && <span className="ml-2 text-[11px] text-primary/70">{t.durationMin} min</span>}
+              {t.why && <p className="mt-1 text-[11px] text-white/45">{t.why}</p>}
             </div>
           </label>
         ))}
@@ -118,16 +168,20 @@ function renderActionPlan(args: UiToolArgs) {
 }
 
 function renderQuiz(args: UiToolArgs) {
-  const data = args as { title: string; questions: QuizQuestion[] };
+  const raw = args as { title?: string; topic?: string; questions?: QuizQuestion[] };
+  const data = {
+    title: raw.title ?? raw.topic ?? "Quiz rapido",
+    questions: arrayOf<QuizQuestion>(raw.questions),
+  };
   return (
     <div className="p-4">
       <p className="mb-3 text-sm font-semibold text-white/80">{data.title}</p>
       <div className="space-y-4">
         {data.questions.map((q, i) => (
           <div key={i} className="rounded-xl border border-white/10 bg-white/5 p-3">
-            <p className="mb-2 text-sm text-white/90">{i + 1}. {q.question}</p>
+            <p className="mb-2 text-sm text-white/90">{i + 1}. {q.question ?? q.text}</p>
             <div className="space-y-1">
-              {q.options.map((o, j) => (
+              {arrayOf<string>(q.options).map((o, j) => (
                 <label key={j} className="flex items-center gap-2 cursor-pointer">
                   <input type="radio" name={`q-${i}`} className="h-3.5 w-3.5 border-white/20 text-violet-500" />
                   <span className="text-xs text-white/60">{o}</span>
@@ -142,7 +196,11 @@ function renderQuiz(args: UiToolArgs) {
 }
 
 function renderResourceList(args: UiToolArgs) {
-  const data = args as { items: ResourceItem[]; title?: string };
+  const raw = args as { items?: ResourceItem[]; resources?: ResourceItem[]; title?: string; heading?: string };
+  const data = {
+    title: raw.title ?? raw.heading,
+    items: arrayOf<ResourceItem>(raw.items ?? raw.resources),
+  };
   return (
     <div className="p-4">
       {data.title && <p className="mb-3 text-sm font-semibold text-white/80">{data.title}</p>}
@@ -154,6 +212,7 @@ function renderResourceList(args: UiToolArgs) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm text-white/90 truncate">{item.title}</div>
+              {item.description && <p className="mt-0.5 line-clamp-2 text-[11px] text-white/45">{item.description}</p>}
               {item.url && (
                 <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-violet-400 hover:underline">
                   Apri

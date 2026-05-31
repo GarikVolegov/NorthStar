@@ -119,7 +119,9 @@ function Router() {
       <Route path="/wendy/memoria">
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
-            <MemoriaWendy />
+            <MainLayout>
+              <ProtectedRoute component={MemoriaWendy} />
+            </MainLayout>
           </Suspense>
         </ErrorBoundary>
       </Route>
@@ -130,17 +132,30 @@ function Router() {
           </Suspense>
         </ErrorBoundary>
       </Route>
+      <Route path="/workspace/:id">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <MainLayout>
+              <ProtectedRoute component={WorkspacePage} />
+            </MainLayout>
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
       <Route path="/workspace">
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
-            <WorkspacePage />
+            <MainLayout>
+              <ProtectedRoute component={WorkspacePage} />
+            </MainLayout>
           </Suspense>
         </ErrorBoundary>
       </Route>
       <Route path="/profilo/briefing">
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
-            <BriefingPage />
+            <MainLayout>
+              <ProtectedRoute component={BriefingPage} />
+            </MainLayout>
           </Suspense>
         </ErrorBoundary>
       </Route>

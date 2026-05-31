@@ -29,6 +29,7 @@ export type EventName =
   | "notification:new"
   | "wendy:response"
   | "wendy:action"
+  | "wendy:navigation-complete"
   | "cache:invalidate"
   // Step 7+: page lifecycle e comunicazione inter-pagina (foundation refactor)
   | "page:mounted"

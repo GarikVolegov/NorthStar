@@ -30,6 +30,13 @@ interface NewsSubscriptionsResponse {
   subscriptions?: string[];
 }
 
+interface NewsFeedResponse {
+  news: NewsItem[];
+  source: "live" | "partial" | "static" | "error";
+  status?: "ok" | "empty" | "partial" | "error";
+  error?: string;
+}
+
 const CATEGORY_CONFIG = [
   { id: "general",    emoji: "🌍", gradient: "from-blue-500/20 to-blue-600/10" },
   { id: "technology", emoji: "💻", gradient: "from-cyan-500/20 to-blue-600/10" },
@@ -300,7 +307,7 @@ export default function News() {
     CATEGORY_CONFIG.forEach(({ id }) => {
       queryClient.prefetchQuery({
         queryKey: ["news", id],
-        queryFn: () => getJson<{ news: NewsItem[]; source: "live" | "static" }>(`${BASE}api/news?category=${id}&limit=12`),
+        queryFn: () => getJson<NewsFeedResponse>(`${BASE}api/news?category=${id}&limit=12`),
         staleTime: NEWS_STALE_MS,
       });
     });
@@ -310,7 +317,7 @@ export default function News() {
     if (!confirmedSector) return;
     queryClient.prefetchQuery({
       queryKey: ["news", "sector", confirmedSector.name],
-      queryFn: () => getJson<{ news: NewsItem[]; source: "live" | "static" }>(
+      queryFn: () => getJson<NewsFeedResponse>(
         `${BASE}api/news/sector/${encodeURIComponent(confirmedSector.name)}?limit=12`,
       ),
       staleTime: NEWS_STALE_MS,
@@ -319,17 +326,34 @@ export default function News() {
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["news", activeTab],
-    queryFn: () => getJson<{ news: NewsItem[]; source: "live" | "static" }>(`${BASE}api/news?category=${activeTab}&limit=12`),
+    queryFn: async () => {
+      const response = await getJson<NewsFeedResponse>(`${BASE}api/news?category=${activeTab}&limit=12`);
+      if (response.status === "error" || response.source === "error") {
+        throw new Error(response.error ?? "news_unavailable");
+      }
+      return response;
+    },
     enabled: activeTab !== "__sector__",
     staleTime: NEWS_STALE_MS,
     placeholderData: keepPreviousData,
   });
 
-  const { data: sectorNewsData, isLoading: sectorLoading } = useQuery({
+  const {
+    data: sectorNewsData,
+    isLoading: sectorLoading,
+    isError: sectorIsError,
+    refetch: refetchSectorNews,
+  } = useQuery({
     queryKey: ["news", "sector", confirmedSector?.name],
-    queryFn: () => getJson<{ news: NewsItem[]; source: "live" | "static" }>(
-      `${BASE}api/news/sector/${encodeURIComponent(confirmedSector!.name)}?limit=12`,
-    ),
+    queryFn: async () => {
+      const response = await getJson<NewsFeedResponse>(
+        `${BASE}api/news/sector/${encodeURIComponent(confirmedSector!.name)}?limit=12`,
+      );
+      if (response.status === "error" || response.source === "error") {
+        throw new Error(response.error ?? "news_unavailable");
+      }
+      return response;
+    },
     enabled: !!confirmedSector,
     staleTime: NEWS_STALE_MS,
     placeholderData: keepPreviousData,
@@ -338,6 +362,8 @@ export default function News() {
   const displayNews = activeTab === "__sector__" ? (sectorNewsData?.news ?? []) : (data?.news ?? []);
   const displaySource = activeTab === "__sector__" ? sectorNewsData?.source : data?.source;
   const displayLoading = activeTab === "__sector__" ? (sectorLoading && !!confirmedSector) : isLoading;
+  const displayError = activeTab === "__sector__" ? sectorIsError : isError;
+  const retryDisplayNews = activeTab === "__sector__" ? refetchSectorNews : refetch;
 
   const subscribedCategories = CATEGORY_CONFIG.filter((c) => subscriptions.includes(c.id));
 
@@ -448,18 +474,17 @@ export default function News() {
           </div>
         )}
 
-        {isError && activeTab !== "__sector__" && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground mb-4">{t("news.loadError")}</p>
-            <Button variant="outline" onClick={() => refetch()} className="gap-2 rounded-full">
-              <RefreshCw className="h-4 w-4" /> {t("news.retry")}
-            </Button>
-          </div>
-        )}
-
         <div className="mb-8">
           {displayLoading
             ? <NewsGridSkeleton count={6} />
+            : displayError ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground mb-4">{t("news.loadError")}</p>
+                <Button variant="outline" onClick={() => retryDisplayNews()} className="gap-2 rounded-full">
+                  <RefreshCw className="h-4 w-4" /> {t("news.retry")}
+                </Button>
+              </div>
+            )
             : displayNews.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {displayNews.map((item) => (
@@ -478,7 +503,11 @@ export default function News() {
         {!displayLoading && displayNews.length > 0 && (
           <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-10">
             <Tag className="h-3 w-3" />
-            {displaySource === "live" ? t("news.sourceLabel.live") : t("news.sourceLabel.static")}
+            {displaySource === "live"
+              ? t("news.sourceLabel.live")
+              : displaySource === "partial"
+                ? t("news.sourceLabel.partial", { defaultValue: "Alcune fonti non sono disponibili: mostriamo le notizie caricate." })
+                : t("news.sourceLabel.static")}
             {user && <span className="ml-2">· {t("news.bookmarkHint")}</span>}
           </p>
         )}

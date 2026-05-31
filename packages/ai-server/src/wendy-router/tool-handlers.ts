@@ -144,8 +144,9 @@ export async function handleOpenView(
 // ── 2. set_filters (client-side) ─────────────────────────────────────────────
 
 export async function handleSetFilters(
-  args: { listType: string; filters: Record<string, unknown> },
+  args: { listType: string; filters: Record<string, unknown> | string },
 ): Promise<ToolResult> {
+  const filters = parseFilterRecord(args.filters);
   return wendyAction({
     type: "set_filters",
     status: "executed",
@@ -153,12 +154,27 @@ export async function handleSetFilters(
     label: "Applico i filtri",
     description: `Imposto i filtri sulla lista ${args.listType}.`,
     requiresConfirmation: false,
-    payload: { listType: args.listType, filters: args.filters },
-    preview: Object.entries(args.filters ?? {}).slice(0, 4).map(([label, value]) => ({
+    payload: { listType: args.listType, filters },
+    preview: Object.entries(filters).slice(0, 4).map(([label, value]) => ({
       label,
       value: typeof value === "string" ? value : JSON.stringify(value),
     })),
   });
+}
+
+function parseFilterRecord(value: Record<string, unknown> | string | undefined): Record<string, unknown> {
+  if (!value) return {};
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed as Record<string, unknown>
+        : {};
+    } catch {
+      return {};
+    }
+  }
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
 function proposeSaveObjective(args: { text?: string; category?: string; deadlineWeeks?: number }): ToolResult {

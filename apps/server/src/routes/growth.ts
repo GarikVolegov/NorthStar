@@ -17,6 +17,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   business: "Business",
 };
 
+type GrowthPersonalization = "profile" | "generic";
+
 function isSql(condition: SQL | undefined): condition is SQL {
   return condition !== undefined;
 }
@@ -68,6 +70,7 @@ router.get("/categorie", async (_req, res) => {
 
 router.get("/per-te", optionalAuth, async (req, res) => {
   try {
+    const hasProfile = Boolean(req.user?.testSessionId);
     const articles = await db
       .select()
       .from(growthArticlesTable)
@@ -76,13 +79,22 @@ router.get("/per-te", optionalAuth, async (req, res) => {
       .limit(6);
     res.json({
       articles: articles.map(mapArticle),
-      hasProfile: !!req.user || articles.length > 0,
+      hasProfile,
+      personalization: (hasProfile ? "profile" : "generic") satisfies GrowthPersonalization,
       types: [],
       italianTypes: [],
     });
   } catch (err) {
     req.log?.error?.({ err }, "growth personalized error");
-    res.status(500).json({ articles: [], hasProfile: false, types: [], italianTypes: [] });
+    res.status(503).json({
+      articles: [],
+      hasProfile: false,
+      personalization: "generic" satisfies GrowthPersonalization,
+      types: [],
+      italianTypes: [],
+      status: "error",
+      error: "growth_unavailable",
+    });
   }
 });
 
@@ -114,10 +126,20 @@ router.get("/", async (req, res) => {
       .orderBy(desc(growthArticlesTable.updatedAt))
       .limit(limit);
 
-    res.json({ articles: articles.map(mapArticle), total: articles.length });
+    res.json({
+      articles: articles.map(mapArticle),
+      total: articles.length,
+      status: articles.length > 0 ? "ok" : "empty",
+    });
   } catch (err) {
     req.log?.error?.({ err }, "growth list error");
-    res.status(500).json({ error: "Errore nel caricamento degli articoli" });
+    res.status(503).json({
+      articles: [],
+      total: 0,
+      status: "error",
+      error: "growth_unavailable",
+      message: "Errore nel caricamento degli articoli",
+    });
   }
 });
 

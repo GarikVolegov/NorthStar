@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Response } from "express";
 import { eq, desc, or, and, lt, ilike, sql, type SQL } from "drizzle-orm";
 import { db, newsArticlesTable } from "@workspace/db";
 import { PUBLIC_NEWS_SOURCES } from "@workspace/ai-server";
@@ -10,6 +11,7 @@ const router = Router();
 
 const CACHE_TTL = 60; // 60s TTL as specified
 type NewsArticleRow = typeof newsArticlesTable.$inferSelect;
+type NewsFeedStatus = "ok" | "empty" | "partial" | "error";
 
 /**
  * Encode a keyset cursor: "publishedAt|id"
@@ -47,6 +49,20 @@ function publicNewsWhere(extra?: SQL<unknown>): SQL<unknown> {
     sql`${newsArticlesTable.url} not ilike '%dev.to%'`,
   );
   return extra ? (and(base, extra) ?? base!) : base!;
+}
+
+function newsStatus(newsCount: number): NewsFeedStatus {
+  return newsCount > 0 ? "ok" : "empty";
+}
+
+function sendNewsUnavailable(res: Response) {
+  res.status(503).json({
+    news: [],
+    nextCursor: null,
+    source: "error",
+    status: "error" satisfies NewsFeedStatus,
+    error: "news_unavailable",
+  });
 }
 
 function newsSearchWhere(search: string): SQL<unknown> | undefined {
@@ -184,10 +200,16 @@ router.get("/", async (req, res) => {
       const anyMore = results.some((r) => r.hasMore);
       const lastNews = news.at(-1);
       const errors = results.filter((r) => "error" in r).map(() => "news_unavailable");
+      if (errors.length > 0 && news.length === 0) {
+        sendNewsUnavailable(res);
+        return;
+      }
+      const status: NewsFeedStatus = errors.length > 0 ? "partial" : newsStatus(news.length);
       res.json({
         news,
         nextCursor: anyMore && lastNews ? encodeCursor(lastNews.publishedAt, parseInt(lastNews.id, 10)) : null,
         source: errors.length > 0 ? "partial" : "live",
+        status,
         ...(errors.length > 0 ? { errors } : {}),
       });
       return;
@@ -198,7 +220,7 @@ router.get("/", async (req, res) => {
       const cacheKey = "news:recent:real:v3";
       const cached = await cacheGet<ReturnType<typeof mapNewsItem>[]>(cacheKey);
       if (cached) {
-        res.json({ news: cached, nextCursor: null, source: "live" });
+        res.json({ news: cached, nextCursor: null, source: "live", status: newsStatus(cached.length) });
         return;
       }
     }
@@ -236,10 +258,10 @@ router.get("/", async (req, res) => {
       ? encodeCursor(last.publishedAt, parseInt(last.id))
       : null;
 
-    res.json({ news: mapped, nextCursor, source: "live" });
+    res.json({ news: mapped, nextCursor, source: "live", status: newsStatus(mapped.length) });
   } catch (err) {
     req.log?.error?.({ err }, "news list error");
-    res.status(200).json({ news: [], nextCursor: null, source: "error", error: "news_unavailable" });
+    sendNewsUnavailable(res);
   }
 });
 
@@ -289,10 +311,10 @@ router.get("/sector/:sectorName", async (req, res) => {
       ? encodeCursor(last.publishedAt, parseInt(last.id))
       : null;
 
-    res.json({ news: mapped, nextCursor, source: "live" });
+    res.json({ news: mapped, nextCursor, source: "live", status: newsStatus(mapped.length) });
   } catch (err) {
     req.log?.error?.({ err }, "news by sector error");
-    res.status(200).json({ news: [], nextCursor: null, source: "error", error: "news_unavailable" });
+    sendNewsUnavailable(res);
   }
 });
 

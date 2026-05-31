@@ -28,7 +28,7 @@ import xpRouter from "./routes/xp";
 import badgesRouter from "./routes/badges";
 import completionRouter from "./routes/completion";
 import applicationsRouter from "./routes/applications";
-import testSessionsRouter from "./routes/test-sessions";
+import testSessionsRouter, { publicTestSessionsRouter } from "./routes/test-sessions";
 import businessIdeasRouter from "./routes/business-ideas";
 import jobsRouter from "./routes/jobs";
 import growthRouter from "./routes/growth";
@@ -106,6 +106,7 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/roles", router: rolesRouter, auth: "public", description: "Catalogo ruoli" },
   { path: "/api/roadmap", router: roadmapRouter, auth: "public", description: "Roadmap pubblica" },
   { path: "/api/contact", router: contactRouter, auth: "public", description: "Messaggi contatto" },
+  { path: "/api/test-sessions", router: publicTestSessionsRouter, auth: "public", description: "Creazione e lettura pubblica test" },
 
   { path: "/api/profile", router: profileRouter, auth: "authenticated", description: "Profilo utente" },
   { path: "/api/profile", router: profileBackgroundRouter, auth: "authenticated", description: "Sfondo personalizzabile profilo" },

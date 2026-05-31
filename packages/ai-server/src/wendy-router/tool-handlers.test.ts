@@ -80,3 +80,28 @@ describe("update_objective_progress proposal", () => {
     });
   });
 });
+
+describe("set_filters proposal", () => {
+  it("parses JSON string filters before building the client action", async () => {
+    const result = await executeToolCall(
+      "set_filters",
+      { listType: "sectors", filters: "{\"trend\":\"growing\",\"riasecTypes\":[\"I\",\"A\"]}" },
+      7,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.data).toMatchObject({
+      clientSide: true,
+      action: "set_filters",
+      wendyAction: {
+        type: "set_filters",
+        payload: {
+          listType: "sectors",
+          filters: { trend: "growing", riasecTypes: ["I", "A"] },
+        },
+      },
+    });
+  });
+});

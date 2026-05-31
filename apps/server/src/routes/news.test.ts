@@ -134,7 +134,7 @@ describe("news routes", () => {
     ]);
   });
 
-  it("marks critical query failures instead of returning an indistinguishable empty list", async () => {
+  it("returns a structured error status when the main feed cannot be queried", async () => {
     const chain = {
       from: vi.fn(() => chain),
       where: vi.fn(() => chain),
@@ -147,12 +147,55 @@ describe("news routes", () => {
 
     const response = await request(app())
       .get("/api/news")
-      .expect(200);
+      .expect(503);
 
     expect(response.body).toMatchObject({
       news: [],
       nextCursor: null,
       source: "error",
+      error: "news_unavailable",
+    });
+  });
+
+  it("keeps partial multi-category content but fails when every category query fails", async () => {
+    const successChain = {
+      from: vi.fn(() => successChain),
+      where: vi.fn(() => successChain),
+      orderBy: vi.fn(() => successChain),
+      limit: vi.fn(async () => [publishedRows[0]]),
+    };
+    const failingChain = {
+      from: vi.fn(() => failingChain),
+      where: vi.fn(() => failingChain),
+      orderBy: vi.fn(() => failingChain),
+      limit: vi.fn(async () => {
+        throw new Error("provider unavailable");
+      }),
+    };
+    dbMock.select.mockReturnValueOnce(successChain).mockReturnValueOnce(failingChain);
+
+    const partial = await request(app())
+      .get("/api/news?multi=true&categories=technology,business&perCategory=1")
+      .expect(200);
+
+    expect(partial.body).toMatchObject({
+      news: [expect.objectContaining({ id: "10" })],
+      source: "partial",
+      status: "partial",
+    });
+    expect(partial.body.errors).toEqual(["news_unavailable"]);
+
+    dbMock.select.mockReturnValue(failingChain);
+
+    const failed = await request(app())
+      .get("/api/news?multi=true&categories=technology,business&perCategory=1")
+      .expect(503);
+
+    expect(failed.body).toMatchObject({
+      news: [],
+      nextCursor: null,
+      source: "error",
+      status: "error",
       error: "news_unavailable",
     });
   });

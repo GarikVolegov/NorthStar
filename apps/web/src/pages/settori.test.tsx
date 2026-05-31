@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import type React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as WorkModeSelectorModule from "@/components/WorkModeSelector";
 import Settori from "./settori";
 
 const authState = vi.hoisted(() => ({
@@ -23,7 +24,7 @@ vi.mock("@/contexts/AuthContext", () => ({
 }));
 
 vi.mock("@/components/WorkModeSelector", async () => {
-  const actual = await vi.importActual<typeof import("@/components/WorkModeSelector")>(
+  const actual = await vi.importActual<typeof WorkModeSelectorModule>(
     "@/components/WorkModeSelector",
   );
   return {
@@ -191,5 +192,47 @@ describe("Settori adaptive pyramid", () => {
     expect(screen.getByText("Piramide mercato")).toBeInTheDocument();
     expect(screen.getByText("Fai il test per personalizzarla")).toBeInTheDocument();
     expect(pyramid).not.toHaveTextContent(/\+\d+(\.\d+)?%/);
+  });
+
+  it("shows a loading error state when sectors cannot be fetched", async () => {
+    getJsonMock.mockImplementation((url: string) => {
+      if (url.includes("api/sectors")) return Promise.reject(new Error("network down"));
+      if (url.includes("api/test-sessions/latest")) return Promise.resolve(null);
+      return Promise.reject(new Error(`Unhandled URL ${url}`));
+    });
+
+    renderSettori();
+
+    expect(await screen.findByText("Errore nel caricamento dei settori")).toBeInTheDocument();
+    expect(screen.getByText("Riprova")).toBeInTheDocument();
+    expect(screen.queryByTestId("sector-pyramid")).not.toBeInTheDocument();
+  });
+
+  it("shows a backend empty state when no sectors exist", async () => {
+    getJsonMock.mockImplementation((url: string) => {
+      if (url.includes("api/sectors")) return Promise.resolve([]);
+      if (url.includes("api/test-sessions/latest")) return Promise.resolve(null);
+      return Promise.reject(new Error(`Unhandled URL ${url}`));
+    });
+
+    renderSettori();
+
+    expect(await screen.findByText("Nessun dato backend")).toBeInTheDocument();
+    expect(screen.getByText("I settori non sono ancora disponibili.")).toBeInTheDocument();
+    expect(screen.queryByText("Rimuovi filtri")).not.toBeInTheDocument();
+  });
+
+  it("shows a filtered empty state without implying backend data is missing", async () => {
+    renderSettori();
+
+    await screen.findByTestId("sector-pyramid");
+    fireEvent.change(screen.getByPlaceholderText("sectors.searchPlaceholder"), {
+      target: { value: "settore inesistente" },
+    });
+
+    expect(screen.getByText("Nessun risultato filtrato")).toBeInTheDocument();
+    expect(screen.getByText("Prova a rimuovere un filtro o cambiare ricerca.")).toBeInTheDocument();
+    expect(screen.getAllByText("Rimuovi filtri").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Nessun dato backend")).not.toBeInTheDocument();
   });
 });

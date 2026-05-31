@@ -98,7 +98,7 @@ export default function Lavori() {
         <p className="text-muted-foreground max-w-md">
           Accedi per vedere le offerte di lavoro ordinate per compatibilità con il tuo profilo.
         </p>
-        <Link href="/">
+        <Link href="/sign-in?redirect_url=/lavori">
           <Button className="rounded-full px-8">Accedi</Button>
         </Link>
       </div>

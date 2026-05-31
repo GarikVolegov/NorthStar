@@ -55,9 +55,27 @@ type ToolCallEvent = {
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  }
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+}
+
+function emitWendyNavigationComplete(route: string, action: WendyAction) {
+  eventBus.emit("wendy:navigation-complete", {
+    route,
+    actionType: action.type,
+    actionId: action.id,
+  });
 }
 
 function createActionId(type: string) {
@@ -238,6 +256,7 @@ export function useWendyActionExecutor() {
       if (action.type === "navigate") {
         const url = action.targetRoute ?? String(action.payload.url ?? "/dashboard");
         setLocation(url);
+        emitWendyNavigationComplete(url, action);
         toast({ title: "Wendy apre la pagina", description: url });
         return { ...action, status: "executed", error: undefined };
       }
@@ -250,6 +269,7 @@ export function useWendyActionExecutor() {
         eventBus.emit("wendy:action", { type: "set_filters", listType, filters, route });
         eventBus.emit("page:message", { to: listType, type: "wendy:set_filters", filters });
         setLocation(route);
+        emitWendyNavigationComplete(route, action);
         toast({ title: "Filtri impostati", description: "Wendy ha preparato la vista richiesta." });
         return { ...action, status: "executed", targetRoute: route, error: undefined };
       }

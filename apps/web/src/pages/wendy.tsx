@@ -77,7 +77,7 @@ export default function WendyPage() {
   };
 
   return (
-    <main className="min-h-dvh overflow-hidden bg-background text-foreground">
+    <main className="min-h-dvh overflow-x-hidden bg-background text-foreground">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(193,158,74,0.14),transparent_46%),radial-gradient(circle_at_12%_18%,rgba(125,184,154,0.09),transparent_34%)]" />
       <div className="relative z-10 flex min-h-dvh flex-col px-4 py-4 lg:px-6">
         <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-card/72 px-4 py-3 backdrop-blur-xl">
@@ -99,7 +99,7 @@ export default function WendyPage() {
           </div>
         </header>
 
-        <div className="grid flex-1 gap-4 lg:grid-cols-[260px_minmax(430px,1fr)_420px]">
+        <div className="grid flex-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(380px,1fr)_420px]">
           <aside className="hidden min-h-0 flex-col gap-3 lg:flex">
             <section className="rounded-2xl border border-white/10 bg-card/70 p-4 backdrop-blur-xl">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -139,13 +139,13 @@ export default function WendyPage() {
             onActiveNodeChange={setActiveNodeId}
             orbState={orbState}
             level={orbLevel}
-            className="min-h-[520px] lg:min-h-0"
+            className="min-h-[420px] lg:min-h-0"
           />
 
           <section
             className={cn(
               "min-h-[560px] overflow-hidden rounded-2xl border border-white/10 bg-card/78 shadow-2xl backdrop-blur-xl",
-              "lg:min-h-0",
+              "lg:col-span-2 lg:min-h-[560px] xl:col-span-1 xl:min-h-0",
             )}
           >
             <WendyConsole

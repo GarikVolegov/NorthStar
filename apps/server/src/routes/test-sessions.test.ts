@@ -30,7 +30,7 @@ vi.mock("@workspace/db", () => ({
   sectorsTable: sectorsTableMock,
 }));
 
-import testSessionsRouter from "./test-sessions";
+import testSessionsRouter, { publicTestSessionsRouter } from "./test-sessions";
 
 function token(userId = 42) {
   return jwt.sign(
@@ -51,6 +51,7 @@ function token(userId = 42) {
 function app() {
   const instance = express();
   instance.use(express.json());
+  instance.use("/api/test-sessions", publicTestSessionsRouter);
   instance.use("/api/test-sessions", testSessionsRouter);
   return instance;
 }
@@ -82,6 +83,23 @@ describe("test sessions routes", () => {
     await request(app())
       .post("/api/test-sessions/123/confirm")
       .send({ sectorId: 7 })
+      .expect(401);
+  });
+
+  it("allows guests to read a public test result by numeric id", async () => {
+    const session = { id: 123, userId: null, primaryTypes: ["Investigativo"] };
+    selectRows([session]);
+
+    const response = await request(app())
+      .get("/api/test-sessions/123")
+      .expect(200);
+
+    expect(response.body).toEqual(session);
+  });
+
+  it("keeps personalized latest session protected from guests", async () => {
+    await request(app())
+      .get("/api/test-sessions/latest")
       .expect(401);
   });
 

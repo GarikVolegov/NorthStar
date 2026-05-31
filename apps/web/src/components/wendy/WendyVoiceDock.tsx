@@ -117,7 +117,7 @@ export function WendyVoiceDock({
             type="button"
             onClick={handleMicClick}
             className={cn(
-              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
               isListening
                 ? "bg-destructive/18 text-destructive animate-pulse"
                 : "text-muted-foreground/70 hover:bg-white/8 hover:text-foreground",
@@ -141,7 +141,7 @@ export function WendyVoiceDock({
           type="button"
           onClick={() => setVoiceMode(true)}
           className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
             chat.ttsEnabled ? "text-primary hover:bg-primary/10" : "text-muted-foreground/50 hover:bg-white/8",
           )}
           aria-label="Apri modalita voce"
@@ -153,7 +153,7 @@ export function WendyVoiceDock({
           <button
             type="button"
             onClick={chat.stopStream}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-destructive/12 text-destructive transition-colors hover:bg-destructive/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-destructive/12 text-destructive transition-colors hover:bg-destructive/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
             aria-label="Interrompi Wendy"
           >
             <Square className="h-3.5 w-3.5 fill-current" />
@@ -163,7 +163,7 @@ export function WendyVoiceDock({
             type="submit"
             disabled={!hasQuery}
             className={cn(
-              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
               hasQuery
                 ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
                 : "bg-muted text-muted-foreground/40",
