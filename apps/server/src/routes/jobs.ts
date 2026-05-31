@@ -6,7 +6,7 @@ const router = Router();
 /* ─── GET /api/jobs  —  lista lavori ─── */
 router.get("/", requireAuth, async (req, res) => {
   try {
-    res.json([]);
+    res.json({ jobs: [], basedOnSector: null, totalCount: 0, status: "empty" });
   } catch (err) {
     req.log?.error?.({ err }, "jobs get error");
     res.status(500).json({ error: "Errore nel caricamento dei lavori" });

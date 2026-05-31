@@ -171,7 +171,7 @@ export default function Dashboard() {
   const professions = summary?.professions ?? [];
   const workMode = summary?.workMode;
 
-  const { insights, markRead, dismiss } = useProactiveInsights();
+  const { insights, error: insightsError, refetch: refetchInsights, markRead, dismiss } = useProactiveInsights();
   const { data: monthlyRitual } = useMonthlyRitualCurrent();
   const { layout: dashboardLayout } = useDashboardLayout();
   const ritualRequested = location.includes("ritual=notte-fondazione");
@@ -396,6 +396,24 @@ export default function Dashboard() {
       case "diary_objectives":
         return <DashboardDiaryBookCard objectives={strategicObjectives} />;
       case "wendy_insights":
+        if (insightsError) {
+          return (
+            <section className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">Insight da Wendy non disponibili</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Non posso verificare gli aggiornamenti in questo momento. Riprova senza perdere il resto della dashboard.
+                  </p>
+                  <Button type="button" size="sm" variant="outline" className="mt-3 h-8" onClick={() => refetchInsights()}>
+                    Riprova
+                  </Button>
+                </div>
+              </div>
+            </section>
+          );
+        }
         if (insights.length === 0) return null;
         return (
           <section className="space-y-2">

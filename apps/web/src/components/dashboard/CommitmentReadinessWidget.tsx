@@ -10,8 +10,9 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowRight, Compass, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowRight, Compass, RefreshCw, Sparkles } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
+import { Button } from "@/components/ui/button";
 
 interface ReadinessData {
   score: number;
@@ -47,7 +48,7 @@ async function fetchReadiness(): Promise<ReadinessData> {
 }
 
 export function CommitmentReadinessWidget() {
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["discovery-readiness"],
     queryFn: fetchReadiness,
     staleTime: 60 * 1000, // 1 min
@@ -62,7 +63,32 @@ export function CommitmentReadinessWidget() {
       </div>
     );
   }
-  if (isError || !data) return null;
+  if (isError || !data) {
+    return (
+      <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-5">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-semibold text-foreground">Discovery Engine non disponibile</h3>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Non riesco a caricare il tuo indice di readiness. Puoi riprovare o continuare dagli strumenti del percorso.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => refetch()}>
+                <RefreshCw className="h-3.5 w-3.5" />
+                Riprova
+              </Button>
+              <Button type="button" size="sm" variant="ghost" className="h-8 gap-1.5 text-xs" asChild>
+                <Link href="/dashboard">
+                  Apri strumenti <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const band = BAND_LABEL[data.band];
 

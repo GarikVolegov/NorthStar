@@ -45,4 +45,35 @@ describe("WendyActionCard", () => {
     fireEvent.click(confirmButton);
     expect(onConfirm).toHaveBeenCalledWith("RESTART DATABASE");
   });
+
+  it("shows a failed objective update as recoverable without repeating the confirmation instruction", () => {
+    const onConfirm = vi.fn();
+    const failedAction: WendyAction = {
+      id: "progress-1",
+      type: "update_objective_progress",
+      status: "failed",
+      risk: "medium",
+      label: "Aggiornare il progresso?",
+      description: "Conferma prima di modificare questo obiettivo.",
+      requiresConfirmation: true,
+      payload: { objectiveId: 42, progress: 55 },
+      preview: [{ label: "Nuovo progresso", value: "55%" }],
+      error: "L'API obiettivi ha risposto: Obiettivo non trovato. Non ho modificato nulla. Riprova dopo aver scelto un obiettivo ancora presente.",
+    };
+
+    render(
+      <WendyActionCard
+        action={failedAction}
+        onConfirm={onConfirm}
+        onCancel={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText("Non riuscita")).toBeInTheDocument();
+    expect(screen.queryByText("Conferma prima di modificare questo obiettivo.")).not.toBeInTheDocument();
+    expect(screen.getByText(/Non ho modificato nulla/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Riprova/i }));
+    expect(onConfirm).toHaveBeenCalledWith(undefined);
+  });
 });

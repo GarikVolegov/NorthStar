@@ -60,6 +60,16 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - Wendy reidrata i messaggi visibili dalla persistenza locale, non solo la history per il backend.
 - Wendy salva transcript visibile con action/tool metadata, suggerimenti cliccabili, request id e stato azioni.
 
+## Tranche 3 Applicata
+
+- Wendy action card per aggiornamento obiettivi non mostra piu fallimenti generici: conserva il motivo API e chiarisce che nulla e stato modificato.
+- Le azioni Wendy fallite mostrano recovery esplicita e bottone `Riprova`, senza saltare la conferma iniziale.
+- Candidature distingue loading, errore API, empty reale e contenuto; l'empty state porta verso offerte lavoro.
+- API candidature e lavori espongono `status` e `totalCount` per rendere l'empty state verificabile dalla UI.
+- Job feed dashboard non converte piu errori in feed vuoto: mostra errore recuperabile con retry.
+- Widget dashboard critici non spariscono su errore API: readiness, insight personalita, obiettivi, streak mindset e insights mostrano stati recuperabili.
+- `useProactiveInsights` non maschera errori come lista vuota quando la dashboard deve guidare l'utente.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -82,12 +92,20 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - `pnpm --filter @northstar/web run typecheck`
 - `git diff --check`
 
+## Verifica Tranche 3
+
+- `pnpm --filter @northstar/server exec vitest run --configLoader runner src/routes/applications.test.ts src/routes/jobs.test.ts src/routes/objectives.test.ts`
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner src/hooks/useWendyActionExecutor.test.ts src/components/wendy/WendyActionCard.test.tsx src/pages/applications.test.tsx src/components/dashboard/widgets/JobFeedWidget.test.tsx src/hooks/useProactiveInsights.test.tsx src/components/dashboard/CommitmentReadinessWidget.test.tsx src/components/ai/PersonalityInsightCard.test.tsx src/components/dashboard/widgets/ProgressObjectivesWidget.test.tsx src/components/dashboard/widgets/MindsetStreakWidget.test.tsx src/components/dashboard/widgets/InsightsWidget.test.tsx`
+- `pnpm --filter @northstar/server run typecheck`
+- `pnpm --filter @northstar/web run typecheck`
+- `git diff --check`
+
 ## Backlog Prossima Tranche
 
-1. Distinguere errori da stati vuoti su objectives, applications, job feed e dashboard widgets.
-2. Consolidare Search/Wendy: evitare due pipeline AI parallele non scopribili.
-3. Aggiungere E2E runtime: Wendy live, news, growth, sectors explore, onboarding/test completo, objectives UI.
-4. Decidere contratto guest Wendy: risposta guest con quota anonima oppure login gate esplicito.
-5. Rendere cancellazione memoria visibile su touch/focus.
-6. Correggere stati auth/sync Clerk con token verificato obbligatorio.
-7. Collegare Growth `types`/`italianTypes` a profilo/test reale invece di lasciarli vuoti.
+1. Consolidare Search/Wendy: evitare due pipeline AI parallele non scopribili.
+2. Aggiungere E2E runtime: Wendy live, news, growth, sectors explore, onboarding/test completo, objectives UI.
+3. Decidere contratto guest Wendy: risposta guest con quota anonima oppure login gate esplicito.
+4. Rendere cancellazione memoria visibile su touch/focus.
+5. Correggere stati auth/sync Clerk con token verificato obbligatorio.
+6. Collegare Growth `types`/`italianTypes` a profilo/test reale invece di lasciarli vuoti.
+7. Sostituire route placeholder di candidature/lavori con persistenza o provider reale quando il prodotto lo richiede.

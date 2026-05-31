@@ -1,9 +1,10 @@
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProactiveInsightCard } from "@/components/wendy/ProactiveInsightCard";
 import { useProactiveInsights } from "@/hooks/useProactiveInsights";
 import { cn } from "@/lib/utils";
-import { Sparkles } from "lucide-react";
+import { AlertTriangle, RefreshCw, Sparkles } from "lucide-react";
 
 const SIZE_HEIGHT: Record<"sm" | "md" | "lg", string> = {
   sm: "min-h-[120px]",
@@ -16,7 +17,7 @@ interface Props {
 }
 
 export function InsightsWidget({ size }: Props) {
-  const { insights, isLoading, markRead, dismiss } = useProactiveInsights();
+  const { insights, isLoading, error, refetch, markRead, dismiss } = useProactiveInsights();
 
   if (isLoading) {
     return (
@@ -40,7 +41,23 @@ export function InsightsWidget({ size }: Props) {
         </CardTitle>
       </CardHeader>
       <CardContent className="px-4 pb-4">
-        {unreadInsights.length === 0 ? (
+        {error ? (
+          <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">Insight di Wendy non disponibili</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Non posso confermare se ci sono nuovi insight. Riprova fra poco.
+                </p>
+              </div>
+            </div>
+            <Button type="button" size="sm" variant="outline" className="mt-3 h-8 gap-1.5" onClick={() => refetch()}>
+              <RefreshCw className="h-3.5 w-3.5" />
+              Riprova
+            </Button>
+          </div>
+        ) : unreadInsights.length === 0 ? (
           <p className="text-xs text-muted-foreground">
             Nessun nuovo insight. Wendy ti aggiornerà presto!
           </p>

@@ -1,8 +1,10 @@
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePersonalityInsight } from "@/hooks/useAIAgents";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertCircle, Brain, Lightbulb, Loader2, Sparkles, TrendingUp } from "lucide-react";
+import { AlertCircle, ArrowRight, Brain, Lightbulb, Loader2, Sparkles, TrendingUp } from "lucide-react";
+import { Link } from "wouter";
 
 interface Props {
   riasecScores: Record<string, number> | null | undefined;
@@ -45,7 +47,36 @@ export function PersonalityInsightCard({ riasecScores, spiritScores, primaryType
         </motion.div>
       )}
 
-      {isError && null}
+      {isError && (
+        <motion.div
+          key="error"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          className="mb-10"
+        >
+          <Card className="border-destructive/20 bg-destructive/5">
+            <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-destructive/10">
+                  <AlertCircle className="h-5 w-5 text-destructive" />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">Insight AI non disponibile</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Il profilo base resta visibile. Riprova piu tardi o apri l'analisi completa.
+                  </p>
+                </div>
+              </div>
+              <Button type="button" variant="outline" size="sm" className="gap-1.5 self-start sm:self-auto" asChild>
+                <Link href="/risultati">
+                  Vedi risultati completi <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {data && !isLoading && (
         <motion.div

@@ -5,7 +5,7 @@
  * senza richiedere un refresh manuale.
  */
 import { useAuth } from "@/contexts/AuthContext";
-import { ApiClientError, getJson, postJson } from "@/lib/apiClient";
+import { getJson, postJson } from "@/lib/apiClient";
 import { API_ENDPOINTS, withParams } from "@/lib/constants";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -28,12 +28,7 @@ interface InsightsResponse {
 }
 
 async function fetchInsights(): Promise<InsightsResponse> {
-  try {
-    return await getJson<InsightsResponse>(API_ENDPOINTS.proactiveInsights.listUnread);
-  } catch (error) {
-    if (error instanceof ApiClientError) return { insights: [], unreadCount: 0 };
-    throw error;
-  }
+  return getJson<InsightsResponse>(API_ENDPOINTS.proactiveInsights.listUnread);
 }
 
 async function postInsightAction(id: number, action: "read" | "dismiss"): Promise<void> {
@@ -45,7 +40,7 @@ export function useProactiveInsights() {
   const { user }    = useAuth();
   const hasUser = user !== null && user !== undefined;
 
-  const { data, isLoading, error } = useQuery<InsightsResponse>({
+  const { data, isLoading, error, isError, refetch } = useQuery<InsightsResponse>({
     queryKey:        ["proactive-insights"],
     queryFn:         fetchInsights,
     enabled:         hasUser, // non chiamare se non loggato
@@ -67,7 +62,9 @@ export function useProactiveInsights() {
     insights:    data?.insights ?? [],
     unreadCount: data?.unreadCount ?? 0,
     isLoading,
+    isError,
     error,
+    refetch,
     markRead:    (id: number) => markRead.mutate(id),
     dismiss:     (id: number) => dismiss.mutate(id),
   };

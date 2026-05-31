@@ -6,7 +6,7 @@ const router = Router();
 /* ─── GET /api/applications/:userId  —  lista applicazioni ───── */
 router.get("/:userId", requireAuth, async (req, res) => {
   try {
-    res.json({ applications: [] });
+    res.json({ applications: [], status: "empty", totalCount: 0 });
   } catch (err) {
     req.log?.error?.({ err }, "applications get error");
     res.status(500).json({ error: "Errore nel caricamento delle applicazioni" });

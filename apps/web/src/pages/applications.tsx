@@ -39,7 +39,7 @@ export default function Candidature() {
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [coverLetterApp, setCoverLetterApp] = useState<Application | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, error, isError, isLoading, refetch } = useQuery({
     queryKey: ["applications", user?.id],
     queryFn: async () => {
       if (!user?.id) return { applications: [] };
@@ -135,7 +135,9 @@ export default function Candidature() {
             <div>
               <h1 className="text-2xl font-serif font-bold text-foreground">{t("candidature.myCandidatures")}</h1>
               <p className="text-sm text-muted-foreground mt-0.5">
-                {total === 0 ? t("candidature.noCandidatures") : t("candidature.totalCount", { count: total })}
+                {isError
+                  ? t("candidature.loadErrorShort", { defaultValue: "Impossibile caricare le candidature" })
+                  : total === 0 ? t("candidature.noCandidatures") : t("candidature.totalCount", { count: total })}
               </p>
             </div>
             <Button onClick={() => openAdd()} className="rounded-full gap-2 shrink-0">
@@ -218,6 +220,23 @@ export default function Candidature() {
           <div className="flex items-center justify-center py-24">
             <Loader2 className="w-7 h-7 animate-spin text-primary" />
           </div>
+        ) : isError ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
+              <AlertCircle className="w-8 h-8 text-destructive/70" />
+            </div>
+            <h2 className="text-lg font-semibold mb-2">
+              {t("candidature.loadError", { defaultValue: "Candidature non disponibili" })}
+            </h2>
+            <p className="text-sm text-muted-foreground max-w-sm mb-6">
+              {error instanceof Error
+                ? error.message
+                : t("candidature.loadErrorDesc", { defaultValue: "Non siamo riusciti a caricare le candidature. Riprova tra poco." })}
+            </p>
+            <Button onClick={() => void refetch()} variant="outline" className="rounded-full">
+              {t("candidature.retry", { defaultValue: "Riprova" })}
+            </Button>
+          </div>
         ) : total === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
@@ -229,6 +248,9 @@ export default function Candidature() {
             </p>
             <Button onClick={() => openAdd()} className="rounded-full gap-2">
               <Plus className="w-4 h-4" /> {t("candidature.addFirst")}
+            </Button>
+            <Button asChild variant="link" className="mt-2 text-primary">
+              <Link href="/lavori">{t("candidature.exploreJobs", { defaultValue: "Esplora offerte lavoro" })}</Link>
             </Button>
           </div>
         ) : view === "stats" ? (

@@ -44,4 +44,8 @@ export const EMPTY_FORM = {
 };
 
 export type ApplicationForm = typeof EMPTY_FORM;
-export type ApplicationsResponse = { applications: Application[] };
+export type ApplicationsResponse = {
+  applications: Application[];
+  status?: "empty" | "ok";
+  totalCount?: number;
+};

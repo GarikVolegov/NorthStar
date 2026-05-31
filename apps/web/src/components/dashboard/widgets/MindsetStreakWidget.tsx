@@ -1,10 +1,11 @@
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
-import { ApiClientError, getJson } from "@/lib/apiClient";
+import { getJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { Brain, Flame } from "lucide-react";
+import { AlertTriangle, Brain, Flame, RefreshCw } from "lucide-react";
 
 const SIZE_HEIGHT: Record<"sm" | "md" | "lg", string> = {
   sm: "min-h-[120px]",
@@ -26,12 +27,7 @@ interface FeedResponse {
 }
 
 async function fetchMindsetFeed(): Promise<FeedResponse> {
-  try {
-    return await getJson<FeedResponse>("/api/routines/feed?type=mindset_exercise&limit=5");
-  } catch (error) {
-    if (error instanceof ApiClientError) return { feed: [] };
-    throw error;
-  }
+  return getJson<FeedResponse>("/api/routines/feed?type=mindset_exercise&limit=5");
 }
 
 function computeStreak(feed: FeedItem[]): number {
@@ -72,7 +68,7 @@ export function MindsetStreakWidget({ size }: Props) {
   const { user } = useAuth();
   const hasUser = user !== null && user !== undefined;
 
-  const { data, isLoading } = useQuery<FeedResponse>({
+  const { data, isLoading, isError, refetch } = useQuery<FeedResponse>({
     queryKey: ["routines-feed-mindset"],
     queryFn: fetchMindsetFeed,
     enabled: hasUser,
@@ -101,7 +97,25 @@ export function MindsetStreakWidget({ size }: Props) {
         </CardTitle>
       </CardHeader>
       <CardContent className="px-4 pb-4">
-        <div className="flex items-center gap-3">
+        {isError ? (
+          <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">Streak non disponibile</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Non riesco a leggere gli esercizi mindset. Riprova prima di aggiornare il conteggio.
+                </p>
+              </div>
+            </div>
+            <Button type="button" size="sm" variant="outline" className="mt-3 h-8 gap-1.5" onClick={() => refetch()}>
+              <RefreshCw className="h-3.5 w-3.5" />
+              Riprova
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
             <Flame className={cn("h-6 w-6", streak > 0 ? "text-orange-500" : "text-muted-foreground")} />
             <span className="text-3xl font-bold tabular-nums text-foreground">{streak}</span>
@@ -114,12 +128,14 @@ export function MindsetStreakWidget({ size }: Props) {
               {streak === 0 ? "Inizia oggi!" : "Continua così!"}
             </p>
           </div>
-        </div>
-        {lastExercise && (
-          <div className="mt-3 rounded-lg border bg-muted/30 p-2">
-            <p className="text-xs text-muted-foreground mb-0.5">Ultimo esercizio</p>
-            <p className="text-xs font-medium text-foreground line-clamp-2">{lastExercise.title}</p>
-          </div>
+            </div>
+            {lastExercise && (
+              <div className="mt-3 rounded-lg border bg-muted/30 p-2">
+                <p className="text-xs text-muted-foreground mb-0.5">Ultimo esercizio</p>
+                <p className="text-xs font-medium text-foreground line-clamp-2">{lastExercise.title}</p>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

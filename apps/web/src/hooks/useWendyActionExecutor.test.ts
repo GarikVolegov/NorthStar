@@ -123,6 +123,52 @@ describe("useWendyActionExecutor", () => {
     expect(updated).toMatchObject({ status: "executed" });
   });
 
+  it("keeps the API reason and recovery copy when a progress update is rejected", async () => {
+    apiFetchMock.mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({ error: "Obiettivo non trovato" }),
+    } as Response);
+    const { result } = renderHook(() => useWendyActionExecutor(), { wrapper: wrapperFactory() });
+
+    let updated: WendyAction | undefined;
+    await act(async () => {
+      updated = await result.current.confirm(progressAction({ objectiveId: 42, progress: 55 }));
+    });
+
+    expect(updated).toMatchObject({
+      status: "failed",
+      error: expect.stringContaining("Obiettivo non trovato"),
+    });
+    expect(updated?.error).toContain("Non ho modificato nulla");
+    expect(updated?.error).toContain("Riprova");
+    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({
+      variant: "destructive",
+      description: expect.stringContaining("Obiettivo non trovato"),
+    }));
+  });
+
+  it("allows retrying a failed confirmed progress update without bypassing the original confirmation", async () => {
+    apiFetchMock.mockResolvedValue({ ok: true } as Response);
+    const failedAction = {
+      ...progressAction({ objectiveId: 42, progress: 55 }),
+      status: "failed" as const,
+      error: "L'API obiettivi ha risposto: Obiettivo non trovato. Non ho modificato nulla. Riprova.",
+    };
+    const { result } = renderHook(() => useWendyActionExecutor(), { wrapper: wrapperFactory() });
+
+    let updated: WendyAction | undefined;
+    await act(async () => {
+      updated = await result.current.confirm(failedAction);
+    });
+
+    expect(apiFetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/api\/objectives\/42$/),
+      expect.objectContaining({ method: "PATCH" }),
+    );
+    expect(updated).toMatchObject({ status: "executed" });
+  });
+
   it("parses JSON string filters and emits navigation completion when applying filters", () => {
     const { result } = renderHook(() => useWendyActionExecutor(), { wrapper: wrapperFactory() });
 

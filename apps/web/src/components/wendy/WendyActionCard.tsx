@@ -48,11 +48,15 @@ export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCard
   );
   const strongConfirmationMatches =
     !strongConfirmationRequired || strongConfirmation === action.confirmationText;
+  const canRetry = action.requiresConfirmation && action.status === "failed";
   const canConfirm =
     action.requiresConfirmation &&
-    action.status === "needs_confirmation" &&
+    (action.status === "needs_confirmation" || canRetry) &&
     strongConfirmationMatches;
-  const canCancel = action.requiresConfirmation && action.status === "needs_confirmation";
+  const canCancel = action.requiresConfirmation && (
+    action.status === "needs_confirmation" ||
+    action.status === "failed"
+  );
 
   return (
     <div
@@ -85,7 +89,9 @@ export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCard
               {statusCopy(action)}
             </span>
           </div>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{action.description}</p>
+          {action.description && action.status !== "failed" && (
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{action.description}</p>
+          )}
 
           {action.preview && action.preview.length > 0 && (
             <dl className="mt-3 grid gap-1.5 text-xs">
@@ -104,7 +110,7 @@ export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCard
             </p>
           )}
 
-          {strongConfirmationRequired && action.status === "needs_confirmation" && (
+          {strongConfirmationRequired && (action.status === "needs_confirmation" || action.status === "failed") && (
             <label className="mt-3 block text-xs text-muted-foreground">
               <span className="mb-1 block font-medium text-foreground">
                 Testo di conferma
@@ -134,7 +140,7 @@ export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCard
               Annulla
             </button>
           )}
-          {action.requiresConfirmation && action.status === "needs_confirmation" && (
+          {action.requiresConfirmation && (action.status === "needs_confirmation" || canRetry) && (
             <button
               type="button"
               disabled={!canConfirm}
@@ -147,7 +153,7 @@ export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCard
               )}
             >
               <Check className="h-3.5 w-3.5" />
-              Conferma
+              {canRetry ? "Riprova" : "Conferma"}
             </button>
           )}
         </div>

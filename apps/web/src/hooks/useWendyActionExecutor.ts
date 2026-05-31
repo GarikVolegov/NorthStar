@@ -156,6 +156,27 @@ function readProgressPercent(value: unknown): number | null {
   return Number.isFinite(parsed) && parsed >= 0 && parsed <= 100 ? parsed : null;
 }
 
+async function readApiError(res: Response): Promise<string | null> {
+  const body = await res.json().catch(() => null) as { error?: unknown; message?: unknown } | null;
+  const message = typeof body?.error === "string"
+    ? body.error
+    : typeof body?.message === "string"
+      ? body.message
+      : null;
+  return message?.trim() ? message.trim() : null;
+}
+
+function objectiveProgressApiFailureMessage(res: Response, apiReason: string | null) {
+  const status = res.status ? ` (${res.status})` : "";
+  const reason = apiReason
+    ? `L'API obiettivi ha risposto: ${apiReason}.`
+    : `L'API obiettivi non ha completato l'aggiornamento${status}.`;
+  const recovery = apiReason?.toLowerCase().includes("non trovato")
+    ? "Riprova dopo aver scelto un obiettivo ancora presente."
+    : "Riprova tra poco; se il problema continua, aggiorna la pagina e riparti dall'obiettivo.";
+  return `${reason} Non ho modificato nulla. ${recovery}`;
+}
+
 function calendarPayload(payload: Record<string, unknown>) {
   const date = typeof payload.date === "string" ? payload.date : new Date().toISOString().split("T")[0];
   const startAt = new Date(`${date}T09:00:00`);
@@ -291,7 +312,11 @@ export function useWendyActionExecutor() {
   }, [setLocation, toast]);
 
   const confirm = useCallback(async (action: WendyAction, strongConfirmationText?: string): Promise<WendyAction> => {
-    if (!action.requiresConfirmation || action.status !== "needs_confirmation") {
+    const canRunConfirmedAction = action.requiresConfirmation && (
+      action.status === "needs_confirmation" ||
+      action.status === "failed"
+    );
+    if (!canRunConfirmedAction) {
       return executeImmediate(action);
     }
 
@@ -344,7 +369,9 @@ export function useWendyActionExecutor() {
           method: "PATCH",
           body: JSON.stringify({ progress, completed: progress === 100 }),
         });
-        if (!res.ok) throw new Error("Non sono riuscita ad aggiornare l'obiettivo.");
+        if (!res.ok) {
+          throw new Error(objectiveProgressApiFailureMessage(res, await readApiError(res)));
+        }
         invalidateOperationalData();
         toast({ title: "Progresso aggiornato", description: `Progresso al ${progress}%.` });
         return { ...running, status: "executed" };
