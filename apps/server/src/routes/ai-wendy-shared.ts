@@ -37,6 +37,7 @@ export function buildWendyContextSources(input: {
   personalSources: Array<"openhuman" | "graphify" | "semantic-memory" | "wendy-brain" | "rag">;
   toolsUsed: string[];
   ragChunksRetrieved: number;
+  brainChunksRetrieved?: number;
 }): WendyContextSource[] {
   const sources = new Set<WendyContextSource>();
   for (const source of input.personalSources) sources.add(source);
@@ -45,6 +46,12 @@ export function buildWendyContextSources(input: {
     input.toolsUsed.includes("search_rag")
   ) {
     sources.add("rag");
+  }
+  if (
+    (input.brainChunksRetrieved ?? 0) > 0 ||
+    input.toolsUsed.includes("search_brain")
+  ) {
+    sources.add("wendy-brain");
   }
   if (input.toolsUsed.some((tool) => APP_DATA_TOOLS.has(tool))) {
     sources.add("app-data");

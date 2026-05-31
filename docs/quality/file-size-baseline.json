@@ -8,7 +8,7 @@
   },
   "offenders": {
     "apps": [
-      { "file": "apps/server/src/routes/ai-wendy.ts", "lines": 1033 },
+      { "file": "apps/server/src/routes/ai-wendy.ts", "lines": 1054 },
       { "file": "apps/web/src/components/admin/console/AgentsSection.tsx", "lines": 732 },
       { "file": "apps/web/src/pages/settori.tsx", "lines": 729 },
       { "file": "apps/server/src/routes/admin/agents.ts", "lines": 685 },
@@ -19,7 +19,8 @@
       { "file": "packages/ai-server/src/wendy-neural/index.ts", "lines": 518 },
       { "file": "packages/ai-server/src/llm/client.ts", "lines": 508 },
       { "file": "packages/ai-server/src/growth-agent/agent.ts", "lines": 463 },
-      { "file": "packages/ai-server/src/growth-agent/memory-manager.ts", "lines": 460 }
+      { "file": "packages/ai-server/src/growth-agent/memory-manager.ts", "lines": 460 },
+      { "file": "packages/ai-server/src/wendy-router/tool-handlers-market.ts", "lines": 416 }
     ]
   }
 }

@@ -307,6 +307,11 @@ router.post(
             }
           }
         }
+        // Brain telemetria: cattura chunk da search_brain
+        if (d.name === "search_brain" && result) {
+          const chunks = (result.chunks as Array<unknown>) ?? [];
+          brainChunksRetrieved += chunks.length;
+        }
       }
     };
 
@@ -345,6 +350,7 @@ router.post(
 
     // Telemetria Step 6 — RAG
     let ragChunksRetrieved = 0;
+    let brainChunksRetrieved = 0;
     let ragTopSimilarity: number | null = null;
     const ragSourcesUsed: string[] = [];
     let neuralContext: WendyActivationContext | null = null;
@@ -363,6 +369,7 @@ router.post(
         personalSources: personalContext.sources,
         toolsUsed: toolsUsedInRequest,
         ragChunksRetrieved,
+        brainChunksRetrieved,
       }),
       ...(neuralContext ? { activationSummary: neuralContext.activationSummary } : {}),
       ...(adaptiveDecisionForDone
@@ -862,9 +869,22 @@ router.post(
           })) {
             if (aborted) break;
             if (event.type === "done") {
+              // Forward only the agent's own done-event fields. Strip `type`
+              // and the canonical wrapper fields (requestId / contextSources /
+              // suggestedPrompts / adaptiveReasoning) so they cannot shadow the
+              // values donePayload sets — even though the agent event does not
+              // currently carry them, this keeps the wrapper authoritative.
+              const {
+                type: _type,
+                requestId: _requestId,
+                contextSources: _contextSources,
+                suggestedPrompts: _suggestedPrompts,
+                adaptiveReasoning: _adaptiveReasoning,
+                ...agentEventFields
+              } = event as Record<string, unknown>;
               sendDoneOnce({
+                ...agentEventFields,
                 answerMode: "llm-full-path",
-                ...(event as Record<string, unknown>),
               });
             } else if (event.type === "error") {
               status = "error_model";
@@ -975,6 +995,7 @@ router.post(
             ...toolsUsedInRequest.filter((tool) => tool !== "__failed"),
             ...ragSourcesUsed,
             ...(ragChunksRetrieved > 0 ? ["search_rag"] : []),
+            ...(brainChunksRetrieved > 0 ? ["search_brain"] : []),
           ]),
         ],
       });

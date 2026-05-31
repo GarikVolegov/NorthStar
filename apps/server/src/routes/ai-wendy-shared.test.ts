@@ -12,6 +12,28 @@ describe("buildWendyContextSources", () => {
       }),
     ).toEqual(["openhuman", "graphify", "semantic-memory", "rag", "app-data"]);
   });
+
+  it("emits wendy-brain when brain chunks are retrieved", () => {
+    expect(
+      buildWendyContextSources({
+        personalSources: [],
+        toolsUsed: ["list_sectors"],
+        ragChunksRetrieved: 0,
+        brainChunksRetrieved: 3,
+      }),
+    ).toEqual(["wendy-brain", "app-data"]);
+  });
+
+  it("emits wendy-brain when search_brain was called even with zero chunks", () => {
+    expect(
+      buildWendyContextSources({
+        personalSources: [],
+        toolsUsed: ["search_brain"],
+        ragChunksRetrieved: 0,
+        brainChunksRetrieved: 0,
+      }),
+    ).toEqual(["wendy-brain"]);
+  });
 });
 
 describe("WendyRequestSchema", () => {
