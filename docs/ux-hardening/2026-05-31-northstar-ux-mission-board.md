@@ -127,6 +127,14 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - Dashboard non maschera piu errori `/api/dashboard` con KPI/timeline/diario vuoti: mostra un blocco recuperabile e mantiene consultabile il resto.
 - Timeline settimanale usa gli obiettivi attivi quando non ci sono eventi calendario, evitando la traccia predefinita se l'utente ha gia azioni reali.
 
+## Tranche 10 Applicata
+
+- Wendy mostra prossimi passi cliccabili anche dopo un errore di stream, cosi la conversazione non finisce in un vicolo cieco.
+- I follow-up da messaggio errore passano a Wendy il contesto del fallimento e chiedono di continuare con azioni/tool senza ripartire da zero.
+- News conserva e mostra la diagnostica provider anche quando `getJson` trasforma un `503` in errore client.
+- `/api/news` non maschera piu una feed vuota come stato reale quando tutte le fonti abilitate hanno `lastError`: risponde `503 news_unavailable` con diagnostica GNews/Tavily/RSS.
+- Growth personalizzato non sparisce quando il profilo esiste ma non ci sono articoli matchati: mostra "Profilo pronto, contenuti in arrivo" e guida alla libreria generale.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -205,6 +213,14 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - `pnpm --filter @northstar/server exec vitest run --configLoader runner src/routes/objectives.test.ts`
 - `pnpm --filter @northstar/web run typecheck`
 - `pnpm --filter @northstar/server run typecheck`
+- `git diff --check`
+
+## Verifica Tranche 10
+
+- `pnpm --filter @northstar/server exec vitest run --configLoader runner src/routes/news.test.ts`
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner src/pages/growth.test.tsx src/pages/news.test.tsx src/components/search/WendyMessageBubble.test.tsx`
+- `pnpm --filter @northstar/server run typecheck`
+- `pnpm --filter @northstar/web run typecheck`
 - `git diff --check`
 
 ## Backlog Prossima Tranche

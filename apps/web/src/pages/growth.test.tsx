@@ -98,6 +98,28 @@ describe("Crescita page reliability states", () => {
     expect(screen.queryByText(/Selezionati in base al tuo profilo/i)).not.toBeInTheDocument();
   });
 
+  it("explains when a real profile has no matching personalized growth articles yet", async () => {
+    getJsonMock.mockImplementation((url: string) => {
+      if (url.includes("api/crescita/categorie")) return Promise.resolve([]);
+      if (url.includes("api/crescita/per-te")) {
+        return Promise.resolve({
+          articles: [],
+          hasProfile: true,
+          personalization: "profile",
+          types: ["I", "A"],
+        });
+      }
+      if (url.includes("api/crescita?limit=6")) return Promise.resolve({ articles: [] });
+      return Promise.reject(new Error(`Unhandled URL ${url}`));
+    });
+
+    renderGrowth();
+
+    expect(await screen.findByText("Profilo pronto, contenuti in arrivo")).toBeInTheDocument();
+    expect(screen.getByText(/Non abbiamo ancora articoli allineati al tuo profilo Investigativo/i)).toBeInTheDocument();
+    expect(screen.getByText(/Esplora tutte le aree/i)).toBeInTheDocument();
+  });
+
   it("shows an API error state when growth content cannot be loaded", async () => {
     getJsonMock.mockRejectedValue(new Error("growth_unavailable"));
 

@@ -62,4 +62,29 @@ describe("WendyMessageBubble", () => {
       expect.stringContaining("Il tuo profilo mostra"),
     );
   });
+
+  it("renders recovery next steps after Wendy error messages", () => {
+    const onFollowUpPrompt = vi.fn();
+
+    render(
+      <WendyMessageBubble
+        message={assistantMessage({
+          role: "error",
+          content: "Wendy non ha risposto correttamente.",
+          suggestedPrompts: undefined,
+        })}
+        onConfirmAction={vi.fn()}
+        onCancelAction={vi.fn()}
+        onFollowUpPrompt={onFollowUpPrompt}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /prossima mossa/i }));
+
+    expect(screen.getByText("Continua con Wendy")).toBeInTheDocument();
+    expect(onFollowUpPrompt).toHaveBeenCalledWith(
+      expect.stringContaining("prossima azione"),
+      expect.stringContaining("Wendy non ha risposto correttamente."),
+    );
+  });
 });

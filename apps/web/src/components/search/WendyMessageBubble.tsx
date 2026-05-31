@@ -38,14 +38,39 @@ export function WendyMessageBubble({
   onFollowUpPrompt,
 }: WendyMessageBubbleProps) {
   if (message.role === "error") {
+    const suggestedPrompts = onFollowUpPrompt
+      ? withWendySuggestedPromptFallback(message.suggestedPrompts, message.content)
+      : [];
+
     return (
       <div className="flex justify-start">
         <div className="flex items-start gap-2.5 max-w-[90%]">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-destructive/15 text-destructive text-xs font-bold mt-0.5">
             !
           </div>
-          <div className="rounded-2xl rounded-tl-sm border border-destructive/20 bg-destructive/8 px-3.5 py-2.5 text-sm text-destructive">
-            {message.content}
+          <div className="flex min-w-0 flex-col items-start gap-1.5">
+            <div className="rounded-2xl rounded-tl-sm border border-destructive/20 bg-destructive/8 px-3.5 py-2.5 text-sm text-destructive">
+              {message.content}
+            </div>
+            {suggestedPrompts.length > 0 && (
+              <div className="mt-1.5 max-w-full space-y-2" aria-label="Prossimi passi Wendy">
+                <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Continua con Wendy
+                </p>
+                <div className="flex max-w-full flex-wrap gap-1.5">
+                  {suggestedPrompts.map((item) => (
+                    <button
+                      key={`${message.id}-${item.prompt}`}
+                      type="button"
+                      onClick={() => onFollowUpPrompt?.(item.prompt, buildFollowUpContext(message, item.label))}
+                      className="inline-flex min-h-8 max-w-full items-center rounded-full border border-primary/20 bg-primary/8 px-2.5 text-left text-[11px] font-semibold text-foreground transition-colors hover:border-primary/35 hover:bg-primary/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                    >
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

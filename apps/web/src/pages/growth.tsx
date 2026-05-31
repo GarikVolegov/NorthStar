@@ -222,9 +222,37 @@ function PerTeSection({ userId }: { userId: number }) {
     );
   }
 
-  if (!data.articles.length) return null;
-
   const typeLabels = (data.types ?? []).map(t => RIASEC_LABELS[t] ?? t);
+
+  if (!data.articles.length) {
+    const profileLabel = typeLabels.length > 0 ? ` ${typeLabels.join(" · ")}` : "";
+
+    return (
+      <section className="py-14 border-b">
+        <div className="container mx-auto px-4 md:px-6 max-w-6xl">
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-8 flex flex-col md:flex-row items-start md:items-center gap-5">
+            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-background border border-primary/20 flex items-center justify-center">
+              <Star className="w-6 h-6 text-primary fill-primary" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-serif font-semibold text-lg text-foreground mb-1">
+                Profilo pronto, contenuti in arrivo
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Non abbiamo ancora articoli allineati al tuo profilo{profileLabel}. Nel frattempo puoi esplorare la libreria generale senza confonderla con consigli personalizzati.
+              </p>
+            </div>
+            <a
+              href="#growth-areas"
+              className="min-h-11 inline-flex items-center justify-center gap-2 rounded-full border border-primary px-5 text-sm font-medium text-primary hover:bg-primary/5 transition-colors"
+            >
+              Esplora tutte le aree <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="py-14 border-b">
@@ -382,7 +410,7 @@ export default function Crescita() {
       )}
 
       {/* Categories */}
-      <section className="py-10 md:py-14">
+      <section id="growth-areas" className="py-10 md:py-14">
         <div className="container mx-auto px-4 md:px-6 max-w-6xl">
           {growthLoadError && (
             <div className="rounded-2xl border border-destructive/25 bg-destructive/5 p-6 mb-8">

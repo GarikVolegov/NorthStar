@@ -70,6 +70,16 @@ const DIAGNOSTIC_ACTION_LABELS: Record<NonNullable<NewsFeedResponse["diagnostics
   retry_later: "Riprova tra poco",
 };
 
+function readDiagnosticsFromError(error: unknown): NewsFeedResponse["diagnostics"] | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const body = (error as { body?: unknown }).body;
+  if (!body || typeof body !== "object") return undefined;
+  const diagnostics = (body as { diagnostics?: unknown }).diagnostics;
+  if (!diagnostics || typeof diagnostics !== "object") return undefined;
+  if (typeof (diagnostics as { message?: unknown }).message !== "string") return undefined;
+  return diagnostics as NewsFeedResponse["diagnostics"];
+}
+
 function timeAgoLabel(dateStr: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const h = Math.floor(diff / 3600000);
@@ -85,6 +95,32 @@ function CategoryFallbackImage({ category, emoji }: { category: string; emoji: s
   return (
     <div className={`aspect-video bg-gradient-to-br ${config?.gradient ?? "from-muted to-muted/50"} flex items-center justify-center`}>
       <span className="text-4xl opacity-60">{emoji}</span>
+    </div>
+  );
+}
+
+function NewsDiagnosticsPanel({ diagnostics }: { diagnostics: NonNullable<NewsFeedResponse["diagnostics"]> }) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="mx-auto mt-5 max-w-lg rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-left">
+      <p className="text-sm font-medium text-foreground">
+        {diagnostics.message}
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <span className="rounded-full bg-background px-2.5 py-1">
+          {t(`news.diagnostics.${diagnostics.refreshAction}`, {
+            defaultValue: DIAGNOSTIC_ACTION_LABELS[diagnostics.refreshAction],
+          })}
+        </span>
+        {diagnostics.lastAttemptAt && (
+          <span>
+            {t("news.diagnostics.lastAttempt", {
+              defaultValue: "Ultimo tentativo",
+            })}: {new Date(diagnostics.lastAttemptAt).toLocaleString("it-IT")}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -345,7 +381,7 @@ export default function News() {
     });
   }, [confirmedSector?.name, queryClient]);
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["news", activeTab],
     queryFn: async () => {
       const response = await getJson<NewsFeedResponse>(`${BASE}api/news?category=${activeTab}&limit=12`);
@@ -363,6 +399,7 @@ export default function News() {
     data: sectorNewsData,
     isLoading: sectorLoading,
     isError: sectorIsError,
+    error: sectorError,
     refetch: refetchSectorNews,
   } = useQuery({
     queryKey: ["news", "sector", confirmedSector?.name],
@@ -385,6 +422,10 @@ export default function News() {
   const displayDiagnostics = activeTab === "__sector__" ? sectorNewsData?.diagnostics : data?.diagnostics;
   const displayLoading = activeTab === "__sector__" ? (sectorLoading && !!confirmedSector) : isLoading;
   const displayError = activeTab === "__sector__" ? sectorIsError : isError;
+  const displayErrorDiagnostics = activeTab === "__sector__"
+    ? readDiagnosticsFromError(sectorError)
+    : readDiagnosticsFromError(error);
+  const effectiveDiagnostics = displayDiagnostics ?? displayErrorDiagnostics;
   const retryDisplayNews = activeTab === "__sector__" ? refetchSectorNews : refetch;
 
   const subscribedCategories = CATEGORY_CONFIG.filter((c) => subscriptions.includes(c.id));
@@ -505,6 +546,7 @@ export default function News() {
                 <Button variant="outline" onClick={() => retryDisplayNews()} className="gap-2 rounded-full">
                   <RefreshCw className="h-4 w-4" /> {t("news.retry")}
                 </Button>
+                {effectiveDiagnostics && <NewsDiagnosticsPanel diagnostics={effectiveDiagnostics} />}
               </div>
             )
             : displayNews.length > 0 ? (
@@ -518,27 +560,7 @@ export default function News() {
                 <Newspaper className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
                 <p className="text-muted-foreground">{t("news.noResults")}</p>
                 <p className="text-xs text-muted-foreground/60 mt-1">{t("news.noResultsHint")}</p>
-                {displayDiagnostics && (
-                  <div className="mx-auto mt-5 max-w-lg rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-left">
-                    <p className="text-sm font-medium text-foreground">
-                      {displayDiagnostics.message}
-                    </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span className="rounded-full bg-background px-2.5 py-1">
-                        {t(`news.diagnostics.${displayDiagnostics.refreshAction}`, {
-                          defaultValue: DIAGNOSTIC_ACTION_LABELS[displayDiagnostics.refreshAction],
-                        })}
-                      </span>
-                      {displayDiagnostics.lastAttemptAt && (
-                        <span>
-                          {t("news.diagnostics.lastAttempt", {
-                            defaultValue: "Ultimo tentativo",
-                          })}: {new Date(displayDiagnostics.lastAttemptAt).toLocaleString("it-IT")}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
+                {effectiveDiagnostics && <NewsDiagnosticsPanel diagnostics={effectiveDiagnostics} />}
               </div>
             )}
         </div>

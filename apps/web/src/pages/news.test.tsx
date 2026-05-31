@@ -107,4 +107,26 @@ describe("News page reliability states", () => {
     expect(screen.getByText(/pipeline non ha ancora registrato un fetch/i)).toBeInTheDocument();
     expect(screen.getByText(/Pipeline in avvio/i)).toBeInTheDocument();
   });
+
+  it("keeps provider diagnostics visible when the feed request fails", async () => {
+    const error = Object.assign(new Error("news_unavailable"), {
+      body: {
+        diagnostics: {
+          providerStatus: "degraded",
+          lastAttemptAt: "2026-05-31T08:01:00.000Z",
+          enabledSources: 2,
+          sourcesWithErrors: 2,
+          refreshAction: "check_provider_keys",
+          message: "GNews e Tavily hanno restituito errori: controlla chiavi provider o quota.",
+        },
+      },
+    });
+    getJsonMock.mockRejectedValue(error);
+
+    renderNews();
+
+    expect(await screen.findByText("news.loadError")).toBeInTheDocument();
+    expect(screen.getByText(/GNews e Tavily hanno restituito errori/i)).toBeInTheDocument();
+    expect(screen.getByText(/Controlla chiavi e limiti provider/i)).toBeInTheDocument();
+  });
 });

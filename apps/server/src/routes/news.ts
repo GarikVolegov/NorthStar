@@ -65,6 +65,21 @@ function newsStatus(newsCount: number): NewsFeedStatus {
   return newsCount > 0 ? "ok" : "empty";
 }
 
+function isTotalProviderFailure(diagnostics: NewsDiagnostics): boolean {
+  return diagnostics.enabledSources > 0 && diagnostics.sourcesWithErrors >= diagnostics.enabledSources;
+}
+
+function sendNewsUnavailableWithDiagnostics(res: Response, diagnostics: NewsDiagnostics) {
+  res.status(503).json({
+    news: [],
+    nextCursor: null,
+    source: "error",
+    status: "error" satisfies NewsFeedStatus,
+    error: "news_unavailable",
+    diagnostics,
+  });
+}
+
 async function buildNewsDiagnostics(): Promise<NewsDiagnostics> {
   try {
     const rows = await db
@@ -155,14 +170,7 @@ async function buildNewsDiagnostics(): Promise<NewsDiagnostics> {
 }
 
 async function sendNewsUnavailable(res: Response) {
-  res.status(503).json({
-    news: [],
-    nextCursor: null,
-    source: "error",
-    status: "error" satisfies NewsFeedStatus,
-    error: "news_unavailable",
-    diagnostics: await buildNewsDiagnostics(),
-  });
+  sendNewsUnavailableWithDiagnostics(res, await buildNewsDiagnostics());
 }
 
 function newsSearchWhere(search: string): SQL<unknown> | undefined {
@@ -322,12 +330,17 @@ router.get("/", async (req, res) => {
       const cached = await cacheGet<ReturnType<typeof mapNewsItem>[]>(cacheKey);
       if (cached) {
         const status = newsStatus(cached.length);
+        const diagnostics = status === "empty" ? await buildNewsDiagnostics() : undefined;
+        if (diagnostics && isTotalProviderFailure(diagnostics)) {
+          sendNewsUnavailableWithDiagnostics(res, diagnostics);
+          return;
+        }
         res.json({
           news: cached,
           nextCursor: null,
           source: "live",
           status,
-          ...(status === "empty" ? { diagnostics: await buildNewsDiagnostics() } : {}),
+          ...(diagnostics ? { diagnostics } : {}),
         });
         return;
       }
@@ -367,12 +380,17 @@ router.get("/", async (req, res) => {
       : null;
 
     const status = newsStatus(mapped.length);
+    const diagnostics = status === "empty" ? await buildNewsDiagnostics() : undefined;
+    if (diagnostics && isTotalProviderFailure(diagnostics)) {
+      sendNewsUnavailableWithDiagnostics(res, diagnostics);
+      return;
+    }
     res.json({
       news: mapped,
       nextCursor,
       source: "live",
       status,
-      ...(status === "empty" ? { diagnostics: await buildNewsDiagnostics() } : {}),
+      ...(diagnostics ? { diagnostics } : {}),
     });
   } catch (err) {
     req.log?.error?.({ err }, "news list error");
@@ -427,12 +445,17 @@ router.get("/sector/:sectorName", async (req, res) => {
       : null;
 
     const status = newsStatus(mapped.length);
+    const diagnostics = status === "empty" ? await buildNewsDiagnostics() : undefined;
+    if (diagnostics && isTotalProviderFailure(diagnostics)) {
+      sendNewsUnavailableWithDiagnostics(res, diagnostics);
+      return;
+    }
     res.json({
       news: mapped,
       nextCursor,
       source: "live",
       status,
-      ...(status === "empty" ? { diagnostics: await buildNewsDiagnostics() } : {}),
+      ...(diagnostics ? { diagnostics } : {}),
     });
   } catch (err) {
     req.log?.error?.({ err }, "news by sector error");

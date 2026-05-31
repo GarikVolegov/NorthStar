@@ -171,6 +171,45 @@ describe("news routes", () => {
     });
   });
 
+  it("does not mask an empty feed as real empty when every enabled provider has errors", async () => {
+    mockSelectRows([]);
+    mockSelectRows([
+      {
+        name: "GNews lavoro",
+        sourceType: "gnews",
+        enabled: true,
+        lastFetchAt: new Date("2026-05-31T08:00:00.000Z"),
+        lastError: "quota exceeded",
+      },
+      {
+        name: "Tavily lavoro",
+        sourceType: "tavily",
+        enabled: true,
+        lastFetchAt: new Date("2026-05-31T08:01:00.000Z"),
+        lastError: "rate limit",
+      },
+    ]);
+
+    const response = await request(app())
+      .get("/api/news")
+      .expect(503);
+
+    expect(response.body).toMatchObject({
+      news: [],
+      nextCursor: null,
+      source: "error",
+      status: "error",
+      error: "news_unavailable",
+      diagnostics: {
+        providerStatus: "degraded",
+        enabledSources: 2,
+        sourcesWithErrors: 2,
+        lastAttemptAt: "2026-05-31T08:01:00.000Z",
+        refreshAction: "check_provider_keys",
+      },
+    });
+  });
+
   it("returns a structured error status when the main feed cannot be queried", async () => {
     const chain = {
       from: vi.fn(() => chain),
