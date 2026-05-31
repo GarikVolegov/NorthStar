@@ -19,6 +19,8 @@ import {
 } from "@/features/sector/SectorSummarySections";
 import { SectorErrorState, SectorLoadingState } from "@/features/sector/SectorStates";
 import type { ChartEntry, SectorExtended } from "@/features/sector/sectorTypes";
+import { CompareDrawer } from "@/features/sector-vitals/CompareDrawer";
+import { VitalSignsRow } from "@/features/sector-vitals/VitalSignsRow";
 import { getCareerStepGroup } from "@/lib/career-steps-utils";
 import { RIASEC_LABELS, SectorIcon } from "@/lib/sector-icon";
 import { buildSectorMeta, usePageMeta } from "@/lib/seo";
@@ -31,6 +33,7 @@ import {
 import {
   ArrowLeft,
   ArrowRight,
+  BarChart3,
   Briefcase,
   Laptop,
   Minus,
@@ -53,6 +56,7 @@ export default function Sector() {
   const { user } = useAuth();
   const { workPreference } = useWorkPreference(user?.id);
   const wendy = useWendy();
+  const [compareOpen, setCompareOpen] = useState(false);
 
   const [stepsView, setStepsView] = useState<"dipendente" | "autonomo">(
     workPreference === "autonomo" ? "autonomo" : "dipendente",
@@ -187,8 +191,21 @@ export default function Sector() {
           <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
             {sector.description}
           </p>
+          <div className="mt-5">
+            <Button variant="outline" onClick={() => setCompareOpen(true)}>
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Confronta settori
+            </Button>
+          </div>
         </div>
       </div>
+      <VitalSignsRow sectorId={id} sectorName={sector.name} className="mb-8" />
+      <CompareDrawer
+        open={compareOpen}
+        onOpenChange={setCompareOpen}
+        currentSectorId={id}
+        currentSectorName={sector.name}
+      />
       <SectorKeyMetrics sector={sector} t={t} />
       <SectorFreshness sector={sector} />
       <SectorCompareCta sectorId={id} sectorName={sector.name} t={t} />

@@ -54,6 +54,16 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
       { name: "professionId", type: "number", description: "ID numerico della professione", required: true },
     ],
   },
+  generate_day_scene: {
+    name:        "generate_day_scene",
+    description: "Genera scene Try-a-Day contestuali per una professione nella scheda ruolo. Usare per domande tipo 'com'è una giornata da questo ruolo?', 'perché questa task conta?' o follow-up sulla simulazione inline.",
+    parameters: [
+      { name: "professionId", type: "number", description: "ID numerico della professione", required: true },
+      { name: "timeBlock", type: "string", description: "Filtro opzionale: morning | afternoon | evening" },
+      { name: "roleContext", type: "string", description: "Contesto sintetico della scheda ruolo o scena corrente" },
+      { name: "userContext", type: "string", description: "Contesto utente non sensibile utile alla personalizzazione" },
+    ],
+  },
   search_professions: {
     name:        "search_professions",
     description: "Cerca professioni per keyword testuale o nome di skill. Usare quando NON si conosce l'ID della professione.",
@@ -67,7 +77,7 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
     name:        "compare_sectors",
     description: "Confronta da 2 a 4 settori su salario, trend, automazione e autonomia. Richiede ALMENO 2 ID settori noti.",
     parameters: [
-      { name: "sectorIds", type: "array", description: "Array di 2-4 ID settori interi", required: true },
+      { name: "sectorIds", type: "array", itemType: "integer", description: "Array di 2-4 ID settori interi", required: true },
     ],
   },
 
@@ -215,7 +225,7 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
       { name: "roleTitle",    type: "string", description: "Titolo del ruolo (es. 'Data Engineer')" },
       { name: "professionId", type: "number", description: "ID professione (alternativo a roleTitle)" },
       { name: "geography",    type: "string", description: "Area geografica: IT | EU | US | Global", required: true },
-      { name: "periods",      type: "array",  description: "Array di periodi YYYY-MM (es. ['2024-10','2025-01'])", required: true },
+      { name: "periods",      type: "array",  itemType: "string", description: "Array di periodi YYYY-MM (es. ['2024-10','2025-01'])", required: true },
     ],
   },
   get_skill_cooccurrences: {
@@ -335,6 +345,7 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_sector_detail",
     "list_sectors",
     "get_profession_detail",
+    "generate_day_scene",
     "search_professions",
     "get_user_objectives",
     "update_objective_progress",
@@ -374,6 +385,7 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_user_context",
     "search_memory_graph",
     "search_rag",                // Step 6: grounding per piano basato su dati reali
+    "search_brain",              // Brain runtime: piani su NorthStar identity/product/process
     "get_weak_signals",          // Step 6: ruoli emergenti rilevanti per il piano
     "get_job_posting_trend",     // Step 6: trend domanda per il ruolo target
     "get_skill_cooccurrences",   // Step 6: skill complementari per il piano
@@ -385,6 +397,7 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_sector_detail",
     "list_sectors",
     "get_profession_detail",
+    "generate_day_scene",
     "search_professions",
     "compare_sectors",
     "get_market_trend",
@@ -432,7 +445,7 @@ export function toolsToOpenAIFormat(tools: ToolDefinition[]): Array<{
           t.parameters.map((p) => [
             p.name,
             { type: p.type === "array" ? "array" : p.type, description: p.description,
-              ...(p.type === "array" ? { items: { type: "integer" } } : {}),
+              ...(p.type === "array" ? { items: { type: p.itemType ?? "string" } } : {}),
             },
           ]),
         ),

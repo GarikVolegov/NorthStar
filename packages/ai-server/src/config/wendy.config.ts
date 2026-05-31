@@ -1,3 +1,4 @@
+import { isRecord } from "../utils";
 import { z } from "zod/v4";
 import type { WendyConfig, WendyConfigOverride } from "./types";
 
@@ -266,9 +267,7 @@ export function parseEnvConfig(env: WendyEnvSource = process.env): WendyConfig {
   return WendyConfigSchema.parse(baseConfig(env)) as WendyConfig;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+
 
 function deepMerge(base: unknown, overlay: unknown): unknown {
   if (!isRecord(base) || !isRecord(overlay)) return overlay;

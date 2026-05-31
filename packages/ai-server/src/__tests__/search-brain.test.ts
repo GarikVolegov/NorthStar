@@ -20,7 +20,6 @@ vi.mock("../logger", () => ({
 }));
 
 import {
-  brainLayerToSector,
   handleSearchBrain,
   searchBrainSqlParts,
 } from "../wendy-router/tool-handlers-market";
@@ -34,8 +33,8 @@ describe("search_brain Wendy tool", () => {
         {
           content: "RAG Pipeline grounds Wendy on curated NorthStar knowledge.",
           obsidian_path: ".brain/20_Product/Subsystems/RAG-Pipeline.md",
-          sectors: ["L3"],
-          roles: ["L3", "product", "rag"],
+          sectors: ["product"],
+          roles: ["product", "rag"],
           similarity: 0.91,
           trust_score: 0.95,
         },
@@ -43,21 +42,16 @@ describe("search_brain Wendy tool", () => {
     });
   });
 
-  it("maps brain layers to stored sector tags", () => {
-    expect(brainLayerToSector("identity")).toBe("L1");
-    expect(brainLayerToSector("domain")).toBe("L2");
-    expect(brainLayerToSector("product")).toBe("L3");
-    expect(brainLayerToSector("process")).toBe("L3.5");
-  });
-
-  it("builds immutable brain-only SQL parts", () => {
+  it("filters on the raw frontmatter layer word that vault-ingest stores", () => {
+    // vault-ingest writes rc.sectors = [layer] using the raw word, so the
+    // filter tag must be the raw layer — not an L1/L2/L3 code.
     expect(searchBrainSqlParts({ layer: "product" })).toEqual({
       sourceType: "brain",
-      layerSector: "L3",
+      layerTag: "product",
     });
     expect(searchBrainSqlParts({})).toEqual({
       sourceType: "brain",
-      layerSector: null,
+      layerTag: null,
     });
   });
 
@@ -75,8 +69,8 @@ describe("search_brain Wendy tool", () => {
           {
             content: "RAG Pipeline grounds Wendy on curated NorthStar knowledge.",
             obsidianPath: ".brain/20_Product/Subsystems/RAG-Pipeline.md",
-            sectors: ["L3"],
-            roles: ["L3", "product", "rag"],
+            sectors: ["product"],
+            roles: ["product", "rag"],
             similarity: 0.91,
             trustScore: 0.95,
           },

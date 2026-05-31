@@ -1,7 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TryADaySection } from "@/components/role/TryADaySection";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/contexts/AuthContext";
+import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { RIASEC_LABELS, SectorIcon } from "@/lib/sector-icon";
 import { useGetRoleDetail } from "@workspace/api-client-react";
 import {
@@ -17,6 +20,7 @@ import {
   TrendingUp,
   Zap,
 } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "wouter";
 
@@ -24,9 +28,25 @@ export default function Ruolo() {
   const { t } = useTranslation();
   const params = useParams();
   const id = parseInt(params.id || "0", 10);
+  const { user } = useAuth();
+  const [currentTryADayScene, setCurrentTryADayScene] = useState<string | null>(null);
 
   const { data: role, isLoading, error } = useGetRoleDetail(id, {
     query: { enabled: !!id, queryKey: ["roleDetail", id] },
+  });
+
+  useWendyPageContext({
+    page: "ruolo",
+    title: role?.title,
+    entityType: "profession",
+    entityId: id || undefined,
+    entityName: role?.title,
+    journeyType: user?.journeyType ?? undefined,
+    sector: role?.sector,
+    roleTitle: role?.title,
+    currentTryADayScene,
+    capabilities: ["get_profession_detail", "generate_day_scene", "search_rag"],
+    fields: ["skills", "salaryRange", "growthOutlook", "tryADay"],
   });
 
   if (isLoading) {
@@ -159,6 +179,12 @@ export default function Ruolo() {
           </div>
         )}
       </div>
+
+      <TryADaySection
+        role={role}
+        journeyType={user?.journeyType}
+        onSceneChange={setCurrentTryADayScene}
+      />
 
       <Separator className="mb-12" />
 

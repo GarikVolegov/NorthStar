@@ -91,6 +91,7 @@ describe("DashboardWeekTimeline", () => {
           progress: 40,
           completed: false,
           completedAt: null,
+          isCertifiableMilestone: false,
           dueDate: "2026-05-29",
           createdAt: "2026-05-27T00:00:00.000Z",
         }]}

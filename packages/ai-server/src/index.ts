@@ -20,6 +20,7 @@ export type { DifficultyLevel } from "./interview/adapt";
 
 export { runGrowthAgent } from "./growth-agent/agent";
 export { loadMemory, buildMemorySection } from "./growth-agent/memory-manager";
+export { loadRecentSummaries, buildSessionHistorySection } from "./growth-agent/session-summarizer";
 export { recordQualityEvent, recordUserFeedback } from "./growth-agent/quality-tracker";
 export { ingestText, ingestPersonaExample, ingestUrl } from "./growth-agent/ingest";
 export { retrieve } from "./growth-agent/retriever";
@@ -37,6 +38,38 @@ export {
   searchWendyBrain,
 } from "./wendy-brain";
 export type { WendyBrainEventInput, WendyBrainHit, WendyBrainSearchOptions } from "./wendy-brain";
+export {
+  applyNeuralEdgeDecay,
+  buildNeuralPromptSection,
+  buildWendyActivationContext,
+  hashNeuralMessage,
+  listNeuralActivationsByRequest,
+  listRecentNeuralActivations,
+  persistActivationTrace,
+  reinforceCoActivations,
+  scoreActivationCandidate,
+} from "./wendy-neural";
+export type {
+  ActivationCandidate,
+  BuildWendyActivationInput,
+  ReinforceCoActivationsInput,
+  ScoredActivationItem,
+  WendyActivationContext,
+} from "./wendy-neural";
+export {
+  buildTryADayScenes,
+  computeTryADayDebrief,
+  pickTryADaySuggestions,
+} from "./try-a-day";
+export type {
+  TryADayDebrief,
+  TryADayProfession,
+  TryADayResponses,
+  TryADayScene,
+  TryADaySuggestion,
+  TryADaySuggestions,
+  TryADayTimeBlock,
+} from "./try-a-day";
 export { buildSystemPrompt } from "./growth-agent/prompt-builder";
 export type { UserContext } from "./growth-agent/prompt-builder";
 export type { RetrievedChunk } from "./growth-agent/retriever";
@@ -96,6 +129,17 @@ export { runJobPostingsAgent } from "./discovery-agent/job-postings-agent";
 export type { JobPostingsAgentResult } from "./discovery-agent/job-postings-agent";
 export { getPersonalizedFeed, invalidateUserFeedCache } from "./discovery-agent/personalizer-agent";
 
+// Sector vital signs
+export { clearSectorVitalsCache, computeVitalSigns } from "./services/sector-vitals/sector-vitals.service";
+export type {
+  ComputeVitalSignsOptions,
+  SectorVitalsRepository,
+  VitalKey,
+  VitalSign,
+  VitalSigns,
+  VitalStatus,
+} from "./services/sector-vitals/types";
+
 // Embeddings
 export { generateEmbedding, generateEmbeddingsBatch, buildEmbeddingText } from "./embeddings/generate";
 export { embedText as probeEmbedding, getEmbedderHealthSnapshot } from "./growth-agent/embedder";
@@ -119,8 +163,13 @@ export type {
 export { executeToolCall }   from "./wendy-router/tool-handlers";
 export { classifyIntent }    from "./wendy-router/intent-classifier";
 export { getToolsForIntent, toolsToOpenAIFormat } from "./wendy-router/tool-registry";
+export { searchProfessionRows } from "./wendy-router/tool-handlers-data";
+export type { SearchProfessionRowsResult } from "./wendy-router/tool-handlers-data";
+export { getSkillCooccurrenceRows } from "./wendy-router/tool-handlers-market";
 export { resolveWendyRoute } from "./wendy-router/router";
 export { buildLightPrompt }  from "./wendy-router/light-prompt";
+export { getFastPathFallbackReply, shouldUseImmediateFastPathFallback, getLlmUnavailableReply } from "./wendy-router/fast-path-fallback";
+export { isLlmConfigured, resolveActiveProvider, hasGroqKey, hasOpenRouterKey, hasOpenAIKey } from "./client";
 export { getLocalWendyReply, getLocalWendyFallbackReply, isLocalWendyReplyMessage } from "./wendy-router/local-reply";
 export type { WendyIntent, WendyPageContext, CompressedHistory, WendyRouterDecision, ToolDefinition } from "./wendy-router/types";
 
@@ -206,6 +255,39 @@ export type {
 } from "./model-router/catalog";
 export { applyContextSignals } from "./model-router";
 
+// Wendy Jarvis intelligence core
+export {
+  buildWendyIntelligenceDirectives,
+  buildWendyRepairHint,
+  buildWendyTrainingPromptSection,
+  evaluateWendyResponse,
+  evaluateWendyTrainingCase,
+  evaluateWendyTrainingResponseShape,
+  getWendyTrainingCoverage,
+  getWendyCapability,
+  planWendyDecision,
+  runWendyTrainingEvaluation,
+  WENDY_CAPABILITIES,
+  WENDY_TRAINING_CASES,
+} from "./wendy-intelligence";
+export type {
+  WendyCapability,
+  WendyCapabilityKey,
+  WendyDecision,
+  WendyDecisionInput,
+  WendyDecisionMode,
+  WendyResponseRubric,
+  WendySelfCheckInput,
+  WendySelfCheckIssue,
+  WendySelfCheckResult,
+  WendyTrainingCase,
+  WendyTrainingCaseResult,
+  WendyTrainingCategory,
+  WendyTrainingCoverage,
+  WendyTrainingEvaluation,
+  WendyTrainingResponseShapeResult,
+} from "./wendy-intelligence";
+
 // Rabbit expert domain
 export { checkRabbitEmergency } from "./rabbit/emergency-triage";
 export type { TriageResult } from "./rabbit/emergency-triage";
@@ -222,6 +304,20 @@ export { withTimeout, gracefulDegrade } from "./utils";
 
 // Agenti AI dipendenti
 export { executeAgentTask } from "./agents/agent-executor";
+export type { ExecuteAgentTaskOptions } from "./agents/agent-executor";
+export { dispatchQueuedAgentTasks, recoverStaleAgentTasks } from "./operator/dispatcher";
+export { appendOperatorEvent } from "./operator/event-log";
+export { planOperatorTask } from "./operator/planner";
+export type {
+  OperatorAction,
+  OperatorDecision,
+  OperatorEventInput,
+  OperatorEventRecord,
+  OperatorEventStatus,
+  OperatorPlan,
+  OperatorPlanInput,
+  OperatorTargetType,
+} from "./operator/types";
 
 // Step 6/7: RAG pipeline
 export { chunkDocument, chunkReport, chunkNews } from "./rag/chunker";

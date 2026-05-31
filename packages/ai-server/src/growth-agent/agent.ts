@@ -10,10 +10,11 @@ import { supervisorAgent } from "./supervisor-agent";
 import { loadMemory, buildMemorySection, type UserMemory } from "./memory-manager";
 import { buildContextualMemorySection, searchMemory } from "./memory-search";
 import { buildWendyBrainContextSection, searchWendyBrain } from "../wendy-brain";
+import { buildWendyActivationContext, type WendyActivationContext } from "../wendy-neural";
 import { runParallelHandoff } from "./parallel-handoff";
 import { UI_TOOLS, type UiToolName, type UiToolArgs } from "./ui-tools";
 import { getToolsForIntent, toolsToOpenAIFormat } from "../wendy-router/tool-registry";
-import { executeToolCall } from "../wendy-router/tool-handlers";
+import { executeToolCall, type ToolResult } from "../wendy-router/tool-handlers";
 import { isClientSideToolData, parseToolArguments } from "./tool-args";
 import { toolRegistry } from "../tools/registry";
 import { scheduleMemorySave } from "./memory-save";
@@ -58,7 +59,14 @@ export interface GrowthAgentOptions {
   requestId?:       string | undefined;
   wendyIntent?:     WendyIntent | undefined;   // passato da ai-wendy.ts per scegliere i tool di dominio
   isPredefined?:    boolean | undefined;
+  neuralContext?:   WendyActivationContext | undefined;
+  executeExternalTool?: GrowthAgentToolExecutor | undefined;
 }
+export type GrowthAgentToolExecutor = (
+  name: string,
+  args: Record<string, unknown>,
+  userId: number,
+) => Promise<ToolResult>;
 export type GrowthAgentEvent =
   | { type: "token"; value: string }
   | { type: "status"; value: string; domain?: RouteDecision["domain"] | undefined }
@@ -74,6 +82,7 @@ export async function* runGrowthAgent(
     maxHistory = 12, voiceMode = false, requestId,
     wendyIntent,
     isPredefined = false,
+    neuralContext: providedNeuralContext,
   } = opts;
   const normalizedMessage = normalizeInput(userMessage);
   const logFields: LoggerFields = { userId, sessionId, requestId };
@@ -122,21 +131,34 @@ export async function* runGrowthAgent(
     routeConfidence: routeDecision.confidence,
   });
 
-  const [contextualMemorySection, wendyBrainSection] = await Promise.all([
-    userId > 0
-      ? searchMemory(userId, normalizedMessage, 5).then(buildContextualMemorySection).catch((err) => {
-          logger.warn({ err, ...logFields }, "contextual memory search failed");
+  const neuralContext = providedNeuralContext ?? await buildWendyActivationContext({
+    requestId: requestId ?? `growth-${sessionId ?? Date.now()}`,
+    userId,
+    message: normalizedMessage,
+    intent: wendyIntent ?? "conversation",
+    domain: routeDecision.domain,
+  }).catch((err) => {
+    logger.warn({ err, ...logFields }, "neural activation failed");
+    return null;
+  });
+
+  const [contextualMemorySection, wendyBrainSection] = neuralContext
+    ? [neuralContext.memorySection ?? "", neuralContext.wendyBrainSection ?? ""]
+    : await Promise.all([
+        userId > 0
+          ? searchMemory(userId, normalizedMessage, 5).then(buildContextualMemorySection).catch((err) => {
+              logger.warn({ err, ...logFields }, "contextual memory search failed");
+              return "";
+            })
+          : Promise.resolve(""),
+        searchWendyBrain(normalizedMessage, {
+          limit: wendyConfig.brain.maxContextNodes,
+          includeCandidates: false,
+        }).then(buildWendyBrainContextSection).catch((err) => {
+          logger.warn({ err, ...logFields }, "wendy brain search failed");
           return "";
-        })
-      : Promise.resolve(""),
-    searchWendyBrain(normalizedMessage, {
-      limit: wendyConfig.brain.maxContextNodes,
-      includeCandidates: false,
-    }).then(buildWendyBrainContextSection).catch((err) => {
-      logger.warn({ err, ...logFields }, "wendy brain search failed");
-      return "";
-    }),
-  ]);
+        }),
+      ]);
   const memorySection = contextualMemorySection || buildMemorySection({
     facts: userMemory.facts.filter((f) => f.key === "goal_main" || f.key === "pending_follow_up"),
     patterns: [],
@@ -144,6 +166,7 @@ export async function* runGrowthAgent(
   const enrichedContext: UserContext & { memorySection?: string | undefined } = {
     ...userContext,
     memorySection: memorySection || userContext.memorySection,
+    neuralSection: neuralContext?.promptSection || userContext.neuralSection,
     wendyBrainSection: wendyBrainSection || userContext.wendyBrainSection,
   };
   let routingHistorySummary = "";
@@ -160,8 +183,13 @@ export async function* runGrowthAgent(
     ? "Non hai abbastanza informazioni per classificare la richiesta dell'utente. Invece di rispondere direttamente, fai 1 domanda di chiarimento specifica per capire meglio di cosa ha bisogno. Non inventare risposte generiche."
     : undefined;
   let lastSupervisorScore: number | undefined;
-  const saveAssistantMemory = (assistantResponse: string, sid: number): void =>
-    scheduleMemorySave({ userId, sessionId: sid, history, userMessage, assistantResponse, routeDecision, logFields, supervisorScore: lastSupervisorScore });
+  // Skip persistence when there is no real session id — inventing Date.now()
+  // wrote memory rows under a bogus session that never coalesces on later turns,
+  // polluting coachMemoryFacts.sourceSessionId / coachMemoryPatterns.sessionIds.
+  const saveAssistantMemory = (assistantResponse: string): void => {
+    if (sessionId == null) return;
+    scheduleMemorySave({ userId, sessionId, history, userMessage, assistantResponse, routeDecision, logFields, supervisorScore: lastSupervisorScore });
+  };
 
   const primaryConfident =
     routeDecision.confidence >= routeDecision.threshold &&
@@ -172,18 +200,25 @@ export async function* runGrowthAgent(
       logger.info({ ...logFields }, "parallel handoff disabled by flag — falling back to primary specialist");
     } else {
       let fullResponse = "";
-      for await (const event of runParallelHandoff({
-        userId, userContext: enrichedContext, history, userMessage: normalizedMessage,
-        primaryRoute:   routeDecision,
-        secondaryRoute: routeDecision.secondaryRoute,
-        memoryFactCount, maxHistory, requestId,
-      })) {
-        if (event.type === "token") fullResponse += event.value;
-        yield event;
-        if (event.type === "done") saveAssistantMemory(fullResponse, sessionId ?? Date.now());
+      try {
+        for await (const event of runParallelHandoff({
+          userId, userContext: enrichedContext, history, userMessage: normalizedMessage,
+          primaryRoute:   routeDecision,
+          secondaryRoute: routeDecision.secondaryRoute,
+          memoryFactCount, maxHistory, requestId,
+        })) {
+          if (event.type === "token") fullResponse += event.value;
+          yield event;
+          if (event.type === "done") saveAssistantMemory(fullResponse);
+        }
+        endRagTimer();
+        return;
+      } catch (err) {
+        // Mirror the single-specialist path: a thrown specialist must not kill
+        // the turn — fall through to the generic growth agent instead.
+        logger.warn({ err, ...logFields }, "parallel handoff failed, falling back to generic growth agent");
+        yield { type: "status", value: "Cambio approccio..." };
       }
-      endRagTimer();
-      return;
     }
   }
 
@@ -202,7 +237,7 @@ export async function* runGrowthAgent(
           }
           if (event.type === "token") fullResponse += event.value;
           yield event;
-          if (event.type === "done") saveAssistantMemory(fullResponse, sessionId ?? Date.now());
+          if (event.type === "done") saveAssistantMemory(fullResponse);
         }
         endRagTimer();
         return;
@@ -228,7 +263,7 @@ export async function* runGrowthAgent(
     const clarification = buildClarification(evalResult, userContext.name);
     yield { type: "token", value: clarification };
     yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], cot, evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
-    saveAssistantMemory(clarification, sessionId ?? Date.now());
+    saveAssistantMemory(clarification);
     return;
   }
 
@@ -297,11 +332,9 @@ export async function* runGrowthAgent(
       },
     );
 
-    const tokenBuffer:   string[] = [];
-    let   toolCallName:  string   = "";
-    let   toolCallArgs:  string   = "";
-    let   toolCallId:    string   = "";
-    let   finishReason:  string   = "stop";
+    const tokenBuffer: string[] = [];
+    const toolCalls = new Map<number, { id: string; name: string; arguments: string }>();
+    let finishReason: string = "stop";
 
     for await (const chunk of stream) {
       const choice = chunk.choices[0];
@@ -314,9 +347,12 @@ export async function* runGrowthAgent(
 
       if (choice.delta?.tool_calls) {
         for (const tc of choice.delta.tool_calls) {
-          if (tc.id)              toolCallId   += tc.id;
-          if (tc.function?.name)  toolCallName += tc.function.name;
-          if (tc.function?.arguments) toolCallArgs += tc.function.arguments;
+          const index = typeof tc.index === "number" ? tc.index : toolCalls.size;
+          const current = toolCalls.get(index) ?? { id: "", name: "", arguments: "" };
+          if (tc.id) current.id += tc.id;
+          if (tc.function?.name) current.name += tc.function.name;
+          if (tc.function?.arguments) current.arguments += tc.function.arguments;
+          toolCalls.set(index, current);
         }
       }
     }
@@ -329,34 +365,56 @@ export async function* runGrowthAgent(
     const endSupervisorTimer = wendyLatencySeconds.startTimer({ phase: "supervisor" });
     const supervisorSpan = startSpan("supervisor_evaluation", { requestId, domain: routeDecision.domain, intent: routeDecision.intent });
 
-    if (finishReason === "tool_calls" && toolCallName) {
+    const orderedToolCalls = Array.from(toolCalls.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([, toolCall], index) => ({
+        id: toolCall.id || `tc_${index}`,
+        name: toolCall.name,
+        arguments: toolCall.arguments,
+      }))
+      .filter((toolCall) => toolCall.name);
+
+    if (finishReason === "tool_calls" && orderedToolCalls.length > 0) {
       supervisorSpan.end();
       endSupervisorTimer();
 
-      if (!toolRegistry.isUiTool(toolCallName)) {
-        const parsedArgs = parseToolArguments(toolCallArgs);
+      if (!orderedToolCalls.every((toolCall) => toolRegistry.isUiTool(toolCall.name))) {
+        const toolExecutor = opts.executeExternalTool ?? executeToolCall;
+        const toolResults: Array<{ toolCall: (typeof orderedToolCalls)[number]; toolData: unknown }> = [];
 
-        const toolResult = await executeToolCall(toolCallName, parsedArgs, userId);
-        const toolData = toolResult.ok ? toolResult.data : { error: toolResult.message };
+        for (const toolCall of orderedToolCalls) {
+          const parsedArgs = parseToolArguments(toolCall.arguments);
+          const toolResult = await toolExecutor(toolCall.name, parsedArgs, userId);
+          const toolData = toolResult.ok ? toolResult.data : { error: toolResult.message };
 
-        if (toolResult.ok && isClientSideToolData(toolData)) {
-          yield { type: "tool_call", name: toolCallName, result: toolData };
-          yield { type: "done", sources: [], evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
-          saveAssistantMemory(`[tool: ${toolCallName}]`, sessionId ?? Date.now());
-          return;
+          if (toolResult.ok && isClientSideToolData(toolData)) {
+            yield { type: "tool_call", name: toolCall.name, result: toolData };
+            yield { type: "done", sources: [], evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
+            saveAssistantMemory(`[tool: ${toolCall.name}]`);
+            return;
+          }
+
+          toolResults.push({ toolCall, toolData });
+          yield { type: "tool_call", name: toolCall.name, result: toolData };
         }
 
         const followUpMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
           ...messages,
           {
             role: "assistant",
-            content:    null,
-            tool_calls: [{ id: toolCallId || "tc_0", type: "function", function: { name: toolCallName, arguments: toolCallArgs } }],
+            content: null,
+            tool_calls: orderedToolCalls.map((toolCall) => ({
+              id: toolCall.id,
+              type: "function" as const,
+              function: { name: toolCall.name, arguments: toolCall.arguments },
+            })),
           },
-          { role: "tool", tool_call_id: toolCallId || "tc_0", content: JSON.stringify(toolData) },
+          ...toolResults.map(({ toolCall, toolData }) => ({
+            role: "tool" as const,
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(toolData),
+          })),
         ];
-
-        yield { type: "tool_call", name: toolCallName, result: toolData };
 
         const followUpStream = await pRetry(
           () => openai.chat.completions.create({
@@ -384,26 +442,29 @@ export async function* runGrowthAgent(
 
         const followUpText = followUpBuffer.join("");
         yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], evalResult, routeDecision };
-        saveAssistantMemory(followUpText, sessionId ?? Date.now());
+        saveAssistantMemory(followUpText);
         return;
       }
 
-      let args: UiToolArgs;
-      try {
-        args = JSON.parse(toolCallArgs) as UiToolArgs;
-      } catch {
-        yield { type: "error", message: `UI tool args parse error: ${toolCallArgs}` };
-        yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
-        return;
+      for (const toolCall of orderedToolCalls) {
+        let args: UiToolArgs;
+        try {
+          args = JSON.parse(toolCall.arguments) as UiToolArgs;
+        } catch {
+          yield { type: "error", message: `UI tool args parse error: ${toolCall.arguments}` };
+          yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
+          return;
+        }
+
+        yield { type: "ui_tool" as const, name: toolCall.name as UiToolName, args };
       }
 
-      yield { type: "ui_tool" as const, name: toolCallName as UiToolName, args };
       yield {
         type: "done",
         sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults],
         evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent),
       };
-      saveAssistantMemory(`[UI: ${toolCallName}]`, sessionId ?? Date.now());
+      saveAssistantMemory(`[UI: ${orderedToolCalls.map((toolCall) => toolCall.name).join(", ")}]`);
       return;
     }
 
@@ -452,7 +513,7 @@ export async function* runGrowthAgent(
       uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent),
     };
 
-    saveAssistantMemory(finalText, sessionId ?? Date.now());
+    saveAssistantMemory(finalText);
     logger.info({ ...logFields, responseLength: finalText.length }, "response completed");
   } catch (err) {
     recordError("llm_generation", routeDecision.domain);

@@ -5,7 +5,11 @@ import { DashboardHero } from "./DashboardHero";
 import { DashboardKpiStrip } from "./DashboardKpiStrip";
 
 vi.mock("wouter", () => ({
-  Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
+  Link: ({
+    children,
+    href,
+    ...props
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => <a href={href} {...props}>{children}</a>,
 }));
 
 const completedSession = {
@@ -50,5 +54,21 @@ describe("dashboard completed profile placement", () => {
 
     expect(screen.queryByText("Profilo completo")).not.toBeInTheDocument();
     expect(screen.getByText("Design & UX")).toBeInTheDocument();
+  });
+
+  it("links the Pro pill to subscription management when premium is active", () => {
+    render(
+      <DashboardHero
+        journeyType="dipendente"
+        session={completedSession}
+        isPremium
+        userName="Ada Lovelace"
+        profilePercent={100}
+        confirmedSectorName="Design & UX"
+        sessionId={12}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: /gestisci abbonamento pro/i })).toHaveAttribute("href", "/abbonamento");
   });
 });

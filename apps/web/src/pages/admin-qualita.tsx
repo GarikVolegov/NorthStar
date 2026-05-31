@@ -34,6 +34,35 @@ interface QualityData {
   };
 }
 
+interface NeuralActivation {
+  id?: number;
+  requestId: string;
+  itemKind: string;
+  itemRef: string;
+  label: string;
+  score: number;
+  selected: boolean;
+  createdAt?: string;
+}
+
+interface NeuralEdge {
+  id: number;
+  sourceItemKind: string;
+  sourceItemRef: string;
+  targetItemKind: string;
+  targetItemRef: string;
+  relationType: string;
+  weight: number;
+  decayScore: number;
+  evidenceCount: number;
+  status: "candidate" | "active" | "archived";
+}
+
+interface NeuralData {
+  activations: NeuralActivation[];
+  edges: NeuralEdge[];
+}
+
 function StatCard({
   label,
   value,
@@ -59,22 +88,50 @@ export default function AdminQualityPage() {
     () => localStorage.getItem("northstar_admin_key") ?? "",
   );
   const [data, setData] = useState<QualityData | null>(null);
+  const [neuralData, setNeuralData] = useState<NeuralData | null>(null);
   const [loading, setLoading] = useState(false);
 
   const fetchQuality = useCallback(async (key: string) => {
     setLoading(true);
     try {
+      const auth = { Authorization: `Bearer ${key}` };
       const res = await apiFetch(`${BASE}api/admin/quality`, {
-        headers: { Authorization: `Bearer ${key}` },
+        headers: auth,
       });
+      const [recentRes, edgesRes] = await Promise.all([
+        apiFetch(`${BASE}api/admin/wendy-brain/neural/recent?limit=20`, {
+          headers: auth,
+        }),
+        apiFetch(`${BASE}api/admin/wendy-brain/neural/edges?status=candidate&limit=20`, {
+          headers: auth,
+        }),
+      ]);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData((await res.json()) as QualityData);
+      setNeuralData({
+        activations: recentRes.ok ? ((await recentRes.json()) as { activations: NeuralActivation[] }).activations : [],
+        edges: edgesRes.ok ? ((await edgesRes.json()) as { edges: NeuralEdge[] }).edges : [],
+      });
     } catch (err) {
       console.error("[admin-quality] fetch error:", err);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const reviewNeuralEdge = useCallback(async (id: number, action: "approve" | "reject") => {
+    if (!adminKey) return;
+    try {
+      const res = await apiFetch(`${BASE}api/admin/wendy-brain/neural/edges/${id}/${action}`, {
+        headers: { Authorization: `Bearer ${adminKey}` },
+        method: "POST",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await fetchQuality(adminKey);
+    } catch (err) {
+      console.error("[admin-quality] neural edge review error:", err);
+    }
+  }, [adminKey, fetchQuality]);
 
   useEffect(() => {
     if (adminKey) fetchQuality(adminKey);
@@ -170,6 +227,91 @@ export default function AdminQualityPage() {
             />
           </div>
         )}
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="px-4 py-3 border-b border-border text-sm font-medium text-foreground">
+              Wendy Neural - attivazioni recenti
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs text-muted-foreground uppercase">
+                    <th className="px-4 py-3 text-left">Item</th>
+                    <th className="px-4 py-3 text-left">Tipo</th>
+                    <th className="px-4 py-3 text-right">Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(neuralData?.activations ?? []).length === 0 ? (
+                    <tr>
+                      <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={3}>
+                        Nessuna attivazione neurale registrata.
+                      </td>
+                    </tr>
+                  ) : (
+                    (neuralData?.activations ?? []).slice(0, 10).map((item, idx) => (
+                      <tr key={`${item.requestId}-${item.itemRef}-${idx}`} className="border-b border-border hover:bg-muted/50">
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-foreground">{item.label}</div>
+                          <div className="max-w-[320px] truncate text-xs text-muted-foreground">{item.itemRef}</div>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{item.itemKind}</td>
+                        <td className="px-4 py-3 text-right text-muted-foreground">
+                          {(item.score * 100).toFixed(0)}%
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="px-4 py-3 border-b border-border text-sm font-medium text-foreground">
+              Wendy Neural - edge candidati
+            </div>
+            <div className="divide-y divide-border">
+              {(neuralData?.edges ?? []).length === 0 ? (
+                <div className="px-4 py-4 text-sm text-muted-foreground">
+                  Nessun edge candidato da revisionare.
+                </div>
+              ) : (
+                (neuralData?.edges ?? []).slice(0, 8).map((edge) => (
+                  <div key={edge.id} className="p-4">
+                    <div className="text-sm font-medium text-foreground">
+                      {edge.sourceItemKind} {"->"} {edge.targetItemKind}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      <span className="block truncate">{edge.sourceItemRef}</span>
+                      <span className="block truncate">{edge.targetItemRef}</span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <span className="text-xs text-muted-foreground">
+                        peso {(edge.weight * edge.decayScore * 100).toFixed(0)}% · evidenze {edge.evidenceCount}
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => reviewNeuralEdge(edge.id, "reject")}
+                          className="rounded-lg border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted"
+                        >
+                          Archivia
+                        </button>
+                        <button
+                          onClick={() => reviewNeuralEdge(edge.id, "approve")}
+                          className="rounded-lg bg-primary px-2.5 py-1 text-xs text-primary-foreground hover:bg-primary/90"
+                        >
+                          Approva
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Per dominio */}
         {data?.qualityStats && data.qualityStats.length > 0 && (

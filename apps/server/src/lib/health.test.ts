@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import express from "express";
+import request from "supertest";
 
 const mocks = vi.hoisted(() => ({
   dbQuery: vi.fn(),
@@ -16,13 +18,19 @@ vi.mock("@workspace/db", () => ({
 
 vi.mock("./rate-limit-redis", () => ({
   getRateLimitRedisClient: mocks.getRateLimitRedisClient,
+  createRedisRateLimitStore: () => undefined,
   isRateLimitRedisRequired: () =>
     process.env.RATE_LIMIT_REDIS_REQUIRED === "true",
 }));
 
-vi.mock("@workspace/ai-server", () => ({
+vi.mock("@workspace/ai-server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@workspace/ai-server")>()),
   probeEmbedding: mocks.probeEmbedding,
   getEmbedderHealthSnapshot: mocks.getEmbedderHealthSnapshot,
+}));
+
+vi.mock("../lib/jwt-secret", () => ({
+  JWT_SECRET: "test-secret",
 }));
 
 async function loadHealth() {
@@ -114,5 +122,28 @@ describe("health checks", () => {
       probe: "disabled",
     });
     expect(mocks.probeEmbedding).not.toHaveBeenCalled();
+  });
+});
+
+describe("health route compatibility", () => {
+  it("serves /api/healthz with the same readiness payload as /api/health", async () => {
+    const { createHealthRouter } = await import("../route-config");
+    const app = express();
+    const healthRouter = createHealthRouter();
+    app.use("/api/health", healthRouter);
+    app.use("/api/healthz", healthRouter);
+
+    const health = await request(app).get("/api/health").expect(200);
+    const healthz = await request(app).get("/api/healthz").expect(200);
+
+    expect(healthz.body).toMatchObject({
+      status: health.body.status,
+      checks: {
+        db: { status: health.body.checks.db.status },
+        redis: { status: health.body.checks.redis.status },
+        pgvector: { status: health.body.checks.pgvector.status },
+        embedder: { status: health.body.checks.embedder.status },
+      },
+    });
   });
 });

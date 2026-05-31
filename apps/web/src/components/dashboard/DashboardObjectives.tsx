@@ -6,7 +6,7 @@ import {
   sortObjectivesByImportance,
 } from "@/lib/objectives-presentation";
 import { cn } from "@/lib/utils";
-import { ArrowRight, Check, Circle, Gauge, Target } from "lucide-react";
+import { ArrowRight, BookOpen, Check, Circle } from "lucide-react";
 import { Link } from "wouter";
 
 export function ObjectiveProgressGauge({
@@ -18,11 +18,19 @@ export function ObjectiveProgressGauge({
 }) {
   const clamped = Math.max(0, Math.min(100, Math.round(value)));
   const angle = -90 + (clamped / 100) * 180;
-  const dimensions = size === "lg" ? "h-32 w-44" : size === "sm" ? "h-20 w-28" : "h-24 w-32";
+  const dimensions =
+    size === "lg" ? "h-32 w-44" : size === "sm" ? "h-20 w-28" : "h-24 w-32";
 
   return (
-    <div className={cn("relative flex items-end justify-center", dimensions)} aria-label={`Progresso obiettivi ${clamped}%`}>
-      <svg viewBox="0 0 160 100" className="absolute inset-0 h-full w-full" aria-hidden="true">
+    <div
+      className={cn("relative flex items-end justify-center", dimensions)}
+      aria-label={`Progresso obiettivi ${clamped}%`}
+    >
+      <svg
+        viewBox="0 0 160 100"
+        className="absolute inset-0 h-full w-full"
+        aria-hidden="true"
+      >
         <path
           d="M 24 82 A 56 56 0 0 1 136 82"
           fill="none"
@@ -54,13 +62,17 @@ export function ObjectiveProgressGauge({
         />
         <circle cx="80" cy="82" r="7" className="fill-foreground" />
       </svg>
-      <span className="relative z-10 mb-1 text-xl font-bold tabular-nums text-foreground">{clamped}%</span>
+      <span className="relative z-10 mb-1 text-xl font-bold tabular-nums text-foreground">
+        {clamped}%
+      </span>
     </div>
   );
 }
 
 function getPathSteps(objectives: DashboardObjective[]) {
-  const strategic = sortObjectivesByImportance(objectives.filter(isStrategicObjective));
+  const strategic = sortObjectivesByImportance(
+    objectives.filter(isStrategicObjective),
+  );
   if (strategic.length === 0) {
     return [
       { label: "Direzione", done: false },
@@ -75,63 +87,135 @@ function getPathSteps(objectives: DashboardObjective[]) {
   }));
 }
 
-export function DashboardObjectivesPathCard({ objectives }: { objectives: DashboardObjective[] }) {
+export function DashboardDiaryBookCard({
+  objectives,
+}: {
+  objectives: DashboardObjective[];
+}) {
   const strategicObjectives = objectives.filter(isStrategicObjective);
   const sortedObjectives = sortObjectivesByImportance(strategicObjectives);
   const progress = getStrategicProgressPercent(strategicObjectives);
   const leadingObjective = sortedObjectives[0] ?? null;
-  const leadingMacroArea = leadingObjective ? getObjectiveMacroArea(leadingObjective.category) : null;
+  const leadingMacroArea = leadingObjective
+    ? getObjectiveMacroArea(leadingObjective.category)
+    : null;
   const steps = getPathSteps(strategicObjectives);
+  const completedCount = strategicObjectives.filter(
+    (objective) => objective.completed || objective.progress >= 100,
+  ).length;
+  const activeCount = strategicObjectives.length - completedCount;
 
   return (
     <Link
-      href="/obiettivi"
-      aria-label="Apri pagina obiettivi"
-      className="group block rounded-lg border bg-card p-4 text-left shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      href="/diario?tab=objectives"
+      aria-label="Apri diario e obiettivi"
+      className="group relative block overflow-hidden rounded-lg border border-border bg-card p-4 text-left shadow-sm transition duration-200 hover:border-primary/35 hover:bg-muted/20 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
     >
       <div className="flex items-start gap-4">
-        <div className="min-h-11 min-w-11 rounded-lg border border-primary/20 bg-primary/10 text-primary flex items-center justify-center">
-          <Target className="h-5 w-5" />
+        <div
+          className="relative h-16 w-14 shrink-0 [perspective:900px]"
+          aria-hidden="true"
+        >
+          <div className="absolute inset-y-1 right-0 w-10 rounded-r-md border border-border bg-background shadow-sm" />
+          <div className="absolute inset-y-2 right-1 w-10 rounded-r-md border border-border bg-muted/50" />
+          <div
+            data-testid="diary-book-cover"
+            className="absolute inset-0 flex origin-left items-center justify-center rounded-md border border-primary/25 bg-primary/10 text-primary shadow-sm shadow-primary/5 transition-transform duration-300 ease-out [backface-visibility:hidden] [transform-style:preserve-3d] group-hover:[transform:rotateY(-28deg)] group-focus-visible:[transform:rotateY(-28deg)] motion-reduce:transition-none motion-reduce:transform-none"
+          >
+            <BookOpen className="h-5 w-5" />
+          </div>
         </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase text-muted-foreground">Direzione</p>
-              <h3 className="text-base font-semibold text-foreground">Obiettivi</h3>
-              <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                {leadingMacroArea ? leadingMacroArea.label : "Definisci il prossimo traguardo principale"}
+              <p className="text-[11px] font-semibold uppercase leading-none text-muted-foreground">
+                Diario personale
+              </p>
+              <h3 className="mt-1 text-lg font-semibold leading-tight text-foreground">
+                Diario
+              </h3>
+              <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
+                {leadingMacroArea
+                  ? leadingMacroArea.label
+                  : "Riflessioni, idee e obiettivi in un unico spazio"}
               </p>
             </div>
-            <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </span>
           </div>
 
-          <div className="mt-4 flex items-center gap-4">
-            <ObjectiveProgressGauge value={progress} size="sm" />
-            <div className="min-w-0 flex-1">
-              <div className="relative flex items-center justify-between gap-2">
-                <div className="absolute left-4 right-4 top-4 h-px bg-border" aria-hidden="true" />
-                {steps.map((step, index) => (
-                  <div key={`${step.label}-${index}`} className="relative z-10 flex w-1/4 min-w-0 flex-col items-center gap-1">
-                    <span
-                      className={cn(
-                        "flex h-8 w-8 items-center justify-center rounded-full border bg-card text-muted-foreground",
-                        step.done && "border-primary/30 bg-primary text-primary-foreground",
-                        index === 0 && !step.done && "border-primary/40 text-primary",
-                      )}
-                    >
-                      {step.done ? <Check className="h-4 w-4" /> : <Circle className="h-3 w-3" />}
-                    </span>
-                    <span className="line-clamp-2 max-w-24 text-center text-[10px] font-medium leading-tight text-muted-foreground">
-                      {step.label}
-                    </span>
-                  </div>
-                ))}
+          <div className="space-y-3">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase leading-none text-muted-foreground">
+                  Avanzamento medio
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {completedCount} / {strategicObjectives.length} completati
+                </p>
               </div>
-              <p className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
-                <Gauge className="h-3.5 w-3.5" />
-                {strategicObjectives.length} obiettivi attivi
+              <p className="text-2xl font-bold leading-none tabular-nums text-foreground">
+                {progress}%
               </p>
+            </div>
+            <div
+              className="h-2 overflow-hidden rounded-full bg-muted"
+              aria-label={`Progresso obiettivi ${progress}%`}
+              aria-valuemax={100}
+              aria-valuemin={0}
+              aria-valuenow={progress}
+              role="progressbar"
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase leading-none text-muted-foreground">
+                Prossimo focus
+              </p>
+              <p className="mt-1 line-clamp-1 text-sm font-medium text-foreground">
+                {leadingObjective?.text ?? "Crea il primo obiettivo strategico"}
+              </p>
+            </div>
+            <p className="text-xs font-medium text-muted-foreground sm:text-right">
+              {activeCount} {activeCount === 1 ? "attivo" : "attivi"}
+            </p>
+          </div>
+
+          <div className="relative">
+            <div
+              className="absolute left-4 right-4 top-3.5 h-px bg-border"
+              aria-hidden="true"
+            />
+            <div className="relative grid grid-cols-4 gap-2">
+              {steps.map((step, index) => (
+                <div key={`${step.label}-${index}`} className="min-w-0">
+                  <span
+                    aria-label={step.label}
+                    className={cn(
+                      "mx-auto flex h-7 w-7 items-center justify-center rounded-full border bg-card text-muted-foreground",
+                      step.done &&
+                        "border-primary/30 bg-primary text-primary-foreground",
+                      index === 0 &&
+                        !step.done &&
+                        "border-primary/40 text-primary",
+                    )}
+                  >
+                    {step.done ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <Circle className="h-3 w-3" />
+                    )}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -139,3 +223,5 @@ export function DashboardObjectivesPathCard({ objectives }: { objectives: Dashbo
     </Link>
   );
 }
+
+export const DashboardObjectivesPathCard = DashboardDiaryBookCard;

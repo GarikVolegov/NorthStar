@@ -12,23 +12,20 @@ function err(code: string, message: string): ToolResult {
 
 export type BrainLayer = "identity" | "domain" | "product" | "process";
 
-export function brainLayerToSector(layer: BrainLayer): "L1" | "L2" | "L3" | "L3.5" {
-  const layerMap = {
-    identity: "L1",
-    domain: "L2",
-    product: "L3",
-    process: "L3.5",
-  } as const;
-  return layerMap[layer];
-}
-
+/**
+ * vault-ingest stores `rc.sectors = [layer]` using the RAW frontmatter layer
+ * word (identity|domain|product|process — see apps/server/.../vault-ingest.ts).
+ * The brain search filter must therefore match that same raw word; mapping to
+ * L1/L2/L3 codes here filtered against data that never contains them, so
+ * layer-scoped search silently returned zero rows.
+ */
 export function searchBrainSqlParts(args: { layer?: BrainLayer }): {
   sourceType: "brain";
-  layerSector: "L1" | "L2" | "L3" | "L3.5" | null;
+  layerTag: BrainLayer | null;
 } {
   return {
     sourceType: "brain",
-    layerSector: args.layer ? brainLayerToSector(args.layer) : null,
+    layerTag: args.layer ?? null,
   };
 }
 
@@ -53,8 +50,8 @@ export async function handleSearchBrain(
     if (!vec) return err("UNAVAILABLE", "Servizio embedding temporaneamente non disponibile");
 
     const literal = vecLiteral(vec);
-    const layerFilter = parts.layerSector
-      ? sql`AND rc.sectors && ARRAY[${parts.layerSector}]::text[]`
+    const layerFilter = parts.layerTag
+      ? sql`AND rc.sectors && ARRAY[${parts.layerTag}]::text[]`
       : sql``;
 
     const rows = await db.execute<{
@@ -344,24 +341,13 @@ export async function handleGetSkillCooccurrences(
   const limit = Math.min(args.limit ?? 8, 15);
 
   try {
-    const rows = await db
-      .select({
-        coSkillName:   skillCooccurrencesTable.coSkillName,
-        frequency:     skillCooccurrencesTable.frequency,
-        frequencyRate: skillCooccurrencesTable.frequencyRate,
-        period:        skillCooccurrencesTable.period,
-      })
-      .from(skillCooccurrencesTable)
-      .where(
-        and(
-          ilike(skillCooccurrencesTable.skillName, args.skillName),
-          args.professionId
-            ? eq(skillCooccurrencesTable.professionId, args.professionId)
-            : undefined,
-        ),
-      )
-      .orderBy(desc(skillCooccurrencesTable.frequencyRate))
-      .limit(limit);
+    const query = {
+      skillName: args.skillName,
+      limit,
+    };
+    const rows = await getSkillCooccurrenceRows(
+      args.professionId === undefined ? query : { ...query, professionId: args.professionId },
+    );
 
     return {
       ok: true,
@@ -379,4 +365,35 @@ export async function handleGetSkillCooccurrences(
     logger.warn({ e, args }, "[tool] get_skill_cooccurrences error");
     return err("UNAVAILABLE", "Co-occorrenze skill temporaneamente non disponibili");
   }
+}
+
+export async function getSkillCooccurrenceRows(args: {
+  skillName: string;
+  professionId?: number;
+  limit?: number;
+}): Promise<Array<{
+  coSkillName: string;
+  frequency: number;
+  frequencyRate: number;
+  period: string;
+}>> {
+  const limit = Math.min(Math.max(args.limit ?? 8, 1), 25);
+  return db
+    .select({
+      coSkillName:   skillCooccurrencesTable.coSkillName,
+      frequency:     skillCooccurrencesTable.frequency,
+      frequencyRate: skillCooccurrencesTable.frequencyRate,
+      period:        skillCooccurrencesTable.period,
+    })
+    .from(skillCooccurrencesTable)
+    .where(
+      and(
+        ilike(skillCooccurrencesTable.skillName, args.skillName),
+        args.professionId
+          ? eq(skillCooccurrencesTable.professionId, args.professionId)
+          : undefined,
+      ),
+    )
+    .orderBy(desc(skillCooccurrencesTable.frequencyRate))
+    .limit(limit);
 }

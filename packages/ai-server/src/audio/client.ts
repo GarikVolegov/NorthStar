@@ -1,3 +1,4 @@
+import { isRecord } from "../utils";
 import { OpenAI, toFile } from "openai";
 import { Buffer } from "node:buffer";
 import { spawn } from "child_process";
@@ -36,9 +37,7 @@ function assertOpenAIConfig(): void {
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+
 
 function readAudioPayload(value: unknown): AudioPayload {
   if (!isRecord(value)) return {};

@@ -18,6 +18,28 @@ const DEEP_PATTERNS = /\b(confronta|analizza|differenza tra|vantaggi e svantaggi
 
 const QUICK_IDENTITY_PATTERNS = /^(ciao|hey|hei|ehi|salve|buongiorno|buonasera|hru|come stai\??|come va\??|tutto bene\??|grazie|ok|perfetto|va bene|chi sei\??|cosa sai fare\??|che cosa sai fare\??|come funziona\??|come funziona wendy\??|presentati|aiutami a capire cosa puoi fare|hi|hello|how are you\??|how's it going\??|everything good\??|thanks|perfect|all good\??|who are you\??|what can you do\??|what do you do\??|how does this work\??|how does wendy work\??|introduce yourself|help me understand what you can do|hola|que tal\??|como estas\??|como va\??|todo bien\??|gracias|perfecto|va bien\??|quien eres\??|que sabes hacer\??|que haces\??|como funciona\??|como funciona wendy\??|salut|ca va\??|tout va bien\??|merci|d'accord|parfait|qui etes-vous\??|que savez-vous faire\??|que faites-vous\??|comment ca marche\??|comment fonctionne wendy\??|presentez-vous|aidez-moi a comprendre ce que vous pouvez faire)$/i;
 
+const GREETING_TERMS = /\b(ciao|hey|hei|ehi|salve|buongiorno|buonasera|hi|hello|hola|salut)\b/i;
+const SMALL_TALK_TERMS = /\b(come stai|come va|tutto bene|hru|how are you|how's it going|everything good|all good|que tal|como estas|como va|todo bien|ca va|tout va bien)\b/i;
+const QUICK_FRAGMENT_PHRASES = new Set([
+  "ciao",
+  "hey",
+  "hei",
+  "ehi",
+  "salve",
+  "buongiorno",
+  "buonasera",
+  "ok",
+  "perfetto",
+  "grazie",
+  "hi",
+  "hello",
+  "thanks",
+  "hola",
+  "gracias",
+  "salut",
+  "merci",
+]);
+
 const APP_OR_LANGUAGE_PATTERNS = /\b(parlami in italiano|rispondi in italiano|usa l'italiano|a cosa serve (l'app|northstar)|cos['’]?e northstar|che cos['’]?e northstar|come funziona (l'app|northstar)|spiegami northstar|talk to me in italian|respond in italian|use italian|what is (the app|northstar) for|what['’]?s northstar|what is northstar|how does (the app|northstar) work|explain northstar|hablame en italiano|responde en italiano|usa el italiano|para que sirve (la app|northstar)|que es northstar|como funciona (la app|northstar)|explicame northstar|parlez-moi en italien|repondez en italien|utilisez l'italien|a quoi sert (l'app|northstar)|qu'est-ce que northstar|comment fonctionne (l'app|northstar)|expliquez-moi northstar)\b/i;
 
 const QA_PAGES = new Set(["settore", "ruolo", "professione", "sector", "profession"]);
@@ -27,6 +49,23 @@ export interface ClassifyIntentInput {
   pageContext?: WendyPageContext | undefined;
   compressedHistory?: CompressedHistory | undefined;
   hasFileAttached?: boolean | undefined;
+}
+
+function isCombinedSmallTalk(msg: string): boolean {
+  if (msg.length > 80) return false;
+  return GREETING_TERMS.test(msg) && SMALL_TALK_TERMS.test(msg);
+}
+
+function isLowInformationSocialFragment(msg: string): boolean {
+  if (msg.length > 40) return false;
+  const normalized = msg
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+  return normalized === "" || QUICK_FRAGMENT_PHRASES.has(normalized);
 }
 
 /**
@@ -49,7 +88,13 @@ export function classifyIntent(input: ClassifyIntentInput): WendyIntent {
 
   if (NAV_PATTERNS.test(msg)) return "navigation";
 
-  if (isLocalWendyReplyMessage(msg) || QUICK_IDENTITY_PATTERNS.test(msg) || APP_OR_LANGUAGE_PATTERNS.test(msg)) {
+  if (
+    isLocalWendyReplyMessage(msg) ||
+    QUICK_IDENTITY_PATTERNS.test(msg) ||
+    isCombinedSmallTalk(msg) ||
+    isLowInformationSocialFragment(msg) ||
+    APP_OR_LANGUAGE_PATTERNS.test(msg)
+  ) {
     return "simple_qa";
   }
 

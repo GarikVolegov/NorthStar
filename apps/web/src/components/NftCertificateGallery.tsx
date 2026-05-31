@@ -27,6 +27,13 @@ interface NftCert {
   metadata: Record<string, unknown>;
   mintedAt: string;
   status: string;
+  chain?: string;
+  imageUrl?: string;
+  verifyUrl?: string;
+}
+
+interface NftCertResponse {
+  certificates: NftCert[];
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -66,8 +73,11 @@ function NftCard({ cert }: { cert: NftCert }) {
   });
   const shortHash =
     cert.certificateHash.slice(0, 8) + "…" + cert.certificateHash.slice(-6);
-  const verifyUrl = `${window.location.origin}/certificato/${cert.certificateHash}`;
-  const imageUrl = `${BASE}api/nft-certificates/image/${cert.certificateHash}.png`;
+  const verifyUrl = cert.verifyUrl?.startsWith("http")
+    ? cert.verifyUrl
+    : `${window.location.origin}${cert.verifyUrl ?? `/certificato/${cert.certificateHash}`}`;
+  const imageUrl =
+    cert.imageUrl ?? `${BASE}api/nft-certificates/image/${cert.certificateHash}.svg`;
 
   return (
     <div
@@ -97,11 +107,11 @@ function NftCard({ cert }: { cert: NftCert }) {
           </a>
           <a
             href={imageUrl}
-            download={`northstar-cert-${cert.id}.png`}
+            download={`northstar-cert-${cert.id}.svg`}
             className="text-[11px] text-white/80 hover:text-white flex items-center gap-1"
             onClick={(e) => e.stopPropagation()}
           >
-            Scarica PNG
+            Scarica SVG
           </a>
         </div>
       </div>
@@ -199,7 +209,8 @@ export function NftCertificateGallery({ userId }: Props) {
     queryKey: ["nft-certificates"],
     queryFn: async () => {
       try {
-        return await getJson<NftCert[]>("/api/nft-certificates/me");
+        const response = await getJson<NftCert[] | NftCertResponse>("/api/nft-certificates/me");
+        return Array.isArray(response) ? response : response.certificates;
       } catch (error) {
         if (error instanceof ApiClientError) return [];
         throw error;
@@ -246,7 +257,7 @@ export function NftCertificateGallery({ userId }: Props) {
         </div>
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Info className="h-3 w-3" />
-          <span>Emessi al completamento degli obiettivi</span>
+          <span>Emessi off-chain al completamento degli obiettivi</span>
         </div>
       </div>
 
@@ -261,7 +272,7 @@ export function NftCertificateGallery({ userId }: Props) {
             </p>
             <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
               Completa i tuoi obiettivi per ricevere certificati NFT
-              verificabili su blockchain.
+              off-chain verificabili pubblicamente.
               <br />
               Ogni traguardo diventa un attestato unico e condivisibile.
             </p>

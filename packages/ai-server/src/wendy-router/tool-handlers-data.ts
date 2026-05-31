@@ -3,6 +3,7 @@ import { db, discoveryItemsTable, educationPathsTable, growthArticlesTable, news
 import { logger } from "../logger";
 import { checkWriteRateLimit, err, queryEmbedding, type ToolResult } from "./tool-handlers";
 import { readSectorTrend } from "./tool-arg-utils";
+import { buildTryADayScenes, type TryADayTimeBlock } from "../try-a-day";
 export async function handleGetSectorDetail(
   args: { sectorId: number },
 ): Promise<ToolResult> {
@@ -100,66 +101,123 @@ export async function handleGetProfessionDetail(
     return err("UNAVAILABLE", "Dati professione temporaneamente non disponibili");
   }
 }
+export async function handleGenerateDayScene(
+  args: { professionId: number; timeBlock?: TryADayTimeBlock; roleContext?: string; userContext?: string },
+): Promise<ToolResult> {
+  try {
+    const [p] = await db
+      .select({
+        id: professionsTable.id, title: professionsTable.title,
+        sector: professionsTable.sector, description: professionsTable.description,
+        skills: professionsTable.skills, riasecFit: professionsTable.riasecFit,
+        workModes: professionsTable.workModes,
+        salaryRange: professionsTable.salaryRange, growthOutlook: professionsTable.growthOutlook,
+        autonomyScore: professionsTable.autonomyScore, stabilityScore: professionsTable.stabilityScore,
+      })
+      .from(professionsTable)
+      .where(and(eq(professionsTable.id, args.professionId), eq(professionsTable.isActive, true)))
+      .limit(1);
+    if (!p) return err("NOT_FOUND", "Professione non trovata");
+
+    const scenes = buildTryADayScenes(p);
+    const filtered = args.timeBlock
+      ? scenes.filter((scene) => scene.timeBlock === args.timeBlock)
+      : scenes;
+
+    return {
+      ok: true,
+      data: {
+        professionId: p.id,
+        roleTitle: p.title,
+        sector: p.sector,
+        roleContext: args.roleContext ?? null,
+        scenes: filtered,
+      },
+    };
+  } catch (e) {
+    logger.warn({ e, args }, "[tool] generate_day_scene error");
+    return err("UNAVAILABLE", "Simulazione giornata temporaneamente non disponibile");
+  }
+}
 export async function handleSearchProfessions(
   args: { query: string; sectorId?: number; limit?: number },
 ): Promise<ToolResult> {
-  const limit = Math.min(args.limit ?? 5, 8);
   try {
-    const vec = await queryEmbedding(args.query).catch(() => null);
-    if (vec) {
-      const vectorLiteral = `[${vec.join(",")}]`;
-      const sectorFilter = args.sectorId
-        ? sql`AND sector_id = ${args.sectorId}`
-        : sql``;
-      const rows = await db.execute<{
-        id: number; title: string; sector: string;
-        salary_range: string; growth_outlook: string;
-        autonomy_score: number; stability_score: number; score: number;
-      }>(sql`
-        SELECT id, title, sector, salary_range, growth_outlook,
-               autonomy_score, stability_score,
-               1 - (embedding <=> ${vectorLiteral}::vector) AS score
-        FROM professions
-        WHERE is_active = true
-          AND embedding IS NOT NULL
-          ${sectorFilter}
-        ORDER BY embedding <=> ${vectorLiteral}::vector
-        LIMIT ${limit}
-      `);
-      if (rows.rows.length > 0) {
-        const professions = rows.rows.map((r) => ({
-          id:             r.id,
-          title:          r.title,
-          sector:         r.sector,
-          salaryRange:    r.salary_range,
-          growthOutlook:  r.growth_outlook,
-          autonomyScore:  r.autonomy_score,
-          stabilityScore: r.stability_score,
-        }));
-        return { ok: true, data: { professions, searchMode: "semantic" } };
-      }
-    }
-    const pattern = `%${args.query}%`;
-    const rows = await db
-      .select({
-        id: professionsTable.id, title: professionsTable.title,
-        sector: professionsTable.sector, salaryRange: professionsTable.salaryRange,
-        growthOutlook: professionsTable.growthOutlook,
-      })
-      .from(professionsTable)
-      .where(
-        and(
-          eq(professionsTable.isActive, true),
-          args.sectorId ? eq(professionsTable.sectorId, args.sectorId) : undefined,
-          or(ilike(professionsTable.title, pattern), ilike(professionsTable.description ?? "", pattern)),
-        ),
-      )
-      .limit(limit);
-    return { ok: true, data: { professions: rows, searchMode: "keyword" } };
+    return { ok: true, data: await searchProfessionRows(args) };
   } catch (e) {
     logger.warn({ e, args }, "[tool] search_professions error");
     return err("UNAVAILABLE", "Ricerca professioni temporaneamente non disponibile");
   }
+}
+
+export interface SearchProfessionRowsResult {
+  professions: Array<{
+    id: number;
+    title: string;
+    sector: string;
+    salaryRange: string;
+    growthOutlook: string;
+    autonomyScore?: number;
+    stabilityScore?: number;
+  }>;
+  searchMode: "semantic" | "keyword";
+}
+
+export async function searchProfessionRows(
+  args: { query: string; sectorId?: number; limit?: number },
+): Promise<SearchProfessionRowsResult> {
+  const limit = Math.min(args.limit ?? 5, 8);
+  const vec = await queryEmbedding(args.query).catch(() => null);
+  if (vec) {
+    const vectorLiteral = `[${vec.join(",")}]`;
+    const sectorFilter = args.sectorId
+      ? sql`AND sector_id = ${args.sectorId}`
+      : sql``;
+    const rows = await db.execute<{
+      id: number; title: string; sector: string;
+      salary_range: string; growth_outlook: string;
+      autonomy_score: number; stability_score: number; score: number;
+    }>(sql`
+      SELECT id, title, sector, salary_range, growth_outlook,
+             autonomy_score, stability_score,
+             1 - (embedding <=> ${vectorLiteral}::vector) AS score
+      FROM professions
+      WHERE is_active = true
+        AND embedding IS NOT NULL
+        ${sectorFilter}
+      ORDER BY embedding <=> ${vectorLiteral}::vector
+      LIMIT ${limit}
+    `);
+    if (rows.rows.length > 0) {
+      const professions = rows.rows.map((r) => ({
+        id:             r.id,
+        title:          r.title,
+        sector:         r.sector,
+        salaryRange:    r.salary_range,
+        growthOutlook:  r.growth_outlook,
+        autonomyScore:  r.autonomy_score,
+        stabilityScore: r.stability_score,
+      }));
+      return { professions, searchMode: "semantic" };
+    }
+  }
+  const pattern = `%${args.query}%`;
+  const rows = await db
+    .select({
+      id: professionsTable.id, title: professionsTable.title,
+      sector: professionsTable.sector, salaryRange: professionsTable.salaryRange,
+      growthOutlook: professionsTable.growthOutlook,
+    })
+    .from(professionsTable)
+    .where(
+      and(
+        eq(professionsTable.isActive, true),
+        args.sectorId ? eq(professionsTable.sectorId, args.sectorId) : undefined,
+        or(ilike(professionsTable.title, pattern), ilike(professionsTable.description ?? "", pattern)),
+      ),
+    )
+    .limit(limit);
+  return { professions: rows, searchMode: "keyword" };
 }
 export async function handleCompareSectors(
   args: { sectorIds: number[] },

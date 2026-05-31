@@ -1,3 +1,4 @@
+import { isRecord } from "../utils";
 import { getLLM } from "../llm/client";
 import { logger } from "../logger";
 import { withTimeout } from "../utils";
@@ -12,9 +13,7 @@ export interface AnswerEvaluation {
   suggestions: string[];
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+
 
 function numberField(record: Record<string, unknown>, key: string, fallback: number): number {
   const value = record[key];

@@ -1,3 +1,4 @@
+import { AppLogo } from "@/components/brand/AppLogo";
 import { Button } from "@/components/ui/button";
 import { getJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
@@ -172,7 +173,7 @@ export default function ScoreCard() {
             href="/"
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary mb-8 transition-colors"
           >
-            <img src="/logo.svg" className="h-5 w-5" alt="NorthStar" />
+            <AppLogo alt="NorthStar" className="h-5 w-5" />
             NorthStar
           </Link>
 

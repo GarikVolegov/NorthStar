@@ -2,6 +2,7 @@ import {
   NavbarDesktopProfileMenu,
   NavbarMobileProfileMenu,
 } from "@/components/layout/NavbarProfileMenus";
+import { AppLogo } from "@/components/brand/AppLogo";
 import { SearchDialog } from "@/components/search/SearchDialog";
 import {
   DropdownMenu,
@@ -11,11 +12,13 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useWendy } from "@/contexts/WendyProvider";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { playWendyEntryChime } from "@/lib/wendy-sound";
 import { useAffiliateInvitePreview } from "@/hooks/useAffiliateInvitePreview";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { useProactiveInsights } from "@/hooks/useProactiveInsights";
 import {
   BASE,
+  DEFAULT_NEWS_TICKER_ITEMS,
   JOURNEY_CATEGORIES,
   type NavPhase,
   prefetchRoute,
@@ -84,6 +87,8 @@ export function Navbar() {
   const initial = displayName.trim().charAt(0).toUpperCase() || "N";
   const activeLanguage =
     i18n.resolvedLanguage?.slice(0, 2) || i18n.language?.slice(0, 2) || "it";
+  const tickerTitles =
+    newsTitles.length > 0 ? newsTitles : DEFAULT_NEWS_TICKER_ITEMS;
   const mobileMenuScale = !isMobile
     ? 1
     : viewportHeight > 0 && viewportHeight < 640
@@ -236,8 +241,13 @@ export function Navbar() {
           <NavbarMobileProfileMenu {...profileMenuProps} />
         </m.div>
       )}
-      <header className="fixed bottom-0 left-0 right-0 z-40 flex justify-center px-3 sm:px-4 pb-2 pt-1 bg-background/60 backdrop-blur-md border-t border-white/[0.06]">
-        <div className="pill-nav flex h-14 w-full max-w-5xl items-center gap-2 px-2">
+      <m.header
+        className="fixed bottom-4 left-0 right-0 z-40 flex justify-center px-3 sm:px-4"
+        initial={prefersReduced ? {} : { y: 80, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <div className={`pill-nav flex h-14 w-full max-w-5xl items-center gap-2 px-2${isWendyActive ? " pill-nav--active" : ""}`}>
           <Link
             href="/news"
             onMouseEnter={() => prefetchRoute("/news")}
@@ -249,28 +259,26 @@ export function Navbar() {
             <div className="relative h-5 min-w-0 flex-1 overflow-hidden">
               <m.div
                 className="absolute flex whitespace-nowrap text-[11px] font-medium leading-5 text-muted-foreground"
-                animate={newsTitles.length > 0 ? { x: ["0%", "-50%"] } : {}}
+                animate={prefersReduced ? {} : { x: ["0%", "-50%"] }}
                 transition={{
-                  duration: 35,
+                  duration: Math.max(35, tickerTitles.length * 12),
                   repeat: Infinity,
                   ease: "linear",
                 }}
               >
                 {[0, 1].map((group) => (
                   <span key={group} className="flex shrink-0 gap-7">
-                    {newsTitles.length > 0
-                      ? newsTitles.map((title, index) => (
-                          <span
-                            key={`${group}-${index}`}
-                            className="flex items-center gap-2"
-                          >
-                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary/60" />
-                            <span className="max-w-[320px] truncate">
-                              {title}
-                            </span>
-                          </span>
-                        ))
-                      : "Caricamento notizie..."}
+                    {tickerTitles.map((title, index) => (
+                      <span
+                        key={`${group}-${index}`}
+                        className="flex items-center gap-2"
+                      >
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary/60" />
+                        <span className="max-w-[320px] truncate">
+                          {title}
+                        </span>
+                      </span>
+                    ))}
                   </span>
                 ))}
               </m.div>
@@ -279,7 +287,10 @@ export function Navbar() {
 
           <button
             type="button"
-            onClick={() => search.setIsOpen(true)}
+            onClick={() => {
+              if (!searchIsOpen) playWendyEntryChime();
+              search.setIsOpen(true);
+            }}
             aria-label={insightsUnread > 0 ? `Apri Wendy (${insightsUnread > 9 ? '9+' : insightsUnread} insight non letti)` : "Apri ricerca Wendy"}
             className="group relative h-12 min-w-0 flex-1 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
           >
@@ -292,26 +303,15 @@ export function Navbar() {
               </span>
             )}
             <div className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2">
-              {isWendyActive ? (
-                <m.div
-                  className="h-5 w-5 rounded-full"
-                  style={{
-                    background:
-                      "conic-gradient(from 0deg, #c19e4a, #7db89a, #5a9fd4, #9b80cc, #d96e66, #c19e4a)",
-                    WebkitMask:
-                      "radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px))",
-                    mask: "radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px))",
-                  }}
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                />
-              ) : (
-                <img
-                  src="/logo.svg"
-                  alt=""
-                  className="h-5 w-5 rounded-full object-cover opacity-40"
-                />
-              )}
+              <m.div
+                data-testid="nav-search-compass"
+                data-motion="slow-rotate"
+                className={`h-5 w-5 ${isWendyActive ? "opacity-90" : "opacity-55"}`}
+                animate={prefersReduced ? {} : { rotate: 360 }}
+                transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
+              >
+                <AppLogo decorative className="h-5 w-5" />
+              </m.div>
             </div>
             {isWendyActive ? (
               <>
@@ -422,7 +422,7 @@ export function Navbar() {
             )}
           </div>
         </div>
-      </header>
+      </m.header>
 
       <SearchDialog
         query={search.query}

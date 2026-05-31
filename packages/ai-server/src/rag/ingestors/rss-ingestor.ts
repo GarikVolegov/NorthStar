@@ -13,6 +13,7 @@
 import { chunkNews }   from "../chunker";
 import { indexChunks } from "../indexer";
 import { logger }      from "../../logger";
+import { isSafeHttpUrl, safeFetch } from "../../net-safety";
 
 export interface RssIngestOptions {
   sourceId:    number;
@@ -77,16 +78,23 @@ export async function ingestRssToRag(opts: RssIngestOptions): Promise<RssIngestR
 
   logger.info({ feedUrl: opts.feedUrl, sourceId: opts.sourceId }, "[rss-ingestor] fetching feed");
 
+  if (!isSafeHttpUrl(opts.feedUrl)) {
+    throw new Error(`[rss-ingestor] feed URL non consentito (SSRF guard): sourceId=${opts.sourceId}`);
+  }
+
   let xml: string;
   try {
-    const res = await fetch(opts.feedUrl, {
+    const res = await safeFetch(opts.feedUrl, {
       headers: { "User-Agent": "NorthStar-RAG/1.0 (+https://northstar.app)" },
       signal:  AbortSignal.timeout(15_000),
     });
+    if (!res) throw new Error("blocked unsafe redirect");
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     xml = await res.text();
   } catch (e) {
-    throw new Error(`[rss-ingestor] fetch fallito (${opts.feedUrl}): ${String(e)}`, { cause: e });
+    // Don't echo the raw URL/upstream error to callers (info leak); log it server-side.
+    logger.warn({ feedUrl: opts.feedUrl, sourceId: opts.sourceId, err: e }, "[rss-ingestor] fetch failed");
+    throw new Error(`[rss-ingestor] fetch fallito per sourceId=${opts.sourceId}`, { cause: e });
   }
 
   const items = parseXmlItems(xml)

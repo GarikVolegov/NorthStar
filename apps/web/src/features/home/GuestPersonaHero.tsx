@@ -1,7 +1,7 @@
 import { useReducedMotion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { ArrowRight, ChevronRight, LogIn, Star } from "lucide-react";
+import { ArrowRight, ChevronRight, LogIn, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "wouter";
 import type { Persona } from "./homeTypes";
@@ -20,36 +20,32 @@ export function GuestPersonaHero({
   const [, setLocation] = useLocation();
 
   return (
-    <section className="relative w-full overflow-hidden">
-      <div className="hero-navy py-10 md:py-18 px-4 relative">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-80 rounded-full bg-primary/5 blur-[90px]" />
+    <section
+      id="per-chi"
+      data-testid="guest-persona-section"
+      className="border-b border-border bg-background py-14 md:py-20"
+    >
+      <div className="container mx-auto max-w-6xl px-4 md:px-6">
+        <div className="mb-8 max-w-3xl">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+            <Users className="h-3.5 w-3.5" />
+            {t("home.audience.badge", { defaultValue: "Per chi e pensata" })}
+          </div>
+          <h2 className="text-3xl font-bold text-foreground md:text-4xl">
+            {t("home.audience.title", {
+              defaultValue:
+                "Scegli il punto di partenza solo dopo aver capito la mappa.",
+            })}
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
+            {t("home.audience.subtitle", {
+              defaultValue:
+                "NorthStar accompagna bisogni diversi, ma parte sempre dalla stessa promessa: ridurre il rumore e trasformare le opzioni in una direzione leggibile.",
+            })}
+          </p>
         </div>
-        <div className="relative z-10 max-w-3xl mx-auto text-center">
-          <motion.div
-            initial={prefersReduced ? {} : { scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-full px-3.5 py-1.5 text-xs font-semibold text-primary mb-4">
-              <Star className="w-3 h-3" /> {t("home.hero.badge")}
-            </div>
-            <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-white leading-tight mb-3">
-              {t("home.hero.heading")}{" "}
-              <span className="text-italic-serif text-primary">
-                {t("home.hero.headingHighlight")}
-              </span>
-            </h1>
-            <p className="text-sm sm:text-base text-white/65 max-w-xl mx-auto">
-              {t("home.hero.subtitle")}
-            </p>
-          </motion.div>
-        </div>
-      </div>
 
-      <div className="bg-background relative pb-2">
-        <div className="max-w-6xl mx-auto px-3 sm:px-4 pt-6 pb-4">
-          <div className="flex flex-col sm:grid sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+        <div className="flex flex-col gap-2.5 sm:grid sm:grid-cols-2 lg:grid-cols-5">
             {personas.map((persona, i) => {
               const Icon = persona.icon;
               return (
@@ -66,10 +62,9 @@ export function GuestPersonaHero({
                     }
                   }}
                   className={cn(
-                    "group cursor-pointer rounded-2xl border border-border bg-card transition-all duration-200 active:scale-[0.98]",
+                    "group flex cursor-pointer flex-row items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 transition-all duration-200 active:scale-[0.98] lg:flex-col lg:items-start lg:p-5",
                     persona.borderClass,
                     "hover:border-primary/40 hover:bg-card/80 hover:shadow-lg hover:shadow-black/25",
-                    "flex flex-row lg:flex-col items-center lg:items-start gap-3 px-4 py-3.5 lg:p-5",
                   )}
                 >
                   <div className="shrink-0 w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:bg-primary/15 transition-colors">
@@ -119,7 +114,7 @@ export function GuestPersonaHero({
             })}
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5 mt-6 pb-2">
+          <div className="mt-6 flex flex-col items-stretch justify-center gap-2.5 pb-2 sm:flex-row sm:items-center">
             <Link href="/test" className="flex-1 sm:flex-initial">
               <div className="w-full sm:w-auto flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold text-sm rounded-full px-7 py-3 hover:bg-primary/90 transition-all shadow-lg hover:shadow-primary/25">
                 {t("home.startTest")} <ArrowRight className="w-4 h-4" />
@@ -133,7 +128,6 @@ export function GuestPersonaHero({
               {t("home.alreadyAccount")}
             </button>
           </div>
-        </div>
       </div>
     </section>
   );

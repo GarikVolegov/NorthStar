@@ -21,4 +21,19 @@ describe("frontend route config", () => {
       title: "Obiettivi",
     });
   });
+
+  it("registers dashboard-linked routines and mood tools as protected pages", () => {
+    expect(routes.find((item) => item.path === "/routines")).toMatchObject({
+      path: "/routines",
+      guard: "protected",
+      layout: "default",
+      title: "Routine",
+    });
+    expect(routes.find((item) => item.path === "/mood")).toMatchObject({
+      path: "/mood",
+      guard: "protected",
+      layout: "default",
+      title: "Mood",
+    });
+  });
 });

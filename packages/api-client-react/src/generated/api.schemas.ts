@@ -489,3 +489,58 @@ export type UnsubscribePushBody = {
 export type UnsubscribePush200 = {
   success: boolean;
 };
+
+/**
+ * Optional additional context (page, sector, etc.)
+ */
+export type WendyChatBodyContext = { [key: string]: unknown };
+
+export type WendyChatBody = {
+  /** User message to Wendy */
+  message: string;
+  /** Conversation session identifier */
+  sessionId?: string;
+  /** Clerk user identifier */
+  clerkId?: string;
+  /** Optional additional context (page, sector, etc.) */
+  context?: WendyChatBodyContext;
+};
+
+export type WendyFeedbackBodyRating =
+  (typeof WendyFeedbackBodyRating)[keyof typeof WendyFeedbackBodyRating];
+
+export const WendyFeedbackBodyRating = {
+  up: "up",
+  down: "down",
+} as const;
+
+export type WendyFeedbackBodyReason =
+  (typeof WendyFeedbackBodyReason)[keyof typeof WendyFeedbackBodyReason];
+
+export const WendyFeedbackBodyReason = {
+  inaccurate: "inaccurate",
+  irrelevant: "irrelevant",
+  too_long: "too_long",
+  too_slow: "too_slow",
+  harmful: "harmful",
+  other: "other",
+} as const;
+
+export type WendyFeedbackBody = {
+  /** ID of the Wendy request being rated */
+  requestId: string;
+  rating: WendyFeedbackBodyRating;
+  reason?: WendyFeedbackBodyReason;
+  intent?: string;
+  domain?: string;
+  toolsUsed?: string[];
+};
+
+export type WendyFeedback200 = {
+  ok: boolean;
+};
+
+export type WendyVoiceBody = {
+  /** Text to synthesize as audio */
+  text: string;
+};

@@ -10,6 +10,7 @@ export interface DashboardObjective {
   progress: number;
   completed: boolean;
   completedAt: string | null;
+  isCertifiableMilestone: boolean;
   dueDate: string | null;
   createdAt: string;
 }

@@ -1,11 +1,13 @@
-import { applyNeuralEdgeDecay, runCollector, runEnricher, runSectorDataAgent, runNewsPublisher, refreshCatalog, runGrowthLibraryAgent, runJobPostingsAgent } from "@workspace/ai-server";
+import { applyNeuralEdgeDecay, dispatchQueuedAgentTasks, executeAgentTask, recoverStaleAgentTasks, runCollector, runEnricher, runSectorDataAgent, runNewsPublisher, refreshCatalog, runGrowthLibraryAgent, runJobPostingsAgent } from "@workspace/ai-server";
 import { rootLogger } from "../middleware/logger";
 import { runWeakSignalDetector } from "./weak-signal-detector";
 import { runProactiveInsightGenerator } from "./proactive-insight-generator";
 import { runBriefingGenerator } from "./briefing-generator";
+import { safeRunRoutineScheduler } from "./routine-scheduler";
 import { runFastCollector } from "./fast-collector";
 import { runVaultIngest } from "./vault-ingest";
 import { writeAgentRunSnapshot } from "../lib/agent-runs";
+import { notifyAgentTaskFinished } from "../services/agents/agent-task-notifications";
 
 const COLLECTOR_INTERVAL_MS        = Number(process.env.COLLECTOR_INTERVAL_MS) || 6 * 60 * 60 * 1000;       // 6 ore
 const FAST_COLLECTOR_INTERVAL_MS   = Number(process.env.FAST_COLLECTOR_INTERVAL_MS) || 90 * 60 * 1000;      // 90 min
@@ -19,6 +21,11 @@ const GROWTH_LIBRARY_INTERVAL_MS    = Number(process.env.GROWTH_LIBRARY_INTERVAL
 const JOB_POSTINGS_INTERVAL_MS      = Number(process.env.JOB_POSTINGS_INTERVAL_MS)      || 24 * 60 * 60 * 1000; // 24 ore
 const VAULT_INGEST_INTERVAL_MS      = Number(process.env.VAULT_INGEST_INTERVAL_MS)      || 24 * 60 * 60 * 1000; // 24 ore
 const WENDY_NEURAL_DECAY_INTERVAL_MS = Number(process.env.WENDY_NEURAL_DECAY_INTERVAL_MS) || 24 * 60 * 60 * 1000; // 24 ore
+const ROUTINE_SCHEDULER_INTERVAL_MS = Number(process.env.ROUTINE_SCHEDULER_INTERVAL_MS) || 30 * 60 * 1000; // 30 min
+const AGENT_OPERATOR_INTERVAL_MS = Number(process.env.AGENT_OPERATOR_INTERVAL_MS) || 5 * 60 * 1000; // 5 min
+const RUN_STARTUP_HEAVY_JOBS =
+  process.env.CRON_RUN_ON_STARTUP === "true" ||
+  (process.env.NODE_ENV === "production" && process.env.CRON_RUN_ON_STARTUP !== "false");
 
 async function recordCronRun<T>(
   agentName: string,
@@ -205,11 +212,31 @@ async function safeRunWendyNeuralDecay(): Promise<void> {
   try {
     rootLogger.info("[cron] wendy-neural-decay starting");
     const result = await recordCronRun("wendy-neural-decay", "cron", applyNeuralEdgeDecay, (result) => ({
-      archivedBefore: result.archivedBefore,
+      archivedEdges: result.archivedEdges,
+      decayDays: result.decayDays,
     }));
     rootLogger.info({ ...result }, "[cron] wendy-neural-decay complete");
   } catch (err) {
     rootLogger.error({ err }, "[cron] wendy-neural-decay failed");
+  }
+}
+
+async function safeRunAgentOperator(): Promise<void> {
+  try {
+    const recovered = await recoverStaleAgentTasks({
+      runningTimeoutMs: Number(process.env.AGENT_OPERATOR_RUNNING_TIMEOUT_MS) || 60 * 60 * 1000,
+    });
+    await Promise.all(recovered.failedTaskIds.map((taskId) => notifyAgentTaskFinished(taskId)));
+    const dispatched = await dispatchQueuedAgentTasks({
+      limit: Number(process.env.AGENT_OPERATOR_DISPATCH_LIMIT) || 5,
+      executeTask: async (taskId, options) => {
+        await executeAgentTask(taskId, options);
+        await notifyAgentTaskFinished(taskId);
+      },
+    });
+    rootLogger.info({ recovered, dispatched }, "[cron] agent operator complete");
+  } catch (err) {
+    rootLogger.error({ err }, "[cron] agent operator failed");
   }
 }
 
@@ -225,25 +252,36 @@ export function startCronJobs(): void {
     jobPostingsIntervalH:      JOB_POSTINGS_INTERVAL_MS      / 3_600_000,
     vaultIngestIntervalH:      VAULT_INGEST_INTERVAL_MS      / 3_600_000,
     wendyNeuralDecayIntervalH: WENDY_NEURAL_DECAY_INTERVAL_MS / 3_600_000,
+    routineSchedulerIntervalMin: ROUTINE_SCHEDULER_INTERVAL_MS / 60_000,
+    agentOperatorIntervalMin: AGENT_OPERATOR_INTERVAL_MS / 60_000,
     briefingWeeklyIntervalD:   BRIEFING_WEEKLY_INTERVAL_MS  / 86_400_000,
     briefingDailyIntervalH:    BRIEFING_DAILY_INTERVAL_MS   / 3_600_000,
   }, "[cron] starting scheduled jobs");
 
-  // Run iniziale dopo startup delay (dà tempo al DB di inizializzarsi)
-  setTimeout(() => {
-    void safeRunCollector();
-    void safeRunEnricher();
-    void safeRunNewsPublisher();
-  }, STARTUP_DELAY_MS);
+  // Run iniziale dopo startup delay. In development resta opt-in: questi job
+  // consumano DB pool e rate limit LLM, e possono rallentare Wendy all'avvio.
+  if (RUN_STARTUP_HEAVY_JOBS) {
+    setTimeout(() => {
+      void safeRunCollector();
+      void safeRunEnricher();
+      void safeRunNewsPublisher();
+    }, STARTUP_DELAY_MS);
+  } else {
+    rootLogger.info("[cron] startup heavy jobs skipped; set CRON_RUN_ON_STARTUP=true to enable");
+  }
 
   // Collector ogni 6 ore
   setInterval(() => { void safeRunCollector(); }, COLLECTOR_INTERVAL_MS);
 
   // Fast lane news collector ogni 90 minuti, sfalsato rispetto allo startup.
-  setTimeout(() => {
-    void safeRunFastCollector();
+  if (RUN_STARTUP_HEAVY_JOBS) {
+    setTimeout(() => {
+      void safeRunFastCollector();
+      setInterval(() => { void safeRunFastCollector(); }, FAST_COLLECTOR_INTERVAL_MS);
+    }, STARTUP_DELAY_MS + 45_000);
+  } else {
     setInterval(() => { void safeRunFastCollector(); }, FAST_COLLECTOR_INTERVAL_MS);
-  }, STARTUP_DELAY_MS + 45_000);
+  }
 
   // Enricher ogni 2 ore → poi publisher pubblica gli arricchiti
   setInterval(async () => {
@@ -285,6 +323,17 @@ export function startCronJobs(): void {
     void safeRunVaultIngest();
     setInterval(() => { void safeRunVaultIngest(); }, VAULT_INGEST_INTERVAL_MS);
   }, 50 * 60 * 1000);
+
+  // Routine utente: esegue job_monitor, market_report e altri handler dovuti.
+  setTimeout(() => {
+    void safeRunRoutineScheduler();
+    setInterval(() => { void safeRunRoutineScheduler(); }, ROUTINE_SCHEDULER_INTERVAL_MS);
+  }, 52 * 60 * 1000);
+
+  setTimeout(() => {
+    void safeRunAgentOperator();
+    setInterval(() => { void safeRunAgentOperator(); }, AGENT_OPERATOR_INTERVAL_MS);
+  }, 54 * 60 * 1000);
 
   // Wendy Neural decay giornaliero: indebolisce edge non rinforzati senza cancellare dati.
   setTimeout(() => {

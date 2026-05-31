@@ -45,6 +45,8 @@ html.lefty #root th {
   }
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    font-size: 15px;
+    line-height: 1.65;
   }
   h1,
   h2,
@@ -55,16 +57,49 @@ html.lefty #root th {
     @apply font-sans tracking-tight text-foreground;
   }
   h1 {
-    @apply text-4xl font-bold leading-tight;
+    @apply font-bold text-foreground;
+    font-size: 36px;
+    line-height: 1.12;
+    letter-spacing: -0.02em;
   }
   h2 {
-    @apply text-2xl font-semibold leading-snug;
+    @apply font-semibold text-foreground;
+    font-size: 24px;
+    line-height: 1.2;
+    letter-spacing: 0;
   }
   h3 {
-    @apply text-xl font-semibold leading-snug;
+    @apply font-semibold text-foreground;
+    font-size: 20px;
+    line-height: 1.3;
   }
   h4 {
-    @apply text-base font-semibold leading-normal;
+    @apply font-semibold text-foreground;
+    font-size: 16px;
+    line-height: 1.35;
+  }
+  small {
+    font-size: 14px;
+    line-height: 1.45;
+    font-weight: 400;
+  }
+  code,
+  kbd,
+  samp,
+  pre {
+    @apply font-mono;
+  }
+  :not(pre) > code,
+  kbd {
+    @apply rounded-md border border-border bg-muted/50 text-foreground;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  :not(pre) > code {
+    padding: 0.15rem 0.35rem;
+  }
+  kbd {
+    padding: 0.15rem 0.4rem;
   }
 
   /* Prevent horizontal overflow on mobile */
@@ -87,6 +122,79 @@ html.lefty #root th {
 }
 
 @layer utilities {
+  .type-h3 {
+    font-size: 20px;
+    line-height: 1.3;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  .type-display {
+    font-size: 48px;
+    line-height: 1.08;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .type-h1 {
+    font-size: 36px;
+    line-height: 1.12;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .type-h2 {
+    font-size: 24px;
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  .type-h4 {
+    font-size: 16px;
+    line-height: 1.35;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  .type-body {
+    font-size: 15px;
+    line-height: 1.65;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  .type-small {
+    font-size: 14px;
+    line-height: 1.45;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  .type-eyebrow {
+    font-size: 12px;
+    line-height: 1.25;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .type-token {
+    @apply rounded-md border border-border bg-muted/50 font-mono text-foreground;
+    font-size: 13px;
+    line-height: 1.35;
+    padding: 0.15rem 0.4rem;
+  }
+
+  .brand-italic,
+  .text-italic-serif {
+    font-family: "Playfair Display", Georgia, serif;
+    font-style: italic;
+    font-weight: 400;
+    color: hsl(var(--primary));
+    letter-spacing: 0;
+  }
+
   :root {
     --app-glass-alpha: 0.72;
     --app-glass-blur: 18px;
@@ -129,221 +237,7 @@ html.lefty #root th {
   }
 }
 
-/* ── Design System v2 — Liquid Glass + Animated Backdrop ──────────────────
-   Derived from NorthStar Design System (Claude Design handoff, 2026-05-25).
-   ──────────────────────────────────────────────────────────────────────── */
-
-/* ─ Liquid Glass card ─────────────────────────────────────────────────── */
-.ns-card {
-  position: relative;
-  background:
-    linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 50%, rgba(255,255,255,0.05) 100%);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 1rem;
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  backdrop-filter: blur(20px) saturate(140%);
-  box-shadow:
-    0 1px 0 0 rgba(255,255,255,0.07) inset,
-    0 -1px 0 0 rgba(0,0,0,0.30) inset,
-    0 8px 32px -8px rgba(0,0,0,0.55),
-    0 2px 8px -2px rgba(0,0,0,0.40);
-  overflow: hidden;
-}
-.ns-card::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 50%;
-  background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 100%);
-  border-radius: 1rem 1rem 0 0;
-  pointer-events: none;
-  z-index: 0;
-}
-.ns-card > * { position: relative; z-index: 1; }
-@supports not (backdrop-filter: blur(1px)) {
-  .ns-card { background: rgba(19,22,33,0.92); }
-}
-.ns-card-hover {
-  transition: border-color 200ms, transform 200ms, box-shadow 200ms, background 200ms;
-  cursor: pointer;
-}
-.ns-card-hover:hover {
-  border-color: rgba(193,158,74,0.32);
-  background:
-    linear-gradient(135deg, rgba(193,158,74,0.10) 0%, rgba(255,255,255,0.03) 50%, rgba(193,158,74,0.05) 100%);
-  transform: translateY(-3px);
-  box-shadow:
-    0 1px 0 0 rgba(255,255,255,0.10) inset,
-    0 -1px 0 0 rgba(0,0,0,0.30) inset,
-    0 16px 40px -8px rgba(0,0,0,0.65),
-    0 0 24px -4px rgba(193,158,74,0.20);
-}
-
-/* ─ Glass utilities ───────────────────────────────────────────────────── */
-.ns-glass {
-  background: linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 50%, rgba(255,255,255,0.05) 100%);
-  border: 1px solid rgba(255,255,255,0.08);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  backdrop-filter: blur(20px) saturate(140%);
-  box-shadow: 0 1px 0 0 rgba(255,255,255,0.07) inset, 0 -1px 0 0 rgba(0,0,0,0.30) inset, 0 8px 32px -8px rgba(0,0,0,0.55);
-}
-.ns-glass-strong {
-  background: linear-gradient(135deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.06) 100%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  backdrop-filter: blur(28px) saturate(160%);
-}
-.ns-glass-subtle {
-  background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
-  -webkit-backdrop-filter: blur(12px) saturate(120%);
-  backdrop-filter: blur(12px) saturate(120%);
-}
-
-/* ─ Pill navbar (liquid glass, bottom-fixed) ──────────────────────────── */
-.ns-pill-nav {
-  background:
-    linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 50%, rgba(255,255,255,0.05) 100%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 9999px;
-  box-shadow:
-    0 1px 0 0 rgba(255,255,255,0.08) inset,
-    0 -1px 0 0 rgba(0,0,0,0.30) inset,
-    0 8px 32px -8px rgba(0,0,0,0.6);
-}
-@supports not (backdrop-filter: blur(1px)) {
-  .ns-pill-nav { background: rgba(19,22,33,0.97); }
-}
-
-/* ─ Animated backdrop layers ──────────────────────────────────────────── */
-.ns-backdrop {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-}
-.ns-mesh { position: absolute; inset: 0; }
-.ns-mesh > span {
-  position: absolute;
-  display: block;
-  border-radius: 50%;
-  filter: blur(70px);
-  will-change: transform, opacity;
-}
-.ns-mesh-a {
-  width: 65vmax; height: 65vmax;
-  left: -10vmax; top: -15vmax;
-  background: radial-gradient(circle at 30% 30%, rgba(193,158,74,0.20), rgba(193,158,74,0) 65%);
-  animation: ns-mesh-a 38s ease-in-out infinite alternate;
-}
-.ns-mesh-b {
-  width: 75vmax; height: 75vmax;
-  right: -25vmax; top: 25%;
-  background: radial-gradient(circle at 50% 50%, rgba(90,159,212,0.15), rgba(90,159,212,0) 60%);
-  animation: ns-mesh-b 46s ease-in-out infinite alternate;
-}
-.ns-mesh-c {
-  width: 85vmax; height: 85vmax;
-  left: 5vmax; bottom: -40vmax;
-  background: radial-gradient(circle at 50% 50%, rgba(125,184,154,0.12), rgba(125,184,154,0) 60%);
-  animation: ns-mesh-c 42s ease-in-out infinite alternate;
-}
-@keyframes ns-mesh-a {
-  0%   { transform: translate3d(0,0,0) scale(1);    opacity: 0.60; }
-  50%  { transform: translate3d(6vw,8vh,0) scale(1.12); opacity: 0.85; }
-  100% { transform: translate3d(-3vw,5vh,0) scale(0.94); opacity: 0.55; }
-}
-@keyframes ns-mesh-b {
-  0%   { transform: translate3d(0,0,0) scale(1);    opacity: 0.55; }
-  50%  { transform: translate3d(-6vw,4vh,0) scale(1.10); opacity: 0.80; }
-  100% { transform: translate3d(4vw,-5vh,0) scale(0.92); opacity: 0.50; }
-}
-@keyframes ns-mesh-c {
-  0%   { transform: translate3d(0,0,0) scale(1);    opacity: 0.50; }
-  50%  { transform: translate3d(5vw,-6vh,0) scale(1.08); opacity: 0.75; }
-  100% { transform: translate3d(-4vw,4vh,0) scale(0.96); opacity: 0.45; }
-}
-
-/* Dust particles drifting upward */
-.ns-dust { position: absolute; inset: 0; }
-.ns-particle {
-  position: absolute;
-  border-radius: 50%;
-  background: #c19e4a;
-  box-shadow: 0 0 4px rgba(193,158,74,0.5);
-  animation: ns-dust-rise linear infinite;
-  will-change: transform, opacity;
-}
-@keyframes ns-dust-rise {
-  0%   { transform: translate3d(0,0,0) scale(0.6); opacity: 0; }
-  10%  { opacity: 1; }
-  50%  { transform: translate3d(calc(var(--drift) * 0.5), -55vh, 0) scale(1); opacity: 1; }
-  90%  { opacity: 0.4; }
-  100% { transform: translate3d(var(--drift), -110vh, 0) scale(0.8); opacity: 0; }
-}
-
-/* Gold diagonal sweep */
-.ns-sweep {
-  position: absolute;
-  inset: -50% -20%;
-  background: linear-gradient(
-    115deg,
-    transparent 38%,
-    rgba(193,158,74,0.05) 47%,
-    rgba(245,225,168,0.10) 50%,
-    rgba(193,158,74,0.05) 53%,
-    transparent 62%
-  );
-  background-size: 200% 200%;
-  animation: ns-sweep 22s ease-in-out infinite;
-  pointer-events: none;
-}
-@keyframes ns-sweep {
-  0%   { background-position: 0% 100%; }
-  50%  { background-position: 100% 0%;  }
-  100% { background-position: 0% 100%; }
-}
-
-/* Cardinal N watermark */
-.ns-cardinal {
-  position: absolute;
-  bottom: 8vh;
-  right: 6vw;
-  width: 180px;
-  height: 180px;
-  will-change: transform;
-}
-
-/* ─ Compass needle oscillation ────────────────────────────────────────── */
-@keyframes ns-needle-spin {
-  0%   { transform: rotate(0deg); }
-  25%  { transform: rotate(120deg); }
-  50%  { transform: rotate(60deg); }
-  75%  { transform: rotate(280deg); }
-  100% { transform: rotate(360deg); }
-}
-.ns-compass-needle {
-  transform-origin: 12px 12px;
-  animation: ns-needle-spin 8s cubic-bezier(0.65,0.05,0.36,1) infinite;
-}
-
-/* ─ News ticker marquee ───────────────────────────────────────────────── */
-@keyframes ns-marquee {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
-}
-.ns-marquee-track {
-  display: inline-flex;
-  gap: 32px;
-  animation: ns-marquee 35s linear infinite;
-  white-space: nowrap;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ns-mesh > span, .ns-particle, .ns-sweep,
-  .ns-compass-needle { animation: none !important; }
-}
+/* Utility classes inherited from @workspace/design-tokens/northstar-theme.css (glass, pill-nav, hero-navy, section-growth, shimmer, gold-line, badge-gold, glow effects, touch-scroll-x, typography helpers) */
 
 /* ── Clerk Custom Theme Overrides ───────────────────────────────────────────
    Stili aggiuntivi per i componenti Clerk che non sono coperti dall'API

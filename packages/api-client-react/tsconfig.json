@@ -9,5 +9,5 @@
     "jsx": "react-jsx",
     "lib": ["dom", "es2022"]
   },
-  "include": ["src/generated", "src/custom-fetch.ts", "src/index.ts"]
+  "include": ["src/generated", "src/hooks", "src/custom-fetch.ts", "src/index.ts"]
 }
