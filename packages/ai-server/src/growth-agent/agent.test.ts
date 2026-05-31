@@ -1,23 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GrowthAgentOptions, GrowthAgentToolExecutor } from "./agent";
 
-const createMock = vi.hoisted(() => vi.fn());
+const getLLMForRouteMock = vi.hoisted(() => vi.fn());
+const chatWithToolsMock = vi.hoisted(() => vi.fn());
+const chatOnceMock = vi.hoisted(() => vi.fn());
 const fallbackToolExecutor = vi.hoisted(() => vi.fn());
 
-async function* streamChunks(chunks: unknown[]) {
-  for (const chunk of chunks) {
-    yield chunk;
-  }
-}
-
-vi.mock("../client", () => ({
-  openai: {
-    chat: {
-      completions: {
-        create: createMock,
-      },
-    },
-  },
+vi.mock("../llm/client", () => ({
+  getLLMForRoute: getLLMForRouteMock,
 }));
 
 vi.mock("./prompt-builder", () => ({
@@ -152,7 +142,7 @@ vi.mock("../feature-flags", () => ({
 
 vi.mock("../model-router", () => ({
   modelFor: () => "test-model",
-  selectModelFor: () => ({ model: "test-model" }),
+  selectModelFor: () => ({ model: "test-model", provider: "groq" }),
 }));
 
 vi.mock("../config/wendy", () => ({
@@ -183,51 +173,36 @@ describe("runGrowthAgent tool dispatch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     fallbackToolExecutor.mockResolvedValue({ ok: true, data: { fallback: true } });
+    getLLMForRouteMock.mockReturnValue({
+      chatWithTools: chatWithToolsMock,
+      chatOnce: chatOnceMock,
+      chat: vi.fn(),
+    });
   });
 
-  it("dispatches multiple streamed tool calls separately through an injected executor", async () => {
+  it("dispatches multiple tool calls separately through an injected executor", async () => {
     const { runGrowthAgent } = await import("./agent");
     const executeExternalTool = vi.fn(async (name: string, args: Record<string, unknown>, userId: number) => ({
       ok: true as const,
       data: { name, args, userId },
     }));
 
-    createMock
-      .mockResolvedValueOnce(streamChunks([
-        {
-          choices: [{
-            delta: {
-              tool_calls: [
-                { index: 0, id: "call_search", type: "function", function: { name: "host_search", arguments: "{\"q\"" } },
-                { index: 1, id: "call_save", type: "function", function: { name: "host_save", arguments: "{\"fact\"" } },
-              ],
-            },
-            finish_reason: null,
-          }],
-        },
-        {
-          choices: [{
-            delta: {
-              tool_calls: [
-                { index: 0, function: { arguments: ":\"alpha\"}" } },
-                { index: 1, function: { arguments: ":\"beta\"}" } },
-              ],
-            },
-            finish_reason: null,
-          }],
-        },
-        { choices: [{ delta: {}, finish_reason: "tool_calls" }] },
-      ]))
-      .mockResolvedValueOnce(streamChunks([
-        { choices: [{ delta: { content: "fatto" }, finish_reason: null }] },
-        { choices: [{ delta: {}, finish_reason: "stop" }] },
-      ]));
+    chatWithToolsMock.mockResolvedValueOnce({
+      content: "",
+      finishReason: "tool_calls",
+      toolCalls: [
+        { id: "call_search", name: "host_search", arguments: { q: "alpha" } },
+        { id: "call_save", name: "host_save", arguments: { fact: "beta" } },
+      ],
+    });
+    chatOnceMock.mockResolvedValueOnce("fatto");
 
     const events = [];
     for await (const event of runGrowthAgent(baseOptions(executeExternalTool))) {
       events.push(event);
     }
 
+    expect(getLLMForRouteMock).toHaveBeenCalledWith({ provider: "groq" });
     expect(executeExternalTool).toHaveBeenCalledTimes(2);
     expect(executeExternalTool).toHaveBeenNthCalledWith(1, "host_search", { q: "alpha" }, 7);
     expect(executeExternalTool).toHaveBeenNthCalledWith(2, "host_save", { fact: "beta" }, 7);

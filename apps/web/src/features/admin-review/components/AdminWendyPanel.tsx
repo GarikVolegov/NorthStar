@@ -112,6 +112,17 @@ export function AdminWendyPanel({
               void chat.confirmAction(messageId, actionId, confirmationText)
             }
             onCancelAction={(messageId, actionId) => chat.cancelAction(messageId, actionId)}
+            onFollowUpPrompt={(prompt, contextPrompt) =>
+              contextPrompt?.trim()
+                ? void chat.sendContextualMessage({
+                    id: `admin-follow-up-${Date.now()}`,
+                    label: prompt,
+                    prompt,
+                    contextPrompt,
+                    isPredefined: true,
+                  })
+                : void chat.sendMessage(prompt)
+            }
           />
         ))}
         <WendyThinkingIndicator thinking={chat.thinking} />

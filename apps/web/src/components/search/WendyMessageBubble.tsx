@@ -8,12 +8,33 @@ interface WendyMessageBubbleProps {
   message: WendyMessage;
   onConfirmAction: (messageId: string, actionId: string, confirmationText?: string) => void;
   onCancelAction: (messageId: string, actionId: string) => void;
+  onFollowUpPrompt?: (prompt: string, contextPrompt?: string) => void;
+}
+
+function buildFollowUpContext(message: WendyMessage, selectedLabel: string): string {
+  const previousAnswer = message.content.trim().slice(0, 1200);
+  const sources = message.contextSources?.length
+    ? `Fonti gia usate: ${message.contextSources.join(", ")}.`
+    : "";
+  const reasoning = message.adaptiveReasoning
+    ? `Decisione precedente: ${message.adaptiveReasoning.mode}; strategia dati: ${message.adaptiveReasoning.dataStrategy}.`
+    : "";
+
+  return [
+    "L'utente ha scelto un prossimo passo cliccabile generato dalla tua risposta precedente.",
+    `Prossimo passo scelto: ${selectedLabel}.`,
+    previousAnswer ? `Risposta precedente Wendy:\n${previousAnswer}` : "",
+    sources,
+    reasoning,
+    "Continua da qui: usa i tool dell'app quando servono dati o modifiche, proponi azioni implementabili e non ripartire da zero.",
+  ].filter(Boolean).join("\n\n");
 }
 
 export function WendyMessageBubble({
   message,
   onConfirmAction,
   onCancelAction,
+  onFollowUpPrompt,
 }: WendyMessageBubbleProps) {
   if (message.role === "error") {
     return (
@@ -32,6 +53,7 @@ export function WendyMessageBubble({
 
   const isUser = message.role === "user";
   const hasBody = !!message.content || !!message.uiTool;
+  const suggestedPrompts = !isUser && !message.isStreaming ? (message.suggestedPrompts ?? []) : [];
 
   return (
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
@@ -72,6 +94,25 @@ export function WendyMessageBubble({
                   onCancel={() => onCancelAction(message.id, action.id)}
                 />
               ))}
+              {suggestedPrompts.length > 0 && onFollowUpPrompt && (
+                <div className="mt-1.5 max-w-full space-y-2" aria-label="Prossimi passi Wendy">
+                  <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Continua con Wendy
+                  </p>
+                  <div className="flex max-w-full flex-wrap gap-1.5">
+                    {suggestedPrompts.map((item) => (
+                      <button
+                        key={`${message.id}-${item.prompt}`}
+                        type="button"
+                        onClick={() => onFollowUpPrompt(item.prompt, buildFollowUpContext(message, item.label))}
+                        className="inline-flex min-h-8 max-w-full items-center rounded-full border border-primary/20 bg-primary/8 px-2.5 text-left text-[11px] font-semibold text-foreground transition-colors hover:border-primary/35 hover:bg-primary/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                      >
+                        <span className="truncate">{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <WendySources message={message} />
             </>
           )}

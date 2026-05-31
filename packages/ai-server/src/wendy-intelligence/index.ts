@@ -1,6 +1,7 @@
 export { getWendyCapability, WENDY_CAPABILITIES } from "./capability-matrix";
 export { buildWendyIntelligenceDirectives } from "./directives";
 export { planWendyDecision } from "./decision-policy";
+export { buildWendySuggestedPrompts } from "./suggested-prompts";
 export { evaluateWendyResponse } from "./self-check";
 export {
   buildWendyTrainingPromptSection,
@@ -17,6 +18,7 @@ export type {
   WendyDecision,
   WendyDecisionInput,
   WendyDecisionMode,
+  WendySuggestedPrompt,
   WendyResponseRubric,
   WendySelfCheckInput,
   WendySelfCheckIssue,

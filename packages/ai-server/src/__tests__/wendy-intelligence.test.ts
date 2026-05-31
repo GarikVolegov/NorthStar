@@ -3,6 +3,7 @@ import {
   buildWendyTrainingPromptSection,
   buildWendyIntelligenceDirectives,
   buildWendyRepairHint,
+  buildWendySuggestedPrompts,
   evaluateWendyTrainingResponseShape,
   evaluateWendyTrainingCase,
   evaluateWendyResponse,
@@ -228,5 +229,109 @@ describe("Wendy Jarvis intelligence core", () => {
     expect(directives).toContain("Non dire fatto");
     expect(directives).toContain("prima");
     expect(directives).toContain("conferma");
+  });
+
+  it("adds explicit adaptive reasoning metadata for profile-market decisions", () => {
+    for (const message of [
+      "Quali settori sono piu adatti a me?",
+      "L'ho gia fatto, che settore scelgo?",
+    ]) {
+      const decision = planWendyDecision({
+        message,
+        intent: "conversation",
+      });
+
+      expect(decision.reasoningDepth).toBe("grounded");
+      expect(decision.dataStrategy).toBe("profile_market");
+      expect(decision.executionMode).toBe("tool_augmented_chat");
+      expect(decision.selfCheck).toEqual(expect.arrayContaining(["grounded_sources", "specific_next_step"]));
+    }
+  });
+
+  it("treats next-action prompts as grounded profile actions", () => {
+    for (const message of [
+      "Che faccio oggi?",
+      "Che faccio questa settimana?",
+      "Qual e la prossima azione?",
+      "Qual e il prossimo passo?",
+      "Cosa dovrei fare oggi?",
+      "Cosa dovrei fare domani?",
+      "What should I do today?",
+      "What is my next step?",
+    ]) {
+      const decision = planWendyDecision({ message, intent: "conversation" });
+
+      expect(decision.mode).toBe("tool_action");
+      expect(decision.reasoningDepth).toBe("grounded");
+      expect(decision.dataStrategy).toBe("profile");
+      expect(decision.executionMode).toBe("tool_augmented_chat");
+    }
+  });
+
+  it("makes long strategic work deliberate and background-friendly", () => {
+    const decision = planWendyDecision({
+      message: "Analizza il mio profilo, confronta tre settori e prepara una strategia dettagliata con rischi e prossime azioni.",
+      intent: "deep_analysis",
+    });
+
+    expect(decision.reasoningDepth).toBe("deliberate");
+    expect(decision.executionMode).toBe("background_agent");
+    expect(decision.dataStrategy).toBe("profile_market");
+  });
+
+  it("injects the adaptive reasoning protocol into Wendy directives", () => {
+    const directives = buildWendyIntelligenceDirectives(
+      planWendyDecision({
+        message: "Quali settori sono piu adatti a me?",
+        intent: "conversation",
+      }),
+    );
+
+    expect(directives).toContain("Protocollo ragionamento adattivo");
+    expect(directives).toContain("grounded");
+    expect(directives).toContain("profile_market");
+    expect(directives).toContain("verifica");
+    expect(directives).toContain("Soluzione operativa");
+    expect(directives).toContain("input pronto");
+  });
+
+  it("always builds clickable next-step prompts for Wendy responses", () => {
+    const decision = planWendyDecision({
+      message: "Quali settori sono piu adatti a me?",
+      intent: "conversation",
+    });
+
+    const prompts = buildWendySuggestedPrompts({ decision, locale: "it" });
+
+    expect(prompts.length).toBeGreaterThanOrEqual(2);
+    expect(prompts.length).toBeLessThanOrEqual(3);
+    expect(prompts[0]).toEqual(expect.objectContaining({
+      label: expect.any(String),
+      prompt: expect.any(String),
+    }));
+    expect(prompts.map((prompt) => prompt.prompt).join(" ")).toContain("settori");
+  });
+
+  it("turns next-step prompts into implementation inputs, not passive suggestions", () => {
+    const prompts = buildWendySuggestedPrompts({
+      decision: planWendyDecision({
+        message: "Quali settori sono piu adatti a me?",
+        intent: "conversation",
+      }),
+      locale: "it",
+    });
+
+    expect(prompts.map((prompt) => prompt.prompt).join(" ")).toMatch(/crea|imposta|scegli|apri|costruisci/i);
+    expect(prompts.map((prompt) => prompt.prompt).join(" ")).not.toMatch(/mostrami le fonti|dimmi quale/i);
+  });
+
+  it("localizes Wendy next-step prompts in English", () => {
+    const prompts = buildWendySuggestedPrompts({
+      decision: planWendyDecision({ message: "What should I do today?", intent: "conversation" }),
+      locale: "en",
+    });
+
+    expect(prompts[0]?.label).toMatch(/next|plan|progress/i);
+    expect(prompts.map((prompt) => prompt.prompt).join(" ")).toMatch(/today|profile|progress/i);
   });
 });

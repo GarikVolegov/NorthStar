@@ -16,9 +16,7 @@
  * Domain icons are resolved from DOMAIN_STATUS_ICONS at runtime.
  * Memory wiring from v3 is preserved unchanged.
  */
-import type OpenAI from "openai";
-import pRetry from "p-retry";
-import { openai } from "../client";
+import { getLLMForRoute, type LLMMessage } from "../llm/client";
 import { retrieve } from "./retriever";
 import { searchWeb, MIN_LOCAL_CHUNKS } from "./web-search";
 import { runChainOfThought } from "./chain-of-thought";
@@ -201,7 +199,7 @@ export abstract class SpecialistAgent {
 
     // ── 5. Stream + BUFFER ────────────────────────────────────────────────────
     const recentHistory = history.slice(-maxHistory);
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    const messages: LLMMessage[] = [
       { role: "system",    content: systemPrompt },
       ...recentHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       { role: "user",      content: userMessage },
@@ -217,28 +215,12 @@ export abstract class SpecialistAgent {
         complexity: evalResult.level === "high" ? "deep" : "standard",
       });
 
-      const stream = await pRetry(
-        () => openai.chat.completions.create({
-          model: route.model, messages, stream: true, temperature,
-          max_tokens: evalResult.level === "low" ? sc.maxTokensLow : sc.maxTokensHigh,
-        }),
-        {
-          retries: 2,
-          minTimeout: 1000,
-          maxTimeout: 3000,
-          onFailedAttempt: (err) => {
-            logger.warn({ err, attempt: err.attemptNumber, domain: this.DOMAIN }, "specialist LLM call failed, retrying");
-          },
-        },
-      );
-
-      const tokenBuffer: string[] = [];
-      for await (const chunk of stream) {
-        const delta = chunk.choices[0]?.delta?.content;
-        if (delta) tokenBuffer.push(delta);
-      }
-
-      const draft = tokenBuffer.join("");
+      const llm = getLLMForRoute({ provider: route.provider });
+      const draft = await llm.chatOnce(messages, {
+        model: route.model,
+        temperature,
+        maxTokens: evalResult.level === "low" ? sc.maxTokensLow : sc.maxTokensHigh,
+      });
 
       // ── 6. Supervisor gate ──────────────────────────────────────────────────
       const supervisorInput = { userMessage: analysisMessage, draft, domain: routeDecision.domain, intent: routeDecision.intent };

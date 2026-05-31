@@ -2,6 +2,36 @@ import { describe, expect, it } from "vitest";
 import { normalizeWendyAction } from "./useWendyActionExecutor";
 
 describe("normalizeWendyAction", () => {
+  it("normalizes Wendy progress updates as confirmation-gated app actions", () => {
+    const action = normalizeWendyAction({
+      name: "update_objective_progress",
+      result: {
+        clientSide: true,
+        action: "update_objective_progress",
+        wendyAction: {
+          id: "progress-1",
+          type: "update_objective_progress",
+          status: "needs_confirmation",
+          risk: "medium",
+          label: "Aggiornare il progresso?",
+          description: "Conferma prima di modificare questo obiettivo.",
+          requiresConfirmation: true,
+          payload: { objectiveId: 42, progress: 55 },
+          preview: [{ label: "Progresso", value: "55%" }],
+        },
+      },
+    });
+
+    expect(action).toMatchObject({
+      id: "progress-1",
+      type: "update_objective_progress",
+      status: "needs_confirmation",
+      requiresConfirmation: true,
+      payload: { objectiveId: 42, progress: 55 },
+      sourceTool: "update_objective_progress",
+    });
+  });
+
   it("preserves admin action token and strong confirmation metadata", () => {
     const action = normalizeWendyAction({
       name: "admin_restart_database",

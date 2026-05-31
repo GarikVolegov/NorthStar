@@ -168,7 +168,8 @@ export type { SearchProfessionRowsResult } from "./wendy-router/tool-handlers-da
 export { getSkillCooccurrenceRows } from "./wendy-router/tool-handlers-market";
 export { resolveWendyRoute } from "./wendy-router/router";
 export { buildLightPrompt }  from "./wendy-router/light-prompt";
-export { getFastPathFallbackReply, shouldUseImmediateFastPathFallback, getLlmUnavailableReply } from "./wendy-router/fast-path-fallback";
+export { getFastPathFallbackReply, getWendyRecoveryFallbackReply, shouldUseImmediateFastPathFallback, shouldUseImmediateWendyRecoveryFallback, shouldUseWendyQuickActionFastPath, getLlmUnavailableReply } from "./wendy-router/fast-path-fallback";
+export { detectWendyLanguage, isLikelyItalianWendyMessage, type WendyDetectedLanguage } from "./wendy-router/language-detection";
 export { isLlmConfigured, resolveActiveProvider, hasGroqKey, hasOpenRouterKey, hasOpenAIKey } from "./client";
 export { getLocalWendyReply, getLocalWendyFallbackReply, isLocalWendyReplyMessage } from "./wendy-router/local-reply";
 export type { WendyIntent, WendyPageContext, CompressedHistory, WendyRouterDecision, ToolDefinition } from "./wendy-router/types";
@@ -259,6 +260,7 @@ export { applyContextSignals } from "./model-router";
 export {
   buildWendyIntelligenceDirectives,
   buildWendyRepairHint,
+  buildWendySuggestedPrompts,
   buildWendyTrainingPromptSection,
   evaluateWendyResponse,
   evaluateWendyTrainingCase,
@@ -276,6 +278,7 @@ export type {
   WendyDecision,
   WendyDecisionInput,
   WendyDecisionMode,
+  WendySuggestedPrompt,
   WendyResponseRubric,
   WendySelfCheckInput,
   WendySelfCheckIssue,

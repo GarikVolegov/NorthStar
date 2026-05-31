@@ -103,6 +103,7 @@ const WendyPageContextSchema = z.object({
 
 export const WendyRequestSchema = z.object({
   message: z.string().min(1).max(5000),
+  contextPrompt: z.string().max(8000).optional(),
   threadId: z.string().max(100).optional(),
   compressedHistory: CompressedHistorySchema.optional(),
   pageContext: WendyPageContextSchema.optional(),

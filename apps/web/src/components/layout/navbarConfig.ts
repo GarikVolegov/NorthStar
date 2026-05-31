@@ -55,6 +55,7 @@ const PREFETCH_MAP: Record<string, () => Promise<unknown>> = {
   "/candidature": () => import("@/pages/applications"),
   "/dashboard": () => import("@/pages/dashboard"),
   "/affiliazione/dashboard": () => import("@/pages/affiliazione-dashboard"),
+  "/wendy": () => import("@/pages/wendy"),
   "/wendy/memoria": () => import("@/pages/memoria-wendy"),
   "/profilo/briefing": () => import("@/pages/briefing"),
   "/workspace": () => import("@/pages/workspace"),

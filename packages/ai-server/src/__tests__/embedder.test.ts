@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockCreate = vi.hoisted(() => vi.fn());
 
@@ -13,6 +13,12 @@ vi.mock("openai", () => ({
 import { chunkText, embedBatch, embedText } from "../growth-agent/embedder";
 
 describe("embedder", () => {
+  beforeEach(() => {
+    process.env.AI_INTEGRATIONS_OPENAI_API_KEY = "sk-test";
+    delete process.env.OPENROUTER_API_KEY;
+    mockCreate.mockReset();
+  });
+
   it("chunks text with overlap", () => {
     const chunks = chunkText("one two three four five", 3, 1);
     expect(chunks).toEqual(["one two three", "three four five", "five"]);

@@ -32,6 +32,7 @@ const NotFound = lazy(() => import("@/pages/not-found"));
 const AdminReview = lazy(() => import("@/pages/admin-review"));
 const AdminOffice = lazy(() => import("@/pages/admin-office"));
 const MemoriaWendy = lazy(() => import("@/pages/memoria-wendy"));
+const WendyPage = lazy(() => import("@/pages/wendy"));
 const WorkspacePage = lazy(() => import("@/pages/workspace"));
 const BriefingPage = lazy(() => import("@/pages/briefing"));
 const CertificatePage = lazy(() => import("@/pages/certificato"));
@@ -119,6 +120,13 @@ function Router() {
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <MemoriaWendy />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
+      <Route path="/wendy">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <ProtectedRoute component={WendyPage} />
           </Suspense>
         </ErrorBoundary>
       </Route>

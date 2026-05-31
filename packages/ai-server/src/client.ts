@@ -68,7 +68,12 @@ export function isLlmConfigured(env: EnvLike = process.env): boolean {
   return hasGroqKey(env) || hasOpenRouterKey(env) || hasOpenAIKey(env);
 }
 
-export function shouldFallbackToOpenAI(err: unknown): boolean {
+function paidOpenAIFallbackEnabled(env: EnvLike = process.env): boolean {
+  return env.ALLOW_PAID_AI_MODELS === "true" || env.OPENAI_FALLBACK_ENABLED === "true";
+}
+
+export function shouldFallbackToOpenAI(err: unknown, env: EnvLike = process.env): boolean {
+  if (!paidOpenAIFallbackEnabled(env)) return false;
   const status = (err as { status?: unknown })?.status;
   if (status === 429 || status === "429") return true;
   const message = String((err as { message?: unknown })?.message ?? err).toLowerCase();

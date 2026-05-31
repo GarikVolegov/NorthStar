@@ -111,7 +111,7 @@ export function Navbar() {
     }
 
     let cancelled = false;
-    apiFetch(`${BASE}api/profile/${user.id}`)
+    apiFetch(`${BASE}api/profile/me`)
       .then((response) => (response.ok ? response.json() : null))
       .then((data: { bannerUrl?: string | null } | null) => {
         if (!cancelled) setProfileBannerUrl(data?.bannerUrl ?? null);
@@ -288,9 +288,15 @@ export function Navbar() {
           <button
             type="button"
             onClick={() => {
-              if (!searchIsOpen) playWendyEntryChime();
-              search.setIsOpen(true);
+              playWendyEntryChime();
+              if (isLoggedIn) {
+                setLocation("/wendy");
+              } else {
+                search.setIsOpen(true);
+              }
             }}
+            onMouseEnter={() => prefetchRoute("/wendy")}
+            onFocus={() => prefetchRoute("/wendy")}
             aria-label={insightsUnread > 0 ? `Apri Wendy (${insightsUnread > 9 ? '9+' : insightsUnread} insight non letti)` : "Apri ricerca Wendy"}
             className="group relative h-12 min-w-0 flex-1 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
           >

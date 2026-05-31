@@ -16,14 +16,15 @@ const PLANNING_PATTERNS = /\b(roadmap|piano|percorso|obiettivo|obiettivi|come di
 // Richieste che richiedono confronto o analisi profonda.
 const DEEP_PATTERNS = /\b(confronta|analizza|differenza tra|vantaggi e svantaggi|pro e contro|quale scelgo|dimmi tutto su|approfondisci|analisi completa|compare|analyze|difference between|pros and cons|which should i choose|tell me everything about|elaborate|complete analysis|compara|analiza|diferencia entre|ventajas y desventajas|pros y contras|que elijo|cuentame todo sobre|profundiza|analisis completo|comparez|analysez|difference entre|avantages et inconvenients|quel choisir|dites-moi tout sur|approfondissez|analyse complete)\b/i;
 
-const QUICK_IDENTITY_PATTERNS = /^(ciao|hey|hei|ehi|salve|buongiorno|buonasera|hru|come stai\??|come va\??|tutto bene\??|grazie|ok|perfetto|va bene|chi sei\??|cosa sai fare\??|che cosa sai fare\??|come funziona\??|come funziona wendy\??|presentati|aiutami a capire cosa puoi fare|hi|hello|how are you\??|how's it going\??|everything good\??|thanks|perfect|all good\??|who are you\??|what can you do\??|what do you do\??|how does this work\??|how does wendy work\??|introduce yourself|help me understand what you can do|hola|que tal\??|como estas\??|como va\??|todo bien\??|gracias|perfecto|va bien\??|quien eres\??|que sabes hacer\??|que haces\??|como funciona\??|como funciona wendy\??|salut|ca va\??|tout va bien\??|merci|d'accord|parfait|qui etes-vous\??|que savez-vous faire\??|que faites-vous\??|comment ca marche\??|comment fonctionne wendy\??|presentez-vous|aidez-moi a comprendre ce que vous pouvez faire)$/i;
+const QUICK_IDENTITY_PATTERNS = /^(ciao|hey|hei|ei|ehi|salve|buongiorno|buonasera|hru|come stai\??|come va\??|tutto bene\??|grazie|ok|perfetto|va bene|chi sei\??|cosa sai fare\??|che cosa sai fare\??|come funziona\??|come funziona wendy\??|presentati|aiutami a capire cosa puoi fare|hi|hello|how are you\??|how's it going\??|everything good\??|thanks|perfect|all good\??|who are you\??|what can you do\??|what do you do\??|how does this work\??|how does wendy work\??|introduce yourself|help me understand what you can do|hola|que tal\??|como estas\??|como va\??|todo bien\??|gracias|perfecto|va bien\??|quien eres\??|que sabes hacer\??|que haces\??|como funciona\??|como funciona wendy\??|salut|ca va\??|tout va bien\??|merci|d'accord|parfait|qui etes-vous\??|que savez-vous faire\??|que faites-vous\??|comment ca marche\??|comment fonctionne wendy\??|presentez-vous|aidez-moi a comprendre ce que vous pouvez faire)$/i;
 
-const GREETING_TERMS = /\b(ciao|hey|hei|ehi|salve|buongiorno|buonasera|hi|hello|hola|salut)\b/i;
+const GREETING_TERMS = /\b(ciao|hey|hei|ei|ehi|salve|buongiorno|buonasera|hi|hello|hola|salut)\b/i;
 const SMALL_TALK_TERMS = /\b(come stai|come va|tutto bene|hru|how are you|how's it going|everything good|all good|que tal|como estas|como va|todo bien|ca va|tout va bien)\b/i;
 const QUICK_FRAGMENT_PHRASES = new Set([
   "ciao",
   "hey",
   "hei",
+  "ei",
   "ehi",
   "salve",
   "buongiorno",
