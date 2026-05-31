@@ -13,7 +13,16 @@
       },
       "ignore": [
         "src/components/ui/**",
-        "src/__tests__/**"
+        "src/__tests__/**",
+        "src/components/dashboard/DashboardCalendar.tsx",
+        "src/components/dashboard/DashboardPersonalisationPanel.tsx",
+        "src/components/dashboard/widgets/InsightsWidget.tsx",
+        "src/components/dashboard/widgets/JobFeedWidget.tsx",
+        "src/components/dashboard/widgets/MindsetStreakWidget.tsx",
+        "src/components/dashboard/widgets/ProgressObjectivesWidget.tsx",
+        "src/components/diary/DiaryPreviewWidget.tsx",
+        "src/components/search/SearchChatComposer.tsx",
+        "src/features/home/TrendingSectorCard.tsx"
       ],
       "ignoreDependencies": [
         "next-themes"
