@@ -108,3 +108,7 @@ export * from "./userRoutines";
 export * from "./routineExecutions";
 export * from "./simulatedDays";
 export * from "./pinnedSectors";
+// ── Percorso Indeciso: "La Bussola" (layer direzionale unificante) ──────
+export * from "./compassProfile";
+export * from "./compassSignal";
+export * from "./sceneCard";
