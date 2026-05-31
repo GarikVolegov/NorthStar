@@ -211,7 +211,7 @@ export function createProfileNavigationLayoutRouter({
   router.put("/navigation-layout", requireAuth, async (req, res) => {
     const userId = req.user!.id;
     const phase = phaseFromJourney(req.user!.journeyType);
-    const validated = normalizeLayout(req.body?.layout, phase);
+    const validated = normalizeLayout((req.body as { layout?: unknown })?.layout, phase);
 
     if ("error" in validated) {
       res.status(400).json({ error: validated.error });

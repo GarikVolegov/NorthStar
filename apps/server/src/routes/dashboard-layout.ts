@@ -144,7 +144,7 @@ router.get("/layout", requireAuth, async (req, res) => {
 router.put("/layout", requireAuth, async (req, res) => {
   const userId = req.user!.id;
 
-  const validated = validateDashboardLayout(req.body?.layout, req.user!.journeyType);
+  const validated = validateDashboardLayout((req.body as { layout?: unknown })?.layout, req.user!.journeyType);
   if ("error" in validated) {
     res.status(400).json({ error: validated.error });
     return;

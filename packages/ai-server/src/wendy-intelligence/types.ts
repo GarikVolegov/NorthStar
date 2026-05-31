@@ -53,7 +53,7 @@ export interface WendyCapability {
 
 export interface WendyDecisionInput {
   message: string;
-  intent?: WendyIntent | string | undefined;
+  intent?: WendyIntent | (string & {}) | undefined;
   page?: string | undefined;
   hasFileAttached?: boolean | undefined;
 }
@@ -112,7 +112,7 @@ export interface WendyResponseRubric {
 export interface WendyTrainingCase {
   id: string;
   message: string;
-  intent: WendyIntent | string;
+  intent: WendyIntent | (string & {});
   expectedMode: WendyDecisionMode;
   expectedCapabilities?: WendyCapabilityKey[] | undefined;
   expectedRequiresConfirmation?: boolean | undefined;

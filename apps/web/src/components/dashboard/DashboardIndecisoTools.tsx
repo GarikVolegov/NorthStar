@@ -19,7 +19,7 @@ interface ReadinessLite {
 async function fetchBand(): Promise<ReadinessLite> {
   const res = await apiFetch("/api/discovery/readiness");
   if (!res.ok) throw new Error("Errore caricamento readiness");
-  const j = await res.json();
+  const j = (await res.json()) as ReadinessLite;
   return { band: j.band };
 }
 

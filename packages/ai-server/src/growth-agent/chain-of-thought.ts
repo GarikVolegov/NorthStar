@@ -121,7 +121,7 @@ export async function runChainOfThought(
   userId: number,
   userMessage: string,
   conversationSummary?: string, // optional: last 2-3 exchanges for context
-  conversationId?: string | number | undefined,
+  conversationId?: string | number,
 ): Promise<CoTResult | null> {
   if (shouldSkipCoT(userMessage)) return null;
 

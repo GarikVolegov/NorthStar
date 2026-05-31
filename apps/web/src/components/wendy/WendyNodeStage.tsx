@@ -1,10 +1,10 @@
 import type { ChatMessage } from "@/hooks/useWendyChat";
 import { cn } from "@/lib/utils";
+import type { FileText } from "lucide-react";
 import {
   Boxes,
   Database,
   ExternalLink,
-  FileText,
   MousePointer2,
   Route,
   Sparkles,

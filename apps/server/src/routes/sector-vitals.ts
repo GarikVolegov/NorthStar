@@ -46,7 +46,7 @@ export function createSectorVitalsRouter({
       return;
     }
 
-    const geography = readGeography(req.body?.geography);
+    const geography = readGeography((req.body as { geography?: unknown })?.geography);
     const vitals = await compute(sectorId, geography);
     const summary = await summarize({
       userId: req.user!.id,

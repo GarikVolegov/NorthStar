@@ -45,7 +45,7 @@ export interface WendyActivationContext {
   requestId: string;
   userId: number;
   messageHash: string;
-  intent: WendyIntent | string;
+  intent: WendyIntent | (string & {});
   domain?: string | null;
   activeItems: ScoredActivationItem[];
   activeTools: string[];
@@ -70,7 +70,7 @@ export interface BuildWendyActivationInput {
   requestId: string;
   userId: number;
   message: string;
-  intent: WendyIntent | string;
+  intent: WendyIntent | (string & {});
   domain?: ActivationDomain;
   pageContext?: WendyPageContext | undefined;
 }
@@ -151,7 +151,7 @@ export function scoreActivationCandidate(candidate: ActivationCandidate): Scored
   };
 }
 
-function buildToolCandidates(intent: WendyIntent | string, message: string): ActivationCandidate[] {
+function buildToolCandidates(intent: WendyIntent | (string & {}), message: string): ActivationCandidate[] {
   if (!["navigation", "simple_qa", "conversation", "planning", "deep_analysis"].includes(intent)) {
     return [];
   }

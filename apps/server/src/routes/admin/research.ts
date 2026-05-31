@@ -52,7 +52,7 @@ router.get("/research/runs", async (req: Request, res: Response) => {
 router.post("/research/news/run", async (req: Request, res: Response) => {
   const startedAt = new Date();
   try {
-    const result = await runNewsPublishingPipeline({ body: req.body ?? {}, startedAt });
+    const result = await runNewsPublishingPipeline({ body: (req.body ?? {}) as Record<string, unknown>, startedAt });
     res.status(result.ok ? 201 : 500).json(result);
   } catch (err) {
     const run = await writeAgentRunSnapshot({
@@ -71,7 +71,7 @@ router.post("/research/news/run", async (req: Request, res: Response) => {
 router.post("/research/growth/run", async (req: Request, res: Response) => {
   const startedAt = new Date();
   try {
-    const result = await runGrowthResearchReviewPipeline({ body: req.body ?? {}, startedAt });
+    const result = await runGrowthResearchReviewPipeline({ body: (req.body ?? {}) as Record<string, unknown>, startedAt });
     res.status(201).json(result);
   } catch (err) {
     const run = await writeAgentRunSnapshot({

@@ -145,7 +145,7 @@ export function createSimulatedDaysRouter({ store = dbSimulatedDaysStore }: { st
 
   router.post("/generate", requireAuth, async (req, res) => {
     const userId = req.user?.id;
-    const professionId = parsePositiveId(req.body?.professionId);
+    const professionId = parsePositiveId((req.body as { professionId?: unknown })?.professionId);
     if (!userId) {
       res.status(401).json({ error: "Unauthorized" });
       return;
@@ -193,7 +193,7 @@ export function createSimulatedDaysRouter({ store = dbSimulatedDaysStore }: { st
 
     const profession = await store.getProfession(record.professionId);
     const candidates = await store.listActiveProfessions();
-    const responses = parseResponses(req.body?.responses);
+    const responses = parseResponses((req.body as { responses?: unknown })?.responses);
     const debrief = computeTryADayDebrief(record.scenesJson, responses);
     if (profession) {
       debrief.suggestions = pickTryADaySuggestions(profession, candidates);
