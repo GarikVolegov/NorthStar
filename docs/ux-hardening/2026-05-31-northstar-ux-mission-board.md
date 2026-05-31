@@ -117,6 +117,16 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - Route lavori/candidature non fingono piu persistenza: `GET/POST/PATCH/DELETE` placeholder espongono `status: "not_configured"`, `reason` e `action` invece di empty/fake success.
 - UI lavori/candidature mostra stato setup esplicito e nasconde CTA che farebbero credere a salvataggi reali quando backend/provider non sono collegati.
 
+## Tranche 9 Applicata
+
+- `PATCH /api/objectives/:id` mantiene coerenti progresso e completamento: `progress: 100` completa l'obiettivo, mentre un progresso inferiore riapre e cancella `completedAt`.
+- Errori obiettivo invalidi o mancanti tornano codici azionabili (`OBJECTIVE_INVALID_ID`, `OBJECTIVE_NOT_FOUND`) con `action: "refresh_objectives"`.
+- Wendy action executor conserva la ragione API quando una creazione obiettivo viene rifiutata, chiarisce che nulla e stato modificato e invita a correggere la proposta prima del retry.
+- Diario obiettivi non confonde piu errore API con lista vuota: mostra un recovery state con `Riprova`.
+- Le mutazioni fallite nel Diario restano visibili con motivo API, invece di sparire in silenzio.
+- Dashboard non maschera piu errori `/api/dashboard` con KPI/timeline/diario vuoti: mostra un blocco recuperabile e mantiene consultabile il resto.
+- Timeline settimanale usa gli obiettivi attivi quando non ci sono eventi calendario, evitando la traccia predefinita se l'utente ha gia azioni reali.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -187,6 +197,14 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - `pnpm --filter @northstar/web exec vitest run --configLoader runner src/components/admin/console/sections.test.tsx src/pages/applications.test.tsx src/pages/lavori.test.tsx src/components/dashboard/widgets/JobFeedWidget.test.tsx`
 - `pnpm --filter @northstar/server run typecheck`
 - `pnpm --filter @northstar/web run typecheck`
+- `git diff --check`
+
+## Verifica Tranche 9
+
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner src/pages/dashboard.test.tsx src/components/diary/DiaryObjectives.test.tsx src/hooks/useWendyActionExecutor.test.ts src/components/wendy/WendyActionCard.test.tsx src/components/dashboard/DashboardWeekTimeline.test.tsx`
+- `pnpm --filter @northstar/server exec vitest run --configLoader runner src/routes/objectives.test.ts`
+- `pnpm --filter @northstar/web run typecheck`
+- `pnpm --filter @northstar/server run typecheck`
 - `git diff --check`
 
 ## Backlog Prossima Tranche

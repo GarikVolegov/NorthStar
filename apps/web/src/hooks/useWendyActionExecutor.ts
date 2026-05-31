@@ -177,6 +177,14 @@ function objectiveProgressApiFailureMessage(res: Response, apiReason: string | n
   return `${reason} Non ho modificato nulla. ${recovery}`;
 }
 
+function objectiveCreationApiFailureMessage(res: Response, apiReason: string | null) {
+  const status = res.status ? ` (${res.status})` : "";
+  const reason = apiReason
+    ? `L'API obiettivi ha risposto: ${apiReason}.`
+    : `L'API obiettivi non ha completato la creazione${status}.`;
+  return `${reason} Non ho modificato nulla. Correggi la proposta e riprova.`;
+}
+
 function calendarPayload(payload: Record<string, unknown>) {
   const date = typeof payload.date === "string" ? payload.date : new Date().toISOString().split("T")[0];
   const startAt = new Date(`${date}T09:00:00`);
@@ -354,7 +362,9 @@ export function useWendyActionExecutor() {
           method: "POST",
           body: JSON.stringify(payload),
         });
-        if (!res.ok) throw new Error("Non sono riuscita a creare l'obiettivo.");
+        if (!res.ok) {
+          throw new Error(objectiveCreationApiFailureMessage(res, await readApiError(res)));
+        }
         invalidateOperationalData();
         toast({ title: "Obiettivo creato", description: "Wendy lo ha salvato nella tua dashboard." });
         return { ...running, status: "executed" };

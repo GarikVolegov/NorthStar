@@ -123,6 +123,40 @@ describe("useWendyActionExecutor", () => {
     expect(updated).toMatchObject({ status: "executed" });
   });
 
+  it("keeps the API reason and recovery copy when objective creation is rejected", async () => {
+    apiFetchMock.mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ message: "Testo obiettivo obbligatorio" }),
+    } as Response);
+    const { result } = renderHook(() => useWendyActionExecutor(), { wrapper: wrapperFactory() });
+
+    let updated: WendyAction | undefined;
+    await act(async () => {
+      updated = await result.current.confirm({
+        id: "objective-1",
+        type: "create_objective",
+        status: "needs_confirmation",
+        risk: "medium",
+        label: "Creare questo obiettivo?",
+        description: "Conferma prima di salvare l'obiettivo.",
+        requiresConfirmation: true,
+        payload: { text: "", category: "lavoro" },
+      });
+    });
+
+    expect(updated).toMatchObject({
+      status: "failed",
+      error: expect.stringContaining("Testo obiettivo obbligatorio"),
+    });
+    expect(updated?.error).toContain("Non ho modificato nulla");
+    expect(updated?.error).toContain("Correggi la proposta");
+    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({
+      variant: "destructive",
+      description: expect.stringContaining("Testo obiettivo obbligatorio"),
+    }));
+  });
+
   it("keeps the API reason and recovery copy when a progress update is rejected", async () => {
     apiFetchMock.mockResolvedValue({
       ok: false,

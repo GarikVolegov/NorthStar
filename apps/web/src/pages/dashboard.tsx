@@ -20,6 +20,7 @@ import {
   HelpCircle,
   LayoutGrid,
   MapPin,
+  RefreshCw,
   Rocket,
   Sparkles,
   TrendingUp
@@ -103,6 +104,26 @@ function useSessionDetail(sessionId: number | null) {
   });
 }
 
+function DashboardProgressUnavailable({ onRetry }: { onRetry: () => void }) {
+  return (
+    <section className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-foreground">Progressi dashboard non disponibili</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Non posso verificare obiettivi, timeline e avanzamento in questo momento. Il resto della dashboard resta consultabile.
+          </p>
+          <Button type="button" size="sm" variant="outline" className="mt-3 h-8 gap-1.5" onClick={onRetry}>
+            <RefreshCw className="h-3.5 w-3.5" />
+            Riprova
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function Dashboard() {
   usePageMeta({
     title: "Fondazione NorthStar",
@@ -132,7 +153,7 @@ export default function Dashboard() {
   const journeyType = (user?.journeyType ?? "indeciso") as JourneyId;
   const journeyMeta = JOURNEY_META[journeyType];
 
-  const { data: dashData, isLoading: dashLoading } = useDashboardData();
+  const { data: dashData, isLoading: dashLoading, isError: dashError, refetch: refetchDashboard } = useDashboardData();
   const { data: latestSession, isLoading: sessionLoading } = useLatestSession();
   const dashboardSession = dashData?.session ?? null;
   const sessionId = latestSession?.sessionId ?? dashboardSession?.id ?? null;
@@ -382,6 +403,7 @@ export default function Dashboard() {
       case "wendy_prompts":
         return <DashboardWendyPrompts />;
       case "kpi_strip":
+        if (dashError) return null;
         return (
           <DashboardKpiStrip
             profilePercent={profilePercent}
@@ -392,8 +414,10 @@ export default function Dashboard() {
           />
         );
       case "week_timeline":
-        return <DashboardWeekTimeline events={upcomingEvents} />;
+        if (dashError) return null;
+        return <DashboardWeekTimeline events={upcomingEvents} objectives={strategicObjectives} />;
       case "diary_objectives":
+        if (dashError) return null;
         return <DashboardDiaryBookCard objectives={strategicObjectives} />;
       case "wendy_insights":
         if (insightsError) {
@@ -455,6 +479,8 @@ export default function Dashboard() {
       />
 
       <MonthlyRitualBanner ritual={monthlyRitual} forceExpanded={ritualRequested} />
+
+      {dashError && <DashboardProgressUnavailable onRetry={() => refetchDashboard()} />}
 
       {dashboardLayout
         .filter((section) => section.visible)

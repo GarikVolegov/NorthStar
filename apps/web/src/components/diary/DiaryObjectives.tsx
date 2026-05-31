@@ -13,7 +13,7 @@ import {
 } from "@/lib/objectives-presentation";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, CheckCircle2, Circle, Flag, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, BadgeCheck, CheckCircle2, Circle, Flag, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -32,6 +32,13 @@ function importanceClass(label: ReturnType<typeof getObjectiveImportance>) {
   if (label === "Media") return "border-blue-500/20 bg-blue-500/10 text-blue-600";
   if (label === "Completata") return "border-primary/20 bg-primary/10 text-primary";
   return "border-border bg-muted text-muted-foreground";
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  return fallback;
 }
 
 function ObjectiveTimeline({
@@ -114,8 +121,9 @@ export function DiaryObjectives() {
   const queryClient = useQueryClient();
   const [newText, setNewText] = useState("");
   const [newCategory, setNewCategory] = useState("carriera");
+  const [operationError, setOperationError] = useState<string | null>(null);
 
-  const { data: objectives = [], isLoading } = useQuery<DashboardObjective[]>({
+  const { data: objectives = [], isLoading, isError, error, refetch } = useQuery<DashboardObjective[]>({
     queryKey: ["objectives-me"],
     queryFn: () => getJson<DashboardObjective[]>(`${BASE}api/objectives`),
     enabled: authReady && !!user,
@@ -123,6 +131,7 @@ export function DiaryObjectives() {
   });
 
   const invalidateObjectives = () => {
+    setOperationError(null);
     void queryClient.invalidateQueries({ queryKey: ["objectives-me"] });
     void queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
   };
@@ -130,11 +139,15 @@ export function DiaryObjectives() {
   const createMutation = useMutation({
     mutationFn: (payload: { text: string; category: string }) => postJson(`${BASE}api/objectives`, payload),
     onSuccess: invalidateObjectives,
+    onError: (mutationError) =>
+      setOperationError(getErrorMessage(mutationError, "Non sono riuscita a creare l'obiettivo.")),
   });
 
   const toggleMutation = useMutation({
     mutationFn: (objective: DashboardObjective) => patchJson(`${BASE}api/objectives/${objective.id}`, { completed: !objective.completed }),
     onSuccess: invalidateObjectives,
+    onError: (mutationError) =>
+      setOperationError(getErrorMessage(mutationError, "Non sono riuscita ad aggiornare l'obiettivo.")),
   });
 
   const certifiableMutation = useMutation({
@@ -143,11 +156,15 @@ export function DiaryObjectives() {
         isCertifiableMilestone: !objective.isCertifiableMilestone,
       }),
     onSuccess: invalidateObjectives,
+    onError: (mutationError) =>
+      setOperationError(getErrorMessage(mutationError, "Non sono riuscita ad aggiornare la milestone.")),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => deleteJson(`${BASE}api/objectives/${id}`),
     onSuccess: invalidateObjectives,
+    onError: (mutationError) =>
+      setOperationError(getErrorMessage(mutationError, "Non sono riuscita a eliminare l'obiettivo.")),
   });
 
   const groups = groupStrategicObjectivesByMacroArea(objectives);
@@ -158,6 +175,7 @@ export function DiaryObjectives() {
     event.preventDefault();
     const text = newText.trim();
     if (text.length < 3) return;
+    setOperationError(null);
     createMutation.mutate({ text, category: newCategory });
     setNewText("");
   };
@@ -171,8 +189,55 @@ export function DiaryObjectives() {
     );
   }
 
+  if (isError) {
+    return (
+      <section className="rounded-lg border border-destructive/25 bg-card p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex gap-3">
+            <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-destructive/25 bg-destructive/10 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Obiettivi non disponibili</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                {getErrorMessage(error, "Non sono riuscita a caricare gli obiettivi. Riprova tra poco.")}
+              </p>
+            </div>
+          </div>
+          <Button type="button" variant="outline" className="rounded-lg" onClick={() => void refetch()}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Riprova
+          </Button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <div className="space-y-5">
+      {operationError && (
+        <div
+          role="alert"
+          className="flex flex-col gap-3 rounded-lg border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-semibold">Aggiornamento non riuscito</p>
+              <p className="mt-0.5 text-destructive/90">{operationError}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            aria-label="Chiudi errore"
+            onClick={() => setOperationError(null)}
+            className="inline-flex min-h-9 min-w-9 items-center justify-center self-start rounded-lg text-destructive/80 hover:bg-destructive/10 hover:text-destructive sm:self-auto"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <section className="rounded-lg border bg-card p-5">
         <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div>

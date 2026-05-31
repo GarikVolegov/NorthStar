@@ -166,9 +166,22 @@ export function createObjectivesRouter({
       const id = parseInt(req.params.id ?? "", 10);
       const data = updateObjectiveSchema.parse(req.body);
 
+      if (!Number.isInteger(id) || id <= 0) {
+        res.status(400).json({
+          code: "OBJECTIVE_INVALID_ID",
+          error: "ID obiettivo non valido",
+          action: "refresh_objectives",
+        });
+        return;
+      }
+
       const existing = await store.findByIdForUser(id, userId);
       if (!existing) {
-        res.status(404).json({ error: "Obiettivo non trovato" });
+        res.status(404).json({
+          code: "OBJECTIVE_NOT_FOUND",
+          error: "Obiettivo non trovato",
+          action: "refresh_objectives",
+        });
         return;
       }
 
@@ -183,7 +196,18 @@ export function createObjectivesRouter({
 
       const updateData: Partial<ObjectiveRecord> = { updatedAt: new Date() };
       if (data.text !== undefined) updateData.text = data.text;
-      if (data.progress !== undefined) updateData.progress = data.progress;
+      if (data.progress !== undefined) {
+        updateData.progress = data.progress;
+        if (data.completed === undefined) {
+          if (data.progress >= 100) {
+            updateData.completed = true;
+            if (!existing.completed) updateData.completedAt = new Date();
+          } else if (existing.completed) {
+            updateData.completed = false;
+            updateData.completedAt = null;
+          }
+        }
+      }
       if (data.completed !== undefined) updateData.completed = data.completed;
       if (data.dueDate !== undefined) updateData.dueDate = data.dueDate;
       if (data.isCertifiableMilestone !== undefined) {
