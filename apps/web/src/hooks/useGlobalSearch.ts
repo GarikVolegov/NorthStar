@@ -1,4 +1,4 @@
-import { getJson, postJson, stream } from "@/lib/apiClient";
+import { getJson, postJson } from "@/lib/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -101,88 +101,13 @@ async function trackSearch(data: Record<string, unknown>) {
   }
 }
 
-type SearchStreamEvent =
-  | { type: "status"; value: string }
-  | { type: "route"; route: RouterOutput }
-  | { type: "results"; results: SearchResult[] }
-  | { type: "sources"; chunks: AiSource[] }
-  | { type: "token"; value: string }
-  | { type: "done" }
-  | { type: "error" }
-  | { type: "unknown" };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function parseSearchResults(value: unknown): SearchResult[] {
-  return Array.isArray(value) ? (value as SearchResult[]) : [];
-}
-
-function parseAiSources(value: unknown): AiSource[] {
-  return Array.isArray(value) ? (value as AiSource[]) : [];
-}
-
-function parseRouterOutput(value: unknown): RouterOutput {
-  if (!isRecord(value)) return DEFAULT_ROUTE;
-  return {
-    intent: typeof value.intent === "string" ? value.intent as RouterOutput["intent"] : DEFAULT_ROUTE.intent,
-    user_mode: typeof value.user_mode === "string" ? value.user_mode as RouterOutput["user_mode"] : DEFAULT_ROUTE.user_mode,
-    experience_level: typeof value.experience_level === "string" ? value.experience_level as RouterOutput["experience_level"] : DEFAULT_ROUTE.experience_level,
-    needs_clarification: value.needs_clarification === true,
-    clarifying_question: typeof value.clarifying_question === "string" ? value.clarifying_question : null,
-    ui_widget_type: typeof value.ui_widget_type === "string" ? value.ui_widget_type as RouterOutput["ui_widget_type"] : DEFAULT_ROUTE.ui_widget_type,
-    retrieval_strategy: typeof value.retrieval_strategy === "string" ? value.retrieval_strategy as RouterOutput["retrieval_strategy"] : DEFAULT_ROUTE.retrieval_strategy,
-    confidence: typeof value.confidence === "number" ? value.confidence : DEFAULT_ROUTE.confidence,
-  };
-}
-
-function parseSearchStreamEvent(line: string): SearchStreamEvent {
-  try {
-    const parsed = JSON.parse(line.slice(6)) as unknown;
-    if (!isRecord(parsed) || typeof parsed.type !== "string") {
-      return { type: "unknown" };
-    }
-    if (parsed.type === "status" && typeof parsed.value === "string") {
-      return { type: "status", value: parsed.value };
-    }
-    if (parsed.type === "route") {
-      return { type: "route", route: parseRouterOutput(parsed.route) };
-    }
-    if (parsed.type === "results") {
-      return { type: "results", results: parseSearchResults(parsed.results) };
-    }
-    if (parsed.type === "sources") {
-      return { type: "sources", chunks: parseAiSources(parsed.chunks) };
-    }
-    if (parsed.type === "token" && typeof parsed.value === "string") {
-      return { type: "token", value: parsed.value };
-    }
-    if (parsed.type === "done") return { type: "done" };
-    if (parsed.type === "error") return { type: "error" };
-    return { type: "unknown" };
-  } catch {
-    return { type: "unknown" };
-  }
-}
-
 export function useGlobalSearch() {
   const [query, setQuery]         = useState("");
   const [isOpen, setIsOpen]       = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debouncedQuery = useDebounce(query, 350);
 
-  // ── AI orchestrator state ──────────────────────────────────────────────────
-  const [aiTokens, setAiTokens]       = useState("");
-  const [aiStatus, setAiStatus]       = useState<string | null>(null);
-  const [aiSources, setAiSources]     = useState<AiSource[]>([]);
-  const [aiRoute, setAiRoute]         = useState<RouterOutput>(DEFAULT_ROUTE);
-  const [isStreaming, setIsStreaming]  = useState(false);
-  const [history, setHistory]         = useState<ChatMessage[]>([]);
-  const [orchestratedResults, setOrchestratedResults] = useState<SearchResult[]>([]);
-  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
-
-  // ── Legacy React Query (fallback / risultati DB istantanei) ───────────────
+  // Global search stays data-only; Wendy chat is owned by SearchDialog.
   const { data, isLoading, isError } = useQuery<HybridResponse>({
     queryKey: ["global-search-hybrid", debouncedQuery],
     queryFn: async () => {
@@ -197,7 +122,7 @@ export function useGlobalSearch() {
     gcTime: 60_000,
   });
 
-  const results    = orchestratedResults.length > 0 ? orchestratedResults : (data?.results ?? []);
+  const results    = data?.results ?? [];
   const hasSemantic = data?.has_semantic ?? false;
   const indexStatus = data?.indexStatus ?? "ready";
   const searchMode = data?.searchMode ?? (hasSemantic ? "semantic" : "keyword");
@@ -219,92 +144,6 @@ export function useGlobalSearch() {
 
   const suggestions = suggestData?.suggestions ?? [];
 
-  // ── Wendy AI streaming (integrated directly in search bar) ──────────────────
-
-  function stopStream() {
-    readerRef.current?.cancel().catch(() => {});
-    readerRef.current = null;
-    setIsStreaming(false);
-  }
-
-  const startWendyAI = useCallback(async (q: string, msgs: ChatMessage[]) => {
-    stopStream();
-    setAiTokens("");
-    setAiStatus(null);
-    setAiSources([]);
-    setOrchestratedResults([]);
-    setIsStreaming(true);
-
-    try {
-      const res = await stream(`${BASE}api/search/orchestrate`, {
-        method: "POST",
-        credentials: "include",
-        body: JSON.stringify({ q, sessionId, history: msgs }),
-      });
-
-      if (!res.ok || !res.body) {
-        setIsStreaming(false);
-        return;
-      }
-
-      const reader  = res.body.getReader();
-      readerRef.current = reader;
-      const decoder = new TextDecoder();
-      let   buf     = "";
-      let   finalText = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split("\n\n");
-        buf = lines.pop()!;
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const event = parseSearchStreamEvent(line);
-          if (event.type === "status") setAiStatus(event.value);
-          if (event.type === "route") setAiRoute(event.route);
-          if (event.type === "results") setOrchestratedResults(event.results);
-          if (event.type === "sources") setAiSources(event.chunks);
-          if (event.type === "token") {
-            finalText += event.value;
-            setAiTokens((t) => t + event.value);
-          }
-          if (event.type === "done") {
-            setIsStreaming(false);
-            if (finalText) {
-              setHistory((h) => [
-                ...h,
-                { role: "user",      content: q },
-                { role: "assistant", content: finalText },
-              ]);
-            }
-            break;
-          }
-          if (event.type === "error") {
-            setIsStreaming(false);
-            break;
-          }
-        }
-      }
-    } catch {
-      setIsStreaming(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (debouncedQuery.length < 2) {
-      setOrchestratedResults([]);
-    }
-    if (debouncedQuery.length < 3) {
-      stopStream();
-      setAiTokens("");
-      setAiStatus(null);
-      setAiSources([]);
-    }
-  }, [debouncedQuery]);
-
   // ── Keyboard shortcut ─────────────────────────────────────────────────────
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -321,15 +160,10 @@ export function useGlobalSearch() {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 50);
     } else {
-      stopStream();
       if (query && query.length >= 2) {
         trackSearch({ query, resultsShown: results, dismissed: true });
       }
       setQuery("");
-      setAiTokens("");
-      setAiStatus(null);
-      setAiSources([]);
-      setOrchestratedResults([]);
     }
   }, [isOpen]);
 
@@ -347,18 +181,16 @@ export function useGlobalSearch() {
     [debouncedQuery, results],
   );
 
-  // Follow-up: aggiunge alla history e richiama Wendy AI
   const sendFollowUp = useCallback((followUpQuery: string) => {
     setQuery(followUpQuery);
-    startWendyAI(followUpQuery, history);
-  }, [history, startWendyAI]);
+  }, []);
 
   return {
     query,
     setQuery,
     results,
     suggestions,
-    route: aiRoute,
+    route: DEFAULT_ROUTE,
     hasSemantic,
     searchMode,
     indexStatus,
@@ -370,12 +202,12 @@ export function useGlobalSearch() {
     trackClick,
     inputRef,
     debouncedQuery,
-    // AI orchestrator
-    aiTokens,
-    aiStatus,
-    aiSources,
-    isStreaming,
-    history,
+    // Legacy shape kept inert for callers that still read these fields.
+    aiTokens: "",
+    aiStatus: null,
+    aiSources: [] as AiSource[],
+    isStreaming: false,
+    history: [] as ChatMessage[],
     sendFollowUp,
   };
 }

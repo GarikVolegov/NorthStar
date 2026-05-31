@@ -40,7 +40,14 @@ export interface WendySuggestedPrompt {
 
 export type WendySseEvent =
   | { type: 'status'; value: string }
-  | { type: 'gate'; message: string }
+  | {
+      type: 'gate';
+      message: string;
+      feature?: string | undefined;
+      authRequired?: boolean | undefined;
+      retryable?: boolean | undefined;
+      loginUrl?: string | undefined;
+    }
   | { type: 'error'; message: string }
   | { type: 'rag_citations'; citations: WendySseRagCitation[] }
   | {
@@ -197,6 +204,10 @@ export function parseWendySseEvent(raw: string): WendySseEvent {
       message: typeof parsed.message === 'string'
         ? parsed.message
         : 'Hai raggiunto un limite di utilizzo di Wendy.',
+      feature: typeof parsed.feature === 'string' ? parsed.feature : undefined,
+      authRequired: typeof parsed.authRequired === 'boolean' ? parsed.authRequired : undefined,
+      retryable: typeof parsed.retryable === 'boolean' ? parsed.retryable : undefined,
+      loginUrl: typeof parsed.loginUrl === 'string' ? parsed.loginUrl : undefined,
     };
   }
   if (type === 'error') {

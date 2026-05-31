@@ -10,7 +10,28 @@ const agentRegistryMock = vi.hoisted(() => ({
 }));
 
 vi.mock("../middleware/auth", () => ({
-  requireAuth: (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+  optionalAuth: (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+    if (req.headers.authorization !== "Bearer test-token") {
+      next();
+      return;
+    }
+    req.user = {
+      id: 42,
+      email: "ada@example.com",
+      name: "Ada",
+      role: "user",
+      onboardingCompleted: true,
+      journeyType: "indeciso",
+      stripeSubscriptionId: null,
+      testSessionId: null,
+    };
+    next();
+  },
+  requireAuth: (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (req.headers.authorization !== "Bearer test-token") {
+      res.status(401).json({ error: "Token mancante" });
+      return;
+    }
     req.user = {
       id: 42,
       email: "ada@example.com",
@@ -134,6 +155,7 @@ describe("ai Wendy route fallbacks", () => {
   it("streams token, done, and coherent suggested prompts for Italian data-backed fallback actions", async () => {
     const response = await request(app())
       .post("/api/ai/wendy")
+      .set("Authorization", "Bearer test-token")
       .send({ message: "Cosa dovrei fare oggi?", locale: "en" })
       .expect(200);
 
@@ -155,5 +177,28 @@ describe("ai Wendy route fallbacks", () => {
     expect(JSON.stringify(done?.suggestedPrompts)).toMatch(/oggi|25 minuti|obiettivo/i);
     expect(response.text).toMatch(/\n\ndata: \{"type":"done"/);
     expect(agentRegistryMock.clear).toHaveBeenCalled();
+  });
+
+  it("returns a non-retryable login gate over SSE for guests", async () => {
+    const response = await request(app())
+      .post("/api/ai/wendy")
+      .send({ message: "Ciao Wendy", locale: "it" })
+      .expect(200);
+
+    expect(response.headers["content-type"]).toContain("text/event-stream");
+    const events = parseSse(response.text);
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: "gate",
+        feature: "auth_required",
+        authRequired: true,
+        retryable: false,
+        loginUrl: "/sign-in",
+        message: expect.stringContaining("Accedi"),
+      }),
+    ]);
+    expect(agentRegistryMock.getSnapshot).not.toHaveBeenCalled();
+    expect(agentRegistryMock.update).not.toHaveBeenCalled();
   });
 });

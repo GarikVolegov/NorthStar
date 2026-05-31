@@ -151,7 +151,7 @@ export default function MemoriaWendy() {
         <div className="space-y-2">
           {facts.map((fact) => (
             <div key={fact.id}
-              className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 hover:bg-muted/20 transition-colors group">
+              className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 hover:bg-muted/20 transition-colors">
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-foreground font-medium">{fact.value}</p>
                 <div className="flex items-center gap-2 mt-1">
@@ -165,16 +165,19 @@ export default function MemoriaWendy() {
                   )}
                 </div>
               </div>
-              <button
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => deleteMutation.mutate(fact.id)}
                 disabled={deleting === fact.id}
-                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+                className="min-h-11 min-w-11 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 focus-visible:ring-destructive/50"
                 aria-label="Cancella fatto"
               >
                 {deleting === fact.id
                   ? <Loader2 className="h-4 w-4 animate-spin" />
                   : <Trash2 className="h-4 w-4" />}
-              </button>
+              </Button>
             </div>
           ))}
         </div>

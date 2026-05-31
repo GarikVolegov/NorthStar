@@ -440,6 +440,7 @@ export function Navbar() {
         searchMode={search.searchMode}
         indexStatus={search.indexStatus}
         isLoading={search.isLoading}
+        isError={search.isError}
         isOpen={search.isOpen}
         setIsOpen={search.setIsOpen}
         close={search.close}

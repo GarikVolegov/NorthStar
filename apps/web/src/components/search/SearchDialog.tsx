@@ -35,6 +35,7 @@ interface SearchDialogProps {
   searchMode?: "semantic" | "hybrid" | "keyword";
   indexStatus?: "ready" | "degraded" | "unavailable";
   isLoading: boolean;
+  isError?: boolean;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
   close: () => void;
@@ -54,6 +55,7 @@ export function SearchDialog({
   searchMode = hasSemantic ? "semantic" : "keyword",
   indexStatus = "ready",
   isLoading,
+  isError = false,
   isOpen,
   close,
   trackClick,
@@ -136,7 +138,6 @@ export function SearchDialog({
     const trimmed = query.trim();
     if (trimmed.length < 2) return;
     void chat.sendMessage(trimmed);
-    setQuery("");
   }
 
   function askQuickAction(label: string) {
@@ -146,6 +147,9 @@ export function SearchDialog({
 
   const showDefaultSuggestions = query.length < 2 && !isLoading;
   const showResults = !isLoading && results.length > 0;
+  const hasSearchQuery = query.trim().length >= 2;
+  const showSearchError = !isLoading && isError && hasSearchQuery;
+  const showSearchEmpty = !isLoading && !isError && results.length === 0 && hasSearchQuery;
   const hasSuggestions = suggestions.length > 0;
   const activeSuggestions = hasSuggestions ? suggestions : SUGGESTIONS_DEFAULTS;
   const pageHints = getPageHints();
@@ -155,7 +159,7 @@ export function SearchDialog({
   const hasConversation = chat.messages.length > 0 || chat.thinking.active || !!chat.streamError;
   const isAIActive = hasConversation || chat.isStreaming;
   const queryLong  = query.length >= 3 || hasConversation;
-  const showSideResults = isLoading || showResults;
+  const showSideResults = isLoading || showResults || showSearchEmpty || showSearchError;
 
   return (
     <AnimatePresence>
@@ -240,19 +244,23 @@ export function SearchDialog({
                   </div>
                 )}
                 {!isAIActive && (
-                  <CommandInput
-                    ref={inputRef}
-                    placeholder={t("search.placeholder")}
-                    value={query}
-                    onValueChange={setQuery}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !event.shiftKey) {
-                        event.preventDefault();
-                        askCurrentQuery();
-                      }
-                    }}
-                    className="border-b border-white/10"
-                  />
+                  <div className="border-b border-white/10">
+                    <div className="flex items-center justify-between gap-3 px-3 py-2">
+                      <div>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground">Ricerca globale</p>
+                        <p className="text-[11px] text-muted-foreground/70">Cerca pagine, ruoli, articoli e contenuti NorthStar.</p>
+                      </div>
+                      <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] text-muted-foreground">
+                        {searchMode}
+                      </span>
+                    </div>
+                    <CommandInput
+                      ref={inputRef}
+                      placeholder={t("search.placeholder")}
+                      value={query}
+                      onValueChange={setQuery}
+                    />
+                  </div>
                 )}
 
                 {/* Layout split quando AI e attiva (solo desktop) */}
@@ -261,7 +269,11 @@ export function SearchDialog({
 
                     {/* Colonna sinistra: risultati DB */}
                     {showSideResults && (
-                    <div className="w-2/5 border-r border-white/10 overflow-y-auto">
+                    <section className="w-2/5 border-r border-white/10 overflow-y-auto" aria-label="Ricerca globale">
+                      <div className="border-b border-white/10 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase text-muted-foreground">Ricerca globale</p>
+                        <p className="text-[11px] text-muted-foreground/70">Risultati nell'app NorthStar.</p>
+                      </div>
                       <CommandList className="max-h-none">
                         {isLoading && (
                           <div className="flex items-center gap-2 px-4 py-4 text-sm text-muted-foreground">
@@ -294,24 +306,32 @@ export function SearchDialog({
                             </CommandGroup>
                           );
                         })}
-                        {!isLoading && !showResults && (
+                        {showSearchError && (
                           <div className="px-4 py-5 text-sm text-muted-foreground">
-                            Nessun risultato nell'app. Wendy puo comunque rispondere qui accanto.
+                            <p className="font-medium text-foreground">La ricerca globale non e disponibile adesso.</p>
+                            <p className="mt-1 text-xs">Puoi riprovare tra poco o chiedere a Wendy qui accanto.</p>
+                          </div>
+                        )}
+                        {showSearchEmpty && (
+                          <div className="px-4 py-5 text-sm text-muted-foreground">
+                            <p className="font-medium text-foreground">Nessun risultato globale per "{query}"</p>
+                            <p className="mt-1 text-xs">Wendy puo aiutarti a riformulare o ragionare sul prossimo passo.</p>
                           </div>
                         )}
                       </CommandList>
-                    </div>
+                    </section>
                     )}
 
-                    <WendyConsole
-                      chat={chat}
-                      query={query}
-                      setQuery={setQuery}
-                      onSubmit={askCurrentQuery}
-                      starterPrompts={quickActions.map((a) => ({ label: a.label, icon: a.icon }))}
-                      inputRef={inputRef}
-                      className={cn(showSideResults ? "w-3/5" : "w-full")}
-                    />
+                    <section className={cn(showSideResults ? "w-3/5" : "w-full")} aria-label="Chat Wendy">
+                      <WendyConsole
+                        chat={chat}
+                        query={query}
+                        setQuery={setQuery}
+                        onSubmit={askCurrentQuery}
+                        starterPrompts={quickActions.map((a) => ({ label: a.label, icon: a.icon }))}
+                        inputRef={inputRef}
+                      />
+                    </section>
                   </div>
 
                 ) : (
@@ -324,11 +344,20 @@ export function SearchDialog({
                       </div>
                     )}
 
-                    {!isLoading && results.length === 0 && query.length >= 2 && (
+                    {showSearchError && (
                       <CommandEmpty>
-                        <p>{t("search.noResults", { query })}</p>
+                        <p className="font-medium text-foreground">La ricerca globale non e disponibile adesso.</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Puoi riprovare tra poco o chiedere a Wendy.
+                        </p>
+                      </CommandEmpty>
+                    )}
+
+                    {showSearchEmpty && (
+                      <CommandEmpty>
+                        <p>Nessun risultato globale per "{query}"</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Prova: tecnologia, marketing, finanza, sanita, istruzione
+                          Prova termini piu generali oppure chiedi a Wendy di guidarti.
                         </p>
                       </CommandEmpty>
                     )}
@@ -358,7 +387,7 @@ export function SearchDialog({
                       </div>
                     )}
 
-                    {query.length >= 2 && !chat.isStreaming && !isAIActive && (
+                    {hasSearchQuery && !chat.isStreaming && !isAIActive && (
                       <div className="px-3 py-2 border-b border-white/5">
                         <button
                           type="button"
@@ -429,7 +458,7 @@ export function SearchDialog({
                 )}
 
                 {isMobile && isAIActive && queryLong && (
-                  <div className="border-t border-white/10" style={{ maxHeight: "58vh" }}>
+                  <section className="border-t border-white/10" style={{ maxHeight: "58vh" }} aria-label="Chat Wendy">
                     <WendyConsole
                       chat={chat}
                       query={query}
@@ -439,7 +468,7 @@ export function SearchDialog({
                       inputRef={inputRef}
                       compact
                     />
-                  </div>
+                  </section>
                 )}
               </Command>
             </div>

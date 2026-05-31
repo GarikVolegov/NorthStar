@@ -70,6 +70,16 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - Widget dashboard critici non spariscono su errore API: readiness, insight personalita, obiettivi, streak mindset e insights mostrano stati recuperabili.
 - `useProactiveInsights` non maschera errori come lista vuota quando la dashboard deve guidare l'utente.
 
+## Tranche 4 Applicata
+
+- Search/Wendy non usa piu due pipeline concorrenti: `useGlobalSearch` gestisce ricerca globale, `WendyConsole` resta la sola chat Wendy.
+- SearchDialog separa visivamente `Ricerca globale` e `Chat Wendy`, con empty/error state chiari e CTA verso Wendy quando la ricerca non trova risultati.
+- Navbar passa lo stato errore ricerca al dialog, evitando empty state ambigui.
+- Guest Wendy non riceve piu un 401 JSON che sembra stream rotto: `/api/ai/wendy` emette un gate SSE non retriable con `auth_required`.
+- Il gate guest punta alla route reale `/sign-in` e non avvia registry, LLM o memoria.
+- Il parser SSE Wendy conserva i metadati del gate auth, cosi il client puo distinguere login richiesto da errore tecnico.
+- Memoria Wendy rende il pulsante delete sempre visibile su touch/focus, con target 44px e focus ring.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -100,12 +110,18 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - `pnpm --filter @northstar/web run typecheck`
 - `git diff --check`
 
+## Verifica Tranche 4
+
+- `pnpm --filter @northstar/server exec vitest run --configLoader runner src/routes/ai-wendy.test.ts`
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner src/hooks/useGlobalSearch.test.tsx src/components/search/SearchDialog.test.tsx src/hooks/useWendyChatSse.test.ts src/hooks/useWendyChat.test.tsx src/pages/memoria-wendy.test.tsx`
+- `pnpm --filter @northstar/server run typecheck`
+- `pnpm --filter @northstar/web run typecheck`
+- `git diff --check`
+
 ## Backlog Prossima Tranche
 
-1. Consolidare Search/Wendy: evitare due pipeline AI parallele non scopribili.
-2. Aggiungere E2E runtime: Wendy live, news, growth, sectors explore, onboarding/test completo, objectives UI.
-3. Decidere contratto guest Wendy: risposta guest con quota anonima oppure login gate esplicito.
-4. Rendere cancellazione memoria visibile su touch/focus.
-5. Correggere stati auth/sync Clerk con token verificato obbligatorio.
-6. Collegare Growth `types`/`italianTypes` a profilo/test reale invece di lasciarli vuoti.
-7. Sostituire route placeholder di candidature/lavori con persistenza o provider reale quando il prodotto lo richiede.
+1. Aggiungere E2E runtime: Wendy live, news, growth, sectors explore, onboarding/test completo, objectives UI.
+2. Correggere stati auth/sync Clerk con token verificato obbligatorio.
+3. Collegare Growth `types`/`italianTypes` a profilo/test reale invece di lasciarli vuoti.
+4. Sostituire route placeholder di candidature/lavori con persistenza o provider reale quando il prodotto lo richiede.
+5. Verificare mobile reale delle aree critiche: SearchDialog, Wendy full-screen, memoria, dashboard.

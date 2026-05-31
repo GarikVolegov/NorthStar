@@ -12,7 +12,7 @@
  */
 import { Router, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
-import { requireAuth } from "../middleware/auth";
+import { optionalAuth } from "../middleware/auth";
 import { wendyLimiter } from "../middleware/rate-limit";
 import { rootLogger } from "../middleware/logger";
 import {
@@ -127,7 +127,7 @@ function buildConfirmableClientAction(toolName: string, args: Record<string, unk
 
 router.post(
   "/",
-  requireAuth,
+  optionalAuth,
   wendyLimiter,
   async (req: Request, res: Response) => {
     const parsed = WendyRequestSchema.safeParse(req.body);
@@ -141,7 +141,29 @@ router.post(
       return;
     }
 
+    if (!req.user) {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders();
+      res.write(
+        `data: ${JSON.stringify({
+          type: "gate",
+          feature: "auth_required",
+          authRequired: true,
+          retryable: false,
+          loginUrl: "/sign-in",
+          message: "Accedi per parlare con Wendy e salvare il contesto del tuo percorso.",
+        })}\n\n`,
+      );
+      res.end();
+      return;
+    }
+
     await ensureWendyConfigFresh();
+
+    const user = req.user;
 
     const {
       message,
@@ -169,7 +191,7 @@ router.post(
       : "";
 
     // SECURITY: userId SEMPRE dal JWT, mai dal body
-    const userId = req.user!.id;
+    const userId = user.id;
     const requestId = randomUUID();
     const startedAt = Date.now();
 
@@ -602,7 +624,7 @@ router.post(
       personalContext = await buildWikiLLMContext({
         query: effectiveMessage,
         userId,
-        userRole: req.user!.role,
+        userRole: user.role,
         includePersonalMemory: true,
         includeWendyBrain: false,
         graphifyProfile: "auto",

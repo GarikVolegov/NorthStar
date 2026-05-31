@@ -99,7 +99,7 @@ describe("useGlobalSearch", () => {
     expect(result.current.suggestions[0]?.title).toBe("Design");
   });
 
-  it("parses orchestrated SSE follow-up events", async () => {
+  it("keeps Wendy orchestration out of the global search pipeline", async () => {
     const { result } = renderHook(() => useGlobalSearch(), { wrapper });
 
     await act(async () => {
@@ -108,10 +108,10 @@ describe("useGlobalSearch", () => {
       await Promise.resolve();
     });
 
-    await waitFor(() => expect(result.current.aiTokens).toBe("Risposta"));
-    expect(result.current.aiStatus).toBe("Cerco");
-    expect(result.current.aiSources).toHaveLength(1);
-    expect(result.current.results[0]?.title).toBe("AI");
+    expect(apiFetchMock).not.toHaveBeenCalledWith(expect.stringContaining("orchestrate"), expect.anything());
+    expect(result.current.aiTokens).toBe("");
+    expect(result.current.aiStatus).toBeNull();
+    expect(result.current.aiSources).toHaveLength(0);
     expect(result.current.isStreaming).toBe(false);
   });
 });

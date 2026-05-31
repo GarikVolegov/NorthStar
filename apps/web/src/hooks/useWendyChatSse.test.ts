@@ -3,6 +3,28 @@ import { describe, expect, it } from "vitest";
 import { parseWendySseEvent } from "./useWendyChatSse";
 
 describe("parseWendySseEvent", () => {
+  it("preserves auth gate metadata for Wendy login gates", () => {
+    expect(
+      parseWendySseEvent(
+        JSON.stringify({
+          type: "gate",
+          feature: "auth_required",
+          authRequired: true,
+          retryable: false,
+          loginUrl: "/login",
+          message: "Accedi per parlare con Wendy.",
+        }),
+      ),
+    ).toEqual({
+      type: "gate",
+      feature: "auth_required",
+      authRequired: true,
+      retryable: false,
+      loginUrl: "/login",
+      message: "Accedi per parlare con Wendy.",
+    });
+  });
+
   it("parses done context sources and drops unknown providers", () => {
     expect(
       parseWendySseEvent(
