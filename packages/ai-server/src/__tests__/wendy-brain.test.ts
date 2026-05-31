@@ -33,7 +33,8 @@ const selectLimit = vi.hoisted(() => vi.fn(async () => [
     embedding: [1, 0, 0],
   },
 ]));
-const selectWhere = vi.hoisted(() => vi.fn(() => ({ limit: selectLimit })));
+const selectOrderBy = vi.hoisted(() => vi.fn(() => ({ limit: selectLimit })));
+const selectWhere = vi.hoisted(() => vi.fn(() => ({ orderBy: selectOrderBy })));
 const selectFrom = vi.hoisted(() => vi.fn(() => ({ where: selectWhere })));
 const selectMock = vi.hoisted(() => vi.fn(() => ({ from: selectFrom })));
 const registryAllMock = vi.hoisted(() => vi.fn(() => [

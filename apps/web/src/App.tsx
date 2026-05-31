@@ -3,6 +3,8 @@ import { UserBackgroundLayer } from "@/components/user-background/UserBackground
 import { WendyInsightToastRunner } from "@/components/wendy/WendyInsightToastRunner";
 import { AppStateProvider } from "@/contexts/AppStateContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { AppLogoHeadSync } from "@/components/brand/AppLogoHeadSync";
+import { AppAudioProvider } from "@/contexts/AppAudioProvider";
 import { AdminAgentProvider } from "@/contexts/AdminAgentContext";
 import { WendyProvider } from "@/contexts/WendyProvider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -30,6 +32,7 @@ const NotFound = lazy(() => import("@/pages/not-found"));
 const AdminReview = lazy(() => import("@/pages/admin-review"));
 const AdminOffice = lazy(() => import("@/pages/admin-office"));
 const MemoriaWendy = lazy(() => import("@/pages/memoria-wendy"));
+const WendyPage = lazy(() => import("@/pages/wendy"));
 const WorkspacePage = lazy(() => import("@/pages/workspace"));
 const BriefingPage = lazy(() => import("@/pages/briefing"));
 const CertificatePage = lazy(() => import("@/pages/certificato"));
@@ -120,6 +123,13 @@ function Router() {
           </Suspense>
         </ErrorBoundary>
       </Route>
+      <Route path="/wendy">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <ProtectedRoute component={WendyPage} />
+          </Suspense>
+        </ErrorBoundary>
+      </Route>
       <Route path="/workspace">
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
@@ -197,10 +207,12 @@ function App() {
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <AppStateProvider>
-            <TooltipProvider>
-              <WendyProvider>
-                <AdminAgentProvider>
+          <AppAudioProvider>
+            <AppStateProvider>
+              <TooltipProvider>
+                <WendyProvider>
+                  <AdminAgentProvider>
+                  <AppLogoHeadSync />
                   <UserBackgroundLayer />
                   <div className="relative z-10 min-h-screen">
                     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
@@ -209,10 +221,11 @@ function App() {
                   </div>
                   <WendyInsightToastRunner />
                   <Toaster />
-                </AdminAgentProvider>
-              </WendyProvider>
-            </TooltipProvider>
-          </AppStateProvider>
+                  </AdminAgentProvider>
+                </WendyProvider>
+              </TooltipProvider>
+            </AppStateProvider>
+          </AppAudioProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>

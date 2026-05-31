@@ -68,6 +68,8 @@ export async function editImages(
   const imageBytes = Buffer.from(imageBase64, "base64");
 
   if (outputPath) {
+    // SECURITY: outputPath MUST be a server-constructed constant/temp path,
+    // never a user- or LLM-supplied string — this is an unconfined write.
     fs.writeFileSync(outputPath, imageBytes);
   }
 

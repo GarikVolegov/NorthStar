@@ -33,7 +33,8 @@ type KnowledgeAskEvent =
   | { kind: "content"; content: string }
   | { kind: "status"; status: string }
   | { kind: "citations"; citations: Citation[]; neighbors?: Citation[] }
-  | { kind: "error"; error: string };
+  | { kind: "error"; error: string }
+  | { kind: "done" };
 
 function isNodeType(value: unknown): value is NodeType {
   return typeof value === "string" && value in TYPE_META;
@@ -69,16 +70,37 @@ function parseCitations(value: unknown): Citation[] {
 }
 
 function parseKnowledgeAskEvent(chunk: string): KnowledgeAskEvent | null {
+  if (chunk.trim() === "[DONE]") return { kind: "done" };
   try {
     const parsed = JSON.parse(chunk) as unknown;
     if (typeof parsed !== "object" || parsed === null) return null;
     const record = parsed as {
+      type?: unknown;
+      value?: unknown;
       content?: unknown;
       status?: unknown;
       citations?: unknown;
       neighbors?: unknown;
       error?: unknown;
+      message?: unknown;
     };
+    if (record.type === "token") {
+      if (typeof record.value === "string") return { kind: "content", content: record.value };
+      if (typeof record.content === "string") return { kind: "content", content: record.content };
+    }
+    if (record.type === "sources") {
+      return { kind: "citations", citations: parseCitations(record.citations) };
+    }
+    if (record.type === "done") {
+      return { kind: "done" };
+    }
+    if (record.type === "error") {
+      const error = typeof record.message === "string" ? record.message : record.error;
+      return {
+        kind: "error",
+        error: typeof error === "string" ? error : "Errore durante la generazione",
+      };
+    }
     if (typeof record.content === "string") {
       return { kind: "content", content: record.content };
     }
@@ -98,7 +120,10 @@ function parseKnowledgeAskEvent(chunk: string): KnowledgeAskEvent | null {
     }
     return null;
   } catch {
-    return null;
+    return {
+      kind: "error",
+      error: "Risposta interrotta: formato dello stream non valido.",
+    };
   }
 }
 
@@ -154,7 +179,7 @@ export function KnowledgeChatPanel({
     try {
       const res = await stream(`${BASE}api/knowledge/ask`, {
         method: "POST",
-        body: JSON.stringify({ question: q }),
+        body: JSON.stringify({ message: q }),
       });
       const reader = res.body?.getReader();
       if (!reader) throw new Error("Nessun reader");
@@ -192,6 +217,12 @@ export function KnowledgeChatPanel({
               next[next.length - 1] = {
                 ...last,
                 error: data.error,
+                status: undefined,
+              };
+            else if (data.kind === "done")
+              next[next.length - 1] = {
+                ...last,
+                content: last.content || "Nessuna risposta ricevuta.",
                 status: undefined,
               };
             return next;

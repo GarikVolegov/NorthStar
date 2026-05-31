@@ -17,6 +17,7 @@ export const userObjectivesTable = pgTable("user_objectives", {
   dueDate: date("due_date"),
   completed: boolean("completed").notNull().default(false),
   completedAt: timestamp("completed_at", { withTimezone: true }),
+  isCertifiableMilestone: boolean("is_certifiable_milestone").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),

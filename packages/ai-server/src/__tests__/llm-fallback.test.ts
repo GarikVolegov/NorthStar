@@ -25,10 +25,16 @@ describe("LLM provider fallback", () => {
     })).toBeNull();
   });
 
-  it("falls back only for OpenRouter quota and rate limit failures", () => {
-    expect(shouldFallbackToOpenAI({ status: 429 })).toBe(true);
-    expect(shouldFallbackToOpenAI(new Error("Rate limit exceeded: free-models-per-day"))).toBe(true);
-    expect(shouldFallbackToOpenAI(new Error("401 invalid key"))).toBe(false);
-    expect(shouldFallbackToOpenAI(new Error("network unavailable"))).toBe(false);
+  it("does not use paid OpenAI fallback unless explicitly enabled", () => {
+    expect(shouldFallbackToOpenAI({ status: 429 }, {})).toBe(false);
+    expect(shouldFallbackToOpenAI(new Error("Rate limit exceeded: free-models-per-day"), {})).toBe(false);
+  });
+
+  it("falls back only for quota and rate limit failures when paid fallback is enabled", () => {
+    const env = { ALLOW_PAID_AI_MODELS: "true" };
+    expect(shouldFallbackToOpenAI({ status: 429 }, env)).toBe(true);
+    expect(shouldFallbackToOpenAI(new Error("Rate limit exceeded: free-models-per-day"), env)).toBe(true);
+    expect(shouldFallbackToOpenAI(new Error("401 invalid key"), env)).toBe(false);
+    expect(shouldFallbackToOpenAI(new Error("network unavailable"), env)).toBe(false);
   });
 });

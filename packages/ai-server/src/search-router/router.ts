@@ -1,3 +1,4 @@
+import { isRecord } from "../utils";
 import { getLLM } from "../llm/client";
 import { logger } from "../logger";
 import { withTimeout } from "../utils";
@@ -37,9 +38,7 @@ const EXPERIENCE_LEVELS = ["beginner", "intermediate", "advanced"] as const;
 const UI_WIDGET_TYPES = ["results_list", "chat", "quick_actions", "sector_cards"] as const;
 const RETRIEVAL_STRATEGIES = ["semantic", "keyword", "hybrid", "none"] as const;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+
 
 function oneOf<const T extends readonly string[]>(
   values: T,

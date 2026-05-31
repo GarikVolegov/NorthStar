@@ -16,12 +16,42 @@ export type WendyContextSource =
   | 'admin'
   | 'printing-press';
 
+export type WendyAnswerMode =
+  | 'local-fast-path'
+  | 'local-quick-action'
+  | 'llm-fast-path'
+  | 'llm-full-path'
+  | 'recovery-fallback'
+  | 'unconfigured';
+
+export interface WendyAdaptiveReasoning {
+  mode: string;
+  reasoningDepth: string;
+  dataStrategy: string;
+  executionMode: string;
+  selfCheck: string[];
+  latencyTargetMs?: number | undefined;
+}
+
+export interface WendySuggestedPrompt {
+  label: string;
+  prompt: string;
+}
+
 export type WendySseEvent =
   | { type: 'status'; value: string }
   | { type: 'gate'; message: string }
   | { type: 'error'; message: string }
   | { type: 'rag_citations'; citations: WendySseRagCitation[] }
-  | { type: 'done'; requestId?: string | undefined; contextSources: WendyContextSource[] }
+  | {
+      type: 'done';
+      requestId?: string | undefined;
+      contextSources: WendyContextSource[];
+      answerMode?: WendyAnswerMode | undefined;
+      recovery?: Record<string, unknown> | undefined;
+      adaptiveReasoning?: WendyAdaptiveReasoning | undefined;
+      suggestedPrompts?: WendySuggestedPrompt[] | undefined;
+    }
   | { type: 'tool_call'; name: string; args?: Record<string, unknown> | undefined; result?: unknown }
   | { type: 'ui_tool'; name: string; args: Record<string, unknown> }
   | { type: 'token'; value: string }
@@ -83,6 +113,60 @@ function parseContextSources(value: unknown): WendyContextSource[] {
   return [...new Set(value.filter(isWendyContextSource))];
 }
 
+function isWendyAnswerMode(value: unknown): value is WendyAnswerMode {
+  return value === 'local-fast-path'
+    || value === 'local-quick-action'
+    || value === 'llm-fast-path'
+    || value === 'llm-full-path'
+    || value === 'recovery-fallback'
+    || value === 'unconfigured';
+}
+
+function parseAdaptiveReasoning(value: unknown): WendyAdaptiveReasoning | undefined {
+  if (!isRecord(value)) return undefined;
+  const mode = value.mode;
+  const reasoningDepth = value.reasoningDepth;
+  const dataStrategy = value.dataStrategy;
+  const executionMode = value.executionMode;
+  const selfCheck = value.selfCheck;
+  const latencyTargetMs = value.latencyTargetMs;
+  if (
+    typeof mode !== 'string'
+    || typeof reasoningDepth !== 'string'
+    || typeof dataStrategy !== 'string'
+    || typeof executionMode !== 'string'
+    || !Array.isArray(selfCheck)
+  ) return undefined;
+  return {
+    mode,
+    reasoningDepth,
+    dataStrategy,
+    executionMode,
+    selfCheck: selfCheck.filter((item): item is string => typeof item === 'string'),
+    latencyTargetMs: typeof latencyTargetMs === 'number' && Number.isFinite(latencyTargetMs)
+      ? latencyTargetMs
+      : undefined,
+  };
+}
+
+function parseSuggestedPrompts(value: unknown): WendySuggestedPrompt[] {
+  if (!Array.isArray(value)) return [];
+  const prompts: WendySuggestedPrompt[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const label = typeof item.label === 'string' ? item.label.trim() : '';
+    const prompt = typeof item.prompt === 'string' ? item.prompt.trim() : '';
+    if (!label || !prompt) continue;
+    const key = prompt.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    prompts.push({ label, prompt });
+    if (prompts.length >= 3) break;
+  }
+  return prompts;
+}
+
 function readProviderToken(record: Record<string, unknown>): string {
   const choices: unknown[] = Array.isArray(record.choices) ? record.choices : [];
   if (choices.length === 0) return '';
@@ -131,6 +215,10 @@ export function parseWendySseEvent(raw: string): WendySseEvent {
       type: 'done',
       requestId: typeof parsed.requestId === 'string' ? parsed.requestId : undefined,
       contextSources: parseContextSources(parsed.contextSources),
+      answerMode: isWendyAnswerMode(parsed.answerMode) ? parsed.answerMode : undefined,
+      recovery: isRecord(parsed.recovery) ? parsed.recovery : undefined,
+      adaptiveReasoning: parseAdaptiveReasoning(parsed.adaptiveReasoning),
+      suggestedPrompts: parseSuggestedPrompts(parsed.suggestedPrompts),
     };
   }
   if (type === 'tool_call' && typeof parsed.name === 'string') {

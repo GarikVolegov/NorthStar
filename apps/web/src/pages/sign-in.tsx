@@ -9,7 +9,7 @@
  * Il tema deep-navy è già configurato nel ClerkProvider (main.tsx).
  */
 import { SignIn } from "@clerk/react";
-import { Compass } from "lucide-react";
+import { AppLogo } from "@/components/brand/AppLogo";
 import { Link } from "wouter";
 
 export default function SignInPage() {
@@ -19,7 +19,7 @@ export default function SignInPage() {
       <div className="flex flex-col items-center gap-3 mb-8">
         <Link href="/" className="flex items-center gap-2.5 group">
           <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center transition-all group-hover:bg-primary/20">
-            <Compass className="w-5 h-5 text-primary" />
+            <AppLogo decorative className="h-8 w-8" />
           </div>
           <div>
             <span className="font-bold text-lg text-foreground leading-none block">NorthStar</span>

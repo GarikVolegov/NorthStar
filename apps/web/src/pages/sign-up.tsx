@@ -9,7 +9,8 @@
  * tramite AuthContext.tsx per sincronizzare l'utente nel DB NorthStar.
  */
 import { SignUp } from "@clerk/react";
-import { Compass, Sparkles } from "lucide-react";
+import { AppLogo } from "@/components/brand/AppLogo";
+import { Sparkles } from "lucide-react";
 import { useEffect } from "react";
 import { Link } from "wouter";
 
@@ -28,7 +29,7 @@ export default function SignUpPage() {
       <div className="flex flex-col items-center gap-3 mb-8">
         <Link href="/" className="flex items-center gap-2.5 group">
           <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center transition-all group-hover:bg-primary/20">
-            <Compass className="w-5 h-5 text-primary" />
+            <AppLogo decorative className="h-8 w-8" />
           </div>
           <div>
             <span className="font-bold text-lg text-foreground leading-none block">NorthStar</span>

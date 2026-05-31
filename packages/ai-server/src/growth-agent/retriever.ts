@@ -10,7 +10,7 @@
  */
 import { db, pool } from "@workspace/db";
 import { knowledgeNodesTable } from "@workspace/db";
-import { eq, and, isNotNull } from "drizzle-orm";
+import { eq, and, or, isNotNull } from "drizzle-orm";
 import CircuitBreaker from "opossum";
 import { embedText } from "./embedder";
 import { logger } from "../logger";
@@ -183,6 +183,7 @@ async function retrieveWithJs(
   topK: number,
   minScore: number,
   sourceTypes?: SourceType[],
+  globalUserId?: number,
 ): Promise<RetrievedChunk[]> {
   const nodes: JsKnowledgeNode[] = [];
   const pageSize = ragConfig.retriever.jsPageSize;
@@ -190,23 +191,22 @@ async function retrieveWithJs(
 
   for (let page = 0; page < ragConfig.retriever.jsMaxPages; page++) {
     const offset = page * pageSize;
-    const pageQuery = db
+    const pageRows = await db
       .select()
       .from(knowledgeNodesTable)
       .where(
         and(
-          eq(knowledgeNodesTable.userId, userId),
+          globalUserId !== undefined
+            ? or(
+                eq(knowledgeNodesTable.userId, userId),
+                eq(knowledgeNodesTable.userId, globalUserId),
+              )
+            : eq(knowledgeNodesTable.userId, userId),
           isNotNull(knowledgeNodesTable.embedding),
         ),
       )
-      .limit(pageSize);
-
-    const pageRows =
-      "offset" in pageQuery && typeof pageQuery.offset === "function"
-        ? await pageQuery.offset(offset)
-        : page === 0
-          ? await pageQuery
-          : [];
+      .limit(pageSize)
+      .offset(offset);
 
     nodes.push(...pageRows);
     if (pageRows.length < pageSize) break;
@@ -318,7 +318,7 @@ export async function retrieve(
 
   try {
     const result = await retrieverWithTimeout(
-      retrieveWithJs(queryEmbedding, userId, topK, minScore, sourceTypes),
+      retrieveWithJs(queryEmbedding, userId, topK, minScore, sourceTypes, needsPlatform ? platformUserId : undefined),
       ragConfig.retriever.jsFallbackTimeoutMs,
     );
     const resultLabel = result.length === 0 ? "empty" : "ok";

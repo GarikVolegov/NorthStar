@@ -362,7 +362,7 @@ export async function extractMemoryIncremental(
  * Patterns are filtered by confidence >= 0.5 and sorted by confidence desc.
  */
 export async function loadMemory(userId: number): Promise<UserMemory> {
-  const [facts, patterns] = await Promise.all([
+  const [factsResult, patternsResult] = await Promise.allSettled([
     db
       .select()
       .from(coachMemoryFactsTable)
@@ -372,6 +372,20 @@ export async function loadMemory(userId: number): Promise<UserMemory> {
       .from(coachMemoryPatternsTable)
       .where(eq(coachMemoryPatternsTable.userId, userId)),
   ]);
+
+  const facts = factsResult.status === "fulfilled" ? factsResult.value : [];
+  const patterns = patternsResult.status === "fulfilled" ? patternsResult.value : [];
+
+  if (factsResult.status === "rejected" || patternsResult.status === "rejected") {
+    logger.warn(
+      {
+        userId,
+        factsError: factsResult.status === "rejected" ? factsResult.reason : undefined,
+        patternsError: patternsResult.status === "rejected" ? patternsResult.reason : undefined,
+      },
+      "loadMemory skipped unavailable memory rows",
+    );
+  }
 
   const mc = wendyConfig.memory;
   const topPatterns = patterns

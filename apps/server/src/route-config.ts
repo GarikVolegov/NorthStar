@@ -32,12 +32,16 @@ import testSessionsRouter from "./routes/test-sessions";
 import businessIdeasRouter from "./routes/business-ideas";
 import jobsRouter from "./routes/jobs";
 import growthRouter from "./routes/growth";
+import sectorVitalsRouter from "./routes/sector-vitals";
 import sectorsRouter from "./routes/sectors";
 import roadmapRouter from "./routes/roadmap";
 import journeyTypeRouter from "./routes/journey-type";
 import accountRouter from "./routes/account";
+import routinesRouter from "./routes/routines";
 import wendyRouter from "./routes/wendy";
 import rolesRouter from "./routes/roles";
+import simulatedDaysRouter from "./routes/simulated-days";
+import skillBridgeRouter from "./routes/skill-bridge";
 import searchRouter from "./routes/search";
 import searchRouteRouter from "./routes/search-route";
 import searchHybridRouter from "./routes/search-hybrid";
@@ -59,6 +63,7 @@ import cvRouter from "./routes/cv";
 import notificationsRouter from "./routes/notifications";
 import pushRouter from "./routes/push";
 import favoritesRouter from "./routes/favorites";
+import pinnedSectorsRouter from "./routes/pinned-sectors";
 import nftCertificatesRouter from "./routes/nft-certificates";
 import certificationsRouter from "./routes/certifications";
 import contactRouter from "./routes/contact";
@@ -66,9 +71,11 @@ import affiliazioneRouter from "./routes/affiliation-program";
 import affiliateRouter from "./routes/affiliate";
 import openhumanRouter from "./routes/openhuman";
 import graphifyRouter from "./routes/graphify";
+import grafoRouter from "./routes/grafo";
 import skillsGapRouter from "./routes/skills-gap";
 import aiImageRouter from "./routes/ai-image";
 import monthlyRitualRouter from "./routes/monthly-ritual";
+import discoveryReadinessRouter from "./routes/discovery-readiness";
 import { getHealthPayload } from "./lib/health";
 
 export type RouteAuthLevel = "public" | "authenticated" | "admin";
@@ -82,50 +89,58 @@ export interface RouteConfig {
   description: string;
 }
 
-const healthRouter = Router();
+export function createHealthRouter(): ExpressRouter {
+  const healthRouter = Router();
 
-healthRouter.get("/live", (_req, res) => {
-  res.json({ status: "alive" });
-});
+  healthRouter.get("/live", (_req, res) => {
+    res.json({ status: "alive" });
+  });
 
-healthRouter.get("/ready", async (_req, res) => {
-  const payload = await getHealthPayload();
-  res.status(payload.status === "fail" ? 503 : 200).json(payload);
-});
+  healthRouter.get("/ready", async (_req, res) => {
+    const payload = await getHealthPayload();
+    res.status(payload.status === "fail" ? 503 : 200).json(payload);
+  });
 
-healthRouter.get("/", async (_req, res) => {
-  const payload = await getHealthPayload();
-  res.status(payload.status === "fail" ? 503 : 200).json(payload);
-});
+  healthRouter.get("/", async (_req, res) => {
+    const payload = await getHealthPayload();
+    res.status(payload.status === "fail" ? 503 : 200).json(payload);
+  });
 
-healthRouter.get("/db", async (_req, res) => {
-  try {
-    const { pool } = await import("@workspace/db");
-    res.json({
-      status: "ok",
-      pool: {
-        totalCount: pool.totalCount,
-        idleCount: pool.idleCount,
-        waitingCount: pool.waitingCount,
-      },
-    });
-  } catch (err) {
-    res.status(503).json({ status: "error", message: String(err) });
-  }
-});
+  healthRouter.get("/db", async (_req, res) => {
+    try {
+      const { pool } = await import("@workspace/db");
+      res.json({
+        status: "ok",
+        pool: {
+          totalCount: pool.totalCount,
+          idleCount: pool.idleCount,
+          waitingCount: pool.waitingCount,
+        },
+      });
+    } catch (err) {
+      res.status(503).json({ status: "error", message: String(err) });
+    }
+  });
 
-healthRouter.get("/alerts", async (_req, res) => {
-  const { getAlertHistory } = await import("./lib/alerts");
-  res.json({ alerts: getAlertHistory() });
-});
+  healthRouter.get("/alerts", async (_req, res) => {
+    const { getAlertHistory } = await import("./lib/alerts");
+    res.json({ alerts: getAlertHistory() });
+  });
+
+  return healthRouter;
+}
+
+const healthRouter = createHealthRouter();
 
 export const routeConfig: RouteConfig[] = [
   { path: "/api/auth", router: authRouter, auth: "public", description: "Autenticazione" },
   { path: "/api/health", router: healthRouter, auth: "public", rateLimit: "none", description: "Liveness e readiness" },
+  { path: "/api/healthz", router: healthRouter, auth: "public", rateLimit: "none", description: "Alias compat readiness" },
   { path: "/api/wiki", router: wikiRouter, auth: "public", description: "Wiki pubblico" },
   { path: "/api/news", router: newsRouter, auth: "public", description: "News pubbliche" },
   { path: "/api/news/subscriptions", router: newsSubsRouter, auth: "public", description: "News subscriptions" },
   { path: "/api/trending-sectors", router: trendingRouter, auth: "public", description: "Settori trending" },
+  { path: "/api/sectors", router: sectorVitalsRouter, auth: "public", description: "Vital signs settori" },
   { path: "/api/sectors", router: sectorsRouter, auth: "public", description: "Catalogo settori" },
   { path: "/api/roles", router: rolesRouter, auth: "public", description: "Catalogo ruoli" },
   { path: "/api/roadmap", router: roadmapRouter, auth: "public", description: "Roadmap pubblica" },
@@ -141,6 +156,7 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/social", router: socialRouter, auth: "authenticated", description: "Social feed" },
   { path: "/api/objectives", router: objectivesRouter, auth: "authenticated", description: "Obiettivi" },
   { path: "/api/calendar", router: calendarRouter, auth: "authenticated", description: "Calendario" },
+  { path: "/api/discovery", router: discoveryReadinessRouter, auth: "authenticated", description: "Discovery readiness" },
   { path: "/api/dashboard", router: dashboardRouter, auth: "authenticated", description: "Dashboard" },
   { path: "/api/dashboard/layout", router: dashboardLayoutRouter, auth: "authenticated", description: "Layout dashboard" },
   { path: "/api/diary", router: diaryRouter, auth: "authenticated", description: "Diario personale" },
@@ -160,7 +176,10 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/crescita", router: growthRouter, auth: "authenticated", description: "Crescita" },
   { path: "/api/journey-type", router: journeyTypeRouter, auth: "authenticated", description: "Tipo percorso" },
   { path: "/api/account", router: accountRouter, auth: "authenticated", description: "Account" },
+  { path: "/api/routines", router: routinesRouter, auth: "authenticated", description: "Routine utente" },
   { path: "/api/wendy", router: wendyRouter, auth: "authenticated", description: "Wendy" },
+  { path: "/api/simulated-days", router: simulatedDaysRouter, auth: "authenticated", description: "Simulazioni Try-a-Day" },
+  { path: "/api/user/skill-bridge", router: skillBridgeRouter, auth: "authenticated", description: "Skill Bridge Map" },
   { path: "/api/search", router: searchRouter, auth: "authenticated", description: "Search" },
   { path: "/api/search/route", router: searchRouteRouter, auth: "authenticated", description: "Search route" },
   { path: "/api/search/hybrid", router: searchHybridRouter, auth: "authenticated", description: "Hybrid search" },
@@ -181,12 +200,14 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/notifications", router: notificationsRouter, auth: "authenticated", description: "Notifications" },
   { path: "/api/push", router: pushRouter, auth: "authenticated", description: "Push notifications" },
   { path: "/api/favorites", router: favoritesRouter, auth: "authenticated", description: "Favorites" },
-  { path: "/api/nft-certificates", router: nftCertificatesRouter, auth: "authenticated", description: "NFT certificates" },
+  { path: "/api/pinned-sectors", router: pinnedSectorsRouter, auth: "authenticated", description: "Settori pinnati" },
+  { path: "/api/nft-certificates", router: nftCertificatesRouter, auth: "public", description: "NFT certificates" },
   { path: "/api/certifications", router: certificationsRouter, auth: "authenticated", description: "Certifications" },
   { path: "/api/affiliazione", router: affiliazioneRouter, auth: "authenticated", description: "Programma affiliazione" },
   { path: "/api/affiliate", router: affiliateRouter, auth: "authenticated", description: "Affiliate" },
   { path: "/api/openhuman", router: openhumanRouter, auth: "authenticated", description: "OpenHuman bridge" },
   { path: "/api/graphify", router: graphifyRouter, auth: "authenticated", description: "Graphify bridge" },
+  { path: "/api/grafo", router: grafoRouter, auth: "authenticated", description: "Grafo legacy compat" },
   { path: "/api/skills-gap", router: skillsGapRouter, auth: "authenticated", description: "Skills gap analysis" },
   { path: "/api/monthly-ritual", router: monthlyRitualRouter, auth: "authenticated", description: "Rituale mensile" },
 

@@ -1,0 +1,92 @@
+$ tsx scripts/check-wendy-tools.ts
+{
+  "status": "ok",
+  "toolCount": 12,
+  "tools": [
+    {
+      "featureId": "calendar",
+      "name": "add_calendar_event",
+      "policy": "write",
+      "risk": "medium",
+      "requiresConfirmation": true
+    },
+    {
+      "featureId": "calendar",
+      "name": "open_view:calendar",
+      "policy": "navigate",
+      "risk": "low",
+      "requiresConfirmation": false
+    },
+    {
+      "featureId": "objectives",
+      "name": "get_user_objectives",
+      "policy": "read",
+      "risk": "low",
+      "requiresConfirmation": false
+    },
+    {
+      "featureId": "objectives",
+      "name": "save_objective",
+      "policy": "write",
+      "risk": "medium",
+      "requiresConfirmation": true
+    },
+    {
+      "featureId": "objectives",
+      "name": "update_objective_progress",
+      "policy": "write",
+      "risk": "medium",
+      "requiresConfirmation": true
+    },
+    {
+      "featureId": "profile",
+      "name": "get_user_context",
+      "policy": "read",
+      "risk": "low",
+      "requiresConfirmation": false
+    },
+    {
+      "featureId": "profile",
+      "name": "open_view:profilo",
+      "policy": "navigate",
+      "risk": "low",
+      "requiresConfirmation": false
+    },
+    {
+      "featureId": "profile",
+      "name": "update_profile_preferences",
+      "policy": "write",
+      "risk": "medium",
+      "requiresConfirmation": true
+    },
+    {
+      "featureId": "sectors",
+      "name": "list_sectors",
+      "policy": "read",
+      "risk": "low",
+      "requiresConfirmation": false
+    },
+    {
+      "featureId": "sectors",
+      "name": "get_sector_detail",
+      "policy": "read",
+      "risk": "low",
+      "requiresConfirmation": false
+    },
+    {
+      "featureId": "sectors",
+      "name": "compare_sectors",
+      "policy": "read",
+      "risk": "low",
+      "requiresConfirmation": false
+    },
+    {
+      "featureId": "sectors",
+      "name": "open_view:settore",
+      "policy": "navigate",
+      "risk": "low",
+      "requiresConfirmation": false
+    }
+  ],
+  "failures": []
+}

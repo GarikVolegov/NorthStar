@@ -3,22 +3,35 @@ import { logger } from "../logger";
 
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMENSIONS = 1536;
+let missingProviderLogged = false;
 
-function getClient(): OpenAI {
+function hasUsableApiKey(value: string | undefined): boolean {
+  const key = value?.trim().toLowerCase();
+  if (!key) return false;
+  return !(
+    key.includes("placeholder") ||
+    key.includes("inactive") ||
+    key.includes("changeme") ||
+    key.includes("dummy") ||
+    key.startsWith("your_")
+  );
+}
+
+function getClient(): OpenAI | null {
   // Usa OpenAI se configurato, altrimenti OpenRouter (supporta text-embedding-3-small)
-  if (process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+  if (hasUsableApiKey(process.env.AI_INTEGRATIONS_OPENAI_API_KEY)) {
     return new OpenAI({
       baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1",
       apiKey:  process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
     });
   }
-  if (process.env.OPENROUTER_API_KEY) {
+  if (hasUsableApiKey(process.env.OPENROUTER_API_KEY)) {
     return new OpenAI({
       baseURL: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
       apiKey:  process.env.OPENROUTER_API_KEY,
     });
   }
-  throw new Error("Nessun provider embedding configurato: imposta AI_INTEGRATIONS_OPENAI_API_KEY o OPENROUTER_API_KEY");
+  return null;
 }
 
 export async function generateEmbedding(text: string): Promise<number[] | null> {
@@ -27,6 +40,13 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
     if (!cleaned) return null;
 
     const openai = getClient();
+    if (!openai) {
+      if (!missingProviderLogged) {
+        missingProviderLogged = true;
+        logger.warn("embedding generation skipped: no usable embedding provider key configured");
+      }
+      return null;
+    }
     const response = await openai.embeddings.create({
       model: EMBEDDING_MODEL,
       input: cleaned,

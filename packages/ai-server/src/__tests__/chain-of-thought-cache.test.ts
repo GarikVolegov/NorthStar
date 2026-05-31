@@ -1,45 +1,38 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const createMock = vi.hoisted(() => vi.fn());
+const chatOnceMock = vi.hoisted(() => vi.fn());
+const getLLMForRouteMock = vi.hoisted(() => vi.fn());
 
-vi.mock("../client", () => ({
-  openai: {
-    chat: {
-      completions: {
-        create: createMock,
-      },
-    },
-  },
+vi.mock("../llm/client", () => ({
+  getLLMForRoute: getLLMForRouteMock,
 }));
 
 vi.mock("../model-router", () => ({
-  selectModelFor: vi.fn(() => ({ model: "test-model" })),
+  selectModelFor: vi.fn(() => ({ model: "test-model", provider: "groq" })),
 }));
 
 describe("runChainOfThought cache", () => {
   beforeEach(() => {
     vi.resetModules();
-    createMock.mockReset();
+    chatOnceMock.mockReset();
+    getLLMForRouteMock.mockReset();
+    getLLMForRouteMock.mockReturnValue({ chatOnce: chatOnceMock });
   });
 
   it("does not reuse cached reasoning across different conversations", async () => {
-    createMock
-      .mockResolvedValueOnce({
-        choices: [{ message: { content: JSON.stringify({
+    chatOnceMock
+      .mockResolvedValueOnce(JSON.stringify({
           limiting_pattern: "first",
           controllable_actions: ["one"],
           blind_spot: "first blind spot",
           confidence: 0.95,
-        }) } }],
-      })
-      .mockResolvedValueOnce({
-        choices: [{ message: { content: JSON.stringify({
+        }))
+      .mockResolvedValueOnce(JSON.stringify({
           limiting_pattern: "second",
           controllable_actions: ["two"],
           blind_spot: "second blind spot",
           confidence: 0.95,
-        }) } }],
-      });
+        }));
 
     const { runChainOfThought } = await import("../growth-agent/chain-of-thought");
     const message = "voglio cambiare carriera ma continuo a rimandare ogni settimana per paura";
@@ -49,6 +42,7 @@ describe("runChainOfThought cache", () => {
 
     expect(first?.limitingPattern).toBe("first");
     expect(second?.limitingPattern).toBe("second");
-    expect(createMock).toHaveBeenCalledTimes(2);
+    expect(getLLMForRouteMock).toHaveBeenCalledWith({ provider: "groq" });
+    expect(chatOnceMock).toHaveBeenCalledTimes(2);
   });
 });

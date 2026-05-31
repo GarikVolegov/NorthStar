@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, useTransition } from "react";
+import { AUTH_EXPIRED_EVENT } from "@/lib/storage-keys";
 
 // §4.1 FRONTEND_RULES — hook canonico per SSE streaming.
 // Unico modo autorizzato nel progetto per consumare stream SSE.
@@ -25,11 +26,19 @@ type StreamEventPayload = {
 };
 
 function readErrorMessage(value: unknown, fallback: string): string {
+  if (value && typeof value === "object" && "message" in value) {
+    const message = (value as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
   if (value && typeof value === "object" && "error" in value) {
     const error = (value as { error?: unknown }).error;
     if (typeof error === "string") return error;
   }
   return fallback;
+}
+
+function buildHttpError(status: number, message: string): Error {
+  return new Error(`HTTP_${status}: ${message}`);
 }
 
 function readTokenChunk(parsed: StreamEventPayload, eventType: string | undefined): string {
@@ -148,7 +157,10 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
 
         if (!res.ok) {
           const errData = (await res.json().catch(() => ({}))) as unknown;
-          throw new Error(readErrorMessage(errData, `Errore ${res.status}`));
+          if (res.status === 401 || res.status === 403) {
+            window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+          }
+          throw buildHttpError(res.status, readErrorMessage(errData, `Errore ${res.status}`));
         }
 
         const reader = res.body?.getReader();
@@ -156,11 +168,15 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
 
         const decoder = new TextDecoder();
         let lineBuffer = "";
+        let doneSentinelSeen = false;
 
         const processLine = (line: string) => {
-          if (!line.startsWith("data: ")) return;
-          const raw = line.slice(6).trim();
-          if (raw === "[DONE]") return;
+          if (!line.startsWith("data:")) return;
+          const raw = line.slice(5).trim();
+          if (raw === "[DONE]") {
+            doneSentinelSeen = true;
+            return;
+          }
           try {
             const parsed = JSON.parse(raw) as StreamEventPayload;
             // Custom event types (ui_tool, status, rag_citations, token, etc.)
@@ -212,6 +228,16 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
           const lines = lineBuffer.split("\n");
           lineBuffer = lines.pop() ?? "";
           for (const line of lines) processLine(line);
+          if (doneSentinelSeen) {
+            if (flushTimerRef.current !== null) {
+              clearTimeout(flushTimerRef.current);
+              flushTimerRef.current = null;
+            }
+            const finalContent = bufferRef.current;
+            startTransition(() => setContent(finalContent));
+            onComplete?.(finalContent);
+            break;
+          }
         }
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {

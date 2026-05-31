@@ -38,6 +38,12 @@ import { useWendyTabRemoteSync } from './useWendyTabRemoteSync';
 import { FATAL_ERRORS, THINKING_LABELS } from './wendy.config';
 
 const RECONNECT_DELAY_MS = [1000, 2000, 4000] as const;
+const WENDY_PAGE_ENTITY_TYPES = new Set(['sector', 'profession', 'article', 'news']);
+
+function readSupportedWendyEntityType(record: Record<string, unknown> | undefined): string | undefined {
+  const entityType = readStringField(record, 'entityType');
+  return entityType && WENDY_PAGE_ENTITY_TYPES.has(entityType) ? entityType : undefined;
+}
 
 export type {
   ChatMessage,
@@ -82,6 +88,10 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
   const lastRequestIdRef        = useRef<string | undefined>(undefined);
   const toolsUsedRef            = useRef<string[]>([]);
   const contextSourcesRef       = useRef<WendyContextSource[]>([]);
+  const answerModeRef           = useRef<ChatMessage['answerMode']>(undefined);
+  const recoveryRef             = useRef<Record<string, unknown> | undefined>(undefined);
+  const adaptiveReasoningRef    = useRef<ChatMessage['adaptiveReasoning']>(undefined);
+  const suggestedPromptsRef     = useRef<ChatMessage['suggestedPrompts']>(undefined);
   const streamedContentRef      = useRef('');
   const hasNonTextOutputRef     = useRef(false);
   const hasTerminalErrorRef     = useRef(false);
@@ -169,6 +179,10 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
           receivedDoneRef.current = true;
           if (event.requestId) lastRequestIdRef.current = event.requestId;
           contextSourcesRef.current = event.contextSources;
+          answerModeRef.current = event.answerMode;
+          recoveryRef.current = event.recovery;
+          adaptiveReasoningRef.current = event.adaptiveReasoning;
+          suggestedPromptsRef.current = event.suggestedPrompts;
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantMsgIdRef.current
@@ -177,6 +191,10 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
                     requestId: event.requestId,
                     toolsUsed: [...toolsUsedRef.current],
                     contextSources: event.contextSources,
+                    answerMode: event.answerMode,
+                    recovery: event.recovery,
+                    adaptiveReasoning: event.adaptiveReasoning,
+                    suggestedPrompts: event.suggestedPrompts,
                   }
                 : m,
             ),
@@ -266,6 +284,10 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       const thinkingMs = firstChunkReceivedRef.current
         ? Date.now() - thinkingStartRef.current : 0;
       const completedContextSources = [...contextSourcesRef.current];
+      const completedAnswerMode = answerModeRef.current;
+      const completedRecovery = recoveryRef.current;
+      const completedAdaptiveReasoning = adaptiveReasoningRef.current;
+      const completedSuggestedPrompts = suggestedPromptsRef.current;
 
       const completedMsg: ChatMessage = {
         id:          assistantMsgIdRef.current,
@@ -278,6 +300,10 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
         thinkingMs,
         citations:   pendingCitationsRef.current,
         contextSources: completedContextSources,
+        answerMode: completedAnswerMode,
+        recovery: completedRecovery,
+        adaptiveReasoning: completedAdaptiveReasoning,
+        suggestedPrompts: completedSuggestedPrompts,
       };
 
       setMessages((prev) =>
@@ -293,6 +319,10 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
                 thinkingMs,
                 citations: pendingCitationsRef.current,
                 contextSources: completedContextSources,
+                answerMode: completedAnswerMode,
+                recovery: completedRecovery,
+                adaptiveReasoning: completedAdaptiveReasoning,
+                suggestedPrompts: completedSuggestedPrompts,
               }
             : m,
         ),
@@ -315,6 +345,10 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
 
       pendingCitationsRef.current = [];
       contextSourcesRef.current = [];
+      answerModeRef.current = undefined;
+      recoveryRef.current = undefined;
+      adaptiveReasoningRef.current = undefined;
+      suggestedPromptsRef.current = undefined;
       streamedContentRef.current = '';
       hasNonTextOutputRef.current = false;
       hasTerminalErrorRef.current = false;
@@ -418,6 +452,10 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     lastRequestIdRef.current       = undefined;
     toolsUsedRef.current           = [];
     contextSourcesRef.current      = [];
+    answerModeRef.current          = undefined;
+    recoveryRef.current            = undefined;
+    adaptiveReasoningRef.current   = undefined;
+    suggestedPromptsRef.current    = undefined;
     streamedContentRef.current     = '';
     hasNonTextOutputRef.current    = false;
     hasTerminalErrorRef.current    = false;
@@ -449,15 +487,17 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     const currentPage = wendyCtx?.pageContext;
     const pageContext = currentPage ? {
       page:       currentPage.page,
-      entityType: readStringField(currentPage.data, 'entityType'),
+      entityType: readSupportedWendyEntityType(currentPage.data),
       entityId:   readNumberField(currentPage.data, 'entityId'),
       entityName: readStringField(currentPage.data, 'entityName'),
       journeyType: readStringField(currentPage.data, 'journeyType'),
       data:       compactPageData(currentPage.data),
     } : undefined;
 
+    const normalizedContextPrompt = contextPrompt?.trim();
     const requestBody = {
-      message:           contextPrompt ?? text,
+      message:           text,
+      ...(normalizedContextPrompt ? { contextPrompt: normalizedContextPrompt } : {}),
       compressedHistory: compressed,
       pageContext,
       locale:            navigator.language?.slice(0, 2) ?? 'it',
@@ -492,17 +532,21 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     if (isStreaming) return;
     tts.stop();
     openaiTts.stop();
-    lastUserMessageRef.current = action.prompt;
+    const visibleText = action.prefillText ?? action.label;
+    const operationalContext = [action.prompt, action.contextPrompt]
+      .map((part) => part?.trim())
+      .filter(Boolean)
+      .join("\n\n");
+    lastUserMessageRef.current = visibleText;
     retriesRef.current = 0;
     setRetryState({ active: false, attempt: 0, max: maxRetries });
 
-    const visibleText = action.prefillText ?? action.label;
     setMessages((prev) => [
       ...prev,
       { id: `user-${Date.now()}`, role: 'user', content: visibleText, timestamp: Date.now() },
     ]);
 
-    await _doStream(visibleText, action.prompt, action.isPredefined ?? true);
+    await _doStream(visibleText, operationalContext || undefined, action.isPredefined ?? true);
   }, [isStreaming, tts, openaiTts]);
 
   const sendFeedback = useCallback(async (

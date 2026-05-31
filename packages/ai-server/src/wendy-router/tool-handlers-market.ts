@@ -5,6 +5,10 @@ import { logger } from "../logger";
 import { readWeakSignalStatus } from "./tool-arg-utils";
 import { queryEmbedding, type ToolResult } from "./tool-handlers";
 import { multiHopSearchRag } from "../rag/sparse-retriever";
+import { wendyConfig } from "../config/wendy";
+
+/** Minimum cosine similarity for brain chunks — mirrors handleSearchRabbitKb (0.3). */
+const BRAIN_MIN_SIMILARITY = 0.3;
 
 function err(code: string, message: string): ToolResult {
   return { ok: false, code, message };
@@ -12,23 +16,20 @@ function err(code: string, message: string): ToolResult {
 
 export type BrainLayer = "identity" | "domain" | "product" | "process";
 
-export function brainLayerToSector(layer: BrainLayer): "L1" | "L2" | "L3" | "L3.5" {
-  const layerMap = {
-    identity: "L1",
-    domain: "L2",
-    product: "L3",
-    process: "L3.5",
-  } as const;
-  return layerMap[layer];
-}
-
+/**
+ * vault-ingest stores `rc.sectors = [layer]` using the RAW frontmatter layer
+ * word (identity|domain|product|process — see apps/server/.../vault-ingest.ts).
+ * The brain search filter must therefore match that same raw word; mapping to
+ * L1/L2/L3 codes here filtered against data that never contains them, so
+ * layer-scoped search silently returned zero rows.
+ */
 export function searchBrainSqlParts(args: { layer?: BrainLayer }): {
   sourceType: "brain";
-  layerSector: "L1" | "L2" | "L3" | "L3.5" | null;
+  layerTag: BrainLayer | null;
 } {
   return {
     sourceType: "brain",
-    layerSector: args.layer ? brainLayerToSector(args.layer) : null,
+    layerTag: args.layer ?? null,
   };
 }
 
@@ -53,8 +54,8 @@ export async function handleSearchBrain(
     if (!vec) return err("UNAVAILABLE", "Servizio embedding temporaneamente non disponibile");
 
     const literal = vecLiteral(vec);
-    const layerFilter = parts.layerSector
-      ? sql`AND rc.sectors && ARRAY[${parts.layerSector}]::text[]`
+    const layerFilter = parts.layerTag
+      ? sql`AND rc.sectors && ARRAY[${parts.layerTag}]::text[]`
       : sql``;
 
     const rows = await db.execute<{
@@ -81,10 +82,22 @@ export async function handleSearchBrain(
       LIMIT ${limit}
     `);
 
+    // Use ragCitationMinScore as a configurable override only when it has been
+    // set below the conservative 0.3 floor (i.e. intentionally relaxed).
+    // For brain chunks 0.3 is already conservative and aligns with
+    // handleSearchRabbitKb; the external-RAG threshold (default 0.70) would
+    // over-filter internal knowledge-base documents.
+    const minSim = Math.min(
+      wendyConfig.prompt.ragCitationMinScore,
+      BRAIN_MIN_SIMILARITY,
+    );
+
+    const filtered = rows.rows.filter((row) => Number(row.similarity) >= minSim);
+
     return {
       ok: true,
       data: {
-        chunks: rows.rows.map((row) => ({
+        chunks: filtered.map((row) => ({
           content: row.content,
           obsidianPath: row.obsidian_path ?? "",
           sectors: row.sectors ?? [],
@@ -92,7 +105,7 @@ export async function handleSearchBrain(
           similarity: Math.round(Number(row.similarity) * 1000) / 1000,
           trustScore: row.trust_score,
         })),
-        totalFound: rows.rows.length,
+        totalFound: filtered.length,
       },
     };
   } catch (e) {
@@ -344,24 +357,13 @@ export async function handleGetSkillCooccurrences(
   const limit = Math.min(args.limit ?? 8, 15);
 
   try {
-    const rows = await db
-      .select({
-        coSkillName:   skillCooccurrencesTable.coSkillName,
-        frequency:     skillCooccurrencesTable.frequency,
-        frequencyRate: skillCooccurrencesTable.frequencyRate,
-        period:        skillCooccurrencesTable.period,
-      })
-      .from(skillCooccurrencesTable)
-      .where(
-        and(
-          ilike(skillCooccurrencesTable.skillName, args.skillName),
-          args.professionId
-            ? eq(skillCooccurrencesTable.professionId, args.professionId)
-            : undefined,
-        ),
-      )
-      .orderBy(desc(skillCooccurrencesTable.frequencyRate))
-      .limit(limit);
+    const query = {
+      skillName: args.skillName,
+      limit,
+    };
+    const rows = await getSkillCooccurrenceRows(
+      args.professionId === undefined ? query : { ...query, professionId: args.professionId },
+    );
 
     return {
       ok: true,
@@ -379,4 +381,35 @@ export async function handleGetSkillCooccurrences(
     logger.warn({ e, args }, "[tool] get_skill_cooccurrences error");
     return err("UNAVAILABLE", "Co-occorrenze skill temporaneamente non disponibili");
   }
+}
+
+export async function getSkillCooccurrenceRows(args: {
+  skillName: string;
+  professionId?: number;
+  limit?: number;
+}): Promise<Array<{
+  coSkillName: string;
+  frequency: number;
+  frequencyRate: number;
+  period: string;
+}>> {
+  const limit = Math.min(Math.max(args.limit ?? 8, 1), 25);
+  return db
+    .select({
+      coSkillName:   skillCooccurrencesTable.coSkillName,
+      frequency:     skillCooccurrencesTable.frequency,
+      frequencyRate: skillCooccurrencesTable.frequencyRate,
+      period:        skillCooccurrencesTable.period,
+    })
+    .from(skillCooccurrencesTable)
+    .where(
+      and(
+        ilike(skillCooccurrencesTable.skillName, args.skillName),
+        args.professionId
+          ? eq(skillCooccurrencesTable.professionId, args.professionId)
+          : undefined,
+      ),
+    )
+    .orderBy(desc(skillCooccurrencesTable.frequencyRate))
+    .limit(limit);
 }

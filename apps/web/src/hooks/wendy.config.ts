@@ -5,7 +5,7 @@ export const THINKING_LABELS = [
   'Compongo la risposta...',
 ];
 
-export const FATAL_ERRORS = ['ML_SERVICE_UNAVAILABLE', 'UNAUTHORIZED', 'FORBIDDEN'];
+export const FATAL_ERRORS = ['ML_SERVICE_UNAVAILABLE', 'UNAUTHORIZED', 'FORBIDDEN', '401', '403', 'Token'];
 
 export const PAGE_CONTEXT_MAX_CHARS = 12000;
 export const KEEP_RAW_TURNS = 6;

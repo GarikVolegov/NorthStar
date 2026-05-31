@@ -55,6 +55,7 @@ const PREFETCH_MAP: Record<string, () => Promise<unknown>> = {
   "/candidature": () => import("@/pages/applications"),
   "/dashboard": () => import("@/pages/dashboard"),
   "/affiliazione/dashboard": () => import("@/pages/affiliazione-dashboard"),
+  "/wendy": () => import("@/pages/wendy"),
   "/wendy/memoria": () => import("@/pages/memoria-wendy"),
   "/profilo/briefing": () => import("@/pages/briefing"),
   "/workspace": () => import("@/pages/workspace"),
@@ -70,6 +71,10 @@ export const JOURNEY_CATEGORIES: Record<NavPhase, string[]> = {
   azienda: ["business", "finance", "technology"],
   investitore: ["finance", "business", "technology"],
 };
+
+export const DEFAULT_NEWS_TICKER_ITEMS = [
+  "Cybersecurity: competenze richieste in crescita negli ultimi 12 mesi",
+];
 
 export function prefetchRoute(path: string) {
   PREFETCH_MAP[path]?.();

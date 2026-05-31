@@ -68,4 +68,31 @@ describe("DashboardPersonality profile normalization", () => {
 
     expect(signals).toEqual(["Test", "Wendy", "Strumenti"]);
   });
+
+  it("uses design-system colors for motivational dimension meters", () => {
+    render(
+      <DashboardPersonality
+        primaryTypes={["Sociale"]}
+        spiritScores={{
+          Motivazione: 4.7,
+          "Pens. Analitico": 4.4,
+          "Or. Strategico": 4.1,
+        }}
+      />,
+    );
+
+    const meters = screen.getAllByRole("meter");
+
+    expect(meters).toHaveLength(3);
+    expect(meters.map((meter) => meter.className)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("bg-primary/70"),
+        expect.stringContaining("bg-growth/70"),
+        expect.stringContaining("bg-info/70"),
+      ]),
+    );
+    for (const meter of meters) {
+      expect(meter.className).not.toMatch(/bg-(violet|indigo|amber|cyan|rose)-400/);
+    }
+  });
 });

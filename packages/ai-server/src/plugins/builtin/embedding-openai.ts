@@ -9,17 +9,28 @@ export type EmbeddingPluginOutput =
   | { mode: "single"; embedding: number[] | null }
   | { mode: "batch"; results: Array<{ id: string | number; embedding: number[] | null }> };
 
-function hasConfig(): boolean {
-  return Boolean(
-    process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENROUTER_API_KEY,
+function hasUsableApiKey(value: string | undefined): boolean {
+  const key = value?.trim().toLowerCase();
+  if (!key) return false;
+  return !(
+    key.includes("placeholder") ||
+    key.includes("inactive") ||
+    key.includes("changeme") ||
+    key.includes("dummy") ||
+    key.startsWith("your_")
   );
+}
+
+function hasConfig(): boolean {
+  return hasUsableApiKey(process.env.AI_INTEGRATIONS_OPENAI_API_KEY) ||
+    hasUsableApiKey(process.env.OPENROUTER_API_KEY);
 }
 
 export const embeddingDefaultPlugin: AIPlugin<EmbeddingPluginInput, EmbeddingPluginOutput> = {
   id: "embedding-openai",
   capability: "embedding",
   version: "1.0.0",
-  provider: process.env.AI_INTEGRATIONS_OPENAI_API_KEY ? "openai" : "openrouter",
+  provider: hasUsableApiKey(process.env.AI_INTEGRATIONS_OPENAI_API_KEY) ? "openai" : "openrouter",
 
   async init(): Promise<void> {
     if (!hasConfig()) {

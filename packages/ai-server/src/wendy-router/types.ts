@@ -52,6 +52,8 @@ export interface ToolParameter {
   type:        "string" | "number" | "boolean" | "array";
   description: string;
   required?:   boolean;
+  /** For `type: "array"`, the JSON-schema type of the items (default "string"). */
+  itemType?:   "string" | "number" | "integer" | "boolean";
 }
 
 export interface ToolDefinition {

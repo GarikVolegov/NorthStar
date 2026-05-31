@@ -14,6 +14,11 @@ const sse = vi.hoisted(() => ({
   options: undefined as undefined | SseOptions,
 }));
 
+const wendyProviderMock = vi.hoisted(() => ({
+  pageContext: null as null | { page: string; title?: string; data?: Record<string, unknown> },
+  setPhase: vi.fn(),
+}));
+
 vi.mock("./useSSEStream.js", () => ({
   useSSEStream: vi.fn((options: SseOptions) => {
     sse.options = options;
@@ -30,8 +35,8 @@ vi.mock("./useSSEStream.js", () => ({
 }));
 
 vi.mock("../contexts/WendyProvider", () => ({
-  useWendy: () => ({ setPhase: vi.fn(), pageContext: null }),
-  useOptionalWendy: () => ({ setPhase: vi.fn(), pageContext: null }),
+  useWendy: () => ({ setPhase: wendyProviderMock.setPhase, pageContext: wendyProviderMock.pageContext }),
+  useOptionalWendy: () => ({ setPhase: wendyProviderMock.setPhase, pageContext: wendyProviderMock.pageContext }),
 }));
 
 vi.mock("./useTTS.js", () => ({
@@ -74,6 +79,8 @@ describe("useWendyChat", () => {
     sse.start.mockReset();
     sse.stop.mockReset();
     sse.options = undefined;
+    wendyProviderMock.pageContext = null;
+    wendyProviderMock.setPhase.mockReset();
     vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true } as Response);
   });
 
@@ -87,6 +94,19 @@ describe("useWendyChat", () => {
         type: "done",
         requestId: "req-1",
         contextSources: ["rag", "openhuman", "graphify"],
+        answerMode: "llm-full-path",
+        adaptiveReasoning: {
+          mode: "tool_action",
+          reasoningDepth: "grounded",
+          dataStrategy: "profile_market",
+          executionMode: "tool_augmented_chat",
+          selfCheck: ["non_empty"],
+          latencyTargetMs: 1800,
+        },
+        suggestedPrompts: [
+          { label: "Confronta settori", prompt: "Confronta i primi tre settori" },
+          { label: "Prossimo passo", prompt: "Dimmi cosa fare oggi" },
+        ],
       }));
       sse.options?.onComplete?.("Ciao");
     });
@@ -107,6 +127,15 @@ describe("useWendyChat", () => {
       content: "Ciao",
       requestId: "req-1",
       contextSources: ["rag", "openhuman", "graphify"],
+      answerMode: "llm-full-path",
+      adaptiveReasoning: expect.objectContaining({
+        reasoningDepth: "grounded",
+        dataStrategy: "profile_market",
+      }),
+      suggestedPrompts: [
+        { label: "Confronta settori", prompt: "Confronta i primi tre settori" },
+        { label: "Prossimo passo", prompt: "Dimmi cosa fare oggi" },
+      ],
       isStreaming: false,
     });
   });
@@ -171,6 +200,22 @@ describe("useWendyChat", () => {
     expect(sse.stop).toHaveBeenCalled();
   });
 
+  it("shows a session message for authenticated stream failures", async () => {
+    sse.start.mockImplementation(async () => {
+      sse.options?.onError?.(new Error("HTTP_401: Token non valido"));
+    });
+
+    const { result } = renderHook(() => useWendyChat({ ttsEnabled: false, maxRetries: 0 }));
+    await act(async () => {
+      await result.current.sendMessage("ciao");
+    });
+
+    expect(result.current.messages.at(-1)).toMatchObject({
+      role: "error",
+      content: "Sessione scaduta. Effettua nuovamente il login.",
+    });
+  });
+
   it("reconnects when the stream closes without a done event", async () => {
     vi.useFakeTimers();
     sse.start.mockImplementation(async () => {
@@ -191,7 +236,7 @@ describe("useWendyChat", () => {
     expect(sse.start).toHaveBeenCalledTimes(2);
   });
 
-  it("marks contextual suggestion requests as predefined", async () => {
+  it("sends contextual suggestion requests with visible text and hidden follow-up context", async () => {
     sse.start.mockImplementation(async () => {
       sse.options?.onRawChunk?.(JSON.stringify({ type: "done", requestId: "req-2", contextSources: [] }));
       sse.options?.onComplete?.("ok");
@@ -203,14 +248,46 @@ describe("useWendyChat", () => {
         id: "career-plan",
         label: "Piano carriera",
         prompt: "Fammi un piano carriera",
+        contextPrompt: "Risposta precedente Wendy: hai completato il test. Usa questo contesto per procedere.",
       });
     });
 
     const [, request] = sse.start.mock.calls[0]!;
     expect(JSON.parse(String(request?.body))).toMatchObject({
-      message: "Fammi un piano carriera",
+      message: "Piano carriera",
+      contextPrompt: expect.stringContaining("Fammi un piano carriera"),
       isPredefined: true,
     });
+    expect(JSON.parse(String(request?.body)).contextPrompt).toContain(
+      "Risposta precedente Wendy: hai completato il test. Usa questo contesto per procedere.",
+    );
+    expect(result.current.messages[0]).toMatchObject({ role: "user", content: "Piano carriera" });
+  });
+
+  it("keeps unsupported page entity types inside compact data instead of sending invalid top-level values", async () => {
+    wendyProviderMock.pageContext = {
+      page: "wendy",
+      title: "Wendy",
+      data: { entityType: "assistant", entityName: "Wendy full screen" },
+    };
+    sse.start.mockImplementation(async () => {
+      sse.options?.onRawChunk?.(JSON.stringify({ type: "token", value: "Ciao" }));
+      sse.options?.onRawChunk?.(JSON.stringify({ type: "done", contextSources: [] }));
+      sse.options?.onComplete?.("Ciao");
+    });
+
+    const { result } = renderHook(() => useWendyChat({ ttsEnabled: false }));
+    await act(async () => {
+      await result.current.sendMessage("ciao");
+    });
+
+    const [, request] = sse.start.mock.calls[0]!;
+    const body = JSON.parse(String(request?.body));
+    expect(body.pageContext).toMatchObject({
+      page: "wendy",
+      data: { entityType: "assistant", entityName: "Wendy full screen" },
+    });
+    expect(body.pageContext).not.toHaveProperty("entityType");
   });
 
   it("keeps feedback local when a message has no requestId", async () => {

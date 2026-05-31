@@ -16,6 +16,7 @@ import { getRequestBody } from "../lib/request-context";
 import { asPlainRecord, isOneOf } from "../lib/type-guards";
 
 const router = Router();
+const FREE_CALENDAR_EVENT_LIMIT = 25;
 
 const EVENT_CATEGORIES = [
   "study",
@@ -146,6 +147,31 @@ function normalizeCalendarEventUpdate(body: CalendarEventInput) {
 
   return { data };
 }
+
+async function countUserCalendarEvents(userId: number): Promise<number> {
+  try {
+    if (typeof db.select !== "function") return 0;
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(calendarEventsTable)
+      .where(eq(calendarEventsTable.userId, userId));
+    return Number(row?.count ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+router.get("/quota", requireAuth, async (req, res) => {
+  const user = req.user!;
+  const isPremium = Boolean(user.stripeSubscriptionId);
+  const eventCount = await countUserCalendarEvents(user.id);
+
+  res.json({
+    isPremium,
+    eventCount,
+    eventLimit: isPremium ? null : FREE_CALENDAR_EVENT_LIMIT,
+  });
+});
 
 /* ─── GET /api/calendar/events  —  eventi filtrati per data ─── */
 router.get("/events", requireAuth, async (req, res) => {

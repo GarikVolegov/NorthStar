@@ -257,5 +257,3 @@ export async function runQualityOptimizerJob(): Promise<{ proposed: number }> {
   logger.info({ proposed }, "[quality-optimizer] job completed");
   return { proposed };
 }
-
-export const runQualityOptimizer = runQualityOptimizerJob;

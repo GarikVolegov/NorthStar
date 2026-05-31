@@ -87,7 +87,7 @@ export async function* runSecurityAgent(
 
     for (const finding of toFix) {
       try {
-        const applied = await applyFix(finding, userId);
+        const applied = await applyFix(finding, userId, repoRoot);
         if (applied) {
           yield { type: "fix_applied", file: finding.file, title: finding.title };
         }

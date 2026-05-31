@@ -1,9 +1,36 @@
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync, realpathSync } from "fs";
+import { resolve, sep, extname } from "path";
 import { getLLM } from "../llm/client";
 import { selectModelFor } from "../model-router";
 import { estimateTokens, recordLlmUsage } from "../cost-tracking";
 import { logger } from "../logger";
 import type { SecurityFinding } from "./types";
+
+/** Only ever rewrite source code, never config/docs/secrets. */
+const FIX_ALLOWED_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
+
+/**
+ * Resolve `finding.file` (LLM-supplied, untrusted) to an absolute path that is
+ * provably inside `repoRoot`, points at an allowed code extension, and exists
+ * (symlinks resolved). Returns null — refuse the fix — otherwise. Without this,
+ * a hallucinated/poisoned `finding.file` like "../../middleware/auth.ts" or an
+ * absolute path would let the auto-fixer overwrite arbitrary files (RCE-class).
+ */
+function resolveConfinedFixPath(repoRoot: string, file: string): string | null {
+  const root = resolve(repoRoot);
+  const candidate = resolve(root, file);
+  if (candidate !== root && !candidate.startsWith(root + sep)) return null;
+  if (!FIX_ALLOWED_EXT.has(extname(candidate).toLowerCase())) return null;
+  try {
+    // Resolve symlinks and re-check containment; also enforces the file exists
+    // (applyFix only ever rewrites an existing file it just read).
+    const real = realpathSync(candidate);
+    if (real !== root && !real.startsWith(root + sep)) return null;
+    return real;
+  } catch {
+    return null;
+  }
+}
 
 const FIX_SYSTEM_PROMPT = `You are a senior security engineer applying a targeted code fix.
 
@@ -16,13 +43,23 @@ Given the ORIGINAL FILE and a SECURITY FINDING, produce ONLY the corrected versi
 export async function applyFix(
   finding: SecurityFinding,
   userId:  number,
+  repoRoot: string,
 ): Promise<boolean> {
+  const safePath = resolveConfinedFixPath(repoRoot, finding.file);
+  if (!safePath) {
+    logger.warn(
+      { file: finding.file, repoRoot },
+      "security-agent: refusing fix — path outside repo, non-code, or missing",
+    );
+    return false;
+  }
+
   const llm   = getLLM();
   const route = selectModelFor("security-fix");
 
   let originalContent: string;
   try {
-    originalContent = readFileSync(finding.file, "utf-8");
+    originalContent = readFileSync(safePath, "utf-8");
   } catch (err) {
     logger.warn({ err, file: finding.file }, "security-agent: cannot read file for fix");
     return false;
@@ -80,7 +117,7 @@ export async function applyFix(
   }
 
   try {
-    writeFileSync(finding.file, stripped, "utf-8");
+    writeFileSync(safePath, stripped, "utf-8");
     logger.info({ file: finding.file, finding: finding.title }, "security-agent: fix applied");
     return true;
   } catch (err) {

@@ -1,0 +1,34 @@
+$ node scripts/check-file-size.mjs
+
+apps offenders: 6
+    732 (0)  apps/web/src/components/admin/console/AgentsSection.tsx
+    696 (0)  apps/server/src/routes/ai-wendy.ts
+    685 (0)  apps/server/src/routes/admin/agents.ts
+    640 (0)  apps/web/src/components/admin/console/types.ts
+    625 (0)  apps/web/src/hooks/useWendyChat.ts
+    604 (0)  apps/web/src/components/search/SearchDialog.tsx
+
+packages offenders: 7
+    520 (0)  packages/ai-server/src/wendy-neural/index.ts
+    480 (0)  packages/ai-server/src/growth-agent/agent.ts
+    479 (0)  packages/ai-server/src/llm/client.ts
+    478 (0)  packages/ai-server/src/wendy-router/tool-registry.ts
+    446 (0)  packages/ai-server/src/growth-agent/memory-manager.ts
+    431 (0)  packages/ai-server/src/wendy-router/tool-handlers-rabbit.ts
+    403 (0)  packages/ai-server/src/model-router.ts
+
+File-size ratchet failed:
+  new apps offender over 600 lines: 732 apps/web/src/components/admin/console/AgentsSection.tsx
+  new apps offender over 600 lines: 696 apps/server/src/routes/ai-wendy.ts
+  new apps offender over 600 lines: 685 apps/server/src/routes/admin/agents.ts
+  new apps offender over 600 lines: 640 apps/web/src/components/admin/console/types.ts
+  new apps offender over 600 lines: 625 apps/web/src/hooks/useWendyChat.ts
+  new apps offender over 600 lines: 604 apps/web/src/components/search/SearchDialog.tsx
+  new packages offender over 400 lines: 520 packages/ai-server/src/wendy-neural/index.ts
+  new packages offender over 400 lines: 480 packages/ai-server/src/growth-agent/agent.ts
+  new packages offender over 400 lines: 479 packages/ai-server/src/llm/client.ts
+  new packages offender over 400 lines: 478 packages/ai-server/src/wendy-router/tool-registry.ts
+  new packages offender over 400 lines: 446 packages/ai-server/src/growth-agent/memory-manager.ts
+  new packages offender over 400 lines: 431 packages/ai-server/src/wendy-router/tool-handlers-rabbit.ts
+  new packages offender over 400 lines: 403 packages/ai-server/src/model-router.ts
+[ELIFECYCLE] Command failed with exit code 1.

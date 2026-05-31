@@ -9,10 +9,16 @@
  * e ha accesso ai tool RAG/weak-signals se il dominio lo richiede.
  */
 import { db, agentTasksTable, agentEmployeesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getLLMForRoute } from "../llm/client";
 import { selectModelFor } from "../model-router";
 import { logger } from "../logger";
+import { appendOperatorEvent } from "../operator/event-log";
+
+export interface ExecuteAgentTaskOptions {
+  source?: string;
+  logEvents?: boolean;
+}
 
 // ── Tool definitions per gli agenti ───────────────────────────────────────────
 
@@ -27,9 +33,11 @@ const AGENT_TOOLS_BY_DOMAIN: Record<string, string[]> = {
 
 // ── Executor principale ────────────────────────────────────────────────────────
 
-export async function executeAgentTask(taskId: number): Promise<void> {
+export async function executeAgentTask(taskId: number, options: ExecuteAgentTaskOptions = {}): Promise<void> {
   const t0 = Date.now();
   const log = logger.child({ taskId });
+  const source = options.source ?? "agent_executor";
+  const shouldLogEvents = options.logEvents !== false;
 
   try {
     // 1. Carica il task
@@ -63,10 +71,28 @@ export async function executeAgentTask(taskId: number): Promise<void> {
       return;
     }
 
-    // 3. Segna come "running"
-    await db.update(agentTasksTable)
+    // 3. Claim atomico: evita doppia esecuzione se route e dispatcher partono insieme.
+    const [claimed] = await db.update(agentTasksTable)
       .set({ status: "running", startedAt: new Date(), updatedAt: new Date() })
-      .where(eq(agentTasksTable.id, taskId));
+      .where(and(eq(agentTasksTable.id, taskId), eq(agentTasksTable.status, "queued")))
+      .returning({ id: agentTasksTable.id });
+
+    if (!claimed) {
+      log.warn("[agent-executor] task claim failed");
+      return;
+    }
+
+    await safeAppendOperatorEvent(shouldLogEvents, {
+      userId: task.userId ?? null,
+      source,
+      triggerType: "agent_task_started",
+      decision: "agent_task",
+      targetType: "agent_task",
+      targetId: taskId,
+      status: "dispatched",
+      inputSummary: task.title,
+      metadata: { agentSlug: task.agentSlug },
+    });
 
     log.info({ agentSlug: task.agentSlug, userId: task.userId }, "[agent-executor] task started");
 
@@ -128,6 +154,18 @@ TOOL DISPONIBILI PER IL TUO DOMINIO: ${(AGENT_TOOLS_BY_DOMAIN[agent.domain] ?? [
       })
       .where(eq(agentTasksTable.id, taskId));
 
+    await safeAppendOperatorEvent(shouldLogEvents, {
+      userId: task.userId ?? null,
+      source,
+      triggerType: "agent_task_completed",
+      decision: "memory_update",
+      targetType: "agent_task",
+      targetId: taskId,
+      status: "completed",
+      inputSummary: task.title,
+      metadata: { agentSlug: task.agentSlug, durationMs, modelUsed: modelRoute.model },
+    });
+
     log.info({ taskId, durationMs }, "[agent-executor] task completed");
 
   } catch (err) {
@@ -143,5 +181,28 @@ TOOL DISPONIBILI PER IL TUO DOMINIO: ${(AGENT_TOOLS_BY_DOMAIN[agent.domain] ?? [
         updatedAt:    new Date(),
       })
       .where(eq(agentTasksTable.id, taskId));
+
+    await safeAppendOperatorEvent(shouldLogEvents, {
+      source,
+      triggerType: "agent_task_failed",
+      decision: "notification",
+      targetType: "agent_task",
+      targetId: taskId,
+      status: "failed",
+      inputSummary: `Task #${taskId}`,
+      metadata: { errorMessage: err instanceof Error ? err.message : String(err), durationMs },
+    });
+  }
+}
+
+async function safeAppendOperatorEvent(
+  enabled: boolean,
+  input: Parameters<typeof appendOperatorEvent>[0],
+): Promise<void> {
+  if (!enabled) return;
+  try {
+    await appendOperatorEvent(input);
+  } catch (err) {
+    logger.warn({ err, targetId: input.targetId }, "[agent-executor] operator event append failed");
   }
 }

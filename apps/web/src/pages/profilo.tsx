@@ -1,8 +1,6 @@
 import { LinkedInImportWizard } from "@/components/LinkedInImportWizard";
-import { OpenHumanAgentCard } from "@/components/profile/OpenHumanAgentCard";
 import { JourneySectionRenderer, type JourneyType } from "@/components/profile/profile-sections";
 import { ProfileSettings } from "@/components/profile/ProfileSettings";
-import { BadgesAchievements } from "@/components/profile/sections/BadgesAchievements";
 import { Button } from "@/components/ui/button";
 import type { AuthUser } from "@/contexts/AuthContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,6 +31,10 @@ interface ProfileData {
   emailVerified: boolean;
   avatarUrl?: string | null;
   bannerUrl?: string | null;
+  bio?: string | null;
+  city?: string | null;
+  username?: string | null;
+  wendyTonePreference?: string | null;
   createdAt: string;
 }
 
@@ -413,22 +415,22 @@ export default function Profilo() {
         onLogout={logout}
       />
 
-      <div className="container mx-auto grid max-w-5xl grid-cols-1 gap-6 px-4 md:grid-cols-3">
-        <div className="space-y-5 md:col-span-1">
-          <div id="impostazioni" className="scroll-mt-20">
-            <ProfileSettings
-              user={user}
-              {...(profile?.createdAt !== undefined ? { createdAt: profile.createdAt } : {})}
-            />
-          </div>
-          <BadgesAchievements completionData={completionData ?? null} />
-          <OpenHumanAgentCard />
-        </div>
-
-        <div className="space-y-5 md:col-span-2">
-          <JourneySectionRenderer
-            journeyType={journeyType}
-            userId={user.id}
+      <div className="container mx-auto max-w-5xl px-4">
+        <div id="impostazioni" className="scroll-mt-20">
+          <ProfileSettings
+            user={user}
+            {...(profile?.createdAt !== undefined ? { createdAt: profile.createdAt } : {})}
+            completionData={completionData ?? null}
+            bio={profile?.bio}
+            city={profile?.city}
+            username={profile?.username}
+            wendyTonePreference={profile?.wendyTonePreference}
+            journeySections={
+              <JourneySectionRenderer
+                journeyType={journeyType}
+                userId={user.id}
+              />
+            }
           />
         </div>
       </div>

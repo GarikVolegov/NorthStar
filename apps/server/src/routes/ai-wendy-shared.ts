@@ -37,6 +37,7 @@ export function buildWendyContextSources(input: {
   personalSources: Array<"openhuman" | "graphify" | "semantic-memory" | "wendy-brain" | "rag">;
   toolsUsed: string[];
   ragChunksRetrieved: number;
+  brainChunksRetrieved?: number;
 }): WendyContextSource[] {
   const sources = new Set<WendyContextSource>();
   for (const source of input.personalSources) sources.add(source);
@@ -45,6 +46,12 @@ export function buildWendyContextSources(input: {
     input.toolsUsed.includes("search_rag")
   ) {
     sources.add("rag");
+  }
+  if (
+    (input.brainChunksRetrieved ?? 0) > 0 ||
+    input.toolsUsed.includes("search_brain")
+  ) {
+    sources.add("wendy-brain");
   }
   if (input.toolsUsed.some((tool) => APP_DATA_TOOLS.has(tool))) {
     sources.add("app-data");
@@ -103,6 +110,7 @@ const WendyPageContextSchema = z.object({
 
 export const WendyRequestSchema = z.object({
   message: z.string().min(1).max(5000),
+  contextPrompt: z.string().max(8000).optional(),
   threadId: z.string().max(100).optional(),
   compressedHistory: CompressedHistorySchema.optional(),
   pageContext: WendyPageContextSchema.optional(),

@@ -1,0 +1,2 @@
+$ node scripts/check-db-types.mjs
+DB schema readiness passed: 79 schema modules exported.

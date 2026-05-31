@@ -37,6 +37,7 @@ export const userProfileSettingsTable = pgTable("user_profile_settings", {
   city: text("city"),
   cityPlaceId: text("city_place_id"),
   bio: text("bio"),
+  activeLogoPreset: text("active_logo_preset").notNull().default("northstar"),
 
   // Sfondo personalizzabile post-login (Fase H)
   // - activeBackgroundId: id del preset ("preset:<slug>") o entry utente ("user:<uuid>")

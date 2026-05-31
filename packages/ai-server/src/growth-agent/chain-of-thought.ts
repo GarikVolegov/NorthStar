@@ -30,7 +30,7 @@
  * If the message is very short (<10 words) or is a greeting/acknowledgement,
  * the CoT is skipped (returns null) to avoid wasting tokens.
  */
-import { openai } from "../client";
+import { getLLMForRoute } from "../llm/client";
 import { logger } from "../logger";
 import { selectModelFor } from "../model-router";
 import { ragConfig } from "../config/rag";
@@ -121,7 +121,7 @@ export async function runChainOfThought(
   userId: number,
   userMessage: string,
   conversationSummary?: string, // optional: last 2-3 exchanges for context
-  conversationId?: string | number | undefined,
+  conversationId?: string | number,
 ): Promise<CoTResult | null> {
   if (shouldSkipCoT(userMessage)) return null;
 
@@ -139,18 +139,18 @@ export async function runChainOfThought(
 
   try {
     const route = selectModelFor("chain-of-thought");
-    const response = await openai.chat.completions.create({
-      model: route.model,
-      messages: [
+    const llm = getLLMForRoute({ provider: route.provider });
+    const raw = await llm.chatOnce(
+      [
         { role: "system", content: COT_SYSTEM },
         { role: "user",   content: userContent },
       ],
-      temperature: ragConfig.chainOfThought.temperature,
-      max_tokens: ragConfig.chainOfThought.maxTokens,
-      response_format: { type: "json_object" },
-    });
-
-    const raw = response.choices[0]?.message?.content ?? "{}";
+      {
+        model: route.model,
+        temperature: ragConfig.chainOfThought.temperature,
+        maxTokens: ragConfig.chainOfThought.maxTokens,
+      },
+    );
     const parsed = JSON.parse(raw) as Record<string, unknown>;
 
     const result: CoTResult = {

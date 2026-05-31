@@ -117,4 +117,22 @@ export default tseslint.config(
       "@typescript-eslint/no-non-null-assertion": "off",
     },
   },
+  {
+    // Test files exercise HTTP responses and mocks whose values are `any` by
+    // construction (supertest `res.body`, `vi.fn()` return types). The
+    // type-aware "unsafe-*" family and `unbound-method` flag this plumbing
+    // without catching real defects, so they are relaxed for tests only.
+    // Production code keeps full strictness (see the typedFiles block above).
+    files: ["**/*.test.{ts,tsx}", "**/__tests__/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/unbound-method": "off",
+      "@typescript-eslint/no-this-alias": "off",
+      "@typescript-eslint/consistent-type-imports": "off",
+    },
+  },
 );

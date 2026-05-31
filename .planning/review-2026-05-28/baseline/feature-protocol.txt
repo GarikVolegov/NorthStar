@@ -1,0 +1,43 @@
+$ tsx scripts/check-feature-protocol.ts
+{
+  "status": "ok",
+  "manifests": [
+    {
+      "id": "calendar",
+      "status": "protocol",
+      "apiRoutes": 4,
+      "webRoutes": 1,
+      "wendyTools": 2
+    },
+    {
+      "id": "objectives",
+      "status": "protocol",
+      "apiRoutes": 5,
+      "webRoutes": 1,
+      "wendyTools": 3
+    },
+    {
+      "id": "profile",
+      "status": "protocol",
+      "apiRoutes": 6,
+      "webRoutes": 2,
+      "wendyTools": 3
+    },
+    {
+      "id": "sectors",
+      "status": "protocol",
+      "apiRoutes": 4,
+      "webRoutes": 2,
+      "wendyTools": 4
+    }
+  ],
+  "coverage": {
+    "total": 4,
+    "protocol": 4,
+    "pilot": 0,
+    "legacy": 0,
+    "protocolRatio": 1,
+    "wendyToolCount": 12
+  },
+  "failures": []
+}

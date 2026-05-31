@@ -1169,15 +1169,24 @@ paths:
             schema:
               type: object
               properties:
-                messageId:
+                requestId:
                   type: string
-                  description: ID of the Wendy message being rated
+                  description: ID of the Wendy request being rated
                 rating:
                   type: string
-                  enum: [upvote, downvote]
-                sessionId:
+                  enum: [up, down]
+                reason:
                   type: string
-              required: [messageId, rating]
+                  enum: [inaccurate, irrelevant, too_long, too_slow, harmful, other]
+                intent:
+                  type: string
+                domain:
+                  type: string
+                toolsUsed:
+                  type: array
+                  items:
+                    type: string
+              required: [requestId, rating]
       responses:
         "200":
           description: Feedback recorded
@@ -1186,8 +1195,8 @@ paths:
               schema:
                 type: object
                 properties:
-                  success: { type: boolean }
-                required: [success]
+                  ok: { type: boolean }
+                required: [ok]
 
   /wendy/voice:
     post:

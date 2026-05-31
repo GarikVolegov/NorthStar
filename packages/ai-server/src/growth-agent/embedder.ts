@@ -7,11 +7,32 @@
  */
 import { OpenAI } from "openai";
 
-function getClient(): OpenAI {
-  return new OpenAI({
-    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1",
-    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || "",
-  });
+function hasUsableApiKey(value: string | undefined): boolean {
+  const key = value?.trim().toLowerCase();
+  if (!key) return false;
+  return !(
+    key.includes("placeholder") ||
+    key.includes("inactive") ||
+    key.includes("changeme") ||
+    key.includes("dummy") ||
+    key.startsWith("your_")
+  );
+}
+
+function getClient(): OpenAI | null {
+  if (hasUsableApiKey(process.env.AI_INTEGRATIONS_OPENAI_API_KEY)) {
+    return new OpenAI({
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1",
+      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+    });
+  }
+  if (hasUsableApiKey(process.env.OPENROUTER_API_KEY)) {
+    return new OpenAI({
+      baseURL: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
+      apiKey: process.env.OPENROUTER_API_KEY,
+    });
+  }
+  return null;
 }
 
 export const EMBEDDING_MODEL = "text-embedding-3-small";
@@ -66,6 +87,11 @@ export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERL
 /** Embed a single string → number[] */
 export async function embedText(text: string): Promise<number[]> {
   const client = getClient();
+  if (!client) {
+    const error = new Error("No usable embedding provider key configured");
+    recordEmbedFailure(error);
+    throw error;
+  }
   try {
     const res = await client.embeddings.create({
       model: EMBEDDING_MODEL,
@@ -85,6 +111,11 @@ export async function embedText(text: string): Promise<number[]> {
 export async function embedBatch(texts: string[]): Promise<number[][]> {
   const BATCH = 100;
   const client = getClient();
+  if (!client) {
+    const error = new Error("No usable embedding provider key configured");
+    recordEmbedFailure(error);
+    throw error;
+  }
   const results: number[][] = [];
   for (let i = 0; i < texts.length; i += BATCH) {
     const batch = texts.slice(i, i + BATCH);

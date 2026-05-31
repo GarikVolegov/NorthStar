@@ -4,6 +4,7 @@ import { selectModelFor } from "../model-router";
 import { estimateTokens, estimateCost, recordLlmUsage } from "../cost-tracking";
 import { logger } from "../logger";
 import type { SecurityFinding } from "./types";
+import { securityFindingSchema } from "./types";
 
 const MAX_FILE_CHARS  = 10_000;
 const MAX_BATCH_CHARS = 50_000;
@@ -124,9 +125,16 @@ export async function scanFiles(
     try {
       const jsonStart = responseText.indexOf("{");
       const jsonEnd   = responseText.lastIndexOf("}");
-      const parsed    = JSON.parse(responseText.slice(jsonStart, jsonEnd + 1)) as { findings?: SecurityFinding[] };
-      const findings  = (parsed.findings ?? []).filter((f) => (f.confidence ?? 1) >= 0.8);
-      allFindings.push(...findings);
+      const parsed    = JSON.parse(responseText.slice(jsonStart, jsonEnd + 1)) as { findings?: unknown };
+      const rawFindings = Array.isArray(parsed.findings) ? parsed.findings : [];
+      for (const raw of rawFindings) {
+        const result = securityFindingSchema.safeParse(raw);
+        if (!result.success) {
+          logger.warn({ batch: i, issues: result.error.issues.slice(0, 3) }, "security-agent: dropped malformed finding");
+          continue;
+        }
+        if (result.data.confidence >= 0.8) allFindings.push(result.data);
+      }
     } catch (err) {
       logger.warn({ err, raw: responseText.slice(0, 200) }, "security-agent: failed to parse scan response");
     }

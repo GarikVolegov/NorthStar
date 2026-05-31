@@ -281,6 +281,19 @@ export const API_ENDPOINTS = {
     list: "/api/notifications",
     markRead: "/api/notifications/:id/read",
     markAllRead: "/api/notifications/read-all",
+    open: "/api/notifications/:id/open",
+    dismiss: "/api/notifications/:id/dismiss",
+    preferences: "/api/notifications/preferences",
+  },
+  profileLogo: {
+    current: "/api/profile/logo",
+  },
+  monthlyRitual: {
+    current: "/api/monthly-ritual/current",
+    open: "/api/monthly-ritual/current/open",
+    completeChallenge: "/api/monthly-ritual/current/challenge/complete",
+    archive: "/api/monthly-ritual/archive",
+    preferences: "/api/monthly-ritual/preferences",
   },
   // ── Step 6/7: RAG, briefing, workspace, coach memory ──
   briefings: {

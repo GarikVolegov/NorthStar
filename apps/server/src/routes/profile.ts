@@ -28,7 +28,15 @@ async function upsertProfileSettings(
 /* ─── GET /api/profile/:userId  —  dati profilo ───────────────────── */
 router.get("/:userId", async (req, res) => {
   try {
-    const userId = parseInt(req.params.userId ?? "", 10);
+    const rawUserId = req.params.userId ?? "";
+    const userId = rawUserId === "me"
+      ? req.user?.id
+      : Number.parseInt(rawUserId, 10);
+    if (typeof userId !== "number" || !Number.isInteger(userId) || userId <= 0) {
+      res.status(400).json({ error: "Invalid profile user id" });
+      return;
+    }
+    const targetUserId = userId;
 
     let user;
     try {
@@ -40,6 +48,10 @@ router.get("/:userId", async (req, res) => {
           emailVerified: usersTable.emailVerified,
           avatarUrl: usersTable.avatarUrl,
           bannerUrl: userProfileSettingsTable.bannerUrl,
+          bio: userProfileSettingsTable.bio,
+          city: userProfileSettingsTable.city,
+          username: userProfileSettingsTable.username,
+          wendyTonePreference: userProfileSettingsTable.wendyTonePreference,
           activeBackgroundId: userProfileSettingsTable.activeBackgroundId,
           backgroundLibrary: userProfileSettingsTable.backgroundLibrary,
           createdAt: usersTable.createdAt,
@@ -49,12 +61,12 @@ router.get("/:userId", async (req, res) => {
           userProfileSettingsTable,
           eq(usersTable.id, userProfileSettingsTable.userId),
         )
-        .where(eq(usersTable.id, userId))
+        .where(eq(usersTable.id, targetUserId))
         .limit(1);
     } catch (err) {
       if (!isPersistenceSchemaError(err)) throw err;
       req.log?.warn?.(
-        { err, route: "profile.get", userId, setupAction: "run_migrations" },
+        { err, route: "profile.get", userId: targetUserId, setupAction: "run_migrations" },
         "profile settings unavailable",
       );
       const [baseUser] = await db
@@ -67,10 +79,19 @@ router.get("/:userId", async (req, res) => {
           createdAt: usersTable.createdAt,
         })
         .from(usersTable)
-        .where(eq(usersTable.id, userId))
+        .where(eq(usersTable.id, targetUserId))
         .limit(1);
       user = baseUser
-        ? { ...baseUser, bannerUrl: null, activeBackgroundId: null, backgroundLibrary: [] as unknown[] }
+        ? {
+            ...baseUser,
+            bannerUrl: null,
+            bio: null,
+            city: null,
+            username: null,
+            wendyTonePreference: "auto",
+            activeBackgroundId: null,
+            backgroundLibrary: [] as unknown[],
+          }
         : undefined;
     }
 
@@ -87,6 +108,75 @@ router.get("/:userId", async (req, res) => {
 });
 
 /* ─── PATCH /api/profile/:userId/avatar  —  upload avatar ──────────── */
+router.patch("/:userId/info", requireAuth, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId ?? "", 10);
+    if (userId !== req.user!.id) {
+      res.status(403).json({ error: "Accesso negato" });
+      return;
+    }
+
+    const body = asPlainRecord(getRequestBody(req));
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    const bio = typeof body.bio === "string" ? body.bio.trim() : "";
+    const city = typeof body.city === "string" ? body.city.trim() : "";
+    const username = typeof body.username === "string" ? body.username.trim() : "";
+
+    if (name.length < 1 || name.length > 100) {
+      res.status(400).json({ error: "Nome non valido" });
+      return;
+    }
+    if (bio.length > 300 || city.length > 100 || username.length > 30 || !/^[a-zA-Z0-9_-]*$/.test(username)) {
+      res.status(400).json({ error: "Dati profilo non validi" });
+      return;
+    }
+
+    await db.update(usersTable).set({ name, updatedAt: new Date() }).where(eq(usersTable.id, userId));
+    await upsertProfileSettings(userId, {
+      bio: bio || null,
+      city: city || null,
+      username: username || null,
+    });
+
+    res.json({
+      name,
+      bio: bio || null,
+      city: city || null,
+      username: username || null,
+    });
+  } catch (err) {
+    req.log?.error?.({ err }, "profile info update error");
+    if (sendPersistenceWriteError(req, res, err, "profile.info.update")) return;
+    res.status(500).json({ error: "Errore aggiornamento profilo" });
+  }
+});
+
+router.patch("/:userId/tone", requireAuth, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId ?? "", 10);
+    if (userId !== req.user!.id) {
+      res.status(403).json({ error: "Accesso negato" });
+      return;
+    }
+
+    const body = asPlainRecord(getRequestBody(req));
+    const tone = typeof body.tone === "string" ? body.tone : "auto";
+    if (!["auto", "concise", "detailed", "formal", "casual"].includes(tone)) {
+      res.status(400).json({ error: "Tono non valido" });
+      return;
+    }
+
+    await upsertProfileSettings(userId, {
+      wendyTonePreference: tone as "auto" | "concise" | "detailed" | "formal" | "casual",
+    });
+    res.json({ tone });
+  } catch (err) {
+    req.log?.error?.({ err }, "profile tone update error");
+    if (sendPersistenceWriteError(req, res, err, "profile.tone.update")) return;
+    res.status(500).json({ error: "Errore aggiornamento tono Wendy" });
+  }
+});
+
 router.patch("/:userId/avatar", requireAuth, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId ?? "", 10);

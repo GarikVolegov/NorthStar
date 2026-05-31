@@ -1,0 +1,43 @@
+$ node scripts/check-tech-debt.mjs
+{
+  "current": {
+    "tracked": {
+      "directApiFetch": 0,
+      "globalNamespacePollution": 0,
+      "hotConsole": 0,
+      "adminHardcodedColors": 0,
+      "productionDbAny": 0
+    },
+    "gated": {
+      "directApiFetch": 0,
+      "globalNamespacePollution": 0,
+      "hotConsole": 0,
+      "adminHardcodedColors": 0,
+      "productionDbAny": 0
+    }
+  },
+  "baseline": {
+    "tracked": {
+      "directApiFetch": 0,
+      "globalNamespacePollution": 0,
+      "hotConsole": 0,
+      "adminHardcodedColors": 0,
+      "productionDbAny": 0
+    },
+    "gated": {
+      "directApiFetch": 0,
+      "globalNamespacePollution": 0,
+      "hotConsole": 0,
+      "adminHardcodedColors": 0,
+      "productionDbAny": 0
+    }
+  },
+  "topFiles": {
+    "directApiFetch": [],
+    "globalNamespacePollution": [],
+    "hotConsole": [],
+    "adminHardcodedColors": [],
+    "productionDbAny": []
+  },
+  "sprint": "foundation-admin-design-tokens-zero"
+}

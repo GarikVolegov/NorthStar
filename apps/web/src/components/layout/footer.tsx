@@ -1,3 +1,4 @@
+import { AppLogo } from "@/components/brand/AppLogo";
 import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 
@@ -28,7 +29,7 @@ export function Footer() {
               onClick={() => window.scrollTo({ top: 0, behavior: "instant" })}
               className="flex items-center gap-2.5"
             >
-              <img src="/logo.svg" alt="NorthStar" className="h-8 w-8 rounded-full object-cover" />
+              <AppLogo alt="NorthStar" className="h-8 w-8" />
               <span className="font-bold text-lg tracking-tight text-foreground">NorthStar</span>
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed">

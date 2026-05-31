@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   db,
   wendyBrainEventsTable,
@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { embedText } from "./growth-agent/embedder";
 import { logger } from "./logger";
+import { clamp01 } from "./utils";
 import "./wendy-router/tool-registry";
 import { toolRegistry } from "./tools/registry";
 import type { PluginToolDefinition } from "./tools/types";
@@ -61,11 +62,6 @@ function maxContextNodes(): number {
 
 function autoPromote(): boolean {
   return process.env.WENDY_BRAIN_AUTO_PROMOTE === "true";
-}
-
-function clamp01(value: number | undefined, fallback: number): number {
-  if (!Number.isFinite(value)) return fallback;
-  return Math.max(0, Math.min(1, Number(value)));
 }
 
 export function normalizeBrainTitle(title: string): string {
@@ -215,6 +211,9 @@ export async function searchWendyBrain(
         inArray(wendyBrainNodesTable.status, statuses),
         options.types?.length ? inArray(wendyBrainNodesTable.type, options.types) : undefined,
       ))
+      // Order before the cap so the 200 candidates are the most salient nodes,
+      // not an arbitrary DB-order slice (JS re-ranks them semantically below).
+      .orderBy(desc(wendyBrainNodesTable.importance), desc(wendyBrainNodesTable.lastReinforcedAt))
       .limit(200);
     const queryEmbedding = await embedText(query).catch(() => null);
     return rows
