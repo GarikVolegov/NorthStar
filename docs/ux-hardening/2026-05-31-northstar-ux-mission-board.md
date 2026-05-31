@@ -143,6 +143,13 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - Il profilo non interpreta piu `emailVerified` mancante come successo: mostra "Email verificata" solo quando il valore e esplicitamente `true`.
 - Le impostazioni profilo usano lo stato reale `user.emailVerified`, evitando un falso badge di fiducia quando la sync profilo fallisce.
 
+## Tranche 12 Applicata
+
+- La pagina pubblica certificato distingue un vero `404` da un servizio certificati non disponibile: mostra errore recuperabile con `Riprova` invece di dire "Certificato non trovato".
+- Il profilo resta utilizzabile quando `/api/profile/:id` fallisce, ma segnala che bio, citta, banner e preferenze potrebbero essere incompleti e offre retry.
+- Il feed routine non maschera piu errori API come feed vuoto reale: `useRoutineFeed` espone `error` e `isError` ai consumatori.
+- Il salvataggio del tono di Wendy nelle impostazioni non resta ottimistico se fallisce: ripristina il tono precedente e mostra un alert operativo.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -234,6 +241,12 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 ## Verifica Tranche 11
 
 - `pnpm --filter @northstar/web exec vitest run --configLoader runner src/lib/apiClient.test.ts src/components/NftCertificateGallery.test.tsx src/hooks/useRoutines.test.tsx src/components/dashboard/widgets/NextRoutineWidget.test.tsx src/pages/profilo.test.tsx`
+- `pnpm --filter @northstar/web run typecheck`
+- `git diff --check`
+
+## Verifica Tranche 12
+
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner src/pages/certificato.test.tsx src/pages/profilo.test.tsx src/hooks/useRoutines.test.tsx src/components/profile/ProfileSettings.test.tsx`
 - `pnpm --filter @northstar/web run typecheck`
 - `git diff --check`
 

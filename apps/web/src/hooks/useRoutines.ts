@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { ApiClientError, deleteJson, getJson, patchJson, postJson } from "@/lib/apiClient";
+import { deleteJson, getJson, patchJson, postJson } from "@/lib/apiClient";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const ROUTINE_TYPE_EMOJI: Record<string, string> = {
@@ -77,12 +77,7 @@ async function fetchRoutines(): Promise<RoutinesResponse> {
 }
 
 async function fetchFeed(): Promise<FeedResponse> {
-  try {
-    return await getJson<FeedResponse>("/api/routines/feed");
-  } catch (error) {
-    if (error instanceof ApiClientError) return { feed: [] };
-    throw error;
-  }
+  return getJson<FeedResponse>("/api/routines/feed");
 }
 
 export function useRoutines() {
@@ -110,7 +105,7 @@ export function useRoutineFeed() {
   const { user } = useAuth();
   const hasUser = user !== null && user !== undefined;
 
-  const { data, isLoading } = useQuery<FeedResponse>({
+  const { data, error, isError, isLoading } = useQuery<FeedResponse>({
     queryKey:        ["routine-feed"],
     queryFn:         fetchFeed,
     enabled:         hasUser,
@@ -120,6 +115,8 @@ export function useRoutineFeed() {
 
   return {
     feed:      data?.feed ?? [],
+    error,
+    isError,
     isLoading,
   };
 }

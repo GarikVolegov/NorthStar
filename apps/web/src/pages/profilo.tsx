@@ -9,11 +9,13 @@ import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { deleteJson, getJson, patchJson } from "@/lib/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   Calendar,
   Camera,
   Linkedin,
   Loader2,
   Mail,
+  RefreshCw,
   ShieldCheck,
   Trash2,
   TrendingUp
@@ -357,7 +359,12 @@ export default function Profilo() {
   const [avatarUrl, setAvatarUrl] = useState<string | null | undefined>(user?.avatarUrl);
   const [bannerUrl, setBannerUrl] = useState<string | null | undefined>();
   const [linkedinWizardOpen, setLinkedinWizardOpen] = useState(false);
-  const { data: profile } = useProfile(user?.id ?? 0);
+  const {
+    data: profile,
+    isError: profileLoadFailed,
+    isFetching: profileIsFetching,
+    refetch: refetchProfile,
+  } = useProfile(user?.id ?? 0);
   const emailVerified = profile?.emailVerified ?? user?.emailVerified;
 
   useEffect(() => {
@@ -417,6 +424,37 @@ export default function Profilo() {
       />
 
       <div className="container mx-auto max-w-5xl px-4">
+        {profileLoadFailed && (
+          <div
+            role="alert"
+            className="mb-4 flex flex-col gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-amber-800 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="flex gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+              <div>
+                <p className="font-semibold">Dettagli profilo non caricati</p>
+                <p className="text-sm">
+                  Stiamo mostrando i dati base. Bio, citta, banner e preferenze potrebbero essere incompleti.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 shrink-0 gap-2 rounded-full bg-background/80"
+              onClick={() => void refetchProfile()}
+              disabled={profileIsFetching}
+              aria-label="Riprova caricamento profilo"
+            >
+              {profileIsFetching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Riprova
+            </Button>
+          </div>
+        )}
         <div id="impostazioni" className="scroll-mt-20">
           <ProfileSettings
             user={user}

@@ -149,6 +149,7 @@ export function ProfileSettings({
   // Tono Wendy con auto-save
   const [tone, setTone] = useState<string>(initialTone ?? "auto");
   const [toneSaving, setToneSaving] = useState(false);
+  const [toneError, setToneError] = useState<string | null>(null);
   const soundscapeEnabled = appAudio.snapshot.supported && !appAudio.snapshot.muted;
   const emailVerified = user.emailVerified === true;
 
@@ -167,10 +168,15 @@ export function ProfileSettings({
   }
 
   async function handleToneChange(value: string) {
+    const previousTone = tone;
+    setToneError(null);
     setTone(value);
     setToneSaving(true);
     try {
       await patchJson(`${BASE}api/profile/${user.id}/tone`, { tone: value });
+    } catch {
+      setTone(previousTone);
+      setToneError("Impossibile salvare il tono di Wendy. Riprova tra poco.");
     } finally {
       setToneSaving(false);
     }
@@ -438,6 +444,11 @@ export function ProfileSettings({
                     </button>
                   ))}
                 </div>
+                {toneError && (
+                  <p className="mt-2 text-xs font-medium text-destructive" role="alert">
+                    {toneError}
+                  </p>
+                )}
               </div>
             </div>
           </AccordionContent>

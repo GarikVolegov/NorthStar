@@ -127,4 +127,13 @@ describe("Profilo reliability states", () => {
     expect(await screen.findAllByText("Email non verificata")).not.toHaveLength(0);
     expect(screen.queryByText(/^Email verificata$/)).not.toBeInTheDocument();
   });
+
+  it("shows a recoverable notice without replacing the profile page when profile details fail to load", async () => {
+    renderProfilo();
+
+    expect(await screen.findByText("Dettagli profilo non caricati")).toBeInTheDocument();
+    expect(screen.getByText(/bio, citta, banner e preferenze/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Riprova caricamento profilo" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ada Lovelace" })).toBeInTheDocument();
+  });
 });

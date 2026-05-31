@@ -4,7 +4,7 @@
  */
 import { Button } from "@/components/ui/button";
 import { CATEGORY_LABELS, CERTIFICATE_CATEGORY_COLORS } from "@/lib/constants";
-import { getJson } from "@/lib/apiClient";
+import { ApiClientError, getJson } from "@/lib/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -64,7 +64,7 @@ export default function CertificatePage() {
 
   const imageUrl = `${BASE}api/nft-certificates/image/${hash}.svg`;
 
-  const { data, isLoading, isError } = useQuery<VerifyResult>({
+  const { data, error, isFetching, isLoading, isError, refetch } = useQuery<VerifyResult>({
     queryKey: ["verify-cert", hash],
     queryFn: () => getJson<VerifyResult>(`${BASE}api/nft-certificates/verify/${hash}`),
     enabled: !!hash,
@@ -73,6 +73,8 @@ export default function CertificatePage() {
   });
 
   const cert = data?.certificate;
+  const isNotFound = error instanceof ApiClientError && error.status === 404;
+  const isRecoverableVerifyError = isError && !isNotFound;
   const colors = cert
     ? (CERTIFICATE_CATEGORY_COLORS[cert.category] ??
       CERTIFICATE_CATEGORY_COLORS.altro)
@@ -120,8 +122,42 @@ export default function CertificatePage() {
           </div>
         )}
 
+        {/* Recoverable verification error */}
+        {isRecoverableVerifyError && (
+          <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-10 text-center space-y-4">
+            <AlertCircle className="h-12 w-12 text-amber-500 mx-auto" />
+            <div>
+              <h2 className="font-bold text-foreground text-lg">
+                Verifica temporaneamente non disponibile
+              </h2>
+              <p className="text-muted-foreground text-sm mt-1">
+                Non posso controllare questo certificato in questo momento. Non
+                significa che l'hash sia errato: riprova tra poco.
+              </p>
+              {error instanceof Error && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {error.message}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button
+                type="button"
+                className="rounded-full"
+                disabled={isFetching}
+                onClick={() => void refetch()}
+              >
+                {isFetching ? "Verifica..." : "Riprova"}
+              </Button>
+              <Link href="/">
+                <Button variant="outline" className="rounded-full">Torna alla home</Button>
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Not found */}
-        {isError && (
+        {isNotFound && (
           <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-10 text-center space-y-4">
             <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
             <div>
