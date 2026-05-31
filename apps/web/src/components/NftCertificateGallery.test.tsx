@@ -1,13 +1,19 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const apiState = vi.hoisted(() => ({
   getJson: vi.fn(),
 }));
 
 vi.mock("@/lib/apiClient", () => ({
-  ApiClientError: class ApiClientError extends Error {},
+  ApiClientError: class ApiClientError extends Error {
+    constructor(message: string, readonly status = 500, readonly body: unknown = null) {
+      super(message);
+      this.name = "ApiClientError";
+    }
+  },
   getJson: (...args: unknown[]) => apiState.getJson(...args),
 }));
 
@@ -25,6 +31,10 @@ function renderComponent() {
 }
 
 describe("NftCertificateGallery", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("renders issued certificates with SVG image and verify links", async () => {
     apiState.getJson.mockResolvedValue({
       certificates: [
@@ -58,5 +68,25 @@ describe("NftCertificateGallery", () => {
       expect.stringContaining("/certificato/abc123"),
     );
     expect(screen.getByText(/off-chain/i)).toBeInTheDocument();
+  });
+
+  it("shows a recoverable error instead of an empty state when certificates cannot be loaded", async () => {
+    const user = userEvent.setup();
+    const ApiClientError = (await import("@/lib/apiClient")).ApiClientError;
+    apiState.getJson
+      .mockRejectedValueOnce(new ApiClientError("Service unavailable", 503, null))
+      .mockResolvedValueOnce({ certificates: [] });
+
+    renderComponent();
+
+    expect(
+      await screen.findByText(/non posso caricare i certificati/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/nessun certificato ancora/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /riprova/i }));
+
+    expect(await screen.findByText(/nessun certificato ancora/i)).toBeInTheDocument();
+    expect(apiState.getJson).toHaveBeenCalledTimes(2);
   });
 });

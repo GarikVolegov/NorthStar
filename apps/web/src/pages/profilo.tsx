@@ -303,13 +303,13 @@ function ProfileHero({
                 )}
                 <span
                   className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 ${
-                    emailVerified === false
-                      ? "border-amber-500/25 bg-amber-500/10 text-amber-700"
-                      : "border-emerald-500/20 bg-emerald-500/10 text-emerald-700"
+                    emailVerified === true
+                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700"
+                      : "border-amber-500/25 bg-amber-500/10 text-amber-700"
                   }`}
                 >
                   <ShieldCheck className="h-3.5 w-3.5" />
-                  {emailVerified === false ? "Email non verificata" : "Email verificata"}
+                  {emailVerified === true ? "Email verificata" : "Email non verificata"}
                 </span>
               </div>
               {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
@@ -358,6 +358,7 @@ export default function Profilo() {
   const [bannerUrl, setBannerUrl] = useState<string | null | undefined>();
   const [linkedinWizardOpen, setLinkedinWizardOpen] = useState(false);
   const { data: profile } = useProfile(user?.id ?? 0);
+  const emailVerified = profile?.emailVerified ?? user?.emailVerified;
 
   useEffect(() => {
     if (profile?.bannerUrl) {
@@ -404,7 +405,7 @@ export default function Profilo() {
         {...(avatarUrl !== undefined ? { avatarUrl } : {})}
         {...(bannerUrl !== undefined ? { bannerUrl } : {})}
         {...(profile?.createdAt !== undefined ? { createdAt: profile.createdAt } : {})}
-        {...(profile?.emailVerified !== undefined ? { emailVerified: profile.emailVerified } : {})}
+        {...(emailVerified !== undefined ? { emailVerified } : {})}
         showLinkedInImport={showLinkedInImport}
         onAvatarUpdate={(url) => {
           setAvatarUrl(url);

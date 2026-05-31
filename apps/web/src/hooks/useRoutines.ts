@@ -73,14 +73,7 @@ interface FeedResponse {
 }
 
 async function fetchRoutines(): Promise<RoutinesResponse> {
-  try {
-    return await getJson<RoutinesResponse>("/api/routines");
-  } catch (error) {
-    if (error instanceof ApiClientError) {
-      return { routines: [], meta: { total: 0, activeCount: 0, plan: "free", limit: 1, canCreate: true } };
-    }
-    throw error;
-  }
+  return getJson<RoutinesResponse>("/api/routines");
 }
 
 async function fetchFeed(): Promise<FeedResponse> {

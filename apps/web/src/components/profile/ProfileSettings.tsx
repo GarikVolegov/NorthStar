@@ -150,6 +150,7 @@ export function ProfileSettings({
   const [tone, setTone] = useState<string>(initialTone ?? "auto");
   const [toneSaving, setToneSaving] = useState(false);
   const soundscapeEnabled = appAudio.snapshot.supported && !appAudio.snapshot.muted;
+  const emailVerified = user.emailVerified === true;
 
   function handleProfileSaved(result: ProfileInfoResult) {
     setBio(result.bio ?? null);
@@ -255,8 +256,10 @@ export function ProfileSettings({
 
                 {/* Verifica email */}
                 <div className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="text-xs text-emerald-700 font-medium">Email verificata</span>
+                  <ShieldCheck className={cn("w-3.5 h-3.5", emailVerified ? "text-emerald-600" : "text-amber-600")} />
+                  <span className={cn("text-xs font-medium", emailVerified ? "text-emerald-700" : "text-amber-700")}>
+                    {emailVerified ? "Email verificata" : "Email non verificata"}
+                  </span>
                 </div>
 
                 {/* Pulsante modifica */}

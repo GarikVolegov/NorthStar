@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ApiClientError, getJson } from "@/lib/apiClient";
+import { getJson } from "@/lib/apiClient";
 import { CATEGORY_LABELS, CERTIFICATE_CATEGORY_COLORS } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -9,6 +9,7 @@ import {
   ExternalLink,
   Gem,
   Info,
+  AlertCircle,
   Shield,
   Sparkles,
 } from "lucide-react";
@@ -205,16 +206,17 @@ interface Props {
 export function NftCertificateGallery({ userId }: Props) {
   useQueryClient();
 
-  const { data: certs = [], isLoading } = useQuery<NftCert[]>({
+  const {
+    data: certs = [],
+    isError,
+    isFetching,
+    isLoading,
+    refetch,
+  } = useQuery<NftCert[]>({
     queryKey: ["nft-certificates"],
     queryFn: async () => {
-      try {
-        const response = await getJson<NftCert[] | NftCertResponse>("/api/nft-certificates/me");
-        return Array.isArray(response) ? response : response.certificates;
-      } catch (error) {
-        if (error instanceof ApiClientError) return [];
-        throw error;
-      }
+      const response = await getJson<NftCert[] | NftCertResponse>("/api/nft-certificates/me");
+      return Array.isArray(response) ? response : response.certificates;
     },
     enabled: !!userId,
     staleTime: 30_000,
@@ -261,7 +263,32 @@ export function NftCertificateGallery({ userId }: Props) {
         </div>
       </div>
 
-      {certs.length === 0 ? (
+      {isError ? (
+        <div className="rounded-2xl border border-destructive/25 bg-destructive/5 p-8 text-center space-y-3">
+          <div className="w-14 h-14 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center mx-auto">
+            <AlertCircle className="h-7 w-7 text-destructive" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground text-sm">
+              Non posso caricare i certificati
+            </p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              La verifica dei certificati non e' disponibile in questo momento.
+              Riprova: evitiamo di mostrarti uno stato vuoto non verificato.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-full"
+            disabled={isFetching}
+            onClick={() => void refetch()}
+          >
+            {isFetching ? "Verifica..." : "Riprova"}
+          </Button>
+        </div>
+      ) : certs.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-card/40 p-8 text-center space-y-3">
           <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto">
             <Gem className="h-7 w-7 text-primary/60" />

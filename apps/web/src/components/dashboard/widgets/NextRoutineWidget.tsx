@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useOptionalWendy } from "@/contexts/WendyProvider";
 import { ROUTINE_TYPE_LABEL, useRoutines } from "@/hooks/useRoutines";
 import { cn } from "@/lib/utils";
-import { ArrowRight, Bot, Calendar, Clock3, Settings2, Zap } from "lucide-react";
+import { AlertCircle, ArrowRight, Bot, Calendar, Clock3, RefreshCcw, Settings2, Zap } from "lucide-react";
 import { Link } from "wouter";
 
 const SIZE_HEIGHT: Record<"sm" | "md" | "lg", string> = {
@@ -35,7 +35,7 @@ interface Props {
 }
 
 export function NextRoutineWidget({ size }: Props) {
-  const { routines, isLoading } = useRoutines();
+  const { routines, error, isError, isLoading, refetch } = useRoutines();
   const wendy = useOptionalWendy();
 
   if (isLoading) {
@@ -43,6 +43,54 @@ export function NextRoutineWidget({ size }: Props) {
       <Card className={cn(SIZE_HEIGHT[size], "p-4")}>
         <Skeleton className="h-5 w-36 mb-3" />
         <Skeleton className="h-24 w-full rounded-xl" />
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card className={cn(SIZE_HEIGHT[size], "overflow-hidden")}>
+        <CardHeader className="px-4 pb-3 pt-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                <Zap className="h-4 w-4 text-primary" />
+                Prossima routine
+              </CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Automazioni personali guidate da Wendy.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full border border-destructive/25 bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
+              Errore
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent className="px-4 pb-4">
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <p className="text-sm font-semibold text-foreground">Routine non disponibili</p>
+            </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Non riesco a caricare lo stato delle routine. Non configurare una nuova routine finche non vediamo se quelle esistenti sono gia attive o in coda.
+            </p>
+            {error instanceof Error && (
+              <p className="mt-2 text-xs text-muted-foreground">{error.message}</p>
+            )}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => void refetch()}>
+              <RefreshCcw className="h-3.5 w-3.5" />
+              Riprova
+            </Button>
+            <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" asChild>
+              <Link href="/routines">
+                Gestisci routine <ArrowRight className="h-3 w-3" />
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
       </Card>
     );
   }

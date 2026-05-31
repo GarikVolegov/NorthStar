@@ -96,6 +96,16 @@ describe("apiClient", () => {
     );
   });
 
+  it("turns network failures into actionable typed API errors", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await expect(getJson("/api/test")).rejects.toMatchObject({
+      name: "ApiClientError",
+      status: 0,
+      message: expect.stringContaining("Server API locale non raggiungibile"),
+    } satisfies Partial<ApiClientError>);
+  });
+
   it("dispatches auth-expired when a tokenized request gets 401", async () => {
     sessionStorage.setItem(TOKEN_STORAGE_KEY, "stored");
     vi.spyOn(globalThis, "fetch").mockResolvedValue(

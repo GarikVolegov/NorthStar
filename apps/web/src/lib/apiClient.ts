@@ -59,12 +59,30 @@ function errorMessage(status: number, body: unknown): string {
   return `API request failed with status ${status}`;
 }
 
+function networkErrorMessage(): string {
+  if (import.meta.env.DEV) {
+    return "Server API locale non raggiungibile. Avvia il backend NorthStar su porta 3001 con `pnpm run dev:server` oppure usa `pnpm run dev:all`.";
+  }
+  return "Connessione al server NorthStar non riuscita. Controlla la rete e riprova.";
+}
+
+async function safeApiFetch(input: string, init: RequestInit): Promise<Response> {
+  try {
+    return await apiFetch(input, init);
+  } catch (error) {
+    throw new ApiClientError(networkErrorMessage(), 0, {
+      error: "network_unreachable",
+      cause: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 export async function requestJson<T>(
   input: string,
   init: ApiClientInit = {},
 ): Promise<T> {
   const { okStatuses, ...requestInit } = init;
-  const res = await apiFetch(input, requestInit);
+  const res = await safeApiFetch(input, requestInit);
   const body = await parseBody(res);
   if (!res.ok && !okStatuses?.includes(res.status)) {
     throw new ApiClientError(errorMessage(res.status, body), res.status, body);
@@ -118,7 +136,7 @@ export async function stream(
   init?: ApiClientInit,
 ): Promise<Response> {
   const { okStatuses, ...requestInit } = init ?? {};
-  const res = await apiFetch(input, requestInit);
+  const res = await safeApiFetch(input, requestInit);
   if (!res.ok && !okStatuses?.includes(res.status)) {
     const body = await parseBody(res);
     throw new ApiClientError(errorMessage(res.status, body), res.status, body);

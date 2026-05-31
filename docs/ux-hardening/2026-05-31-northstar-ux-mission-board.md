@@ -135,6 +135,14 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - `/api/news` non maschera piu una feed vuota come stato reale quando tutte le fonti abilitate hanno `lastError`: risponde `503 news_unavailable` con diagnostica GNews/Tavily/RSS.
 - Growth personalizzato non sparisce quando il profilo esiste ma non ci sono articoli matchati: mostra "Profilo pronto, contenuti in arrivo" e guida alla libreria generale.
 
+## Tranche 11 Applicata
+
+- `apiClient` trasforma i fallimenti di rete/fetch in `ApiClientError` con status `0` e messaggio operativo, invece di propagare `TypeError` grezzi alle pagine.
+- La galleria certificati non mostra piu "Nessun certificato ancora" quando `/api/nft-certificates/me` fallisce: espone uno stato recuperabile con `Riprova`.
+- `useRoutines` non converte piu errori API in lista vuota; il widget "Prossima routine" mostra errore recuperabile e link gestione routine.
+- Il profilo non interpreta piu `emailVerified` mancante come successo: mostra "Email verificata" solo quando il valore e esplicitamente `true`.
+- Le impostazioni profilo usano lo stato reale `user.emailVerified`, evitando un falso badge di fiducia quando la sync profilo fallisce.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -220,6 +228,12 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - `pnpm --filter @northstar/server exec vitest run --configLoader runner src/routes/news.test.ts`
 - `pnpm --filter @northstar/web exec vitest run --configLoader runner src/pages/growth.test.tsx src/pages/news.test.tsx src/components/search/WendyMessageBubble.test.tsx`
 - `pnpm --filter @northstar/server run typecheck`
+- `pnpm --filter @northstar/web run typecheck`
+- `git diff --check`
+
+## Verifica Tranche 11
+
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner src/lib/apiClient.test.ts src/components/NftCertificateGallery.test.tsx src/hooks/useRoutines.test.tsx src/components/dashboard/widgets/NextRoutineWidget.test.tsx src/pages/profilo.test.tsx`
 - `pnpm --filter @northstar/web run typecheck`
 - `git diff --check`
 
