@@ -6,6 +6,20 @@ const router = Router();
 /* ─── GET /api/applications/:userId  —  lista applicazioni ───── */
 router.get("/:userId", requireAuth, async (req, res) => {
   try {
+    const requestedUserId = Number.parseInt(req.params.userId ?? "", 10);
+    if (!Number.isInteger(requestedUserId) || requestedUserId <= 0) {
+      res.status(400).json({ error: "userId non valido" });
+      return;
+    }
+
+    if (req.user?.role !== "admin" && req.user?.id !== requestedUserId) {
+      res.status(403).json({
+        code: "APPLICATIONS_USER_MISMATCH",
+        error: "Puoi consultare solo le tue candidature",
+      });
+      return;
+    }
+
     res.json({ applications: [], status: "empty", totalCount: 0 });
   } catch (err) {
     req.log?.error?.({ err }, "applications get error");

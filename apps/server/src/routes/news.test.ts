@@ -85,7 +85,7 @@ function flattenSql(value: unknown): string {
   return "";
 }
 
-function mockSelectRows(rows: typeof publishedRows) {
+function mockSelectRows(rows: unknown[]) {
   lastWhereText = "";
   const chain = {
     from: vi.fn(() => chain),
@@ -132,6 +132,43 @@ describe("news routes", () => {
         tags: ["Sanita & Life Sciences"],
       }),
     ]);
+  });
+
+  it("adds provider diagnostics when the feed is empty", async () => {
+    mockSelectRows([]);
+    mockSelectRows([
+      {
+        name: "GNews lavoro",
+        sourceType: "gnews",
+        enabled: true,
+        lastFetchAt: new Date("2026-05-31T08:00:00.000Z"),
+        lastError: null,
+      },
+      {
+        name: "Tavily lavoro",
+        sourceType: "tavily",
+        enabled: true,
+        lastFetchAt: null,
+        lastError: "rate limit",
+      },
+    ]);
+
+    const response = await request(app())
+      .get("/api/news")
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      news: [],
+      source: "live",
+      status: "empty",
+      diagnostics: {
+        providerStatus: "degraded",
+        enabledSources: 2,
+        sourcesWithErrors: 1,
+        lastAttemptAt: "2026-05-31T08:00:00.000Z",
+        refreshAction: "check_provider_keys",
+      },
+    });
   });
 
   it("returns a structured error status when the main feed cannot be queried", async () => {

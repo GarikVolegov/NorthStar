@@ -108,7 +108,7 @@ export function WendyVoiceDock({
     >
       <div
         className={cn(
-          "flex items-center gap-2 rounded-2xl border border-white/10 bg-background/70 transition-colors focus-within:border-primary/45 focus-within:bg-background/90",
+          "flex min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-background/70 transition-colors focus-within:border-primary/45 focus-within:bg-background/90",
           compact ? "px-3 py-1.5" : "px-3.5 py-2",
         )}
       >
@@ -134,7 +134,7 @@ export function WendyVoiceDock({
           value={value}
           onChange={(event) => setValue(event.target.value)}
           placeholder="Chiedi a Wendy..."
-          className="min-h-8 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
+          className="min-h-8 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
         />
 
         <button

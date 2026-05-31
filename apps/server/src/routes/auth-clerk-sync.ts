@@ -1,9 +1,14 @@
 import type { Response, Router } from "express";
+import { createPublicKey } from "node:crypto";
 import { eq } from "drizzle-orm";
+import jwt from "jsonwebtoken";
 import { db, generateUsername, protectedDbQuery, userProfileSettingsTable, usersTable } from "@workspace/db";
 import { getRequestBody } from "../lib/request-context";
 import { asPlainRecord } from "../lib/type-guards";
 import { buildJwtPayload, findReferralAccount, generateToken, readReferralCode, readStringField, recordReferral } from "./auth-shared";
+import { resolveClerkJwksUrl } from "../lib/clerk-jwks-url";
+
+const { verify } = jwt;
 
 type ClerkSyncUser = {
   id: number;
@@ -24,6 +29,20 @@ type ClerkSyncUser = {
   isAffiliate: boolean | null;
   onboardingCompleted: boolean | null;
 };
+
+type ClerkJwk = {
+  kid: string;
+  kty?: string;
+  n: string;
+  e: string;
+};
+
+type ClerkJwks = {
+  keys: ClerkJwk[];
+};
+
+let clerkJwksCache: ClerkJwks | null = null;
+let clerkJwksCacheTime = 0;
 
 function isUniqueViolation(err: unknown): boolean {
   return (
@@ -54,6 +73,74 @@ function userProjection() {
     isAffiliate: userProfileSettingsTable.isAffiliate,
     onboardingCompleted: usersTable.onboardingCompleted,
   };
+}
+
+function isProduction(): boolean {
+  return process.env.NODE_ENV === "production";
+}
+
+function unauthorizedClerkSync(res: Response, code: string, error: string): void {
+  res.status(401).json({ code, error });
+}
+
+async function getClerkJwks(): Promise<ClerkJwks | null> {
+  const now = Date.now();
+  if (clerkJwksCache && now - clerkJwksCacheTime < 3600000) {
+    return clerkJwksCache;
+  }
+
+  const jwksUrl = resolveClerkJwksUrl();
+  if (!jwksUrl) return null;
+
+  const response = await fetch(jwksUrl);
+  if (!response.ok) return null;
+
+  const jwks = (await response.json()) as ClerkJwks;
+  if (!Array.isArray(jwks.keys)) return null;
+
+  clerkJwksCache = jwks;
+  clerkJwksCacheTime = now;
+  return jwks;
+}
+
+function decodeJwtPart<T>(part: string): T | null {
+  try {
+    return JSON.parse(Buffer.from(part, "base64url").toString("utf-8")) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function verifyClerkBearerSub(token: string): Promise<string | null> {
+  try {
+    const tokenHeader = token.split(".")[0];
+    if (!tokenHeader) return null;
+
+    const header = decodeJwtPart<{ kid?: unknown }>(tokenHeader);
+    const kid = typeof header?.kid === "string" ? header.kid : null;
+    if (!kid) return null;
+
+    const jwks = await getClerkJwks();
+    const key = jwks?.keys.find((candidate) => candidate.kid === kid);
+    if (!key) return null;
+
+    const publicKey = createPublicKey({
+      key: {
+        kty: key.kty ?? "RSA",
+        n: key.n,
+        e: key.e,
+      },
+      format: "jwk",
+    });
+
+    const payload = verify(token, publicKey, { algorithms: ["RS256"] });
+    if (typeof payload !== "object" || payload === null) return null;
+
+    const sub = (payload as { sub?: unknown }).sub;
+    return typeof sub === "string" ? sub : null;
+  } catch {
+    return null;
+  }
 }
 
 async function selectUserByClerkId(clerkId: string): Promise<ClerkSyncUser | null> {
@@ -115,7 +202,7 @@ function respondWithUser(res: Response, user: ClerkSyncUser, status = 200): void
 }
 
 export function registerClerkSyncRoute(router: Router): void {
-router.post("/clerk-sync", async (req, res) => {
+  router.post("/clerk-sync", async (req, res) => {
     try {
       // SECURITY: verifica che il Bearer token (Clerk JWT) contenga
       // lo stesso sub/clerkId inviato nel body — previene impersonificazione.
@@ -142,6 +229,39 @@ router.post("/clerk-sync", async (req, res) => {
 
       const displayName =
         typeof name === "string" && name.trim() ? name.trim() : email.trim();
+
+      const bearerToken = authHeader?.startsWith("Bearer ")
+        ? authHeader.slice(7).trim()
+        : null;
+
+      if (isProduction()) {
+        if (!bearerToken) {
+          unauthorizedClerkSync(
+            res,
+            "CLERK_SYNC_TOKEN_REQUIRED",
+            "Token Clerk mancante. Effettua di nuovo l'accesso.",
+          );
+          return;
+        }
+
+        const verifiedSub = await verifyClerkBearerSub(bearerToken);
+        if (!verifiedSub) {
+          unauthorizedClerkSync(
+            res,
+            "CLERK_SYNC_TOKEN_INVALID",
+            "Token Clerk non valido o non verificabile. Effettua di nuovo l'accesso.",
+          );
+          return;
+        }
+
+        if (verifiedSub !== bodyClerkId) {
+          res.status(403).json({
+            code: "CLERK_SYNC_TOKEN_MISMATCH",
+            error: "Token Clerk non corrisponde all'utente da sincronizzare.",
+          });
+          return;
+        }
+      }
 
       if (authHeader?.startsWith("Bearer ")) {
         try {

@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { getEffectivePlan, planMeets } from "./check-feature";
 import { JWT_SECRET } from "../lib/jwt-secret";
 import { logSecurityEvent } from "../lib/security-events";
+import { resolveClerkJwksUrl } from "../lib/clerk-jwks-url";
 
 declare global {
   namespace Express {
@@ -26,8 +27,6 @@ declare global {
 }
 
 const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY ?? "";
-const CLERK_JWKS_URL =
-  process.env.CLERK_JWKS_URL ?? "https://api.clerk.com/v1/jwks";
 
 interface ClerkJwtPayload {
   sub: string;
@@ -57,7 +56,10 @@ async function getClerkJwks() {
   if (jwksCache && now - jwksCacheTime < 3600000) {
     return jwksCache;
   }
-  const res = await fetch(CLERK_JWKS_URL);
+  const jwksUrl = resolveClerkJwksUrl();
+  if (!jwksUrl) return null;
+  const res = await fetch(jwksUrl);
+  if (!res.ok) return null;
   jwksCache = (await res.json()) as { keys: Array<{ kid: string; n: string; e: string }> };
   jwksCacheTime = now;
   return jwksCache;

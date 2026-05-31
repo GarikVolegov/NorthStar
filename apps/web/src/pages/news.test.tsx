@@ -85,4 +85,26 @@ describe("News page reliability states", () => {
     expect(await screen.findByText("news.noResults")).toBeInTheDocument();
     expect(screen.queryByText("news.loadError")).not.toBeInTheDocument();
   });
+
+  it("shows provider diagnostics when an empty feed explains why news are missing", async () => {
+    getJsonMock.mockResolvedValue({
+      news: [],
+      source: "live",
+      status: "empty",
+      diagnostics: {
+        providerStatus: "never_run",
+        lastAttemptAt: null,
+        enabledSources: 2,
+        sourcesWithErrors: 0,
+        refreshAction: "wait_for_startup_pipeline",
+        message: "Le fonti news sono configurate, ma la pipeline non ha ancora registrato un fetch.",
+      },
+    });
+
+    renderNews();
+
+    expect(await screen.findByText("news.noResults")).toBeInTheDocument();
+    expect(screen.getByText(/pipeline non ha ancora registrato un fetch/i)).toBeInTheDocument();
+    expect(screen.getByText(/Pipeline in avvio/i)).toBeInTheDocument();
+  });
 });

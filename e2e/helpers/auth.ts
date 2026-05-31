@@ -181,6 +181,7 @@ export async function waitForAuthReady(page: Page): Promise<void> {
     page
       .locator('[data-auth-ready="true"]')
       .or(page.locator("main"))
-      .or(page.locator("body")),
+      .or(page.locator("body"))
+      .first(),
   ).toBeVisible({ timeout: 10_000 });
 }

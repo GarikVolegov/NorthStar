@@ -132,7 +132,10 @@ function syncedUser(overrides: Record<string, unknown> = {}) {
 }
 
 describe("auth clerk-sync route", () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+
   beforeEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
     vi.clearAllMocks();
     selectRows.queue = [];
     insertBehavior.throwUnique = false;
@@ -211,6 +214,46 @@ describe("auth clerk-sync route", () => {
     const body = response.body as ClerkSyncResponseBody;
     expect(body.id).toBe(44);
     expect(body.northstar_token).toEqual(expect.any(String));
+  });
+
+  it("requires a bearer token for Clerk sync in production", async () => {
+    process.env.NODE_ENV = "production";
+
+    const response = await request(app())
+      .post("/api/auth/clerk-sync")
+      .set("Content-Type", "application/json")
+      .send(JSON.stringify({
+        clerkId: "clerk-tokenless",
+        email: "tokenless@example.com",
+        name: "Tokenless User",
+      }))
+      .expect(401);
+
+    expect(response.body).toMatchObject({
+      code: "CLERK_SYNC_TOKEN_REQUIRED",
+      error: expect.any(String),
+    });
+    expect(insertBehavior.rows).toEqual([]);
+  });
+
+  it("rejects malformed bearer tokens for Clerk sync in production", async () => {
+    process.env.NODE_ENV = "production";
+
+    const response = await request(app())
+      .post("/api/auth/clerk-sync")
+      .set("Authorization", "Bearer not-a-jwt")
+      .set("Content-Type", "application/json")
+      .send(JSON.stringify({
+        clerkId: "clerk-malformed",
+        email: "malformed@example.com",
+        name: "Malformed User",
+      }))
+      .expect(401);
+
+    expect(response.body).toMatchObject({
+      code: "CLERK_SYNC_TOKEN_INVALID",
+      error: expect.any(String),
+    });
   });
 
   it("recovers when profile settings already exist during email linking", async () => {

@@ -97,6 +97,17 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - SearchDialog mobile non somma piu risultati `60vh` e chat Wendy `58vh` dentro un bottom sheet limitato: la lista diventa flessibile e la chat resta raggiungibile.
 - Memoria Wendy ha composer mobile stacked, input e CTA con target 44px, evitando campi compressi su schermi stretti.
 
+## Tranche 7 Applicata
+
+- `/api/news` espone diagnostica provider quando il feed e vuoto o degradato: stato fonti, ultimo tentativo, errori e prossima azione consigliata.
+- UI News non lascia piu l'utente davanti a un vuoto muto: mostra messaggio operativo su pipeline, chiavi provider, fonti mancanti o refresh atteso.
+- Clerk sync in produzione richiede un bearer Clerk verificabile: token mancante/invalido o `sub` non coerente non arrivano piu alla sync DB.
+- La verifica JWKS Clerk usa un resolver condiviso che deriva l'endpoint dal Frontend API URL o dalla publishable key, evitando il vecchio default generico.
+- API candidature non restituisce piu un falso empty state quando l'utente richiede candidature di un altro account: risponde `403 APPLICATIONS_USER_MISMATCH`.
+- E2E mobile Pixel 5 copre SearchDialog/Wendy, pagina `/wendy`, memoria Wendy e dashboard, verificando assenza di overflow orizzontale e controlli raggiungibili.
+- Auth dev/e2e supporta token NorthStar locale senza sessione Clerk reale solo in `DEV`, cosi le route protette sono testabili senza indebolire produzione.
+- Wendy mobile tiene composer e pulsanti dentro il viewport: bottom sheet con altezza reale, console fullscreen ordinata prima dello stage e input flex `min-w-0`.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -152,10 +163,19 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - `pnpm --filter @northstar/web run typecheck`
 - `git diff --check`
 
+## Verifica Tranche 7
+
+- `pnpm --filter @northstar/server exec vitest run --configLoader runner src/lib/clerk-jwks-url.test.ts src/routes/auth-clerk-sync.test.ts src/routes/applications.test.ts src/routes/jobs.test.ts src/routes/news.test.ts`
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner src/pages/news.test.tsx src/components/search/SearchDialog.test.tsx src/contexts/AuthContext.test.tsx src/components/wendy/WendyNodeStage.test.ts src/components/wendy/WendyActionCard.test.tsx`
+- `pnpm exec playwright test e2e/mobile/wendy-critical-surfaces.mobile.spec.ts --project=chromium --workers=1`
+- `pnpm --filter @northstar/server run typecheck`
+- `pnpm --filter @northstar/web run typecheck`
+- `git diff --check`
+
 ## Backlog Prossima Tranche
 
-1. Rafforzare ulteriormente auth/sync Clerk: rendere token verification obbligatoria in produzione e chiarire UX lato `AuthContext`.
+1. Aggiungere issuer/audience validation esplicita alla verifica Clerk JWKS in produzione.
 2. Sostituire route placeholder di candidature/lavori con persistenza o provider reale quando il prodotto lo richiede.
-3. Verificare mobile reale delle aree critiche con Playwright visuale: SearchDialog, Wendy full-screen, memoria, dashboard.
-4. Aggiungere diagnostica provider a `/api/news` (`lastAttempt`, provider status, refresh action) senza appesantire il contratto pubblico.
+3. Aggiungere pannello admin/manual refresh per fonti news, GNews/Tavily e stato provider.
+4. Estendere mobile visual QA a WebKit/Safari e a viewport tablet.
 5. Estendere E2E full-stack a referral, affiliate UI e mobile viewport, eliminando le ultime assunzioni su seed account.

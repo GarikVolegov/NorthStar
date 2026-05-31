@@ -1,7 +1,7 @@
 import { Router } from "express";
 import type { Response } from "express";
 import { eq, desc, or, and, lt, ilike, sql, type SQL } from "drizzle-orm";
-import { db, newsArticlesTable } from "@workspace/db";
+import { db, discoverySourcesTable, newsArticlesTable } from "@workspace/db";
 import { PUBLIC_NEWS_SOURCES } from "@workspace/ai-server";
 import { cacheGet, cacheSet } from "../lib/redis";
 import { clampContentLimit, readContentSearchQuery } from "../lib/content-search";
@@ -12,6 +12,16 @@ const router = Router();
 const CACHE_TTL = 60; // 60s TTL as specified
 type NewsArticleRow = typeof newsArticlesTable.$inferSelect;
 type NewsFeedStatus = "ok" | "empty" | "partial" | "error";
+type NewsProviderStatus = "ready" | "degraded" | "never_run" | "stale" | "not_configured" | "unavailable";
+
+type NewsDiagnostics = {
+  providerStatus: NewsProviderStatus;
+  lastAttemptAt: string | null;
+  enabledSources: number;
+  sourcesWithErrors: number;
+  refreshAction: "wait_for_next_refresh" | "wait_for_startup_pipeline" | "check_provider_keys" | "configure_sources" | "retry_later";
+  message: string;
+};
 
 /**
  * Encode a keyset cursor: "publishedAt|id"
@@ -55,13 +65,103 @@ function newsStatus(newsCount: number): NewsFeedStatus {
   return newsCount > 0 ? "ok" : "empty";
 }
 
-function sendNewsUnavailable(res: Response) {
+async function buildNewsDiagnostics(): Promise<NewsDiagnostics> {
+  try {
+    const rows = await db
+      .select({
+        name: discoverySourcesTable.name,
+        sourceType: discoverySourcesTable.sourceType,
+        enabled: discoverySourcesTable.enabled,
+        lastFetchAt: discoverySourcesTable.lastFetchAt,
+        lastError: discoverySourcesTable.lastError,
+      })
+      .from(discoverySourcesTable)
+      .where(and(
+        eq(discoverySourcesTable.itemType, "news"),
+        eq(discoverySourcesTable.enabled, true),
+      ))
+      .limit(50);
+
+    const enabledSources = rows.length;
+    const sourcesWithErrors = rows.filter((row) => Boolean(row.lastError?.trim())).length;
+    const lastAttempt = rows
+      .map((row) => row.lastFetchAt)
+      .filter((date): date is Date => date instanceof Date)
+      .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+
+    if (enabledSources === 0) {
+      return {
+        providerStatus: "not_configured",
+        lastAttemptAt: null,
+        enabledSources,
+        sourcesWithErrors,
+        refreshAction: "configure_sources",
+        message: "Nessuna fonte news attiva: configura GNews, Tavily o feed RSS dalla console admin.",
+      };
+    }
+
+    if (sourcesWithErrors > 0) {
+      return {
+        providerStatus: "degraded",
+        lastAttemptAt: lastAttempt?.toISOString() ?? null,
+        enabledSources,
+        sourcesWithErrors,
+        refreshAction: "check_provider_keys",
+        message: "Alcune fonti news hanno segnalato errori: controlla chiavi provider, rate limit o URL sorgente.",
+      };
+    }
+
+    if (!lastAttempt) {
+      return {
+        providerStatus: "never_run",
+        lastAttemptAt: null,
+        enabledSources,
+        sourcesWithErrors,
+        refreshAction: "wait_for_startup_pipeline",
+        message: "Le fonti news sono configurate, ma la pipeline non ha ancora registrato un fetch.",
+      };
+    }
+
+    const stale = Date.now() - lastAttempt.getTime() > 12 * 60 * 60 * 1000;
+    if (stale) {
+      return {
+        providerStatus: "stale",
+        lastAttemptAt: lastAttempt.toISOString(),
+        enabledSources,
+        sourcesWithErrors,
+        refreshAction: "retry_later",
+        message: "La pipeline news non aggiorna da diverse ore: verifica cron e provider se il feed resta fermo.",
+      };
+    }
+
+    return {
+      providerStatus: "ready",
+      lastAttemptAt: lastAttempt.toISOString(),
+      enabledSources,
+      sourcesWithErrors,
+      refreshAction: "wait_for_next_refresh",
+      message: "Le fonti news risultano attive; il feed si aggiornera al prossimo ciclo utile.",
+    };
+  } catch {
+    return {
+      providerStatus: "unavailable",
+      lastAttemptAt: null,
+      enabledSources: 0,
+      sourcesWithErrors: 0,
+      refreshAction: "retry_later",
+      message: "Non riesco a leggere lo stato delle fonti news in questo momento.",
+    };
+  }
+}
+
+async function sendNewsUnavailable(res: Response) {
   res.status(503).json({
     news: [],
     nextCursor: null,
     source: "error",
     status: "error" satisfies NewsFeedStatus,
     error: "news_unavailable",
+    diagnostics: await buildNewsDiagnostics(),
   });
 }
 
@@ -201,7 +301,7 @@ router.get("/", async (req, res) => {
       const lastNews = news.at(-1);
       const errors = results.filter((r) => "error" in r).map(() => "news_unavailable");
       if (errors.length > 0 && news.length === 0) {
-        sendNewsUnavailable(res);
+        await sendNewsUnavailable(res);
         return;
       }
       const status: NewsFeedStatus = errors.length > 0 ? "partial" : newsStatus(news.length);
@@ -211,6 +311,7 @@ router.get("/", async (req, res) => {
         source: errors.length > 0 ? "partial" : "live",
         status,
         ...(errors.length > 0 ? { errors } : {}),
+        ...(status !== "ok" ? { diagnostics: await buildNewsDiagnostics() } : {}),
       });
       return;
     }
@@ -220,7 +321,14 @@ router.get("/", async (req, res) => {
       const cacheKey = "news:recent:real:v3";
       const cached = await cacheGet<ReturnType<typeof mapNewsItem>[]>(cacheKey);
       if (cached) {
-        res.json({ news: cached, nextCursor: null, source: "live", status: newsStatus(cached.length) });
+        const status = newsStatus(cached.length);
+        res.json({
+          news: cached,
+          nextCursor: null,
+          source: "live",
+          status,
+          ...(status === "empty" ? { diagnostics: await buildNewsDiagnostics() } : {}),
+        });
         return;
       }
     }
@@ -258,10 +366,17 @@ router.get("/", async (req, res) => {
       ? encodeCursor(last.publishedAt, parseInt(last.id))
       : null;
 
-    res.json({ news: mapped, nextCursor, source: "live", status: newsStatus(mapped.length) });
+    const status = newsStatus(mapped.length);
+    res.json({
+      news: mapped,
+      nextCursor,
+      source: "live",
+      status,
+      ...(status === "empty" ? { diagnostics: await buildNewsDiagnostics() } : {}),
+    });
   } catch (err) {
     req.log?.error?.({ err }, "news list error");
-    sendNewsUnavailable(res);
+    await sendNewsUnavailable(res);
   }
 });
 
@@ -311,10 +426,17 @@ router.get("/sector/:sectorName", async (req, res) => {
       ? encodeCursor(last.publishedAt, parseInt(last.id))
       : null;
 
-    res.json({ news: mapped, nextCursor, source: "live", status: newsStatus(mapped.length) });
+    const status = newsStatus(mapped.length);
+    res.json({
+      news: mapped,
+      nextCursor,
+      source: "live",
+      status,
+      ...(status === "empty" ? { diagnostics: await buildNewsDiagnostics() } : {}),
+    });
   } catch (err) {
     req.log?.error?.({ err }, "news by sector error");
-    sendNewsUnavailable(res);
+    await sendNewsUnavailable(res);
   }
 });
 

@@ -49,4 +49,16 @@ describe("applications routes", () => {
       totalCount: 0,
     });
   });
+
+  it("rejects requests for another user's applications instead of returning an ambiguous empty state", async () => {
+    const response = await request(app())
+      .get("/api/applications/7")
+      .set("Authorization", `Bearer ${token()}`)
+      .expect(403);
+
+    expect(response.body).toEqual({
+      code: "APPLICATIONS_USER_MISMATCH",
+      error: "Puoi consultare solo le tue candidature",
+    });
+  });
 });

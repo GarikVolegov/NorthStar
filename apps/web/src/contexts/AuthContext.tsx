@@ -56,6 +56,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const BASE = import.meta.env.BASE_URL || "/";
 const REFERRAL_STORAGE_KEY = "referralCode";
+const ENABLE_DEV_TOKEN_AUTH = import.meta.env.DEV;
 
 type ClerkUser = NonNullable<ReturnType<typeof useUser>["user"]>;
 
@@ -153,11 +154,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!clerkLoaded) return;
 
     if (!isSignedIn || !clerkUser) {
-      clearNorthStarSession();
-      setAuthSyncFailed(false);
-      setAuthSyncError(null);
-      setAuthReady(true);
-      return;
+      const devToken = ENABLE_DEV_TOKEN_AUTH
+        ? sessionStorage.getItem(TOKEN_STORAGE_KEY) ?? localStorage.getItem(TOKEN_STORAGE_KEY)
+        : null;
+
+      if (!devToken) {
+        clearNorthStarSession();
+        setAuthSyncFailed(false);
+        setAuthSyncError(null);
+        setAuthReady(true);
+        return;
+      }
+
+      const ctrl = new AbortController();
+      const syncDevToken = async () => {
+        setAuthReady(false);
+        setToken(devToken);
+        setInMemoryToken(devToken);
+        setAuthTokenGetter(() => devToken);
+        try {
+          const res = await fetch(`${BASE}api/auth/me`, {
+            headers: { Authorization: `Bearer ${devToken}` },
+            signal: ctrl.signal,
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const serverUser = (await res.json()) as AuthUser;
+          sessionStorage.setItem(TOKEN_STORAGE_KEY, devToken);
+          setUser(serverUser);
+          setAuthSyncFailed(false);
+          setAuthSyncError(null);
+        } catch (err) {
+          if (ctrl.signal.aborted) return;
+          const message = err instanceof Error ? err.message : "Token dev non valido.";
+          clearNorthStarSession();
+          setAuthSyncFailed(true);
+          setAuthSyncError(message);
+        } finally {
+          if (!ctrl.signal.aborted) setAuthReady(true);
+        }
+      };
+
+      void syncDevToken();
+      return () => ctrl.abort();
     }
 
     if (syncedClerkIdRef.current === clerkUser.id) return;

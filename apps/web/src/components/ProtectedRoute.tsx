@@ -39,7 +39,7 @@ export function ProtectedRoute({ component: Component, ...rest }: ProtectedRoute
     );
   }
 
-  if (!isSignedIn) {
+  if (!isSignedIn && !isLoggedIn) {
     return <Redirect to="/sign-in" />;
   }
 

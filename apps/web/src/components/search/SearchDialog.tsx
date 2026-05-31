@@ -184,7 +184,7 @@ export function SearchDialog({
               ? "fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-3xl bg-card/95 backdrop-blur-xl border-t border-white/10 shadow-2xl overflow-hidden"
               : "fixed z-50 left-1/2 -translate-x-1/2 w-full px-4"}
             style={isMobile
-              ? { maxHeight: "85dvh" }
+              ? { height: "85dvh", maxHeight: "85dvh" }
               : { top: "76px", maxWidth: isAIActive && queryLong ? "920px" : "720px" }}
             initial={isMobile ? { y: "100%" } : { opacity: 0, y: -8, scale: 0.98 }}
             animate={isMobile ? { y: 0 }   : { opacity: 1, y: 0,   scale: 1 }}
@@ -219,7 +219,7 @@ export function SearchDialog({
               isMobile ? "flex min-h-0 flex-1 flex-col" : "rounded-3xl border border-white/10 bg-card/90 backdrop-blur-2xl shadow-2xl",
             )}>
               {/* Input sempre in cima */}
-              <Command shouldFilter={false} className={mobileAIStack ? "min-h-0" : undefined}>
+              <Command shouldFilter={false} className={mobileAIStack ? "min-h-0 flex-1 overflow-hidden" : undefined}>
                 {(showDefaultSuggestions || query.length < 3) && (
                   <div className="flex gap-2 overflow-x-auto border-b border-white/10 px-3 py-3">
                     {quickActions.map((action) => (
@@ -337,7 +337,7 @@ export function SearchDialog({
 
                 ) : (
                   /* Layout classico (senza AI attiva) */
-                  <CommandList className={mobileAIStack ? "min-h-0 flex-1 max-h-none" : "max-h-[60vh]"}>
+                  <CommandList className={mobileAIStack ? "min-h-0 flex-1 basis-0 max-h-none" : "max-h-[60vh]"}>
                     {isLoading && (
                       <div className="flex items-center gap-2 px-4 py-6 text-sm text-muted-foreground">
                         <Sparkles className="h-4 w-4 animate-pulse text-primary" />
@@ -459,7 +459,7 @@ export function SearchDialog({
                 )}
 
                 {mobileAIStack && (
-                  <section className="max-h-[52dvh] shrink-0 overflow-hidden border-t border-white/10" aria-label="Chat Wendy">
+                  <section className="h-[52dvh] min-h-0 max-h-[52dvh] shrink-0 overflow-hidden border-t border-white/10" aria-label="Chat Wendy">
                     <WendyConsole
                       chat={chat}
                       query={query}

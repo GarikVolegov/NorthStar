@@ -35,6 +35,19 @@ interface NewsFeedResponse {
   source: "live" | "partial" | "static" | "error";
   status?: "ok" | "empty" | "partial" | "error";
   error?: string;
+  diagnostics?: {
+    providerStatus: "ready" | "degraded" | "never_run" | "stale" | "not_configured" | "unavailable";
+    lastAttemptAt: string | null;
+    enabledSources: number;
+    sourcesWithErrors: number;
+    refreshAction:
+      | "wait_for_next_refresh"
+      | "wait_for_startup_pipeline"
+      | "check_provider_keys"
+      | "configure_sources"
+      | "retry_later";
+    message: string;
+  };
 }
 
 const CATEGORY_CONFIG = [
@@ -48,6 +61,14 @@ const CATEGORY_CONFIG = [
 ] as const;
 
 const NEWS_STALE_MS = 15 * 60_000;
+
+const DIAGNOSTIC_ACTION_LABELS: Record<NonNullable<NewsFeedResponse["diagnostics"]>["refreshAction"], string> = {
+  wait_for_next_refresh: "Aggiornamento automatico in arrivo",
+  wait_for_startup_pipeline: "Pipeline in avvio",
+  check_provider_keys: "Controlla chiavi e limiti provider",
+  configure_sources: "Configura le fonti news",
+  retry_later: "Riprova tra poco",
+};
 
 function timeAgoLabel(dateStr: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -361,6 +382,7 @@ export default function News() {
 
   const displayNews = activeTab === "__sector__" ? (sectorNewsData?.news ?? []) : (data?.news ?? []);
   const displaySource = activeTab === "__sector__" ? sectorNewsData?.source : data?.source;
+  const displayDiagnostics = activeTab === "__sector__" ? sectorNewsData?.diagnostics : data?.diagnostics;
   const displayLoading = activeTab === "__sector__" ? (sectorLoading && !!confirmedSector) : isLoading;
   const displayError = activeTab === "__sector__" ? sectorIsError : isError;
   const retryDisplayNews = activeTab === "__sector__" ? refetchSectorNews : refetch;
@@ -496,6 +518,27 @@ export default function News() {
                 <Newspaper className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
                 <p className="text-muted-foreground">{t("news.noResults")}</p>
                 <p className="text-xs text-muted-foreground/60 mt-1">{t("news.noResultsHint")}</p>
+                {displayDiagnostics && (
+                  <div className="mx-auto mt-5 max-w-lg rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-left">
+                    <p className="text-sm font-medium text-foreground">
+                      {displayDiagnostics.message}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span className="rounded-full bg-background px-2.5 py-1">
+                        {t(`news.diagnostics.${displayDiagnostics.refreshAction}`, {
+                          defaultValue: DIAGNOSTIC_ACTION_LABELS[displayDiagnostics.refreshAction],
+                        })}
+                      </span>
+                      {displayDiagnostics.lastAttemptAt && (
+                        <span>
+                          {t("news.diagnostics.lastAttempt", {
+                            defaultValue: "Ultimo tentativo",
+                          })}: {new Date(displayDiagnostics.lastAttemptAt).toLocaleString("it-IT")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
         </div>

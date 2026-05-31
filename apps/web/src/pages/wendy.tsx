@@ -144,7 +144,8 @@ export default function WendyPage() {
 
           <section
             className={cn(
-              "min-h-[560px] overflow-hidden rounded-2xl border border-white/10 bg-card/78 shadow-2xl backdrop-blur-xl",
+              "order-first h-[440px] max-h-[calc(100dvh-8rem)] overflow-hidden rounded-2xl border border-white/10 bg-card/78 shadow-2xl backdrop-blur-xl sm:h-[520px]",
+              "lg:order-none lg:h-auto lg:max-h-none",
               "lg:col-span-2 lg:min-h-[560px] xl:col-span-1 xl:min-h-0",
             )}
           >
