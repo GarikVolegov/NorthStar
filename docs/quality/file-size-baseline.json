@@ -1,12 +1,25 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-25T00:00:00.000Z",
+  "updatedAt": "2026-05-31T00:00:00.000Z",
+  "_note": "Ratchet baseline. Entries are tracked debt: runtime/UI-heavy files whose split needs verification against a running instance (DB/.env) or browser preview, which the CI worktree lacks. They are frozen at current size (cannot grow) and should be removed as they are split. Pure-data files use the *-data.ts suffix and are exempt from the walk (see check-file-size.mjs).",
   "limits": {
     "apps": 600,
     "packages": 400
   },
   "offenders": {
-    "apps": [],
-    "packages": []
+    "apps": [
+      { "file": "apps/server/src/routes/ai-wendy.ts", "lines": 1033 },
+      { "file": "apps/web/src/components/admin/console/AgentsSection.tsx", "lines": 732 },
+      { "file": "apps/web/src/pages/settori.tsx", "lines": 729 },
+      { "file": "apps/server/src/routes/admin/agents.ts", "lines": 685 },
+      { "file": "apps/web/src/pages/home.tsx", "lines": 677 },
+      { "file": "apps/web/src/hooks/useWendyChat.ts", "lines": 669 }
+    ],
+    "packages": [
+      { "file": "packages/ai-server/src/wendy-neural/index.ts", "lines": 518 },
+      { "file": "packages/ai-server/src/llm/client.ts", "lines": 508 },
+      { "file": "packages/ai-server/src/growth-agent/agent.ts", "lines": 463 },
+      { "file": "packages/ai-server/src/growth-agent/memory-manager.ts", "lines": 460 }
+    ]
   }
 }
