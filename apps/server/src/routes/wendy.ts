@@ -97,7 +97,7 @@ router.post(
       // If not authenticated, return a friendly message explaining how to get started
       if (!isAuthenticated) {
         log.info(
-          { message: data.message },
+          { messageLength: data.message.length },
           "[wendy] unauthenticated request — sending onboarding response",
         );
         await streamUnauthenticatedResponse(res);

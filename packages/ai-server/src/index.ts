@@ -93,7 +93,7 @@ export type { QualityEvent } from "./growth-agent/quality-tracker";
 export { searchMemory, buildContextualMemorySection } from "./growth-agent/memory-search";
 export type { MemoryHit, MemoryHitType } from "./growth-agent/memory-search";
 export { runMemoryDecayJob, computeDecayScore } from "./jobs/memory-decay";
-export { runQualityOptimizer, runQualityOptimizerJob } from "./jobs/quality-optimizer";
+export { runQualityOptimizerJob } from "./jobs/quality-optimizer";
 // Phase 5: Plugin Tool Registry
 export { toolRegistry } from "./tools/registry";
 export type { Domain as ToolDomain, PluginToolDefinition, PluginParam, PluginToolContext, ToolDefinition as PluginToolDefinitionStrict } from "./tools/types";

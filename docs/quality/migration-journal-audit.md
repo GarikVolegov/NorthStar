@@ -3,6 +3,31 @@
 > **Status: PROPOSAL. No migration has been run and no file renamed/edited.**
 > This document records findings and a recommended fix for review.
 
+## ⚠️ CORRECTION (verified by db-guardian specialist, 2026-05-31)
+A specialist DB review confirmed the central finding (journal lists 40/50) but
+proved three claims below **wrong or understated** — read this first:
+- **Prod IS journal-based.** `.github/workflows/production.yml` runs `db:migrate`
+  (`tsx migrate.ts`) in CI, never `db:push`. So the missing 11 migrations are a
+  **real production defect**, not informational. The "prod is push-based →
+  journal informational" escape hatch in the Recommendation below is INVALID.
+- **Journal rebuild alone is NOT sufficient and would FAIL on a clean DB:**
+  - 4 tables (`nft_certificates`, `coach_memory_patterns`, `coach_memory_facts`,
+    `discovery_sources`) have **no `CREATE TABLE` in any SQL file** — only
+    `ALTER TABLE` (0036/0040/0041/0048). They exist only because `db:push`
+    materialized them from the TS schema. `migrate.ts` on an empty DB throws.
+  - `CREATE INDEX CONCURRENTLY` in 0035/0036 cannot run inside the migrator's
+    per-file transaction (Postgres 25001) → hard fail.
+  - `0041` has a bare non-idempotent `ADD CONSTRAINT` (no `DO/EXCEPTION` guard).
+  So the "all 11 idempotent / low-risk" claim is FALSE for these files.
+- **Required additions to the fix:** author the 4 missing `CREATE TABLE IF NOT
+  EXISTS` migrations (from TS schema, sequenced before their ALTERs); drop
+  `CONCURRENTLY`; guard 0041's constraint; reconcile index drift so
+  `drizzle-kit check` is zero-diff; fix `check-migration-safety.mjs` to scan all
+  `.sql` files (today it only reads journal entries — blind to the risky ones).
+The 3-step plan below stands as the *skeleton* but must absorb these additions
+before it is safe. Step 3 (verify on a throwaway empty DB) is what catches all
+of the above and must be a hard gate.
+
 ## Findings
 
 ### 1. `_journal.json` is missing 11 migrations
