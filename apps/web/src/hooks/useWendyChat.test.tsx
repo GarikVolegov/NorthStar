@@ -210,12 +210,13 @@ describe("useWendyChat", () => {
         reasoningDepth: "grounded",
         dataStrategy: "profile_market",
       }),
-      suggestedPrompts: [
+      suggestedPrompts: expect.arrayContaining([
         { label: "Confronta settori", prompt: "Confronta i primi tre settori" },
         { label: "Prossimo passo", prompt: "Dimmi cosa fare oggi" },
-      ],
+      ]),
       isStreaming: false,
     });
+    expect(result.current.messages[1]?.suggestedPrompts).toHaveLength(3);
   });
 
   it("persists the completed visible turn with streamed tools and actions", async () => {
@@ -304,6 +305,31 @@ describe("useWendyChat", () => {
     expect(result.current.messages.at(-1)).toMatchObject({
       role: "error",
       content: "Il provider AI ha raggiunto un limite temporaneo.",
+    });
+  });
+
+  it("adds recovery follow-ups when Wendy reports a stream error", async () => {
+    sse.start.mockImplementation(async () => {
+      sse.options?.onRawChunk?.(JSON.stringify({
+        type: "error",
+        message: "Wendy non ha potuto aggiornare il progresso dell'obiettivo.",
+      }));
+      sse.options?.onComplete?.("");
+    });
+
+    const { result } = renderHook(() => useWendyChat({ ttsEnabled: false }));
+    await act(async () => {
+      await result.current.sendMessage("aggiorna progresso obiettivo");
+    });
+
+    expect(result.current.messages.at(-1)).toMatchObject({
+      role: "error",
+      suggestedPrompts: expect.arrayContaining([
+        expect.objectContaining({
+          label: expect.stringMatching(/obiettiv|progresso/i),
+          prompt: expect.stringMatching(/strumenti dell'app|app/i),
+        }),
+      ]),
     });
   });
 

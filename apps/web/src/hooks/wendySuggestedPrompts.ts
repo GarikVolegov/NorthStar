@@ -27,6 +27,32 @@ function addPrompt(
   prompts.push({ label, prompt: text });
 }
 
+function sanitizeSuggestedPrompts(
+  suggestedPrompts: WendySuggestedPrompt[] | undefined,
+): WendySuggestedPrompt[] {
+  if (!suggestedPrompts?.length) return [];
+  const prompts: WendySuggestedPrompt[] = [];
+  const seen = new Set<string>();
+  for (const prompt of suggestedPrompts) {
+    addPrompt(prompts, seen, prompt);
+    if (prompts.length >= 3) break;
+  }
+  return prompts;
+}
+
+function mergeSuggestedPrompts(
+  primary: WendySuggestedPrompt[],
+  fallback: WendySuggestedPrompt[],
+): WendySuggestedPrompt[] {
+  const prompts: WendySuggestedPrompt[] = [];
+  const seen = new Set<string>();
+  for (const prompt of [...primary, ...fallback]) {
+    addPrompt(prompts, seen, prompt);
+    if (prompts.length >= 3) break;
+  }
+  return prompts;
+}
+
 export function buildWendyFallbackSuggestedPrompts(
   content: string,
   pageContext?: WendyPromptPageContext | null,
@@ -49,8 +75,25 @@ export function buildWendyFallbackSuggestedPrompts(
     || normalizedContent.includes("affinit")
   ) {
     addPrompt(prompts, seen, {
+      label: "Usa il profilo",
+      prompt: "Usa gli strumenti dell'app sul profilo per trasformare questa analisi in priorita, lacune e prossimo passo verificabile.",
+    });
+    addPrompt(prompts, seen, {
       label: "Trasforma in piano",
       prompt: "Trasforma questa analisi in un piano operativo con priorita e primo passo.",
+    });
+  }
+
+  if (
+    normalizedContent.includes("obiettiv")
+    || normalizedContent.includes("progres")
+    || normalizedContent.includes("avanzament")
+    || normalizedContent.includes("checkpoint")
+    || normalizedContent.includes("milestone")
+  ) {
+    addPrompt(prompts, seen, {
+      label: "Aggiorna progresso",
+      prompt: "Usa gli strumenti dell'app per leggere obiettivi e progresso, poi proponi l'aggiornamento o il prossimo checkpoint concreto.",
     });
   }
 
@@ -83,7 +126,7 @@ export function withWendySuggestedPromptFallback(
   content: string,
   pageContext?: WendyPromptPageContext | null,
 ): WendySuggestedPrompt[] {
-  return suggestedPrompts && suggestedPrompts.length > 0
-    ? suggestedPrompts
-    : buildWendyFallbackSuggestedPrompts(content, pageContext);
+  const sanitizedPrompts = sanitizeSuggestedPrompts(suggestedPrompts);
+  const fallbackPrompts = buildWendyFallbackSuggestedPrompts(content, pageContext);
+  return mergeSuggestedPrompts(sanitizedPrompts, fallbackPrompts);
 }

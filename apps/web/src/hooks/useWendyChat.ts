@@ -152,6 +152,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
         if (event.type === 'gate') {
           hasNonTextOutputRef.current = true;
           hasTerminalErrorRef.current = true;
+          streamedContentRef.current = event.message;
           setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
           setStreamError(new Error('WENDY_GATE'));
           setMessages((prev) =>
@@ -167,6 +168,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
           const message = event.message || 'Wendy si è interrotta. Riprova.';
           hasNonTextOutputRef.current = true;
           hasTerminalErrorRef.current = true;
+          streamedContentRef.current = message;
           setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
           setStreamError(new Error(event.message));
           setMessages((prev) =>
@@ -294,6 +296,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
 
       const completedContent = finalContent || streamedContentRef.current;
       const hasNonTextOutput = hasNonTextOutputRef.current;
+      const completedHasTerminalError = hasTerminalErrorRef.current;
       const emptyWithoutOutput = !completedContent.trim() && !hasNonTextOutput;
       const thinkingMs = firstChunkReceivedRef.current
         ? Date.now() - thinkingStartRef.current : 0;
@@ -331,7 +334,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
         suggestedPrompts: completedSuggestedPrompts,
       };
 
-      if (!emptyWithoutOutput && !hasTerminalErrorRef.current) {
+      if (!emptyWithoutOutput && !completedHasTerminalError) {
         const assistantHistory = completedContent.trim() || '[Azione Wendy proposta o completata]';
         const newEntries: Array<{ role: 'user' | 'assistant'; content: string }> = [
           { role: 'user',      content: lastUserMessageRef.current },
@@ -371,7 +374,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
 
         const finalizedAssistant = finalizedMessages.find((m) => m.id === assistantMsgIdRef.current);
         if (finalizedAssistant) completedVisibleMessage = finalizedAssistant;
-        if (!emptyWithoutOutput && !hasTerminalErrorRef.current) {
+        if (!emptyWithoutOutput && !completedHasTerminalError) {
           savePersistedThread(historyRef.current, threadSummaryRef.current, finalizedMessages);
         }
         return finalizedMessages;
@@ -392,7 +395,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       setRetryState({ active: false, attempt: 0, max: maxRetries });
 
       setWendyPhase?.('idle');
-      if (ttsEnabled && completedContent.trim()) {
+      if (ttsEnabled && completedContent.trim() && !completedHasTerminalError) {
         openaiTts.play(completedContent).catch(() => {
           if (tts.supported) tts.speak(completedContent, sttLang);
         });
@@ -414,17 +417,19 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
       setMessages((prev) => {
         const assistantId = assistantMsgIdRef.current;
+        const errorContent = _friendlyError(err);
+        const suggestedPrompts = withWendySuggestedPromptFallback(undefined, errorContent, wendyCtx?.pageContext);
         if (assistantId && prev.some((message) => message.id === assistantId && message.isStreaming)) {
           return prev.map((message) =>
             message.id === assistantId
-              ? { ...message, role: 'error', content: _friendlyError(err), isStreaming: false }
+              ? { ...message, role: 'error', content: errorContent, isStreaming: false, suggestedPrompts }
               : message,
           );
         }
         return [
           ...prev,
           { id: `err-${Date.now()}`, role: 'error',
-            content: _friendlyError(err), timestamp: Date.now() },
+            content: errorContent, timestamp: Date.now(), suggestedPrompts },
         ];
       });
     },

@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Response } from "express";
 import { eq, desc, or, and, lt, ilike, sql, type SQL } from "drizzle-orm";
 import { db, discoverySourcesTable, newsArticlesTable } from "@workspace/db";
-import { PUBLIC_NEWS_SOURCES } from "@workspace/ai-server";
+import { PUBLIC_NEWS_SOURCES, runNewsPublisher } from "@workspace/ai-server";
 import { cacheGet, cacheSet } from "../lib/redis";
 import { clampContentLimit, readContentSearchQuery } from "../lib/content-search";
 import { mapNewsCategoryForUi, resolveNewsCategoryFilter } from "../lib/news-category";
@@ -10,9 +10,23 @@ import { mapNewsCategoryForUi, resolveNewsCategoryFilter } from "../lib/news-cat
 const router = Router();
 
 const CACHE_TTL = 60; // 60s TTL as specified
+const NEWS_AUTO_REFRESH_STALE_MS = Number(process.env.NEWS_AUTO_REFRESH_STALE_MS) || 48 * 60 * 60 * 1000;
+const NEWS_AUTO_REFRESH_COOLDOWN_MS = process.env.NODE_ENV === "test"
+  ? 0
+  : Number(process.env.NEWS_AUTO_REFRESH_COOLDOWN_MS) || 5 * 60 * 1000;
 type NewsArticleRow = typeof newsArticlesTable.$inferSelect;
 type NewsFeedStatus = "ok" | "empty" | "partial" | "error";
 type NewsProviderStatus = "ready" | "degraded" | "never_run" | "stale" | "not_configured" | "unavailable";
+type NewsRefreshReason = "empty" | "stale";
+
+type NewsRefreshResult = {
+  attempted: boolean;
+  reason: NewsRefreshReason;
+  transferred: number;
+  missingCoverage: number;
+  durationMs: number;
+  error?: string;
+};
 
 type NewsDiagnostics = {
   providerStatus: NewsProviderStatus;
@@ -21,7 +35,12 @@ type NewsDiagnostics = {
   sourcesWithErrors: number;
   refreshAction: "wait_for_next_refresh" | "wait_for_startup_pipeline" | "check_provider_keys" | "configure_sources" | "retry_later";
   message: string;
+  lastRefreshError?: string;
 };
+
+let newsRefreshInFlight: Promise<NewsRefreshResult> | null = null;
+let lastNewsRefreshAt = 0;
+let lastNewsRefreshResult: NewsRefreshResult | null = null;
 
 /**
  * Encode a keyset cursor: "publishedAt|id"
@@ -63,6 +82,87 @@ function publicNewsWhere(extra?: SQL<unknown>): SQL<unknown> {
 
 function newsStatus(newsCount: number): NewsFeedStatus {
   return newsCount > 0 ? "ok" : "empty";
+}
+
+function isStaleNewsRow(row: NewsArticleRow | undefined): boolean {
+  if (!row?.publishedAt) return false;
+  const publishedAt = row.publishedAt instanceof Date ? row.publishedAt : new Date(row.publishedAt);
+  if (!Number.isFinite(publishedAt.getTime())) return false;
+  return Date.now() - publishedAt.getTime() > NEWS_AUTO_REFRESH_STALE_MS;
+}
+
+function isStaleMappedNewsItem(item: ReturnType<typeof mapNewsItem> | undefined): boolean {
+  if (!item?.publishedAt) return false;
+  const publishedAt = new Date(item.publishedAt);
+  if (!Number.isFinite(publishedAt.getTime())) return false;
+  return Date.now() - publishedAt.getTime() > NEWS_AUTO_REFRESH_STALE_MS;
+}
+
+async function runAutoNewsRefresh(reason: NewsRefreshReason, log?: { warn?: (payload: unknown, message?: string) => void }): Promise<NewsRefreshResult> {
+  if (
+    NEWS_AUTO_REFRESH_COOLDOWN_MS > 0
+    && lastNewsRefreshResult
+    && Date.now() - lastNewsRefreshAt < NEWS_AUTO_REFRESH_COOLDOWN_MS
+  ) {
+    return {
+      attempted: false,
+      reason,
+      transferred: 0,
+      missingCoverage: lastNewsRefreshResult.missingCoverage,
+      durationMs: 0,
+      ...(lastNewsRefreshResult.error ? { error: lastNewsRefreshResult.error } : {}),
+    };
+  }
+
+  if (!newsRefreshInFlight) {
+    const startedAt = Date.now();
+    newsRefreshInFlight = runNewsPublisher()
+      .then((result) => {
+        const refreshResult = {
+          attempted: true,
+          reason,
+          transferred: result.transferred,
+          missingCoverage: result.missingCoverage.length,
+          durationMs: result.durationMs,
+        };
+        lastNewsRefreshAt = Date.now();
+        lastNewsRefreshResult = refreshResult;
+        return refreshResult;
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        log?.warn?.({ err, reason }, "news auto-refresh failed");
+        const refreshResult = {
+          attempted: true,
+          reason,
+          transferred: 0,
+          missingCoverage: 0,
+          durationMs: Date.now() - startedAt,
+          error: message,
+        };
+        lastNewsRefreshAt = Date.now();
+        lastNewsRefreshResult = refreshResult;
+        return refreshResult;
+      })
+      .finally(() => {
+        newsRefreshInFlight = null;
+      });
+  }
+
+  return newsRefreshInFlight;
+}
+
+async function diagnosticsWithRefreshError(refresh?: NewsRefreshResult): Promise<NewsDiagnostics> {
+  const diagnostics = await buildNewsDiagnostics();
+  if (refresh?.error) {
+    return {
+      ...diagnostics,
+      lastRefreshError: refresh.error,
+      refreshAction: "retry_later",
+      message: `${diagnostics.message} Ultimo refresh automatico fallito: ${refresh.error}`,
+    };
+  }
+  return diagnostics;
 }
 
 function isTotalProviderFailure(diagnostics: NewsDiagnostics): boolean {
@@ -270,7 +370,7 @@ router.get("/", async (req, res) => {
       const cats = (categories as string).split(",");
       const perCat = Math.max(1, parseInt(perCategory as string, 10) || 1);
 
-      const results = await Promise.all(
+      const loadCategoryResults = () => Promise.all(
         cats.map(async (cat) => {
           try {
             // Build cursor-based query per category
@@ -304,7 +404,15 @@ router.get("/", async (req, res) => {
         }),
       );
 
-      const news = results.flatMap((r) => r.articles).map(mapNewsItem);
+      let refresh: NewsRefreshResult | undefined;
+      let results = await loadCategoryResults();
+      let news = results.flatMap((r) => r.articles).map(mapNewsItem);
+      if (!cursor && news.length === 0) {
+        refresh = await runAutoNewsRefresh("empty", req.log);
+        results = await loadCategoryResults();
+        news = results.flatMap((r) => r.articles).map(mapNewsItem);
+      }
+
       const anyMore = results.some((r) => r.hasMore);
       const lastNews = news.at(-1);
       const errors = results.filter((r) => "error" in r).map(() => "news_unavailable");
@@ -316,10 +424,11 @@ router.get("/", async (req, res) => {
       res.json({
         news,
         nextCursor: anyMore && lastNews ? encodeCursor(lastNews.publishedAt, parseInt(lastNews.id, 10)) : null,
-        source: errors.length > 0 ? "partial" : "live",
+        source: errors.length > 0 ? "partial" : (refresh?.transferred ? "auto_refresh" : "live"),
         status,
+        ...(refresh ? { refresh } : {}),
         ...(errors.length > 0 ? { errors } : {}),
-        ...(status !== "ok" ? { diagnostics: await buildNewsDiagnostics() } : {}),
+        ...(status !== "ok" ? { diagnostics: await diagnosticsWithRefreshError(refresh) } : {}),
       });
       return;
     }
@@ -328,7 +437,7 @@ router.get("/", async (req, res) => {
     if (!category && !cursor && !search) {
       const cacheKey = "news:recent:real:v3";
       const cached = await cacheGet<ReturnType<typeof mapNewsItem>[]>(cacheKey);
-      if (cached) {
+      if (cached && cached.length > 0 && !isStaleMappedNewsItem(cached[0])) {
         const status = newsStatus(cached.length);
         const diagnostics = status === "empty" ? await buildNewsDiagnostics() : undefined;
         if (diagnostics && isTotalProviderFailure(diagnostics)) {
@@ -362,7 +471,12 @@ router.get("/", async (req, res) => {
       whereClause = whereClause ? and(whereClause, cursorCond) : cursorCond;
     }
 
-    const articles = await selectNewsRows(publicNewsWhere(whereClause), limitNum + 1);
+    let articles = await selectNewsRows(publicNewsWhere(whereClause), limitNum + 1);
+    let refresh: NewsRefreshResult | undefined;
+    if (!cursor && !search && (articles.length === 0 || isStaleNewsRow(articles[0]))) {
+      refresh = await runAutoNewsRefresh(articles.length === 0 ? "empty" : "stale", req.log);
+      articles = await selectNewsRows(publicNewsWhere(whereClause), limitNum + 1);
+    }
 
     const hasMore = articles.length > limitNum;
     const capped = hasMore ? articles.slice(0, limitNum) : articles;
@@ -380,7 +494,7 @@ router.get("/", async (req, res) => {
       : null;
 
     const status = newsStatus(mapped.length);
-    const diagnostics = status === "empty" ? await buildNewsDiagnostics() : undefined;
+    const diagnostics = status === "empty" ? await diagnosticsWithRefreshError(refresh) : undefined;
     if (diagnostics && isTotalProviderFailure(diagnostics)) {
       sendNewsUnavailableWithDiagnostics(res, diagnostics);
       return;
@@ -388,8 +502,9 @@ router.get("/", async (req, res) => {
     res.json({
       news: mapped,
       nextCursor,
-      source: "live",
+      source: refresh?.transferred ? "auto_refresh" : "live",
       status,
+      ...(refresh ? { refresh } : {}),
       ...(diagnostics ? { diagnostics } : {}),
     });
   } catch (err) {

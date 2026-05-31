@@ -120,6 +120,42 @@ describe("Crescita page reliability states", () => {
     expect(screen.getByText(/Esplora tutte le aree/i)).toBeInTheDocument();
   });
 
+  it("shows fallback growth articles as a general path, not personalized advice", async () => {
+    getJsonMock.mockImplementation((url: string) => {
+      if (url.includes("api/crescita/categorie")) return Promise.resolve([]);
+      if (url.includes("api/crescita/per-te")) {
+        return Promise.resolve({
+          articles: [
+            {
+              id: -1,
+              title: "Piano di crescita in 90 giorni",
+              slug: "piano-crescita-90-giorni",
+              category: "crescita-professionale",
+              description: "Un percorso pratico in italiano.",
+              tags: ["crescita"],
+              difficulty: "base",
+              readTimeMinutes: 6,
+            },
+          ],
+          hasProfile: true,
+          personalization: "generic",
+          source: "fallback",
+          status: "fallback",
+          types: ["I", "A"],
+        });
+      }
+      if (url.includes("api/crescita?limit=6")) return Promise.resolve({ articles: [] });
+      return Promise.reject(new Error(`Unhandled URL ${url}`));
+    });
+
+    renderGrowth();
+
+    expect(await screen.findByText("Contenuti di crescita in evidenza")).toBeInTheDocument();
+    expect(screen.getByText(/percorso generale/i)).toBeInTheDocument();
+    expect(screen.queryByText("Per te")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Selezionati in base al tuo profilo/i)).not.toBeInTheDocument();
+  });
+
   it("shows an API error state when growth content cannot be loaded", async () => {
     getJsonMock.mockRejectedValue(new Error("growth_unavailable"));
 

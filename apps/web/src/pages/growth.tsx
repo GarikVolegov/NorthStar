@@ -36,7 +36,8 @@ interface PerTeData {
   personalization?: "profile" | "generic";
   types?: string[];
   italianTypes?: string[];
-  status?: "ok" | "empty" | "error";
+  status?: "ok" | "empty" | "error" | "fallback";
+  source?: "library" | "fallback";
 }
 
 const RIASEC_LABELS: Record<string, string> = {
@@ -167,7 +168,9 @@ function PerTeSection({ userId }: { userId: number }) {
 
   if (!data) return null;
 
-  if (!data.hasProfile && data.articles.length > 0) {
+  if (data.personalization !== "profile" && data.articles.length > 0) {
+    const isFallback = data.source === "fallback" || data.status === "fallback";
+
     return (
       <section className="py-14 border-b">
         <div className="container mx-auto px-4 md:px-6 max-w-6xl">
@@ -178,7 +181,9 @@ function PerTeSection({ userId }: { userId: number }) {
                 <h2 className="text-2xl font-serif font-bold text-foreground">Contenuti di crescita in evidenza</h2>
               </div>
               <p className="text-muted-foreground text-sm">
-                Una selezione generale dalla libreria NorthStar. Completa il test per ottenere suggerimenti basati sul tuo profilo reale.
+                {isFallback
+                  ? "Un percorso generale in italiano da cui partire mentre la libreria NorthStar viene aggiornata. Non e personalizzato sul tuo profilo."
+                  : "Una selezione generale dalla libreria NorthStar. Completa il test per ottenere suggerimenti basati sul tuo profilo reale."}
               </p>
             </div>
             <Link href="/test" className="text-sm font-medium text-primary hover:underline flex items-center gap-1 self-start sm:self-auto">

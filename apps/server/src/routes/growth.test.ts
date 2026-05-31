@@ -62,6 +62,7 @@ function mockSelectRows(rows: unknown[]) {
   const chain = {
     from: vi.fn(() => chain),
     where: vi.fn(() => chain),
+    groupBy: vi.fn(async () => rows),
     orderBy: vi.fn(() => chain),
     limit: vi.fn(async () => rows),
   };
@@ -172,5 +173,123 @@ describe("growth routes", () => {
       status: "error",
       error: "growth_unavailable",
     });
+  });
+
+  it("returns useful Italian fallback articles when the published growth library is empty", async () => {
+    mockSelectRows([]);
+
+    const response = await request(app())
+      .get("/api/crescita?limit=6")
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      total: expect.any(Number),
+      status: "fallback",
+      source: "fallback",
+    });
+    expect(response.body.articles.length).toBeGreaterThan(0);
+    expect(response.body.articles[0]).toMatchObject({
+      title: expect.stringMatching(/90 giorni|focus|crescita/i),
+      category: expect.any(String),
+      description: expect.stringMatching(/italiano|percorso|pratico|settimana/i),
+      tags: expect.arrayContaining(["crescita"]),
+    });
+  });
+
+  it("keeps empty filtered fallback responses distinguishable from provider errors", async () => {
+    mockSelectRows([]);
+    mockSelectRows([]);
+
+    const response = await request(app())
+      .get("/api/crescita?category=non-esiste&limit=6")
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      articles: [],
+      total: 0,
+      status: "empty",
+      source: "fallback",
+    });
+  });
+
+  it("does not use fallback content for a filtered miss when the published library exists", async () => {
+    mockSelectRows([]);
+    mockSelectRows(articles);
+
+    const response = await request(app())
+      .get("/api/crescita?category=non-esiste&limit=6")
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      articles: [],
+      total: 0,
+      status: "empty",
+      source: "library",
+    });
+  });
+
+  it("returns sectioned fallback categories when the growth library has no published categories", async () => {
+    mockSelectRows([]);
+
+    const response = await request(app())
+      .get("/api/crescita/categorie")
+      .expect(200);
+
+    expect(response.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "crescita-professionale",
+          label: "Crescita professionale",
+          description: expect.stringMatching(/Percorsi pratici in italiano/i),
+          count: expect.any(Number),
+          source: "fallback",
+        }),
+      ]),
+    );
+  });
+
+  it("keeps fallback recommendations generic when a ready profile has no published growth content", async () => {
+    authState.user = {
+      id: 7,
+      name: "Ada",
+      email: "ada@example.com",
+      role: "user",
+      stripeSubscriptionId: null,
+      journeyType: null,
+      testSessionId: null,
+      onboardingCompleted: true,
+    };
+    mockSelectRows([{ primaryTypes: ["I", "A"], riasecScores: { I: 4.8, A: 4.1 } }]);
+    mockSelectRows([]);
+
+    const response = await request(app())
+      .get("/api/crescita/per-te")
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      hasProfile: true,
+      personalization: "generic",
+      status: "fallback",
+      source: "fallback",
+      types: ["I", "A"],
+      italianTypes: ["Investigativo", "Artistico"],
+    });
+    expect(response.body.articles.length).toBeGreaterThan(0);
+  });
+
+  it("serves fallback growth article details by slug without touching unavailable providers", async () => {
+    mockSelectRows([]);
+
+    const response = await request(app())
+      .get("/api/crescita/piano-crescita-90-giorni")
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      slug: "piano-crescita-90-giorni",
+      title: expect.stringMatching(/90 giorni/i),
+      source: "fallback",
+      related: expect.any(Array),
+    });
+    expect(response.body.content).toMatch(/Settimana|giorni|azione/i);
   });
 });

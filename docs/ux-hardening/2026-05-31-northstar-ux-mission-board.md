@@ -150,6 +150,16 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - Il feed routine non maschera piu errori API come feed vuoto reale: `useRoutineFeed` espone `error` e `isError` ai consumatori.
 - Il salvataggio del tono di Wendy nelle impostazioni non resta ottimistico se fallisce: ripristina il tono precedente e mostra un alert operativo.
 
+## Tranche 13 Applicata
+
+- `/api/news` prova un refresh automatico con i provider reali quando la prima pagina e vuota o stale, poi rilegge il feed e marca la risposta `source: "auto_refresh"` quando arrivano contenuti.
+- La cache news non serve piu una prima pagina vuota o stale senza tentare il refresh; le ricerche senza risultati non scatenano refresh provider inutili.
+- Le news multi-categoria provano un refresh automatico quando tutti i bucket sono vuoti, cosi tecnologia/salute/business possono popolarsi appena GNews/Tavily trasferiscono articoli.
+- Growth espone una libreria fallback italiana, divisa per categorie, quando non esistono articoli pubblicati: lista, categorie, `/per-te` e dettaglio slug restano navigabili.
+- La UI Growth mostra i contenuti fallback come percorso generale, non come suggerimento personalizzato basato sul profilo.
+- Wendy conserva gli errori stream come terminali, evita persistenza/TTS di risposte fallite e aggiunge follow-up cliccabili orientati a strumenti app, obiettivi e prossimo checkpoint.
+- I suggerimenti backend di Wendy vengono sanificati, deduplicati e completati con fallback fino a tre azioni cliccabili.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -247,6 +257,16 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 ## Verifica Tranche 12
 
 - `pnpm --filter @northstar/web exec vitest run --configLoader runner src/pages/certificato.test.tsx src/pages/profilo.test.tsx src/hooks/useRoutines.test.tsx src/components/profile/ProfileSettings.test.tsx`
+- `pnpm --filter @northstar/web run typecheck`
+- `git diff --check`
+
+## Verifica Tranche 13
+
+- `pnpm --filter @northstar/server exec vitest run --configLoader runner src/routes/news.test.ts`
+- `pnpm --filter @northstar/server exec vitest run --configLoader runner src/routes/growth.test.ts`
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner src/pages/growth.test.tsx`
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner src/hooks/useWendyChat.test.tsx src/hooks/wendySuggestedPrompts.test.ts`
+- `pnpm --filter @northstar/server run typecheck`
 - `pnpm --filter @northstar/web run typecheck`
 - `git diff --check`
 

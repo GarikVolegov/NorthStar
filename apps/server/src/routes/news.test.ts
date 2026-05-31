@@ -6,13 +6,23 @@ const dbMock = vi.hoisted(() => ({
   select: vi.fn(),
 }));
 
-vi.mock("../lib/redis", () => ({
-  cacheGet: vi.fn(async () => null),
+const aiServerMock = vi.hoisted(() => ({
+  runNewsPublisher: vi.fn(),
+}));
+
+const redisMock = vi.hoisted(() => ({
+  cacheGet: vi.fn(async (): Promise<unknown> => null),
   cacheSet: vi.fn(async () => undefined),
+}));
+
+vi.mock("../lib/redis", () => ({
+  cacheGet: redisMock.cacheGet,
+  cacheSet: redisMock.cacheSet,
 }));
 
 vi.mock("@workspace/ai-server", () => ({
   PUBLIC_NEWS_SOURCES: ["gnews", "tavily", "newsapi", "il sole 24 ore", "ninja marketing", "ansa", "wired italia", "la repubblica"],
+  runNewsPublisher: aiServerMock.runNewsPublisher,
 }));
 
 vi.mock("@workspace/db", async (importOriginal) => {
@@ -103,6 +113,9 @@ describe("news routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     dbMock.select.mockReset();
+    redisMock.cacheGet.mockResolvedValue(null);
+    redisMock.cacheSet.mockResolvedValue(undefined);
+    aiServerMock.runNewsPublisher.mockResolvedValue({ transferred: 0, seeded: 0, missingCoverage: [], durationMs: 10 });
   });
 
   it("returns published GNews and Tavily articles whose source keeps the editorial name", async () => {
@@ -135,6 +148,8 @@ describe("news routes", () => {
   });
 
   it("adds provider diagnostics when the feed is empty", async () => {
+    mockSelectRows([]);
+    aiServerMock.runNewsPublisher.mockResolvedValueOnce({ transferred: 0, seeded: 0, missingCoverage: [], durationMs: 10 });
     mockSelectRows([]);
     mockSelectRows([
       {
@@ -171,7 +186,171 @@ describe("news routes", () => {
     });
   });
 
+  it("auto-refreshes the feed from trusted news providers when the first page is empty", async () => {
+    mockSelectRows([]);
+    aiServerMock.runNewsPublisher.mockResolvedValueOnce({ transferred: 1, seeded: 0, missingCoverage: [], durationMs: 25 });
+    mockSelectRows([publishedRows[0]]);
+
+    const response = await request(app())
+      .get("/api/news")
+      .expect(200);
+
+    expect(aiServerMock.runNewsPublisher).toHaveBeenCalledTimes(1);
+    expect(response.body).toMatchObject({
+      status: "ok",
+      source: "auto_refresh",
+      refresh: {
+        attempted: true,
+        reason: "empty",
+        transferred: 1,
+      },
+      news: [expect.objectContaining({ id: "10" })],
+    });
+  });
+
+  it("does not serve a cached empty first page without trying an auto-refresh", async () => {
+    redisMock.cacheGet.mockResolvedValueOnce([]);
+    mockSelectRows([]);
+    aiServerMock.runNewsPublisher.mockResolvedValueOnce({ transferred: 1, seeded: 0, missingCoverage: [], durationMs: 25 });
+    mockSelectRows([publishedRows[0]]);
+
+    const response = await request(app())
+      .get("/api/news")
+      .expect(200);
+
+    expect(aiServerMock.runNewsPublisher).toHaveBeenCalledTimes(1);
+    expect(response.body.source).toBe("auto_refresh");
+    expect(response.body.news).toEqual([expect.objectContaining({ id: "10" })]);
+  });
+
+  it("does not serve a cached stale first page without trying an auto-refresh", async () => {
+    redisMock.cacheGet.mockResolvedValueOnce([
+      {
+        id: "9",
+        title: "Vecchia notizia",
+        preview: "Feed fermo",
+        description: "Feed fermo",
+        source: "GNews",
+        sourceUrl: "https://example.com/stale",
+        url: "https://example.com/stale",
+        detailUrl: "/news/9",
+        publishedAt: "2026-05-20T10:00:00.000Z",
+        image: null,
+        category: "technology",
+        sector: "Tecnologia & Software",
+        tags: ["Tecnologia & Software"],
+        relevance: 0.5,
+        plan: "free",
+      },
+    ]);
+    mockSelectRows([
+      {
+        ...publishedRows[0],
+        id: 9,
+        publishedAt: new Date("2026-05-20T10:00:00.000Z"),
+      },
+    ]);
+    aiServerMock.runNewsPublisher.mockResolvedValueOnce({ transferred: 1, seeded: 0, missingCoverage: [], durationMs: 25 });
+    mockSelectRows([publishedRows[0]]);
+
+    const response = await request(app())
+      .get("/api/news")
+      .expect(200);
+
+    expect(aiServerMock.runNewsPublisher).toHaveBeenCalledTimes(1);
+    expect(response.body).toMatchObject({
+      source: "auto_refresh",
+      refresh: {
+        reason: "stale",
+        transferred: 1,
+      },
+      news: [expect.objectContaining({ id: "10" })],
+    });
+  });
+
+  it("auto-refreshes the first page when the newest public article is stale", async () => {
+    mockSelectRows([
+      {
+        ...publishedRows[0],
+        id: 9,
+        publishedAt: new Date("2026-05-20T10:00:00.000Z"),
+      },
+    ]);
+    aiServerMock.runNewsPublisher.mockResolvedValueOnce({ transferred: 1, seeded: 0, missingCoverage: [], durationMs: 25 });
+    mockSelectRows([publishedRows[0]]);
+
+    const response = await request(app())
+      .get("/api/news")
+      .expect(200);
+
+    expect(aiServerMock.runNewsPublisher).toHaveBeenCalledTimes(1);
+    expect(response.body).toMatchObject({
+      source: "auto_refresh",
+      refresh: {
+        reason: "stale",
+        transferred: 1,
+      },
+      news: [expect.objectContaining({ id: "10" })],
+    });
+  });
+
+  it("does not auto-refresh for a search query that simply has no matches", async () => {
+    mockSelectRows([]);
+    mockSelectRows([
+      {
+        name: "GNews lavoro",
+        sourceType: "gnews",
+        enabled: true,
+        lastFetchAt: new Date(),
+        lastError: null,
+      },
+    ]);
+
+    const response = await request(app())
+      .get("/api/news?search=nessun-risultato-specifico")
+      .expect(200);
+
+    expect(aiServerMock.runNewsPublisher).not.toHaveBeenCalled();
+    expect(response.body).toMatchObject({
+      news: [],
+      source: "live",
+      status: "empty",
+      diagnostics: {
+        providerStatus: "ready",
+      },
+    });
+  });
+
+  it("auto-refreshes an empty multi-category feed so sector buckets can populate", async () => {
+    mockSelectRows([]);
+    mockSelectRows([]);
+    aiServerMock.runNewsPublisher.mockResolvedValueOnce({ transferred: 2, seeded: 0, missingCoverage: [], durationMs: 25 });
+    mockSelectRows([publishedRows[0]]);
+    mockSelectRows([publishedRows[1]]);
+
+    const response = await request(app())
+      .get("/api/news?multi=true&categories=technology,health&perCategory=1")
+      .expect(200);
+
+    expect(aiServerMock.runNewsPublisher).toHaveBeenCalledTimes(1);
+    expect(response.body).toMatchObject({
+      source: "auto_refresh",
+      status: "ok",
+      refresh: {
+        attempted: true,
+        reason: "empty",
+        transferred: 2,
+      },
+      news: [
+        expect.objectContaining({ id: "10", category: "technology" }),
+        expect.objectContaining({ id: "11", category: "health" }),
+      ],
+    });
+  });
+
   it("does not mask an empty feed as real empty when every enabled provider has errors", async () => {
+    mockSelectRows([]);
+    aiServerMock.runNewsPublisher.mockResolvedValueOnce({ transferred: 0, seeded: 0, missingCoverage: [], durationMs: 10 });
     mockSelectRows([]);
     mockSelectRows([
       {

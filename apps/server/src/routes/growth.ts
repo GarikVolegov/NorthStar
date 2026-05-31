@@ -18,6 +18,88 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 type GrowthPersonalization = "profile" | "generic";
+type GrowthSource = "library" | "fallback";
+
+type GrowthArticleView = {
+  id: number;
+  title: string;
+  slug: string;
+  category: string;
+  subcategory: string | null;
+  description: string;
+  content: string;
+  tags: string[];
+  difficulty: string;
+  personalityMatches: string[];
+  sectorLinks: string[];
+  readTimeMinutes: number;
+  viewCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+  source?: GrowthSource;
+};
+
+const FALLBACK_UPDATED_AT = new Date("2026-05-01T00:00:00.000Z");
+
+const FALLBACK_GROWTH_ARTICLES: GrowthArticleView[] = [
+  {
+    id: -101,
+    title: "Piano di crescita in 90 giorni",
+    slug: "piano-crescita-90-giorni",
+    category: "crescita-professionale",
+    subcategory: "percorso",
+    description: "Un percorso pratico in italiano per trasformare un obiettivo in azioni settimanali misurabili.",
+    content:
+      "Questo percorso non e personalizzato: usalo come base quando la libreria NorthStar non ha ancora contenuti disponibili.\n\nSettimane 1-2: scegli un obiettivo osservabile e scrivi perche conta nel tuo percorso.\n\nSettimane 3-6: dedica due blocchi da 45 minuti a settimana a studio, esercizio o portfolio.\n\nSettimane 7-10: raccogli feedback da una persona competente e correggi il piano.\n\nSettimane 11-13: prepara una prova concreta del lavoro fatto: pagina portfolio, candidatura, colloquio simulato o progetto breve.",
+    tags: ["crescita", "percorso", "obiettivi"],
+    difficulty: "base",
+    personalityMatches: [],
+    sectorLinks: [],
+    readTimeMinutes: 6,
+    viewCount: 0,
+    createdAt: FALLBACK_UPDATED_AT,
+    updatedAt: FALLBACK_UPDATED_AT,
+    source: "fallback",
+  },
+  {
+    id: -102,
+    title: "Routine di focus per studiare e lavorare meglio",
+    slug: "routine-focus-studio-lavoro",
+    category: "produttivita",
+    subcategory: "focus",
+    description: "Una guida semplice per proteggere attenzione, energia e continuita durante la settimana.",
+    content:
+      "Parti da una routine leggera: scegli una fascia oraria stabile, elimina una distrazione ricorrente e definisci il risultato minimo prima di iniziare.\n\nOgni sessione ha tre parti: cinque minuti per preparare, venticinque minuti di lavoro senza cambio contesto, cinque minuti per annotare il prossimo passo.\n\nDopo una settimana guarda i dati: quante sessioni hai completato, quale ostacolo torna spesso, quale modifica rende piu facile ripartire.",
+    tags: ["crescita", "focus", "produttivita"],
+    difficulty: "base",
+    personalityMatches: [],
+    sectorLinks: [],
+    readTimeMinutes: 4,
+    viewCount: 0,
+    createdAt: FALLBACK_UPDATED_AT,
+    updatedAt: FALLBACK_UPDATED_AT,
+    source: "fallback",
+  },
+  {
+    id: -103,
+    title: "Diario decisionale per scegliere con piu lucidita",
+    slug: "diario-decisionale-lucidita",
+    category: "autoconsapevolezza",
+    subcategory: "decisioni",
+    description: "Uno schema recuperabile per collegare scelte, motivazioni, rischi e prossime azioni.",
+    content:
+      "Quando devi scegliere, scrivi quattro righe: opzione, motivo, rischio, prossimo esperimento.\n\nNon cercare la risposta perfetta. Cerca una prova piccola che riduca l'incertezza: parlare con qualcuno, leggere una fonte, provare un compito reale, visitare un corso.\n\nRileggi il diario dopo sette giorni e aggiorna la decisione con quello che hai scoperto.",
+    tags: ["crescita", "autoconsapevolezza", "decisioni"],
+    difficulty: "base",
+    personalityMatches: [],
+    sectorLinks: [],
+    readTimeMinutes: 3,
+    viewCount: 0,
+    createdAt: FALLBACK_UPDATED_AT,
+    updatedAt: FALLBACK_UPDATED_AT,
+    source: "fallback",
+  },
+];
 
 const RIASEC_LABELS: Record<string, string> = {
   R: "Realistico",
@@ -40,7 +122,7 @@ function isSql(condition: SQL | undefined): condition is SQL {
   return condition !== undefined;
 }
 
-function mapArticle(article: typeof growthArticlesTable.$inferSelect) {
+function mapArticle(article: typeof growthArticlesTable.$inferSelect | GrowthArticleView) {
   return {
     id: article.id,
     title: article.title,
@@ -57,7 +139,57 @@ function mapArticle(article: typeof growthArticlesTable.$inferSelect) {
     viewCount: article.viewCount,
     createdAt: article.createdAt,
     updatedAt: article.updatedAt,
+    source: "source" in article ? article.source : "library",
   };
+}
+
+function fallbackCategories() {
+  const counts = FALLBACK_GROWTH_ARTICLES.reduce<Record<string, number>>((acc, article) => {
+    acc[article.category] = (acc[article.category] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  return Object.entries(counts).map(([category, count]) => ({
+    id: category,
+    label: CATEGORY_LABELS[category] ?? category.replace(/-/g, " "),
+    description: `Percorsi pratici in italiano per ${category.replace(/-/g, " ")}.`,
+    count,
+    source: "fallback" satisfies GrowthSource,
+  }));
+}
+
+function filterFallbackArticles(input: { category?: string; search?: string; limit: number }) {
+  const search = input.search?.trim().toLowerCase();
+  return FALLBACK_GROWTH_ARTICLES.filter((article) => {
+    if (input.category && article.category !== input.category) return false;
+    if (!search) return true;
+    const searchable = [
+      article.title,
+      article.description,
+      article.content,
+      article.category,
+      ...article.tags,
+      ...article.personalityMatches,
+      ...article.sectorLinks,
+    ]
+      .join(" ")
+      .toLowerCase();
+    return searchable.includes(search);
+  }).slice(0, input.limit);
+}
+
+function fallbackArticleBySlug(slug: string) {
+  return FALLBACK_GROWTH_ARTICLES.find((article) => article.slug === slug);
+}
+
+async function hasPublishedGrowthArticles(): Promise<boolean> {
+  const rows = await db
+    .select({ id: growthArticlesTable.id })
+    .from(growthArticlesTable)
+    .where(eq(growthArticlesTable.status, "published"))
+    .limit(1);
+
+  return rows.length > 0;
 }
 
 function normalizeProfileTypes(input: unknown): string[] {
@@ -118,12 +250,18 @@ router.get("/categorie", async (_req, res) => {
       .where(eq(growthArticlesTable.status, "published"))
       .groupBy(growthArticlesTable.category);
 
+    if (rows.length === 0) {
+      res.json(fallbackCategories());
+      return;
+    }
+
     res.json(
       rows.map((row) => ({
         id: row.category,
         label: CATEGORY_LABELS[row.category] ?? row.category.replace(/-/g, " "),
         description: `Guide e strumenti per ${row.category.replace(/-/g, " ")}.`,
         count: Number(row.count) || 0,
+        source: "library" satisfies GrowthSource,
       })),
     );
   } catch (err) {
@@ -161,21 +299,25 @@ router.get("/per-te", optionalAuth, async (req, res) => {
       .limit(hasProfile ? 24 : 6);
 
     const comparableTypes = toComparableTypeSet(types);
-    const sortedArticles = hasProfile
+    const source: GrowthSource = articles.length > 0 ? "library" : "fallback";
+    const candidateArticles = articles.length > 0 ? articles : FALLBACK_GROWTH_ARTICLES;
+    const sortedArticles = hasProfile && source === "library"
       ? [...articles].sort((a, b) => {
           const matchDelta =
             scoreArticleForProfile(b, comparableTypes) - scoreArticleForProfile(a, comparableTypes);
           if (matchDelta !== 0) return matchDelta;
           return (b.updatedAt?.getTime?.() ?? 0) - (a.updatedAt?.getTime?.() ?? 0);
         })
-      : articles;
+      : candidateArticles;
 
     res.json({
       articles: sortedArticles.slice(0, 6).map(mapArticle),
       hasProfile,
-      personalization: (hasProfile ? "profile" : "generic") satisfies GrowthPersonalization,
+      personalization: (hasProfile && source === "library" ? "profile" : "generic") satisfies GrowthPersonalization,
       types,
       italianTypes: toItalianTypes(types),
+      status: source === "library" ? "ok" : "fallback",
+      source,
     });
   } catch (err) {
     req.log?.error?.({ err }, "growth personalized error");
@@ -219,10 +361,32 @@ router.get("/", async (req, res) => {
       .orderBy(desc(growthArticlesTable.updatedAt))
       .limit(limit);
 
+    if (articles.length === 0) {
+      if ((category || search) && await hasPublishedGrowthArticles()) {
+        res.json({
+          articles: [],
+          total: 0,
+          status: "empty",
+          source: "library" satisfies GrowthSource,
+        });
+        return;
+      }
+
+      const fallbackArticles = filterFallbackArticles({ category, search, limit });
+      res.json({
+        articles: fallbackArticles.map(mapArticle),
+        total: fallbackArticles.length,
+        status: fallbackArticles.length > 0 ? "fallback" : "empty",
+        source: "fallback" satisfies GrowthSource,
+      });
+      return;
+    }
+
     res.json({
       articles: articles.map(mapArticle),
       total: articles.length,
-      status: articles.length > 0 ? "ok" : "empty",
+      status: "ok",
+      source: "library" satisfies GrowthSource,
     });
   } catch (err) {
     req.log?.error?.({ err }, "growth list error");
@@ -258,6 +422,17 @@ router.get("/:slug", async (req, res) => {
       )
       .limit(1);
     if (!article) {
+      const fallback = fallbackArticleBySlug(req.params.slug);
+      if (fallback) {
+        res.json({
+          ...mapArticle(fallback),
+          related: FALLBACK_GROWTH_ARTICLES.filter((item) => item.id !== fallback.id)
+            .slice(0, 3)
+            .map(mapArticle),
+          source: "fallback" satisfies GrowthSource,
+        });
+        return;
+      }
       res.status(404).json({ error: "Articolo non trovato" });
       return;
     }
