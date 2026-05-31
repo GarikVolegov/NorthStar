@@ -37,7 +37,7 @@ function app() {
 }
 
 describe("applications routes", () => {
-  it("returns an explicit empty list state", async () => {
+  it("reports that applications persistence is not connected instead of pretending the list is empty", async () => {
     const response = await request(app())
       .get("/api/applications/42")
       .set("Authorization", `Bearer ${token()}`)
@@ -45,7 +45,9 @@ describe("applications routes", () => {
 
     expect(response.body).toEqual({
       applications: [],
-      status: "empty",
+      status: "not_configured",
+      reason: "applications_persistence_not_connected",
+      action: "connect_applications_persistence",
       totalCount: 0,
     });
   });
@@ -59,6 +61,45 @@ describe("applications routes", () => {
     expect(response.body).toEqual({
       code: "APPLICATIONS_USER_MISMATCH",
       error: "Puoi consultare solo le tue candidature",
+    });
+  });
+
+  it("does not report a placeholder create as a persisted application", async () => {
+    const response = await request(app())
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${token()}`)
+      .send({ company: "NorthStar", role: "UX Reliability" })
+      .expect(201);
+
+    expect(response.body).toEqual({
+      status: "not_configured",
+      reason: "applications_persistence_not_connected",
+      action: "connect_applications_persistence",
+    });
+  });
+
+  it("does not report placeholder update and delete operations as successful writes", async () => {
+    const update = await request(app())
+      .patch("/api/applications/1")
+      .set("Authorization", `Bearer ${token()}`)
+      .send({ status: "interview" })
+      .expect(200);
+
+    expect(update.body).toEqual({
+      status: "not_configured",
+      reason: "applications_persistence_not_connected",
+      action: "connect_applications_persistence",
+    });
+
+    const deletion = await request(app())
+      .delete("/api/applications/1")
+      .set("Authorization", `Bearer ${token()}`)
+      .expect(200);
+
+    expect(deletion.body).toEqual({
+      status: "not_configured",
+      reason: "applications_persistence_not_connected",
+      action: "connect_applications_persistence",
     });
   });
 });

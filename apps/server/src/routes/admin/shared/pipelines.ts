@@ -30,12 +30,108 @@ export type PipelineResponse = Record<string, unknown> & {
   warnings: string[];
 };
 
+type NewsSourceStatus = "ready" | "empty" | "error" | "not_configured" | "not_run";
+
+type NewsSourceDiagnostic = {
+  key: string;
+  label: string;
+  status: NewsSourceStatus;
+  collected: number;
+  lastError: string | null;
+  action: string;
+};
+
 function compactJson(value: unknown, max = 1000): string {
   return JSON.stringify(value).slice(0, max);
 }
 
 function warningText(value: unknown): string {
   return String(value).slice(0, 200);
+}
+
+function envConfigured(key: string): boolean {
+  return Boolean(process.env[key]?.trim());
+}
+
+function sourceError(errors: string[], key: string): string | null {
+  return errors.find((error) => error.toLowerCase().startsWith(`${key.toLowerCase()}:`)) ?? null;
+}
+
+function buildSourceDiagnostic(input: {
+  key: string;
+  label: string;
+  collected: number | undefined;
+  error: string | null;
+  requiredEnv?: string;
+  emptyAction: string;
+  notConfiguredAction?: string;
+}): NewsSourceDiagnostic {
+  const collected = input.collected ?? 0;
+  const missingRequiredEnv = input.requiredEnv ? !envConfigured(input.requiredEnv) : false;
+  const status: NewsSourceStatus = input.error
+    ? "error"
+    : missingRequiredEnv
+      ? "not_configured"
+      : input.collected == null
+        ? "not_run"
+        : collected > 0
+          ? "ready"
+          : "empty";
+  const action = status === "ready"
+    ? "Fonte operativa: controlla publisher/enricher se non compaiono articoli pubblici."
+    : status === "error"
+      ? "Apri i dettagli tecnici, correggi URL/chiavi o rate limit, poi rilancia."
+      : status === "not_configured"
+        ? input.notConfiguredAction ?? `Configura ${input.requiredEnv} e rilancia la pipeline.`
+        : input.emptyAction;
+
+  return {
+    key: input.key,
+    label: input.label,
+    status,
+    collected,
+    lastError: input.error,
+    action,
+  };
+}
+
+function buildNewsSourceDiagnostics(collector: Awaited<ReturnType<typeof runCollector>>): NewsSourceDiagnostic[] {
+  const bySource = collector.bySource ?? {};
+  const errors = collector.errors ?? [];
+  return [
+    buildSourceDiagnostic({
+      key: "gnews",
+      label: "GNews",
+      collected: bySource.gnews,
+      error: sourceError(errors, "gnews"),
+      requiredEnv: "GNEWS_API_KEY",
+      emptyAction: "Controlla quota, query recenti e filtri lingua/lavoro GNews.",
+      notConfiguredAction: "Configura GNEWS_API_KEY e rilancia la pipeline.",
+    }),
+    buildSourceDiagnostic({
+      key: "tavily_news",
+      label: "Tavily",
+      collected: bySource.tavily_news,
+      error: sourceError(errors, "tavily_news"),
+      requiredEnv: "TAVILY_API_KEY",
+      emptyAction: "Controlla quota, query recenti e filtri lingua/lavoro Tavily.",
+      notConfiguredAction: "Configura TAVILY_API_KEY e rilancia la pipeline.",
+    }),
+    buildSourceDiagnostic({
+      key: "static_rss",
+      label: "RSS statici",
+      collected: bySource.static_rss ?? bySource.static_priority_rss,
+      error: sourceError(errors, "static_rss") ?? sourceError(errors, "static_priority_rss"),
+      emptyAction: "Verifica raggiungibilita dei feed statici o prova le fonti RSS admin.",
+    }),
+    buildSourceDiagnostic({
+      key: "dynamic_sources",
+      label: "RSS admin",
+      collected: bySource.dynamic_sources ?? bySource.dynamic_priority_sources,
+      error: sourceError(errors, "dynamic_sources") ?? sourceError(errors, "dynamic_priority_sources"),
+      emptyAction: "Configura o abilita fonti RSS news nella console admin.",
+    }),
+  ];
 }
 
 export async function runNewsPublishingPipeline({
@@ -93,6 +189,7 @@ export async function runNewsPublishingPipeline({
   }
 
   const output = { collector, enricher, publisher, warnings };
+  const sourceDiagnostics = buildNewsSourceDiagnostics(collector);
   const status =
     warnings.length && !collector.totalInserted && !publisher?.transferred
       ? "failed"
@@ -115,6 +212,7 @@ export async function runNewsPublishingPipeline({
     collector,
     enricher,
     publisher,
+    sourceDiagnostics,
     warnings,
   };
 }

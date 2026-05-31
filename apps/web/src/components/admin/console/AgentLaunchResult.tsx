@@ -23,6 +23,7 @@ export function AgentLaunchResult({
   const publisher = recordValue(data.publisher);
   const created = arrayRecords(data.created);
   const missingCoverage = arrayRecords(publisher.missingCoverage);
+  const sourceDiagnostics = arrayRecords(data.sourceDiagnostics);
   const topics = stringList(data.topics);
   const hasWarnings = warnings.length > 0;
   const tone = isRunning
@@ -162,6 +163,40 @@ export function AgentLaunchResult({
                 : {String(item.realArticles ?? 0)} reali, ne mancano{" "}
                 {String(item.needed ?? 0)}
               </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(key === "news-publishing" || key === "news-research") && sourceDiagnostics.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold">Fonti news</p>
+          <div className="mt-2 space-y-2">
+            {sourceDiagnostics.map((source) => (
+              <div
+                key={String(source.key ?? source.label)}
+                className="rounded-md border bg-background/60 p-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold">
+                    {String(source.label ?? source.key ?? "Fonte")}
+                  </span>
+                  <Badge variant="outline" className="text-[11px]">
+                    {String(source.status ?? "unknown")}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-[11px] opacity-75">
+                  Raccolti: {String(source.collected ?? 0)}
+                </p>
+                {source.action != null && (
+                  <p className="mt-1 text-xs">{String(source.action)}</p>
+                )}
+                {source.lastError != null && (
+                  <p className="mt-1 break-words text-[11px] opacity-75">
+                    {String(source.lastError)}
+                  </p>
+                )}
+              </div>
             ))}
           </div>
         </div>

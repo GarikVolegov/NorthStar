@@ -1,6 +1,8 @@
 import express from "express";
+import { generateKeyPairSync } from "node:crypto";
+import jwt from "jsonwebtoken";
 import request from "supertest";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const selectRows = vi.hoisted(() => ({ queue: [] as Array<Array<Record<string, unknown>>> }));
 const insertBehavior = vi.hoisted(() => ({
@@ -108,6 +110,41 @@ function clerkJwt(sub: string) {
   return `${header}.${payload}.sig`;
 }
 
+function productionClerkJwt({
+  sub,
+  issuer,
+  audience,
+}: {
+  sub: string;
+  issuer: string;
+  audience: string;
+}) {
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const jwk = publicKey.export({ format: "jwk" }) as JsonWebKey;
+  const kid = `kid-${Math.random().toString(36).slice(2)}`;
+  const token = jwt.sign({ sub }, privateKey, {
+    algorithm: "RS256",
+    audience,
+    expiresIn: "5m",
+    issuer,
+    keyid: kid,
+  });
+
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+    keys: [{ kid, kty: "RSA", n: jwk.n, e: jwk.e }],
+  }), { status: 200 })));
+
+  return token;
+}
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+  process.env[name] = value;
+}
+
 function syncedUser(overrides: Record<string, unknown> = {}) {
   return {
     id: 42,
@@ -133,13 +170,27 @@ function syncedUser(overrides: Record<string, unknown> = {}) {
 
 describe("auth clerk-sync route", () => {
   const originalNodeEnv = process.env.NODE_ENV;
+  const originalClerkFrontendApiUrl = process.env.CLERK_FRONTEND_API_URL;
+  const originalClerkJwtAudience = process.env.CLERK_JWT_AUDIENCE;
+  const originalClerkJwtIssuer = process.env.CLERK_JWT_ISSUER;
 
   beforeEach(() => {
     process.env.NODE_ENV = originalNodeEnv;
+    restoreEnv("CLERK_FRONTEND_API_URL", originalClerkFrontendApiUrl);
+    restoreEnv("CLERK_JWT_AUDIENCE", originalClerkJwtAudience);
+    restoreEnv("CLERK_JWT_ISSUER", originalClerkJwtIssuer);
     vi.clearAllMocks();
     selectRows.queue = [];
     insertBehavior.throwUnique = false;
     insertBehavior.rows = [];
+  });
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+    restoreEnv("CLERK_FRONTEND_API_URL", originalClerkFrontendApiUrl);
+    restoreEnv("CLERK_JWT_AUDIENCE", originalClerkJwtAudience);
+    restoreEnv("CLERK_JWT_ISSUER", originalClerkJwtIssuer);
+    vi.unstubAllGlobals();
   });
 
   it("recovers from duplicate inserts caused by repeated Clerk sync requests", async () => {
@@ -254,6 +305,61 @@ describe("auth clerk-sync route", () => {
       code: "CLERK_SYNC_TOKEN_INVALID",
       error: expect.any(String),
     });
+  });
+
+  it("accepts production Clerk bearer only when issuer and audience match", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.CLERK_FRONTEND_API_URL = "saving-possum-85.clerk.accounts.dev";
+    process.env.CLERK_JWT_AUDIENCE = "northstar-web";
+    selectRows.queue = [[syncedUser({ id: 47, email: "prod@example.com" })]];
+
+    const response = await request(app())
+      .post("/api/auth/clerk-sync")
+      .set("Authorization", `Bearer ${productionClerkJwt({
+        sub: "clerk-prod",
+        issuer: "https://saving-possum-85.clerk.accounts.dev",
+        audience: "northstar-web",
+      })}`)
+      .set("Content-Type", "application/json")
+      .send(JSON.stringify({
+        clerkId: "clerk-prod",
+        email: "prod@example.com",
+        name: "Prod User",
+      }))
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      id: 47,
+      northstar_token: expect.any(String),
+    });
+  });
+
+  it("rejects production Clerk bearer with an unexpected issuer before DB sync", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.CLERK_FRONTEND_API_URL = "saving-possum-85.clerk.accounts.dev";
+    process.env.CLERK_JWT_AUDIENCE = "northstar-web";
+    selectRows.queue = [[syncedUser({ id: 48 })]];
+
+    const response = await request(app())
+      .post("/api/auth/clerk-sync")
+      .set("Authorization", `Bearer ${productionClerkJwt({
+        sub: "clerk-prod",
+        issuer: "https://wrong-issuer.example",
+        audience: "northstar-web",
+      })}`)
+      .set("Content-Type", "application/json")
+      .send(JSON.stringify({
+        clerkId: "clerk-prod",
+        email: "prod@example.com",
+        name: "Prod User",
+      }))
+      .expect(401);
+
+    expect(response.body).toMatchObject({
+      code: "CLERK_SYNC_TOKEN_INVALID",
+      error: expect.any(String),
+    });
+    expect(selectRows.queue).toHaveLength(1);
   });
 
   it("recovers when profile settings already exist during email linking", async () => {

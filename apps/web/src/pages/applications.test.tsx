@@ -63,4 +63,20 @@ describe("applications page reliability states", () => {
     expect(await screen.findByText("candidature.startTracking")).toBeInTheDocument();
     expect(screen.queryByText("candidature.loadError")).not.toBeInTheDocument();
   });
+
+  it("shows a setup state instead of the empty-applications CTA when persistence is not connected", async () => {
+    getJsonMock.mockResolvedValue({
+      applications: [],
+      status: "not_configured",
+      reason: "applications_persistence_not_connected",
+      action: "connect_applications_persistence",
+      totalCount: 0,
+    });
+
+    renderApplications();
+
+    expect(await screen.findByText("Candidature non ancora collegate")).toBeInTheDocument();
+    expect(screen.queryByText("candidature.startTracking")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /candidature.add/i })).not.toBeInTheDocument();
+  });
 });

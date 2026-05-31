@@ -37,7 +37,7 @@ function app() {
 }
 
 describe("jobs routes", () => {
-  it("returns an explicit empty job feed state", async () => {
+  it("reports that the job provider is not connected instead of pretending the feed is empty", async () => {
     const response = await request(app())
       .get("/api/jobs")
       .set("Authorization", `Bearer ${token()}`)
@@ -47,7 +47,59 @@ describe("jobs routes", () => {
       jobs: [],
       basedOnSector: null,
       totalCount: 0,
-      status: "empty",
+      status: "not_configured",
+      reason: "jobs_provider_not_connected",
+      action: "connect_jobs_provider",
+    });
+  });
+
+  it("does not return a fake job detail when the provider is not connected", async () => {
+    const response = await request(app())
+      .get("/api/jobs/123")
+      .set("Authorization", `Bearer ${token()}`)
+      .expect(200);
+
+    expect(response.body).toEqual({
+      status: "not_configured",
+      reason: "jobs_provider_not_connected",
+      action: "connect_jobs_provider",
+    });
+  });
+
+  it("does not report placeholder job writes as successful persistence", async () => {
+    const create = await request(app())
+      .post("/api/jobs")
+      .set("Authorization", `Bearer ${token()}`)
+      .send({ title: "Designer", company: "NorthStar" })
+      .expect(201);
+
+    expect(create.body).toEqual({
+      status: "not_configured",
+      reason: "jobs_provider_not_connected",
+      action: "connect_jobs_provider",
+    });
+
+    const update = await request(app())
+      .patch("/api/jobs/1")
+      .set("Authorization", `Bearer ${token()}`)
+      .send({ title: "Senior Designer" })
+      .expect(200);
+
+    expect(update.body).toEqual({
+      status: "not_configured",
+      reason: "jobs_provider_not_connected",
+      action: "connect_jobs_provider",
+    });
+
+    const deletion = await request(app())
+      .delete("/api/jobs/1")
+      .set("Authorization", `Bearer ${token()}`)
+      .expect(200);
+
+    expect(deletion.body).toEqual({
+      status: "not_configured",
+      reason: "jobs_provider_not_connected",
+      action: "connect_jobs_provider",
     });
   });
 });

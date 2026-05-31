@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { Briefcase, Clock, ExternalLink, Filter, MapPin, Sparkles, TrendingUp } from "lucide-react";
+import { AlertCircle, Briefcase, Clock, ExternalLink, Filter, MapPin, Sparkles, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
 
@@ -17,6 +17,9 @@ interface Job {
 
 interface JobsResponse {
   jobs: Job[]; basedOnSector: string | null; totalCount: number;
+  status?: "ok" | "empty" | "not_configured";
+  reason?: "jobs_provider_not_connected" | string;
+  action?: "connect_jobs_provider" | string;
 }
 
 function MatchBar({ score }: { score: number }) {
@@ -88,6 +91,7 @@ export default function Lavori() {
     staleTime: 60_000 * 10,
   });
 
+  const jobsNotConfigured = data?.status === "not_configured";
   const jobs = (data?.jobs ?? []).filter((j) => filterType === "all" || j.type === filterType);
 
   if (!isLoggedIn) {
@@ -120,6 +124,8 @@ export default function Lavori() {
               <p className="text-muted-foreground text-sm">
                 {data?.basedOnSector
                   ? <>Ordinate per match con il tuo settore: <span className="text-foreground font-medium">{data.basedOnSector}</span></>
+                  : jobsNotConfigured
+                    ? "Provider offerte non collegato"
                   : "Completa il test per vedere offerte personalizzate"
                 }
               </p>
@@ -135,31 +141,32 @@ export default function Lavori() {
       </div>
 
       <div className="container mx-auto px-4 max-w-5xl py-8">
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2 mb-6">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
-            {[
-              { key: "all", label: "Tutti" },
-              { key: "full-time", label: "Tempo pieno" },
-              { key: "freelance", label: "Freelance" },
-            ].map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setFilterType(key)}
-                className={cn(
-                  "text-xs px-3 py-1.5 rounded-full border font-medium transition-all whitespace-nowrap",
-                  filterType === key
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "border-border text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {label}
-              </button>
-            ))}
+        {!jobsNotConfigured && (
+          <div className="flex flex-wrap items-center gap-2 mb-6">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+              {[
+                { key: "all", label: "Tutti" },
+                { key: "full-time", label: "Tempo pieno" },
+                { key: "freelance", label: "Freelance" },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setFilterType(key)}
+                  className={cn(
+                    "text-xs px-3 py-1.5 rounded-full border font-medium transition-all whitespace-nowrap",
+                    filterType === key
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-muted-foreground shrink-0">{jobs.length} offerte</span>
           </div>
-          <span className="text-xs text-muted-foreground shrink-0">{jobs.length} offerte</span>
-        </div>
+        )}
 
         {isLoading ? (
           <div className="grid sm:grid-cols-2 gap-4">
@@ -167,13 +174,21 @@ export default function Lavori() {
               <div key={i} className="h-48 bg-card border border-border rounded-2xl animate-pulse" />
             ))}
           </div>
+        ) : jobsNotConfigured ? (
+          <div className="rounded-2xl border border-warning-muted bg-warning-surface p-8 text-center text-warning">
+            <AlertCircle className="h-8 w-8 mx-auto mb-3" />
+            <h2 className="text-lg font-semibold text-foreground mb-2">Offerte lavoro non ancora collegate</h2>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              La pagina e pronta, ma non c'e ancora un provider o una persistenza offerte collegata. Non mostriamo annunci fittizi finche il backend non sara connesso.
+            </p>
+          </div>
         ) : (
           <div className="grid sm:grid-cols-2 gap-4">
             {jobs.map((job) => <JobCard key={job.id} job={job} />)}
           </div>
         )}
 
-        {!data?.basedOnSector && !isLoading && (
+        {!data?.basedOnSector && !isLoading && !jobsNotConfigured && (
           <div className="mt-8 rounded-2xl border border-dashed border-border p-8 text-center">
             <Sparkles className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-muted-foreground text-sm mb-4">

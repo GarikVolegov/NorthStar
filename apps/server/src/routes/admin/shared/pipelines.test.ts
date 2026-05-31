@@ -6,6 +6,35 @@ import {
   runNewsPublishingPipeline,
 } from "./pipelines";
 
+type AgentRunSnapshotInput = {
+  agentName: string;
+  taskType: string;
+  startedAt: Date;
+  status: "completed" | "failed";
+  inputSummary?: string;
+  outputSummary?: string;
+  errorMessage?: string;
+};
+
+function agentRunSnapshot(id: number, input: AgentRunSnapshotInput) {
+  const finishedAt = new Date(input.startedAt.getTime() + 100);
+  return {
+    id,
+    agentName: input.agentName,
+    userId: null,
+    taskType: input.taskType,
+    inputSummary: input.inputSummary ?? null,
+    outputSummary: input.outputSummary ?? null,
+    status: input.status,
+    retryCount: 0,
+    startedAt: input.startedAt,
+    finishedAt,
+    durationMs: finishedAt.getTime() - input.startedAt.getTime(),
+    errorMessage: input.errorMessage ?? null,
+    createdAt: input.startedAt,
+  };
+}
+
 describe("admin runnable pipelines", () => {
   it("exposes task-oriented pipelines without atomic agents as primary actions", () => {
     expect(RUNNABLE_PIPELINES.map((pipeline) => pipeline.key)).toEqual([
@@ -23,7 +52,7 @@ describe("admin runnable pipelines", () => {
 
   it("runs news publishing steps in order and records one pipeline run", async () => {
     const order: string[] = [];
-    const writeAgentRunSnapshot = vi.fn(async (input) => ({ id: 41, ...input }));
+    const writeAgentRunSnapshot = vi.fn(async (input: AgentRunSnapshotInput) => agentRunSnapshot(41, input));
 
     const result = await runNewsPublishingPipeline({
       body: { sectorNames: ["Economia"] },
@@ -55,8 +84,65 @@ describe("admin runnable pipelines", () => {
     expect(result).toMatchObject({ ok: true, runId: 41, added: 4 });
   });
 
+  it("returns actionable news source diagnostics for empty provider results", async () => {
+    const previousGnews = process.env.GNEWS_API_KEY;
+    const previousTavily = process.env.TAVILY_API_KEY;
+    delete process.env.GNEWS_API_KEY;
+    process.env.TAVILY_API_KEY = "test-key";
+
+    try {
+      const result = await runNewsPublishingPipeline({
+        body: {},
+        startedAt: new Date("2026-05-26T10:00:00Z"),
+        deps: {
+          runCollector: vi.fn(async () => ({
+            totalCollected: 4,
+            totalInserted: 0,
+            bySource: {
+              gnews: 0,
+              tavily_news: 0,
+              static_rss: 4,
+              dynamic_sources: 0,
+            },
+            errors: ["static_rss: HTTP 403 for https://example.com/feed.xml"],
+            durationMs: 100,
+          })),
+          runEnricher: vi.fn(async () => ({ processed: 0, enriched: 0, skipped: 0, filtered: 0, retried: 0, durationMs: 100, errors: [] })),
+          runNewsPublisher: vi.fn(async () => ({ transferred: 0, seeded: 0, missingCoverage: [], durationMs: 100 })),
+          writeAgentRunSnapshot: vi.fn(async (input: AgentRunSnapshotInput) => agentRunSnapshot(45, input)),
+        },
+      });
+
+      expect(result.sourceDiagnostics).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          key: "gnews",
+          label: "GNews",
+          status: "not_configured",
+          action: "Configura GNEWS_API_KEY e rilancia la pipeline.",
+        }),
+        expect.objectContaining({
+          key: "tavily_news",
+          label: "Tavily",
+          status: "empty",
+          action: "Controlla quota, query recenti e filtri lingua/lavoro Tavily.",
+        }),
+        expect.objectContaining({
+          key: "static_rss",
+          label: "RSS statici",
+          status: "error",
+          lastError: "static_rss: HTTP 403 for https://example.com/feed.xml",
+        }),
+      ]));
+    } finally {
+      if (previousGnews === undefined) delete process.env.GNEWS_API_KEY;
+      else process.env.GNEWS_API_KEY = previousGnews;
+      if (previousTavily === undefined) delete process.env.TAVILY_API_KEY;
+      else process.env.TAVILY_API_KEY = previousTavily;
+    }
+  });
+
   it("records a failed pipeline run when the first news step fails", async () => {
-    const writeAgentRunSnapshot = vi.fn(async (input) => ({ id: 44, ...input }));
+    const writeAgentRunSnapshot = vi.fn(async (input: AgentRunSnapshotInput) => agentRunSnapshot(44, input));
 
     const result = await runNewsPublishingPipeline({
       body: {},
@@ -80,7 +166,7 @@ describe("admin runnable pipelines", () => {
 
   it("creates growth research outputs as pending review drafts", async () => {
     const inserted: Array<Record<string, unknown>> = [];
-    const writeAgentRunSnapshot = vi.fn(async (input) => ({ id: 42, ...input }));
+    const writeAgentRunSnapshot = vi.fn(async (input: AgentRunSnapshotInput) => agentRunSnapshot(42, input));
 
     const result = await runGrowthResearchReviewPipeline({
       body: { topics: ["focus lavoro"], limit: 1 },
@@ -116,7 +202,7 @@ describe("admin runnable pipelines", () => {
 
   it("runs market refresh jobs and sector data in order", async () => {
     const order: string[] = [];
-    const writeAgentRunSnapshot = vi.fn(async (input) => ({ id: 43, ...input }));
+    const writeAgentRunSnapshot = vi.fn(async (input: AgentRunSnapshotInput) => agentRunSnapshot(43, input));
 
     const result = await runMarketRefreshPipeline({
       body: {},

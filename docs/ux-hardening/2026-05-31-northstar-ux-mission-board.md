@@ -108,6 +108,15 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - Auth dev/e2e supporta token NorthStar locale senza sessione Clerk reale solo in `DEV`, cosi le route protette sono testabili senza indebolire produzione.
 - Wendy mobile tiene composer e pulsanti dentro il viewport: bottom sheet con altezza reale, console fullscreen ordinata prima dello stage e input flex `min-w-0`.
 
+## Tranche 8 Applicata
+
+- Verifica Clerk rafforzata: i token RS256 ora validano anche `issuer` derivato da Frontend API/publishable key e `audience` esplicita quando configurata.
+- I test auth coprono un bearer Clerk production valido e un issuer inatteso bloccato prima di qualunque sync DB.
+- La pipeline admin `news-publishing` ritorna `sourceDiagnostics` per GNews, Tavily, RSS statici e RSS admin: stato, raccolti, ultimo errore e azione operativa.
+- La console admin mostra la sezione "Fonti news" nei risultati pipeline, cosi l'operatore capisce subito se mancano chiavi, quota/provider o feed RSS.
+- Route lavori/candidature non fingono piu persistenza: `GET/POST/PATCH/DELETE` placeholder espongono `status: "not_configured"`, `reason` e `action` invece di empty/fake success.
+- UI lavori/candidature mostra stato setup esplicito e nasconde CTA che farebbero credere a salvataggi reali quando backend/provider non sono collegati.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -172,10 +181,18 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - `pnpm --filter @northstar/web run typecheck`
 - `git diff --check`
 
+## Verifica Tranche 8
+
+- `pnpm --filter @northstar/server exec vitest run --configLoader runner src/lib/clerk-jwks-url.test.ts src/routes/auth-clerk-sync.test.ts src/routes/admin/shared/pipelines.test.ts src/routes/applications.test.ts src/routes/jobs.test.ts --pool=forks`
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner src/components/admin/console/sections.test.tsx src/pages/applications.test.tsx src/pages/lavori.test.tsx src/components/dashboard/widgets/JobFeedWidget.test.tsx`
+- `pnpm --filter @northstar/server run typecheck`
+- `pnpm --filter @northstar/web run typecheck`
+- `git diff --check`
+
 ## Backlog Prossima Tranche
 
-1. Aggiungere issuer/audience validation esplicita alla verifica Clerk JWKS in produzione.
+1. Persistenza/storico stabile per stato provider news (`lastFetchAt`, `lastError`, rate limit) anche fuori dai run manuali.
 2. Sostituire route placeholder di candidature/lavori con persistenza o provider reale quando il prodotto lo richiede.
-3. Aggiungere pannello admin/manual refresh per fonti news, GNews/Tavily e stato provider.
+3. Aggiungere pannello admin/manual refresh piu completo per fonti news, GNews/Tavily e stato provider.
 4. Estendere mobile visual QA a WebKit/Safari e a viewport tablet.
 5. Estendere E2E full-stack a referral, affiliate UI e mobile viewport, eliminando le ultime assunzioni su seed account.

@@ -46,6 +46,8 @@ export const EMPTY_FORM = {
 export type ApplicationForm = typeof EMPTY_FORM;
 export type ApplicationsResponse = {
   applications: Application[];
-  status?: "empty" | "ok";
+  status?: "empty" | "ok" | "not_configured";
+  reason?: "applications_persistence_not_connected" | string;
+  action?: "connect_applications_persistence" | string;
   totalCount?: number;
 };

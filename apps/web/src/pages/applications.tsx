@@ -49,11 +49,19 @@ export default function Candidature() {
   });
 
   const applications = data?.applications ?? [];
+  const applicationsNotConfigured = data?.status === "not_configured";
+  const applicationsNotConfiguredMessage = t("candidature.notConfiguredDesc", {
+    defaultValue: "Questa area e pronta, ma la persistenza delle candidature non e ancora collegata. Non salviamo modifiche finche il backend non sara connesso.",
+  });
 
   const createMutation = useMutation({
     mutationFn: (payload: ApplicationForm) =>
-      postJson<Application>(`${BASE}api/applications`, { ...payload }),
-    onSuccess: () => {
+      postJson<Application | ApplicationsResponse>(`${BASE}api/applications`, { ...payload }),
+    onSuccess: (response) => {
+      if ("status" in response && response.status === "not_configured") {
+        setFormError(applicationsNotConfiguredMessage);
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ["applications", user?.id] });
       setAddOpen(false);
       setForm(EMPTY_FORM);
@@ -64,16 +72,22 @@ export default function Candidature() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: Partial<Application> }) => {
-      return patchJson<Application>(`${BASE}api/applications/${id}`, updates);
+      return patchJson<Application | ApplicationsResponse>(`${BASE}api/applications/${id}`, updates);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["applications", user?.id] }),
+    onSuccess: (response) => {
+      if ("status" in response && response.status === "not_configured") return;
+      queryClient.invalidateQueries({ queryKey: ["applications", user?.id] });
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      await deleteJson(`${BASE}api/applications/${id}`);
+      return deleteJson<ApplicationsResponse>(`${BASE}api/applications/${id}`);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["applications", user?.id] }),
+    onSuccess: (response) => {
+      if (response.status === "not_configured") return;
+      queryClient.invalidateQueries({ queryKey: ["applications", user?.id] });
+    },
   });
 
   function handleSubmit() {
@@ -83,7 +97,16 @@ export default function Candidature() {
     }
     if (editApp) {
       updateMutation.mutate({ id: editApp.id, updates: form }, {
-        onSuccess: () => { setEditApp(null); setForm(EMPTY_FORM); setFormError(null); setAddOpen(false); },
+        onSuccess: (response) => {
+          if ("status" in response && response.status === "not_configured") {
+            setFormError(applicationsNotConfiguredMessage);
+            return;
+          }
+          setEditApp(null);
+          setForm(EMPTY_FORM);
+          setFormError(null);
+          setAddOpen(false);
+        },
       });
     } else {
       createMutation.mutate(form);
@@ -137,12 +160,15 @@ export default function Candidature() {
               <p className="text-sm text-muted-foreground mt-0.5">
                 {isError
                   ? t("candidature.loadErrorShort", { defaultValue: "Impossibile caricare le candidature" })
+                  : applicationsNotConfigured ? t("candidature.notConfiguredShort", { defaultValue: "Archivio candidature non collegato" })
                   : total === 0 ? t("candidature.noCandidatures") : t("candidature.totalCount", { count: total })}
               </p>
             </div>
-            <Button onClick={() => openAdd()} className="rounded-full gap-2 shrink-0">
-              <Plus className="w-4 h-4" /> {t("candidature.add")}
-            </Button>
+            {!applicationsNotConfigured && (
+              <Button onClick={() => openAdd()} className="rounded-full gap-2 shrink-0">
+                <Plus className="w-4 h-4" /> {t("candidature.add")}
+              </Button>
+            )}
           </div>
 
           {/* Stats bar */}
@@ -236,6 +262,18 @@ export default function Candidature() {
             <Button onClick={() => void refetch()} variant="outline" className="rounded-full">
               {t("candidature.retry", { defaultValue: "Riprova" })}
             </Button>
+          </div>
+        ) : applicationsNotConfigured ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <div className="w-16 h-16 rounded-2xl border border-warning-muted bg-warning-surface text-warning flex items-center justify-center mb-4">
+              <AlertCircle className="w-8 h-8" />
+            </div>
+            <h2 className="text-lg font-semibold mb-2">
+              {t("candidature.notConfiguredTitle", { defaultValue: "Candidature non ancora collegate" })}
+            </h2>
+            <p className="text-sm text-muted-foreground max-w-sm">
+              {applicationsNotConfiguredMessage}
+            </p>
           </div>
         ) : total === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">

@@ -290,6 +290,52 @@ describe("admin console sections", () => {
     expect(screen.queryByText("Run fallita")).not.toBeInTheDocument();
   });
 
+  it("renders news source diagnostics in pipeline results", () => {
+    render(
+      <AgentsSection
+        data={agents}
+        loading={false}
+        tab="launch"
+        onTabChange={vi.fn()}
+        agentDays="30"
+        onAgentDaysChange={vi.fn()}
+        agentFilter="all"
+        onAgentFilterChange={vi.fn()}
+        agentStatusFilter="all"
+        onAgentStatusFilterChange={vi.fn()}
+        newsSectorInput=""
+        onNewsSectorInputChange={vi.fn()}
+        agentsRunning={new Set()}
+        agentsResult={{
+          "news-publishing": {
+            ok: true,
+            data: {
+              runId: 45,
+              checked: 0,
+              added: 0,
+              sourceDiagnostics: [
+                {
+                  key: "gnews",
+                  label: "GNews",
+                  status: "not_configured",
+                  collected: 0,
+                  action: "Configura GNEWS_API_KEY e rilancia la pipeline.",
+                },
+              ],
+            },
+          },
+        }}
+        onRefresh={vi.fn()}
+        onOpenStatus={vi.fn()}
+        onLaunch={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Fonti news")).toBeInTheDocument();
+    expect(screen.getByText("GNews")).toBeInTheDocument();
+    expect(screen.getByText("Configura GNEWS_API_KEY e rilancia la pipeline.")).toBeInTheDocument();
+  });
+
   it("renders StatusSection operational controls", () => {
     const onMaintenance = vi.fn();
     render(

@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { getEffectivePlan, planMeets } from "./check-feature";
 import { JWT_SECRET } from "../lib/jwt-secret";
 import { logSecurityEvent } from "../lib/security-events";
-import { resolveClerkJwksUrl } from "../lib/clerk-jwks-url";
+import { resolveClerkJwksUrl, resolveClerkJwtVerifyOptions } from "../lib/clerk-jwks-url";
 
 declare global {
   namespace Express {
@@ -97,9 +97,7 @@ async function verifyClerkToken(
       .match(/.{1,64}/g)!
       .join("\n")}\n-----END PUBLIC KEY-----`;
 
-    const payload = verify(token, pem, {
-      algorithms: ["RS256"],
-    }) as ClerkJwtPayload;
+    const payload = verify(token, pem, resolveClerkJwtVerifyOptions()) as ClerkJwtPayload;
     return payload;
   } catch {
     return null;

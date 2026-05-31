@@ -3,6 +3,12 @@ import { requireAuth } from "../middleware/auth";
 
 const router = Router();
 
+const APPLICATIONS_NOT_CONFIGURED = {
+  status: "not_configured",
+  reason: "applications_persistence_not_connected",
+  action: "connect_applications_persistence",
+} as const;
+
 /* ─── GET /api/applications/:userId  —  lista applicazioni ───── */
 router.get("/:userId", requireAuth, async (req, res) => {
   try {
@@ -20,7 +26,7 @@ router.get("/:userId", requireAuth, async (req, res) => {
       return;
     }
 
-    res.json({ applications: [], status: "empty", totalCount: 0 });
+    res.json({ applications: [], ...APPLICATIONS_NOT_CONFIGURED, totalCount: 0 });
   } catch (err) {
     req.log?.error?.({ err }, "applications get error");
     res.status(500).json({ error: "Errore nel caricamento delle applicazioni" });
@@ -30,7 +36,7 @@ router.get("/:userId", requireAuth, async (req, res) => {
 /* ─── POST /api/applications  —  crea applicazione ──────────── */
 router.post("/", requireAuth, async (req, res) => {
   try {
-    res.status(201).json({ id: 1 });
+    res.status(201).json(APPLICATIONS_NOT_CONFIGURED);
   } catch (err) {
     req.log?.error?.({ err }, "applications create error");
     res.status(500).json({ error: "Errore nella creazione dell'applicazione" });
@@ -40,7 +46,7 @@ router.post("/", requireAuth, async (req, res) => {
 /* ─── PATCH /api/applications/:id  —  aggiorna applicazione ─── */
 router.patch("/:id", requireAuth, async (req, res) => {
   try {
-    res.json({ success: true });
+    res.json(APPLICATIONS_NOT_CONFIGURED);
   } catch (err) {
     req.log?.error?.({ err }, "applications update error");
     res.status(500).json({ error: "Errore nell'aggiornamento dell'applicazione" });
@@ -50,7 +56,7 @@ router.patch("/:id", requireAuth, async (req, res) => {
 /* ─── DELETE /api/applications/:id  —  elimina applicazione ─── */
 router.delete("/:id", requireAuth, async (req, res) => {
   try {
-    res.json({ success: true });
+    res.json(APPLICATIONS_NOT_CONFIGURED);
   } catch (err) {
     req.log?.error?.({ err }, "applications delete error");
     res.status(500).json({ error: "Errore nell'eliminazione dell'applicazione" });

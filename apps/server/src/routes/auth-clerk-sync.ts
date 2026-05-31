@@ -6,7 +6,7 @@ import { db, generateUsername, protectedDbQuery, userProfileSettingsTable, users
 import { getRequestBody } from "../lib/request-context";
 import { asPlainRecord } from "../lib/type-guards";
 import { buildJwtPayload, findReferralAccount, generateToken, readReferralCode, readStringField, recordReferral } from "./auth-shared";
-import { resolveClerkJwksUrl } from "../lib/clerk-jwks-url";
+import { resolveClerkJwksUrl, resolveClerkJwtVerifyOptions } from "../lib/clerk-jwks-url";
 
 const { verify } = jwt;
 
@@ -133,7 +133,7 @@ async function verifyClerkBearerSub(token: string): Promise<string | null> {
       format: "jwk",
     });
 
-    const payload = verify(token, publicKey, { algorithms: ["RS256"] });
+    const payload = verify(token, publicKey, resolveClerkJwtVerifyOptions());
     if (typeof payload !== "object" || payload === null) return null;
 
     const sub = (payload as { sub?: unknown }).sub;

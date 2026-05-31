@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveClerkJwksUrl } from "./clerk-jwks-url";
+import { resolveClerkJwksUrl, resolveClerkJwtVerifyOptions } from "./clerk-jwks-url";
 
 describe("resolveClerkJwksUrl", () => {
   it("uses explicit CLERK_JWKS_URL when configured", () => {
@@ -21,5 +21,23 @@ describe("resolveClerkJwksUrl", () => {
     expect(resolveClerkJwksUrl({
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: key,
     } as NodeJS.ProcessEnv)).toBe("https://saving-possum-85.clerk.accounts.dev/.well-known/jwks.json");
+  });
+
+  it("derives issuer verification from the Clerk frontend API", () => {
+    expect(resolveClerkJwtVerifyOptions({
+      CLERK_FRONTEND_API: "saving-possum-85.clerk.accounts.dev",
+    } as NodeJS.ProcessEnv)).toMatchObject({
+      issuer: "https://saving-possum-85.clerk.accounts.dev",
+    });
+  });
+
+  it("uses explicit issuer and audience verification when configured", () => {
+    expect(resolveClerkJwtVerifyOptions({
+      CLERK_JWT_ISSUER: "https://issuer.example",
+      CLERK_JWT_AUDIENCE: "northstar-web,northstar-mobile",
+    } as NodeJS.ProcessEnv)).toMatchObject({
+      issuer: "https://issuer.example",
+      audience: ["northstar-web", "northstar-mobile"],
+    });
   });
 });
