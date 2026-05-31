@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { useSSEStream } from "./useSSEStream";
+import { AUTH_EXPIRED_EVENT } from "@/lib/storage-keys";
 
 function streamResponse(body: string, init: ResponseInit = {}): Response {
   return new Response(
@@ -32,19 +33,23 @@ describe("useSSEStream", () => {
     expect(result.current.content).toBe("ciao");
   });
 
-  it("surfaces message fields from HTTP error bodies", async () => {
+  it("surfaces status and message fields from HTTP error bodies", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       streamResponse(JSON.stringify({ message: "Token non valido" }), { status: 401 }),
     );
 
     const onError = vi.fn();
+    const onAuthExpired = vi.fn();
+    window.addEventListener(AUTH_EXPIRED_EVENT, onAuthExpired);
     const { result } = renderHook(() => useSSEStream({ onError }));
 
     await act(async () => {
       await result.current.start("/api/ai/wendy");
     });
 
-    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: "Token non valido" }));
-    expect(result.current.error?.message).toBe("Token non valido");
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: "HTTP_401: Token non valido" }));
+    expect(result.current.error?.message).toBe("HTTP_401: Token non valido");
+    expect(onAuthExpired).toHaveBeenCalledTimes(1);
+    window.removeEventListener(AUTH_EXPIRED_EVENT, onAuthExpired);
   });
 });

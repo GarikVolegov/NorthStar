@@ -8,6 +8,23 @@ export type WendyDecisionMode =
   | "memory_update"
   | "clarify";
 
+export type WendyReasoningDepth = "instant" | "grounded" | "deliberate";
+
+export type WendyDataStrategy =
+  | "none"
+  | "profile"
+  | "market"
+  | "profile_market"
+  | "app_action"
+  | "memory";
+
+export type WendyExecutionMode =
+  | "direct_chat"
+  | "tool_augmented_chat"
+  | "background_agent"
+  | "scheduled_routine"
+  | "memory_capture";
+
 export type WendyCapabilityKey =
   | "social_presence"
   | "tool_discipline"
@@ -47,6 +64,15 @@ export interface WendyDecision {
   requiresConfirmation: boolean;
   latencyTargetMs: number;
   reason: string;
+  reasoningDepth: WendyReasoningDepth;
+  dataStrategy: WendyDataStrategy;
+  executionMode: WendyExecutionMode;
+  selfCheck: string[];
+}
+
+export interface WendySuggestedPrompt {
+  label: string;
+  prompt: string;
 }
 
 export interface WendySelfCheckIssue {

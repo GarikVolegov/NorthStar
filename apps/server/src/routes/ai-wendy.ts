@@ -44,10 +44,14 @@ import {
   persistActivationTrace,
   reinforceCoActivations,
   getFastPathFallbackReply,
+  getWendyRecoveryFallbackReply,
   shouldUseImmediateFastPathFallback,
+  shouldUseImmediateWendyRecoveryFallback,
+  shouldUseWendyQuickActionFastPath,
   getLlmUnavailableReply,
   isLlmConfigured,
   buildWendyIntelligenceDirectives,
+  buildWendySuggestedPrompts,
   evaluateWendyResponse,
   planWendyDecision,
 } from "@workspace/ai-server";
@@ -64,17 +68,58 @@ import { executeWendyToolCall } from "../lib/wendy-tool-executor";
 import { storeSemanticTurnInBackground } from "../lib/semantic-memory";
 import { withRouteTimeout } from "../lib/wendy-fast-path";
 import { resolveWendyLocale } from "../lib/wendy-locale";
+import {
+  buildWendyDataBackedGuidedAction,
+  classifyWendyDataBackedQuickAction,
+  formatWendyDataBackedQuickActionReply,
+} from "../lib/wendy-data-backed-quick-action";
 import { checkRabbitEmergency } from "@workspace/ai-server";
 const router = Router();
 
-function wendyErrorMessage(status: string): string {
-  if (status === "error_ratelimit") {
-    return "Il provider AI ha raggiunto un limite temporaneo. Sto usando i fallback quando disponibili; riprova tra poco se il problema continua.";
+function buildConfirmableClientAction(toolName: string, args: Record<string, unknown>) {
+  if (toolName === "set_filters") {
+    const filters = args.filters && typeof args.filters === "object" && !Array.isArray(args.filters)
+      ? args.filters as Record<string, unknown>
+      : {};
+    const listType = typeof args.listType === "string" ? args.listType : "sectors";
+    return {
+      clientSide: true,
+      action: "set_filters",
+      wendyAction: {
+        id: `wendy-set_filters-${randomUUID()}`,
+        type: "set_filters",
+        status: "needs_confirmation",
+        risk: "low",
+        label: "Preparare Esplora settori?",
+        description: "Applico i filtri quando confermi, cosi non interrompo la risposta.",
+        requiresConfirmation: true,
+        payload: { listType, filters },
+        preview: Object.entries(filters).slice(0, 4).map(([label, value]) => ({
+          label,
+          value: typeof value === "string" ? value : JSON.stringify(value),
+        })),
+      },
+    };
   }
-  if (status === "error_timeout") {
-    return "Wendy ci ha messo troppo a rispondere. Riprova con una richiesta piu breve o tra qualche secondo.";
-  }
-  return "Wendy non riesce a completare la risposta in questo momento. Riprova tra poco.";
+
+  const viewId = typeof args.viewId === "string" ? args.viewId : "settori";
+  const targetRoute = viewId === "settori" ? "/settori" : "/dashboard";
+  return {
+    clientSide: true,
+    action: "navigate",
+    wendyAction: {
+      id: `wendy-navigate-${randomUUID()}`,
+      type: "navigate",
+      status: "needs_confirmation",
+      risk: "low",
+      label: "Aprire Esplora settori?",
+      description: "Apro la pagina quando confermi, senza tagliare la risposta di Wendy.",
+      requiresConfirmation: true,
+      targetRoute,
+      payload: { url: targetRoute, viewId },
+      preview: [{ label: "Destinazione", value: targetRoute }],
+    },
+  };
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -99,6 +144,7 @@ router.post(
 
     const {
       message,
+      contextPrompt,
       threadId,
       compressedHistory,
       pageContext,
@@ -107,6 +153,13 @@ router.post(
       isPredefined,
     } = parsed.data;
     const locale = resolveWendyLocale(rawLocale, message);
+    const followUpContext = contextPrompt?.trim();
+    const effectiveMessage = followUpContext
+      ? `${message}\n\n[Contesto operativo follow-up Wendy]\n${followUpContext}`
+      : message;
+    const followUpPromptSection = followUpContext
+      ? `\n\n## Contesto operativo follow-up\n${followUpContext}\n\nUsa questo contesto per continuare la decisione precedente, attivare tool dell'app quando servono dati/modifiche, e proporre il prossimo passo eseguibile senza ripartire da zero.`
+      : "";
 
     // SECURITY: userId SEMPRE dal JWT, mai dal body
     const userId = req.user!.id;
@@ -301,6 +354,7 @@ router.post(
     let supervisorScoreForLog: number | null = null;
     let wasRewrittenForLog = false;
     let ttftMs: number | null = null;
+    let adaptiveDecisionForDone: ReturnType<typeof planWendyDecision> | null = null;
 
     const donePayload = (extra: Record<string, unknown> = {}) => ({
       type: "done",
@@ -311,6 +365,22 @@ router.post(
         ragChunksRetrieved,
       }),
       ...(neuralContext ? { activationSummary: neuralContext.activationSummary } : {}),
+      ...(adaptiveDecisionForDone
+        ? {
+            adaptiveReasoning: {
+              mode: adaptiveDecisionForDone.mode,
+              reasoningDepth: adaptiveDecisionForDone.reasoningDepth,
+              dataStrategy: adaptiveDecisionForDone.dataStrategy,
+              executionMode: adaptiveDecisionForDone.executionMode,
+              selfCheck: adaptiveDecisionForDone.selfCheck,
+              latencyTargetMs: adaptiveDecisionForDone.latencyTargetMs,
+            },
+          }
+        : {}),
+      suggestedPrompts: buildWendySuggestedPrompts({
+        decision: adaptiveDecisionForDone,
+        locale,
+      }),
       ...extra,
     });
 
@@ -326,7 +396,10 @@ router.post(
           "[rabbit-triage] emergency detected",
         );
         send({ type: "token", value: triage.responseText });
-        send(donePayload({ rabbitTriage: { emergency: true, signals: triage.matchedSignals } }));
+        send(donePayload({
+          answerMode: "local-fast-path",
+          rabbitTriage: { emergency: true, signals: triage.matchedSignals },
+        }));
         if (!res.writableEnded) res.end();
         markIdle();
         return;
@@ -335,7 +408,7 @@ router.post(
 
     // Routing fuori dal try — serve nel finally per il logging
     const { intent, decision } = resolveWendyRoute({
-      userMessage: message,
+      userMessage: effectiveMessage,
       pageContext: pageContext as WendyPageContext | undefined,
       compressedHistory: compressedHistory as CompressedHistory | undefined,
       isPremium,
@@ -348,13 +421,132 @@ router.post(
     );
 
     const wendyDecisionPlan = planWendyDecision({
-      message,
+      message: effectiveMessage,
       intent,
       page: pageContext?.page,
       hasFileAttached,
     });
+    adaptiveDecisionForDone = wendyDecisionPlan;
     const wendyIntelligenceDirectives =
       buildWendyIntelligenceDirectives(wendyDecisionPlan);
+    const useQuickActionLightPipeline = shouldUseWendyQuickActionFastPath({ intent, message: effectiveMessage });
+    let terminalDoneSent = false;
+    const sendDoneOnce = (extra: Record<string, unknown> = {}) => {
+      if (terminalDoneSent || res.writableEnded) return;
+      terminalDoneSent = true;
+      send(donePayload(extra));
+    };
+    const sendRecoveryFallbackOnce = (
+      reason: string,
+      fallbackStatus: typeof status = "error_model",
+    ) => {
+      if (terminalDoneSent || res.writableEnded) return false;
+      const fallbackText = getWendyRecoveryFallbackReply({ intent, message, locale });
+      status = fallbackStatus;
+      responseCategory = "error_model";
+      outputTokens += estimateTokens(fallbackText);
+      assistantResponseForMemory += fallbackText;
+      if (ttftMs === null) ttftMs = Date.now() - startedAt;
+      send({ type: "token", value: fallbackText });
+      sendDoneOnce({
+        intent,
+        answerMode: "recovery-fallback",
+        usage: {
+          model: "local-recovery-fallback",
+          inputTokens: estimateTokens(message),
+          outputTokens,
+        },
+        recovery: { reason, status: fallbackStatus },
+      });
+      return true;
+    };
+
+    const llmConfigured = isLlmConfigured();
+
+    const dataBackedQuickAction = classifyWendyDataBackedQuickAction(effectiveMessage);
+    if (dataBackedQuickAction) {
+      const [objectivesResult, contextResult] = await Promise.all([
+        executeWendyToolCall("get_user_objectives", {}, userId),
+        executeWendyToolCall("get_user_context", {}, userId),
+      ]);
+      send({
+        type: "tool_call",
+        name: "get_user_objectives",
+        args: {},
+        result: objectivesResult.ok ? objectivesResult.data : null,
+      });
+      send({
+        type: "tool_call",
+        name: "get_user_context",
+        args: {},
+        result: contextResult.ok ? contextResult.data : null,
+      });
+      const quickActionText = formatWendyDataBackedQuickActionReply({
+        kind: dataBackedQuickAction,
+        locale,
+        objectives: objectivesResult.ok ? objectivesResult.data : undefined,
+        userContext: contextResult.ok ? contextResult.data : undefined,
+      });
+      const guidedAction = buildWendyDataBackedGuidedAction({
+        kind: dataBackedQuickAction,
+        objectives: objectivesResult.ok ? objectivesResult.data : undefined,
+        userContext: contextResult.ok ? contextResult.data : undefined,
+      });
+      if (guidedAction) {
+        const guidedActionResult = guidedAction.confirmBeforeExecution
+          ? {
+              ok: true as const,
+              data: buildConfirmableClientAction(guidedAction.toolName, guidedAction.args),
+            }
+          : await executeWendyToolCall(
+              guidedAction.toolName,
+              guidedAction.args,
+              userId,
+            );
+        send({
+          type: "tool_call",
+          name: guidedAction.toolName,
+          args: guidedAction.args,
+          result: guidedActionResult.ok ? guidedActionResult.data : null,
+        });
+      }
+      outputTokens += estimateTokens(quickActionText);
+      assistantResponseForMemory += quickActionText;
+      if (ttftMs === null) ttftMs = Date.now() - startedAt;
+      send({ type: "token", value: quickActionText });
+      sendDoneOnce({
+        intent,
+        answerMode: "local-quick-action",
+        usage: {
+          model: "local-data-quick-action",
+          inputTokens: estimateTokens(message),
+          outputTokens,
+        },
+      });
+      if (!res.writableEnded) res.end();
+      markIdle();
+      return;
+    }
+
+    if (shouldUseImmediateWendyRecoveryFallback({ intent, message, llmConfigured })) {
+      const quickActionText = getWendyRecoveryFallbackReply({ intent, message, locale });
+      outputTokens += estimateTokens(quickActionText);
+      assistantResponseForMemory += quickActionText;
+      if (ttftMs === null) ttftMs = Date.now() - startedAt;
+      send({ type: "token", value: quickActionText });
+      sendDoneOnce({
+        intent,
+        answerMode: "local-quick-action",
+        usage: {
+          model: "local-quick-action",
+          inputTokens: estimateTokens(message),
+          outputTokens,
+        },
+      });
+      if (!res.writableEnded) res.end();
+      markIdle();
+      return;
+    }
 
     if (shouldUseImmediateFastPathFallback({ intent, message })) {
       const fallbackText = getFastPathFallbackReply({ intent, message, locale });
@@ -363,11 +555,10 @@ router.post(
         assistantResponseForMemory += fallbackText;
         if (ttftMs === null) ttftMs = Date.now() - startedAt;
         send({ type: "token", value: fallbackText });
-        send({
-          ...donePayload({
-            intent,
-            usage: { model: "local-fast-path", inputTokens: estimateTokens(message), outputTokens },
-          }),
+        sendDoneOnce({
+          intent,
+          answerMode: "local-fast-path",
+          usage: { model: "local-fast-path", inputTokens: estimateTokens(message), outputTokens },
         });
         if (!res.writableEnded) res.end();
         markIdle();
@@ -377,65 +568,81 @@ router.post(
 
     // No chat LLM provider configured → degrade gracefully with a clear message
     // instead of letting downstream LLM/embedding calls throw ("si è interrotta").
-    if (!isLlmConfigured()) {
+    if (!llmConfigured) {
       const msg = getLlmUnavailableReply(locale);
       outputTokens += estimateTokens(msg);
       assistantResponseForMemory += msg;
       if (ttftMs === null) ttftMs = Date.now() - startedAt;
       rootLogger.warn({ userId, requestId }, "[ai/wendy] no LLM provider configured — returning graceful notice");
       send({ type: "token", value: msg });
-      send(donePayload({ intent, usage: { model: "unconfigured", inputTokens: estimateTokens(message), outputTokens } }));
+      sendDoneOnce({
+        intent,
+        answerMode: "unconfigured",
+        usage: { model: "unconfigured", inputTokens: estimateTokens(message), outputTokens },
+      });
       if (!res.writableEnded) res.end();
       markIdle();
       return;
     }
 
-    personalContext = await buildWikiLLMContext({
-      query: message,
-      userId,
-      userRole: req.user!.role,
-      includePersonalMemory: true,
-      includeWendyBrain: false,
-      graphifyProfile: "auto",
-    });
+    if (!useQuickActionLightPipeline) {
+      personalContext = await buildWikiLLMContext({
+        query: effectiveMessage,
+        userId,
+        userRole: req.user!.role,
+        includePersonalMemory: true,
+        includeWendyBrain: false,
+        graphifyProfile: "auto",
+      }).catch((err) => {
+        rootLogger.warn({ err, userId, requestId }, "[ai/wendy] context build failed; continuing without personal context");
+        return {
+          context: "",
+          contexts: { semanticMemory: "", openHuman: "", graphify: "", wendyBrain: "" },
+          sources: [],
+        };
+      });
 
-    neuralContext = await buildWendyActivationContext({
-      requestId,
-      userId,
-      message,
-      intent,
-      domain: null,
-      pageContext: pageContext as WendyPageContext | undefined,
-    }).catch((err) => {
-      rootLogger.warn({ err, userId, requestId }, "[ai/wendy] neural activation failed");
-      return null;
-    });
-    if (neuralContext) {
-      await persistActivationTrace(neuralContext);
+      neuralContext = await buildWendyActivationContext({
+        requestId,
+        userId,
+        message: effectiveMessage,
+        intent,
+        domain: null,
+        pageContext: pageContext as WendyPageContext | undefined,
+      }).catch((err) => {
+        rootLogger.warn({ err, userId, requestId }, "[ai/wendy] neural activation failed");
+        return null;
+      });
+      if (neuralContext) {
+        await persistActivationTrace(neuralContext);
+      }
+    } else {
+      rootLogger.debug({ userId, requestId, intent }, "[ai/wendy] using lightweight quick-action path");
     }
 
     try {
       // ── 2. Fast path: navigation / simple_qa ────────────────────────────
-      if (decision.skipFullPipeline) {
+      const useLightPipeline = decision.skipFullPipeline || useQuickActionLightPipeline;
+      if (useLightPipeline) {
         const systemPrompt =
           buildLightPrompt({
             locale,
             intent,
-            userMessage: message,
+            userMessage: effectiveMessage,
             ...(pageContext
               ? { pageContext: pageContext as WendyPageContext }
               : {}),
             ...(neuralContext?.promptSection
               ? { neuralSection: neuralContext.promptSection }
               : {}),
-          }) + personalContext.context;
+          }) + personalContext.context + followUpPromptSection;
 
         const openAiTools = toolsToOpenAIFormat(decision.toolsEnabled);
         const llm = getLLMForRoute({
           provider: decision.provider ?? "openrouter",
         });
 
-        inputTokens = estimateTokens(systemPrompt + message);
+        inputTokens = estimateTokens(systemPrompt + message + (followUpContext ?? ""));
         send({ type: "status", value: intent === "navigation" ? "⚡" : "💬" });
 
         // Tool calling loop — max 3 turni per evitare loop infiniti
@@ -528,11 +735,10 @@ router.post(
 
             // Navigazione client-side — termina subito senza risposta testuale
             if (toolResult.ok && isClientSideToolData(toolData)) {
-              send({
-                ...donePayload({
-                  intent,
-                  usage: { model: decision.model, inputTokens, outputTokens },
-                }),
+              sendDoneOnce({
+                intent,
+                answerMode: "llm-fast-path",
+                usage: { model: decision.model, inputTokens, outputTokens },
               });
               return;
             }
@@ -575,22 +781,35 @@ router.post(
           if (ttftMs === null) ttftMs = Date.now() - startedAt;
           send({ type: "token", value: finalText });
         }
-        send({
-          ...donePayload({
+        if (!finalText && !terminalDoneSent) {
+          sendRecoveryFallbackOnce("empty_fast_path", "error_model");
+        } else {
+          sendDoneOnce({
             intent,
+            answerMode: "llm-fast-path",
             usage: { model: decision.model, inputTokens, outputTokens },
-          }),
-        });
+          });
+        }
       } else {
         // ── 3. Full path: growth agent completo ──────────────────────────
-        const FULL_PATH_TIMEOUT_MS = parseInt(process.env.WENDY_FULL_PATH_TIMEOUT_MS ?? "30000");
+        const FULL_PATH_TIMEOUT_MS = parseInt(process.env.WENDY_FULL_PATH_TIMEOUT_MS ?? "12000");
         let fullPathTimedOut = false;
         const fullPathTimeout = setTimeout(() => {
           fullPathTimedOut = true;
           aborted = true;
           status = "error_timeout";
           responseCategory = "error_model";
-          send({ type: "error", message: wendyErrorMessage("error_timeout"), code: "error_timeout" });
+          if (assistantResponseForMemory.trim()) {
+            sendDoneOnce({
+              intent,
+              answerMode: "llm-full-path",
+              usage: { model: decision.model, inputTokens, outputTokens },
+              recovery: { reason: "full_path_timeout_after_tokens", status: "error_timeout" },
+            });
+          } else {
+            sendRecoveryFallbackOnce("full_path_timeout", "error_timeout");
+          }
+          if (!res.writableEnded) res.end();
         }, FULL_PATH_TIMEOUT_MS);
 
         const [userMemory, recentSummaries] = await Promise.all([
@@ -602,7 +821,8 @@ router.post(
           buildSessionHistorySection(recentSummaries) +
           personalContext.contexts.semanticMemory +
           personalContext.contexts.openHuman +
-          `\n\n${wendyIntelligenceDirectives}`;
+          `\n\n${wendyIntelligenceDirectives}` +
+          followUpPromptSection;
 
         // Flatten compressed history per il growth agent
         const flatHistory = [
@@ -633,7 +853,7 @@ router.post(
               journeyType: pageContext?.journeyType,
             },
             history: flatHistory,
-            userMessage: message,
+            userMessage: effectiveMessage,
             requestId,
             wendyIntent: intent, // abilita i Wendy domain tools nel full path
             isPredefined,
@@ -642,17 +862,26 @@ router.post(
           })) {
             if (aborted) break;
             if (event.type === "done") {
-              send(donePayload(event as Record<string, unknown>));
+              sendDoneOnce({
+                answerMode: "llm-full-path",
+                ...(event as Record<string, unknown>),
+              });
+            } else if (event.type === "error") {
+              status = "error_model";
+              errorCode = "GROWTH_AGENT_ERROR";
+              responseCategory = "error_model";
+              if (assistantResponseForMemory.trim()) {
+                sendDoneOnce({
+                  intent,
+                  answerMode: "recovery-fallback",
+                  usage: { model: decision.model, inputTokens, outputTokens },
+                  recovery: { reason: "growth_agent_error_after_tokens", status: "error_model" },
+                });
+              } else {
+                sendRecoveryFallbackOnce("growth_agent_error", "error_model");
+              }
             } else {
-              send(
-                event.type === "error"
-                  ? {
-                      type: "error",
-                      message: wendyErrorMessage("error_model"),
-                      code: "error_model",
-                    }
-                  : event,
-              );
+              send(event);
             }
             if (event.type === "token") {
               if (ttftMs === null) ttftMs = Date.now() - startedAt;
@@ -665,11 +894,6 @@ router.post(
               wasRewrittenForLog = event.supervisorResult?.rewritten ?? false;
             }
             if (event.type === "done" || event.type === "error") {
-              if (event.type === "error") {
-                status = "error_model";
-                errorCode = "GROWTH_AGENT_ERROR";
-                responseCategory = "error_model";
-              }
               // Rileva insufficient_data dal done event dell'agente
               if (isDoneWithLowEval(event)) {
                 responseCategory = "insufficient_data";
@@ -701,11 +925,16 @@ router.post(
       responseCategory = status.startsWith("error")
         ? "error_model"
         : responseCategory;
-      send({
-        type: "error",
-        message: wendyErrorMessage(status),
-        code: status,
-      });
+      if (assistantResponseForMemory.trim()) {
+        sendDoneOnce({
+          intent,
+          answerMode: "recovery-fallback",
+          usage: { model: decision.model, inputTokens, outputTokens },
+          recovery: { reason: "unhandled_error_after_tokens", status },
+        });
+      } else {
+        sendRecoveryFallbackOnce("unhandled_error", status);
+      }
     } finally {
       // Inferisci responseCategory da status se non già impostato
       if (responseCategory === "success" && status !== "success") {

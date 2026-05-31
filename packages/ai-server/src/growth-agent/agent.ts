@@ -1,6 +1,4 @@
-import type OpenAI from "openai";
-import pRetry from "p-retry";
-import { openai } from "../client";
+import { getLLMForRoute, type LLMMessage, type ToolDefinitionOpenAI } from "../llm/client";
 import { buildSystemPrompt, type UserContext } from "./prompt-builder";
 import { evaluateSelf, buildClarification, type EvalResult } from "./self-evaluator";
 import { routerAgent } from "./router-agent";
@@ -15,7 +13,7 @@ import { runParallelHandoff } from "./parallel-handoff";
 import { UI_TOOLS, type UiToolName, type UiToolArgs } from "./ui-tools";
 import { getToolsForIntent, toolsToOpenAIFormat } from "../wendy-router/tool-registry";
 import { executeToolCall, type ToolResult } from "../wendy-router/tool-handlers";
-import { isClientSideToolData, parseToolArguments } from "./tool-args";
+import { isClientSideToolData } from "./tool-args";
 import { toolRegistry } from "../tools/registry";
 import { scheduleMemorySave } from "./memory-save";
 import { buildUiDirectives, type UiDirectives } from "./ui-directives";
@@ -34,6 +32,7 @@ import { startSpan } from "../tracing";
 import { FF } from "../feature-flags";
 import { selectModelFor, modelFor } from "../model-router";
 import { wendyConfig } from "../config/wendy";
+import { getWendyRecoveryFallbackReply } from "../wendy-router/fast-path-fallback";
 import "./specialists/career-agent";
 import "./specialists/mindset-agent";
 import "./specialists/habits-agent";
@@ -283,7 +282,7 @@ export async function* runGrowthAgent(
   });
 
   const recentHistory = history.slice(-maxHistory);
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+  const messages: LLMMessage[] = [
     { role: "system", content: systemPrompt },
     ...recentHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
     { role: "user", content: userMessage },
@@ -302,79 +301,39 @@ export async function* runGrowthAgent(
       complexity: evalResult.level === "high" ? "deep" : "standard",
     });
 
+    const llm = getLLMForRoute({ provider: route.provider });
     const wendyDomainTools = wendyIntent
       ? toolsToOpenAIFormat(getToolsForIntent(wendyIntent))
       : [];
-    const allTools: OpenAI.Chat.ChatCompletionTool[] = [
-      ...(FF.generativeUI ? (UI_TOOLS as OpenAI.Chat.ChatCompletionTool[]) : []),
-      ...wendyDomainTools as OpenAI.Chat.ChatCompletionTool[],
+    const allTools: ToolDefinitionOpenAI[] = [
+      ...(FF.generativeUI ? (UI_TOOLS as unknown as ToolDefinitionOpenAI[]) : []),
+      ...(wendyDomainTools as ToolDefinitionOpenAI[]),
     ];
     const hasTools = allTools.length > 0;
 
-    const completionParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming = {
+    const result = await llm.chatWithTools(messages, hasTools ? allTools : [], {
       model: route.model,
-      messages,
-      stream: true,
       temperature,
-      max_tokens: evalResult.level === "low" ? wendyConfig.agent.maxTokensLow : wendyConfig.agent.maxTokensHigh,
-      stream_options: { include_usage: false },
-      ...(hasTools ? { tools: allTools, tool_choice: "auto" } : {}),
-    };
-    const stream = await pRetry(
-      () => openai.chat.completions.create(completionParams),
-      {
-        retries: 2,
-        minTimeout: 1000,
-        maxTimeout: 3000,
-        onFailedAttempt: (err) => {
-          logger.warn({ err, attempt: err.attemptNumber, ...logFields }, "LLM call failed, retrying");
-        },
-      },
-    );
-
-    const tokenBuffer: string[] = [];
-    const toolCalls = new Map<number, { id: string; name: string; arguments: string }>();
-    let finishReason: string = "stop";
-
-    for await (const chunk of stream) {
-      const choice = chunk.choices[0];
-      if (!choice) continue;
-      finishReason = choice.finish_reason ?? finishReason;
-
-      if (choice.delta?.content) {
-        tokenBuffer.push(choice.delta.content);
-      }
-
-      if (choice.delta?.tool_calls) {
-        for (const tc of choice.delta.tool_calls) {
-          const index = typeof tc.index === "number" ? tc.index : toolCalls.size;
-          const current = toolCalls.get(index) ?? { id: "", name: "", arguments: "" };
-          if (tc.id) current.id += tc.id;
-          if (tc.function?.name) current.name += tc.function.name;
-          if (tc.function?.arguments) current.arguments += tc.function.arguments;
-          toolCalls.set(index, current);
-        }
-      }
-    }
+      maxTokens: evalResult.level === "low" ? wendyConfig.agent.maxTokensLow : wendyConfig.agent.maxTokensHigh,
+    });
 
     llmSpan.end();
     endLlmTimer();
-    const fullText = tokenBuffer.join("");
+    const fullText = result.content ?? "";
     recordLlmTokens(route.model, fullText.length);
 
     const endSupervisorTimer = wendyLatencySeconds.startTimer({ phase: "supervisor" });
     const supervisorSpan = startSpan("supervisor_evaluation", { requestId, domain: routeDecision.domain, intent: routeDecision.intent });
 
-    const orderedToolCalls = Array.from(toolCalls.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([, toolCall], index) => ({
+    const orderedToolCalls = result.toolCalls
+      .map((toolCall, index) => ({
         id: toolCall.id || `tc_${index}`,
         name: toolCall.name,
         arguments: toolCall.arguments,
       }))
       .filter((toolCall) => toolCall.name);
 
-    if (finishReason === "tool_calls" && orderedToolCalls.length > 0) {
+    if (result.finishReason === "tool_calls" && orderedToolCalls.length > 0) {
       supervisorSpan.end();
       endSupervisorTimer();
 
@@ -383,8 +342,7 @@ export async function* runGrowthAgent(
         const toolResults: Array<{ toolCall: (typeof orderedToolCalls)[number]; toolData: unknown }> = [];
 
         for (const toolCall of orderedToolCalls) {
-          const parsedArgs = parseToolArguments(toolCall.arguments);
-          const toolResult = await toolExecutor(toolCall.name, parsedArgs, userId);
+          const toolResult = await toolExecutor(toolCall.name, toolCall.arguments, userId);
           const toolData = toolResult.ok ? toolResult.data : { error: toolResult.message };
 
           if (toolResult.ok && isClientSideToolData(toolData)) {
@@ -398,63 +356,36 @@ export async function* runGrowthAgent(
           yield { type: "tool_call", name: toolCall.name, result: toolData };
         }
 
-        const followUpMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        const toolSummary = toolResults
+          .map(({ toolCall, toolData }) => `${toolCall.name}: ${JSON.stringify(toolData)}`)
+          .join("\n");
+        const followUpMessages: LLMMessage[] = [
           ...messages,
           {
             role: "assistant",
-            content: null,
-            tool_calls: orderedToolCalls.map((toolCall) => ({
-              id: toolCall.id,
-              type: "function" as const,
-              function: { name: toolCall.name, arguments: toolCall.arguments },
-            })),
+            content: fullText || "Ho consultato gli strumenti disponibili.",
           },
-          ...toolResults.map(({ toolCall, toolData }) => ({
-            role: "tool" as const,
-            tool_call_id: toolCall.id,
-            content: JSON.stringify(toolData),
-          })),
+          {
+            role: "user",
+            content: `Risultati degli strumenti:\n${toolSummary}\n\nRispondi all'utente in modo sintetico, citando solo cio che emerge dai risultati.`,
+          },
         ];
 
-        const followUpStream = await pRetry(
-          () => openai.chat.completions.create({
-            model: route.model, messages: followUpMessages,
-            stream: true, temperature: 0.55, max_tokens: wendyConfig.agent.followUpMaxTokens,
-          }),
-          {
-            retries: 2,
-            minTimeout: 1000,
-            maxTimeout: 3000,
-            onFailedAttempt: (err) => {
-              logger.warn({ err, attempt: err.attemptNumber, ...logFields }, "LLM follow-up call failed, retrying");
-            },
-          },
-        );
-
-        const followUpBuffer: string[] = [];
-        for await (const chunk of followUpStream) {
-          const delta = chunk.choices[0]?.delta?.content;
-          if (delta) {
-            followUpBuffer.push(delta);
-            yield { type: "token", value: delta };
-          }
+        const followUpText = await llm.chatOnce(followUpMessages, {
+          model: route.model,
+          temperature: 0.55,
+          maxTokens: wendyConfig.agent.followUpMaxTokens,
+        });
+        for (let i = 0; i < followUpText.length; i += wendyConfig.agent.chunkSize) {
+          yield { type: "token", value: followUpText.slice(i, i + wendyConfig.agent.chunkSize) };
         }
-
-        const followUpText = followUpBuffer.join("");
         yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], evalResult, routeDecision };
         saveAssistantMemory(followUpText);
         return;
       }
 
       for (const toolCall of orderedToolCalls) {
-        let args: UiToolArgs;
-        try {
-          args = JSON.parse(toolCall.arguments) as UiToolArgs;
-        } catch {
-          yield { type: "error", message: `UI tool args parse error: ${toolCall.arguments}` };
-          yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
-          return;
-        }
+        const args = toolCall.arguments as unknown as UiToolArgs;
 
         yield { type: "ui_tool" as const, name: toolCall.name as UiToolName, args };
       }
@@ -468,7 +399,7 @@ export async function* runGrowthAgent(
       return;
     }
 
-    const draft = tokenBuffer.join("");
+    const draft = fullText;
 
     const supervisorInput = {
       userMessage: normalizedMessage, draft,
@@ -500,6 +431,14 @@ export async function* runGrowthAgent(
 
     supervisorSpan.end();
     endSupervisorTimer();
+
+    if (!finalText.trim()) {
+      finalText = getWendyRecoveryFallbackReply({
+        intent: wendyIntent ?? "conversation",
+        message: normalizedMessage,
+        ...(userContext.locale ? { locale: userContext.locale } : {}),
+      });
+    }
 
     const CHUNK_SIZE = wendyConfig.agent.chunkSize;
     for (let i = 0; i < finalText.length; i += CHUNK_SIZE) {

@@ -28,7 +28,15 @@ async function upsertProfileSettings(
 /* ─── GET /api/profile/:userId  —  dati profilo ───────────────────── */
 router.get("/:userId", async (req, res) => {
   try {
-    const userId = parseInt(req.params.userId ?? "", 10);
+    const rawUserId = req.params.userId ?? "";
+    const userId = rawUserId === "me"
+      ? req.user?.id
+      : Number.parseInt(rawUserId, 10);
+    if (typeof userId !== "number" || !Number.isInteger(userId) || userId <= 0) {
+      res.status(400).json({ error: "Invalid profile user id" });
+      return;
+    }
+    const targetUserId = userId;
 
     let user;
     try {
@@ -53,12 +61,12 @@ router.get("/:userId", async (req, res) => {
           userProfileSettingsTable,
           eq(usersTable.id, userProfileSettingsTable.userId),
         )
-        .where(eq(usersTable.id, userId))
+        .where(eq(usersTable.id, targetUserId))
         .limit(1);
     } catch (err) {
       if (!isPersistenceSchemaError(err)) throw err;
       req.log?.warn?.(
-        { err, route: "profile.get", userId, setupAction: "run_migrations" },
+        { err, route: "profile.get", userId: targetUserId, setupAction: "run_migrations" },
         "profile settings unavailable",
       );
       const [baseUser] = await db
@@ -71,7 +79,7 @@ router.get("/:userId", async (req, res) => {
           createdAt: usersTable.createdAt,
         })
         .from(usersTable)
-        .where(eq(usersTable.id, userId))
+        .where(eq(usersTable.id, targetUserId))
         .limit(1);
       user = baseUser
         ? {

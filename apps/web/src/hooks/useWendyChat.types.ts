@@ -1,5 +1,5 @@
 import type { WendyAction } from './useWendyActionExecutor';
-import type { WendyContextSource } from './useWendyChatSse';
+import type { WendyAdaptiveReasoning, WendyAnswerMode, WendyContextSource, WendySuggestedPrompt } from './useWendyChatSse';
 import type { useSTT } from './useSTT.js';
 import type { useTTS } from './useTTS.js';
 import type { useWendyOpenAITTS } from './useWendyOpenAITTS.js';
@@ -29,6 +29,10 @@ export interface ChatMessage {
   requestId?: string | undefined;
   toolsUsed?: string[] | undefined;
   contextSources?: WendyContextSource[] | undefined;
+  answerMode?: WendyAnswerMode | undefined;
+  recovery?: Record<string, unknown> | undefined;
+  adaptiveReasoning?: WendyAdaptiveReasoning | undefined;
+  suggestedPrompts?: WendySuggestedPrompt[] | undefined;
 }
 
 export interface ThinkingPhase {
@@ -42,6 +46,7 @@ export interface ContextualAction {
   label: string;
   prompt: string;
   prefillText?: string | undefined;
+  contextPrompt?: string | undefined;
   isPredefined?: boolean | undefined;
 }
 

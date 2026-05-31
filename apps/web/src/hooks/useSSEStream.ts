@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, useTransition } from "react";
+import { AUTH_EXPIRED_EVENT } from "@/lib/storage-keys";
 
 // §4.1 FRONTEND_RULES — hook canonico per SSE streaming.
 // Unico modo autorizzato nel progetto per consumare stream SSE.
@@ -34,6 +35,10 @@ function readErrorMessage(value: unknown, fallback: string): string {
     if (typeof error === "string") return error;
   }
   return fallback;
+}
+
+function buildHttpError(status: number, message: string): Error {
+  return new Error(`HTTP_${status}: ${message}`);
 }
 
 function readTokenChunk(parsed: StreamEventPayload, eventType: string | undefined): string {
@@ -152,7 +157,10 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
 
         if (!res.ok) {
           const errData = (await res.json().catch(() => ({}))) as unknown;
-          throw new Error(readErrorMessage(errData, `Errore ${res.status}`));
+          if (res.status === 401 || res.status === 403) {
+            window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+          }
+          throw buildHttpError(res.status, readErrorMessage(errData, `Errore ${res.status}`));
         }
 
         const reader = res.body?.getReader();
