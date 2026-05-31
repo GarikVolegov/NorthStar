@@ -70,6 +70,22 @@ export type {
   TryADaySuggestions,
   TryADayTimeBlock,
 } from "./try-a-day";
+export {
+  RIASEC_DIMS,
+  recencyDecay,
+  weightedRiasec,
+  blendRiasec,
+  clusterFit,
+  deriveHypotheses,
+  nextStage,
+  directionConfidence,
+} from "./compass/scoring";
+export type {
+  RiasecDim,
+  RiasecVector,
+  ScoringSignal,
+  CandidateCluster,
+} from "./compass/scoring";
 export { buildSystemPrompt } from "./growth-agent/prompt-builder";
 export type { UserContext } from "./growth-agent/prompt-builder";
 export type { RetrievedChunk } from "./growth-agent/retriever";
