@@ -51,7 +51,7 @@ import {
   type AdaptiveDashboardPhase,
 } from "@/components/dashboard/dashboard-adaptive-flow";
 import { JourneyToolsSection } from "@/components/dashboard/JourneyToolsSection";
-import { DashboardIndecisoTools } from "@/components/dashboard/DashboardIndecisoTools";
+import { BussolaLaunchpad } from "@/features/compass/BussolaLaunchpad";
 import { ProfessionCard } from "@/components/dashboard/ProfessionCard";
 import { WorkModePanel } from "@/components/dashboard/WorkModePanel";
 
@@ -84,7 +84,7 @@ const JOURNEY_META: Record<JourneyId, {
   headline: string;
   subline: string;
 }> = {
-  indeciso:    { label: "Indeciso",   Icon: HelpCircle,  color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30",      headline: "Scopri la tua strada",           subline: "Inizia con il test RIASEC per capire il tuo profilo professionale" },
+  indeciso:    { label: "Indeciso",   Icon: HelpCircle,  color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30",      headline: "Scopri la tua strada",           subline: "La Bussola ti guida passo dopo passo a capire cosa vuoi davvero — senza verdetti" },
   dipendente:  { label: "Dipendente", Icon: TrendingUp,  color: "text-growth",    bgColor: "bg-growth/10",    borderColor: "border-growth/30",    headline: "Accelera la tua carriera",        subline: "Analizza le tue skill, allenati per i colloqui, ottieni un piano di crescita" },
   autonomo:    { label: "Autonomo",   Icon: Rocket,      color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30",      headline: "Scala il tuo business",          subline: "Valida idee, trova mercati, costruisci il tuo piano strategico con l'AI" },
   azienda:     { label: "Azienda",    Icon: Building2,   color: "text-growth",    bgColor: "bg-growth/10",    borderColor: "border-growth/30",    headline: "Trova i profili giusti",          subline: "Esplora i profili RIASEC, pubblica le tue opportunità, analizza il mercato" },
@@ -371,11 +371,7 @@ export default function Dashboard() {
           {journeyMeta && <span className="text-xs text-muted-foreground">- {journeyMeta.label}</span>}
         </div>
         {isIndeciso ? (
-          <DashboardIndecisoTools
-            toolsProps={toolsProps}
-            adaptivePhase={adaptiveState.phase}
-            presentation={adaptiveSectionPresentation.tools}
-          />
+          <BussolaLaunchpad />
         ) : (
           <JourneyToolsSection {...toolsProps} presentation={adaptiveSectionPresentation.tools} />
         )}

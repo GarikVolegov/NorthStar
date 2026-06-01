@@ -1,11 +1,16 @@
 /**
- * /bussola — hub de "La Bussola" per l'utente indeciso.
- * Mostra lo stage del percorso, la confidenza direzionale, le ipotesi emerse
- * (fuse da test RIASEC + try-a-day + diario indizi) e i prossimi passi.
+ * /bussola — LA CASA dell'utente indeciso.
+ *
+ * Una sola fonte di verità: lo `stage` della Bussola (zero_ideas → committed).
+ * Tutto è organizzato nei 4 momenti del viaggio, con UN prossimo passo in
+ * evidenza e ogni strumento raggruppato nella fase giusta — niente liste sparse.
  */
 import { useCompass, type CompassStage, type CompassBlockType } from "@/features/compass/useCompass";
 import { CommittedActionPlan } from "@/features/compass/CommittedActionPlan";
-import { Compass, Sparkles, Target, Zap, ArrowRight, HelpCircle, Swords, FlaskConical } from "lucide-react";
+import {
+  Compass, Sparkles, Target, Zap, ArrowRight, HelpCircle, Swords, FlaskConical,
+  Layers, BookOpen, HeartHandshake, Briefcase, Rocket, type LucideIcon,
+} from "lucide-react";
 import { useLocation } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -26,6 +31,66 @@ const BLOCK_LABEL: Record<CompassBlockType, string> = {
   unknown: "Da capire",
 };
 
+interface Tool { href: string; icon: LucideIcon; title: string; desc: string }
+interface Phase { id: string; n: number; label: string; tagline: string; stages: CompassStage[]; tools: Tool[] }
+
+const PHASES: Phase[] = [
+  {
+    id: "scopri", n: 1, label: "Scopri", tagline: "Cosa ti muove, per davvero",
+    stages: ["zero_ideas"],
+    tools: [
+      { href: `${BASE}bussola/blocco`, icon: HelpCircle, title: "Cosa ti blocca", desc: "Diamo un nome all'indecisione" },
+      { href: `${BASE}bussola/specchio`, icon: Sparkles, title: "Lo Specchio", desc: "Reagisci a momenti reali: emergono le preferenze" },
+      { href: `${BASE}diario?mode=indizi`, icon: BookOpen, title: "Diario degli Indizi", desc: "Annota un momento di energia o curiosità" },
+      { href: `${BASE}mood`, icon: HeartHandshake, title: "Mood check-in", desc: "60s: come stai? Ti suggerisco una cosa" },
+    ],
+  },
+  {
+    id: "sperimenta", n: 2, label: "Sperimenta", tagline: "Senti com'è davvero, prima di scegliere",
+    stages: ["zero_ideas", "hypotheses"],
+    tools: [
+      { href: `${BASE}ruoli`, icon: Rocket, title: "Prova una giornata", desc: "Esplora i ruoli e vivi una giornata-tipo" },
+      { href: `${BASE}settori`, icon: Layers, title: "Esplora settori", desc: "28 settori — niente impegno, solo curiosità" },
+    ],
+  },
+  {
+    id: "restringi", n: 3, label: "Restringi", tagline: "Per sottrazione: quale ti tira di più?",
+    stages: ["hypotheses"],
+    tools: [
+      { href: `${BASE}bussola/torneo`, icon: Swords, title: "Il Torneo", desc: "Scegli a coppie: la direzione si affina" },
+    ],
+  },
+  {
+    id: "agisci", n: 4, label: "Decidi & Agisci", tagline: "Un test reversibile, poi il lavoro vero",
+    stages: ["experimenting", "committed"],
+    tools: [
+      { href: `${BASE}bussola/spike`, icon: FlaskConical, title: "Mettila alla prova", desc: "Uno spike di 2 settimane, reversibile" },
+      { href: `${BASE}candidature`, icon: Briefcase, title: "Le mie candidature", desc: "Quando la direzione regge: candidati e traccia" },
+    ],
+  },
+];
+
+/** L'UNICO prossimo passo consigliato, derivato dallo stage + blocco. */
+function nextStep(stage: CompassStage, block: CompassBlockType, hasHypotheses: boolean): Tool {
+  if (block === "unknown") {
+    return { href: `${BASE}bussola/blocco`, icon: HelpCircle, title: "Capiamo cosa ti blocca", desc: "Dare un nome all'indecisione è il primo passo per scioglierla." };
+  }
+  switch (stage) {
+    case "zero_ideas":
+      return block === "too_many_interests"
+        ? { href: `${BASE}bussola/torneo`, icon: Swords, title: "Restringi col Torneo", desc: "Hai tanti interessi: procediamo per sottrazione." }
+        : { href: `${BASE}bussola/specchio`, icon: Sparkles, title: "Fai lo Specchio", desc: "La direzione emerge da come reagisci, non da un quiz." };
+    case "hypotheses":
+      return hasHypotheses
+        ? { href: `${BASE}bussola/torneo`, icon: Swords, title: "Affina col Torneo", desc: "Hai delle ipotesi: mettile a confronto per farne emergere una netta." }
+        : { href: `${BASE}bussola/specchio`, icon: Sparkles, title: "Continua con lo Specchio", desc: "Servono ancora segnali perché una direzione emerga." };
+    case "experimenting":
+      return { href: `${BASE}bussola/spike`, icon: FlaskConical, title: "Rivedi il tuo spike", desc: "È un test reversibile: cosa hai scoperto in queste settimane?" };
+    case "committed":
+      return { href: `${BASE}candidature`, icon: Briefcase, title: "Passa all'azione", desc: "La direzione ha retto: ora trasformala in candidature reali." };
+  }
+}
+
 export default function BussolaPage() {
   const { profile, loading, error } = useCompass();
   const [, setLocation] = useLocation();
@@ -40,6 +105,8 @@ export default function BussolaPage() {
   const stageIdx = STAGES.findIndex((s) => s.id === profile.stage);
   const openHyp = profile.hypotheses.filter((h) => h.verdict !== "discarded");
   const energizers = profile.energyProfile?.energizers ?? [];
+  const step = nextStep(profile.stage, profile.blockType, openHyp.length > 0);
+  const StepIcon = step.icon;
 
   return (
     <div className="mx-auto max-w-3xl space-y-8 p-6">
@@ -57,7 +124,25 @@ export default function BussolaPage() {
       {/* Il ponte verso il lavoro vero (solo se direzione confermata / committed) */}
       <CommittedActionPlan />
 
-      {/* Stage progress */}
+      {/* IL PROSSIMO PASSO — un'azione chiara in evidenza */}
+      <button
+        onClick={() => setLocation(step.href)}
+        className="group flex w-full items-center justify-between gap-4 rounded-2xl border-2 border-primary/40 bg-primary/5 p-5 text-left transition hover:border-primary"
+      >
+        <span className="flex items-center gap-4">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+            <StepIcon className="h-6 w-6" />
+          </span>
+          <span>
+            <span className="block text-xs font-semibold uppercase tracking-wide text-primary">Il tuo prossimo passo</span>
+            <span className="block text-lg font-bold">{step.title}</span>
+            <span className="block text-sm text-muted-foreground">{step.desc}</span>
+          </span>
+        </span>
+        <ArrowRight className="h-5 w-5 shrink-0 text-primary transition group-hover:translate-x-1" />
+      </button>
+
+      {/* Stage progress — "sei qui" */}
       <section className="rounded-xl border bg-card p-5">
         <div className="mb-4 flex items-center justify-between">
           <span className="text-sm font-medium text-muted-foreground">Il tuo punto del viaggio</span>
@@ -68,9 +153,7 @@ export default function BussolaPage() {
         <div className="flex items-center gap-2">
           {STAGES.map((s, i) => (
             <div key={s.id} className="flex flex-1 flex-col items-center gap-1">
-              <div
-                className={`h-2 w-full rounded-full ${i <= stageIdx ? "bg-primary" : "bg-muted"}`}
-              />
+              <div className={`h-2 w-full rounded-full ${i <= stageIdx ? "bg-primary" : "bg-muted"}`} />
               <span className={`text-[11px] ${i === stageIdx ? "font-semibold text-primary" : "text-muted-foreground"}`}>
                 {s.label}
               </span>
@@ -84,16 +167,12 @@ export default function BussolaPage() {
       </section>
 
       {/* Ipotesi */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Target className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Ipotesi che stanno emergendo</h2>
-        </div>
-        {openHyp.length === 0 ? (
-          <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-            Ancora nessuna direzione. Fai qualche swipe nello Specchio: emergeranno dal tuo comportamento, non da un quiz.
-          </p>
-        ) : (
+      {openHyp.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Target className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Ipotesi che stanno emergendo</h2>
+          </div>
           <ul className="space-y-2">
             {openHyp.map((h) => (
               <li key={h.clusterId} className="rounded-lg border bg-card p-4">
@@ -110,8 +189,8 @@ export default function BussolaPage() {
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* Energia */}
       {energizers.length > 0 && (
@@ -128,60 +207,48 @@ export default function BussolaPage() {
         </section>
       )}
 
-      {/* Prossimi passi */}
-      <section className="grid gap-3 sm:grid-cols-2">
-        <button
-          onClick={() => setLocation(`${BASE}bussola/specchio`)}
-          className="group flex items-center justify-between rounded-xl border bg-card p-4 text-left transition hover:border-primary/50"
-        >
-          <span className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <span>
-              <span className="block font-medium">Lo Specchio</span>
-              <span className="block text-xs text-muted-foreground">Scopri cosa ti muove, per davvero</span>
-            </span>
-          </span>
-          <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-1" />
-        </button>
-        <button
-          onClick={() => setLocation(`${BASE}bussola/blocco`)}
-          className="group flex items-center justify-between rounded-xl border bg-card p-4 text-left transition hover:border-primary/50"
-        >
-          <span className="flex items-center gap-2">
-            <HelpCircle className="h-5 w-5 text-primary" />
-            <span>
-              <span className="block font-medium">Cosa ti blocca</span>
-              <span className="block text-xs text-muted-foreground">Diamo un nome all'indecisione</span>
-            </span>
-          </span>
-          <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-1" />
-        </button>
-        <button
-          onClick={() => setLocation(`${BASE}bussola/torneo`)}
-          className="group flex items-center justify-between rounded-xl border bg-card p-4 text-left transition hover:border-primary/50"
-        >
-          <span className="flex items-center gap-2">
-            <Swords className="h-5 w-5 text-primary" />
-            <span>
-              <span className="block font-medium">Il Torneo</span>
-              <span className="block text-xs text-muted-foreground">Scegli per sottrazione: quale ti tira di più?</span>
-            </span>
-          </span>
-          <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-1" />
-        </button>
-        <button
-          onClick={() => setLocation(`${BASE}bussola/spike`)}
-          className="group flex items-center justify-between rounded-xl border bg-card p-4 text-left transition hover:border-primary/50"
-        >
-          <span className="flex items-center gap-2">
-            <FlaskConical className="h-5 w-5 text-primary" />
-            <span>
-              <span className="block font-medium">Mettila alla prova</span>
-              <span className="block text-xs text-muted-foreground">Uno spike di 2 settimane, reversibile</span>
-            </span>
-          </span>
-          <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-1" />
-        </button>
+      {/* I 4 momenti — tutto a portata, raggruppato; la fase corrente in evidenza */}
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold">Il tuo viaggio, in 4 momenti</h2>
+        {PHASES.map((phase) => {
+          const active = phase.stages.includes(profile.stage);
+          return (
+            <div
+              key={phase.id}
+              className={`rounded-xl border p-4 transition ${active ? "border-primary/40 bg-primary/5" : "border-border bg-card/40"}`}
+            >
+              <div className="mb-3 flex items-center gap-2">
+                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                  {phase.n}
+                </span>
+                <span className="font-semibold">{phase.label}</span>
+                <span className="text-xs text-muted-foreground">· {phase.tagline}</span>
+                {active && <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">sei qui</span>}
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {phase.tools.map((t) => {
+                  const Icon = t.icon;
+                  return (
+                    <button
+                      key={t.href}
+                      onClick={() => setLocation(t.href)}
+                      className="group flex items-center justify-between gap-2 rounded-lg border bg-card p-3 text-left transition hover:border-primary/50"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Icon className="h-5 w-5 shrink-0 text-primary" />
+                        <span>
+                          <span className="block text-sm font-medium">{t.title}</span>
+                          <span className="block text-xs text-muted-foreground">{t.desc}</span>
+                        </span>
+                      </span>
+                      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-1" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </section>
     </div>
   );
