@@ -101,6 +101,10 @@ const ADAPTIVE_PHASE_LABEL: Record<AdaptiveDashboardPhase, string> = {
   active_journey: "Percorso attivo",
 };
 
+const DASHBOARD_WENDY_CAPABILITIES = ["navigate", "create_objective", "update_objective_progress", "set_filters"];
+const DASHBOARD_WENDY_FIELDS = ["objective.text", "objective.category", "objective.dueDate"];
+const DASHBOARD_WENDY_ACTIONS = ["Crea obiettivo", "Aggiorna progresso", "Mostra prossimi passi"];
+
 function useLatestSession() {
   return useQuery<LatestSession>({
     queryKey: ["latest-session-dashboard"],
@@ -143,13 +147,6 @@ export default function Dashboard() {
   usePageMeta({
     title: "Fondazione NorthStar",
     description: "La tua analisi AI personalizzata: professioni consigliate, percorsi formativi e modalità di lavoro ottimale per il tuo profilo RIASEC.",
-  });
-  useWendyPageContext({
-    page: 'dashboard',
-    title: 'Dashboard',
-    capabilities: ['navigate', 'create_objective', 'update_objective_progress', 'set_filters'],
-    fields: ['objective.text', 'objective.category', 'objective.dueDate'],
-    actions: ['Crea obiettivo', 'Aggiorna progresso', 'Mostra prossimi passi'],
   });
   usePageModule({ pageId: "dashboard" });
 
@@ -221,8 +218,43 @@ export default function Dashboard() {
   const strategicObjectives = objectives.filter((objective) => objective.category !== "idea_validation");
   const objectivesProgress = dashData?.objectivesProgress ?? { done: 0, total: 0, percent: 0 };
   const upcomingEvents = dashData?.upcomingEvents ?? [];
+  const readinessBand = isReadinessData(readinessData) ? readinessData.band : undefined;
+  const clarityScore = journeyType === "indeciso"
+    ? Math.min(100, Math.round(
+        (sessionId               ? 30 : 0) +
+        (user?.onboardingCompleted ? 15 : 0) +
+        (savedSectorsCount >= 1  ? 15 : 0) +
+        (savedSectorsCount >= 3  ? 20 : 0) +
+        (savedSectorsCount >= 5  ? 20 : 0)
+      ))
+    : undefined;
+  const adaptiveInput = {
+    journeyType,
+    hasSession: !!sessionId,
+    savedSectorsCount,
+    hasDecided: false,
+    readinessBand,
+    layout: dashboardLayout,
+  };
+  const adaptiveState = deriveDashboardPhase(adaptiveInput);
+  const adaptiveSectionPresentation = getAdaptiveSectionPresentation(adaptiveInput);
+  const visibleDashboardLayout = getAdaptiveDashboardLayout(adaptiveInput);
 
   const queryClient = useQueryClient();
+
+  useWendyPageContext({
+    page: 'dashboard',
+    title: 'Dashboard',
+    journeyType,
+    capabilities: DASHBOARD_WENDY_CAPABILITIES,
+    fields: DASHBOARD_WENDY_FIELDS,
+    actions: DASHBOARD_WENDY_ACTIONS,
+    adaptivePhase: adaptiveState.phase,
+    adaptiveNextAction: adaptiveState.nextAction,
+    clarityScore,
+    savedSectorsCount,
+    readinessBand,
+  });
 
   useEffect(() => {
     if (dashData && strategicObjectives.length === 0 && journeyType) {
@@ -282,17 +314,6 @@ export default function Dashboard() {
 
   const confirmedSectorName = effectiveSession?.recommendations?.[0]?.sectorName ?? null;
 
-  // ── Indeciso-specific state ──────────────────────────────────────────────
-  const clarityScore = journeyType === "indeciso"
-    ? Math.min(100, Math.round(
-        (sessionId               ? 30 : 0) +
-        (user?.onboardingCompleted ? 15 : 0) +
-        (savedSectorsCount >= 1  ? 15 : 0) +
-        (savedSectorsCount >= 3  ? 20 : 0) +
-        (savedSectorsCount >= 5  ? 20 : 0)
-      ))
-    : undefined;
-
   // Top 2 recommendations for career comparison
   const topTwoRecs = recommendations.slice(0, 2);
   const compSectorA = topTwoRecs[0]
@@ -301,19 +322,6 @@ export default function Dashboard() {
   const compSectorB = topTwoRecs[1]
     ? { sectorId: topTwoRecs[1].sectorId, sectorName: topTwoRecs[1].sectorName, matchScore: topTwoRecs[1].matchScore ?? 0 }
     : null;
-
-  const readinessBand = isReadinessData(readinessData) ? readinessData.band : undefined;
-  const adaptiveInput = {
-    journeyType,
-    hasSession: !!sessionId,
-    savedSectorsCount,
-    hasDecided: false,
-    readinessBand,
-    layout: dashboardLayout,
-  };
-  const adaptiveState = deriveDashboardPhase(adaptiveInput);
-  const adaptiveSectionPresentation = getAdaptiveSectionPresentation(adaptiveInput);
-  const visibleDashboardLayout = getAdaptiveDashboardLayout(adaptiveInput);
 
   function renderDiscoveryFeed() {
     if (!user) return null;

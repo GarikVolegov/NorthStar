@@ -6,11 +6,35 @@ type WendyPromptPageContext = {
   data?: Record<string, unknown> | undefined;
 };
 
+type AdaptiveNextActionContext = {
+  label: string;
+  href: string;
+  sectionId?: string | undefined;
+};
+
 function readContextName(pageContext: WendyPromptPageContext | null | undefined): string | undefined {
   const entityName = pageContext?.data?.entityName;
   if (typeof entityName === "string" && entityName.trim()) return entityName.trim();
   if (pageContext?.title?.trim()) return pageContext.title.trim();
   return undefined;
+}
+
+function readAdaptivePhase(pageContext: WendyPromptPageContext | null | undefined): string | undefined {
+  const phase = pageContext?.data?.adaptivePhase;
+  return typeof phase === "string" && phase.trim() ? phase.trim() : undefined;
+}
+
+function readAdaptiveNextAction(
+  pageContext: WendyPromptPageContext | null | undefined,
+): AdaptiveNextActionContext | undefined {
+  const value = pageContext?.data?.adaptiveNextAction;
+  if (!value || typeof value !== "object") return undefined;
+  const action = value as Record<string, unknown>;
+  const label = typeof action.label === "string" ? action.label.trim() : "";
+  const href = typeof action.href === "string" ? action.href.trim() : "";
+  const sectionId = typeof action.sectionId === "string" ? action.sectionId.trim() : undefined;
+  if (!label || !href) return undefined;
+  return { label, href, ...(sectionId ? { sectionId } : {}) };
 }
 
 function addPrompt(
@@ -59,8 +83,18 @@ export function buildWendyFallbackSuggestedPrompts(
 ): WendySuggestedPrompt[] {
   const normalizedContent = content.toLowerCase();
   const contextName = readContextName(pageContext);
+  const adaptivePhase = readAdaptivePhase(pageContext);
+  const adaptiveNextAction = readAdaptiveNextAction(pageContext);
   const prompts: WendySuggestedPrompt[] = [];
   const seen = new Set<string>();
+
+  if (adaptiveNextAction) {
+    const phaseText = adaptivePhase ? ` nella fase ${adaptivePhase}` : "";
+    addPrompt(prompts, seen, {
+      label: adaptiveNextAction.label,
+      prompt: `Usa il contesto della dashboard${phaseText}: guidami nell'azione "${adaptiveNextAction.label}" e prepara il passaggio verso ${adaptiveNextAction.href}.`,
+    });
+  }
 
   if (contextName) {
     addPrompt(prompts, seen, {

@@ -4,10 +4,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Dashboard from "./dashboard";
 
+type WendyPageContextCall = {
+  page?: string;
+  adaptivePhase?: string;
+  adaptiveNextAction?: {
+    label: string;
+    href: string;
+    sectionId: string;
+  };
+  savedSectorsCount?: number;
+};
+
 const useDashboardDataMock = vi.hoisted(() => vi.fn());
 const refetchDashboardMock = vi.hoisted(() => vi.fn());
 const getJsonMock = vi.hoisted(() => vi.fn());
 const apiFetchMock = vi.hoisted(() => vi.fn());
+const useWendyPageContextMock = vi.hoisted(() => vi.fn<(ctx: WendyPageContextCall) => void>());
 const authState = vi.hoisted(() => ({
   user: {
     id: 7,
@@ -68,7 +80,7 @@ vi.mock("@/hooks/usePageModule", () => ({
 }));
 
 vi.mock("@/hooks/useWendyPageContext", () => ({
-  useWendyPageContext: vi.fn(),
+  useWendyPageContext: useWendyPageContextMock,
 }));
 
 vi.mock("@/hooks/useAgentAnalysis", () => ({
@@ -303,5 +315,14 @@ describe("Dashboard progress UX", () => {
 
     expect(clarity.compareDocumentPosition(sectors) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(sectors.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const wendyContext = useWendyPageContextMock.mock.calls.at(-1)?.[0];
+    expect(wendyContext?.page).toBe("dashboard");
+    expect(wendyContext?.adaptivePhase).toBe("explore_sectors");
+    expect(wendyContext?.adaptiveNextAction).toEqual({
+      label: "Esplora settori",
+      href: "/settori",
+      sectionId: "discovery_feed",
+    });
+    expect(wendyContext?.savedSectorsCount).toBe(0);
   });
 });

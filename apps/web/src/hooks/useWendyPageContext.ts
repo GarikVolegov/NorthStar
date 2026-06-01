@@ -20,6 +20,15 @@ export interface WendyPageContextInput {
   sector?: string | undefined;
   roleTitle?: string | undefined;
   currentTryADayScene?: string | null | undefined;
+  adaptivePhase?: string | undefined;
+  adaptiveNextAction?: {
+    label: string;
+    href: string;
+    sectionId?: string | undefined;
+  } | undefined;
+  clarityScore?: number | undefined;
+  savedSectorsCount?: number | undefined;
+  readinessBand?: string | undefined;
 }
 
 /**
@@ -54,9 +63,33 @@ export function useWendyPageContext(ctx: WendyPageContextInput): void {
         sector:       ctx.sector,
         roleTitle:    ctx.roleTitle,
         currentTryADayScene: ctx.currentTryADayScene,
+        adaptivePhase: ctx.adaptivePhase,
+        adaptiveNextAction: ctx.adaptiveNextAction,
+        clarityScore: ctx.clarityScore,
+        savedSectorsCount: ctx.savedSectorsCount,
+        readinessBand: ctx.readinessBand,
       },
     };
     setPageContext(pageCtx);
     return () => setPageContext({ page: 'default' });
-  }, [ctx.page, ctx.entityId, ctx.entityName, ctx.journeyType, ctx.currentTryADayScene, setPageContext]);
+  }, [
+    ctx.page,
+    ctx.title,
+    ctx.entityType,
+    ctx.entityId,
+    ctx.entityName,
+    ctx.journeyType,
+    ctx.capabilities,
+    ctx.fields,
+    ctx.actions,
+    ctx.sector,
+    ctx.roleTitle,
+    ctx.currentTryADayScene,
+    ctx.adaptivePhase,
+    ctx.adaptiveNextAction,
+    ctx.clarityScore,
+    ctx.savedSectorsCount,
+    ctx.readinessBand,
+    setPageContext,
+  ]);
 }
