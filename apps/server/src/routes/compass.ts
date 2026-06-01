@@ -8,19 +8,68 @@
  * SECURITY: ogni query è owner-scoped su req.user!.id. Mai userId dal body.
  */
 import { Router } from "express";
-import { and, eq, notInArray, sql } from "drizzle-orm";
+import { and, desc, eq, notInArray, sql } from "drizzle-orm";
 import {
   db,
   compassProfilesTable,
   compassSignalsTable,
   sceneCardsTable,
+  professionsTable,
+  jobPostingSnapshotsTable,
   COMPASS_SIGNAL_TYPES,
   COMPASS_BLOCK_TYPES,
   type CompassSignalType,
   type CompassBlockType,
+  type CompassHypothesis,
 } from "@workspace/db";
+import {
+  selectTournamentPool,
+  nextTournamentPair,
+  tournamentChoiceDims,
+  tournamentTarget,
+  type TournamentChoice,
+} from "@workspace/ai-server";
 import { requireAuth } from "../middleware/auth";
 import { recomputeCompass } from "../services/compass/recompute";
+import { candidatesFromProfessions } from "../services/compass/adapters";
+
+const TOURNAMENT_POOL_SIZE = 8;
+
+/** Carica il pool del Torneo (deterministico) e lo stream di scelte già fatte. */
+async function loadTournament(userId: number) {
+  const professions = await db
+    .select({ id: professionsTable.id, title: professionsTable.title, riasecFit: professionsTable.riasecFit })
+    .from(professionsTable)
+    .where(eq(professionsTable.isActive, true));
+  const candidates = candidatesFromProfessions(professions);
+
+  const [profile] = await db
+    .select({ hypotheses: compassProfilesTable.hypotheses })
+    .from(compassProfilesTable)
+    .where(eq(compassProfilesTable.userId, userId))
+    .limit(1);
+  const hypothesisIds = ((profile?.hypotheses as CompassHypothesis[] | undefined) ?? [])
+    .filter((h) => h.verdict !== "discarded")
+    .map((h) => h.clusterId);
+
+  const pool = selectTournamentPool(candidates, hypothesisIds, TOURNAMENT_POOL_SIZE);
+
+  const rows = await db
+    .select({ payload: compassSignalsTable.payload })
+    .from(compassSignalsTable)
+    .where(and(
+      eq(compassSignalsTable.userId, userId),
+      eq(compassSignalsTable.signalType, "tournament_choice"),
+    ));
+  const choices: TournamentChoice[] = rows
+    .map((r) => r.payload as { winnerId?: unknown; loserId?: unknown })
+    .filter((p): p is { winnerId: string; loserId: string } =>
+      typeof p?.winnerId === "string" && typeof p?.loserId === "string")
+    .map((p) => ({ winnerId: p.winnerId, loserId: p.loserId }));
+
+  const riasecByCluster = new Map(candidates.map((c) => [c.clusterId, c.riasec]));
+  return { pool, choices, riasecByCluster };
+}
 
 const router = Router();
 
@@ -168,6 +217,150 @@ router.get("/scenes", requireAuth, async (req, res) => {
   } catch (err) {
     req.log?.error?.({ err }, "compass scenes error");
     res.status(500).json({ error: "Errore nel caricamento delle scene" });
+  }
+});
+
+/* ─── GET /api/compass/tournament — pool + prossima coppia da confrontare ─── */
+router.get("/tournament", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { pool, choices } = await loadTournament(userId);
+    const pair = nextTournamentPair(pool, choices);
+    res.json({
+      pool: pool.map((c) => ({ clusterId: c.clusterId, label: c.label, riasec: c.riasec })),
+      pair: pair ? pair.map((c) => ({ clusterId: c.clusterId, label: c.label, riasec: c.riasec })) : null,
+      comparisons: choices.length,
+      target: tournamentTarget(pool.length),
+      done: pair === null,
+    });
+  } catch (err) {
+    req.log?.error?.({ err }, "compass tournament get error");
+    res.status(500).json({ error: "Errore nel caricamento del Torneo" });
+  }
+});
+
+/* ─── POST /api/compass/tournament/choice — registra una scelta a coppie ─── */
+router.post("/tournament/choice", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const winnerId = typeof body.winnerId === "string" ? body.winnerId : "";
+    const loserId = typeof body.loserId === "string" ? body.loserId : "";
+
+    if (!winnerId || !loserId || winnerId === loserId) {
+      res.status(400).json({ error: "winnerId e loserId devono essere cluster distinti" });
+      return;
+    }
+
+    // I dims si derivano SERVER-side dal RIASEC dei cluster (anti-gaming):
+    // non ci fidiamo mai dei dims dal client.
+    const { pool, choices, riasecByCluster } = await loadTournament(userId);
+    const inPool = new Set(pool.map((c) => c.clusterId));
+    if (!inPool.has(winnerId) || !inPool.has(loserId)) {
+      res.status(400).json({ error: "I cluster non fanno parte del Torneo corrente" });
+      return;
+    }
+
+    const dims = tournamentChoiceDims(
+      riasecByCluster.get(winnerId) ?? [],
+      riasecByCluster.get(loserId) ?? [],
+    );
+
+    await db.insert(compassSignalsTable).values({
+      userId,
+      signalType: "tournament_choice",
+      refType: "profession",
+      refId: winnerId,
+      payload: {
+        winnerId,
+        loserId,
+        dims,
+        valence: 1,
+        ...(body.reactionMs != null ? { reactionMs: clampNum(body.reactionMs, 0, 600000, 0) } : {}),
+      },
+      weight: 1.2, // una scelta deliberata pesa un po' più di uno swipe
+    });
+
+    const profile = await recomputeCompass(userId);
+    const nextChoices = [...choices, { winnerId, loserId }];
+    const pair = nextTournamentPair(pool, nextChoices);
+    res.status(201).json({
+      profile,
+      pair: pair ? pair.map((c) => ({ clusterId: c.clusterId, label: c.label, riasec: c.riasec })) : null,
+      comparisons: nextChoices.length,
+      target: tournamentTarget(pool.length),
+      done: pair === null,
+    });
+  } catch (err) {
+    req.log?.error?.({ err }, "compass tournament choice error");
+    res.status(500).json({ error: "Errore nella registrazione della scelta" });
+  }
+});
+
+/* ─── GET /api/compass/action-plan — il ponte verso il lavoro vero ─── */
+/* Quando una direzione ha retto alla prova (confirmed) o è la più forte, la
+ * connette al mercato REALE: domanda (job_posting_snapshots) + prossimi passi
+ * concreti. È la chiusura "ora l'app ti aiuta a trovare lavoro davvero". */
+router.get("/action-plan", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const [profile] = await db
+      .select()
+      .from(compassProfilesTable)
+      .where(eq(compassProfilesTable.userId, userId))
+      .limit(1);
+
+    if (!profile) {
+      res.json({ ready: false, stage: "zero_ideas" as const });
+      return;
+    }
+
+    const hyps = (profile.hypotheses as CompassHypothesis[]).filter((h) => h.verdict !== "discarded");
+    // priorità: un'ipotesi confermata da uno spike, altrimenti la più forte
+    const direction = hyps.find((h) => h.verdict === "confirmed") ?? hyps[0];
+    if (!direction) {
+      res.json({ ready: false, stage: profile.stage });
+      return;
+    }
+
+    const professionId = Number(/^profession:(\d+)$/.exec(direction.clusterId)?.[1]);
+
+    let demand: {
+      count: number; period: string; growthRate: number | null;
+      avgSalaryMin: number | null; avgSalaryMax: number | null; topSkills: string[];
+    } | null = null;
+    if (Number.isInteger(professionId)) {
+      const [snap] = await db
+        .select({
+          count: jobPostingSnapshotsTable.count,
+          period: jobPostingSnapshotsTable.period,
+          growthRate: jobPostingSnapshotsTable.growthRate,
+          avgSalaryMin: jobPostingSnapshotsTable.avgSalaryMin,
+          avgSalaryMax: jobPostingSnapshotsTable.avgSalaryMax,
+          topSkills: jobPostingSnapshotsTable.topSkills,
+        })
+        .from(jobPostingSnapshotsTable)
+        .where(eq(jobPostingSnapshotsTable.professionId, professionId))
+        .orderBy(desc(jobPostingSnapshotsTable.period), desc(jobPostingSnapshotsTable.createdAt))
+        .limit(1);
+      demand = snap ?? null;
+    }
+
+    res.json({
+      ready: true,
+      stage: profile.stage,
+      direction: {
+        label: direction.label,
+        clusterId: direction.clusterId,
+        professionId: Number.isInteger(professionId) ? professionId : null,
+        confidence: direction.confidence,
+        confirmed: direction.verdict === "confirmed",
+      },
+      demand, // dati reali di mercato (può essere null se non abbiamo snapshot)
+    });
+  } catch (err) {
+    req.log?.error?.({ err }, "compass action-plan error");
+    res.status(500).json({ error: "Errore nel piano d'azione" });
   }
 });
 
